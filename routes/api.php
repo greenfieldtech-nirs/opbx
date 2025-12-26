@@ -1,0 +1,122 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CallLogController;
+use App\Http\Controllers\Api\ConferenceRoomController;
+use App\Http\Controllers\Api\ExtensionController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\UsersController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes (Control Plane)
+|--------------------------------------------------------------------------
+|
+| These routes handle the REST API for PBX configuration and management.
+| All routes require authentication via Laravel Sanctum.
+|
+*/
+
+// Health check routes (public)
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'service' => 'opbx-api',
+        'timestamp' => now()->toIso8601String(),
+    ]);
+})->name('health');
+
+Route::get('/websocket/health', function () {
+    try {
+        // Test Pusher/Soketi connection
+        $pusher = new \Pusher\Pusher(
+            config('broadcasting.connections.pusher.key'),
+            config('broadcasting.connections.pusher.secret'),
+            config('broadcasting.connections.pusher.options.app_id'),
+            config('broadcasting.connections.pusher.options')
+        );
+
+        // Trigger a test event to verify connection
+        $pusher->trigger('test-channel', 'test-event', ['message' => 'health-check']);
+
+        return response()->json([
+            'status' => 'ok',
+            'websocket' => 'connected',
+            'driver' => config('broadcasting.default'),
+            'host' => config('broadcasting.connections.pusher.options.host'),
+            'port' => config('broadcasting.connections.pusher.options.port'),
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'websocket' => 'disconnected',
+            'error' => $e->getMessage(),
+            'timestamp' => now()->toIso8601String(),
+        ], 500);
+    }
+})->name('websocket.health');
+
+// API Version 1 routes
+Route::prefix('v1')->group(function (): void {
+    // Authentication routes (public)
+    Route::prefix('auth')->group(function (): void {
+        // Login with rate limiting: 5 attempts per minute per IP
+        Route::post('/login', [AuthController::class, 'login'])
+            ->middleware('throttle:5,1')
+            ->name('auth.login');
+
+        // Protected authentication routes
+        Route::middleware('auth:sanctum')->group(function (): void {
+            Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
+            Route::post('/refresh', [AuthController::class, 'refresh'])->name('auth.refresh');
+            Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
+        });
+    });
+
+    // Protected API routes
+    Route::middleware(['auth:sanctum', 'tenant.scope'])->group(function (): void {
+        // Profile management (user-scoped, no tenant required)
+        Route::prefix('profile')->group(function (): void {
+            Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
+            Route::put('/', [ProfileController::class, 'update'])->name('profile.update');
+            Route::put('/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+            Route::put('/organization', [ProfileController::class, 'updateOrganization'])->name('profile.organization');
+        });
+
+        // Users
+        Route::apiResource('users', UsersController::class);
+
+        // Extensions
+        Route::apiResource('extensions', ExtensionController::class);
+
+        // Conference Rooms
+        Route::apiResource('conference-rooms', ConferenceRoomController::class);
+
+        // Call Logs (read-only)
+        Route::prefix('call-logs')->group(function (): void {
+            Route::get('/', [CallLogController::class, 'index'])->name('call-logs.index');
+            Route::get('/active', [CallLogController::class, 'active'])->name('call-logs.active');
+            Route::get('/statistics', [CallLogController::class, 'statistics'])->name('call-logs.statistics');
+            Route::get('/{callLog}', [CallLogController::class, 'show'])->name('call-logs.show');
+        });
+
+        // Settings (Owner only)
+        Route::prefix('settings')->group(function (): void {
+            Route::get('cloudonix', [SettingsController::class, 'getCloudonixSettings'])->name('settings.cloudonix.show');
+            Route::put('cloudonix', [SettingsController::class, 'updateCloudonixSettings'])->name('settings.cloudonix.update');
+            Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
+            Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
+        });
+
+        // TODO: Add more resource controllers
+        // - Organizations
+        // - DID Numbers
+        // - Ring Groups
+        // - Business Hours
+    });
+});

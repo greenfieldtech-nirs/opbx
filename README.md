@@ -1,0 +1,350 @@
+# OPBX - Open Source Business PBX
+
+A modern, containerized business PBX application built on top of the Cloudonix CPaaS platform. OPBX provides enterprise-grade call routing, ring groups, business hours management, and real-time call monitoring - all without the complexity of managing SIP infrastructure.
+
+## Features (v1 - Inbound Calls)
+
+- **Multi-tenant Architecture**: Secure organization isolation with RBAC (Owner, Admin, Agent)
+- **Flexible Call Routing**:
+  - Direct-to-extension routing
+  - Ring groups (simultaneous, round-robin, sequential strategies)
+  - Business hours-based routing
+  - Voicemail
+- **Call Management**:
+  - Real-time call logs and statistics
+  - Active call monitoring
+  - Call recordings
+- **Real-time Updates**: WebSocket-based live call presence
+- **Enterprise Ready**: Docker-based deployment, Redis-backed state management, idempotent webhooks
+
+## Technology Stack
+
+- **Backend**: Laravel 12 (PHP 8.4+)
+- **Database**: MySQL 8.0
+- **Cache/Queue**: Redis 7
+- **API**: RESTful API with Laravel Sanctum authentication
+- **Real-time**: Laravel Broadcasting with Redis
+- **Deployment**: Docker Compose with nginx, PHP-FPM, queue workers, scheduler
+
+## Architecture
+
+### Control Plane (CRUD/Configuration)
+- REST API for managing organizations, users, extensions, DIDs, ring groups, business hours
+- React SPA frontend (planned)
+- MySQL as source of truth
+
+### Execution Plane (Runtime Call Handling)
+- Webhook endpoints for Cloudonix call events
+- Redis-based idempotency and distributed locking
+- Async job processing via Laravel queues
+- CXML response generation for call routing
+
+## Prerequisites
+
+- Docker & Docker Compose
+- Cloudonix CPaaS account and API token
+- ngrok or Cloudflare Tunnel (for local webhook development)
+
+## Quick Start
+
+### 1. Clone and Configure
+
+```bash
+git clone <repository-url>
+cd opbx.cloudonix.com
+
+# Copy environment file
+cp .env.example .env
+
+# Generate application key
+php artisan key:generate
+```
+
+### 2. Configure Environment Variables
+
+Edit `.env` and set:
+
+```env
+# Cloudonix API Configuration
+CLOUDONIX_API_TOKEN=your_api_token_here
+
+# Public webhook URL (see Local Development section)
+WEBHOOK_BASE_URL=https://your-domain.com
+```
+
+### 3. Start Docker Services
+
+```bash
+docker-compose up -d
+```
+
+This will start:
+- `nginx` - Web server (port 80)
+- `app` - Laravel PHP-FPM
+- `queue-worker` - Laravel queue worker
+- `scheduler` - Laravel task scheduler
+- `mysql` - MySQL database (port 3306)
+- `redis` - Redis cache/queue (port 6379)
+
+### 4. Run Database Migrations
+
+Migrations run automatically on container startup. To run manually:
+
+```bash
+docker-compose exec app php artisan migrate
+```
+
+### 5. Create First Organization and User
+
+```bash
+docker-compose exec app php artisan tinker
+
+# In tinker:
+$org = App\Models\Organization::create([
+    'name' => 'My Company',
+    'slug' => 'my-company',
+    'status' => 'active',
+    'timezone' => 'America/New_York',
+]);
+
+$user = App\Models\User::create([
+    'organization_id' => $org->id,
+    'name' => 'Admin User',
+    'email' => 'admin@mycompany.com',
+    'password' => bcrypt('password'),
+    'role' => 'owner',
+    'status' => 'active',
+]);
+```
+
+### 6. Test the API
+
+```bash
+# Login
+curl -X POST http://localhost/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@mycompany.com","password":"password"}'
+
+# Get call logs (use token from login response)
+curl -X GET http://localhost/api/call-logs \
+  -H "Authorization: Bearer <your-token>"
+```
+
+## Local Webhook Development
+
+Cloudonix needs to send webhooks to your application. For local development:
+
+### Option 1: ngrok
+
+```bash
+# Install ngrok: https://ngrok.com/download
+ngrok http 80
+
+# Copy the HTTPS URL (e.g., https://abc123.ngrok.io)
+# Update .env:
+WEBHOOK_BASE_URL=https://abc123.ngrok.io
+```
+
+### Option 2: Cloudflare Tunnel
+
+```bash
+# Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/
+cloudflared tunnel --url http://localhost:80
+
+# Copy the HTTPS URL
+# Update .env:
+WEBHOOK_BASE_URL=https://xyz.trycloudflare.com
+```
+
+### Configure Cloudonix Webhooks
+
+In your Cloudonix portal, configure these webhook URLs:
+
+- **Call Initiated**: `https://your-domain.com/api/webhooks/cloudonix/call-initiated`
+- **Call Status**: `https://your-domain.com/api/webhooks/cloudonix/call-status`
+- **CDR**: `https://your-domain.com/api/webhooks/cloudonix/cdr`
+
+## API Documentation
+
+### Authentication
+
+All API endpoints require authentication via Laravel Sanctum tokens.
+
+**Login**
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password"
+}
+```
+
+**Response**
+```json
+{
+  "token": "1|abc123...",
+  "user": {
+    "id": 1,
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "role": "owner",
+    "organization_id": 1
+  }
+}
+```
+
+Use the token in subsequent requests:
+```http
+Authorization: Bearer 1|abc123...
+```
+
+### Key Endpoints
+
+#### Extensions
+- `GET /api/extensions` - List extensions
+- `POST /api/extensions` - Create extension
+- `GET /api/extensions/{id}` - Get extension
+- `PUT /api/extensions/{id}` - Update extension
+- `DELETE /api/extensions/{id}` - Delete extension
+
+#### Call Logs
+- `GET /api/call-logs` - List call logs
+- `GET /api/call-logs/active` - Get active calls
+- `GET /api/call-logs/statistics` - Get statistics
+- `GET /api/call-logs/{id}` - Get specific call log
+
+### Webhook Endpoints (Public)
+
+These endpoints receive webhooks from Cloudonix:
+
+- `POST /api/webhooks/cloudonix/call-initiated` - New inbound call
+- `POST /api/webhooks/cloudonix/call-status` - Call status update
+- `POST /api/webhooks/cloudonix/cdr` - Call detail record
+
+All webhooks implement automatic idempotency using Redis.
+
+## Database Schema
+
+### Core Tables
+
+- **organizations** - Tenant organizations
+- **users** - Users with RBAC (owner/admin/agent)
+- **extensions** - Phone extensions with SIP configuration
+- **did_numbers** - Inbound phone numbers with routing config
+- **ring_groups** - Extension groups with routing strategies
+- **business_hours** - Time-based routing rules
+- **call_logs** - Call history and active calls
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Unit tests
+docker-compose exec app php artisan test --testsuite=Unit
+
+# Feature tests
+docker-compose exec app php artisan test --testsuite=Feature
+
+# All tests
+docker-compose exec app php artisan test
+```
+
+Key test coverage:
+- Webhook idempotency
+- Call state machine transitions
+- RBAC/tenant scoping
+- CXML generation
+- API authentication and authorization
+
+## Production Deployment
+
+### Environment Configuration
+
+1. Set `APP_ENV=production` and `APP_DEBUG=false`
+2. Generate secure `APP_KEY`
+3. Use strong database passwords
+4. Configure proper Redis password
+5. Set up SSL/TLS termination (e.g., nginx reverse proxy with Let's Encrypt)
+
+### Performance Optimization
+
+The application is optimized for production:
+
+- **OpCache** enabled with JIT compilation
+- **Redis** for caching, sessions, and queues
+- **Route/config/view caching** enabled automatically in production
+- **Database indexes** on all foreign keys and query columns
+- **Queue workers** for async webhook processing
+
+### Monitoring
+
+- Health check: `GET /health`
+- Laravel logs: `storage/logs/laravel.log`
+- Queue monitoring: `docker-compose logs queue-worker`
+
+## Call Flow Example
+
+1. **Inbound call arrives** → Cloudonix sends webhook to `/api/webhooks/cloudonix/call-initiated`
+2. **Webhook handler**:
+   - Checks idempotency (Redis)
+   - Acquires distributed lock for call
+   - Looks up DID routing configuration
+   - Generates CXML response
+3. **CXML routing** → Cloudonix routes call based on response:
+   - Direct to extension SIP URI
+   - Ring group (multiple SIP URIs)
+   - Business hours (time-based routing)
+   - Voicemail
+4. **Status updates** → Cloudonix sends status webhooks (ringing, answered, completed)
+5. **Call log** → Final CDR stored in MySQL, broadcasted to UI
+
+## Security
+
+- **Tenant isolation**: Global query scopes enforce organization_id filtering
+- **RBAC**: Policy-based authorization on all resources
+- **API authentication**: Laravel Sanctum token-based auth
+- **Input validation**: Laravel form requests
+- **SQL injection prevention**: Eloquent ORM with parameter binding
+- **XSS protection**: Blade templating with auto-escaping
+- **CXML escaping**: XML entities properly escaped
+
+## Roadmap
+
+- [ ] Frontend React SPA
+- [ ] Outbound calling
+- [ ] IVR (Interactive Voice Response)
+- [ ] Call queues
+- [ ] WebRTC softphone
+- [ ] Analytics dashboard
+- [ ] Multi-language support
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow PSR-12 coding standards
+4. Write tests for new features
+5. Submit a pull request
+
+## License
+
+MIT License
+
+## Support
+
+- Cloudonix Documentation: https://developers.cloudonix.com
+- GitHub Issues: [Create an issue]
+- Email: support@example.com
+
+## Credits
+
+Built with:
+- [Laravel](https://laravel.com) - PHP Framework
+- [Cloudonix CPaaS](https://cloudonix.com) - Communications Platform
+- [Docker](https://docker.com) - Containerization
+- [Redis](https://redis.io) - Cache & Queue

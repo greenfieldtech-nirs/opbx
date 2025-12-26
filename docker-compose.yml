@@ -1,0 +1,191 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: opbx_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevent overwriting node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost/api/v1
+      - VITE_API_PROXY_TARGET=http://nginx
+      - VITE_WEBSOCKET_HOST=localhost
+      - VITE_WEBSOCKET_PORT=6001
+      - VITE_WEBSOCKET_KEY=${PUSHER_APP_KEY:-pbxappkey}
+      - VITE_WEBSOCKET_CLUSTER=mt1
+    depends_on:
+      - nginx
+      - soketi
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: opbx_nginx
+    ports:
+      - "${APP_PORT:-80}:80"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: opbx_app
+    volumes:
+      - ./:/var/www/html
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_HOST=mysql
+      - DB_DATABASE=${DB_DATABASE:-opbx}
+      - DB_USERNAME=${DB_USERNAME:-opbx}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - opbx
+    healthcheck:
+      test: ["CMD", "php", "-v"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  queue-worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: opbx_queue_worker
+    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90
+    volumes:
+      - ./:/var/www/html
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_HOST=mysql
+      - DB_DATABASE=${DB_DATABASE:-opbx}
+      - DB_USERNAME=${DB_USERNAME:-opbx}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+    depends_on:
+      - app
+      - redis
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: opbx_scheduler
+    command: /usr/local/bin/scheduler.sh
+    volumes:
+      - ./:/var/www/html
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_HOST=mysql
+      - DB_DATABASE=${DB_DATABASE:-opbx}
+      - DB_USERNAME=${DB_USERNAME:-opbx}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+    depends_on:
+      - app
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: opbx_mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootsecret}
+      - MYSQL_DATABASE=${DB_DATABASE:-opbx}
+      - MYSQL_USER=${DB_USERNAME:-opbx}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - opbx
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: opbx_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - opbx
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  soketi:
+    image: 'quay.io/soketi/soketi:latest-16-alpine'
+    container_name: opbx_websocket
+    ports:
+      - "${SOKETI_PORT:-6001}:6001"
+      - "${SOKETI_METRICS_PORT:-9601}:9601"
+    environment:
+      SOKETI_DEBUG: '${SOKETI_DEBUG:-0}'
+      SOKETI_DEFAULT_APP_ID: '${PUSHER_APP_ID:-app-id}'
+      SOKETI_DEFAULT_APP_KEY: '${PUSHER_APP_KEY:-pbxappkey}'
+      SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:-pbxappsecret}'
+      SOKETI_METRICS_SERVER_PORT: '9601'
+      SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES: 'false'
+      SOKETI_DEFAULT_APP_ENABLE_STATISTICS: 'true'
+      SOKETI_DEFAULT_APP_MAX_CONNECTIONS: '10000'
+      SOKETI_DEFAULT_APP_MAX_BACKEND_EVENTS_PER_SECOND: '100'
+      SOKETI_DEFAULT_APP_MAX_CLIENT_EVENTS_PER_SECOND: '100'
+      SOKETI_DEFAULT_APP_MAX_READ_REQUEST_PER_SECOND: '100'
+    networks:
+      - opbx
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:9601/ready']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  opbx:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local

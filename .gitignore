@@ -1,0 +1,151 @@
+# ============================================================================
+# Environment & Configuration (Sensitive)
+# ============================================================================
+.env
+.env.*
+.env.local
+.env.*.local
+.env.backup
+.env.production
+.env.staging
+.env.development
+.env.test
+auth.json
+config/secrets.php
+
+# ============================================================================
+# API Keys & Credentials (Sensitive)
+# ============================================================================
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+id_rsa*
+credentials.json
+secrets.json
+*.secret
+*-key.json
+service-account*.json
+
+# ============================================================================
+# Database & Backups (Sensitive)
+# ============================================================================
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+/database/*.sqlite
+/database/*.sqlite3
+/storage/database.sqlite
+*.backup
+*.bak
+
+# ============================================================================
+# Laravel Specific
+# ============================================================================
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/app/public/*
+/bootstrap/cache/*
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+.phpunit.result.cache
+/.phpunit.cache
+
+# ============================================================================
+# Logs (Sensitive - may contain tokens, passwords)
+# ============================================================================
+*.log
+/logs
+/storage/logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ============================================================================
+# IDE & Editor Files
+# ============================================================================
+/.idea
+/.vscode
+/.fleet
+/.nova
+/.zed
+*.swp
+*.swo
+*~
+.phpactor.json
+*.sublime-project
+*.sublime-workspace
+.history/
+*.code-workspace
+
+# ============================================================================
+# OS Files
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================================================
+# Docker & Deployment (may contain secrets)
+# ============================================================================
+docker-compose.override.yml
+.dockerignore.local
+
+# ============================================================================
+# Frontend Build Artifacts
+# ============================================================================
+/frontend/node_modules
+/frontend/dist
+/frontend/build
+/frontend/.env
+/frontend/.env.local
+/frontend/.env.*.local
+/frontend/coverage
+
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+/coverage
+/.nyc_output
+/tests/coverage
+phpunit.xml
+.phpunit.cache
+
+# ============================================================================
+# Temporary & Cache Files
+# ============================================================================
+*.cache
+.cache/
+tmp/
+temp/
+*.tmp
+
+# ============================================================================
+# Session & Token Files (Sensitive)
+# ============================================================================
+/storage/framework/sessions/*
+*.session
+.token

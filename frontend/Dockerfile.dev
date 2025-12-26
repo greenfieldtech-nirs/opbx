@@ -1,0 +1,22 @@
+# Development Dockerfile for OPBX Frontend
+# Runs Vite dev server with hot-reload for testing
+
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code (will be overridden by volume mount for hot-reload)
+COPY . .
+
+# Expose Vite dev server port
+EXPOSE 3000
+
+# Run Vite dev server with host 0.0.0.0 (required for Docker networking)
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
