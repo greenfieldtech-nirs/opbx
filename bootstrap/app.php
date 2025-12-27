@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Middleware aliases
         $middleware->alias([
             'tenant.scope' => \App\Http\Middleware\EnsureTenantScope::class,
+            'webhook.signature' => \App\Http\Middleware\VerifyCloudonixSignature::class,
             'webhook.idempotency' => \App\Http\Middleware\EnsureWebhookIdempotency::class,
         ]);
 
