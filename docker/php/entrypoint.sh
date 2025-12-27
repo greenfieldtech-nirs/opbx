@@ -9,9 +9,13 @@ done
 
 echo "MySQL is ready!"
 
-# Run migrations (safe approach - won't fail if already run)
-echo "Running database migrations..."
-php artisan migrate --force --no-interaction || echo "Migration failed or already up to date"
+# Run migrations only from the main app container (not from queue-worker or scheduler)
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    echo "Running database migrations..."
+    php artisan migrate --force --no-interaction || echo "Migration failed or already up to date"
+else
+    echo "Skipping migrations (RUN_MIGRATIONS=false)..."
+fi
 
 # Cache configuration for production
 if [ "$APP_ENV" = "production" ]; then

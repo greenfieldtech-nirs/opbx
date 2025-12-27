@@ -102,6 +102,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed confusing "Exception dates must be unique" error message
   - Applied fixes to both StoreBusinessHoursScheduleRequest and UpdateBusinessHoursScheduleRequest
 
+#### Docker Migration Race Condition
+- Fixed race condition where multiple containers ran migrations simultaneously (`docker-compose.yml`, `docker/php/entrypoint.sh`)
+  - **Problem**: app, scheduler, and queue-worker containers all ran migrations at startup causing conflicts
+  - **Solution**: Only app container runs migrations now
+  - Added `RUN_MIGRATIONS` environment variable check in entrypoint.sh
+  - Set `RUN_MIGRATIONS=false` for scheduler and queue-worker containers
+  - scheduler and queue-worker now wait for app container to complete migrations first
+  - Prevents "Table doesn't exist" and "Failed to open referenced table" errors during container startup
+
 #### Business Hours Migration Idempotency and Foreign Key Constraints
 - Fixed Business Hours database migration (`database/migrations/2025_12_27_202223_restructure_business_hours_tables.php`)
   - **Fixed foreign key constraint name length**: MySQL has 64-character limit, auto-generated names exceeded this

@@ -87,6 +87,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-secret}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - RUN_MIGRATIONS=false
     depends_on:
       - app
       - redis
@@ -111,6 +112,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-secret}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - RUN_MIGRATIONS=false
     depends_on:
       - app
     networks:
