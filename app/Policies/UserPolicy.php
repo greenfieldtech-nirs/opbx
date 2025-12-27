@@ -34,6 +34,19 @@ class UserPolicy
     }
 
     /**
+     * Determine if the user can create a new user.
+     *
+     * Only Owner and PBX Admin can create users.
+     *
+     * @param  User  $user  The authenticated user
+     * @return bool True if authorized to create users
+     */
+    public function create(User $user): bool
+    {
+        return $user->role->canManageUsers();
+    }
+
+    /**
      * Determine if the user can view another user's details.
      *
      * - Owner and PBX Admin can view any user
@@ -118,7 +131,7 @@ class UserPolicy
      *
      * - Owner and PBX Admin can delete users
      * - Users cannot delete themselves (prevents lockout)
-     * - Owner cannot be deleted by anyone
+     * - Controller handles "last owner" business logic
      *
      * @param  User  $authUser  The authenticated user
      * @param  User  $targetUser  The user being deleted
@@ -133,11 +146,6 @@ class UserPolicy
 
         // Users cannot delete themselves
         if ($authUser->id === $targetUser->id) {
-            return false;
-        }
-
-        // Owner accounts cannot be deleted
-        if ($targetUser->role->isOwner()) {
             return false;
         }
 
