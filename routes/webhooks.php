@@ -17,15 +17,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('webhooks/cloudonix')->group(function (): void {
     Route::post('/call-initiated', [CloudonixWebhookController::class, 'callInitiated'])
-        ->middleware('webhook.idempotency')
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.call-initiated');
 
     Route::post('/call-status', [CloudonixWebhookController::class, 'callStatus'])
-        ->middleware('webhook.idempotency')
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.call-status');
 
     Route::post('/cdr', [CloudonixWebhookController::class, 'cdr'])
-        ->middleware('webhook.idempotency')
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.cdr');
 });
 
