@@ -49,7 +49,7 @@ export const businessHoursService = {
    * Update business hours
    */
   async update(id: string, data: UpdateBusinessHoursRequest): Promise<BusinessHours> {
-    const response = await api.patch<BusinessHours>(`/business-hours/${id}`, data);
+    const response = await api.put<BusinessHours>(`/business-hours/${id}`, data);
     return response.data;
   },
 
@@ -58,5 +58,13 @@ export const businessHoursService = {
    */
   async delete(id: string): Promise<void> {
     await api.delete(`/business-hours/${id}`);
+  },
+
+  /**
+   * Duplicate business hours
+   */
+  async duplicate(id: string): Promise<BusinessHours> {
+    const response = await api.post<BusinessHours>(`/business-hours/${id}/duplicate`);
+    return response.data;
   },
 };

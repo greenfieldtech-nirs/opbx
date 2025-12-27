@@ -77,6 +77,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added inline PHPDoc comments throughout codebase
   - Documented API endpoints and response formats
 
+### Changed - 2025-12-27
+
+#### Business Hours API Integration
+- Connected Business Hours UI to backend REST API (`frontend/src/pages/BusinessHours.tsx`)
+  - Replaced mock data operations with React Query hooks (useQuery, useMutation)
+  - Integrated businessHoursService for all CRUD operations
+  - Added loading and error states to the UI
+  - Create/Update/Delete operations now call backend API endpoints
+  - Data automatically refreshes after mutations via query invalidation
+  - Improved user feedback with toast notifications on success/error
+  - Updated businessHoursService to use PUT for updates (matching Laravel apiResource)
+  - Added duplicate endpoint support in service
+
 ### Fixed - 2025-12-27
 
 #### Business Hours Migration Idempotency

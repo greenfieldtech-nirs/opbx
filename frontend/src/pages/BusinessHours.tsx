@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import { businessHoursService } from '@/services/businessHours.service';
+import { extensionsService } from '@/services/extensions.service';
 import {
   type BusinessHoursSchedule,
   type WeeklySchedule,
@@ -68,9 +71,9 @@ import {
 
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  // State for schedules
-  const [schedules, setSchedules] = useState<BusinessHoursSchedule[]>(mockBusinessHoursSchedules);
+  // State for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleStatus>('all');
   const [sortBy, setSortBy] = useState<'name' | 'created_at'>('name');
@@ -97,6 +100,62 @@ const BusinessHours: React.FC = () => {
   const [copyToDays, setCopyToDays] = useState<DayOfWeek[]>([]);
 
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+
+  // Fetch business hours schedules
+  const { data: schedulesData, isLoading, error } = useQuery({
+    queryKey: ['business-hours'],
+    queryFn: () => businessHoursService.getAll(),
+  });
+
+  const schedules = schedulesData?.data || [];
+
+  // Fetch extensions for select boxes
+  const { data: extensionsData } = useQuery({
+    queryKey: ['extensions'],
+    queryFn: () => extensionsService.getAll({ per_page: 1000 }),
+  });
+
+  const extensions = extensionsData?.data || mockExtensions;
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (data: any) => businessHoursService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      toast.success('Business hours schedule has been created successfully.');
+      setIsCreateEditDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create business hours schedule.');
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      businessHoursService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      toast.success('Business hours schedule has been updated successfully.');
+      setIsCreateEditDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update business hours schedule.');
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => businessHoursService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      toast.success('Business hours schedule has been deleted.');
+      setIsDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete business hours schedule.');
+    },
+  });
 
   // Filtered and sorted schedules
   const filteredSchedules = useMemo(() => {
@@ -393,37 +452,23 @@ const BusinessHours: React.FC = () => {
       return;
     }
 
-    // Save schedule
-    const now = new Date().toISOString();
-    const savedSchedule: BusinessHoursSchedule = {
-      id: editingSchedule?.id || getNextScheduleId(),
-      organization_id: user?.organization_id || 'org-1',
+    // Prepare data for API
+    const apiData = {
       name: formData.name!,
-      description: formData.description,
-      timezone: formData.timezone!,
       status: formData.status!,
+      open_hours_action: formData.open_hours_action!,
+      closed_hours_action: formData.closed_hours_action!,
       schedule: formData.schedule!,
       exceptions: formData.exceptions || [],
-      current_status: 'open', // Would be calculated server-side
-      created_at: editingSchedule?.created_at || now,
-      updated_at: now,
-      created_by: editingSchedule?.created_by || user?.id || 'user-1',
-      updated_by: editingSchedule ? user?.id : undefined,
     };
 
     if (editingSchedule) {
       // Update existing
-      setSchedules((prev) =>
-        prev.map((s) => (s.id === editingSchedule.id ? savedSchedule : s))
-      );
-      toast.success('Business hours schedule has been updated successfully.');
+      updateMutation.mutate({ id: editingSchedule.id, data: apiData });
     } else {
       // Create new
-      setSchedules((prev) => [...prev, savedSchedule]);
-      toast.success('Business hours schedule has been created successfully.');
+      createMutation.mutate(apiData);
     }
-
-    setIsCreateEditDialogOpen(false);
   };
 
   // Handle delete
@@ -435,7 +480,7 @@ const BusinessHours: React.FC = () => {
   const handleConfirmDelete = () => {
     if (!selectedSchedule) return;
 
-    // Check if schedule is associated with DIDs
+    // Check if schedule is associated with DIDs (TODO: fetch from backend)
     const associatedDids = mockDidBusinessHours.filter(
       (dh) => dh.business_hours_schedule_id === selectedSchedule.id
     );
@@ -446,9 +491,7 @@ const BusinessHours: React.FC = () => {
       return;
     }
 
-    setSchedules((prev) => prev.filter((s) => s.id !== selectedSchedule.id));
-    toast.success('Business hours schedule has been deleted.');
-    setIsDeleteDialogOpen(false);
+    deleteMutation.mutate(selectedSchedule.id);
   };
 
   // Handle detail view
@@ -510,19 +553,34 @@ const BusinessHours: React.FC = () => {
         </Select>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="border rounded-lg p-6 text-center text-destructive">
+          <p>Error loading business hours: {(error as any).message}</p>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="border rounded-lg p-6 text-center">
+          <p>Loading business hours...</p>
+        </div>
+      )}
+
       {/* Schedules Table */}
-      <div className="border rounded-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/50">
-              <tr className="border-b">
-                <th className="text-left p-4 font-medium">Name</th>
-                <th className="text-left p-4 font-medium">Status</th>
-                {canManage && <th className="text-right p-4 font-medium">Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSchedules.length === 0 ? (
+      {!isLoading && !error && (
+        <div className="border rounded-lg">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr className="border-b">
+                  <th className="text-left p-4 font-medium">Name</th>
+                  <th className="text-left p-4 font-medium">Status</th>
+                  {canManage && <th className="text-right p-4 font-medium">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSchedules.length === 0 ? (
                 <tr>
                   <td colSpan={canManage ? 3 : 2} className="text-center p-8 text-muted-foreground">
                     No schedules found
@@ -596,6 +654,7 @@ const BusinessHours: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
 
       {/* Pagination info */}
       {filteredSchedules.length > 0 && (
