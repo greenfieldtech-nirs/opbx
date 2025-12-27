@@ -389,23 +389,10 @@ class RingGroupController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Authorization check
-        if (!$user->isOwner() && !$user->isPBXAdmin()) {
-            Log::warning('Unauthorized ring group deletion attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'ring_group_id' => $ringGroup->id,
-                'role' => $user->role->value,
-            ]);
+        // Check authorization using policy
+        $this->authorize('delete', $ringGroup);
 
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'You do not have permission to delete ring groups.',
-            ], 403);
-        }
-
-        // Tenant scope check
+        // Tenant scope check (policy already verifies this, but keeping for logging)
         if ($ringGroup->organization_id !== $user->organization_id) {
             Log::warning('Cross-tenant ring group deletion attempt', [
                 'request_id' => $requestId,
