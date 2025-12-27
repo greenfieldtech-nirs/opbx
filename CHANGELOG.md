@@ -106,11 +106,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Business Hours database migration (`database/migrations/2025_12_27_202223_restructure_business_hours_tables.php`)
   - **Fixed foreign key constraint name length**: MySQL has 64-character limit, auto-generated names exceeded this
   - Specified custom short constraint names (e.g., `bh_schedule_days_schedule_fk`)
+  - **Fixed index name length**: Auto-generated index names also exceeded 64-character limit
+  - Specified custom short index names (e.g., `bh_schedules_org_status_idx`, `bh_exception_time_ranges_idx`)
   - **Fixed table drop failure**: Added `SET FOREIGN_KEY_CHECKS=0` before dropping tables
   - Tables now drop cleanly even with existing foreign key constraints
   - Re-enables foreign key checks after drops complete
   - Migration now fully idempotent and safe to run multiple times
-  - Prevents both "Base table or view already exists" and "Identifier name too long" errors
+  - Prevents "Base table or view already exists" and "Identifier name too long" errors
 
 #### Business Hours Toast Notifications
 - Fixed toast notification format errors in Business Hours UI (`frontend/src/pages/BusinessHours.tsx`)

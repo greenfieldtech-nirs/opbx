@@ -50,8 +50,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['organization_id', 'status']);
-            $table->index('deleted_at');
+            $table->index(['organization_id', 'status'], 'bh_schedules_org_status_idx');
+            $table->index('deleted_at', 'bh_schedules_deleted_idx');
         });
 
         // Create business_hours_schedule_days table
@@ -71,8 +71,8 @@ return new class extends Migration
                 ->on('business_hours_schedules')
                 ->cascadeOnDelete();
 
-            $table->unique(['business_hours_schedule_id', 'day_of_week'], 'schedule_day_unique');
-            $table->index('business_hours_schedule_id');
+            $table->unique(['business_hours_schedule_id', 'day_of_week'], 'bh_schedule_days_unique');
+            $table->index('business_hours_schedule_id', 'bh_schedule_days_schedule_idx');
         });
 
         // Create business_hours_time_ranges table
@@ -89,7 +89,7 @@ return new class extends Migration
                 ->on('business_hours_schedule_days')
                 ->cascadeOnDelete();
 
-            $table->index('business_hours_schedule_day_id');
+            $table->index('business_hours_schedule_day_id', 'bh_time_ranges_day_idx');
         });
 
         // Create business_hours_exceptions table
@@ -107,8 +107,8 @@ return new class extends Migration
                 ->on('business_hours_schedules')
                 ->cascadeOnDelete();
 
-            $table->index('business_hours_schedule_id');
-            $table->index('date');
+            $table->index('business_hours_schedule_id', 'bh_exceptions_schedule_idx');
+            $table->index('date', 'bh_exceptions_date_idx');
         });
 
         // Create business_hours_exception_time_ranges table
@@ -125,7 +125,7 @@ return new class extends Migration
                 ->on('business_hours_exceptions')
                 ->cascadeOnDelete();
 
-            $table->index('business_hours_exception_id');
+            $table->index('business_hours_exception_id', 'bh_exception_time_ranges_idx');
         });
     }
 
