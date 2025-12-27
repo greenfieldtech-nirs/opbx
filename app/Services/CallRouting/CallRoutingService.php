@@ -10,6 +10,7 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -138,46 +139,70 @@ class CallRoutingService
             return CxmlBuilder::busy();
         }
 
-        $members = $ringGroup->getMembers();
+        // Acquire read lock to ensure consistent view of ring group members
+        $lockKey = "lock:ring_group:{$ringGroup->id}";
+        $lock = Cache::lock($lockKey, 5);
 
-        if ($members->isEmpty()) {
-            Log::error('Ring group has no active members', [
+        try {
+            // Try to acquire lock with 3 second timeout
+            if (! $lock->block(3)) {
+                Log::warning('Failed to acquire ring group read lock, using stale data', [
+                    'did_id' => $didNumber->id,
+                    'ring_group_id' => $ringGroup->id,
+                    'lock_key' => $lockKey,
+                ]);
+                // Continue without lock - better to route with potentially stale data
+                // than to fail the call completely
+            }
+
+            // Refresh ring group to get latest data
+            $ringGroup->refresh();
+            $members = $ringGroup->getMembers();
+
+            if ($members->isEmpty()) {
+                Log::error('Ring group has no active members', [
+                    'did_id' => $didNumber->id,
+                    'ring_group_id' => $ringGroup->id,
+                ]);
+
+                return $this->handleRingGroupFallback($ringGroup);
+            }
+
+            $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())
+                ->filter()
+                ->values()
+                ->toArray();
+
+            if (empty($sipUris)) {
+                Log::error('Ring group members have no SIP URIs', [
+                    'did_id' => $didNumber->id,
+                    'ring_group_id' => $ringGroup->id,
+                ]);
+
+                return $this->handleRingGroupFallback($ringGroup);
+            }
+
+            Log::info('Routing call to ring group', [
                 'did_id' => $didNumber->id,
                 'ring_group_id' => $ringGroup->id,
+                'strategy' => $ringGroup->strategy->value,
+                'member_count' => count($sipUris),
             ]);
 
-            return $this->handleRingGroupFallback($ringGroup);
-        }
+            // For v1, we'll support simultaneous ringing
+            // Round-robin and sequential would require additional state management
+            if ($ringGroup->strategy === RingGroupStrategy::SIMULTANEOUS) {
+                return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+            }
 
-        $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())
-            ->filter()
-            ->values()
-            ->toArray();
-
-        if (empty($sipUris)) {
-            Log::error('Ring group members have no SIP URIs', [
-                'did_id' => $didNumber->id,
-                'ring_group_id' => $ringGroup->id,
-            ]);
-
-            return $this->handleRingGroupFallback($ringGroup);
-        }
-
-        Log::info('Routing call to ring group', [
-            'did_id' => $didNumber->id,
-            'ring_group_id' => $ringGroup->id,
-            'strategy' => $ringGroup->strategy->value,
-            'member_count' => count($sipUris),
-        ]);
-
-        // For v1, we'll support simultaneous ringing
-        // Round-robin and sequential would require additional state management
-        if ($ringGroup->strategy === RingGroupStrategy::SIMULTANEOUS) {
+            // TODO: Implement round-robin and sequential strategies
             return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+        } finally {
+            // Always release the lock if acquired
+            if (isset($lock)) {
+                $lock->release();
+            }
         }
-
-        // TODO: Implement round-robin and sequential strategies
-        return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
     }
 
     /**
