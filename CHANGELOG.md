@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - 2025-12-27
+
+#### Phase 2: Security Hardening & Performance Improvements
+
+- **Rate Limiting Implementation**
+  - Configured rate limiters in AppServiceProvider for multiple endpoint types:
+    - API routes: 60 requests/minute per authenticated user
+    - Webhooks: 100 requests/minute (by IP)
+    - Sensitive operations: 10 requests/minute per user (password/org updates)
+    - Authentication endpoints: 5 requests/minute (by IP)
+  - Created `config/rate_limiting.php` with configurable limits
+  - Applied throttling middleware to all API and webhook routes
+  - Custom JSON error responses with retry_after headers
+  - Added environment variables: RATE_LIMIT_API, RATE_LIMIT_WEBHOOKS, RATE_LIMIT_SENSITIVE, RATE_LIMIT_AUTH
+  - Created comprehensive test suite (`tests/Feature/RateLimitingTest.php`) with 7 tests
+
+- **Password Policy Enforcement**
+  - Strengthened minimum password length from 6 to 8 characters
+  - Added `password_reset_required` flag to users table
+  - Added `password_last_changed_at` timestamp to users table
+  - Created `password:enforce-policy` artisan command for enforcing password age policies
+  - Command supports dry-run mode and configurable max password age (default: 90 days)
+
+- **Authorization Policy Enforcement**
+  - Updated UserPolicy with missing `create()` method
+  - Refactored UsersController to use policy-based authorization
+    - Replaced manual `isOwner()` and `isPBXAdmin()` checks with `$this->authorize()` calls
+    - Applied to all CRUD methods: viewAny, create, view, update, delete
+  - Updated RingGroupController to use policy for delete authorization
+  - Updated SettingsController to use policy for viewAny and generateApiKey
+  - Centralized authorization logic in policy classes for better maintainability
+
+- **Tenant Isolation in Webhooks**
+  - Enhanced CloudonixWebhookController with organization validation
+  - Added eager loading of organization relationship in DID queries
+  - Added explicit checks for organization existence
+  - Added active status validation for organizations
+  - Return proper error messages for inactive or non-existent organizations
+  - Comprehensive logging for tenant isolation violations
+
+- **N+1 Query Prevention**
+  - Fixed N+1 query issues in RingGroupController index() method
+  - Added comprehensive eager loading with `with()` for nested relationships:
+    - members with extension and user details
+    - fallbackExtension
+  - Added `withCount()` for aggregate queries:
+    - Total members count
+    - Active members count (filtered by extension status)
+  - Used `select()` to limit columns loaded and reduce memory usage
+  - Ordered members by priority for consistent display
+
+- **Security Headers Middleware**
+  - Created comprehensive SecurityHeaders middleware
+  - Implemented Content Security Policy (CSP):
+    - default-src 'self'
+    - script-src with React inline script support
+    - style-src with inline style support
+    - connect-src with WebSocket support
+    - frame-ancestors 'none' (prevents clickjacking)
+  - Added X-Content-Type-Options: nosniff
+  - Added X-Frame-Options: DENY
+  - Added Referrer-Policy: strict-origin-when-cross-origin
+  - Added Permissions-Policy restricting browser features (geolocation, microphone, camera, etc.)
+  - Added HSTS (Strict-Transport-Security) for production environments
+  - Added X-XSS-Protection for legacy browser support
+  - Registered globally in bootstrap/app.php
+
+- **Webhook Replay Protection**
+  - Implemented timestamp validation in EnsureWebhookIdempotency middleware
+  - Reject webhooks older than 5 minutes (configurable via WEBHOOK_REPLAY_MAX_AGE)
+  - Reject webhooks with future timestamps (>60 seconds ahead)
+  - Added comprehensive logging for replay attack detection
+  - Created `replay_protection` configuration section in config/webhooks.php
+  - Added WEBHOOK_REPLAY_MAX_AGE environment variable (default: 300 seconds)
+  - Proper error responses with 400 status code for expired/invalid webhooks
+
+#### Files Changed
+- `app/Providers/AppServiceProvider.php` - Added rate limiting configuration
+- `config/rate_limiting.php` - New file for rate limit configuration
+- `routes/api.php` - Applied throttle middleware to routes
+- `routes/webhooks.php` - Applied throttle:webhooks middleware
+- `.env.example` - Added rate limiting and webhook replay protection variables
+- `app/Http/Requests/Auth/LoginRequest.php` - Updated password min length to 8
+- `database/migrations/*_add_password_reset_required_to_users_table.php` - New migration
+- `app/Console/Commands/EnforcePasswordPolicy.php` - New command
+- `app/Policies/UserPolicy.php` - Added create() method
+- `app/Http/Controllers/Api/UsersController.php` - Replaced manual auth checks with policies
+- `app/Http/Controllers/Api/RingGroupController.php` - Added policy auth and eager loading
+- `app/Http/Controllers/Api/SettingsController.php` - Added policy authorization
+- `app/Http/Controllers/Webhooks/CloudonixWebhookController.php` - Added organization validation
+- `app/Http/Middleware/SecurityHeaders.php` - New middleware
+- `bootstrap/app.php` - Registered SecurityHeaders middleware
+- `app/Http/Middleware/EnsureWebhookIdempotency.php` - Added timestamp validation
+- `config/webhooks.php` - Added replay_protection configuration
+- `tests/Feature/RateLimitingTest.php` - New comprehensive test suite
+
+#### Audit Topics Covered
+- **Security Review**: Rate limiting, password policy, tenant isolation, security headers, replay protection
+- **Code Review**: Authorization policies, N+1 query optimization, middleware implementation
+- **Compliancy Review**: OWASP best practices, security headers, password policies
+
 ### Added - 2025-12-26
 
 #### Ring Groups Backend Integration & API Implementation
