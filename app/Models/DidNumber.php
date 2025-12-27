@@ -88,10 +88,138 @@ class DidNumber extends Model
      */
     public function getTargetBusinessHoursId(): ?int
     {
-        if ($this->routing_type === 'business_hours' && isset($this->routing_config['business_hours_id'])) {
-            return (int) $this->routing_config['business_hours_id'];
+        if ($this->routing_type === 'business_hours' && isset($this->routing_config['business_hours_schedule_id'])) {
+            return (int) $this->routing_config['business_hours_schedule_id'];
         }
 
         return null;
+    }
+
+    /**
+     * Get the routing target conference room ID.
+     */
+    public function getTargetConferenceRoomId(): ?int
+    {
+        if ($this->routing_type === 'conference_room' && isset($this->routing_config['conference_room_id'])) {
+            return (int) $this->routing_config['conference_room_id'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the extension for extension routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getExtensionAttribute(): ?Extension
+    {
+        $extensionId = $this->getTargetExtensionId();
+        if ($extensionId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_extension', $this->attributes)) {
+            return $this->attributes['_extension'];
+        }
+
+        return Extension::find($extensionId);
+    }
+
+    /**
+     * Get the ring group for ring group routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getRingGroupAttribute(): ?RingGroup
+    {
+        $ringGroupId = $this->getTargetRingGroupId();
+        if ($ringGroupId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_ring_group', $this->attributes)) {
+            return $this->attributes['_ring_group'];
+        }
+
+        return RingGroup::find($ringGroupId);
+    }
+
+    /**
+     * Get the business hours schedule for business hours routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getBusinessHoursScheduleAttribute(): ?BusinessHoursSchedule
+    {
+        $scheduleId = $this->getTargetBusinessHoursId();
+        if ($scheduleId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_business_hours_schedule', $this->attributes)) {
+            return $this->attributes['_business_hours_schedule'];
+        }
+
+        return BusinessHoursSchedule::find($scheduleId);
+    }
+
+    /**
+     * Get the conference room for conference room routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getConferenceRoomAttribute(): ?ConferenceRoom
+    {
+        $conferenceRoomId = $this->getTargetConferenceRoomId();
+        if ($conferenceRoomId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_conference_room', $this->attributes)) {
+            return $this->attributes['_conference_room'];
+        }
+
+        return ConferenceRoom::find($conferenceRoomId);
+    }
+
+    /**
+     * Manually set the extension relationship.
+     */
+    public function setExtension(?Extension $extension): void
+    {
+        $this->attributes['_extension'] = $extension;
+    }
+
+    /**
+     * Manually set the ring group relationship.
+     */
+    public function setRingGroup(?RingGroup $ringGroup): void
+    {
+        $this->attributes['_ring_group'] = $ringGroup;
+    }
+
+    /**
+     * Manually set the business hours schedule relationship.
+     */
+    public function setBusinessHoursSchedule(?BusinessHoursSchedule $schedule): void
+    {
+        $this->attributes['_business_hours_schedule'] = $schedule;
+    }
+
+    /**
+     * Manually set the conference room relationship.
+     */
+    public function setConferenceRoom(?ConferenceRoom $conferenceRoom): void
+    {
+        $this->attributes['_conference_room'] = $conferenceRoom;
     }
 }

@@ -56,7 +56,8 @@
       "Bash(timeout 10 npm run dev:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test:*)"
     ]
   }
 }

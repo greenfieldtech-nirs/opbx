@@ -76,7 +76,7 @@ export type RingGroupFallbackAction = 'extension' | 'hangup';
 export type RingGroupStatus = 'active' | 'inactive';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'voicemail';
+export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room';
 
 // ============================================================================
 // Organization
@@ -195,39 +195,74 @@ export interface UpdateExtensionRequest {
 export interface DIDNumber {
   id: string;
   organization_id: string;
-  did_number: string;
-  country_code: string;
+  phone_number: string;
+  friendly_name?: string;
   routing_type: RoutingType;
   routing_config: {
     extension_id?: string;
     ring_group_id?: string;
-    business_hours_id?: string;
-    voicemail_greeting?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
   };
-  cloudonix_data?: {
+  cloudonix_config?: {
     number_id?: string;
-    trunk_id?: string;
+    purchased_at?: string;
+    monthly_cost?: number;
+    capabilities?: string[];
+    region?: string;
+    carrier?: string;
   };
   status: 'active' | 'inactive';
   extension?: Extension;
   ring_group?: RingGroup;
-  business_hours?: BusinessHours;
+  business_hours_schedule?: BusinessHours;
+  conference_room?: ConferenceRoom;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConferenceRoom {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  max_participants: number;
+  status: Status;
+  pin?: string;
+  pin_required: boolean;
+  host_pin?: string;
+  recording_enabled: boolean;
+  recording_auto_start: boolean;
+  wait_for_host: boolean;
+  mute_on_entry: boolean;
+  announce_join_leave: boolean;
+  music_on_hold: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateDIDRequest {
-  did_number: string;
-  country_code: string;
+  phone_number: string;
+  friendly_name?: string;
   routing_type: RoutingType;
-  routing_config: Record<string, unknown>;
+  routing_config: {
+    extension_id?: string;
+    ring_group_id?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
+  };
   status?: 'active' | 'inactive';
 }
 
 export interface UpdateDIDRequest {
-  did_number?: string;
+  friendly_name?: string;
   routing_type?: RoutingType;
-  routing_config?: Record<string, unknown>;
+  routing_config?: {
+    extension_id?: string;
+    ring_group_id?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
+  };
   status?: 'active' | 'inactive';
 }
 

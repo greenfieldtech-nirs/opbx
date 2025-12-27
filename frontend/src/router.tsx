@@ -17,7 +17,7 @@ import { lazy } from 'react';
 const Users = lazy(() => import('@/pages/UsersComplete'));
 const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
-const DIDs = lazy(() => import('@/pages/DIDs'));
+const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = lazy(() => import('@/pages/RingGroups'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
@@ -60,7 +60,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dids',
-        element: <DIDs />,
+        element: <PhoneNumbers />,
+      },
+      {
+        path: 'phone-numbers',
+        element: <PhoneNumbers />,
       },
       {
         path: 'ring-groups',

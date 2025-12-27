@@ -1,7 +1,7 @@
 /**
- * DIDs Service
+ * Phone Numbers (DIDs) Service
  *
- * Handles DID (phone number) management operations
+ * Handles phone number (DID) management operations
  */
 
 import api from './api';
@@ -12,7 +12,7 @@ import type {
   UpdateDIDRequest,
 } from '@/types/api.types';
 
-export interface DIDFilters {
+export interface PhoneNumberFilters {
   page?: number;
   per_page?: number;
   status?: string;
@@ -20,45 +20,48 @@ export interface DIDFilters {
   search?: string;
 }
 
-export const didsService = {
+export const phoneNumbersService = {
   /**
-   * Get all DIDs with optional filters
+   * Get all phone numbers with optional filters
    */
-  async getAll(filters?: DIDFilters): Promise<PaginatedResponse<DIDNumber>> {
-    const response = await api.get<PaginatedResponse<DIDNumber>>('/dids', {
+  async getAll(filters?: PhoneNumberFilters): Promise<PaginatedResponse<DIDNumber>> {
+    const response = await api.get<PaginatedResponse<DIDNumber>>('/phone-numbers', {
       params: filters,
     });
     return response.data;
   },
 
   /**
-   * Get DID by ID
+   * Get phone number by ID
    */
   async getById(id: string): Promise<DIDNumber> {
-    const response = await api.get<DIDNumber>(`/dids/${id}`);
-    return response.data;
+    const response = await api.get<{ data: DIDNumber }>(`/phone-numbers/${id}`);
+    return response.data.data;
   },
 
   /**
-   * Create new DID
+   * Create new phone number
    */
   async create(data: CreateDIDRequest): Promise<DIDNumber> {
-    const response = await api.post<DIDNumber>('/dids', data);
-    return response.data;
+    const response = await api.post<{ data: DIDNumber }>('/phone-numbers', data);
+    return response.data.data;
   },
 
   /**
-   * Update DID
+   * Update phone number
    */
   async update(id: string, data: UpdateDIDRequest): Promise<DIDNumber> {
-    const response = await api.patch<DIDNumber>(`/dids/${id}`, data);
-    return response.data;
+    const response = await api.put<{ data: DIDNumber }>(`/phone-numbers/${id}`, data);
+    return response.data.data;
   },
 
   /**
-   * Delete DID
+   * Delete phone number
    */
   async delete(id: string): Promise<void> {
-    await api.delete(`/dids/${id}`);
+    await api.delete(`/phone-numbers/${id}`);
   },
 };
+
+// Keep backward compatibility with old name
+export const didsService = phoneNumbersService;

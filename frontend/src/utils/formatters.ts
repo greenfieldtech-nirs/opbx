@@ -45,27 +45,70 @@ export function formatDuration(seconds: number): string {
 }
 
 // Phone number formatting
+// Formats E.164 phone numbers (+12125551234) to readable format
 export function formatPhoneNumber(phoneNumber: string): string {
-  // Remove all non-numeric characters
-  const cleaned = phoneNumber.replace(/\D/g, '');
+  if (!phoneNumber) return '';
 
-  // Format as: +1 (555) 123-4567 for US numbers
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  // Remove all non-numeric characters except leading +
+  const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+
+  // If it doesn't start with +, return as-is
+  if (!cleaned.startsWith('+')) {
+    return phoneNumber;
   }
 
-  // Format international numbers
-  if (cleaned.length > 10) {
-    return `+${cleaned}`;
+  // Remove the + for easier parsing
+  const digits = cleaned.substring(1);
+
+  // US/Canada numbers (+1 XXX XXX XXXX)
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const countryCode = digits.substring(0, 1);
+    const areaCode = digits.substring(1, 4);
+    const exchange = digits.substring(4, 7);
+    const subscriber = digits.substring(7, 11);
+    return `+${countryCode} (${areaCode}) ${exchange}-${subscriber}`;
   }
 
-  // Format as: (555) 123-4567 for 10-digit numbers
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  // UK numbers (+44 XXXX XXXXXX)
+  if (digits.length >= 10 && digits.startsWith('44')) {
+    const countryCode = digits.substring(0, 2);
+    const areaCode = digits.substring(2, 6);
+    const local = digits.substring(6);
+    return `+${countryCode} ${areaCode} ${local}`;
   }
 
-  // Return as-is if format is unknown
-  return phoneNumber;
+  // Israel numbers (+972 XX XXX XXXX)
+  if (digits.length >= 10 && digits.startsWith('972')) {
+    const countryCode = digits.substring(0, 3);
+    const prefix = digits.substring(3, 5);
+    const part1 = digits.substring(5, 8);
+    const part2 = digits.substring(8);
+    return `+${countryCode} ${prefix} ${part1} ${part2}`;
+  }
+
+  // Generic international format: +XX XXXX XXXX
+  if (digits.length > 10) {
+    const countryCode = digits.substring(0, digits.length - 10);
+    const remaining = digits.substring(digits.length - 10);
+    const part1 = remaining.substring(0, 4);
+    const part2 = remaining.substring(4, 8);
+    const part3 = remaining.substring(8);
+    return `+${countryCode} ${part1} ${part2}${part3 ? ' ' + part3 : ''}`;
+  }
+
+  // Shorter international numbers: just add spaces every 3-4 digits
+  if (digits.length > 6) {
+    const countryCode = digits.substring(0, Math.min(3, digits.length - 6));
+    const remaining = digits.substring(countryCode.length);
+    const parts = [];
+    for (let i = 0; i < remaining.length; i += 3) {
+      parts.push(remaining.substring(i, i + 3));
+    }
+    return `+${countryCode} ${parts.join(' ')}`;
+  }
+
+  // Return with + if nothing else matches
+  return cleaned;
 }
 
 // Status badge colors

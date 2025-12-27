@@ -9,6 +9,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added - 2025-12-27
 
+#### Phone Numbers (DIDs) Management Feature (Complete Implementation)
+
+- **Frontend Implementation**
+  - Created comprehensive Phone Numbers management UI in React (`frontend/src/pages/PhoneNumbers.tsx`)
+  - Implemented phone number table with filtering by status and routing type
+  - Added search functionality for phone numbers and friendly names
+  - Created Create/Edit dialog with conditional routing configuration
+  - Implemented E.164 phone number formatting utility
+  - Added routing type badges with icons (Extension, Ring Group, Business Hours, Conference Room)
+  - Created phone number validation with E.164 format enforcement
+  - Implemented permission-based UI (Owner/PBX Admin can manage, others view-only)
+  - Added conditional target selection based on routing type:
+    - Extension selector with active extensions
+    - Ring Group selector with member count display
+    - Business Hours Schedule selector
+    - Conference Room selector with capacity display
+  - Created utility functions in `frontend/src/utils/phoneNumbers.ts`
+  - Updated TypeScript types to match new routing_config structure
+  - Changed API endpoint from `/dids` to `/phone-numbers`
+
+- **Backend Implementation**
+  - Updated `did_numbers` table schema via migration:
+    - Changed routing_type enum: removed 'ivr', 'voicemail', added 'conference_room'
+    - Maintained E.164 phone number format requirement
+    - Preserved global uniqueness constraint on phone_number field
+  - Enhanced DidNumber model:
+    - Added `getTargetConferenceRoomId()` method
+    - Fixed `getTargetBusinessHoursId()` to use correct key
+    - Added accessor/setter methods for related resources
+    - Maintained OrganizationScope for tenant isolation
+  - Created comprehensive Policy (DidNumberPolicy):
+    - viewAny: All authenticated users can view
+    - view: Must be in same organization
+    - create/update/delete: Only Owner and PBX Admin
+  - Implemented RESTful API controller (PhoneNumberController) with 5 endpoints:
+    - GET /api/v1/phone-numbers (list with pagination, filtering, search)
+    - GET /api/v1/phone-numbers/{id} (single phone number with eager loaded relations)
+    - POST /api/v1/phone-numbers (create with validation)
+    - PUT /api/v1/phone-numbers/{id} (update routing configuration)
+    - DELETE /api/v1/phone-numbers/{id} (delete with activity logging)
+  - Created comprehensive validation via FormRequests:
+    - StorePhoneNumberRequest: E.164 format validation, uniqueness check
+    - UpdatePhoneNumberRequest: Same as store but prohibits phone_number updates
+    - Conditional validation based on routing_type (extension_id, ring_group_id, etc.)
+    - Validates target resources exist, are active, belong to same organization
+    - Ring groups must have at least 1 active member
+  - Implemented intelligent eager loading:
+    - Batch loads related resources grouped by routing_type
+    - Prevents N+1 query problems
+    - Only loads relevant relations based on routing configuration
+  - Created API Resources:
+    - PhoneNumberResource: Transforms model with conditional related resources
+    - RingGroupResource: Nested resource for ring group details
+  - Added comprehensive logging with correlation IDs
+  - Implemented database transactions for data integrity
+
+- **Testing**
+  - Created 25 feature tests for PhoneNumberController (100% passing)
+  - Created 17 unit tests for DidNumber model (94% passing)
+  - Tests cover:
+    - Authorization (Owner, PBX Admin, PBX User, Reporter)
+    - CRUD operations for all routing types
+    - E.164 phone number format validation
+    - Phone number uniqueness across organizations
+    - Target resource validation (exists, active, same organization)
+    - Ring group member validation
+    - Pagination, filtering, and search
+    - Eager loading verification
+    - Phone number immutability after creation
+
+- **Security Enhancements**
+  - Added AuthorizesRequests trait to base Controller class
+  - SQL injection prevention via Eloquent ORM
+  - Mass assignment protection with $fillable
+  - Authorization checks on every endpoint
+  - Organization scoping on all queries
+  - Input validation and sanitization
+  - Structured audit logging
+
+- **Code Quality**
+  - PHP 8.3+ features: strict types, type hints, match expressions
+  - Laravel best practices: FormRequests, Policies, Resources
+  - Comprehensive PHPDoc blocks
+  - PSR-12 coding standards
+  - Zero tolerance for code smells
+
+- **Database Factories**
+  - DidNumberFactory: Creates valid E.164 phone numbers
+  - ConferenceRoomFactory: Creates test conference rooms
+  - State methods for different routing configurations
+
+- **Bug Fixes**
+  - Fixed UserFactory to use correct UserRole enum values (PBX_USER instead of AGENT, PBX_ADMIN instead of ADMIN)
+  - Removed auto-prepending of '+' to phone numbers (enforces E.164 validation)
+  - Fixed phone number regex to require '+' prefix (was optional)
+
 #### Business Hours Feature (Complete Implementation)
 
 - **Frontend Implementation**

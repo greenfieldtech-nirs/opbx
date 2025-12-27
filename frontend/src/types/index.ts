@@ -70,7 +70,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'voicemail';
+export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room';
 
 // ============================================================================
 // Entity Types
@@ -134,15 +134,23 @@ export interface DIDNumber {
   routing_config: {
     extension_id?: string;
     ring_group_id?: string;
-    business_hours_id?: string;
-    fallback_extension_id?: string;
-    voicemail_greeting?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
   };
   status: Status;
   cloudonix_config?: {
-    dnid?: string;
-    voice_application_id?: string;
+    number_id?: string;
+    purchased_at?: string;
+    monthly_cost?: number;
+    capabilities?: string[];
+    region?: string;
+    carrier?: string;
   };
+  // Related entities (eager loaded)
+  extension?: Extension;
+  ring_group?: RingGroup;
+  business_hours_schedule?: BusinessHours;
+  conference_room?: ConferenceRoom;
   created_at: string;
   updated_at: string;
 }
@@ -379,9 +387,8 @@ export interface CreateDIDRequest {
   routing_config: {
     extension_id?: string;
     ring_group_id?: string;
-    business_hours_id?: string;
-    fallback_extension_id?: string;
-    voicemail_greeting?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
   };
   status?: Status;
 }
@@ -392,9 +399,8 @@ export interface UpdateDIDRequest {
   routing_config?: {
     extension_id?: string;
     ring_group_id?: string;
-    business_hours_id?: string;
-    fallback_extension_id?: string;
-    voicemail_greeting?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
   };
   status?: Status;
 }
