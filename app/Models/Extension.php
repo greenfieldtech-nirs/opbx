@@ -110,6 +110,30 @@ class Extension extends Model
     }
 
     /**
+     * Get the SIP URI for this extension.
+     *
+     * @return string|null
+     */
+    public function getSipUri(): ?string
+    {
+        if (!$this->configuration || !isset($this->configuration['sip_uri'])) {
+            return null;
+        }
+
+        return $this->configuration['sip_uri'];
+    }
+
+    /**
+     * Check if extension has a SIP URI configured.
+     *
+     * @return bool
+     */
+    public function hasSipUri(): bool
+    {
+        return !empty($this->getSipUri());
+    }
+
+    /**
      * Scope query to extensions in a specific organization.
      *
      * @param Builder $query
