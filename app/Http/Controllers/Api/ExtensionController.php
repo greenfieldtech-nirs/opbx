@@ -142,6 +142,14 @@ class ExtensionController extends Controller
                 // Assign to current user's organization
                 $validated['organization_id'] = $currentUser->organization_id;
 
+                // Convert string enum values to enum instances for proper SQL binding
+                if (isset($validated['type']) && is_string($validated['type'])) {
+                    $validated['type'] = ExtensionType::from($validated['type']);
+                }
+                if (isset($validated['status']) && is_string($validated['status'])) {
+                    $validated['status'] = UserStatus::from($validated['status']);
+                }
+
                 // Create extension
                 $extension = Extension::create($validated);
 
@@ -284,6 +292,14 @@ class ExtensionController extends Controller
 
         try {
             DB::transaction(function () use ($extension, $validated): void {
+                // Convert string enum values to enum instances for proper SQL binding
+                if (isset($validated['type']) && is_string($validated['type'])) {
+                    $validated['type'] = ExtensionType::from($validated['type']);
+                }
+                if (isset($validated['status']) && is_string($validated['status'])) {
+                    $validated['status'] = UserStatus::from($validated['status']);
+                }
+
                 // Update extension
                 $extension->update($validated);
             });

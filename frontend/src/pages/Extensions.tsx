@@ -35,7 +35,6 @@ import {
   Users,
   Menu,
   Bot,
-  Code,
   ArrowRight,
   Check,
   Calendar,
@@ -131,10 +130,11 @@ const mockRingGroups = [
   { id: 'ring-3', name: 'Management' },
 ];
 
+// TODO: Replace with real API call to fetch IVR menus
 const mockIVRMenus = [
-  { id: 'ivr-1', name: 'Main Menu' },
-  { id: 'ivr-2', name: 'After Hours Menu' },
-  { id: 'ivr-3', name: 'Sales Department Menu' },
+  { id: '1', name: 'Main Menu' },
+  { id: '2', name: 'After Hours Menu' },
+  { id: '3', name: 'Sales Department Menu' },
 ];
 
 // Mock Cloudonix Container Applications (will be loaded from Cloudonix API)
@@ -392,7 +392,6 @@ export default function ExtensionsComplete() {
       ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
       ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
       ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
-      custom_logic: { label: 'Custom Logic', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Code },
       forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
     };
 
@@ -431,9 +430,6 @@ export default function ExtensionsComplete() {
       }
       case 'ai_assistant': {
         return extension.configuration?.provider || 'Not configured';
-      }
-      case 'custom_logic': {
-        return extension.configuration?.script ? 'Script configured' : 'No script';
       }
       default:
         return '-';
@@ -477,15 +473,6 @@ export default function ExtensionsComplete() {
         errors.ai_phone_number = 'Phone number is required';
       } else if (!/^\+?[1-9]\d{1,14}$/.test(formData.ai_phone_number)) {
         errors.ai_phone_number = 'Invalid phone number format';
-      }
-    }
-
-    if (formData.type === 'custom_logic') {
-      if (!formData.container_application_name) {
-        errors.container_application_name = 'Container application selection is required';
-      }
-      if (!formData.container_block_name) {
-        errors.container_block_name = 'Block selection is required';
       }
     }
 
@@ -541,10 +528,6 @@ export default function ExtensionsComplete() {
       case 'ai_assistant':
         configuration.provider = formData.ai_provider;
         configuration.phone_number = formData.ai_phone_number;
-        break;
-      case 'custom_logic':
-        configuration.container_application_name = formData.container_application_name;
-        configuration.container_block_name = formData.container_block_name;
         break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
@@ -618,10 +601,6 @@ export default function ExtensionsComplete() {
       case 'ai_assistant':
         configuration.provider = formData.ai_provider;
         configuration.phone_number = formData.ai_phone_number;
-        break;
-      case 'custom_logic':
-        configuration.container_application_name = formData.container_application_name;
-        configuration.container_block_name = formData.container_block_name;
         break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
@@ -868,75 +847,6 @@ export default function ExtensionsComplete() {
           </>
         );
 
-      case 'custom_logic':
-        const selectedApplication = mockContainerApplications.find(
-          app => app.name === formData.container_application_name
-        );
-
-        return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="container_application">
-                Container Application <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.container_application_name}
-                onValueChange={(value) => setFormData({
-                  ...formData,
-                  container_application_name: value,
-                  container_block_name: '' // Reset block when application changes
-                })}
-              >
-                <SelectTrigger id="container_application">
-                  <SelectValue placeholder="Select a container application" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockContainerApplications.map((app) => (
-                    <SelectItem key={app.name} value={app.name}>
-                      {app.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Container applications from Cloudonix
-              </p>
-              {formErrors.container_application_name && (
-                <p className="text-sm text-destructive">{formErrors.container_application_name}</p>
-              )}
-            </div>
-
-            {formData.container_application_name && (
-              <div className="space-y-2">
-                <Label htmlFor="container_block">
-                  Execution Block <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.container_block_name}
-                  onValueChange={(value) => setFormData({ ...formData, container_block_name: value })}
-                >
-                  <SelectTrigger id="container_block">
-                    <SelectValue placeholder="Select a block to execute" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedApplication?.blocks.map((block) => (
-                      <SelectItem key={block.name} value={block.name}>
-                        {block.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select which block to execute from the application
-                </p>
-                {formErrors.container_block_name && (
-                  <p className="text-sm text-destructive">{formErrors.container_block_name}</p>
-                )}
-              </div>
-            )}
-          </>
-        );
-
       case 'forward':
         return (
           <div className="space-y-2">
@@ -1179,7 +1089,6 @@ export default function ExtensionsComplete() {
                 <SelectItem value="ring_group">Ring Group</SelectItem>
                 <SelectItem value="ivr">IVR Menu</SelectItem>
                 <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                <SelectItem value="custom_logic">Custom Logic</SelectItem>
                 <SelectItem value="forward">Forward</SelectItem>
               </SelectContent>
             </Select>
@@ -1471,7 +1380,6 @@ export default function ExtensionsComplete() {
                   <SelectItem value="ring_group">Ring Group</SelectItem>
                   <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
                   <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                  <SelectItem value="custom_logic">Custom Logic</SelectItem>
                   <SelectItem value="forward">Forward</SelectItem>
                 </SelectContent>
               </Select>
@@ -1581,7 +1489,6 @@ export default function ExtensionsComplete() {
                   <SelectItem value="ring_group">Ring Group</SelectItem>
                   <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
                   <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                  <SelectItem value="custom_logic">Custom Logic</SelectItem>
                   <SelectItem value="forward">Forward</SelectItem>
                 </SelectContent>
               </Select>
@@ -1833,14 +1740,6 @@ export default function ExtensionsComplete() {
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Forward To:</span>
                           <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
-                        </div>
-                      )}
-                      {selectedExtension.type === 'custom_logic' && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">Script:</span>
-                          <pre className="text-xs mt-2 p-2 bg-black text-green-400 rounded overflow-x-auto">
-                            {selectedExtension.configuration.script}
-                          </pre>
                         </div>
                       )}
                     </div>
