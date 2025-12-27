@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Webhook\CallInitiatedRequest;
+use App\Http\Requests\Webhook\CallStatusRequest;
+use App\Http\Requests\Webhook\CdrRequest;
 use App\Jobs\ProcessCDRJob;
 use App\Jobs\ProcessInboundCallJob;
 use App\Jobs\UpdateCallStatusJob;
 use App\Models\DidNumber;
 use App\Services\CallRouting\CallRoutingService;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 
@@ -32,7 +34,7 @@ class CloudonixWebhookController extends Controller
      *
      * @see https://developers.cloudonix.com/Documentation/voiceApplication/requestParameters
      */
-    public function callInitiated(Request $request): Response
+    public function callInitiated(CallInitiatedRequest $request): Response
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $from = $request->input('From') ?? $request->input('from');
@@ -94,7 +96,7 @@ class CloudonixWebhookController extends Controller
      * Handle call status update webhook.
      * This is called by Cloudonix when call status changes.
      */
-    public function callStatus(Request $request): Response
+    public function callStatus(CallStatusRequest $request): Response
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $status = $request->input('CallStatus') ?? $request->input('status');
@@ -119,7 +121,7 @@ class CloudonixWebhookController extends Controller
      * Handle CDR (Call Detail Record) webhook.
      * This is called by Cloudonix after a call completes.
      */
-    public function cdr(Request $request): Response
+    public function cdr(CdrRequest $request): Response
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
 
