@@ -42,20 +42,8 @@ class SettingsController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Check authorization
-        if (!$user->role->canManageOrganization()) {
-            Log::warning('Unauthorized access to Cloudonix settings', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'role' => $user->role->value,
-            ]);
-
-            return response()->json([
-                'error' => 'Unauthorized',
-                'message' => 'Only organization owners can view Cloudonix settings.',
-            ], 403);
-        }
+        // Check authorization using policy
+        $this->authorize('viewAny', CloudonixSettings::class);
 
         $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
 
@@ -332,20 +320,8 @@ class SettingsController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Check authorization
-        if (!$user->role->canManageOrganization()) {
-            Log::warning('Unauthorized API key generation attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'role' => $user->role->value,
-            ]);
-
-            return response()->json([
-                'error' => 'Unauthorized',
-                'message' => 'Only organization owners can generate API keys.',
-            ], 403);
-        }
+        // Check authorization using policy
+        $this->authorize('generateApiKey', CloudonixSettings::class);
 
         // Generate a cryptographically secure random key
         // 32 characters: alphanumeric + symbols for high entropy
