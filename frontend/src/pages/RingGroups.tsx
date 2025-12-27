@@ -67,10 +67,8 @@ import {
   Users,
   RotateCw,
   List,
-  Mail,
   PhoneForwarded,
   PhoneOff,
-  Repeat,
   Edit,
   Trash2,
   Eye,
@@ -224,14 +222,10 @@ export default function RingGroups() {
   // Fallback icon mapping
   const getFallbackIcon = (action: RingGroupFallbackAction) => {
     switch (action) {
-      case 'voicemail':
-        return <Mail className="h-4 w-4" />;
       case 'extension':
         return <PhoneForwarded className="h-4 w-4" />;
       case 'hangup':
         return <PhoneOff className="h-4 w-4" />;
-      case 'repeat':
-        return <Repeat className="h-4 w-4" />;
     }
   };
 
