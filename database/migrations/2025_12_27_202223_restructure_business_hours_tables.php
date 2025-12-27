@@ -24,7 +24,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Drop old business_hours table (if it exists, recreate with new schema)
+        // Drop all tables in reverse order (respecting foreign key constraints)
+        Schema::dropIfExists('business_hours_exception_time_ranges');
+        Schema::dropIfExists('business_hours_exceptions');
+        Schema::dropIfExists('business_hours_time_ranges');
+        Schema::dropIfExists('business_hours_schedule_days');
+        Schema::dropIfExists('business_hours_schedules');
         Schema::dropIfExists('business_hours');
 
         // Create business_hours_schedules table

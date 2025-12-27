@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed - 2025-12-27
 
+#### Business Hours Migration Idempotency
+- Fixed Business Hours database migration to be idempotent (`database/migrations/2025_12_27_202223_restructure_business_hours_tables.php`)
+  - Added `Schema::dropIfExists()` for all new tables before creation
+  - Prevents "Base table or view already exists" errors on container restart
+  - Migration now drops tables in reverse order respecting foreign key constraints
+  - Safe to run multiple times without errors
+
 #### Business Hours Toast Notifications
 - Fixed toast notification format errors in Business Hours UI (`frontend/src/pages/BusinessHours.tsx`)
   - Migrated from object-based toast API to sonner's string-based API
