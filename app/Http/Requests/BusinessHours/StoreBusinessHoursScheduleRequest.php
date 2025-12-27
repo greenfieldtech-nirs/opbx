@@ -90,15 +90,15 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                 'boolean',
             ],
             'schedule.*.time_ranges' => [
-                'required',
+                'nullable',
                 'array',
             ],
             'schedule.*.time_ranges.*.start_time' => [
-                'required_if:schedule.*.enabled,true',
+                'required',
                 'date_format:H:i',
             ],
             'schedule.*.time_ranges.*.end_time' => [
-                'required_if:schedule.*.enabled,true',
+                'required',
                 'date_format:H:i',
                 'after:schedule.*.time_ranges.*.start_time',
             ],
@@ -158,10 +158,9 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             'schedule.required' => 'Weekly schedule is required.',
             'schedule.*.enabled.required' => 'Enabled status is required for each day.',
             'schedule.*.enabled.boolean' => 'Enabled must be true or false.',
-            'schedule.*.time_ranges.required' => 'Time ranges are required for each day.',
-            'schedule.*.time_ranges.*.start_time.required_if' => 'Start time is required when day is enabled.',
+            'schedule.*.time_ranges.*.start_time.required' => 'Start time is required for time ranges.',
             'schedule.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
-            'schedule.*.time_ranges.*.end_time.required_if' => 'End time is required when day is enabled.',
+            'schedule.*.time_ranges.*.end_time.required' => 'End time is required for time ranges.',
             'schedule.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
             'schedule.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
             'exceptions.max' => 'Maximum 100 exceptions allowed per schedule.',
@@ -207,6 +206,23 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
         if (!empty($schedule)) {
             $this->merge(['schedule' => $schedule]);
         }
+
+        // Deduplicate exception dates (silently use first occurrence)
+        $exceptions = $this->input('exceptions', []);
+        if (!empty($exceptions)) {
+            $seenDates = [];
+            $uniqueExceptions = [];
+
+            foreach ($exceptions as $exception) {
+                $date = $exception['date'] ?? null;
+                if ($date && !in_array($date, $seenDates)) {
+                    $seenDates[] = $date;
+                    $uniqueExceptions[] = $exception;
+                }
+            }
+
+            $this->merge(['exceptions' => $uniqueExceptions]);
+        }
     }
 
     /**
@@ -220,15 +236,6 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
         $validator->after(function ($validator) {
             $schedule = $this->input('schedule', []);
             $exceptions = $this->input('exceptions', []);
-
-            // Validate that at least one day is enabled or there's a valid reason for none
-            $enabledDays = array_filter($schedule, fn($day) => $day['enabled'] ?? false);
-            if (empty($enabledDays)) {
-                $validator->errors()->add(
-                    'schedule',
-                    'At least one day must be enabled in the schedule.'
-                );
-            }
 
             // Validate that enabled days have at least one time range
             foreach ($schedule as $dayName => $daySchedule) {
@@ -262,15 +269,6 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                         'Closed exceptions should not have time ranges.'
                     );
                 }
-            }
-
-            // Validate no duplicate exception dates
-            $exceptionDates = array_column($exceptions, 'date');
-            if (count($exceptionDates) !== count(array_unique($exceptionDates))) {
-                $validator->errors()->add(
-                    'exceptions',
-                    'Exception dates must be unique. You cannot have multiple exceptions for the same date.'
-                );
             }
         });
     }

@@ -92,6 +92,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed - 2025-12-27
 
+#### Business Hours Validation Logic Improvements
+- Fixed overly strict validation in Business Hours API (`app/Http/Requests/BusinessHours/*.php`)
+  - **Allow disabled days without time ranges**: Disabled days (closed all day) no longer require empty time_ranges array to be filled
+  - Changed `schedule.*.time_ranges` validation from `required` to `nullable`
+  - Removed illogical "at least one day must be enabled" requirement - fully closed schedules are now valid
+  - **Automatic deduplication of exception dates**: Silently uses first occurrence when duplicate dates are found
+  - Added deduplication logic in `prepareForValidation()` to handle duplicate exception dates gracefully
+  - Removed confusing "Exception dates must be unique" error message
+  - Applied fixes to both StoreBusinessHoursScheduleRequest and UpdateBusinessHoursScheduleRequest
+
 #### Business Hours Migration Idempotency and Foreign Key Constraints
 - Fixed Business Hours database migration (`database/migrations/2025_12_27_202223_restructure_business_hours_tables.php`)
   - **Fixed foreign key constraint name length**: MySQL has 64-character limit, auto-generated names exceeded this
