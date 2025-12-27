@@ -20,6 +20,7 @@ import {
   MoreVertical,
   Edit,
   Trash2,
+  Users,
   UserCheck,
   Mail,
   Copy,
@@ -459,12 +460,10 @@ export default function UsersComplete() {
       {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Users</h1>
-            <Badge variant="secondary" className="text-base">
-              {totalUsers}
-            </Badge>
-          </div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Users className="h-8 w-8" />
+            Users
+          </h1>
           <p className="text-muted-foreground mt-1">
             Manage user accounts and permissions
           </p>
