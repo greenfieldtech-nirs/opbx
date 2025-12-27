@@ -15,8 +15,11 @@ import type {
 export interface RingGroupFilters {
   page?: number;
   per_page?: number;
-  strategy?: string;
   search?: string;
+  strategy?: string;
+  status?: string;
+  sort_by?: string;
+  sort_direction?: 'asc' | 'desc';
 }
 
 export const ringGroupsService = {
@@ -50,7 +53,7 @@ export const ringGroupsService = {
    * Update ring group
    */
   async update(id: string, data: UpdateRingGroupRequest): Promise<RingGroup> {
-    const response = await api.patch<RingGroup>(`/ring-groups/${id}`, data);
+    const response = await api.put<RingGroup>(`/ring-groups/${id}`, data);
     return response.data;
   },
 

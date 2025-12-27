@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\RingGroupFallbackAction;
+use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[ScopedBy([OrganizationScope::class])]
 class RingGroup extends Model
@@ -27,8 +31,9 @@ class RingGroup extends Model
         'description',
         'strategy',
         'timeout',
-        'members',
+        'ring_turns',
         'fallback_action',
+        'fallback_extension_id',
         'status',
     ];
 
@@ -41,9 +46,10 @@ class RingGroup extends Model
     {
         return [
             'strategy' => RingGroupStrategy::class,
-            'members' => 'array',
-            'fallback_action' => 'array',
+            'fallback_action' => RingGroupFallbackAction::class,
+            'status' => RingGroupStatus::class,
             'timeout' => 'integer',
+            'ring_turns' => 'integer',
         ];
     }
 
@@ -56,36 +62,96 @@ class RingGroup extends Model
     }
 
     /**
+     * Get the members of this ring group.
+     */
+    public function members(): HasMany
+    {
+        return $this->hasMany(RingGroupMember::class)->orderBy('priority');
+    }
+
+    /**
+     * Get the fallback extension for this ring group.
+     */
+    public function fallbackExtension(): BelongsTo
+    {
+        return $this->belongsTo(Extension::class, 'fallback_extension_id');
+    }
+
+    /**
      * Check if the ring group is active.
      */
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->status === RingGroupStatus::ACTIVE;
     }
 
     /**
-     * Get the member extension IDs.
+     * Check if the ring group is inactive.
+     */
+    public function isInactive(): bool
+    {
+        return $this->status === RingGroupStatus::INACTIVE;
+    }
+
+    /**
+     * Scope query to ring groups in a specific organization.
      *
-     * @return array<int>
+     * @param Builder $query
+     * @param int|string $organizationId
+     * @return Builder
      */
-    public function getMemberExtensionIds(): array
+    public function scopeForOrganization(Builder $query, int|string $organizationId): Builder
     {
-        return array_map('intval', $this->members ?? []);
+        return $query->where('organization_id', $organizationId);
     }
 
     /**
-     * Get the member extensions.
+     * Scope query to ring groups with a specific strategy.
+     *
+     * @param Builder $query
+     * @param RingGroupStrategy $strategy
+     * @return Builder
      */
-    public function getMembers(): \Illuminate\Database\Eloquent\Collection
+    public function scopeWithStrategy(Builder $query, RingGroupStrategy $strategy): Builder
     {
-        $extensionIds = $this->getMemberExtensionIds();
+        return $query->where('strategy', $strategy->value);
+    }
 
-        if (empty($extensionIds)) {
-            return new \Illuminate\Database\Eloquent\Collection();
-        }
+    /**
+     * Scope query to ring groups with a specific status.
+     *
+     * @param Builder $query
+     * @param RingGroupStatus $status
+     * @return Builder
+     */
+    public function scopeWithStatus(Builder $query, RingGroupStatus $status): Builder
+    {
+        return $query->where('status', $status->value);
+    }
 
-        return Extension::whereIn('id', $extensionIds)
-            ->where('status', 'active')
-            ->get();
+    /**
+     * Scope query to search ring groups by name or description.
+     *
+     * @param Builder $query
+     * @param string $search
+     * @return Builder
+     */
+    public function scopeSearch(Builder $query, string $search): Builder
+    {
+        return $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%");
+        });
+    }
+
+    /**
+     * Scope query to active ring groups only.
+     *
+     * @param Builder $query
+     * @return Builder
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', RingGroupStatus::ACTIVE->value);
     }
 }

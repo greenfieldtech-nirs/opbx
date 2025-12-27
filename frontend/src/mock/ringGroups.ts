@@ -20,7 +20,8 @@ export interface RingGroup {
   name: string;
   description?: string;
   strategy: RingGroupStrategy;
-  timeout: number; // seconds
+  timeout: number; // Extension ring timeout in seconds (how long each extension rings)
+  ring_turns: number; // Number of complete cycles through all extensions (1-9)
   fallback_action: FallbackAction;
   fallback_extension_id?: string;
   fallback_extension_number?: string;
@@ -62,6 +63,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Main sales team for inbound leads',
     strategy: 'simultaneous',
     timeout: 30,
+    ring_turns: 2,
     fallback_action: 'voicemail',
     status: 'active',
     members: [
@@ -79,6 +81,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Customer support team',
     strategy: 'round_robin',
     timeout: 45,
+    ring_turns: 3,
     fallback_action: 'extension',
     fallback_extension_id: 'ext-010',
     fallback_extension_number: '110',
@@ -99,6 +102,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Escalation path for urgent matters',
     strategy: 'sequential',
     timeout: 20,
+    ring_turns: 2,
     fallback_action: 'voicemail',
     status: 'active',
     members: [
@@ -116,6 +120,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Team available outside business hours',
     strategy: 'simultaneous',
     timeout: 60,
+    ring_turns: 1,
     fallback_action: 'hangup',
     status: 'inactive',
     members: [
@@ -132,6 +137,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Dedicated team for VIP customers',
     strategy: 'sequential',
     timeout: 15,
+    ring_turns: 5,
     fallback_action: 'repeat',
     status: 'active',
     members: [
@@ -148,6 +154,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Technical issues and troubleshooting',
     strategy: 'round_robin',
     timeout: 40,
+    ring_turns: 2,
     fallback_action: 'voicemail',
     status: 'active',
     members: [
@@ -165,6 +172,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Payment and billing questions',
     strategy: 'simultaneous',
     timeout: 25,
+    ring_turns: 3,
     fallback_action: 'extension',
     fallback_extension_id: 'ext-004',
     fallback_extension_number: '104',
@@ -183,6 +191,7 @@ export const mockRingGroups: RingGroup[] = [
     description: 'Assist new customers with setup',
     strategy: 'sequential',
     timeout: 30,
+    ring_turns: 1,
     fallback_action: 'voicemail',
     status: 'inactive',
     members: [

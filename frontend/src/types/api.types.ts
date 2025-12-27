@@ -69,6 +69,12 @@ export type CallDirection = 'inbound' | 'outbound';
 // Ring Group Strategy
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
+// Ring Group Fallback Action
+export type RingGroupFallbackAction = 'voicemail' | 'extension' | 'hangup' | 'repeat';
+
+// Ring Group Status
+export type RingGroupStatus = 'active' | 'inactive';
+
 // Routing Type
 export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'voicemail';
 
@@ -229,39 +235,58 @@ export interface UpdateDIDRequest {
 // Ring Groups
 // ============================================================================
 
+export interface RingGroupMember {
+  extension_id: string;
+  extension_number: string;
+  user_name: string | null;
+  priority: number;
+}
+
 export interface RingGroup {
   id: string;
   organization_id: string;
   name: string;
+  description?: string;
   strategy: RingGroupStrategy;
-  ring_timeout: number;
-  members: string[]; // Array of extension IDs
-  fallback_action: 'voicemail' | 'busy' | 'extension';
-  fallback_config?: {
-    extension_id?: string;
-    voicemail_greeting?: string;
-  };
-  extensions?: Extension[];
+  timeout: number; // Extension ring timeout in seconds (how long each extension rings)
+  ring_turns: number; // Number of complete cycles through all extensions (1-9)
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_extension_number?: string;
+  status: RingGroupStatus;
+  members: RingGroupMember[];
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateRingGroupRequest {
   name: string;
+  description?: string;
   strategy: RingGroupStrategy;
-  ring_timeout?: number;
-  members: string[];
-  fallback_action: 'voicemail' | 'busy' | 'extension';
-  fallback_config?: Record<string, unknown>;
+  timeout: number;
+  ring_turns: number;
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  status: RingGroupStatus;
+  members: Array<{
+    extension_id: string;
+    priority: number;
+  }>;
 }
 
 export interface UpdateRingGroupRequest {
   name?: string;
+  description?: string;
   strategy?: RingGroupStrategy;
-  ring_timeout?: number;
-  members?: string[];
-  fallback_action?: 'voicemail' | 'busy' | 'extension';
-  fallback_config?: Record<string, unknown>;
+  timeout?: number;
+  ring_turns?: number;
+  fallback_action?: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  status?: RingGroupStatus;
+  members?: Array<{
+    extension_id: string;
+    priority: number;
+  }>;
 }
 
 // ============================================================================

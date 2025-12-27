@@ -1,28 +1,33 @@
 /**
  * Ring Groups Management Page
- * Full CRUD operations with mock data
+ * Full CRUD operations with backend API integration
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ringGroupsService } from '@/services/ringGroups.service';
+import { extensionsService } from '@/services/extensions.service';
+import { useAuth } from '@/hooks/useAuth';
+import type {
+  RingGroup,
+  RingGroupMember,
+  RingGroupStrategy,
+  RingGroupStatus,
+  RingGroupFallbackAction,
+  CreateRingGroupRequest,
+  UpdateRingGroupRequest,
+  Extension,
+} from '@/types/api.types';
 import {
-  mockRingGroups,
-  mockAvailableExtensions,
-  mockCurrentUserForRingGroups,
-  type RingGroup,
-  type RingGroupStrategy,
-  type RingGroupStatus,
-  type FallbackAction,
-  type RingGroupMember,
-  getNextRingGroupId,
   getStrategyDisplayName,
   getStrategyDescription,
   getFallbackDisplayText,
 } from '@/mock/ringGroups';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -77,17 +82,30 @@ import {
 } from 'lucide-react';
 
 export default function RingGroups() {
-  // Current user for permissions
-  const currentUser = mockCurrentUserForRingGroups;
-  const canManage = ['owner', 'pbx_admin'].includes(currentUser.role);
+  const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
 
-  // State
-  const [ringGroups, setRingGroups] = useState<RingGroup[]>(mockRingGroups);
+  // Permission check
+  const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
+
+  // UI State
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<RingGroupStrategy | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<RingGroupStatus | 'all'>('all');
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'members' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Dialog states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -102,12 +120,94 @@ export default function RingGroups() {
     description: '',
     strategy: 'simultaneous',
     timeout: 30,
+    ring_turns: 2,
     fallback_action: 'voicemail',
     status: 'active',
     members: [],
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Fetch ring groups with React Query
+  const { data: ringGroupsData, isLoading, error } = useQuery({
+    queryKey: ['ring-groups', {
+      page: currentPage,
+      per_page: perPage,
+      search: debouncedSearch,
+      strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      sort_by: sortField,
+      sort_direction: sortDirection,
+    }],
+    queryFn: () => ringGroupsService.getAll({
+      page: currentPage,
+      per_page: perPage,
+      search: debouncedSearch || undefined,
+      strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      sort_by: sortField,
+      sort_direction: sortDirection,
+    }),
+  });
+
+  const ringGroups = ringGroupsData?.data || [];
+  const totalRingGroups = ringGroupsData?.meta?.total || 0;
+  const totalPages = ringGroupsData?.meta?.last_page || 1;
+
+  // Fetch available extensions (type: user, status: active)
+  const { data: extensionsData } = useQuery({
+    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
+    queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
+  });
+
+  const availableExtensions = extensionsData?.data || [];
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      setIsCreateDialogOpen(false);
+      resetForm();
+      toast.success('Ring group created successfully');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to create ring group';
+      toast.error(message);
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateRingGroupRequest }) =>
+      ringGroupsService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      setIsEditDialogOpen(false);
+      setSelectedGroup(null);
+      resetForm();
+      toast.success('Ring group updated successfully');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to update ring group';
+      toast.error(message);
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => ringGroupsService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      setIsDeleteDialogOpen(false);
+      setSelectedGroup(null);
+      toast.success('Ring group deleted successfully');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to delete ring group';
+      toast.error(message);
+    },
+  });
 
   // Strategy icon mapping
   const getStrategyIcon = (strategy: RingGroupStrategy) => {
@@ -122,7 +222,7 @@ export default function RingGroups() {
   };
 
   // Fallback icon mapping
-  const getFallbackIcon = (action: FallbackAction) => {
+  const getFallbackIcon = (action: RingGroupFallbackAction) => {
     switch (action) {
       case 'voicemail':
         return <Mail className="h-4 w-4" />;
@@ -135,45 +235,7 @@ export default function RingGroups() {
     }
   };
 
-  // Filter and sort ring groups
-  const filteredAndSortedGroups = ringGroups
-    .filter((group) => {
-      const matchesSearch =
-        group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStrategy = strategyFilter === 'all' || group.strategy === strategyFilter;
-      const matchesStatus = statusFilter === 'all' || group.status === statusFilter;
-      return matchesSearch && matchesStrategy && matchesStatus;
-    })
-    .sort((a, b) => {
-      let aVal: string | number;
-      let bVal: string | number;
-
-      switch (sortField) {
-        case 'name':
-          aVal = a.name.toLowerCase();
-          bVal = b.name.toLowerCase();
-          break;
-        case 'strategy':
-          aVal = a.strategy;
-          bVal = b.strategy;
-          break;
-        case 'members':
-          aVal = a.members.length;
-          bVal = b.members.length;
-          break;
-        case 'status':
-          aVal = a.status;
-          bVal = b.status;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
+  // API handles filtering and sorting, so we use ringGroups directly
 
   // Toggle sort
   const toggleSort = (field: typeof sortField) => {
@@ -209,6 +271,10 @@ export default function RingGroups() {
       errors.timeout = 'Timeout must be between 5 and 300 seconds';
     }
 
+    if (!formData.ring_turns || formData.ring_turns < 1 || formData.ring_turns > 9) {
+      errors.ring_turns = 'Ring turns must be between 1 and 9';
+    }
+
     if (formData.fallback_action === 'extension' && !formData.fallback_extension_id) {
       errors.fallback_extension = 'Fallback extension is required';
     }
@@ -224,6 +290,7 @@ export default function RingGroups() {
       description: '',
       strategy: 'simultaneous',
       timeout: 30,
+      ring_turns: 2,
       fallback_action: 'voicemail',
       status: 'active',
       members: [],
@@ -235,62 +302,56 @@ export default function RingGroups() {
   const handleCreate = () => {
     if (!validateForm()) return;
 
-    const newGroup: RingGroup = {
-      id: getNextRingGroupId(ringGroups),
-      organization_id: currentUser.organization_id,
+    // Transform members to API format
+    const members = (formData.members as RingGroupMember[]).map((member) => ({
+      extension_id: member.extension_id,
+      priority: member.priority,
+    }));
+
+    const requestData: CreateRingGroupRequest = {
       name: formData.name!,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
       timeout: formData.timeout!,
-      fallback_action: formData.fallback_action as FallbackAction,
+      ring_turns: formData.ring_turns!,
+      fallback_action: formData.fallback_action as RingGroupFallbackAction,
       fallback_extension_id: formData.fallback_extension_id,
-      fallback_extension_number: formData.fallback_extension_number,
       status: formData.status as RingGroupStatus,
-      members: formData.members as RingGroupMember[],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      members,
     };
 
-    setRingGroups([...ringGroups, newGroup]);
-    setIsCreateDialogOpen(false);
-    resetForm();
+    createMutation.mutate(requestData);
   };
 
   // Handle edit
   const handleEdit = () => {
     if (!validateForm() || !selectedGroup) return;
 
-    const updatedGroups = ringGroups.map((group) =>
-      group.id === selectedGroup.id
-        ? {
-            ...group,
-            name: formData.name!,
-            description: formData.description,
-            strategy: formData.strategy as RingGroupStrategy,
-            timeout: formData.timeout!,
-            fallback_action: formData.fallback_action as FallbackAction,
-            fallback_extension_id: formData.fallback_extension_id,
-            fallback_extension_number: formData.fallback_extension_number,
-            status: formData.status as RingGroupStatus,
-            members: formData.members as RingGroupMember[],
-            updated_at: new Date().toISOString(),
-          }
-        : group
-    );
+    // Transform members to API format
+    const members = (formData.members as RingGroupMember[]).map((member) => ({
+      extension_id: member.extension_id,
+      priority: member.priority,
+    }));
 
-    setRingGroups(updatedGroups);
-    setIsEditDialogOpen(false);
-    setSelectedGroup(null);
-    resetForm();
+    const requestData: UpdateRingGroupRequest = {
+      name: formData.name,
+      description: formData.description,
+      strategy: formData.strategy as RingGroupStrategy,
+      timeout: formData.timeout,
+      ring_turns: formData.ring_turns,
+      fallback_action: formData.fallback_action as RingGroupFallbackAction,
+      fallback_extension_id: formData.fallback_extension_id,
+      status: formData.status as RingGroupStatus,
+      members,
+    };
+
+    updateMutation.mutate({ id: selectedGroup.id, data: requestData });
   };
 
   // Handle delete
   const handleDelete = () => {
     if (!selectedGroup) return;
-
-    setRingGroups(ringGroups.filter((group) => group.id !== selectedGroup.id));
-    setIsDeleteDialogOpen(false);
-    setSelectedGroup(null);
+    deleteMutation.mutate(selectedGroup.id);
   };
 
   // Open create dialog
@@ -307,6 +368,7 @@ export default function RingGroups() {
       description: group.description,
       strategy: group.strategy,
       timeout: group.timeout,
+      ring_turns: group.ring_turns,
       fallback_action: group.fallback_action,
       fallback_extension_id: group.fallback_extension_id,
       fallback_extension_number: group.fallback_extension_number,
@@ -332,17 +394,17 @@ export default function RingGroups() {
   const addMember = () => {
     const currentMembers = formData.members || [];
     const usedExtensionIds = currentMembers.map((m) => m.extension_id);
-    const availableExtensions = mockAvailableExtensions.filter(
+    const unusedExtensions = availableExtensions.filter(
       (ext) => !usedExtensionIds.includes(ext.id)
     );
 
-    if (availableExtensions.length === 0) return;
+    if (unusedExtensions.length === 0) return;
 
-    const firstAvailable = availableExtensions[0];
+    const firstAvailable = unusedExtensions[0];
     const newMember: RingGroupMember = {
       extension_id: firstAvailable.id,
       extension_number: firstAvailable.extension_number,
-      user_name: firstAvailable.user_name,
+      user_name: firstAvailable.user?.name || null,
       priority: currentMembers.length + 1,
     };
 
@@ -370,7 +432,7 @@ export default function RingGroups() {
 
   const updateMemberExtension = (index: number, extensionId: string) => {
     const currentMembers = formData.members || [];
-    const extension = mockAvailableExtensions.find((ext) => ext.id === extensionId);
+    const extension = availableExtensions.find((ext) => ext.id === extensionId);
     if (!extension) return;
 
     const newMembers = [...currentMembers];
@@ -378,7 +440,7 @@ export default function RingGroups() {
       ...newMembers[index],
       extension_id: extension.id,
       extension_number: extension.extension_number,
-      user_name: extension.user_name,
+      user_name: extension.user?.name || null,
     };
 
     setFormData({
@@ -442,7 +504,7 @@ export default function RingGroups() {
     const usedExtensionIds = currentMembers
       .map((m) => m.extension_id)
       .filter((id) => id !== currentMemberExtensionId);
-    return mockAvailableExtensions.filter((ext) => !usedExtensionIds.includes(ext.id));
+    return availableExtensions.filter((ext) => !usedExtensionIds.includes(ext.id));
   };
 
   // Render form dialog content
@@ -467,205 +529,39 @@ export default function RingGroups() {
         </Alert>
 
         <div className="space-y-4 py-4">
-          {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name">
-              Name <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="name"
-              value={formData.name || ''}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Sales Team"
-              className={formErrors.name ? 'border-red-500' : ''}
-            />
-            {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Optional description"
-              rows={2}
-            />
-          </div>
-
-          {/* Strategy */}
-          <div className="space-y-2">
-            <Label htmlFor="strategy">
-              Ring Strategy <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.strategy}
-              onValueChange={(value) =>
-                setFormData({ ...formData, strategy: value as RingGroupStrategy })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="simultaneous">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Simultaneous (Ring All)</div>
-                      <div className="text-xs text-muted-foreground">
-                        All members ring at the same time
-                      </div>
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="round_robin">
-                  <div className="flex items-center gap-2">
-                    <RotateCw className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Round Robin</div>
-                      <div className="text-xs text-muted-foreground">
-                        Calls distributed evenly in rotation
-                      </div>
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="sequential">
-                  <div className="flex items-center gap-2">
-                    <List className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Sequential</div>
-                      <div className="text-xs text-muted-foreground">
-                        Ring one at a time by priority
-                      </div>
-                    </div>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              {getStrategyDescription(formData.strategy as RingGroupStrategy)}
-            </p>
-          </div>
-
-          {/* Timeout */}
-          <div className="space-y-2">
-            <Label htmlFor="timeout">
-              Ring Timeout (seconds) <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="timeout"
-              type="number"
-              min="5"
-              max="300"
-              value={formData.timeout || 30}
-              onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) })}
-              className={formErrors.timeout ? 'border-red-500' : ''}
-            />
-            {formErrors.timeout && <p className="text-sm text-red-500">{formErrors.timeout}</p>}
-            <p className="text-sm text-muted-foreground">How long to ring before moving to fallback (5-300 seconds)</p>
-          </div>
-
-          {/* Fallback Action */}
-          <div className="space-y-2">
-            <Label htmlFor="fallback_action">
-              Fallback Action <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.fallback_action}
-              onValueChange={(value) => {
-                setFormData({
-                  ...formData,
-                  fallback_action: value as FallbackAction,
-                  fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
-                  fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="voicemail">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    <span>Voicemail</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="extension">
-                  <div className="flex items-center gap-2">
-                    <PhoneForwarded className="h-4 w-4" />
-                    <span>Forward to Extension</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="hangup">
-                  <div className="flex items-center gap-2">
-                    <PhoneOff className="h-4 w-4" />
-                    <span>Hangup</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="repeat">
-                  <div className="flex items-center gap-2">
-                    <Repeat className="h-4 w-4" />
-                    <span>Repeat (try again)</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Fallback Extension (conditional) */}
-          {formData.fallback_action === 'extension' && (
+          {/* Name and Status */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="fallback_extension">
-                Fallback Extension <span className="text-red-500">*</span>
+              <Label htmlFor="name">
+                Name <span className="text-red-500">*</span>
               </Label>
+              <Input
+                id="name"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Sales Team"
+                className={formErrors.name ? 'border-red-500' : ''}
+              />
+              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
               <Select
-                value={formData.fallback_extension_id || ''}
-                onValueChange={(value) => {
-                  const ext = mockAvailableExtensions.find((e) => e.id === value);
-                  setFormData({
-                    ...formData,
-                    fallback_extension_id: value,
-                    fallback_extension_number: ext?.extension_number,
-                  });
-                }}
+                value={formData.status}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, status: value as RingGroupStatus })
+                }
               >
-                <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select extension" />
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockAvailableExtensions.map((ext) => (
-                    <SelectItem key={ext.id} value={ext.id}>
-                      {ext.extension_number} - {ext.user_name || 'Unassigned'}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
-              {formErrors.fallback_extension && (
-                <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
-              )}
             </div>
-          )}
-
-          {/* Status */}
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) =>
-                setFormData({ ...formData, status: value as RingGroupStatus })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Members */}
@@ -778,6 +674,178 @@ export default function RingGroups() {
               </p>
             )}
           </div>
+
+          {/* Strategy */}
+          <div className="space-y-2">
+            <Label htmlFor="strategy">
+              Ring Strategy <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.strategy}
+              onValueChange={(value) =>
+                setFormData({ ...formData, strategy: value as RingGroupStrategy })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="simultaneous">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">Simultaneous (Ring All)</div>
+                      <div className="text-xs text-muted-foreground">
+                        All members ring at the same time
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="round_robin">
+                  <div className="flex items-center gap-2">
+                    <RotateCw className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">Round Robin</div>
+                      <div className="text-xs text-muted-foreground">
+                        Calls distributed evenly in rotation
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="sequential">
+                  <div className="flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">Sequential</div>
+                      <div className="text-xs text-muted-foreground">
+                        Ring one at a time by priority
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              {getStrategyDescription(formData.strategy as RingGroupStrategy)}
+            </p>
+          </div>
+
+          {/* Timeout and Ring Turns */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="timeout">
+                Extension Ring Timeout (seconds) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="timeout"
+                type="number"
+                min="5"
+                max="300"
+                value={formData.timeout || 30}
+                onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) })}
+                className={formErrors.timeout ? 'border-red-500' : ''}
+              />
+              {formErrors.timeout && <p className="text-sm text-red-500">{formErrors.timeout}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ring_turns">
+                Ring Turns <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="ring_turns"
+                type="number"
+                min="1"
+                max="9"
+                value={formData.ring_turns || 2}
+                onChange={(e) => setFormData({ ...formData, ring_turns: parseInt(e.target.value) })}
+                className={formErrors.ring_turns ? 'border-red-500' : ''}
+              />
+              {formErrors.ring_turns && <p className="text-sm text-red-500">{formErrors.ring_turns}</p>}
+            </div>
+          </div>
+
+          {/* Fallback Action */}
+          <div className="space-y-2">
+            <Label htmlFor="fallback_action">
+              Fallback Action <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.fallback_action}
+              onValueChange={(value) => {
+                setFormData({
+                  ...formData,
+                  fallback_action: value as RingGroupFallbackAction,
+                  fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
+                  fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="voicemail">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    <span>Voicemail</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="extension">
+                  <div className="flex items-center gap-2">
+                    <PhoneForwarded className="h-4 w-4" />
+                    <span>Forward to Extension</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="hangup">
+                  <div className="flex items-center gap-2">
+                    <PhoneOff className="h-4 w-4" />
+                    <span>Hangup</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="repeat">
+                  <div className="flex items-center gap-2">
+                    <Repeat className="h-4 w-4" />
+                    <span>Repeat (try again)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Fallback Extension (conditional) */}
+          {formData.fallback_action === 'extension' && (
+            <div className="space-y-2">
+              <Label htmlFor="fallback_extension">
+                Fallback Extension <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.fallback_extension_id || ''}
+                onValueChange={(value) => {
+                  const ext = availableExtensions.find((e) => e.id === value);
+                  setFormData({
+                    ...formData,
+                    fallback_extension_id: value,
+                    fallback_extension_number: ext?.extension_number,
+                  });
+                }}
+              >
+                <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select extension" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableExtensions.map((ext) => (
+                    <SelectItem key={ext.id} value={ext.id}>
+                      {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formErrors.fallback_extension && (
+                <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -900,7 +968,7 @@ export default function RingGroups() {
                     <ArrowUpDown className="ml-2 h-3 w-3" />
                   </Button>
                 </TableHead>
-                <TableHead>Timeout</TableHead>
+                <TableHead>Timeout / Turns</TableHead>
                 <TableHead>Fallback</TableHead>
                 <TableHead>
                   <Button
@@ -917,14 +985,26 @@ export default function RingGroups() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedGroups.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    Loading ring groups...
+                  </TableCell>
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-red-500 py-8">
+                    Error loading ring groups. Please try again.
+                  </TableCell>
+                </TableRow>
+              ) : ringGroups.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No ring groups found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAndSortedGroups.map((group) => (
+                ringGroups.map((group) => (
                   <TableRow key={group.id}>
                     <TableCell>
                       <div>
@@ -949,7 +1029,10 @@ export default function RingGroups() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{group.timeout}s</span>
+                      <div className="text-sm">
+                        <div>{group.timeout}s</div>
+                        <div className="text-xs text-muted-foreground">{group.ring_turns} {group.ring_turns === 1 ? 'turn' : 'turns'}</div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -1059,11 +1142,15 @@ export default function RingGroups() {
                   </p>
                 </div>
 
-                {/* Timeout & Fallback */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Timeout, Ring Turns & Status */}
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Timeout</h3>
+                    <h3 className="text-sm font-medium mb-2">Extension Timeout</h3>
                     <p className="text-sm">{selectedGroup.timeout} seconds</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Ring Turns</h3>
+                    <p className="text-sm">{selectedGroup.ring_turns} {selectedGroup.ring_turns === 1 ? 'turn' : 'turns'}</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium mb-2">Status</h3>

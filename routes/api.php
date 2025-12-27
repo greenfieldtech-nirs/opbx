@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
 use Illuminate\Support\Facades\Route;
@@ -97,6 +98,9 @@ Route::prefix('v1')->group(function (): void {
         // Conference Rooms
         Route::apiResource('conference-rooms', ConferenceRoomController::class);
 
+        // Ring Groups
+        Route::apiResource('ring-groups', RingGroupController::class);
+
         // Call Logs (read-only)
         Route::prefix('call-logs')->group(function (): void {
             Route::get('/', [CallLogController::class, 'index'])->name('call-logs.index');
@@ -116,7 +120,6 @@ Route::prefix('v1')->group(function (): void {
         // TODO: Add more resource controllers
         // - Organizations
         // - DID Numbers
-        // - Ring Groups
         // - Business Hours
     });
 });
