@@ -14,6 +14,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
 import { usersService } from '@/services/users.service';
+import { conferenceRoomsService } from '@/services/conferenceRooms.service';
+import { ringGroupsService } from '@/services/ringGroups.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,
@@ -222,6 +224,24 @@ export default function ExtensionsComplete() {
 
   const users = usersData?.data || [];
 
+  // Fetch conference rooms for conference extension type
+  const { data: conferenceRoomsData } = useQuery({
+    queryKey: ['conference-rooms', { per_page: 100, status: 'active' }],
+    queryFn: () => conferenceRoomsService.getAll({ per_page: 100, status: 'active' }),
+    enabled: formData.type === 'conference',
+  });
+
+  const conferenceRooms = conferenceRoomsData?.data || [];
+
+  // Fetch ring groups for ring group extension type
+  const { data: ringGroupsData } = useQuery({
+    queryKey: ['ring-groups', { per_page: 100, status: 'active' }],
+    queryFn: () => ringGroupsService.getAll({ per_page: 100, status: 'active' }),
+    enabled: formData.type === 'ring_group',
+  });
+
+  const ringGroups = ringGroupsData?.data || [];
+
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateExtensionRequest) => extensionsService.create(data),
@@ -230,8 +250,15 @@ export default function ExtensionsComplete() {
       toast.success('Extension created successfully');
     },
     onError: (error: any) => {
-      const message = error.response?.data?.error?.message || 'Failed to create extension';
-      toast.error(message);
+      const errors = error.response?.data?.errors;
+      if (errors) {
+        // Show first validation error
+        const firstError = Object.values(errors)[0];
+        toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+      } else {
+        const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to create extension';
+        toast.error(message);
+      }
     },
   });
 
@@ -244,8 +271,15 @@ export default function ExtensionsComplete() {
       toast.success('Extension updated successfully');
     },
     onError: (error: any) => {
-      const message = error.response?.data?.error?.message || 'Failed to update extension';
-      toast.error(message);
+      const errors = error.response?.data?.errors;
+      if (errors) {
+        // Show first validation error
+        const firstError = Object.values(errors)[0];
+        toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+      } else {
+        const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to update extension';
+        toast.error(message);
+      }
     },
   });
 
@@ -481,13 +515,28 @@ export default function ExtensionsComplete() {
         // No additional configuration for user extensions
         break;
       case 'conference':
-        configuration.conference_room_id = parseInt(formData.conference_room_id, 10);
+        if (formData.conference_room_id) {
+          const parsed = parseInt(formData.conference_room_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.conference_room_id = parsed;
+          }
+        }
         break;
       case 'ring_group':
-        configuration.ring_group_id = parseInt(formData.ring_group_id, 10);
+        if (formData.ring_group_id) {
+          const parsed = parseInt(formData.ring_group_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ring_group_id = parsed;
+          }
+        }
         break;
       case 'ivr':
-        configuration.ivr_id = parseInt(formData.ivr_id, 10);
+        if (formData.ivr_id) {
+          const parsed = parseInt(formData.ivr_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ivr_id = parsed;
+          }
+        }
         break;
       case 'ai_assistant':
         configuration.provider = formData.ai_provider;
@@ -506,10 +555,18 @@ export default function ExtensionsComplete() {
       extension_number: formData.extension_number,
       type: formData.type,
       status: formData.status,
-      user_id: formData.user_id === 'unassigned' || !formData.user_id ? null : parseInt(formData.user_id, 10),
       voicemail_enabled: false, // Voicemail disabled for now
       configuration,
     };
+
+    // Only include user_id for USER type extensions
+    if (formData.type === 'user') {
+      if (formData.user_id && formData.user_id !== 'unassigned') {
+        createData.user_id = parseInt(formData.user_id, 10);
+      } else {
+        createData.user_id = null;
+      }
+    }
 
     createMutation.mutate(createData, {
       onSuccess: () => {
@@ -535,13 +592,28 @@ export default function ExtensionsComplete() {
         // No additional configuration for user extensions
         break;
       case 'conference':
-        configuration.conference_room_id = parseInt(formData.conference_room_id, 10);
+        if (formData.conference_room_id) {
+          const parsed = parseInt(formData.conference_room_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.conference_room_id = parsed;
+          }
+        }
         break;
       case 'ring_group':
-        configuration.ring_group_id = parseInt(formData.ring_group_id, 10);
+        if (formData.ring_group_id) {
+          const parsed = parseInt(formData.ring_group_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ring_group_id = parsed;
+          }
+        }
         break;
       case 'ivr':
-        configuration.ivr_id = parseInt(formData.ivr_id, 10);
+        if (formData.ivr_id) {
+          const parsed = parseInt(formData.ivr_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ivr_id = parsed;
+          }
+        }
         break;
       case 'ai_assistant':
         configuration.provider = formData.ai_provider;
@@ -559,10 +631,18 @@ export default function ExtensionsComplete() {
     const updateData: UpdateExtensionRequest = {
       type: formData.type,
       status: formData.status,
-      user_id: formData.user_id === 'unassigned' || !formData.user_id ? null : parseInt(formData.user_id, 10),
       voicemail_enabled: false, // Voicemail disabled for now
       configuration,
     };
+
+    // Only include user_id for USER type extensions
+    if (formData.type === 'user') {
+      if (formData.user_id && formData.user_id !== 'unassigned') {
+        updateData.user_id = parseInt(formData.user_id, 10);
+      } else {
+        updateData.user_id = null;
+      }
+    }
 
     updateMutation.mutate(
       { id: selectedExtension.id, data: updateData },
@@ -663,9 +743,9 @@ export default function ExtensionsComplete() {
                 <SelectValue placeholder="Select a conference room" />
               </SelectTrigger>
               <SelectContent>
-                {mockConferenceRooms.map((room) => (
-                  <SelectItem key={room.id} value={room.id}>
-                    {room.name} ({room.number})
+                {conferenceRooms.map((room) => (
+                  <SelectItem key={room.id} value={room.id.toString()}>
+                    {room.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -693,8 +773,8 @@ export default function ExtensionsComplete() {
                 <SelectValue placeholder="Select a ring group" />
               </SelectTrigger>
               <SelectContent>
-                {mockRingGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
+                {ringGroups.map((group) => (
+                  <SelectItem key={group.id} value={group.id.toString()}>
                     {group.name}
                   </SelectItem>
                 ))}

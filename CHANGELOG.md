@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2025-12-27
+
+#### Extensions Dialog Critical Bug Fixes
+
+**Problem:** Extensions dialog was completely broken when creating/editing non-user extension types (conference, ring_group, ivr, ai_assistant, custom_logic, forward), resulting in validation errors and preventing successful creation.
+
+**Root Causes Identified:**
+1. **user_id field always sent**: Frontend was sending `user_id` field for ALL extension types, violating backend validation rule that requires `user_id` only for 'user' type extensions
+2. **Configuration IDs sent as NaN/null**: Empty string values were being parsed with `parseInt('', 10)` resulting in `NaN`, which serialized to `null` in JSON, failing backend integer validation
+3. **Using mock data**: Conference rooms and ring groups dropdowns showed hardcoded mock data instead of fetching from real API endpoints
+
+**Fixes Implemented:**
+- **Conditional user_id inclusion**: Modified `handleCreateExtension()` and `handleEditExtension()` to only include `user_id` field when extension type is 'user', completely omitting it for other types
+- **Proper integer parsing**: Added validation before parsing configuration IDs - only set field if value exists AND parses to valid integer (not NaN)
+- **Real API integration**: Added React Query hooks to fetch conference rooms from `/api/v1/conference-rooms` and ring groups from `/api/v1/ring-groups` with conditional enabling based on selected type
+- **Enhanced error handling**: Improved mutation error handlers to extract and display Laravel validation errors from the `errors` object, providing clear feedback to users
+
+**Files Modified:**
+- `frontend/src/pages/Extensions.tsx` - Core fixes to data submission logic
+
+**Request Format Examples:**
+
+Conference extension (correct format after fix):
+```json
+{
+  "extension_number": "1001",
+  "type": "conference",
+  "status": "active",
+  "voicemail_enabled": false,
+  "configuration": {
+    "conference_room_id": 1
+  }
+}
+```
+Note: NO `user_id` field!
+
+User extension (correct format):
+```json
+{
+  "extension_number": "1002",
+  "type": "user",
+  "status": "active",
+  "user_id": 5,
+  "voicemail_enabled": false,
+  "configuration": {}
+}
+```
+
+**Documentation Created:**
+- `EXTENSIONS_BUGFIX_SUMMARY.md` - Detailed analysis of problems and solutions
+- `EXTENSIONS_CODE_CHANGES.md` - Line-by-line code changes with before/after
+- `EXTENSIONS_TEST_SCENARIOS.md` - Complete test scenarios and validation checklist
+
+**Impact:** Extensions dialog now works correctly for ALL extension types, enabling proper PBX configuration and call routing setup.
+
 ### Added - 2025-12-27
 
 #### Phone Numbers (DIDs) Management Feature (Complete Implementation)
