@@ -87,11 +87,11 @@ class Organization extends Model
     }
 
     /**
-     * Get the business hours for the organization.
+     * Get the business hours schedules for the organization.
      */
-    public function businessHours(): HasMany
+    public function businessHoursSchedules(): HasMany
     {
-        return $this->hasMany(BusinessHours::class);
+        return $this->hasMany(BusinessHoursSchedule::class);
     }
 
     /**

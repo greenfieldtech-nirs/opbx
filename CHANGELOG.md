@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-12-27
+
+#### Business Hours Feature (Complete Implementation)
+
+- **Frontend Implementation**
+  - Created comprehensive Business Hours management UI in React (`frontend/src/pages/BusinessHours.tsx`)
+  - Implemented weekly schedule configuration with multiple time ranges per day
+  - Added exception dates support (holidays and special hours)
+  - Created Holiday Import dialog with dynamic country/year selection via Nager.Date API
+  - Added "Import Holidays" feature with 100+ countries support
+  - Implemented Copy Hours functionality for quick schedule duplication
+  - Created visual calendar view in detail sheet
+  - Added Open/Closed hours action selectors for call routing
+  - Removed timezone field (moved to global settings)
+  - Simplified status display with Active/Disabled indicators
+  - Created UI components: AlertDialog, RadioGroup, Checkbox, Separator
+  - Added mock data structure in `frontend/src/mock/businessHours.ts`
+  - Installed required dependencies: @radix-ui/react-alert-dialog, @radix-ui/react-radio-group, @radix-ui/react-checkbox, @radix-ui/react-separator
+
+- **Backend Implementation**
+  - Created comprehensive database schema with 5 tables:
+    - `business_hours_schedules` - Main schedules with tenant scoping
+    - `business_hours_schedule_days` - Days of week (Monday-Sunday)
+    - `business_hours_time_ranges` - Multiple time ranges per day
+    - `business_hours_exceptions` - Holidays and special hours
+    - `business_hours_exception_time_ranges` - Time ranges for special hours
+  - Implemented 8 Eloquent models with proper relationships:
+    - BusinessHoursSchedule with smart current_status calculation
+    - BusinessHoursScheduleDay
+    - BusinessHoursTimeRange with time overlap detection
+    - BusinessHoursException
+    - BusinessHoursExceptionTimeRange
+    - Type-safe enums: BusinessHoursStatus, BusinessHoursExceptionType, DayOfWeek
+  - Created RESTful API controller with 6 endpoints:
+    - GET /api/v1/business-hours (list with pagination and filtering)
+    - GET /api/v1/business-hours/{id} (single schedule with details)
+    - POST /api/v1/business-hours (create with nested data)
+    - PUT /api/v1/business-hours/{id} (update with transaction safety)
+    - DELETE /api/v1/business-hours/{id} (soft delete with validation)
+    - POST /api/v1/business-hours/{id}/duplicate (copy schedule)
+  - Implemented comprehensive validation with 40+ rules via FormRequests
+  - Created authorization policy with proper RBAC (Owner/Admin manage, Agents view)
+  - Added API Resources for proper JSON response formatting
+  - Implemented BusinessHoursScheduleFactory for testing
+
+- **Security & Quality**
+  - Complete multi-tenant isolation with organization scoping
+  - All database queries filtered by organization_id
+  - Transaction-safe complex operations
+  - Cross-organization access prevention with logging
+  - Soft deletes for data preservation
+  - Comprehensive input validation and sanitization
+  - N+1 query prevention with eager loading
+  - Proper indexing for performance
+
+- **Testing**
+  - Created 24 comprehensive tests:
+    - 15 Feature tests for API endpoints
+    - 9 Unit tests for business logic
+  - Tests cover: CRUD operations, tenant isolation, RBAC, validation, edge cases
+  - Test for current status calculation accuracy
+  - Test for exception date handling
+  - Test for time range overlap detection
+
+- **Documentation**
+  - Created `BUSINESS_HOURS_IMPLEMENTATION.md` with technical details
+  - Created `docs/BUSINESS_HOURS_SPECIFICATION.md` with complete feature specs
+  - Added inline PHPDoc comments throughout codebase
+  - Documented API endpoints and response formats
+
 ### Security - 2025-12-27
 
 #### Phase 2: Security Hardening & Performance Improvements

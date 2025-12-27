@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
@@ -107,6 +108,11 @@ Route::prefix('v1')->group(function (): void {
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
 
+        // Business Hours
+        Route::apiResource('business-hours', BusinessHoursController::class);
+        Route::post('business-hours/{businessHour}/duplicate', [BusinessHoursController::class, 'duplicate'])
+            ->name('business-hours.duplicate');
+
         // Call Logs (read-only)
         Route::prefix('call-logs')->group(function (): void {
             Route::get('/', [CallLogController::class, 'index'])->name('call-logs.index');
@@ -126,6 +132,5 @@ Route::prefix('v1')->group(function (): void {
         // TODO: Add more resource controllers
         // - Organizations
         // - DID Numbers
-        // - Business Hours
     });
 });
