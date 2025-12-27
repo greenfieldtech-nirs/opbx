@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone } from 'lucide-react';
+import opbxLogo from '@/assets/opbx_logo.png';
 
 // Form validation schema
 const loginSchema = z.object({
@@ -75,15 +75,7 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-3 bg-primary rounded-lg">
-                <Phone className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">OPBX</h1>
-                <p className="text-sm text-muted-foreground">Business PBX</p>
-              </div>
-            </div>
+            <img src={opbxLogo} alt="OPBX Logo" className="w-auto" />
           </div>
           <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
           <CardDescription className="text-center">

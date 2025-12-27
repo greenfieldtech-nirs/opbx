@@ -18,6 +18,7 @@ import {
   Activity,
   Video,
 } from 'lucide-react';
+import opbxLogo from '@/assets/opbx_logo.png';
 
 interface NavItem {
   name: string;
@@ -50,12 +51,8 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col bg-gray-900 text-white">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-gray-800">
-        <Phone className="h-8 w-8 text-blue-400" />
-        <div>
-          <h1 className="text-xl font-bold">OPBX</h1>
-          <p className="text-xs text-gray-400">Business PBX</p>
-        </div>
+      <div className="flex h-16 items-center justify-center px-6 border-b border-gray-800">
+        <img src={opbxLogo} alt="OPBX Logo" className="h-18 w-auto" />
       </div>
 
       {/* Navigation */}
