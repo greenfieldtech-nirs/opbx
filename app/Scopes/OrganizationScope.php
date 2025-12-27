@@ -19,6 +19,10 @@ class OrganizationScope implements Scope
 
         if ($organizationId !== null) {
             $builder->where($model->getTable() . '.organization_id', $organizationId);
+        } else {
+            // SECURITY: Force zero results when unauthenticated
+            // This prevents unauthorized access to any organization's data
+            $builder->whereRaw('1 = 0');
         }
     }
 
