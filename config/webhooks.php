@@ -39,4 +39,28 @@ return [
         */
         'max_response_size' => env('WEBHOOK_MAX_CACHE_SIZE', 102400),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Replay Protection
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for webhook replay attack protection using timestamp
+    | validation.
+    |
+    */
+
+    'replay_protection' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Maximum Webhook Age
+        |--------------------------------------------------------------------------
+        |
+        | Maximum age (in seconds) for webhook timestamps. Webhooks older than
+        | this will be rejected to prevent replay attacks.
+        | Default: 300 seconds (5 minutes)
+        |
+        */
+        'max_age' => env('WEBHOOK_REPLAY_MAX_AGE', 300),
+    ],
 ];

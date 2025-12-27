@@ -34,6 +34,45 @@ class EnsureWebhookIdempotency
             return $next($request);
         }
 
+        // Validate webhook timestamp to prevent replay attacks
+        $timestamp = $request->input('timestamp');
+        if ($timestamp) {
+            $webhookAge = time() - (int) $timestamp;
+            $maxAge = config('webhooks.replay_protection.max_age', 300); // 5 minutes default
+
+            if ($webhookAge > $maxAge) {
+                Log::warning('Webhook replay attack detected - timestamp too old', [
+                    'idempotency_key' => $idempotencyKey,
+                    'url' => $request->fullUrl(),
+                    'ip' => $request->ip(),
+                    'timestamp' => $timestamp,
+                    'age_seconds' => $webhookAge,
+                    'max_age_seconds' => $maxAge,
+                ]);
+
+                return response()->json([
+                    'error' => 'Webhook Expired',
+                    'message' => 'Webhook timestamp is too old. Possible replay attack.',
+                ], 400);
+            }
+
+            if ($webhookAge < -60) {
+                // Webhook is from the future (more than 1 minute)
+                Log::warning('Webhook with future timestamp detected', [
+                    'idempotency_key' => $idempotencyKey,
+                    'url' => $request->fullUrl(),
+                    'ip' => $request->ip(),
+                    'timestamp' => $timestamp,
+                    'age_seconds' => $webhookAge,
+                ]);
+
+                return response()->json([
+                    'error' => 'Invalid Timestamp',
+                    'message' => 'Webhook timestamp is in the future.',
+                ], 400);
+            }
+        }
+
         $cacheKey = "idem:webhook:{$idempotencyKey}";
         $ttl = config('webhooks.idempotency.ttl', 86400);
 
