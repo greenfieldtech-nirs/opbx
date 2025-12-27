@@ -7,7 +7,9 @@ namespace App\Models;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
+use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -91,6 +93,40 @@ class RingGroup extends Model
     public function isInactive(): bool
     {
         return $this->status === RingGroupStatus::INACTIVE;
+    }
+
+    /**
+     * Get active member extensions for this ring group.
+     *
+     * Returns a collection of Extension models that are:
+     * - Linked to this ring group via ring_group_members
+     * - Have status ACTIVE
+     * - Ordered by priority
+     *
+     * @return Collection
+     */
+    public function getMembers(): Collection
+    {
+        return $this->members()
+            ->with(['extension' => function ($query) {
+                $query->select('id', 'extension_number', 'user_id', 'status', 'configuration');
+            }])
+            ->whereHas('extension', function ($query) {
+                $query->where('status', UserStatus::ACTIVE->value);
+            })
+            ->orderBy('priority', 'asc')
+            ->get()
+            ->pluck('extension');
+    }
+
+    /**
+     * Get count of active members in this ring group.
+     *
+     * @return int
+     */
+    public function getActiveMemberCount(): int
+    {
+        return $this->getMembers()->count();
     }
 
     /**
