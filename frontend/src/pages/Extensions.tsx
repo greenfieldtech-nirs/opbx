@@ -224,6 +224,30 @@ export default function ExtensionsComplete() {
 
   const users = usersData?.data || [];
 
+  // Dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
+  const [showExtensionDetail, setShowExtensionDetail] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState<ExtensionFormData>({
+    extension_number: '',
+    type: 'user',
+    status: 'active',
+    user_id: '',
+    conference_room_id: '',
+    ring_group_id: '',
+    ivr_id: '',
+    ai_provider: '',
+    ai_phone_number: '',
+    container_application_name: '',
+    container_block_name: '',
+    forward_to: '',
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Fetch conference rooms for conference extension type
   const { data: conferenceRoomsData } = useQuery({
     queryKey: ['conference-rooms', { per_page: 100, status: 'active' }],
@@ -295,30 +319,6 @@ export default function ExtensionsComplete() {
       toast.error(message);
     },
   });
-
-  // Dialog state
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
-  const [showExtensionDetail, setShowExtensionDetail] = useState(false);
-
-  // Form state
-  const [formData, setFormData] = useState<ExtensionFormData>({
-    extension_number: '',
-    type: 'user',
-    status: 'active',
-    user_id: '',
-    conference_room_id: '',
-    ring_group_id: '',
-    ivr_id: '',
-    ai_provider: '',
-    ai_phone_number: '',
-    container_application_name: '',
-    container_block_name: '',
-    forward_to: '',
-  });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Check user permissions
   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
