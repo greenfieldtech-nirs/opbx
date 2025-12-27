@@ -68,7 +68,7 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
         Route::post('/login', [AuthController::class, 'login'])
-            ->middleware('throttle:5,1')
+            ->middleware('throttle:auth')
             ->name('auth.login');
 
         // Protected authentication routes
@@ -80,13 +80,19 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // Protected API routes
-    Route::middleware(['auth:sanctum', 'tenant.scope'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'tenant.scope', 'throttle:api'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
             Route::put('/', [ProfileController::class, 'update'])->name('profile.update');
-            Route::put('/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
-            Route::put('/organization', [ProfileController::class, 'updateOrganization'])->name('profile.organization');
+
+            // Sensitive operations with stricter rate limiting
+            Route::put('/password', [ProfileController::class, 'updatePassword'])
+                ->middleware('throttle:sensitive')
+                ->name('profile.password');
+            Route::put('/organization', [ProfileController::class, 'updateOrganization'])
+                ->middleware('throttle:sensitive')
+                ->name('profile.organization');
         });
 
         // Users
