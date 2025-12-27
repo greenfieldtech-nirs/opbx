@@ -404,7 +404,7 @@ export default function RingGroups() {
     const newMember: RingGroupMember = {
       extension_id: firstAvailable.id,
       extension_number: firstAvailable.extension_number,
-      user_name: firstAvailable.user?.name || null,
+      user_name: firstAvailable.name || null,
       priority: currentMembers.length + 1,
     };
 
@@ -440,7 +440,7 @@ export default function RingGroups() {
       ...newMembers[index],
       extension_id: extension.id,
       extension_number: extension.extension_number,
-      user_name: extension.user?.name || null,
+      user_name: extension.name || null,
     };
 
     setFormData({
@@ -633,7 +633,7 @@ export default function RingGroups() {
                         <SelectContent>
                           {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
                             <SelectItem key={ext.id} value={ext.id}>
-                              {ext.extension_number} - {ext.user_name || 'Unassigned'}
+                              {ext.extension_number} - {ext.name || 'Unassigned'}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -836,7 +836,7 @@ export default function RingGroups() {
                 <SelectContent>
                   {availableExtensions.map((ext) => (
                     <SelectItem key={ext.id} value={ext.id}>
-                      {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                      {ext.extension_number} - {ext.name || 'Unassigned'}
                     </SelectItem>
                   ))}
                 </SelectContent>
