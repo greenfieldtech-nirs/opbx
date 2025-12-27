@@ -16,6 +16,10 @@ You are provided the following internal Claude agents and MUST delegate tasks ac
 - frontend-developer
 - ui-designer
 - websocket-engineer
+- security-auditor
+- error-detective
+- debugger
+- code-reviewer
 
 Each agent should work only in its domain, but align to the overall architecture.
 
@@ -198,6 +202,37 @@ React SPA pages:
 - Live Calls (presence)
 
 Keep UI functional and minimal.
+
+MANDATORY EMPTY STATE PATTERN:
+All feature pages MUST display a consistent empty state when no data is available.
+Reference implementation: ConferenceRooms.tsx (lines 790-807)
+
+Required elements:
+1. Large icon (h-12 w-12 mx-auto text-muted-foreground mb-4) - relevant to the feature
+2. Heading (text-lg font-semibold mb-2) - "No [items] found"
+3. Contextual message (text-muted-foreground mb-4) - changes based on filters:
+   - If filters active: "Try adjusting your filters"
+   - If no filters: "Get started by creating your first [item]"
+4. Optional CTA button - shown only when no filters active AND user has create permissions
+
+Example implementation:
+```tsx
+<TableCell colSpan={N} className="text-center py-12">
+  <FeatureIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+  <h3 className="text-lg font-semibold mb-2">No [items] found</h3>
+  <p className="text-muted-foreground mb-4">
+    {hasActiveFilters
+      ? 'Try adjusting your filters'
+      : 'Get started by creating your first [item]'}
+  </p>
+  {canCreate && !hasActiveFilters && (
+    <Button onClick={openCreateDialog}>
+      <Plus className="h-4 w-4 mr-2" />
+      Create [Item]
+    </Button>
+  )}
+</TableCell>
+```
 
 ========================
 11) SECURITY & MULTI-TENANCY

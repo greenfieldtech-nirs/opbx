@@ -55,30 +55,46 @@ export default function DIDs() {
               </tr>
             </thead>
             <tbody>
-              {data?.data.map((did) => (
-                <tr key={did.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <PhoneCall className="h-5 w-5 text-blue-600" />
-                      <span className="font-medium">{formatPhoneNumber(did.did_number)}</span>
-                    </div>
-                  </td>
-                  <td className="p-4 capitalize">{did.routing_type.replace('_', ' ')}</td>
-                  <td className="p-4 text-muted-foreground">
-                    {did.extension?.extension_number || did.ring_group?.name || 'N/A'}
-                  </td>
-                  <td className="p-4">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getStatusColor(did.status))}>
-                      {did.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm">Edit</Button>
-                    </div>
+              {!data?.data || data.data.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12">
+                    <PhoneCall className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No phone numbers found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Get started by adding your first phone number
+                    </p>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Phone Number
+                    </Button>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                data.data.map((did) => (
+                  <tr key={did.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <PhoneCall className="h-5 w-5 text-blue-600" />
+                        <span className="font-medium">{formatPhoneNumber(did.did_number)}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 capitalize">{did.routing_type.replace('_', ' ')}</td>
+                    <td className="p-4 text-muted-foreground">
+                      {did.extension?.extension_number || did.ring_group?.name || 'N/A'}
+                    </td>
+                    <td className="p-4">
+                      <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getStatusColor(did.status))}>
+                        {did.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">Edit</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </CardContent>

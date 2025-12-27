@@ -69,21 +69,33 @@ export default function CallLogs() {
               </tr>
             </thead>
             <tbody>
-              {data?.data.map((call) => (
-                <tr key={call.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4">{formatPhoneNumber(call.from_number)}</td>
-                  <td className="p-4">{formatPhoneNumber(call.to_number)}</td>
-                  <td className="p-4">
-                    <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getStatusColor(call.status))}>
-                      {call.status}
-                    </span>
+              {!data?.data || data.data.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No call logs found</h3>
+                    <p className="text-muted-foreground">
+                      Call logs will appear here once you start receiving calls
+                    </p>
                   </td>
-                  <td className="p-4 text-muted-foreground">
-                    {call.duration ? formatDuration(call.duration) : 'N/A'}
-                  </td>
-                  <td className="p-4 text-muted-foreground">{formatDateTime(call.created_at)}</td>
                 </tr>
-              ))}
+              ) : (
+                data.data.map((call) => (
+                  <tr key={call.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">{formatPhoneNumber(call.from_number)}</td>
+                    <td className="p-4">{formatPhoneNumber(call.to_number)}</td>
+                    <td className="p-4">
+                      <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getStatusColor(call.status))}>
+                        {call.status}
+                      </span>
+                    </td>
+                    <td className="p-4 text-muted-foreground">
+                      {call.duration ? formatDuration(call.duration) : 'N/A'}
+                    </td>
+                    <td className="p-4 text-muted-foreground">{formatDateTime(call.created_at)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </CardContent>
