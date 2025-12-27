@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -24,13 +25,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Drop all tables in reverse order (respecting foreign key constraints)
+        // Disable foreign key checks to allow dropping tables
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+
+        // Drop all tables in reverse order
         Schema::dropIfExists('business_hours_exception_time_ranges');
         Schema::dropIfExists('business_hours_exceptions');
         Schema::dropIfExists('business_hours_time_ranges');
         Schema::dropIfExists('business_hours_schedule_days');
         Schema::dropIfExists('business_hours_schedules');
         Schema::dropIfExists('business_hours');
+
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Create business_hours_schedules table
         Schema::create('business_hours_schedules', function (Blueprint $table) {
@@ -50,15 +57,19 @@ return new class extends Migration
         // Create business_hours_schedule_days table
         Schema::create('business_hours_schedule_days', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('business_hours_schedule_id')
-                ->constrained('business_hours_schedules')
-                ->cascadeOnDelete();
+            $table->unsignedBigInteger('business_hours_schedule_id');
             $table->enum('day_of_week', [
                 'monday', 'tuesday', 'wednesday', 'thursday',
                 'friday', 'saturday', 'sunday'
             ]);
             $table->boolean('enabled')->default(false);
             $table->timestamps();
+
+            // Foreign key with custom short name
+            $table->foreign('business_hours_schedule_id', 'bh_schedule_days_schedule_fk')
+                ->references('id')
+                ->on('business_hours_schedules')
+                ->cascadeOnDelete();
 
             $table->unique(['business_hours_schedule_id', 'day_of_week'], 'schedule_day_unique');
             $table->index('business_hours_schedule_id');
@@ -67,12 +78,16 @@ return new class extends Migration
         // Create business_hours_time_ranges table
         Schema::create('business_hours_time_ranges', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('business_hours_schedule_day_id')
-                ->constrained('business_hours_schedule_days')
-                ->cascadeOnDelete();
+            $table->unsignedBigInteger('business_hours_schedule_day_id');
             $table->time('start_time'); // HH:mm format
             $table->time('end_time');   // HH:mm format
             $table->timestamps();
+
+            // Foreign key with custom short name
+            $table->foreign('business_hours_schedule_day_id', 'bh_time_ranges_day_fk')
+                ->references('id')
+                ->on('business_hours_schedule_days')
+                ->cascadeOnDelete();
 
             $table->index('business_hours_schedule_day_id');
         });
@@ -80,13 +95,17 @@ return new class extends Migration
         // Create business_hours_exceptions table
         Schema::create('business_hours_exceptions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('business_hours_schedule_id')
-                ->constrained('business_hours_schedules')
-                ->cascadeOnDelete();
+            $table->unsignedBigInteger('business_hours_schedule_id');
             $table->date('date'); // YYYY-MM-DD format
             $table->string('name');
             $table->enum('type', ['closed', 'special_hours'])->default('closed');
             $table->timestamps();
+
+            // Foreign key with custom short name
+            $table->foreign('business_hours_schedule_id', 'bh_exceptions_schedule_fk')
+                ->references('id')
+                ->on('business_hours_schedules')
+                ->cascadeOnDelete();
 
             $table->index('business_hours_schedule_id');
             $table->index('date');
@@ -95,12 +114,16 @@ return new class extends Migration
         // Create business_hours_exception_time_ranges table
         Schema::create('business_hours_exception_time_ranges', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('business_hours_exception_id')
-                ->constrained('business_hours_exceptions')
-                ->cascadeOnDelete();
+            $table->unsignedBigInteger('business_hours_exception_id');
             $table->time('start_time'); // HH:mm format
             $table->time('end_time');   // HH:mm format
             $table->timestamps();
+
+            // Foreign key with custom short name
+            $table->foreign('business_hours_exception_id', 'bh_exception_time_ranges_fk')
+                ->references('id')
+                ->on('business_hours_exceptions')
+                ->cascadeOnDelete();
 
             $table->index('business_hours_exception_id');
         });
