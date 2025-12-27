@@ -13,17 +13,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('ring_group_members', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('ring_group_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('extension_id')->constrained()->cascadeOnDelete();
-            $table->integer('priority')->default(1); // 1-100, used for sequential strategy
-            $table->timestamps();
+        if (!Schema::hasTable('ring_group_members')) {
+            Schema::create('ring_group_members', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('ring_group_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('extension_id')->constrained()->cascadeOnDelete();
+                $table->integer('priority')->default(1); // 1-100, used for sequential strategy
+                $table->timestamps();
 
-            $table->index('ring_group_id');
-            $table->index('extension_id');
-            $table->unique(['ring_group_id', 'extension_id']);
-        });
+                $table->index('ring_group_id');
+                $table->index('extension_id');
+                $table->unique(['ring_group_id', 'extension_id']);
+            });
+        }
     }
 
     /**

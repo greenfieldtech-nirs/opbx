@@ -13,22 +13,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('ring_groups', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
-            $table->string('name', 100);
-            $table->text('description')->nullable();
-            $table->enum('strategy', ['simultaneous', 'round_robin', 'sequential'])->default('simultaneous');
-            $table->integer('timeout')->default(30); // 5-300 seconds
-            $table->integer('ring_turns')->default(1); // 1-9 complete cycles
-            $table->enum('fallback_action', ['voicemail', 'extension', 'hangup', 'repeat'])->default('voicemail');
-            $table->foreignId('fallback_extension_id')->nullable()->constrained('extensions')->nullOnDelete();
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->timestamps();
+        if (!Schema::hasTable('ring_groups')) {
+            Schema::create('ring_groups', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+                $table->string('name', 100);
+                $table->text('description')->nullable();
+                $table->enum('strategy', ['simultaneous', 'round_robin', 'sequential'])->default('simultaneous');
+                $table->integer('timeout')->default(30); // 5-300 seconds
+                $table->integer('ring_turns')->default(1); // 1-9 complete cycles
+                $table->enum('fallback_action', ['voicemail', 'extension', 'hangup', 'repeat'])->default('voicemail');
+                $table->foreignId('fallback_extension_id')->nullable()->constrained('extensions')->nullOnDelete();
+                $table->enum('status', ['active', 'inactive'])->default('active');
+                $table->timestamps();
 
-            $table->index(['organization_id', 'status']);
-            $table->unique(['organization_id', 'name']);
-        });
+                $table->index(['organization_id', 'status']);
+                $table->unique(['organization_id', 'name']);
+            });
+        }
     }
 
     /**
