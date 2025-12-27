@@ -503,15 +503,20 @@ const BusinessHours: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
             <Clock className="h-8 w-8" />
             Business Hours
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground mt-1">
             Manage business hours schedules for time-based call routing
           </p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Business Hours</span>
+          </div>
         </div>
         {canManage && (
           <Button onClick={handleCreateNew}>
