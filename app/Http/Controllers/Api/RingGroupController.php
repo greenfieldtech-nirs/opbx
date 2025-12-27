@@ -13,6 +13,7 @@ use App\Models\RingGroup;
 use App\Models\RingGroupMember;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -282,7 +283,32 @@ class RingGroupController extends Controller
             'ring_group_id' => $ringGroup->id,
         ]);
 
+        // Acquire distributed lock to prevent race conditions during member updates
+        $lockKey = "lock:ring_group:{$ringGroup->id}";
+        $lock = Cache::lock($lockKey, 30);
+
         try {
+            // Try to acquire lock with 5 second timeout
+            if (! $lock->block(5)) {
+                Log::warning('Failed to acquire ring group lock', [
+                    'request_id' => $requestId,
+                    'user_id' => $user->id,
+                    'ring_group_id' => $ringGroup->id,
+                    'lock_key' => $lockKey,
+                ]);
+
+                return response()->json([
+                    'error' => 'Conflict',
+                    'message' => 'Ring group is currently being modified. Please try again.',
+                ], 409);
+            }
+
+            Log::debug('Ring group lock acquired', [
+                'request_id' => $requestId,
+                'ring_group_id' => $ringGroup->id,
+                'lock_key' => $lockKey,
+            ]);
+
             DB::transaction(function () use ($ringGroup, $validated): void {
                 // Extract members data
                 $membersData = $validated['members'] ?? [];
@@ -334,6 +360,16 @@ class RingGroupController extends Controller
                 'error' => 'Failed to update ring group',
                 'message' => 'An error occurred while updating the ring group.',
             ], 500);
+        } finally {
+            // Always release the lock
+            if (isset($lock)) {
+                $lock->release();
+                Log::debug('Ring group lock released', [
+                    'request_id' => $requestId,
+                    'ring_group_id' => $ringGroup->id,
+                    'lock_key' => $lockKey,
+                ]);
+            }
         }
     }
 
