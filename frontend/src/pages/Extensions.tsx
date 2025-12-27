@@ -1038,9 +1038,6 @@ export default function ExtensionsComplete() {
               <Phone className="h-8 w-8" />
               Extensions
             </h1>
-            <Badge variant="secondary" className="text-base">
-              {totalExtensions}
-            </Badge>
             {isReadOnly && (
               <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
                 Read-Only
