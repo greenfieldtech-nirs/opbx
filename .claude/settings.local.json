@@ -53,7 +53,9 @@
       "Bash(/tmp/test_validation_with_profile.sh:*)",
       "Bash(bash:*)",
       "Bash(/tmp/test_login.sh)",
-      "Bash(timeout 10 npm run dev:*)"
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
