@@ -27,13 +27,18 @@ export default function DIDs() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <PhoneCall className="h-7 w-7" />
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <PhoneCall className="h-8 w-8" />
             Phone Numbers
           </h1>
-          <p className="text-muted-foreground">Manage inbound phone numbers and routing</p>
+          <p className="text-muted-foreground mt-1">Manage inbound phone numbers and routing</p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Phone Numbers</span>
+          </div>
         </div>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
