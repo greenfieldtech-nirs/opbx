@@ -35,7 +35,7 @@ class EnsureWebhookIdempotency
         }
 
         $cacheKey = "idem:webhook:{$idempotencyKey}";
-        $ttl = config('cloudonix.webhooks.idempotency_ttl', 86400);
+        $ttl = config('webhooks.idempotency.ttl', 86400);
 
         // Check if webhook was already processed
         if (Cache::has($cacheKey)) {
@@ -47,9 +47,24 @@ class EnsureWebhookIdempotency
             // Return cached response or 200 OK
             $cachedResponse = Cache::get($cacheKey);
 
-            if (is_array($cachedResponse) && isset($cachedResponse['status'], $cachedResponse['content'])) {
-                return response($cachedResponse['content'], $cachedResponse['status'])
-                    ->header('Content-Type', 'application/xml');
+            if (is_array($cachedResponse)) {
+                $status = $cachedResponse['status'] ?? 200;
+
+                // If full content was cached, return it
+                if (isset($cachedResponse['content'])) {
+                    return response($cachedResponse['content'], $status)
+                        ->header('Content-Type', 'application/xml');
+                }
+
+                // If only metadata was cached (oversized response), return simple success
+                if (isset($cachedResponse['metadata_only']) && $cachedResponse['metadata_only']) {
+                    Log::debug('Returning success for oversized cached response', [
+                        'idempotency_key' => $idempotencyKey,
+                        'original_size' => $cachedResponse['size'] ?? 'unknown',
+                    ]);
+
+                    return response('', $status);
+                }
             }
 
             return response('', 200);
@@ -58,17 +73,9 @@ class EnsureWebhookIdempotency
         // Process the request
         $response = $next($request);
 
-        // Cache the idempotency key with response
+        // Cache the idempotency key with response (with size limits)
         try {
-            Cache::put($cacheKey, [
-                'status' => $response->getStatusCode(),
-                'content' => $response->getContent(),
-                'processed_at' => now()->toIso8601String(),
-            ], $ttl);
-
-            Log::debug('Webhook idempotency key cached', [
-                'idempotency_key' => $idempotencyKey,
-            ]);
+            $this->cacheResponse($cacheKey, $response, $ttl, $idempotencyKey);
         } catch (\Exception $e) {
             Log::error('Failed to cache webhook idempotency key', [
                 'idempotency_key' => $idempotencyKey,
@@ -77,6 +84,57 @@ class EnsureWebhookIdempotency
         }
 
         return $response;
+    }
+
+    /**
+     * Cache webhook response with size limits to prevent Redis memory exhaustion.
+     *
+     * @param string $cacheKey Redis cache key
+     * @param Response $response HTTP response to cache
+     * @param int $ttl Time to live in seconds
+     * @param string $idempotencyKey Idempotency key for logging
+     * @return void
+     */
+    private function cacheResponse(string $cacheKey, Response $response, int $ttl, string $idempotencyKey): void
+    {
+        $content = $response->getContent();
+        $contentSize = strlen($content);
+        $maxSize = config('webhooks.idempotency.max_response_size', 102400);
+
+        $status = $response->getStatusCode();
+
+        // If response is within size limits, cache full content
+        if ($contentSize <= $maxSize) {
+            Cache::put($cacheKey, [
+                'status' => $status,
+                'content' => $content,
+                'size' => $contentSize,
+                'processed_at' => now()->toIso8601String(),
+            ], $ttl);
+
+            Log::debug('Webhook response cached (full content)', [
+                'idempotency_key' => $idempotencyKey,
+                'size' => $contentSize,
+                'max_size' => $maxSize,
+            ]);
+
+            return;
+        }
+
+        // Response is too large - cache metadata only
+        Cache::put($cacheKey, [
+            'status' => $status,
+            'metadata_only' => true,
+            'size' => $contentSize,
+            'processed_at' => now()->toIso8601String(),
+        ], $ttl);
+
+        Log::warning('Webhook response too large for cache, storing metadata only', [
+            'idempotency_key' => $idempotencyKey,
+            'size' => $contentSize,
+            'max_size' => $maxSize,
+            'size_exceeded_by' => $contentSize - $maxSize,
+        ]);
     }
 
     /**
