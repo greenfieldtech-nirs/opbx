@@ -693,34 +693,19 @@ export default function RingGroups() {
                 <SelectItem value="simultaneous">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Simultaneous (Ring All)</div>
-                      <div className="text-xs text-muted-foreground">
-                        All members ring at the same time
-                      </div>
-                    </div>
+                    <span>Simultaneous (Ring All)</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="round_robin">
                   <div className="flex items-center gap-2">
                     <RotateCw className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Round Robin</div>
-                      <div className="text-xs text-muted-foreground">
-                        Calls distributed evenly in rotation
-                      </div>
-                    </div>
+                    <span>Round Robin</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="sequential">
                   <div className="flex items-center gap-2">
                     <List className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">Sequential</div>
-                      <div className="text-xs text-muted-foreground">
-                        Ring one at a time by priority
-                      </div>
-                    </div>
+                    <span>Sequential</span>
                   </div>
                 </SelectItem>
               </SelectContent>
