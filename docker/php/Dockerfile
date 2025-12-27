@@ -10,6 +10,7 @@ RUN apk add --no-cache \
     mysql-client \
     bash \
     supervisor \
+    icu-dev \
     && docker-php-ext-install \
     pdo_mysql \
     mbstring \
@@ -17,7 +18,8 @@ RUN apk add --no-cache \
     exif \
     pcntl \
     bcmath \
-    opcache
+    opcache \
+    intl
 
 # Install Redis extension
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
