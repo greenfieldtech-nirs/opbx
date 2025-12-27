@@ -40,20 +40,15 @@ class UsersController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Check authorization - only Owner and PBX Admin can list users
-        if (!$user->isOwner() && !$user->isPBXAdmin()) {
-            Log::warning('Unauthorized access to users list', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'role' => $user->role->value,
-            ]);
+        // Check authorization using policy
+        $this->authorize('viewAny', User::class);
 
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'You do not have permission to manage users.',
-            ], 403);
-        }
+        Log::info('Users list access authorized', [
+            'request_id' => $requestId,
+            'user_id' => $user->id,
+            'organization_id' => $user->organization_id,
+            'role' => $user->role->value,
+        ]);
 
         // Build query
         $query = User::query()
@@ -143,6 +138,9 @@ class UsersController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
+        // Check authorization using policy
+        $this->authorize('create', User::class);
+
         $validated = $request->validated();
 
         Log::info('Creating new user', [
@@ -214,21 +212,8 @@ class UsersController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Check authorization - only Owner and PBX Admin can view user details
-        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
-            Log::warning('Unauthorized access to user details', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'role' => $currentUser->role->value,
-            ]);
-
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'You do not have permission to view user details.',
-            ], 403);
-        }
+        // Check authorization using policy
+        $this->authorize('view', $user);
 
         // Tenant scope check
         if ($user->organization_id !== $currentUser->organization_id) {
@@ -276,6 +261,9 @@ class UsersController extends Controller
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
+
+        // Check authorization using policy
+        $this->authorize('update', $user);
 
         // Tenant scope check
         if ($user->organization_id !== $currentUser->organization_id) {
@@ -374,21 +362,8 @@ class UsersController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        // Check authorization - only Owner and PBX Admin can delete users
-        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
-            Log::warning('Unauthorized user deletion attempt', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'role' => $currentUser->role->value,
-            ]);
-
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'You do not have permission to delete users.',
-            ], 403);
-        }
+        // Check authorization using policy
+        $this->authorize('delete', $user);
 
         // Tenant scope check
         if ($user->organization_id !== $currentUser->organization_id) {
@@ -406,38 +381,7 @@ class UsersController extends Controller
             ], 404);
         }
 
-        // Cannot delete yourself
-        if ($currentUser->id === $user->id) {
-            Log::warning('Self-deletion attempt blocked', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Conflict',
-                'message' => 'You cannot delete yourself.',
-            ], 409);
-        }
-
-        // Cannot delete if not authorized by role hierarchy
-        if (!$currentUser->canManageUser($user)) {
-            Log::warning('Insufficient privilege to delete user', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'current_user_role' => $currentUser->role->value,
-                'target_user_role' => $user->role->value,
-            ]);
-
-            return response()->json([
-                'error' => 'Forbidden',
-                'message' => 'You do not have permission to delete this user.',
-            ], 403);
-        }
-
-        // Cannot delete last owner in organization
+        // Business logic: Cannot delete last owner in organization
         if ($user->role === UserRole::OWNER) {
             $ownerCount = User::forOrganization($currentUser->organization_id)
                 ->withRole(UserRole::OWNER)
