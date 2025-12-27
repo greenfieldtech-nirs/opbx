@@ -51,8 +51,9 @@ class CloudonixWebhookController extends Controller
         $fromNumber = $this->normalizePhoneNumber($from);
         $toNumber = $this->normalizePhoneNumber($to);
 
-        // Find organization by DID
-        $didNumber = DidNumber::where('phone_number', $toNumber)
+        // Find organization by DID (with eager loading)
+        $didNumber = DidNumber::with('organization:id,name,status')
+            ->where('phone_number', $toNumber)
             ->where('status', 'active')
             ->first();
 
@@ -60,6 +61,7 @@ class CloudonixWebhookController extends Controller
             Log::warning('DID not found for webhook', [
                 'call_id' => $callId,
                 'to_number' => $toNumber,
+                'from' => $fromNumber,
             ]);
 
             return response(
@@ -67,6 +69,42 @@ class CloudonixWebhookController extends Controller
                 200
             )->header('Content-Type', 'application/xml');
         }
+
+        // Validate organization exists and is active
+        if (!$didNumber->organization) {
+            Log::error('DID belongs to non-existent organization', [
+                'call_id' => $callId,
+                'did_id' => $didNumber->id,
+                'phone_number' => $toNumber,
+                'organization_id' => $didNumber->organization_id,
+            ]);
+
+            return response(
+                '<Response><Say>Service temporarily unavailable.</Say><Hangup/></Response>',
+                200
+            )->header('Content-Type', 'application/xml');
+        }
+
+        if ($didNumber->organization->status !== 'active') {
+            Log::warning('Call to inactive organization', [
+                'call_id' => $callId,
+                'did_id' => $didNumber->id,
+                'organization_id' => $didNumber->organization_id,
+                'organization_status' => $didNumber->organization->status,
+            ]);
+
+            return response(
+                '<Response><Say>Service temporarily unavailable.</Say><Hangup/></Response>',
+                200
+            )->header('Content-Type', 'application/xml');
+        }
+
+        Log::info('Webhook validated for organization', [
+            'call_id' => $callId,
+            'organization_id' => $didNumber->organization_id,
+            'organization_name' => $didNumber->organization->name,
+            'did_number' => $toNumber,
+        ]);
 
         // Dispatch job to process webhook asynchronously
         ProcessInboundCallJob::dispatch([
