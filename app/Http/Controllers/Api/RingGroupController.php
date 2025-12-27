@@ -47,10 +47,28 @@ class RingGroupController extends Controller
             'organization_id' => $user->organization_id,
         ]);
 
-        // Build query with members relationship
+        // Build query with eager loading and member counts
         $query = RingGroup::query()
             ->forOrganization($user->organization_id)
-            ->with(['members.extension.user:id,name', 'fallbackExtension:id,extension_number']);
+            ->with([
+                'members' => function ($query) {
+                    $query->select('id', 'ring_group_id', 'extension_id', 'priority')
+                        ->orderBy('priority', 'asc');
+                },
+                'members.extension' => function ($query) {
+                    $query->select('id', 'user_id', 'extension_number', 'status');
+                },
+                'members.extension.user:id,name',
+                'fallbackExtension:id,extension_number',
+            ])
+            ->withCount([
+                'members',
+                'members as active_members_count' => function ($query) {
+                    $query->whereHas('extension', function ($q) {
+                        $q->where('status', 'active');
+                    });
+                },
+            ]);
 
         // Apply filters
         if ($request->has('strategy')) {
