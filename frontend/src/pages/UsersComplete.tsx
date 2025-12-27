@@ -702,32 +702,26 @@ export default function UsersComplete() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit User
                               </DropdownMenuItem>
-                              {user.role !== 'reporter' && (
-                                <DropdownMenuItem>
-                                  <UserCog className="h-4 w-4 mr-2" />
-                                  Manage Extension
-                                </DropdownMenuItem>
+                              {user.role !== 'owner' && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => {
+                                      setSelectedUser(user);
+                                      setShowDeleteDialog(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete User
+                                  </DropdownMenuItem>
+                                </>
                               )}
-                              <DropdownMenuItem>
-                                <KeyRound className="h-4 w-4 mr-2" />
-                                Send Password Reset
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
-                                <UserCheck className="h-4 w-4 mr-2" />
-                                {user.status === 'active' ? 'Deactivate' : 'Activate'}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowDeleteDialog(true);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete User
-                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -1027,8 +1021,14 @@ export default function UsersComplete() {
                 onCheckedChange={(checked) =>
                   setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
                 }
+                disabled={selectedUser?.role === 'owner'}
               />
             </div>
+            {selectedUser?.role === 'owner' && (
+              <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                Cannot change status of organization owner
+              </p>
+            )}
 
             {/* Same form fields as Create */}
             <div className="grid grid-cols-2 gap-4">
@@ -1070,17 +1070,23 @@ export default function UsersComplete() {
               <Select
                 value={formData.role}
                 onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}
+                disabled={selectedUser?.role === 'owner'}
               >
                 <SelectTrigger id="edit-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
                   <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                   <SelectItem value="pbx_user">PBX User</SelectItem>
                   <SelectItem value="reporter">Reporter</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Note: Backend enforces role change permissions</p>
+              {selectedUser?.role === 'owner' ? (
+                <p className="text-xs text-amber-600">Cannot change role of organization owner</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Note: Backend enforces role change permissions</p>
+              )}
             </div>
 
             {/* Contact Information */}
