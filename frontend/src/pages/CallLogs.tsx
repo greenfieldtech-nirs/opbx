@@ -41,13 +41,18 @@ export default function CallLogs() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-7 w-7" />
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <FileText className="h-8 w-8" />
             Call Logs
           </h1>
-          <p className="text-muted-foreground">View call history and records</p>
+          <p className="text-muted-foreground mt-1">View call history and records</p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Call Logs</span>
+          </div>
         </div>
         <Button onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />

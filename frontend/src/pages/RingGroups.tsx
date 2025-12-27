@@ -842,13 +842,18 @@ export default function RingGroups() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <UserPlus className="h-7 w-7" />
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <UserPlus className="h-8 w-8" />
             Ring Groups
           </h1>
-          <p className="text-muted-foreground">Manage extension ring groups and routing strategies</p>
+          <p className="text-muted-foreground mt-1">Manage extension ring groups and routing strategies</p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Ring Groups</span>
+          </div>
         </div>
         {canManage && (
           <Button onClick={openCreateDialog}>

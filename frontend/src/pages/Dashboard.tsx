@@ -53,10 +53,18 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <LayoutDashboard className="h-7 w-7" />
-          Dashboard
-        </h1>
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <LayoutDashboard className="h-8 w-8" />
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Overview of your PBX system activity and statistics
+          </p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span className="text-foreground">Dashboard</span>
+          </div>
+        </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -78,13 +86,16 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <LayoutDashboard className="h-7 w-7" />
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <LayoutDashboard className="h-8 w-8" />
           Dashboard
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground mt-1">
           Overview of your PBX system activity and statistics
         </p>
+        <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+          <span className="text-foreground">Dashboard</span>
+        </div>
       </div>
 
       {/* Statistics Cards */}

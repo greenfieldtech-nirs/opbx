@@ -52,11 +52,19 @@ export default function Users() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-7 w-7" />
-            Users
-          </h1>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Users className="h-8 w-8" />
+              Users
+            </h1>
+            <p className="text-muted-foreground mt-1">Manage user accounts and permissions</p>
+            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+              <span>Dashboard</span>
+              <span>/</span>
+              <span className="text-foreground">Users</span>
+            </div>
+          </div>
         </div>
         <Card>
           <CardContent className="p-6">
@@ -75,13 +83,18 @@ export default function Users() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-7 w-7" />
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Users className="h-8 w-8" />
             Users
           </h1>
-          <p className="text-muted-foreground">Manage user accounts and permissions</p>
+          <p className="text-muted-foreground mt-1">Manage user accounts and permissions</p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Users</span>
+          </div>
         </div>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -110,9 +123,6 @@ export default function Users() {
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
-          <CardDescription>
-            {data?.total || 0} users found
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
