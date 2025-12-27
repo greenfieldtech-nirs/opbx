@@ -77,6 +77,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added inline PHPDoc comments throughout codebase
   - Documented API endpoints and response formats
 
+### Fixed - 2025-12-27
+
+#### Business Hours Toast Notifications
+- Fixed toast notification format errors in Business Hours UI (`frontend/src/pages/BusinessHours.tsx`)
+  - Migrated from object-based toast API to sonner's string-based API
+  - Fixed 9 instances of incorrect toast usage causing "Objects are not valid as a React child" errors
+  - Updated all toast calls to use `toast.success()` and `toast.error()` methods
+  - Resolved Copy Hours button functionality
+  - Fixed exception form validation error notifications
+  - Fixed schedule create/update/delete success notifications
+
 ### Security - 2025-12-27
 
 #### Phase 2: Security Hardening & Performance Improvements

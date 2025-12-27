@@ -273,10 +273,7 @@ const BusinessHours: React.FC = () => {
     });
 
     setIsCopyHoursDialogOpen(false);
-    toast({
-      title: 'Hours Copied',
-      description: `Copied hours from ${copyFromDay} to ${copyToDays.length} day(s).`,
-    });
+    toast.success(`Copied hours from ${copyFromDay} to ${copyToDays.length} day(s).`);
   };
 
   // Toggle copy day selection
@@ -307,11 +304,7 @@ const BusinessHours: React.FC = () => {
   const handleSaveException = () => {
     // Validate
     if (!exceptionFormData.date || !exceptionFormData.name) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive',
-      });
+      toast.error('Please fill in all required fields.');
       return;
     }
 
@@ -346,10 +339,7 @@ const BusinessHours: React.FC = () => {
     });
 
     setIsExceptionDialogOpen(false);
-    toast({
-      title: editingException ? 'Exception Updated' : 'Exception Added',
-      description: `Exception date has been ${editingException ? 'updated' : 'added'}.`,
-    });
+    toast.success(`Exception date has been ${editingException ? 'updated' : 'added'}.`);
   };
 
   const handleDeleteException = (exceptionId: string) => {
@@ -358,10 +348,7 @@ const BusinessHours: React.FC = () => {
       exceptions: (prev.exceptions || []).filter((ex) => ex.id !== exceptionId),
     }));
 
-    toast({
-      title: 'Exception Removed',
-      description: 'Exception date has been removed.',
-    });
+    toast.success('Exception date has been removed.');
   };
 
   // Validate and save schedule
@@ -402,11 +389,7 @@ const BusinessHours: React.FC = () => {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      toast({
-        title: 'Validation Error',
-        description: 'Please fix the errors in the form.',
-        variant: 'destructive',
-      });
+      toast.error('Please fix the errors in the form.');
       return;
     }
 
@@ -433,17 +416,11 @@ const BusinessHours: React.FC = () => {
       setSchedules((prev) =>
         prev.map((s) => (s.id === editingSchedule.id ? savedSchedule : s))
       );
-      toast({
-        title: 'Schedule Updated',
-        description: 'Business hours schedule has been updated successfully.',
-      });
+      toast.success('Business hours schedule has been updated successfully.');
     } else {
       // Create new
       setSchedules((prev) => [...prev, savedSchedule]);
-      toast({
-        title: 'Schedule Created',
-        description: 'Business hours schedule has been created successfully.',
-      });
+      toast.success('Business hours schedule has been created successfully.');
     }
 
     setIsCreateEditDialogOpen(false);
@@ -464,20 +441,13 @@ const BusinessHours: React.FC = () => {
     );
 
     if (associatedDids.length > 0) {
-      toast({
-        title: 'Cannot Delete',
-        description: `This schedule is associated with ${associatedDids.length} DID(s). Remove associations first.`,
-        variant: 'destructive',
-      });
+      toast.error(`This schedule is associated with ${associatedDids.length} DID(s). Remove associations first.`);
       setIsDeleteDialogOpen(false);
       return;
     }
 
     setSchedules((prev) => prev.filter((s) => s.id !== selectedSchedule.id));
-    toast({
-      title: 'Schedule Deleted',
-      description: 'Business hours schedule has been deleted.',
-    });
+    toast.success('Business hours schedule has been deleted.');
     setIsDeleteDialogOpen(false);
   };
 
