@@ -121,7 +121,7 @@ export default function RingGroups() {
     strategy: 'simultaneous',
     timeout: 30,
     ring_turns: 2,
-    fallback_action: 'voicemail',
+    fallback_action: 'extension',
     status: 'active',
     members: [],
   });
@@ -291,7 +291,7 @@ export default function RingGroups() {
       strategy: 'simultaneous',
       timeout: 30,
       ring_turns: 2,
-      fallback_action: 'voicemail',
+      fallback_action: 'extension',
       status: 'active',
       members: [],
     });
@@ -770,12 +770,6 @@ export default function RingGroups() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="voicemail">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    <span>Voicemail</span>
-                  </div>
-                </SelectItem>
                 <SelectItem value="extension">
                   <div className="flex items-center gap-2">
                     <PhoneForwarded className="h-4 w-4" />
@@ -786,12 +780,6 @@ export default function RingGroups() {
                   <div className="flex items-center gap-2">
                     <PhoneOff className="h-4 w-4" />
                     <span>Hangup</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="repeat">
-                  <div className="flex items-center gap-2">
-                    <Repeat className="h-4 w-4" />
-                    <span>Repeat (try again)</span>
                   </div>
                 </SelectItem>
               </SelectContent>

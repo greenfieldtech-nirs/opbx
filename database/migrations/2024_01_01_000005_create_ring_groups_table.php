@@ -22,7 +22,7 @@ return new class extends Migration
                 $table->enum('strategy', ['simultaneous', 'round_robin', 'sequential'])->default('simultaneous');
                 $table->integer('timeout')->default(30); // 5-300 seconds
                 $table->integer('ring_turns')->default(1); // 1-9 complete cycles
-                $table->enum('fallback_action', ['voicemail', 'extension', 'hangup', 'repeat'])->default('voicemail');
+                $table->enum('fallback_action', ['extension', 'hangup'])->default('extension');
                 $table->foreignId('fallback_extension_id')->nullable()->constrained('extensions')->nullOnDelete();
                 $table->enum('status', ['active', 'inactive'])->default('active');
                 $table->timestamps();
