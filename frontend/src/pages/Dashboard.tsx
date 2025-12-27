@@ -7,7 +7,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { callLogsService } from '@/services/callLogs.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Users, PhoneCall, Activity } from 'lucide-react';
+import { Phone, Users, PhoneCall, Activity, LayoutDashboard } from 'lucide-react';
 import { formatPhoneNumber, formatTimeAgo, getStatusColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 
@@ -53,7 +53,10 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <LayoutDashboard className="h-7 w-7" />
+          Dashboard
+        </h1>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -75,7 +78,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <LayoutDashboard className="h-7 w-7" />
+          Dashboard
+        </h1>
         <p className="text-muted-foreground">
           Overview of your PBX system activity and statistics
         </p>

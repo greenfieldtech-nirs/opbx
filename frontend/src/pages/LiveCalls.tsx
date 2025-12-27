@@ -73,7 +73,10 @@ export default function LiveCalls() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Live Calls</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Activity className="h-7 w-7" />
+            Live Calls
+          </h1>
           <p className="text-muted-foreground">Real-time active call monitoring</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -65,6 +65,7 @@ import {
   Search,
   Filter,
   Users,
+  UserPlus,
   RotateCw,
   List,
   PhoneForwarded,
@@ -843,7 +844,10 @@ export default function RingGroups() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Ring Groups</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <UserPlus className="h-7 w-7" />
+            Ring Groups
+          </h1>
           <p className="text-muted-foreground">Manage extension ring groups and routing strategies</p>
         </div>
         {canManage && (

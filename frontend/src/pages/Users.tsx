@@ -10,7 +10,7 @@ import { usersService } from '@/services/users.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Trash2, Edit, UserCheck } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, UserCheck, Users } from 'lucide-react';
 import { formatDate, getRoleColor, getStatusColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -53,7 +53,10 @@ export default function Users() {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Users</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-7 w-7" />
+            Users
+          </h1>
         </div>
         <Card>
           <CardContent className="p-6">
@@ -74,7 +77,10 @@ export default function Users() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Users</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-7 w-7" />
+            Users
+          </h1>
           <p className="text-muted-foreground">Manage user accounts and permissions</p>
         </div>
         <Button>

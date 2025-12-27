@@ -29,7 +29,10 @@ export default function DIDs() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Phone Numbers</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <PhoneCall className="h-7 w-7" />
+            Phone Numbers
+          </h1>
           <p className="text-muted-foreground">Manage inbound phone numbers and routing</p>
         </div>
         <Button>

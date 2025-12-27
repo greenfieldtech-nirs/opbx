@@ -884,7 +884,10 @@ export default function ExtensionsComplete() {
         <div className="space-y-6">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold">My Extension</h1>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Phone className="h-8 w-8" />
+                My Extension
+              </h1>
               <p className="text-muted-foreground mt-1">
                 Your phone extension settings
               </p>
@@ -908,7 +911,10 @@ export default function ExtensionsComplete() {
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold">My Extension</h1>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Phone className="h-8 w-8" />
+              My Extension
+            </h1>
             <p className="text-muted-foreground mt-1">
               Your phone extension settings
             </p>
@@ -999,7 +1005,10 @@ export default function ExtensionsComplete() {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Extensions</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Phone className="h-8 w-8" />
+            Extensions
+          </h1>
         </div>
         <Card>
           <CardContent className="p-6">
@@ -1025,7 +1034,10 @@ export default function ExtensionsComplete() {
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Extensions</h1>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Phone className="h-8 w-8" />
+              Extensions
+            </h1>
             <Badge variant="secondary" className="text-base">
               {totalExtensions}
             </Badge>
