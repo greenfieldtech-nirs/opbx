@@ -7,6 +7,176 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-12-28
+
+#### Phase 1 Voice Routing Implementation (Complete)
+
+**Core Routing Application - Steps 1-5 Complete**
+
+- **Voice Routing Controller** (`app/Http/Controllers/Voice/VoiceRoutingController.php`)
+  - Implemented complete call classification system (Internal, External, Invalid)
+  - Added extension-to-extension routing with Dial CXML generation
+  - Implemented user validation for extensions (assigned, active status)
+  - Added tenant isolation validation for FROM and TO extensions
+  - Implemented E.164 outbound calling with extension-type based permissions
+  - Added comprehensive structured logging for all routing decisions
+  - Security checks to prevent external callers from E.164 dialing
+  - Defense-in-depth validation with CRITICAL security event logging
+
+- **Extension Type Access Control**
+  - Added `canMakeOutboundCalls()` method to ExtensionType enum
+  - Only PBX User extensions can make outbound calls (enabled by default)
+  - All other extension types (AI Assistant, IVR, Conference, Ring Group, etc.) blocked from outbound
+  - Enhanced validation with extension type tracking in all logs
+
+- **E.164 Number Validation**
+  - Implemented `validateE164Number()` with enhanced validation
+  - Rejects all-zeros patterns (e.g., +00000000000)
+  - Rejects all-same-digit patterns (e.g., +11111111111)
+  - Validates country code cannot be 0
+  - Requires minimum 8 digits for international numbers
+  - Proper error messages for invalid number formats
+
+- **Call Detail Records (CDR) System**
+  - Created CallDetailRecord model with comprehensive field mapping
+  - Implemented CDR webhook endpoint with synchronous processing
+  - Added CDR storage with organization_id tenant isolation
+  - Returns CDR ID on successful storage with proper JSON response
+  - Handles callAnswerTime=0 by storing NULL instead of epoch date
+  - Fixed return type declaration (Response → JsonResponse)
+  - Added pagination, filtering (from, to, disposition, dates), and search
+  - Implemented CSV export functionality
+
+- **CDR Viewer UI** (`frontend/src/pages/CallLogs.tsx`)
+  - Created comprehensive Call Logs page with CDR table
+  - Added filter controls (From/To number, date range, disposition)
+  - Implemented disposition color coding:
+    - ANSWER/ANSWERED: Green
+    - BUSY: Cyan
+    - CANCEL/CANCELLED: Yellow
+    - CONGESTION: Red
+    - FAILED: Orange
+    - NO ANSWER/NOANSWER: Blue
+  - Added CDR detail modal with complete call information
+  - Implemented export to CSV functionality
+  - Added pagination controls
+
+- **Webhook Infrastructure**
+  - Created `VerifyCloudonixRequestAuth` middleware for voice webhooks
+  - Implemented dual authentication: Bearer token for voice, domain UUID for CDR
+  - Added session-update webhook endpoint (mock implementation, always returns 200 OK)
+  - Enhanced idempotency middleware to distinguish CDR from other webhooks
+  - Accept delayed CDR webhooks (log but don't reject old timestamps)
+  - Extract organization from owner.domain.uuid in CDR webhooks
+
+- **Cloudonix Integration & Sync**
+  - Created CloudonixSubscriberService for extension-subscriber synchronization
+  - Implemented bidirectional sync: local ↔ Cloudonix with status reconciliation
+  - Added sync comparison and manual sync API endpoints (GET/POST /api/v1/extensions/sync)
+  - Added CloudonixSyncSubscribers artisan command for CLI-based sync
+  - Implemented listSubscribers() method in CloudonixClient
+  - Added migration for cloudonix_subscriber_id, cloudonix_uuid, cloudonix_synced fields
+  - Status field sync in subscriber updates (active/inactive)
+  - Skip phone number subscribers (>5 digits) during import
+  - Graceful handling of Cloudonix API failures with detailed warnings
+
+- **Extension Password Management**
+  - Created PasswordGenerator service for strong password generation
+    - Generates 16-32 character passwords (24 chars default)
+    - Minimum 2 special characters, 2 digits, 2 lowercase, 2 uppercase letters
+  - Added password column to extensions table (migration)
+  - Auto-generate passwords on extension creation (server-side)
+  - Passwords stored in plain text for SIP authentication
+  - Frontend: password visibility toggle and copy-to-clipboard functionality
+
+- **Ngrok Tunnel Integration**
+  - Replaced Cloudflare tunnel with ngrok in docker-compose
+  - Added NGROK_AUTHTOKEN to .env.example
+  - Configured ngrok web interface on port 4040
+  - Updated documentation with ngrok-only instructions
+
+- **UI Refresh Functionality**
+  - Added refresh buttons to 6 pages: Users, Extensions, Conference Rooms, Phone Numbers, Ring Groups, Business Hours
+  - RefreshCw icon with spinning animation during data refresh
+  - Sync Extensions button with comparison and sync logic
+  - Toast notifications for sync results with detailed counts
+
+### Fixed - 2025-12-28
+
+#### Voice Routing & Extension Management
+
+- **Extension User Assignment**
+  - Removed validation requirement that forced USER type extensions to have a user_id
+  - Extensions can now be created unassigned (normal PBX workflow)
+  - Kept validation to prevent non-USER extension types from being assigned to users
+
+- **Enum Comparisons**
+  - Fixed ExtensionType and UserStatus enum comparisons in voice routing
+  - Use `.value` property for proper enum value comparison
+
+- **CDR Processing**
+  - Fixed callAnswerTime=0 handling to store NULL instead of 1970-01-01 00:00:00
+  - Changed CDR processing from async to sync for immediate error responses
+  - Fixed return type mismatch (Response vs JsonResponse)
+
+- **Webhook Timestamp Validation**
+  - Fixed CDR webhook rejection for delayed records
+  - Added CDR-specific exception to accept old timestamps with logging
+  - Distinguish CDR webhooks from other webhook types in idempotency middleware
+
+- **Authentication Error Handling**
+  - Fixed authentication to return JSON 401/403 for API routes
+  - Proper error responses for webhook authentication failures
+
+### Changed - 2025-12-28
+
+#### Configuration & Architecture
+
+- **Extension Validation Rules**
+  - Updated `UpdateExtensionRequest` to allow unassigned USER extensions
+  - Modified extension user_id validation logic
+
+- **Password Generation**
+  - Replaced random password generator with dictionary-based passphrase generator
+  - Enhanced security with structured password patterns
+
+- **Cloudonix Configuration**
+  - Restructured `config/cloudonix.php` with nested 'api' configuration
+  - Added Cloudonix OpenAPI spec for reference
+
+- **Tunnel Strategy**
+  - Migrated from Cloudflare Tunnel to ngrok for local development
+  - Updated all documentation and setup scripts
+
+### Security - 2025-12-28
+
+#### Voice Routing Security
+
+- **Tenant Isolation (Phase 1 Step 4)**
+  - Added FROM extension organization validation with CRITICAL security logging
+  - Added destination extension organization validation
+  - Implemented defense-in-depth security checks in call routing
+  - Structured logging for tenant isolation events with severity levels
+  - Security audit trail for cross-organization routing attempts
+
+- **Outbound Calling Access Control (Phase 1 Step 5)**
+  - Extension-type based access control for outbound calling
+  - Only PBX User extensions allowed to make outbound calls
+  - Additional E.164 validation beyond basic format checks
+  - Rejects obviously invalid number patterns
+  - Comprehensive logging for outbound call attempts with extension type
+
+- **External Caller Protection**
+  - Security check to reject external callers attempting E.164 dialing
+  - Prevents unauthorized outbound calling through internal routing
+
+### Documentation - 2025-12-28
+
+- Updated `CORE_ROUTING_SPECIFICATION.md` with call classification rules
+- Added ngrok setup instructions to bootstrap script
+- Documented webhook authentication requirements
+- Added inline documentation for voice routing logic
+
 ### Fixed - 2025-12-27
 
 #### Extensions Dialog Critical Bug Fixes
