@@ -15,17 +15,17 @@ This application transforms static PBX configuration (users, extensions, ring gr
 The Core Routing Application sits between two major components:
 
 ```
-┌─────────────────┐      HTTP POST        ┌──────────────────────┐      CXML Response      ┌─────────────────┐
+┌─────────────────┐      HTTP POST       ┌──────────────────────┐    CXML Response      ┌─────────────────┐
 │   Cloudonix     │ ──────────────────→  │  Core Routing App    │ ──────────────────→   │   Cloudonix     │
-│   Platform      │   (Call Event)        │   (Webhook)          │   (Instructions)       │   Platform      │
-└─────────────────┘                       └──────────────────────┘                        └─────────────────┘
-         │                                          │                                              │
-         │                                          ↓                                              │
-         │                                   ┌──────────────┐                                     │
-         │                                   │   MySQL DB   │                                     │
-         │                                   │  (Config)    │                                     │
-         │                                   └──────────────┐                                     │
-         │                                                                                         │
+│   Platform      │   (Call Event)       │   (Webhook)          │   (Instructions)      │   Platform      │
+└─────────────────┘                      └──────────────────────┘                       └─────────────────┘
+         │                                          │                                          │
+         │                                          ↓                                          │
+         │                                   ┌──────────────┐                                  │
+         │                                   │   MySQL DB   │                                  │
+         │                                   │  (Config)    │                                  │
+         │                                   └──────────────┘                                  │
+         │                                                                                     │
          └─────────────────────────────────────────────────────────────────────────────────────┘
                                     Executes CXML Instructions
 ```
@@ -66,7 +66,7 @@ When a call arrives at a configured DNID (phone number), Cloudonix makes an HTTP
 **Request Headers:**
 
 ```
-POST /api/voice/route HTTP/1.1
+POST /api/voice/routeRequest HTTP/1.1
 Host: opbx.example.com
 Content-Type: application/x-www-form-urlencoded
 X-CX-Domain: tenant-domain.cloudonix.io
@@ -91,8 +91,45 @@ The webhook receives these parameters (derived from [search results](https://dev
 
 **Example POST Body:**
 ```
-From=%2B14155551234&To=%2B18005551000&Session=abc123&Domain=tenant.cloudonix.io&SessionData=%7B...%7D&CallSid=CAxxxx&Direction=inbound&CallStatus=ringing
+{
+  "ApiVersion": "1",
+  "CallStatus": "unknown",
+  "From": "972546982826",
+  "To": "972532006879",
+  "CallSid": "6284916944dd44cf20a1668347eedfe9@sentry.bglobal.global",
+  "SessionData": {
+    "id": 2795535,
+    "domainId": 102,
+    "destination": "97229991390",
+    "callerId": "18456402102",
+    "token": "2eac5483c05842e885583d8f81f873dc",
+    "profile": {
+      "trunk-sip-headers": {
+        "Ident": "Njg4NjUxMzIxNTAwMA==",
+        "A2B-A2Bacc": "",
+        "A2B-CLID": "18456402102",
+        "A2B-Account": "",
+        "A2B-DNID": "17188383588"
+      },
+      "callId": [
+        "6284916944dd44cf20a1668347eedfe9@sentry.bglobal.global"
+      ],
+      "inbound-trunk-name": "inbound-147.234.16.245",
+      "inbound-trunk-id": 380
+    },
+    "callStartTime": 1659451145018,
+    "status": "new",
+    "vappServer": "172.24.40.238",
+    "domainNameOrId": "bglobal.global",
+    "ringing": false
+  },
+  "Domain": "bglobal.global",
+  "Direction": "inbound",
+  "AccountSid": "bglobal.global",
+  "Session": "2eac5483c05842e885583d8f81f873dc"
+}
 ```
+
 
 ---
 
@@ -104,17 +141,17 @@ The routing application processes each call through this decision tree:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  1. IDENTIFY TENANT                                              │
+│  1. IDENTIFY TENANT                                             │
 │     - Match 'To' (DNID) against did_numbers table               │
-│     - Extract organization_id                                    │
+│     - Extract organization_id                                   │
 │     - If no match → Reject call (404 response)                  │
 └────────────────┬────────────────────────────────────────────────┘
                  ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  2. CHECK BUSINESS HOURS                                         │
-│     - Query business_hours_schedules for this DID                │
-│     - Evaluate current time against active schedule              │
-│     - Determine: OPEN or CLOSED                                  │
+│  2. CHECK BUSINESS HOURS                                        │
+│     - Query business_hours_schedules for this DID               │
+│     - Evaluate current time against active schedule             │
+│     - Determine: OPEN or CLOSED                                 │
 └────────────────┬────────────────────────────────────────────────┘
                  ↓
          ┌───────┴────────┐
@@ -123,13 +160,13 @@ The routing application processes each call through this decision tree:
          │                │
          ↓                ↓
 ┌────────────────┐  ┌─────────────────────────────────────────────┐
-│  3a. CLOSED     │  │  3b. OPEN HOURS ROUTING                     │
-│  Execute        │  │     - Get DID routing configuration          │
-│  after_hours    │  │     - Route based on routing_type:           │
-│  action         │  │       • extension → Dial extension           │
-└────────────────┘  │       • ring_group → Ring group routing      │
-                    │       • ivr → IVR menu                        │
-                    │       • voicemail → Direct to voicemail       │
+│  3a. CLOSED    │  │  3b. OPEN HOURS ROUTING                     │
+│  Execute       │  │     - Get DID routing configuration         │
+│  after_hours   │  │     - Route based on routing_type:          │
+│  action        │  │       • extension → Dial extension          │
+└────────────────┘  │       • ring_group → Ring group routing     │
+                    │       • ivr → IVR menu                      │
+                    │       • voicemail → Direct to voicemail     │
                     └─────────────────────────────────────────────┘
 ```
 
@@ -154,12 +191,11 @@ did_numbers.routing_destination_id = {extension_id}
 5. Generate appropriate CXML
 
 **CXML Response for User Extension:**
+**Description:** Inbound calls from +18005551000 to extension number 1005.
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="30" callerId="+18005551000">
-    <Number>sip:ext1001@tenant.cloudonix.io</Number>
-  </Dial>
+  <Dial timeout="30" callerId="+18005551000">1005</Dial>
 </Response>
 ```
 
@@ -192,14 +228,11 @@ did_numbers.routing_destination_id = {ring_group_id}
 | **Longest Idle** | Ring member idle longest | Query last call time, order by idle duration |
 
 **CXML for Simultaneous Ring:**
+**Description:** Inbound calls from +18005551000 to multiple extensions.
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="25" callerId="+18005551000">
-    <Number>sip:ext1001@tenant.cloudonix.io</Number>
-    <Number>sip:ext1002@tenant.cloudonix.io</Number>
-    <Number>sip:ext1003@tenant.cloudonix.io</Number>
-  </Dial>
+  <Dial timeout="25" callerId="+18005551000">1005&1006&1007</Dial>
   <!-- If no answer, handle fallback -->
   <Say>All agents are busy. Please try again later.</Say>
   <Hangup/>
@@ -216,9 +249,7 @@ did_numbers.routing_destination_id = {ring_group_id}
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="20" action="https://opbx.example.com/api/voice/ring-group-callback?group_id=5&attempt=1">
-    <Number>sip:ext1001@tenant.cloudonix.io</Number>
-  </Dial>
+  <Dial timeout="20" action="https://opbx.example.com/api/voice/ring-group-callback?group_id=5&attempt=1">1005</Dial>
 </Response>
 ```
 
@@ -226,8 +257,7 @@ did_numbers.routing_destination_id = {ring_group_id}
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="20" action="https://opbx.example.com/api/voice/ring-group-callback?group_id=5&attempt=2">
-    <Number>sip:ext1002@tenant.cloudonix.io</Number>
+  <Dial timeout="20" action="https://opbx.example.com/api/voice/ring-group-callback?group_id=5&attempt=2">1002</Number>
   </Dial>
 </Response>
 ```
@@ -281,9 +311,7 @@ did_numbers.routing_destination_id = {ivr_menu_id}
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say>Connecting you to Sales.</Say>
-  <Dial timeout="30">
-    <Number>sip:sales-group@tenant.cloudonix.io</Number>
-  </Dial>
+  <Dial timeout="30">3000</Dial>
 </Response>
 ```
 
@@ -312,15 +340,14 @@ did_numbers.routing_destination_id = {ivr_menu_id}
 #### 3.2.5 AI Assistant Routing (`routing_type: 'ai_assistant'`)
 
 **CXML for AI Assistant:**
+**Description:** Dialing to a VAPI AI Assistant.
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Connect>
-    <Stream url="wss://ai-provider.example.com/agent/stream">
-      <Parameter name="agent_id" value="agent-123"/>
-      <Parameter name="language" value="en-US"/>
-    </Stream>
-  </Connect>
+    <Dial>
+        <Service provider="vapi">+12127773456</Service>
+    </Dial>
 </Response>
 ```
 
@@ -337,9 +364,7 @@ did_numbers.routing_destination_id = {ivr_menu_id}
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say>Your call is being forwarded.</Say>
-  <Dial timeout="30" callerId="+18005551000">
-    <Number>+14155559999</Number>
-  </Dial>
+  <Dial timeout="30" callerId="+18005551000">+14155559999</Dial>
 </Response>
 ```
 
