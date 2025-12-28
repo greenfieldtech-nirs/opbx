@@ -25,8 +25,42 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
         ->name('webhooks.cloudonix.call-status');
 
     Route::post('/cdr', [CloudonixWebhookController::class, 'cdr'])
-        ->middleware(['webhook.signature', 'webhook.idempotency', 'throttle:webhooks'])
+        ->middleware(['cloudonix.request.auth', 'webhook.idempotency', 'throttle:webhooks'])
         ->name('webhooks.cloudonix.cdr');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Voice Routing Routes (Core Routing Application)
+|--------------------------------------------------------------------------
+|
+| These routes handle real-time call routing decisions from Cloudonix.
+| They return CXML (Cloudonix XML) documents that instruct the platform
+| how to route calls based on organizational configuration.
+|
+*/
+
+use App\Http\Controllers\Voice\VoiceRoutingController;
+
+Route::prefix('voice')->group(function (): void {
+    // Main inbound call routing endpoint
+    Route::post('/route', [VoiceRoutingController::class, 'handleInbound'])
+        ->middleware(['cloudonix.request.auth', 'throttle:voice'])
+        ->name('voice.route');
+
+    // IVR digit input callback
+    Route::post('/ivr-input', [VoiceRoutingController::class, 'handleIvrInput'])
+        ->middleware(['cloudonix.request.auth', 'throttle:voice'])
+        ->name('voice.ivr-input');
+
+    // Ring group callback for sequential routing (round robin, priority, etc.)
+    Route::post('/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
+        ->middleware(['cloudonix.request.auth', 'throttle:voice'])
+        ->name('voice.ring-group-callback');
+
+    // Voice routing health check
+    Route::get('/health', [VoiceRoutingController::class, 'health'])
+        ->name('voice.health');
 });
 
 // Health check endpoint

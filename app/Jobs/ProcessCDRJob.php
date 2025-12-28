@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\CallDetailRecord;
 use App\Models\CallLog;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,49 +33,75 @@ class ProcessCDRJob implements ShouldQueue
     public function handle(): void
     {
         $callId = $this->webhookData['call_id'] ?? null;
+        $organizationId = $this->webhookData['_organization_id'] ?? null;
 
         Log::info('Processing CDR webhook', [
             'call_id' => $callId,
+            'organization_id' => $organizationId,
         ]);
 
         if (!$callId) {
-            Log::error('Invalid CDR webhook data', [
+            Log::error('Invalid CDR webhook data - missing call_id', [
                 'webhook_data' => $this->webhookData,
             ]);
 
             return;
         }
 
-        $callLog = CallLog::where('call_id', $callId)->first();
-
-        if (!$callLog) {
-            Log::warning('Call log not found for CDR', [
+        if (!$organizationId) {
+            Log::error('Cannot determine organization for CDR - missing _organization_id', [
                 'call_id' => $callId,
             ]);
 
             return;
         }
 
-        // Update call log with CDR data
-        $updateData = [
-            'cloudonix_cdr' => $this->webhookData,
-        ];
+        // Create Call Detail Record
+        try {
+            $cdr = CallDetailRecord::createFromWebhook($this->webhookData, $organizationId);
 
-        // Extract recording URL if available
-        if (isset($this->webhookData['recording_url'])) {
-            $updateData['recording_url'] = $this->webhookData['recording_url'];
+            Log::info('CDR created successfully', [
+                'call_id' => $callId,
+                'cdr_id' => $cdr->id,
+                'organization_id' => $organizationId,
+                'disposition' => $cdr->disposition,
+                'duration' => $cdr->duration,
+                'billsec' => $cdr->billsec,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to create CDR', [
+                'call_id' => $callId,
+                'organization_id' => $organizationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
         }
 
-        // Extract duration if available and not already set
-        if (!$callLog->duration && isset($this->webhookData['duration'])) {
-            $updateData['duration'] = (int) $this->webhookData['duration'];
+        // Also update CallLog if it exists (for backwards compatibility)
+        $callLog = CallLog::where('call_id', $callId)->first();
+        if ($callLog) {
+            $updateData = [
+                'cloudonix_cdr' => $this->webhookData,
+            ];
+
+            // Extract recording URL if available
+            if (isset($this->webhookData['recording_url'])) {
+                $updateData['recording_url'] = $this->webhookData['recording_url'];
+            }
+
+            // Extract duration if available and not already set
+            if (!$callLog->duration && isset($this->webhookData['duration'])) {
+                $updateData['duration'] = (int) $this->webhookData['duration'];
+            }
+
+            $callLog->update($updateData);
+
+            Log::info('CDR data also saved to call log', [
+                'call_id' => $callId,
+                'call_log_id' => $callLog->id,
+            ]);
         }
-
-        $callLog->update($updateData);
-
-        Log::info('CDR data saved to call log', [
-            'call_id' => $callId,
-            'call_log_id' => $callLog->id,
-        ]);
     }
 }

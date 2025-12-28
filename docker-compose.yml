@@ -185,6 +185,22 @@ services:
       retries: 3
     restart: unless-stopped
 
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: opbx_ngrok
+    command:
+      - "http"
+      - "nginx:80"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    depends_on:
+      - nginx
+    networks:
+      - opbx
+    ports:
+      - "4040:4040"  # ngrok web interface
+    restart: unless-stopped
+
 networks:
   opbx:
     driver: bridge

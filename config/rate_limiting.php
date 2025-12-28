@@ -19,6 +19,9 @@ return [
     // Webhook routes - external webhook requests per IP
     'webhooks' => env('RATE_LIMIT_WEBHOOKS', 100),
 
+    // Voice routing routes - high traffic voice routing requests per IP
+    'voice' => env('RATE_LIMIT_VOICE', 1000),
+
     // Sensitive operations - password changes, role updates, etc.
     'sensitive' => env('RATE_LIMIT_SENSITIVE', 10),
 

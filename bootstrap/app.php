@@ -33,6 +33,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.scope' => \App\Http\Middleware\EnsureTenantScope::class,
             'webhook.signature' => \App\Http\Middleware\VerifyCloudonixSignature::class,
             'webhook.idempotency' => \App\Http\Middleware\EnsureWebhookIdempotency::class,
+            'cloudonix.request.auth' => \App\Http\Middleware\VerifyCloudonixRequestAuth::class,
+            // Legacy aliases (deprecated - use cloudonix.request.auth instead)
+            'voice.webhook.auth' => \App\Http\Middleware\VerifyVoiceWebhookAuth::class,
+            'cdr.auth' => \App\Http\Middleware\VerifyCloudonixCdrAuth::class,
         ]);
 
         // Configure authentication to return JSON for API routes instead of redirecting

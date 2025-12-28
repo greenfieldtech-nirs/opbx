@@ -450,3 +450,69 @@ export interface DashboardStats {
   calls_today: number;
   recent_calls: CallLog[];
 }
+
+// ============================================================================
+// Call Detail Records (CDR)
+// ============================================================================
+
+export interface CallDetailRecord {
+  id: number;
+  organization_id: string;
+
+  // Session information
+  session_timestamp: string;
+  session_token: string;
+  session_id: string;
+
+  // Call participants
+  from: string;
+  to: string;
+
+  // Call details
+  disposition: string;
+  duration: number;
+  duration_formatted: string;
+  billsec: number;
+  billsec_formatted: string;
+  call_id: string;
+
+  // Session timing
+  call_start_time?: string;
+  call_end_time?: string;
+  call_answer_time?: string;
+  status: string;
+
+  // Routing information
+  domain: string;
+  subscriber?: string;
+  cx_trunk_id?: string;
+  application?: string;
+  route?: string;
+  vapp_server?: string;
+
+  // Cost information
+  rated_cost?: number;
+  approx_cost?: number;
+  sell_cost?: number;
+
+  // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
+  raw_cdr?: Record<string, unknown>;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CDRFilters {
+  page?: number;
+  per_page?: number;
+  from?: string; // partial match on 'from' number
+  to?: string; // partial match on 'to' number
+  from_date?: string; // ISO date string
+  to_date?: string; // ISO date string
+  disposition?: string;
+}
+
+// User/Extension status types
+export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type ExtensionStatus = 'active' | 'inactive';

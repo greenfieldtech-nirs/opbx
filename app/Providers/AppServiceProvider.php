@@ -86,6 +86,24 @@ class AppServiceProvider extends ServiceProvider
                 });
         });
 
+        // Voice routing routes - 1000 requests per minute per IP (high traffic)
+        RateLimiter::for('voice', function (Request $request) {
+            return Limit::perMinute(config('rate_limiting.voice', 1000))
+                ->by($request->ip())
+                ->response(function (Request $request, array $headers) {
+                    // Return CXML format for voice routing endpoints
+                    $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
+                        '<Response>' . "\n" .
+                        '  <Say language="en-US">Service temporarily unavailable. Rate limit exceeded.</Say>' . "\n" .
+                        '  <Hangup/>' . "\n" .
+                        '</Response>';
+
+                    return response($cxml, 429, array_merge($headers, [
+                        'Content-Type' => 'application/xml',
+                    ]));
+                });
+        });
+
         // Sensitive operations - 10 requests per minute per user
         RateLimiter::for('sensitive', function (Request $request) {
             return Limit::perMinute(config('rate_limiting.sensitive', 10))

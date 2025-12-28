@@ -161,18 +161,17 @@ class CloudonixWebhookController extends Controller
      */
     public function cdr(CdrRequest $request): Response
     {
-        $callId = $request->input('CallSid') ?? $request->input('call_id');
+        $callId = $request->input('call_id');
+        $organizationId = $request->input('_organization_id');
 
         Log::info('Received CDR webhook', [
             'call_id' => $callId,
+            'organization_id' => $organizationId,
             'payload' => $request->all(),
         ]);
 
         // Dispatch job to process CDR asynchronously
-        ProcessCDRJob::dispatch([
-            'call_id' => $callId,
-            'webhook_data' => $request->all(),
-        ]);
+        ProcessCDRJob::dispatch($request->all());
 
         return response('', 200);
     }

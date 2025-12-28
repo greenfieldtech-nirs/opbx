@@ -172,6 +172,28 @@ The routing application processes each call through this decision tree:
 
 ### 3.2 Detailed Routing Types
 
+#### 3.2.0 Call Routing inbound/outbound classification
+Voice Application requests from Cloudonix are received for both internal and external call attempts.
+
+A call will be deemed as an internal call attempt if (originating from a PBX User to anywhere else):
+- The "From" attribute of the JSON object equals to an extension number that is assigned to a "PBX User".
+- The "From" attribute of the JSON object equals to an extension number that is assigned to an "AI Assistant".
+- The "To" attribute of the JSON object equals to any internal extension number, or is a valid E.164 formatted number.
+
+A call will be deemed as an external call attempt if (originating from the outside world to a valid E.164 number):
+- The "From" attribute of the JSON object isn't equal to any of application "Extensions".
+- The "To" attribute of the JSON object equals to an application defined "Phone Number".
+
+Upon receiving a "Call Routing Voice Application request", it must be validated against the above rules. If a rule matches,
+the call may continue onwards for additional checking. If not, the result will be the following CXML response:
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Hangup />
+</Response>
+```
+
 #### 3.2.1 Extension Routing (`routing_type: 'extension'`)
 
 **Configuration:**
@@ -184,11 +206,14 @@ did_numbers.routing_destination_id = {extension_id}
 1. Look up extension by `routing_destination_id`
 2. Check extension status: `active` or `inactive`
 3. Check extension type: `user`, `conference`, `ring_group`, `ivr`, `ai_assistant`, `forward`
-4. If `type = 'user'`:
+4. If no extension type is matched, the call is deemed to be routed externally - setting its type to "world".
+5. If `type = 'user'`:
    - Look up user by `extension.user_id`
    - Check user status: `active` or `inactive`
    - Get user's SIP endpoint from `users` table
-5. Generate appropriate CXML
+6. If `type = 'world'`:
+   - Use From and To to generate and CXML document.
+7. Generate appropriate CXML
 
 **CXML Response for User Extension:**
 **Description:** Inbound calls from +18005551000 to extension number 1005.

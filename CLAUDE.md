@@ -180,13 +180,16 @@ Requirements:
 ========================
 9) LOCAL WEBHOOK DEVELOPMENT
 ========================
-Provide a method to expose local webhook endpoints (choose one):
-- ngrok OR Cloudflare Tunnel
+Use ngrok to expose local webhook endpoints.
 
-Include instructions:
-- how to start tunnel
-- what public URL to configure in Cloudonix
-- how to test inbound webhook locally
+Requirements:
+- ngrok runs automatically in Docker (configured in docker-compose.yml)
+- Uses NGROK_AUTHTOKEN from .env (never commit authtoken to git)
+- Web interface available at http://localhost:4040
+- Provide clear instructions for getting the public URL
+- Include steps for updating WEBHOOK_BASE_URL in .env
+- Explain how to configure webhooks in Cloudonix portal
+- Include testing instructions for verifying webhook delivery
 
 ========================
 10) FRONTEND REQUIREMENTS
@@ -295,7 +298,7 @@ Produce:
 5) Laravel folder structure
 6) React folder structure
 7) Docker compose + env example
-8) Tunnel setup guide
+8) ngrok setup guide (how to get authtoken, configure in .env, access web UI)
 9) Minimal complete implementation with unit tests:
    - webhook idempotency tests
    - state machine transition tests

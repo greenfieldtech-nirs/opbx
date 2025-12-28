@@ -321,7 +321,7 @@ fi
 WEBHOOK_URL=$(grep "^WEBHOOK_BASE_URL=" .env | cut -d '=' -f2-)
 if [ "$WEBHOOK_URL" = "https://your-domain.com" ] || [ -z "$WEBHOOK_URL" ]; then
     print_warning "WEBHOOK_BASE_URL is not configured (required for production)"
-    echo "    For local development, use ngrok or Cloudflare Tunnel"
+    echo "    For local development, ngrok runs in Docker - see instructions below"
 fi
 
 print_header "Step 6: Pre-flight Summary"
@@ -358,16 +358,25 @@ echo ""
 
 print_header "Optional: Local Webhook Development"
 
-echo "For local development with Cloudonix webhooks, you need to expose your"
-echo "local server to the internet. Choose one option:"
+echo "For local development with Cloudonix webhooks, ngrok is included in Docker"
+echo "and will automatically expose your local server to the internet."
 echo ""
-echo "  Option 1: ngrok"
-echo "    ngrok http 80"
-echo "    Then update WEBHOOK_BASE_URL in .env with the ngrok HTTPS URL"
+echo "Steps to configure:"
 echo ""
-echo "  Option 2: Cloudflare Tunnel"
-echo "    cloudflared tunnel --url http://localhost:80"
-echo "    Then update WEBHOOK_BASE_URL in .env with the Cloudflare URL"
+echo "  1. Ensure NGROK_AUTHTOKEN is set in your .env file"
+echo "     Get your token from: https://dashboard.ngrok.com/get-started/your-authtoken"
+echo ""
+echo "  2. Start Docker services (ngrok will start automatically)"
+echo "     docker compose up -d"
+echo ""
+echo "  3. Get your ngrok public URL:"
+echo "     - Web UI: http://localhost:4040"
+echo "     - API: curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'"
+echo ""
+echo "  4. Update WEBHOOK_BASE_URL in .env with the ngrok HTTPS URL"
+echo ""
+echo "  5. Restart Laravel app to pick up the new URL:"
+echo "     docker compose restart app"
 echo ""
 
 print_success "Bootstrap script completed successfully!"

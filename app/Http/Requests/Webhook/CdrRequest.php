@@ -29,44 +29,61 @@ class CdrRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Call identifier - required
-            'call_id' => ['required', 'string', 'regex:/^[a-zA-Z0-9_-]+$/', 'max:255'],
+            // Session timestamp - required
+            'timestamp' => ['required', 'integer', 'min:1000000000'],
 
-            // Caller number - required, E.164 format
-            'from' => ['required', 'string', 'regex:/^\+?[1-9]\d{1,14}$/', 'max:16'],
+            // Session data - optional but commonly present
+            'session' => ['nullable', 'array'],
+            'session.token' => ['nullable', 'string'],
+            'session.id' => ['nullable', 'integer'],
+            'session.callStartTime' => ['nullable', 'integer'],
+            'session.callEndTime' => ['nullable', 'integer'],
+            'session.callAnswerTime' => ['nullable', 'integer'],
+            'session.status' => ['nullable', 'string'],
 
-            // Called number - required, E.164 format
-            'to' => ['required', 'string', 'regex:/^\+?[1-9]\d{1,14}$/', 'max:16'],
+            // Caller number - required
+            'from' => ['required', 'string', 'max:100'],
 
-            // DID number - required, E.164 format
-            'did' => ['required', 'string', 'regex:/^\+?[1-9]\d{1,14}$/', 'max:16'],
+            // Called/DID number - required
+            'to' => ['required', 'string', 'max:100'],
+
+            // Call disposition - required
+            'disposition' => ['required', 'string', 'max:50'],
 
             // Call duration in seconds - required
-            'duration' => ['required', 'integer', 'min:0', 'max:86400'],
+            'duration' => ['required', 'integer', 'min:0'],
 
-            // Call start time - required
-            'start_time' => ['required', 'integer', 'min:1000000000', 'max:9999999999'],
+            // Billable seconds - required
+            'billsec' => ['required', 'integer', 'min:0'],
 
-            // Call end time - required
-            'end_time' => ['required', 'integer', 'min:1000000000', 'max:9999999999'],
+            // SIP Call-ID - required
+            'call_id' => ['required', 'string', 'max:255'],
 
-            // Call answered time - optional
-            'answer_time' => ['nullable', 'integer', 'min:1000000000', 'max:9999999999'],
+            // Domain - optional
+            'domain' => ['nullable', 'string', 'max:255'],
 
-            // Call status/disposition - required
-            'disposition' => ['required', 'string', 'in:answered,busy,no-answer,failed,hangup,cancelled'],
+            // Subscriber - optional
+            'subscriber' => ['nullable', 'string', 'max:100'],
 
-            // Disconnect reason - optional
-            'disconnect_reason' => ['nullable', 'string', 'max:100'],
+            // Trunk ID - optional
+            'cx_trunk_id' => ['nullable', 'integer'],
 
-            // Direction - required
-            'direction' => ['required', 'string', 'in:inbound,outbound'],
+            // Application - optional
+            'application' => ['nullable', 'string', 'max:255'],
+
+            // Route - optional
+            'route' => ['nullable', 'string', 'max:255'],
+
+            // Cost data - optional
+            'rated_cost' => ['nullable', 'numeric', 'min:0'],
+            'approx_cost' => ['nullable', 'numeric', 'min:0'],
+            'sell_cost' => ['nullable', 'numeric', 'min:0'],
+
+            // VApp server - optional
+            'vapp_server' => ['nullable', 'string', 'max:50'],
 
             // Recording URL - optional
             'recording_url' => ['nullable', 'url', 'max:500'],
-
-            // Cost/billing data - optional
-            'cost' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -78,21 +95,16 @@ class CdrRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'call_id.required' => 'Call ID is required in CDR payload.',
-            'from.required' => 'Caller number is required.',
-            'from.regex' => 'Caller number must be in E.164 format.',
-            'to.required' => 'Called number is required.',
-            'to.regex' => 'Called number must be in E.164 format.',
-            'did.required' => 'DID number is required.',
+            'timestamp.required' => 'CDR timestamp is required.',
+            'timestamp.integer' => 'CDR timestamp must be a Unix timestamp.',
+            'from.required' => 'Caller number (from) is required.',
+            'to.required' => 'Called number (to) is required.',
+            'disposition.required' => 'Call disposition is required.',
             'duration.required' => 'Call duration is required.',
             'duration.integer' => 'Call duration must be an integer (seconds).',
-            'duration.max' => 'Call duration exceeds maximum allowed (24 hours).',
-            'start_time.required' => 'Call start time is required.',
-            'end_time.required' => 'Call end time is required.',
-            'disposition.required' => 'Call disposition is required.',
-            'disposition.in' => 'Invalid call disposition value.',
-            'direction.required' => 'Call direction is required.',
-            'direction.in' => 'Call direction must be inbound or outbound.',
+            'billsec.required' => 'Billable seconds (billsec) is required.',
+            'billsec.integer' => 'Billable seconds must be an integer.',
+            'call_id.required' => 'SIP Call-ID is required.',
             'recording_url.url' => 'Recording URL must be a valid URL.',
         ];
     }

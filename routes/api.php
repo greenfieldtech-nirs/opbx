@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
+use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
@@ -125,6 +126,13 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/active', [CallLogController::class, 'active'])->name('call-logs.active');
             Route::get('/statistics', [CallLogController::class, 'statistics'])->name('call-logs.statistics');
             Route::get('/{callLog}', [CallLogController::class, 'show'])->name('call-logs.show');
+        });
+
+        // Call Detail Records (read-only)
+        Route::prefix('call-detail-records')->group(function (): void {
+            Route::get('/', [CallDetailRecordController::class, 'index'])->name('call-detail-records.index');
+            Route::get('/statistics', [CallDetailRecordController::class, 'statistics'])->name('call-detail-records.statistics');
+            Route::get('/{callDetailRecord}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
         });
 
         // Settings (Owner only)

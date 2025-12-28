@@ -129,6 +129,21 @@ export function getStatusColor(status: string): string {
   return statusColors[status] || 'bg-gray-100 text-gray-800';
 }
 
+// Disposition badge colors for CDRs
+export function getDispositionColor(disposition: string): string {
+  const dispositionColors: Record<string, string> = {
+    ANSWERED: 'bg-green-100 text-green-800 border border-green-200',
+    'NO ANSWER': 'bg-orange-100 text-orange-800 border border-orange-200',
+    BUSY: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    FAILED: 'bg-red-100 text-red-800 border border-red-200',
+    CANCELLED: 'bg-gray-100 text-gray-800 border border-gray-200',
+    CONGESTION: 'bg-purple-100 text-purple-800 border border-purple-200',
+  };
+
+  const normalizedDisposition = disposition.toUpperCase();
+  return dispositionColors[normalizedDisposition] || 'bg-gray-100 text-gray-800 border border-gray-200';
+}
+
 // Role badge colors
 export function getRoleColor(role: string): string {
   const roleColors: Record<string, string> = {
