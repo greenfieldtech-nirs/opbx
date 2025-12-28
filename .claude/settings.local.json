@@ -58,7 +58,7 @@
       "Bash(git commit:*)",
       "Bash(find:*)",
       "Bash(DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
       "Bash(xargs cat:*)",
       "Bash(./opbx_bootstrap.sh:*)"
     ]
