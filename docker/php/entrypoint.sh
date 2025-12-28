@@ -13,6 +13,10 @@ echo "MySQL is ready!"
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running database migrations..."
     php artisan migrate --force --no-interaction || echo "Migration failed or already up to date"
+
+    # Run database seeders on fresh installations (creates default admin user)
+    echo "Checking if database seeding is needed..."
+    php artisan db:seed --force --no-interaction || echo "Seeding skipped or already completed"
 else
     echo "Skipping migrations (RUN_MIGRATIONS=false)..."
 fi
