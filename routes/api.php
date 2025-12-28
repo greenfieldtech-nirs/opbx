@@ -101,6 +101,8 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('users', UsersController::class);
 
         // Extensions
+        Route::get('extensions/sync/compare', [ExtensionController::class, 'compareSync']);
+        Route::post('extensions/sync', [ExtensionController::class, 'performSync']);
         Route::apiResource('extensions', ExtensionController::class);
 
         // Conference Rooms

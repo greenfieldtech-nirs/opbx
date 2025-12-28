@@ -51,6 +51,7 @@ import {
   Trash2,
   Loader2,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
@@ -86,7 +87,7 @@ export default function PhoneNumbers() {
   }, [searchQuery]);
 
   // Fetch phone numbers with React Query
-  const { data: phoneNumbersData, isLoading, error } = useQuery({
+  const { data: phoneNumbersData, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: [
       'phone-numbers',
       {
@@ -301,6 +302,16 @@ export default function PhoneNumbers() {
                 />
               </div>
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
 
             {/* Routing Type Filter */}
             <Select value={routingTypeFilter} onValueChange={(val: any) => setRoutingTypeFilter(val)}>

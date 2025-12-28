@@ -28,6 +28,9 @@ class Extension extends Model
         'user_id',
         'extension_number',
         'password',
+        'cloudonix_subscriber_id',
+        'cloudonix_uuid',
+        'cloudonix_synced',
         'type',
         'status',
         'voicemail_enabled',
@@ -45,6 +48,7 @@ class Extension extends Model
             'type' => ExtensionType::class,
             'status' => UserStatus::class,
             'voicemail_enabled' => 'boolean',
+            'cloudonix_synced' => 'boolean',
             'configuration' => 'array',
         ];
     }

@@ -42,6 +42,7 @@ import {
   Activity,
   PhoneForwarded,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -181,6 +182,11 @@ export default function ExtensionsComplete() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
+  // Sync state
+  const [syncComparison, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: any; from_cloudonix: any } | null>(null);
+  const [isSyncNeeded, setIsSyncNeeded] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -191,8 +197,24 @@ export default function ExtensionsComplete() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Check sync status on page load
+  useEffect(() => {
+    const checkSyncStatus = async () => {
+      try {
+        const result = await extensionsService.compareSync();
+        setSyncComparison(result);
+        setIsSyncNeeded(result.needs_sync);
+      } catch (error) {
+        console.error('Failed to check sync status:', error);
+        // Don't show error toast, just fail silently
+      }
+    };
+
+    checkSyncStatus();
+  }, []);
+
   // Fetch extensions
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['extensions', {
       page: currentPage,
       per_page: perPage,
@@ -321,6 +343,37 @@ export default function ExtensionsComplete() {
       toast.error(message);
     },
   });
+
+  // Sync mutation
+  const syncMutation = useMutation({
+    mutationFn: () => extensionsService.performSync(),
+    onMutate: () => {
+      setIsSyncing(true);
+      toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      setIsSyncNeeded(false);
+      const toCreated = data.to_cloudonix?.created || 0;
+      const fromCreated = data.from_cloudonix?.created || 0;
+      toast.success(
+        `Extensions synchronized! Created ${toCreated} in Cloudonix, imported ${fromCreated} from Cloudonix`,
+        { id: 'sync-extensions' }
+      );
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
+      toast.error(message, { id: 'sync-extensions' });
+    },
+    onSettled: () => {
+      setIsSyncing(false);
+    },
+  });
+
+  // Handle sync button click
+  const handleSync = () => {
+    syncMutation.mutate();
+  };
 
   // Check user permissions
   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
@@ -1079,10 +1132,24 @@ export default function ExtensionsComplete() {
           </div>
         </div>
         {canCreate && (
-          <Button onClick={openCreateDialog}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Extension
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSync}
+              disabled={!isSyncNeeded || isSyncing}
+              className={cn(
+                'transition-colors',
+                (!isSyncNeeded || isSyncing) && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <RefreshCw className={cn('h-4 w-4 mr-2', isSyncing && 'animate-spin')} />
+              Sync Extensions
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Extension
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1104,6 +1171,16 @@ export default function ExtensionsComplete() {
                 autoComplete="off"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
 
             {/* Type Filter */}
             <Select

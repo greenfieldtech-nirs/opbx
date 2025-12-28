@@ -61,4 +61,22 @@ export const extensionsService = {
   delete: (id: string): Promise<void> => {
     return api.delete(`/extensions/${id}`).then(() => undefined);
   },
+
+  /**
+   * Compare extensions sync status
+   * GET /extensions/sync/compare
+   */
+  compareSync: (): Promise<{ needs_sync: boolean; to_cloudonix: any; from_cloudonix: any }> => {
+    return api.get<{ needs_sync: boolean; to_cloudonix: any; from_cloudonix: any }>('/extensions/sync/compare')
+      .then(res => res.data);
+  },
+
+  /**
+   * Perform extensions sync
+   * POST /extensions/sync
+   */
+  performSync: (): Promise<{ message: string; to_cloudonix: any; from_cloudonix: any }> => {
+    return api.post<{ message: string; to_cloudonix: any; from_cloudonix: any }>('/extensions/sync')
+      .then(res => res.data);
+  },
 };

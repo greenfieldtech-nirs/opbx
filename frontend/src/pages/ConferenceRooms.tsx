@@ -14,6 +14,7 @@ import {
   Video,
   ChevronDown,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +75,7 @@ import { toast } from 'sonner';
 import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { useAuth } from '@/hooks/useAuth';
 import type { ConferenceRoom, CreateConferenceRoomRequest, UpdateConferenceRoomRequest, Status } from '@/types';
+import { cn } from '@/lib/utils';
 
 type RoomFormData = {
   name: string;
@@ -148,7 +150,7 @@ export default function ConferenceRooms() {
   }, [searchQuery]);
 
   // Fetch conference rooms
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['conference-rooms', {
       page: currentPage,
       per_page: perPage,
@@ -719,6 +721,16 @@ export default function ConferenceRooms() {
                 autoComplete="off"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
 
             {/* Filter dropdowns */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>

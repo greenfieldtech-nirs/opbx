@@ -10,7 +10,7 @@ import { usersService } from '@/services/users.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Trash2, Edit, UserCheck, Users } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, UserCheck, Users, RefreshCw } from 'lucide-react';
 import { formatDate, getRoleColor, getStatusColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -21,7 +21,7 @@ export default function Users() {
   const queryClient = useQueryClient();
 
   // Fetch users
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['users', page, searchQuery],
     queryFn: () =>
       usersService.getAll({
@@ -115,6 +115,15 @@ export default function Users() {
                 className="pl-9"
               />
             </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
           </div>
         </CardContent>
       </Card>

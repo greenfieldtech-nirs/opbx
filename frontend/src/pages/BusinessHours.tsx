@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter } from 'lucide-react';
+import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,6 +46,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
 import { extensionsService } from '@/services/extensions.service';
+import { cn } from '@/lib/utils';
 import {
   type BusinessHoursSchedule,
   type WeeklySchedule,
@@ -103,7 +104,7 @@ const BusinessHours: React.FC = () => {
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
 
   // Fetch business hours schedules
-  const { data: schedulesData, isLoading, error } = useQuery({
+  const { data: schedulesData, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['business-hours'],
     queryFn: () => businessHoursService.getAll(),
   });
@@ -542,6 +543,16 @@ const BusinessHours: React.FC = () => {
                 autoComplete="off"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
 
             {/* Filter dropdowns */}
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>

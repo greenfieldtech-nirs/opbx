@@ -12,9 +12,11 @@ return [
     |
     */
 
-    'api_base_url' => env('CLOUDONIX_API_BASE_URL', 'https://api.cloudonix.io'),
-
-    'api_token' => env('CLOUDONIX_API_TOKEN'),
+    'api' => [
+        'base_url' => env('CLOUDONIX_API_BASE_URL', 'https://api.cloudonix.io'),
+        'token' => env('CLOUDONIX_API_TOKEN'),
+        'timeout' => env('CLOUDONIX_API_TIMEOUT', 30),
+    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -210,16 +210,8 @@ class UpdateExtensionRequest extends FormRequest
                 }
             }
 
-            // USER type extensions must have a user_id
-            if ($type === ExtensionType::USER->value) {
-                $effectiveUserId = $this->has('user_id') ? $userId : $extension?->user_id;
-                if (!$effectiveUserId) {
-                    $validator->errors()->add(
-                        'user_id',
-                        'User ID is required for user extensions.'
-                    );
-                }
-            }
+            // USER type extensions CAN be unassigned (user_id = null is allowed)
+            // No validation needed - unassigned USER extensions are valid
 
             // Non-USER type extensions should not have a user_id
             if ($type !== ExtensionType::USER->value && $this->has('user_id') && $userId) {

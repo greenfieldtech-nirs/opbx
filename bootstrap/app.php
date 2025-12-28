@@ -37,12 +37,31 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Configure authentication to return JSON for API routes instead of redirecting
         $middleware->redirectGuestsTo(function ($request) {
-            if ($request->expectsJson()) {
+            // For API routes, always return JSON 401 instead of redirecting
+            if ($request->is('api/*') || $request->expectsJson()) {
                 return null; // Return 401 with JSON instead of redirect
             }
-            return route('login'); // Fallback for web routes (if any)
+            // For web routes, redirect to home (no login page in this API-first app)
+            return '/';
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Handle authorization exceptions for API routes
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Unauthenticated',
+                    'message' => 'Authentication required to access this resource.',
+                ], 401);
+            }
+        });
+
+        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Forbidden',
+                    'message' => $e->getMessage() ?: 'You do not have permission to perform this action.',
+                ], 403);
+            }
+        });
     })->create();

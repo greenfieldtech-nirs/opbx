@@ -24,6 +24,7 @@ import {
   getStrategyDescription,
   getFallbackDisplayText,
 } from '@/mock/ringGroups';
+import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +79,7 @@ import {
   X,
   Info,
   ArrowUpDown,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function RingGroups() {
@@ -128,7 +130,7 @@ export default function RingGroups() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch ring groups with React Query
-  const { data: ringGroupsData, isLoading, error } = useQuery({
+  const { data: ringGroupsData, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['ring-groups', {
       page: currentPage,
       per_page: perPage,
@@ -878,6 +880,15 @@ export default function RingGroups() {
                 />
               </div>
             </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
             <Select value={strategyFilter} onValueChange={(value: any) => setStrategyFilter(value)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
