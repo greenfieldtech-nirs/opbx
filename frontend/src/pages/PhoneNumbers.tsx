@@ -287,7 +287,7 @@ export default function PhoneNumbers() {
 
       {/* Filters & Search */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
