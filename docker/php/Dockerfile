@@ -46,6 +46,12 @@ COPY . .
 RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 
 # Generate optimized autoloader (triggers package discovery)
+# Set dummy env vars to prevent broadcasting errors during build
+ENV BROADCAST_DRIVER=log \
+    PUSHER_APP_KEY=dummy \
+    PUSHER_APP_SECRET=dummy \
+    PUSHER_APP_ID=dummy
+
 RUN composer dump-autoload --optimize --no-dev
 
 # Set permissions
