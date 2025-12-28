@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -526,58 +527,84 @@ const BusinessHours: React.FC = () => {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search schedules..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="created_at">Created Date</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Filters Section */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search schedules..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                autoComplete="off"
+              />
+            </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="border rounded-lg p-6 text-center text-destructive">
-          <p>Error loading business hours: {(error as any).message}</p>
-        </div>
-      )}
+            {/* Filter dropdowns */}
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="border rounded-lg p-6 text-center">
-          <p>Loading business hours...</p>
-        </div>
-      )}
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="created_at">Created Date</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Schedules Table */}
-      {!isLoading && !error && (
-        <div className="border rounded-lg">
-          <div className="overflow-x-auto">
+      {/* Business Hours Schedules Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Business Hours Schedules</CardTitle>
+          <CardDescription>
+            {filteredSchedules.length} {filteredSchedules.length === 1 ? 'schedule' : 'schedules'} configured
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading business hours...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 text-destructive">
+              <p>Error loading business hours: {(error as any).message}</p>
+            </div>
+          ) : filteredSchedules.length === 0 ? (
+            <div className="text-center py-12">
+              <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No schedules found</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchQuery || statusFilter !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'Get started by creating your first business hours schedule'}
+              </p>
+              {canManage && !searchQuery && statusFilter === 'all' && (
+                <Button onClick={handleCreateNew}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Schedule
+                </Button>
+              )}
+            </div>
+          ) : (
             <table className="w-full">
-              <thead className="bg-muted/50">
+              <thead>
                 <tr className="border-b">
                   <th className="text-left p-4 font-medium">Name</th>
                   <th className="text-left p-4 font-medium">Status</th>
@@ -585,18 +612,11 @@ const BusinessHours: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredSchedules.length === 0 ? (
-                <tr>
-                  <td colSpan={canManage ? 3 : 2} className="text-center p-8 text-muted-foreground">
-                    No schedules found
-                  </td>
-                </tr>
-              ) : (
-                filteredSchedules.map((schedule) => {
+                {filteredSchedules.map((schedule) => {
                   return (
                     <tr
                       key={schedule.id}
-                      className="border-b hover:bg-muted/50 cursor-pointer"
+                      className="border-b hover:bg-gray-50 cursor-pointer"
                       onClick={() => handleViewDetails(schedule)}
                     >
                       <td className="p-4">
@@ -653,13 +673,12 @@ const BusinessHours: React.FC = () => {
                       )}
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
+                })}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pagination info */}
       {filteredSchedules.length > 0 && (
