@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Voice;
 use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Models\BusinessHoursSchedule;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Services\Cxml\CxmlBuilder;
@@ -74,6 +75,12 @@ class VoiceRoutingController extends Controller
                 'to' => $to,
             ]);
             return $this->cxmlBuilder->hangup();
+        }
+
+        // Step 7: Check business hours (if configured)
+        $businessHoursResponse = $this->checkBusinessHours($organizationId, $callSid);
+        if ($businessHoursResponse) {
+            return $businessHoursResponse;
         }
 
         // Classify call according to section 3.2.0 of CORE_ROUTING_SPECIFICATION.md
@@ -566,6 +573,77 @@ class VoiceRoutingController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * Check business hours and return closed message if outside hours
+     *
+     * Phase 1 Step 7: Basic Business Hours Check
+     * - Load organization's active business hours schedule
+     * - If schedule exists and business is closed, return "we are closed" message
+     * - If no schedule or business is open, return null (proceed with normal routing)
+     *
+     * @param int $organizationId
+     * @param string $callSid
+     * @return Response|null
+     */
+    private function checkBusinessHours(int $organizationId, string $callSid): ?Response
+    {
+        // Load the organization's active business hours schedule
+        // Organizations can have multiple schedules, but we use the first active one
+        $businessHoursSchedule = BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->active()
+            ->first();
+
+        // If no business hours schedule configured, proceed with normal routing
+        if (!$businessHoursSchedule) {
+            Log::info('Voice routing: No business hours schedule configured, proceeding with normal routing', [
+                'call_sid' => $callSid,
+                'organization_id' => $organizationId,
+            ]);
+            return null;
+        }
+
+        Log::info('Voice routing: Checking business hours', [
+            'call_sid' => $callSid,
+            'organization_id' => $organizationId,
+            'schedule_id' => $businessHoursSchedule->id,
+            'schedule_name' => $businessHoursSchedule->name,
+        ]);
+
+        // Check if currently open
+        $isOpen = $businessHoursSchedule->isCurrentlyOpen();
+
+        Log::info('Voice routing: Business hours check result', [
+            'call_sid' => $callSid,
+            'organization_id' => $organizationId,
+            'schedule_id' => $businessHoursSchedule->id,
+            'is_open' => $isOpen,
+            'current_status' => $businessHoursSchedule->current_status,
+        ]);
+
+        // If business is closed, return "we are closed" message
+        if (!$isOpen) {
+            Log::info('Voice routing: Business is closed, returning closed message', [
+                'call_sid' => $callSid,
+                'organization_id' => $organizationId,
+                'schedule_id' => $businessHoursSchedule->id,
+            ]);
+
+            $closedMessage = 'Thank you for calling. We are currently closed. Please call back during our business hours.';
+
+            return $this->cxmlBuilder->unavailable($closedMessage);
+        }
+
+        // Business is open, proceed with normal routing
+        Log::info('Voice routing: Business is open, proceeding with normal routing', [
+            'call_sid' => $callSid,
+            'organization_id' => $organizationId,
+            'schedule_id' => $businessHoursSchedule->id,
+        ]);
+
+        return null;
     }
 
 }
