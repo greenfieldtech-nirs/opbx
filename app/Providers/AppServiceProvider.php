@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(
             \App\Services\CloudonixApiClient::class
         );
+
+        $this->app->singleton(
+            \App\Services\VoiceRouting\VoiceRoutingCacheService::class
+        );
     }
 
     /**
@@ -48,6 +52,15 @@ class AppServiceProvider extends ServiceProvider
 
         // Configure rate limiting
         $this->configureRateLimiting();
+
+        // Register model observers for cache invalidation (Phase 1 Step 8)
+        \App\Models\Extension::observe(\App\Observers\ExtensionCacheObserver::class);
+        \App\Models\BusinessHoursSchedule::observe(\App\Observers\BusinessHoursScheduleCacheObserver::class);
+
+        // Register observers for nested business hours models (Phase 1 Step 8.6)
+        \App\Models\BusinessHoursScheduleDay::observe(\App\Observers\BusinessHoursScheduleDayCacheObserver::class);
+        \App\Models\BusinessHoursTimeRange::observe(\App\Observers\BusinessHoursTimeRangeCacheObserver::class);
+        \App\Models\BusinessHoursException::observe(\App\Observers\BusinessHoursExceptionCacheObserver::class);
 
         // Disable model events for CLI commands if needed
         if ($this->app->runningInConsole()) {

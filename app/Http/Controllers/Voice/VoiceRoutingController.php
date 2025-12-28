@@ -11,6 +11,7 @@ use App\Models\BusinessHoursSchedule;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Services\Cxml\CxmlBuilder;
+use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -36,9 +37,11 @@ class VoiceRoutingController extends Controller
      * Constructor
      *
      * @param CxmlBuilder $cxmlBuilder CXML response builder
+     * @param VoiceRoutingCacheService $cache Voice routing cache service
      */
     public function __construct(
-        private readonly CxmlBuilder $cxmlBuilder
+        private readonly CxmlBuilder $cxmlBuilder,
+        private readonly VoiceRoutingCacheService $cache
     ) {
     }
 
@@ -98,16 +101,16 @@ class VoiceRoutingController extends Controller
             $normalizedFrom = $this->normalizePhoneNumber($from);
             $normalizedTo = $this->normalizePhoneNumber($to);
 
-            // Check if From is NOT an internal extension
-            $fromExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('organization_id', $organizationId)
-                ->where('extension_number', $normalizedFrom)
-                ->whereIn('type', [ExtensionType::USER->value, ExtensionType::AI_ASSISTANT->value])
-                ->where('status', UserStatus::ACTIVE->value)
-                ->exists();
+            // Step 8: Check if From is NOT an internal extension (with caching)
+            $fromExtension = $this->cache->getExtension($organizationId, $normalizedFrom);
+
+            // Apply filters
+            $fromExtensionExists = $fromExtension &&
+                in_array($fromExtension->type, [ExtensionType::USER, ExtensionType::AI_ASSISTANT], true) &&
+                $fromExtension->isActive();
 
             // If external caller is trying to reach E.164 number: security violation
-            if (!$fromExtension && $this->isE164($normalizedTo)) {
+            if (!$fromExtensionExists && $this->isE164($normalizedTo)) {
                 Log::warning('Voice routing: Security violation - external caller attempting E.164 dial', [
                     'call_sid' => $callSid,
                     'from' => $from,
@@ -240,20 +243,25 @@ class VoiceRoutingController extends Controller
         $normalizedFrom = $this->normalizePhoneNumber($from);
         $normalizedTo = $this->normalizePhoneNumber($to);
 
-        // Check if From is an internal extension
-        $fromExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('organization_id', $organizationId)
-            ->where('extension_number', $normalizedFrom)
-            ->whereIn('type', [ExtensionType::USER->value, ExtensionType::AI_ASSISTANT->value])
-            ->where('status', UserStatus::ACTIVE->value)
-            ->first();
+        // Step 8: Check if From is an internal extension (with caching)
+        $fromExtension = $this->cache->getExtension($organizationId, $normalizedFrom);
 
-        // Check if To is an internal extension
-        $toExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('organization_id', $organizationId)
-            ->where('extension_number', $normalizedTo)
-            ->where('status', UserStatus::ACTIVE->value)
-            ->first();
+        // Filter by type and status (cache returns all, we need to filter)
+        if ($fromExtension &&
+            !in_array($fromExtension->type, [ExtensionType::USER, ExtensionType::AI_ASSISTANT], true)) {
+            $fromExtension = null;
+        }
+        if ($fromExtension && !$fromExtension->isActive()) {
+            $fromExtension = null;
+        }
+
+        // Step 8: Check if To is an internal extension (with caching)
+        $toExtension = $this->cache->getExtension($organizationId, $normalizedTo);
+
+        // Filter by status (cache returns all, we need active only)
+        if ($toExtension && !$toExtension->isActive()) {
+            $toExtension = null;
+        }
 
         // Check if To is a DID (Phone Number)
         $toDid = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
@@ -304,14 +312,18 @@ class VoiceRoutingController extends Controller
             'organization_id' => $organizationId,
         ]);
 
-        // Step 4: Tenant Isolation - Verify FROM extension belongs to this organization
+        // Step 4 & 8: Tenant Isolation - Verify FROM extension belongs to this organization (with caching)
         // This provides defense-in-depth against middleware bypass or misconfiguration
-        $fromExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('organization_id', $organizationId)
-            ->where('extension_number', $normalizedFrom)
-            ->whereIn('type', [ExtensionType::USER->value, ExtensionType::AI_ASSISTANT->value])
-            ->where('status', UserStatus::ACTIVE->value)
-            ->first();
+        $fromExtension = $this->cache->getExtension($organizationId, $normalizedFrom);
+
+        // Apply filters (cache returns all, we need specific criteria)
+        if ($fromExtension &&
+            !in_array($fromExtension->type, [ExtensionType::USER, ExtensionType::AI_ASSISTANT], true)) {
+            $fromExtension = null;
+        }
+        if ($fromExtension && !$fromExtension->isActive()) {
+            $fromExtension = null;
+        }
 
         if (!$fromExtension) {
             // This should never happen if middleware works correctly, but log as security event
@@ -387,14 +399,10 @@ class VoiceRoutingController extends Controller
             return $this->cxmlBuilder->dial($normalizedTo, $from);
         }
 
-        // Look up destination extension in database (without status filter for better error messages)
+        // Step 4 & 8: Look up destination extension with caching
         // Eager load user relationship for Step 3 validation
-        // Step 4: Tenant Isolation - Load destination extension scoped to organization
-        $destinationExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->with('user')
-            ->where('organization_id', $organizationId)
-            ->where('extension_number', $normalizedTo)
-            ->first();
+        // Tenant Isolation - Load destination extension scoped to organization
+        $destinationExtension = $this->cache->getExtension($organizationId, $normalizedTo);
 
         // Validation Step 1: Check if extension exists (enforces tenant isolation)
         if (!$destinationExtension) {
@@ -589,12 +597,9 @@ class VoiceRoutingController extends Controller
      */
     private function checkBusinessHours(int $organizationId, string $callSid): ?Response
     {
-        // Load the organization's active business hours schedule
+        // Step 8: Load the organization's active business hours schedule from cache
         // Organizations can have multiple schedules, but we use the first active one
-        $businessHoursSchedule = BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('organization_id', $organizationId)
-            ->active()
-            ->first();
+        $businessHoursSchedule = $this->cache->getActiveBusinessHoursSchedule($organizationId);
 
         // If no business hours schedule configured, proceed with normal routing
         if (!$businessHoursSchedule) {
