@@ -27,6 +27,7 @@ class Extension extends Model
         'organization_id',
         'user_id',
         'extension_number',
+        'password',
         'type',
         'status',
         'voicemail_enabled',

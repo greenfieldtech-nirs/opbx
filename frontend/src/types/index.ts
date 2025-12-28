@@ -116,6 +116,7 @@ export interface Extension {
   organization_id: string;
   user_id: string | null;
   extension_number: string;
+  password: string;
   type: ExtensionType;
   status: Status;
   voicemail_enabled: boolean;

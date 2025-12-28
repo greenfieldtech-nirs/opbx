@@ -30,6 +30,7 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  EyeOff,
   UserCheck,
   UserX,
   Users,
@@ -230,6 +231,7 @@ export default function ExtensionsComplete() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
   const [showExtensionDetail, setShowExtensionDetail] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
 
   // Form state
   const [formData, setFormData] = useState<ExtensionFormData>({
@@ -673,6 +675,29 @@ export default function ExtensionsComplete() {
       forward_to: '',
     });
     setFormErrors({});
+  };
+
+  // Toggle password visibility
+  const togglePasswordVisibility = (extensionId: string) => {
+    setVisiblePasswords(prev => {
+      const next = new Set(prev);
+      if (next.has(extensionId)) {
+        next.delete(extensionId);
+      } else {
+        next.add(extensionId);
+      }
+      return next;
+    });
+  };
+
+  // Copy password to clipboard
+  const copyPassword = async (password: string, extensionNumber: string) => {
+    try {
+      await navigator.clipboard.writeText(password);
+      toast.success(`Password for extension ${extensionNumber} copied to clipboard`);
+    } catch (error) {
+      toast.error('Failed to copy password');
+    }
   };
 
   // Open create dialog
@@ -1161,6 +1186,7 @@ export default function ExtensionsComplete() {
                     {getSortIcon('extension_number')}
                   </div>
                 </TableHead>
+                <TableHead>Password</TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
                   <div className="flex items-center gap-2">
                     Type
@@ -1186,7 +1212,7 @@ export default function ExtensionsComplete() {
             <TableBody>
               {displayedExtensions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
+                  <TableCell colSpan={7} className="text-center py-12">
                     <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No extensions found</h3>
                     <p className="text-muted-foreground mb-4">
@@ -1215,6 +1241,37 @@ export default function ExtensionsComplete() {
                       >
                         {extension.extension_number}
                       </button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">
+                          {visiblePasswords.has(extension.id) ? extension.password : '••••••••••••••••'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => togglePasswordVisibility(extension.id)}
+                            title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
+                          >
+                            {visiblePasswords.has(extension.id) ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => copyPassword(extension.password, extension.extension_number)}
+                            title="Copy password"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>{getTypeBadge(extension.type)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">

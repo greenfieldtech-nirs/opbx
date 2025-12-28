@@ -11,6 +11,7 @@ use App\Http\Requests\Extension\StoreExtensionRequest;
 use App\Http\Requests\Extension\UpdateExtensionRequest;
 use App\Http\Resources\ExtensionResource;
 use App\Models\Extension;
+use App\Services\PasswordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -116,9 +117,10 @@ class ExtensionController extends Controller
      * Store a newly created extension.
      *
      * @param StoreExtensionRequest $request
+     * @param PasswordGenerator $passwordGenerator
      * @return JsonResponse
      */
-    public function store(StoreExtensionRequest $request): JsonResponse
+    public function store(StoreExtensionRequest $request, PasswordGenerator $passwordGenerator): JsonResponse
     {
         $requestId = (string) Str::uuid();
         $currentUser = $request->user();
@@ -139,6 +141,9 @@ class ExtensionController extends Controller
 
         // Assign to current user's organization
         $validated['organization_id'] = $currentUser->organization_id;
+
+        // Auto-generate strong password for the extension
+        $validated['password'] = $passwordGenerator->generate(24);
 
         try {
             $extension = DB::transaction(function () use ($validated): Extension {
