@@ -159,7 +159,7 @@ class CloudonixWebhookController extends Controller
      * Handle CDR (Call Detail Record) webhook.
      * This is called by Cloudonix after a call completes.
      */
-    public function cdr(CdrRequest $request): Response
+    public function cdr(CdrRequest $request): \Illuminate\Http\JsonResponse
     {
         $callId = $request->input('call_id');
         $organizationId = $request->input('_organization_id');
@@ -170,8 +170,74 @@ class CloudonixWebhookController extends Controller
             'payload' => $request->all(),
         ]);
 
-        // Dispatch job to process CDR asynchronously
-        ProcessCDRJob::dispatch($request->all());
+        // Process CDR synchronously so we can return proper response
+        try {
+            $cdr = \App\Models\CallDetailRecord::createFromWebhook($request->all(), $organizationId);
+
+            Log::info('CDR created successfully', [
+                'call_id' => $callId,
+                'cdr_id' => $cdr->id,
+                'organization_id' => $organizationId,
+                'disposition' => $cdr->disposition,
+                'duration' => $cdr->duration,
+                'billsec' => $cdr->billsec,
+            ]);
+
+            // Also update CallLog if it exists (for backwards compatibility)
+            $callLog = \App\Models\CallLog::where('call_id', $callId)->first();
+            if ($callLog) {
+                $updateData = [
+                    'cloudonix_cdr' => $request->all(),
+                ];
+
+                if ($request->has('recording_url')) {
+                    $updateData['recording_url'] = $request->input('recording_url');
+                }
+
+                if (!$callLog->duration && $request->has('duration')) {
+                    $updateData['duration'] = (int) $request->input('duration');
+                }
+
+                $callLog->update($updateData);
+
+                Log::info('CDR data also saved to call log', [
+                    'call_id' => $callId,
+                    'call_log_id' => $callLog->id,
+                ]);
+            }
+
+            // Return CDR ID to indicate successful insertion
+            return response()->json([
+                'cdr_id' => $cdr->id,
+                'status' => 'success',
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to create CDR', [
+                'call_id' => $callId,
+                'organization_id' => $organizationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'payload' => $request->all(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to store CDR: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Handle session update webhook.
+     * This is called by Cloudonix to update session state during calls.
+     * Currently a mock endpoint that accepts all updates.
+     */
+    public function sessionUpdate(\Illuminate\Http\Request $request): Response
+    {
+        // Mock endpoint: Just log and return 200 OK always
+        Log::info('Received session-update webhook', [
+            'payload' => $request->all(),
+        ]);
 
         return response('', 200);
     }

@@ -149,13 +149,13 @@ class CallDetailRecord extends Model
             'sell_cost' => $payload['sell_cost'] ?? null,
             'vapp_server' => $payload['vapp_server'] ?? null,
             'session_id' => $session['id'] ?? null,
-            'call_start_time' => isset($session['callStartTime'])
+            'call_start_time' => isset($session['callStartTime']) && $session['callStartTime'] > 0
                 ? Carbon::createFromTimestampMs($session['callStartTime'])
                 : null,
-            'call_end_time' => isset($session['callEndTime'])
+            'call_end_time' => isset($session['callEndTime']) && $session['callEndTime'] > 0
                 ? Carbon::createFromTimestampMs($session['callEndTime'])
                 : null,
-            'call_answer_time' => isset($session['callAnswerTime'])
+            'call_answer_time' => isset($session['callAnswerTime']) && $session['callAnswerTime'] > 0
                 ? Carbon::createFromTimestampMs($session['callAnswerTime'])
                 : null,
             'status' => $session['status'] ?? null,

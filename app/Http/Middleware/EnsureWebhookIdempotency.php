@@ -40,20 +40,38 @@ class EnsureWebhookIdempotency
             $webhookAge = time() - (int) $timestamp;
             $maxAge = config('webhooks.replay_protection.max_age', 300); // 5 minutes default
 
-            if ($webhookAge > $maxAge) {
-                Log::warning('Webhook replay attack detected - timestamp too old', [
-                    'idempotency_key' => $idempotencyKey,
-                    'url' => $request->fullUrl(),
-                    'ip' => $request->ip(),
-                    'timestamp' => $timestamp,
-                    'age_seconds' => $webhookAge,
-                    'max_age_seconds' => $maxAge,
-                ]);
+            // Check if this is a CDR webhook (CDRs can arrive late due to processing delays)
+            $isCdrWebhook = $request->is('api/webhooks/cloudonix/cdr');
 
-                return response()->json([
-                    'error' => 'Webhook Expired',
-                    'message' => 'Webhook timestamp is too old. Possible replay attack.',
-                ], 400);
+            if ($webhookAge > $maxAge) {
+                if ($isCdrWebhook) {
+                    // For CDR webhooks, log but accept older records
+                    Log::info('CDR webhook received with old timestamp (accepted)', [
+                        'idempotency_key' => $idempotencyKey,
+                        'url' => $request->fullUrl(),
+                        'ip' => $request->ip(),
+                        'timestamp' => $timestamp,
+                        'age_seconds' => $webhookAge,
+                        'max_age_seconds' => $maxAge,
+                        'reason' => 'CDR processing delay - accepted',
+                    ]);
+                    // Continue processing - do not reject
+                } else {
+                    // For other webhooks, reject as potential replay attack
+                    Log::warning('Webhook replay attack detected - timestamp too old', [
+                        'idempotency_key' => $idempotencyKey,
+                        'url' => $request->fullUrl(),
+                        'ip' => $request->ip(),
+                        'timestamp' => $timestamp,
+                        'age_seconds' => $webhookAge,
+                        'max_age_seconds' => $maxAge,
+                    ]);
+
+                    return response()->json([
+                        'error' => 'Webhook Expired',
+                        'message' => 'Webhook timestamp is too old. Possible replay attack.',
+                    ], 400);
+                }
             }
 
             if ($webhookAge < -60) {

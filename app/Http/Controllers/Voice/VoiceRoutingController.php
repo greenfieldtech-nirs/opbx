@@ -73,8 +73,35 @@ class VoiceRoutingController extends Controller
             'call_type' => $callType,
         ]);
 
-        // If call doesn't match internal or external rules, hangup
+        // If call doesn't match internal or external rules, check for security violations
         if ($callType === 'invalid') {
+            // Security check: Detect if external caller is trying to dial E.164 number
+            // This is a potential security violation (toll fraud attempt)
+            $normalizedFrom = $this->normalizePhoneNumber($from);
+            $normalizedTo = $this->normalizePhoneNumber($to);
+
+            // Check if From is NOT an internal extension
+            $fromExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                ->where('organization_id', $organizationId)
+                ->where('extension_number', $normalizedFrom)
+                ->whereIn('type', [ExtensionType::USER->value, ExtensionType::AI_ASSISTANT->value])
+                ->where('status', UserStatus::ACTIVE->value)
+                ->exists();
+
+            // If external caller is trying to reach E.164 number: security violation
+            if (!$fromExtension && $this->isE164($normalizedTo)) {
+                Log::warning('Voice routing: Security violation - external caller attempting E.164 dial', [
+                    'call_sid' => $callSid,
+                    'from' => $from,
+                    'to' => $to,
+                    'organization_id' => $organizationId,
+                    'reason' => 'security_violation_e164',
+                ]);
+
+                return $this->buildUnavailableResponse('Security violation, no outbound dialing allowed');
+            }
+
+            // Other invalid scenarios: silent hangup
             return $this->buildHangupResponse();
         }
 
@@ -255,8 +282,26 @@ class VoiceRoutingController extends Controller
             'organization_id' => $organizationId,
         ]);
 
+        // Check if destination is E.164 format (internal extension dialing out)
+        if ($this->isE164($normalizedTo)) {
+            Log::info('Voice routing: Internal call to E.164 number', [
+                'call_sid' => $callSid,
+                'from' => $from,
+                'to' => $normalizedTo,
+                'organization_id' => $organizationId,
+            ]);
+
+            // Generate Dial CXML for outbound call
+            $cxml = $this->buildDialCxml($from, $normalizedTo);
+
+            return response($cxml, 200)
+                ->header('Content-Type', 'application/xml');
+        }
+
         // Look up destination extension in database (without status filter for better error messages)
+        // Eager load user relationship for Step 3 validation
         $destinationExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->with('user')
             ->where('organization_id', $organizationId)
             ->where('extension_number', $normalizedTo)
             ->first();
@@ -270,7 +315,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'extension_not_found',
             ]);
 
-            return $this->buildUnavailableResponse('The extension you are trying to reach does not exist.');
+            return $this->buildUnavailableResponse('The extension number you are trying to reach is invalid, please try again.');
         }
 
         // Validation Step 2: Check if extension is active (use enum comparison)
@@ -284,7 +329,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'extension_inactive',
             ]);
 
-            return $this->buildUnavailableResponse('The extension you are trying to reach is unavailable.');
+            return $this->buildUnavailableResponse('The extension number you are trying to reach is disabled, goodbye.');
         }
 
         // Validation Step 3: Check extension type (Step 2: only support 'user' type for now)
@@ -301,12 +346,42 @@ class VoiceRoutingController extends Controller
             return $this->buildUnavailableResponse('The extension you are trying to reach is not available at this time.');
         }
 
-        Log::info('Voice routing: Extension validated successfully, generating Dial CXML', [
+        // Validation Step 4 (Phase 1 Step 3): Check if user is assigned to extension
+        if (!$destinationExtension->user) {
+            Log::warning('Voice routing: Extension has no user assigned', [
+                'call_sid' => $callSid,
+                'to' => $normalizedTo,
+                'extension_id' => $destinationExtension->id,
+                'organization_id' => $organizationId,
+                'reason' => 'no_user_assigned',
+            ]);
+
+            return $this->buildUnavailableResponse('This extension is not associated with any user. Please associate the extension and try again.');
+        }
+
+        // Validation Step 5 (Phase 1 Step 3): Check if assigned user is active
+        if (!$destinationExtension->user->isActive()) {
+            Log::warning('Voice routing: Extension user is inactive', [
+                'call_sid' => $callSid,
+                'to' => $normalizedTo,
+                'extension_id' => $destinationExtension->id,
+                'user_id' => $destinationExtension->user->id,
+                'user_status' => $destinationExtension->user->status->value,
+                'organization_id' => $organizationId,
+                'reason' => 'user_inactive',
+            ]);
+
+            return $this->buildUnavailableResponse('The user you are trying to reach is currently unavailable.');
+        }
+
+        Log::info('Voice routing: Extension and user validated successfully, generating Dial CXML', [
             'call_sid' => $callSid,
             'extension_id' => $destinationExtension->id,
             'extension_number' => $destinationExtension->extension_number,
             'extension_type' => $destinationExtension->type->value,
             'extension_status' => $destinationExtension->status->value,
+            'user_id' => $destinationExtension->user->id,
+            'user_status' => $destinationExtension->user->status->value,
         ]);
 
         // Generate Dial CXML
