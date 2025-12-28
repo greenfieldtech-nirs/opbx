@@ -704,31 +704,27 @@ export default function ConferenceRooms() {
         )}
       </div>
 
+      {/* Filters Section */}
       <Card>
-        <CardHeader>
-          <CardTitle>Conference Rooms</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading...' : `${totalRooms} room${totalRooms !== 1 ? 's' : ''}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search conference rooms..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search conference rooms..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                autoComplete="off"
+              />
             </div>
 
+            {/* Filter dropdowns */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue />
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
@@ -737,14 +733,53 @@ export default function ConferenceRooms() {
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Table */}
-          <div className="rounded-md border">
+      {/* Conference Rooms Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Conference Rooms</CardTitle>
+          <CardDescription>
+            {isLoading ? 'Loading...' : `${totalRooms} room${totalRooms !== 1 ? 's' : ''}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading || error || rooms.length === 0 ? (
+            // Empty/Loading/Error States
+            <div className="text-center py-12">
+              {isLoading ? (
+                <p className="text-muted-foreground">Loading conference rooms...</p>
+              ) : error ? (
+                <div className="text-destructive">
+                  <p className="font-semibold mb-2">Error loading conference rooms</p>
+                  <p className="text-sm text-muted-foreground">Please try again later</p>
+                </div>
+              ) : (
+                <>
+                  <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No conference rooms found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchQuery || statusFilter !== 'all'
+                      ? 'Try adjusting your filters'
+                      : 'Get started by creating your first conference room'}
+                  </p>
+                  {canManageRooms && !searchQuery && statusFilter === 'all' && (
+                    <Button onClick={openCreateDialog}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Conference Room
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer select-none hover:bg-gray-50"
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center gap-2">
@@ -756,7 +791,7 @@ export default function ConferenceRooms() {
                   </TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer select-none hover:bg-gray-50"
                     onClick={() => handleSort('max_participants')}
                   >
                     <div className="flex items-center gap-2">
@@ -772,47 +807,7 @@ export default function ConferenceRooms() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
-                  // Loading skeleton
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
-                      <div className="text-destructive">
-                        <p className="font-semibold mb-2">Error loading conference rooms</p>
-                        <p className="text-sm text-muted-foreground">Please try again later</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : rooms.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
-                      <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">No conference rooms found</h3>
-                      <p className="text-muted-foreground mb-4">
-                        {searchQuery || statusFilter !== 'all'
-                          ? 'Try adjusting your filters'
-                          : 'Get started by creating your first conference room'}
-                      </p>
-                      {canManageRooms && !searchQuery && statusFilter === 'all' && (
-                        <Button onClick={openCreateDialog}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Conference Room
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rooms.map((room) => {
+                {rooms.map((room) => {
                     const securityFeatures = [];
                     if (room.pin_required) securityFeatures.push('PIN');
                     if (room.wait_for_host) securityFeatures.push('Wait for Host');
@@ -820,7 +815,7 @@ export default function ConferenceRooms() {
                     return (
                       <TableRow
                         key={room.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer hover:bg-gray-50"
                         onClick={() => openDetailSheet(room)}
                       >
                         <TableCell className="font-medium">{room.name}</TableCell>
@@ -878,14 +873,12 @@ export default function ConferenceRooms() {
                         </TableCell>
                       </TableRow>
                     );
-                  })
-                )}
+                  })}
               </TableBody>
             </Table>
-          </div>
 
-          {/* Pagination */}
-          {!isLoading && !error && rooms.length > 0 && totalPages > 1 && (
+            {/* Pagination */}
+            {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
               <div className="text-sm text-muted-foreground">
                 Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalRooms)} of {totalRooms} rooms
@@ -912,6 +905,8 @@ export default function ConferenceRooms() {
                 </Button>
               </div>
             </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
