@@ -9,6 +9,7 @@ use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Services\Cxml\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,16 @@ use Illuminate\Support\Facades\Log;
  */
 class VoiceRoutingController extends Controller
 {
+    /**
+     * Constructor
+     *
+     * @param CxmlBuilder $cxmlBuilder CXML response builder
+     */
+    public function __construct(
+        private readonly CxmlBuilder $cxmlBuilder
+    ) {
+    }
+
     /**
      * Handle inbound call routing
      *
@@ -62,7 +73,7 @@ class VoiceRoutingController extends Controller
                 'call_sid' => $callSid,
                 'to' => $to,
             ]);
-            return $this->buildHangupResponse();
+            return $this->cxmlBuilder->hangup();
         }
 
         // Classify call according to section 3.2.0 of CORE_ROUTING_SPECIFICATION.md
@@ -98,11 +109,11 @@ class VoiceRoutingController extends Controller
                     'reason' => 'security_violation_e164',
                 ]);
 
-                return $this->buildUnavailableResponse('Security violation, no outbound dialing allowed');
+                return $this->cxmlBuilder->unavailable('Security violation, no outbound dialing allowed');
             }
 
             // Other invalid scenarios: silent hangup
-            return $this->buildHangupResponse();
+            return $this->cxmlBuilder->hangup();
         }
 
         // Phase 1: Route internal calls (extension-to-extension)
@@ -111,10 +122,12 @@ class VoiceRoutingController extends Controller
         }
 
         // Phase 0: Return placeholder CXML for external calls (not yet implemented)
-        $cxml = $this->buildPlaceholderCxml($callSid, $from, $to, $callType);
+        $message = sprintf(
+            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: %s.',
+            $callType ?? 'unknown'
+        );
 
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
+        return $this->cxmlBuilder->say($message, hangupAfter: true);
     }
 
     /**
@@ -140,10 +153,10 @@ class VoiceRoutingController extends Controller
 
         // Phase 0: Return placeholder CXML
         // Phase 5+: Implement IVR routing logic
-        $cxml = $this->buildPlaceholderCxml($callSid);
-
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
+        return $this->cxmlBuilder->say(
+            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.',
+            hangupAfter: true
+        );
     }
 
     /**
@@ -172,10 +185,10 @@ class VoiceRoutingController extends Controller
 
         // Phase 0: Return placeholder CXML
         // Phase 4+: Implement sequential ring group logic
-        $cxml = $this->buildPlaceholderCxml($callSid);
-
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
+        return $this->cxmlBuilder->say(
+            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.',
+            hangupAfter: true
+        );
     }
 
     /**
@@ -304,7 +317,7 @@ class VoiceRoutingController extends Controller
                 'severity' => 'CRITICAL',
             ]);
 
-            return $this->buildUnavailableResponse('Call routing error. Please contact support.');
+            return $this->cxmlBuilder->unavailable('Call routing error. Please contact support.');
         }
 
         Log::info('Voice routing: FROM extension validated for organization', [
@@ -336,7 +349,7 @@ class VoiceRoutingController extends Controller
                     'reason' => 'extension_type_cannot_make_outbound_calls',
                 ]);
 
-                return $this->buildUnavailableResponse('Your extension type is not permitted to make outbound calls.');
+                return $this->cxmlBuilder->unavailable('Your extension type is not permitted to make outbound calls.');
             }
 
             // Validate E.164 number format is correct
@@ -349,7 +362,7 @@ class VoiceRoutingController extends Controller
                     'reason' => 'invalid_e164_format',
                 ]);
 
-                return $this->buildUnavailableResponse('The phone number you dialed is invalid. Please check the number and try again.');
+                return $this->cxmlBuilder->unavailable('The phone number you dialed is invalid. Please check the number and try again.');
             }
 
             // Log successful outbound routing
@@ -364,10 +377,7 @@ class VoiceRoutingController extends Controller
             ]);
 
             // Generate Dial CXML for outbound call
-            $cxml = $this->buildDialCxml($from, $normalizedTo);
-
-            return response($cxml, 200)
-                ->header('Content-Type', 'application/xml');
+            return $this->cxmlBuilder->dial($normalizedTo, $from);
         }
 
         // Look up destination extension in database (without status filter for better error messages)
@@ -388,7 +398,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'extension_not_found_or_tenant_isolation',
             ]);
 
-            return $this->buildUnavailableResponse('The extension number you are trying to reach is invalid, please try again.');
+            return $this->cxmlBuilder->unavailable('The extension number you are trying to reach is invalid, please try again.');
         }
 
         // Step 4: Log successful tenant isolation for destination
@@ -411,7 +421,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'extension_inactive',
             ]);
 
-            return $this->buildUnavailableResponse('The extension number you are trying to reach is disabled, goodbye.');
+            return $this->cxmlBuilder->unavailable('The extension number you are trying to reach is disabled, goodbye.');
         }
 
         // Validation Step 3: Check extension type (Step 2: only support 'user' type for now)
@@ -425,7 +435,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'unsupported_extension_type',
             ]);
 
-            return $this->buildUnavailableResponse('The extension you are trying to reach is not available at this time.');
+            return $this->cxmlBuilder->unavailable('The extension you are trying to reach is not available at this time.');
         }
 
         // Validation Step 4 (Phase 1 Step 3): Check if user is assigned to extension
@@ -438,7 +448,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'no_user_assigned',
             ]);
 
-            return $this->buildUnavailableResponse('This extension is not associated with any user. Please associate the extension and try again.');
+            return $this->cxmlBuilder->unavailable('This extension is not associated with any user. Please associate the extension and try again.');
         }
 
         // Validation Step 5 (Phase 1 Step 3): Check if assigned user is active
@@ -453,7 +463,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'user_inactive',
             ]);
 
-            return $this->buildUnavailableResponse('The user you are trying to reach is currently unavailable.');
+            return $this->cxmlBuilder->unavailable('The user you are trying to reach is currently unavailable.');
         }
 
         Log::info('Voice routing: Extension and user validated successfully, generating Dial CXML', [
@@ -466,51 +476,8 @@ class VoiceRoutingController extends Controller
             'user_status' => $destinationExtension->user->status->value,
         ]);
 
-        // Generate Dial CXML
-        $cxml = $this->buildDialCxml($from, $normalizedTo);
-
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
-    }
-
-    /**
-     * Build Dial CXML response for extension-to-extension calls
-     *
-     * @param string $callerId
-     * @param string $destination
-     * @return string
-     */
-    private function buildDialCxml(string $callerId, string $destination): string
-    {
-        return '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            '  <Dial timeout="30" callerId="' . htmlspecialchars($callerId, ENT_XML1, 'UTF-8') . '">' .
-            htmlspecialchars($destination, ENT_XML1, 'UTF-8') .
-            '</Dial>' . "\n" .
-            '</Response>';
-    }
-
-    /**
-     * Build unavailable CXML response
-     *
-     * Returns a user-friendly message followed by hangup when
-     * an extension cannot be reached (not found, inactive, etc.)
-     *
-     * @param string $message
-     * @return Response
-     */
-    private function buildUnavailableResponse(string $message = 'The extension you are trying to reach is unavailable.'): Response
-    {
-        $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            '  <Say voice="woman" language="en-US">' . "\n" .
-            '    ' . htmlspecialchars($message, ENT_XML1, 'UTF-8') . ' Goodbye.' . "\n" .
-            '  </Say>' . "\n" .
-            '  <Hangup/>' . "\n" .
-            '</Response>';
-
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
+        // Generate Dial CXML for internal call
+        return $this->cxmlBuilder->dial($normalizedTo, $from);
     }
 
     /**
@@ -601,53 +568,4 @@ class VoiceRoutingController extends Controller
         return true;
     }
 
-    /**
-     * Build hangup CXML response for invalid calls
-     *
-     * According to CORE_ROUTING_SPECIFICATION.md section 3.2.0,
-     * if a call doesn't match internal or external rules, return:
-     * <Response><Hangup /></Response>
-     *
-     * @return Response
-     */
-    private function buildHangupResponse(): Response
-    {
-        $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            '  <Hangup />' . "\n" .
-            '</Response>';
-
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
-    }
-
-    /**
-     * Build placeholder CXML response (Phase 0 only)
-     *
-     * Returns a simple CXML document that plays a message and hangs up.
-     * This is only used during Phase 0 to verify the webhook infrastructure works.
-     *
-     * @param string|null $callSid
-     * @param string|null $from
-     * @param string|null $to
-     * @param string|null $callType
-     * @return string
-     */
-    private function buildPlaceholderCxml(
-        ?string $callSid = null,
-        ?string $from = null,
-        ?string $to = null,
-        ?string $callType = null
-    ): string {
-        $message = sprintf(
-            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: %s.',
-            $callType ?? 'unknown'
-        );
-
-        return '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            '  <Say language="en-US">' . $message . '</Say>' . "\n" .
-            '  <Hangup/>' . "\n" .
-            '</Response>';
-    }
 }
