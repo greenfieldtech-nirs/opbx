@@ -112,6 +112,21 @@ docker exec -u root opbx_app chown -R www-data:www-data /var/www/html
 docker compose restart app
 ```
 
+### Broadcast Connection Error
+
+If you see "Broadcast connection [redis] is not defined" error:
+
+1. Ensure your `.env` file has the correct broadcast connection settings:
+   ```bash
+   BROADCAST_CONNECTION=default
+   REDIS_CLIENT=phpredis
+   ```
+
+2. If you copied from an old `.env.example`, update these values and restart:
+   ```bash
+   docker compose restart app queue-worker
+   ```
+
 ## Development Workflow
 
 ### Running Migrations
