@@ -134,6 +134,7 @@ class StoreExtensionRequest extends FormRequest
             'user_id.exists' => 'The selected user does not exist.',
             'type.required' => 'Extension type is required.',
             'status.required' => 'Extension status is required.',
+            'voicemail_enabled.boolean' => 'Voicemail enabled must be true or false.',
             'configuration.required' => 'Configuration is required.',
             'configuration.conference_room_id.required_if' => 'Conference room ID is required for conference extensions.',
             'configuration.ring_group_id.required_if' => 'Ring group ID is required for ring group extensions.',
@@ -198,14 +199,6 @@ class StoreExtensionRequest extends FormRequest
                         'The selected user does not belong to your organization.'
                     );
                 }
-            }
-
-            // USER type extensions must have a user_id
-            if ($type === ExtensionType::USER->value && !$userId) {
-                $validator->errors()->add(
-                    'user_id',
-                    'User ID is required for user extensions.'
-                );
             }
 
             // Non-USER type extensions should not have a user_id
