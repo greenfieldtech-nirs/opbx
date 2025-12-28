@@ -77,6 +77,7 @@ export default function DIDs() {
       {/* Filters Section */}
       <Card>
         <CardContent className="p-4">
+          {/* Search and Filters in Single Row */}
           <div className="flex flex-wrap gap-3">
             {/* Search */}
             <div className="relative flex-1 min-w-[250px]">
