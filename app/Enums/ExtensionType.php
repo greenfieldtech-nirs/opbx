@@ -71,6 +71,19 @@ enum ExtensionType: string
     }
 
     /**
+     * Check if this extension type can make outbound calls.
+     *
+     * Only PBX User extensions are allowed to make outbound calls by default.
+     * Other extension types (AI Assistant, IVR, etc.) cannot make outbound calls.
+     *
+     * @return bool
+     */
+    public function canMakeOutboundCalls(): bool
+    {
+        return $this === self::USER;
+    }
+
+    /**
      * Get required configuration fields for this extension type.
      *
      * @return array<string>

@@ -314,13 +314,53 @@ class VoiceRoutingController extends Controller
             'organization_id' => $organizationId,
         ]);
 
-        // Check if destination is E.164 format (internal extension dialing out)
+        // Step 5: Check if destination is E.164 format (extension dialing out)
         if ($this->isE164($normalizedTo)) {
-            Log::info('Voice routing: Internal call to E.164 number', [
+            Log::info('Voice routing: Extension attempting outbound call to E.164 number', [
                 'call_sid' => $callSid,
-                'from' => $from,
-                'to' => $normalizedTo,
+                'from_extension' => $normalizedFrom,
+                'from_extension_type' => $fromExtension->type->value,
+                'to_number' => $normalizedTo,
                 'organization_id' => $organizationId,
+            ]);
+
+            // Check if this extension type is allowed to make outbound calls
+            // Only PBX User extensions can make outbound calls by default
+            if (!$fromExtension->type->canMakeOutboundCalls()) {
+                Log::warning('Voice routing: Outbound calling not allowed for extension type', [
+                    'call_sid' => $callSid,
+                    'from_extension' => $normalizedFrom,
+                    'extension_type' => $fromExtension->type->value,
+                    'to_number' => $normalizedTo,
+                    'organization_id' => $organizationId,
+                    'reason' => 'extension_type_cannot_make_outbound_calls',
+                ]);
+
+                return $this->buildUnavailableResponse('Your extension type is not permitted to make outbound calls.');
+            }
+
+            // Validate E.164 number format is correct
+            if (!$this->validateE164Number($normalizedTo)) {
+                Log::warning('Voice routing: Invalid E.164 number format', [
+                    'call_sid' => $callSid,
+                    'from_extension' => $normalizedFrom,
+                    'to_number' => $normalizedTo,
+                    'organization_id' => $organizationId,
+                    'reason' => 'invalid_e164_format',
+                ]);
+
+                return $this->buildUnavailableResponse('The phone number you dialed is invalid. Please check the number and try again.');
+            }
+
+            // Log successful outbound routing
+            Log::info('Voice routing: Routing outbound call', [
+                'call_sid' => $callSid,
+                'from_extension' => $normalizedFrom,
+                'from_extension_type' => $fromExtension->type->value,
+                'caller_id' => $from,
+                'to_number' => $normalizedTo,
+                'organization_id' => $organizationId,
+                'call_type' => 'outbound',
             ]);
 
             // Generate Dial CXML for outbound call
@@ -516,6 +556,49 @@ class VoiceRoutingController extends Controller
         // Check length (7-15 digits after +)
         $length = strlen($digits);
         return $length >= 7 && $length <= 15;
+    }
+
+    /**
+     * Validate E.164 number with additional checks beyond format
+     *
+     * Performs additional validation to reject obviously invalid numbers
+     * that may pass basic E.164 format checks but are not dialable.
+     *
+     * @param string $number
+     * @return bool
+     */
+    private function validateE164Number(string $number): bool
+    {
+        // Must pass basic E.164 format check first
+        if (!$this->isE164($number)) {
+            return false;
+        }
+
+        $digits = substr($number, 1); // Remove +
+
+        // Reject obviously invalid patterns
+        // All zeros
+        if (preg_match('/^0+$/', $digits)) {
+            return false;
+        }
+
+        // All same digit (e.g., +11111111111)
+        if (preg_match('/^(\d)\1+$/', $digits)) {
+            return false;
+        }
+
+        // Country code cannot be 0
+        if (str_starts_with($digits, '0')) {
+            return false;
+        }
+
+        // Check minimum length per region (country code + subscriber)
+        // Most valid international numbers are at least 8 digits
+        if (strlen($digits) < 8) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
