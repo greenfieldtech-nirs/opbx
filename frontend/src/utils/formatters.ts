@@ -133,11 +133,14 @@ export function getStatusColor(status: string): string {
 export function getDispositionColor(disposition: string): string {
   const dispositionColors: Record<string, string> = {
     ANSWERED: 'bg-green-100 text-green-800 border border-green-200',
-    'NO ANSWER': 'bg-orange-100 text-orange-800 border border-orange-200',
-    BUSY: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    FAILED: 'bg-red-100 text-red-800 border border-red-200',
-    CANCELLED: 'bg-gray-100 text-gray-800 border border-gray-200',
-    CONGESTION: 'bg-purple-100 text-purple-800 border border-purple-200',
+    ANSWER: 'bg-green-100 text-green-800 border border-green-200',
+    BUSY: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
+    CANCEL: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    CANCELLED: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    CONGESTION: 'bg-red-100 text-red-800 border border-red-200',
+    FAILED: 'bg-orange-100 text-orange-800 border border-orange-200',
+    'NO ANSWER': 'bg-blue-100 text-blue-800 border border-blue-200',
+    NOANSWER: 'bg-blue-100 text-blue-800 border border-blue-200',
   };
 
   const normalizedDisposition = disposition.toUpperCase();

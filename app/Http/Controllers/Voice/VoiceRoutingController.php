@@ -272,13 +272,45 @@ class VoiceRoutingController extends Controller
      */
     private function routeInternalCall(string $from, string $to, int $organizationId, string $callSid): Response
     {
+        $normalizedFrom = $this->normalizePhoneNumber($from);
         $normalizedTo = $this->normalizePhoneNumber($to);
 
         Log::info('Voice routing: Routing internal call', [
             'call_sid' => $callSid,
             'from' => $from,
             'to' => $to,
+            'normalized_from' => $normalizedFrom,
             'normalized_to' => $normalizedTo,
+            'organization_id' => $organizationId,
+        ]);
+
+        // Step 4: Tenant Isolation - Verify FROM extension belongs to this organization
+        // This provides defense-in-depth against middleware bypass or misconfiguration
+        $fromExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('extension_number', $normalizedFrom)
+            ->whereIn('type', [ExtensionType::USER->value, ExtensionType::AI_ASSISTANT->value])
+            ->where('status', UserStatus::ACTIVE->value)
+            ->first();
+
+        if (!$fromExtension) {
+            // This should never happen if middleware works correctly, but log as security event
+            Log::error('Voice routing: SECURITY - FROM extension not in organization', [
+                'call_sid' => $callSid,
+                'from' => $from,
+                'normalized_from' => $normalizedFrom,
+                'organization_id' => $organizationId,
+                'reason' => 'tenant_isolation_violation',
+                'severity' => 'CRITICAL',
+            ]);
+
+            return $this->buildUnavailableResponse('Call routing error. Please contact support.');
+        }
+
+        Log::info('Voice routing: FROM extension validated for organization', [
+            'call_sid' => $callSid,
+            'from_extension_id' => $fromExtension->id,
+            'from_extension_number' => $fromExtension->extension_number,
             'organization_id' => $organizationId,
         ]);
 
@@ -300,23 +332,33 @@ class VoiceRoutingController extends Controller
 
         // Look up destination extension in database (without status filter for better error messages)
         // Eager load user relationship for Step 3 validation
+        // Step 4: Tenant Isolation - Load destination extension scoped to organization
         $destinationExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->with('user')
             ->where('organization_id', $organizationId)
             ->where('extension_number', $normalizedTo)
             ->first();
 
-        // Validation Step 1: Check if extension exists
+        // Validation Step 1: Check if extension exists (enforces tenant isolation)
         if (!$destinationExtension) {
-            Log::warning('Voice routing: Destination extension not found', [
+            Log::warning('Voice routing: Destination extension not found or not in organization', [
                 'call_sid' => $callSid,
                 'to' => $normalizedTo,
                 'organization_id' => $organizationId,
-                'reason' => 'extension_not_found',
+                'reason' => 'extension_not_found_or_tenant_isolation',
             ]);
 
             return $this->buildUnavailableResponse('The extension number you are trying to reach is invalid, please try again.');
         }
+
+        // Step 4: Log successful tenant isolation for destination
+        Log::info('Voice routing: Destination extension validated for organization', [
+            'call_sid' => $callSid,
+            'to_extension_id' => $destinationExtension->id,
+            'to_extension_number' => $destinationExtension->extension_number,
+            'organization_id' => $organizationId,
+            'tenant_isolation' => 'enforced',
+        ]);
 
         // Validation Step 2: Check if extension is active (use enum comparison)
         if (!$destinationExtension->isActive()) {
