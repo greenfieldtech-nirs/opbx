@@ -114,6 +114,9 @@ class CxmlBuilder
 
         $conference = $this->document->createElement('Conference');
 
+        // Set conference name as an attribute instead of text content
+        $conference->setAttribute('name', htmlspecialchars($conferenceIdentifier, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+
         $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
         $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
 
@@ -127,9 +130,6 @@ class CxmlBuilder
 
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
         $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
-
-        // Add conference identifier as text content
-        $conference->textContent = $conferenceIdentifier;
 
         $dial->appendChild($conference);
         $this->response->appendChild($dial);

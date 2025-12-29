@@ -534,74 +534,124 @@ class VoiceRoutingController extends Controller
      */
     private function routeToConference(Extension $extension, int $organizationId, string $callSid): Response
     {
-        // Get the conference room from extension configuration
-        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
-
-        if (!$conferenceRoomId) {
-            Log::warning('Voice routing: Conference extension has no conference_room_id configured', [
+        try {
+            Log::info('Voice routing: Starting conference routing', [
                 'call_sid' => $callSid,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
+                'extension_type' => $extension->type->value,
                 'organization_id' => $organizationId,
-                'reason' => 'missing_conference_room_id',
+                'configuration' => $extension->configuration,
             ]);
 
-            return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is not properly configured.'));
-        }
+            // Get the conference room from extension configuration
+            $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
 
-        // Load the conference room
-        $conferenceRoom = \App\Models\ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $conferenceRoomId)
-            ->where('organization_id', $organizationId)
-            ->first();
+            if (!$conferenceRoomId) {
+                Log::warning('Voice routing: Conference extension has no conference_room_id configured', [
+                    'call_sid' => $callSid,
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'organization_id' => $organizationId,
+                    'configuration' => $extension->configuration,
+                    'reason' => 'missing_conference_room_id',
+                ]);
 
-        if (!$conferenceRoom) {
-            Log::warning('Voice routing: Conference room not found or not in organization', [
+                return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is not properly configured.'));
+            }
+
+            // Load the conference room
+            Log::info('Voice routing: Looking up conference room', [
                 'call_sid' => $callSid,
-                'extension_id' => $extension->id,
                 'conference_room_id' => $conferenceRoomId,
                 'organization_id' => $organizationId,
-                'reason' => 'conference_room_not_found',
             ]);
 
-            return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room not found.'));
-        }
+            $conferenceRoom = \App\Models\ConferenceRoom::where('id', $conferenceRoomId)
+                ->where('organization_id', $organizationId)
+                ->first();
 
-        // Check if conference room is active
-        if ($conferenceRoom->status !== \App\Enums\UserStatus::ACTIVE) {
-            Log::warning('Voice routing: Conference room is not active', [
+            if (!$conferenceRoom) {
+                Log::warning('Voice routing: Conference room not found or not in organization', [
+                    'call_sid' => $callSid,
+                    'extension_id' => $extension->id,
+                    'conference_room_id' => $conferenceRoomId,
+                    'organization_id' => $organizationId,
+                    'reason' => 'conference_room_not_found',
+                ]);
+
+                return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room not found.'));
+            }
+
+            Log::info('Voice routing: Conference room found', [
+                'call_sid' => $callSid,
+                'conference_room_id' => $conferenceRoom->id,
+                'conference_room_name' => $conferenceRoom->name,
+                'conference_room_status' => $conferenceRoom->status->value,
+            ]);
+
+            // Check if conference room is active
+            if ($conferenceRoom->status !== \App\Enums\UserStatus::ACTIVE) {
+                Log::warning('Voice routing: Conference room is not active', [
+                    'call_sid' => $callSid,
+                    'extension_id' => $extension->id,
+                    'conference_room_id' => $conferenceRoom->id,
+                    'conference_room_status' => $conferenceRoom->status->value,
+                    'organization_id' => $organizationId,
+                    'reason' => 'conference_room_inactive',
+                ]);
+
+                return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is currently unavailable.'));
+            }
+
+            // Generate clean conference identifier (letters and digits only)
+            $conferenceIdentifier = $this->generateConferenceIdentifier($conferenceRoom->name);
+
+            Log::info('Voice routing: Routing call to conference room', [
                 'call_sid' => $callSid,
                 'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
                 'conference_room_id' => $conferenceRoom->id,
-                'conference_room_status' => $conferenceRoom->status->value,
+                'conference_room_name' => $conferenceRoom->name,
+                'conference_identifier' => $conferenceIdentifier,
+                'max_participants' => $conferenceRoom->max_participants,
                 'organization_id' => $organizationId,
-                'reason' => 'conference_room_inactive',
             ]);
 
-            return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is currently unavailable.'));
+            // Generate Conference CXML with Dial wrapper
+            Log::info('Voice routing: Generating conference CXML', [
+                'call_sid' => $callSid,
+                'conference_identifier' => $conferenceIdentifier,
+                'max_participants' => $conferenceRoom->max_participants,
+                'mute_on_entry' => $conferenceRoom->mute_on_entry,
+                'announce_join_leave' => $conferenceRoom->announce_join_leave,
+            ]);
+
+            $cxml = CxmlBuilder::joinConference(
+                $conferenceIdentifier,
+                $conferenceRoom->max_participants,
+                $conferenceRoom->mute_on_entry,
+                $conferenceRoom->announce_join_leave
+            );
+
+            Log::info('Voice routing: Generated conference CXML', [
+                'call_sid' => $callSid,
+                'cxml' => $cxml,
+            ]);
+
+            return $this->cxmlResponse($cxml);
+
+        } catch (\Exception $e) {
+            Log::error('Voice routing: Error routing to conference', [
+                'call_sid' => $callSid,
+                'extension_id' => $extension->id,
+                'organization_id' => $organizationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->cxmlErrorResponse('Conference routing error. Please try again.');
         }
-
-        // Generate clean conference identifier (letters and digits only)
-        $conferenceIdentifier = $this->generateConferenceIdentifier($conferenceRoom->name);
-
-        Log::info('Voice routing: Routing call to conference room', [
-            'call_sid' => $callSid,
-            'extension_id' => $extension->id,
-            'extension_number' => $extension->extension_number,
-            'conference_room_id' => $conferenceRoom->id,
-            'conference_room_name' => $conferenceRoom->name,
-            'conference_identifier' => $conferenceIdentifier,
-            'max_participants' => $conferenceRoom->max_participants,
-            'organization_id' => $organizationId,
-        ]);
-
-        // Generate Conference CXML with Dial wrapper
-        return $this->cxmlResponse(CxmlBuilder::joinConference(
-            $conferenceIdentifier,
-            $conferenceRoom->max_participants,
-            $conferenceRoom->mute_on_entry,
-            $conferenceRoom->announce_join_leave
-        ));
     }
 
     /**
