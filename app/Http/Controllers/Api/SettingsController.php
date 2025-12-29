@@ -67,8 +67,10 @@ class SettingsController extends Controller
                 'id' => $settings->id,
                 'organization_id' => $settings->organization_id,
                 'domain_uuid' => $settings->domain_uuid,
+                'domain_name' => $settings->domain_name,
                 'domain_api_key' => $settings->domain_api_key, // Show real key (owner only)
                 'domain_requests_api_key' => $settings->domain_requests_api_key, // Show real key (owner only)
+                'webhook_base_url' => $settings->webhook_base_url,
                 'no_answer_timeout' => $settings->no_answer_timeout,
                 'recording_format' => $settings->recording_format,
                 'is_configured' => $settings->isConfigured(),
@@ -180,8 +182,10 @@ class SettingsController extends Controller
                     'id' => $settings->id,
                     'organization_id' => $settings->organization_id,
                     'domain_uuid' => $settings->domain_uuid,
+                    'domain_name' => $settings->domain_name,
                     'domain_api_key' => $settings->domain_api_key, // Show real key (owner only)
                     'domain_requests_api_key' => $settings->domain_requests_api_key, // Show real key (owner only)
+                    'webhook_base_url' => $settings->webhook_base_url,
                     'no_answer_timeout' => $settings->no_answer_timeout,
                     'recording_format' => $settings->recording_format,
                     'is_configured' => $settings->isConfigured(),
@@ -250,6 +254,11 @@ class SettingsController extends Controller
             // Extract settings from domain profile if available
             $profileSettings = [];
             if ($domainProfile) {
+                // Extract domain name (e.g., "sample.cloudonix.net")
+                if (isset($domainProfile['domain'])) {
+                    $profileSettings['domain_name'] = $domainProfile['domain'];
+                }
+
                 // Extract call-timeout (default to 60 if not present)
                 if (isset($domainProfile['call-timeout'])) {
                     $timeout = (int) $domainProfile['call-timeout'];

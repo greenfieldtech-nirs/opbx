@@ -30,8 +30,10 @@ class UpdateCloudonixSettingsRequest extends FormRequest
     {
         return [
             'domain_uuid' => ['nullable', 'string', 'uuid'],
+            'domain_name' => ['nullable', 'string', 'max:255'],
             'domain_api_key' => ['nullable', 'string', 'max:255'],
             'domain_requests_api_key' => ['nullable', 'string', 'max:255'],
+            'webhook_base_url' => ['nullable', 'string', 'url', 'max:255'],
             'no_answer_timeout' => ['required', 'integer', 'min:5', 'max:120'],
             'recording_format' => ['required', 'string', 'in:wav,mp3'],
         ];
@@ -46,8 +48,10 @@ class UpdateCloudonixSettingsRequest extends FormRequest
     {
         return [
             'domain_uuid' => 'domain UUID',
+            'domain_name' => 'domain name',
             'domain_api_key' => 'domain API key',
             'domain_requests_api_key' => 'webhook API key',
+            'webhook_base_url' => 'webhook base URL',
             'no_answer_timeout' => 'no answer timeout',
             'recording_format' => 'recording format',
         ];

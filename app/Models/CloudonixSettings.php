@@ -14,8 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $organization_id
  * @property string|null $domain_uuid
+ * @property string|null $domain_name
  * @property string|null $domain_api_key
  * @property string|null $domain_requests_api_key
+ * @property string|null $webhook_base_url
  * @property int $no_answer_timeout
  * @property string $recording_format
  * @property \Illuminate\Support\Carbon $created_at
@@ -41,8 +43,10 @@ class CloudonixSettings extends Model
     protected $fillable = [
         'organization_id',
         'domain_uuid',
+        'domain_name',
         'domain_api_key',
         'domain_requests_api_key',
+        'webhook_base_url',
         'no_answer_timeout',
         'recording_format',
     ];
@@ -87,8 +91,12 @@ class CloudonixSettings extends Model
      */
     public function getCallbackUrl(): string
     {
-        $appUrl = rtrim(config('app.url'), '/');
-        return "{$appUrl}/api/webhooks/cloudonix/session-update";
+        // Use custom webhook base URL if configured, otherwise fall back to APP_URL
+        $baseUrl = !empty($this->webhook_base_url)
+            ? rtrim($this->webhook_base_url, '/')
+            : rtrim(config('app.url'), '/');
+
+        return "{$baseUrl}/api/webhooks/cloudonix/session-update";
     }
 
     /**
@@ -98,8 +106,12 @@ class CloudonixSettings extends Model
      */
     public function getCdrUrl(): string
     {
-        $appUrl = rtrim(config('app.url'), '/');
-        return "{$appUrl}/api/webhooks/cloudonix/cdr";
+        // Use custom webhook base URL if configured, otherwise fall back to APP_URL
+        $baseUrl = !empty($this->webhook_base_url)
+            ? rtrim($this->webhook_base_url, '/')
+            : rtrim(config('app.url'), '/');
+
+        return "{$baseUrl}/api/webhooks/cloudonix/cdr";
     }
 
     /**

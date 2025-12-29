@@ -56,8 +56,10 @@ import type {
 // Settings form validation schema
 const settingsSchema = z.object({
   domain_uuid: z.string().uuid('Invalid UUID format').optional().or(z.literal('')),
+  domain_name: z.string().optional().or(z.literal('')),
   domain_api_key: z.string().min(1, 'API Key is required').optional().or(z.literal('')),
   domain_requests_api_key: z.string().optional().or(z.literal('')),
+  webhook_base_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
   no_answer_timeout: z.number().min(5, 'Minimum 5 seconds').max(120, 'Maximum 120 seconds'),
   recording_format: z.enum(['wav', 'mp3']),
 });
@@ -87,8 +89,10 @@ export default function Settings() {
     resolver: zodResolver(settingsSchema),
     defaultValues: {
       domain_uuid: '',
+      domain_name: '',
       domain_api_key: '',
       domain_requests_api_key: '',
+      webhook_base_url: '',
       no_answer_timeout: 60,
       recording_format: 'mp3',
     },
@@ -107,8 +111,10 @@ export default function Settings() {
         // Reset form with loaded data
         reset({
           domain_uuid: data.domain_uuid || '',
+          domain_name: data.domain_name || '',
           domain_api_key: data.domain_api_key || '',
           domain_requests_api_key: data.domain_requests_api_key || '',
+          webhook_base_url: data.webhook_base_url || '',
           no_answer_timeout: data.no_answer_timeout,
           recording_format: data.recording_format,
         });
@@ -165,6 +171,10 @@ export default function Settings() {
         // Step 2: Populate form fields with Cloudonix profile settings if available
         const currentFormValues = watch();
         if (result.profile_settings) {
+          if (result.profile_settings.domain_name !== undefined) {
+            setValue('domain_name', result.profile_settings.domain_name);
+            currentFormValues.domain_name = result.profile_settings.domain_name;
+          }
           if (result.profile_settings.no_answer_timeout !== undefined) {
             setValue('no_answer_timeout', result.profile_settings.no_answer_timeout);
             currentFormValues.no_answer_timeout = result.profile_settings.no_answer_timeout;
@@ -180,8 +190,10 @@ export default function Settings() {
           // Prepare update data with all fields
           const updateData: UpdateCloudonixSettingsRequest = {
             domain_uuid: currentFormValues.domain_uuid || undefined,
+            domain_name: currentFormValues.domain_name || undefined,
             domain_api_key: currentFormValues.domain_api_key || undefined,
             domain_requests_api_key: currentFormValues.domain_requests_api_key || undefined,
+            webhook_base_url: currentFormValues.webhook_base_url || undefined,
             no_answer_timeout: currentFormValues.no_answer_timeout,
             recording_format: currentFormValues.recording_format,
           };
@@ -207,8 +219,10 @@ export default function Settings() {
             // Update form with refreshed data
             reset({
               domain_uuid: refreshedSettings.domain_uuid || '',
+              domain_name: refreshedSettings.domain_name || '',
               domain_api_key: refreshedSettings.domain_api_key || '',
               domain_requests_api_key: refreshedSettings.domain_requests_api_key || '',
+              webhook_base_url: refreshedSettings.webhook_base_url || '',
               no_answer_timeout: refreshedSettings.no_answer_timeout,
               recording_format: refreshedSettings.recording_format,
             });
@@ -341,6 +355,11 @@ export default function Settings() {
                     <p className="text-sm text-destructive flex items-center gap-1">
                       <XCircle className="h-3 w-3" />
                       {errors.domain_uuid.message}
+                    </p>
+                  )}
+                  {settingsData?.domain_name && (
+                    <p className="text-xs text-muted-foreground">
+                      Cloudonix Domain: <span className="font-mono">{settingsData.domain_name}</span>
                     </p>
                   )}
                 </div>
@@ -522,6 +541,44 @@ export default function Settings() {
                   </p>
                 </div>
               )}
+
+              {/* Divider */}
+              <div className="border-t pt-6" />
+
+              {/* Webhook Base URL */}
+              <div className="space-y-2">
+                <Label htmlFor="webhook_base_url" className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Webhook Base URL
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>
+                        Custom base URL for webhook endpoints (CDR and Session Update Callback).
+                        If not specified, the default application URL will be used.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <Input
+                  id="webhook_base_url"
+                  type="url"
+                  placeholder="https://example.com (optional)"
+                  disabled={isValidating}
+                  {...register('webhook_base_url')}
+                />
+                {errors.webhook_base_url && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    {errors.webhook_base_url.message}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Optional: Custom base URL for webhook endpoints. Leave empty to use the default application URL.
+                </p>
+              </div>
 
               {/* Divider */}
               <div className="border-t pt-6" />

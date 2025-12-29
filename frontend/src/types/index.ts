@@ -121,6 +121,8 @@ export interface Extension {
   status: Status;
   voicemail_enabled: boolean;
   configuration?: Record<string, any>;
+  // Eager loaded relationships
+  user?: User | null;
   created_at: string;
   updated_at: string;
 }
@@ -375,6 +377,7 @@ export interface ExtensionsFilterParams extends PaginationParams {
   search?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
+  with?: string; // Eager load relationships (e.g., 'user')
 }
 
 // ============================================================================
@@ -645,8 +648,10 @@ export interface CloudonixSettings {
   id: number;
   organization_id: number;
   domain_uuid: string | null;
+  domain_name: string | null;
   domain_api_key: string | null;
   domain_requests_api_key: string | null;
+  webhook_base_url: string | null;
   no_answer_timeout: number;
   recording_format: RecordingFormat;
   callback_url?: string | null;
@@ -659,8 +664,10 @@ export interface CloudonixSettings {
 
 export interface UpdateCloudonixSettingsRequest {
   domain_uuid?: string;
+  domain_name?: string;
   domain_api_key?: string;
   domain_requests_api_key?: string;
+  webhook_base_url?: string;
   no_answer_timeout?: number;
   recording_format?: RecordingFormat;
 }
@@ -674,6 +681,7 @@ export interface ValidateCloudonixCredentialsResponse {
   valid: boolean;
   message?: string;
   profile_settings?: {
+    domain_name?: string;
     no_answer_timeout?: number;
     recording_format?: 'wav' | 'mp3';
   };
