@@ -1311,7 +1311,9 @@ export default function ExtensionsComplete() {
                     {getSortIcon('extension_number')}
                   </div>
                 </TableHead>
-                <TableHead>Password</TableHead>
+                {displayedExtensions.some(ext => ext.type === 'user') && (
+                  <TableHead>Password</TableHead>
+                )}
                 <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
                   <div className="flex items-center gap-2">
                     Type
@@ -1337,7 +1339,7 @@ export default function ExtensionsComplete() {
             <TableBody>
               {displayedExtensions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 7 : 6} className="text-center py-12">
                     <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No extensions found</h3>
                     <p className="text-muted-foreground mb-4">
@@ -1366,38 +1368,44 @@ export default function ExtensionsComplete() {
                       >
                         {extension.extension_number}
                       </button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">
-                          {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => togglePasswordVisibility(extension.id)}
-                            title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
-                          >
-                            {visiblePasswords.has(extension.id) ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
-                            title="Copy password"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </TableCell>
+                     </TableCell>
+                     {displayedExtensions.some(ext => ext.type === 'user') && (
+                       <TableCell>
+                         {extension.type === 'user' ? (
+                           <div className="flex items-center gap-2">
+                             <span className="font-mono text-sm">
+                               {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
+                             </span>
+                             <div className="flex items-center gap-1">
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-7 w-7 p-0"
+                                 onClick={() => togglePasswordVisibility(extension.id)}
+                                 title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
+                               >
+                                 {visiblePasswords.has(extension.id) ? (
+                                   <EyeOff className="h-4 w-4" />
+                                 ) : (
+                                   <Eye className="h-4 w-4" />
+                                 )}
+                               </Button>
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-7 w-7 p-0"
+                                 onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
+                                 title="Copy password"
+                               >
+                                 <Copy className="h-4 w-4" />
+                               </Button>
+                             </div>
+                           </div>
+                         ) : (
+                           <span className="text-muted-foreground">-</span>
+                         )}
+                       </TableCell>
+                     )}
                     <TableCell>{getTypeBadge(extension.type)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {getConfigurationDisplay(extension)}
@@ -1435,7 +1443,7 @@ export default function ExtensionsComplete() {
                                      <Edit className="h-4 w-4 mr-2" />
                                      Edit Extension
                                    </DropdownMenuItem>
-                                   {canResetPassword && (
+                                   {canResetPassword && extension.type === 'user' && (
                                      <>
                                        <DropdownMenuSeparator />
                                        <DropdownMenuItem
