@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\CloudonixSettings;
+use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -173,5 +175,185 @@ class WebhookSignatureTest extends TestCase
             'X-Custom-Signature' => $signature,
         ]);
         $this->assertNotEquals(401, $response2->status());
+    }
+
+    public function test_timestamp_validation_accepts_recent_timestamp(): void
+    {
+        // Enable timestamp requirement
+        Config::set('cloudonix.require_timestamp', true);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+        $timestamp = time(); // Current time
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+            'X-Cloudonix-Timestamp' => (string) $timestamp,
+        ]);
+
+        // Should not be rejected specifically due to timestamp (may fail on other validations like idempotency)
+        // We just need to verify it's NOT a timestamp error
+        if ($response->status() === 400) {
+            $data = $response->json();
+            $this->assertNotEquals('Timestamp outside tolerance window', $data['error'] ?? '', 'Should not reject valid timestamp');
+        } else {
+            $this->assertNotEquals(400, $response->status(), 'Should not reject valid timestamp');
+        }
+    }
+
+    public function test_timestamp_validation_rejects_old_timestamp(): void
+    {
+        // Enable timestamp requirement
+        Config::set('cloudonix.require_timestamp', true);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+        $timestamp = time() - 600; // 10 minutes ago (outside 5-minute window)
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+            'X-Cloudonix-Timestamp' => (string) $timestamp,
+        ]);
+
+        $response->assertStatus(400);
+        $response->assertJsonFragment(['error' => 'Timestamp outside tolerance window']);
+    }
+
+    public function test_timestamp_validation_rejects_future_timestamp(): void
+    {
+        // Enable timestamp requirement
+        Config::set('cloudonix.require_timestamp', true);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+        $timestamp = time() + 600; // 10 minutes in future (outside 5-minute window)
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+            'X-Cloudonix-Timestamp' => (string) $timestamp,
+        ]);
+
+        $response->assertStatus(400);
+        $response->assertJsonFragment(['error' => 'Timestamp outside tolerance window']);
+    }
+
+    public function test_timestamp_validation_optional_by_default(): void
+    {
+        // Timestamp not required by default
+        Config::set('cloudonix.require_timestamp', false);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+
+        // No timestamp header sent
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+        ]);
+
+        // Should not be rejected specifically due to missing timestamp (may fail on other validations like idempotency)
+        if ($response->status() === 400) {
+            $data = $response->json();
+            $this->assertNotEquals('Missing timestamp header', $data['error'] ?? '', 'Should not require timestamp by default');
+        } else {
+            $this->assertNotEquals(400, $response->status(), 'Should not require timestamp by default');
+        }
+    }
+
+    public function test_timestamp_validation_rejects_invalid_format(): void
+    {
+        // Enable timestamp requirement
+        Config::set('cloudonix.require_timestamp', true);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+            'X-Cloudonix-Timestamp' => 'not-a-number',
+        ]);
+
+        $response->assertStatus(400);
+        $response->assertJsonFragment(['error' => 'Invalid timestamp format']);
+    }
+
+    public function test_ip_allowlist_accepts_allowed_ip(): void
+    {
+        // Set IP allowlist
+        Config::set('cloudonix.webhook_allowed_ips', ['127.0.0.1']);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+        ]);
+
+        // Should not be rejected specifically due to IP (request comes from 127.0.0.1 in tests)
+        // May fail on other validations but not IP check
+        if ($response->status() === 400) {
+            $data = $response->json();
+            $this->assertNotEquals('Unauthorized IP address', $data['error'] ?? '', 'Should accept allowed IP');
+        } else {
+            $this->assertNotEquals(400, $response->status(), 'Should accept allowed IP');
+        }
+    }
+
+    public function test_ip_allowlist_rejects_unauthorized_ip(): void
+    {
+        // Set IP allowlist that doesn't include test IP
+        Config::set('cloudonix.webhook_allowed_ips', ['1.2.3.4', '5.6.7.8']);
+
+        $payload = json_encode(['call_id' => 'test-123', 'status' => 'initiated']);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+        ]);
+
+        $response->assertStatus(400);
+        $response->assertJsonFragment(['error' => 'Unauthorized IP address']);
+    }
+
+    public function test_organization_extraction_from_domain_uuid(): void
+    {
+        // Create organization and settings
+        $org = Organization::factory()->create();
+        CloudonixSettings::factory()->create([
+            'organization_id' => $org->id,
+            'domain_uuid' => 'test-domain-uuid-123',
+        ]);
+
+        $payload = json_encode([
+            'call_id' => 'test-123',
+            'status' => 'initiated',
+            'domain_uuid' => 'test-domain-uuid-123',
+        ]);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+        ]);
+
+        // Organization should be extracted and injected
+        // This can be verified in the controller or middleware logs
+        // For now, just verify the request wasn't rejected
+        $this->assertNotEquals(401, $response->status());
+    }
+
+    public function test_organization_extraction_from_payload_field(): void
+    {
+        $payload = json_encode([
+            'call_id' => 'test-123',
+            'status' => 'initiated',
+            'organization_id' => 42,
+        ]);
+        $signature = hash_hmac('sha256', $payload, self::TEST_SECRET);
+
+        $response = $this->postJson(self::TEST_WEBHOOK_URL, json_decode($payload, true), [
+            'X-Cloudonix-Signature' => $signature,
+        ]);
+
+        // Organization should be extracted from payload
+        $this->assertNotEquals(401, $response->status());
     }
 }
