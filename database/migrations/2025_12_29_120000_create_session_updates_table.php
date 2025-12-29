@@ -56,6 +56,7 @@ return new class extends Migration
 
             // Metadata
             $table->timestamp('processed_at')->useCurrent();
+            $table->timestamps();
 
             // Indexes
             $table->unique(['organization_id', 'session_id', 'event_id'], 'unique_session_event');
