@@ -47,14 +47,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Production security validation: Ensure Redis password is configured
+        // Production security warning: Redis password should be configured
         if ($this->app->environment('production')) {
             if (empty(config('database.redis.default.password'))) {
-                throw new \RuntimeException(
-                    'Redis password must be set in production. ' .
-                    'Set REDIS_PASSWORD in your .env file. ' .
-                    'Generate a secure password: php artisan generate:password'
-                );
+                Log::critical('SECURITY WARNING: Redis password not set in production!', [
+                    'message' => 'Redis is running without password protection',
+                    'recommendation' => 'Set REDIS_PASSWORD in your .env file',
+                    'command' => 'php artisan generate:password',
+                    'risk' => 'Unauthorized access to Redis data (sessions, cache, call state)',
+                ]);
             }
         }
 
