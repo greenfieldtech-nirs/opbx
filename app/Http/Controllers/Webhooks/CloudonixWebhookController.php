@@ -175,7 +175,7 @@ class CloudonixWebhookController extends Controller
             ]);
 
             // Identify organization from Cloudonix domain
-            $organizationId = $this->identifyOrganizationFromDomain($validated['domain'], $validated['domainId']);
+            $organizationId = $this->identifyOrganizationFromDomain($validated['domain']);
             if (!$organizationId) {
                 Log::error('Session update: Organization not identified from domain', [
                     'request_id' => $requestId,
@@ -336,13 +336,10 @@ class CloudonixWebhookController extends Controller
     /**
      * Identify organization from Cloudonix domain information.
      */
-    private function identifyOrganizationFromDomain(string $domain, int $domainId): ?int
+    private function identifyOrganizationFromDomain(string $domain): ?int
     {
-        // Try to find organization by domain name or domain ID
-        $settings = CloudonixSettings::where(function ($query) use ($domain, $domainId) {
-            $query->where('domain_name', $domain)
-                  ->orWhere('cloudonix_domain_id', $domainId);
-        })->first();
+        // Find organization by domain name
+        $settings = CloudonixSettings::where('domain_name', $domain)->first();
 
         return $settings?->organization_id;
     }
