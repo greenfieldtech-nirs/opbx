@@ -180,27 +180,53 @@ class CxmlBuilder
         bool $muteOnEntry = false,
         bool $announceJoinLeave = false
     ): self {
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Starting conference element creation', [
+            'conference_identifier' => $conferenceIdentifier,
+            'start_on_enter' => $startOnEnter,
+            'end_on_exit' => $endOnExit,
+            'max_participants' => $maxParticipants,
+            'wait_url' => $waitUrl,
+            'mute_on_entry' => $muteOnEntry,
+            'announce_join_leave' => $announceJoinLeave,
+        ]);
+
         $conference = $this->document->createElement('Conference');
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Conference element created');
 
         $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Set startConferenceOnEnter attribute');
+
         $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Set endConferenceOnExit attribute');
 
         if ($maxParticipants !== null) {
             $conference->setAttribute('maxParticipants', (string) $maxParticipants);
+            \Illuminate\Support\Facades\Log::info('CxmlBuilder: Set maxParticipants attribute', ['value' => $maxParticipants]);
         }
 
         if ($waitUrl !== null) {
-            $conference->setAttribute('waitUrl', htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+            $escapedWaitUrl = htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+            $conference->setAttribute('waitUrl', $escapedWaitUrl);
+            \Illuminate\Support\Facades\Log::info('CxmlBuilder: Set waitUrl attribute', ['original' => $waitUrl, 'escaped' => $escapedWaitUrl]);
         }
 
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Set muteOnEntry attribute');
+
         $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Set announceJoinLeave attribute');
 
         // Add conference identifier as text node
         $textNode = $this->document->createTextNode($conferenceIdentifier);
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Created text node', ['content' => $conferenceIdentifier]);
+
         $conference->appendChild($textNode);
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Appended text node to conference element');
 
         $this->response->appendChild($conference);
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Appended conference element to response');
+
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Conference method completed successfully');
 
         return $this;
     }
@@ -348,7 +374,16 @@ class CxmlBuilder
         bool $muteOnEntry = false,
         bool $announceJoinLeave = false
     ): string {
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: joinConference static method called', [
+            'conference_identifier' => $conferenceIdentifier,
+            'max_participants' => $maxParticipants,
+            'mute_on_entry' => $muteOnEntry,
+            'announce_join_leave' => $announceJoinLeave,
+        ]);
+
         $builder = new self();
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Created new CxmlBuilder instance');
+
         $builder->conference(
             $conferenceIdentifier,
             true, // startOnEnter
@@ -358,8 +393,15 @@ class CxmlBuilder
             $muteOnEntry,
             $announceJoinLeave
         );
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Called conference method on builder');
 
-        return $builder->build();
+        $result = $builder->build();
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: Called build method', [
+            'result_length' => strlen($result),
+            'result' => $result,
+        ]);
+
+        return $result;
     }
 
     /**
@@ -378,11 +420,22 @@ class CxmlBuilder
      */
     public function build(): string
     {
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: build method called');
+
         $xml = $this->document->saveXML();
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: saveXML called', [
+            'xml_result' => $xml,
+            'xml_length' => $xml ? strlen($xml) : 0,
+        ]);
 
         if ($xml === false) {
+            \Illuminate\Support\Facades\Log::error('CxmlBuilder: saveXML returned false');
             throw new \RuntimeException('Failed to generate CXML');
         }
+
+        \Illuminate\Support\Facades\Log::info('CxmlBuilder: build method completed successfully', [
+            'final_xml' => $xml,
+        ]);
 
         return $xml;
     }
