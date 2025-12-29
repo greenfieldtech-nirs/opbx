@@ -141,9 +141,9 @@ class CloudonixWebhookController extends Controller
      * Handle session update webhook.
      * Session updates are sent during call progress for monitoring and debugging.
      */
-    public function sessionUpdate(\Illuminate\Http\Request $request): Response
+    public function sessionUpdate(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
     {
-        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $requestId = (string)\Illuminate\Support\Str::uuid();
         $payload = $request->all();
 
         Log::info('Processing session-update webhook', [
@@ -161,18 +161,33 @@ class CloudonixWebhookController extends Controller
                 'eventId' => 'required|string',
                 'domainId' => 'required|integer',
                 'domain' => 'required|string',
-                'subscriberId' => 'required|integer',
+                'subscriberId' => 'nullable|integer',
                 'callerId' => 'required|string',
                 'destination' => 'required|string',
-                'direction' => 'required|in:incoming,outgoing',
+                'direction' => 'nullable|in:incoming,outgoing',
                 'status' => 'required|string',
                 'createdAt' => 'required|string',
                 'modifiedAt' => 'required|string',
                 'action' => 'required|string',
-                'reason' => 'required|string',
-                'callIds' => 'required|array',
-                'profile' => 'required|array',
+                'reason' => 'nullable|string',
+                'callIds' => 'nullable|array',
+                'profile' => 'nullable|array',
             ]);
+
+            // Filter events by status - only process specific statuses
+            $allowedStatuses = ['processing', 'ringing', 'connected', 'answer'];
+            if (!in_array($validated['status'], $allowedStatuses, true)) {
+                Log::info('Session update ignored - status not in allowed list', [
+                    'request_id' => $requestId,
+                    'session_id' => $validated['id'],
+                    'event_id' => $validated['eventId'],
+                    'status' => $validated['status'],
+                    'allowed_statuses' => $allowedStatuses,
+                ]);
+
+                // Return 200 OK to acknowledge receipt but indicate no processing
+                return response('', 200);
+            }
 
             // Identify organization from Cloudonix domain
             $organizationId = $this->identifyOrganizationFromDomain($validated['domain']);
@@ -198,7 +213,7 @@ class CloudonixWebhookController extends Controller
                     'event_id' => $validated['eventId'],
                     'existing_id' => $existingUpdate->id,
                 ]);
-            return response('', 201); // HTTP 201 Created - resource successfully created
+                return response()->json(['message' => 'Session record updated successfully'], 200);
             }
 
             // Process and store session update
@@ -239,8 +254,7 @@ class CloudonixWebhookController extends Controller
                 'organization_id' => $organizationId,
             ]);
 
-            return response('', 200);
-
+            return response()->json(['message' => 'Session record updated successfully'], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Session update validation failed', [
                 'request_id' => $requestId,
@@ -248,7 +262,6 @@ class CloudonixWebhookController extends Controller
                 'payload' => $payload,
             ]);
             return response()->json(['error' => 'Validation failed', 'details' => $e->errors()], 400);
-
         } catch (\Exception $e) {
             Log::error('Session update processing failed', [
                 'request_id' => $requestId,
@@ -313,7 +326,7 @@ class CloudonixWebhookController extends Controller
                 }
 
                 if (!$callLog->duration && $request->has('duration')) {
-                    $updateData['duration'] = (int) $request->input('duration');
+                    $updateData['duration'] = (int)$request->input('duration');
                 }
 
                 $callLog->update($updateData);
@@ -324,9 +337,8 @@ class CloudonixWebhookController extends Controller
                 ]);
             }
 
-            // Return 201 No Content to indicate successful creation
-            return response('', 201);
-
+            // Return 204 No Content to indicate successful creation
+            return response()->json(['message' => 'CDR Inserted successfully'], 200);
         } catch (\Exception $e) {
             Log::error('CDR processing failed', [
                 'call_id' => $callId,
