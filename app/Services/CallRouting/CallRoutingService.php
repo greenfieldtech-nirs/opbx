@@ -10,6 +10,8 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\Fallback\ResilientCacheService;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -18,6 +20,13 @@ use Illuminate\Support\Facades\Log;
  */
 class CallRoutingService
 {
+    private ResilientCacheService $resilientCache;
+
+    public function __construct()
+    {
+        $this->resilientCache = new ResilientCacheService();
+    }
+
     /**
      * Route an inbound call based on DID configuration.
      *
@@ -110,7 +119,7 @@ class CallRoutingService
     }
 
     /**
-     * Route call to a ring group.
+     * Route call to a ring group with retry logic.
      */
     private function routeToRingGroup(DidNumber $didNumber): string
     {
@@ -139,70 +148,152 @@ class CallRoutingService
             return CxmlBuilder::busy();
         }
 
-        // Acquire read lock to ensure consistent view of ring group members
-        $lockKey = "lock:ring_group:{$ringGroup->id}";
-        $lock = Cache::lock($lockKey, 5);
+        // Route with retry logic
+        return $this->routeRingGroupWithRetry($ringGroup, $didNumber->id);
+    }
 
-        try {
-            // Try to acquire lock with 3 second timeout
-            if (! $lock->block(3)) {
-                Log::warning('Failed to acquire ring group read lock, using stale data', [
-                    'did_id' => $didNumber->id,
+    /**
+     * Route to ring group with lock acquisition and retry logic.
+     *
+     * @param RingGroup $ringGroup
+     * @param int $didId
+     * @param int $maxAttempts
+     * @return string CXML response
+     */
+    private function routeRingGroupWithRetry(RingGroup $ringGroup, int $didId, int $maxAttempts = 3): string
+    {
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt < $maxAttempts) {
+            try {
+                return $this->routeRingGroupWithLock($ringGroup, $didId);
+
+            } catch (LockTimeoutException $e) {
+                $attempt++;
+                $lastException = $e;
+
+                if ($attempt < $maxAttempts) {
+                    Log::info('Ring group lock timeout, retrying', [
+                        'ring_group_id' => $ringGroup->id,
+                        'did_id' => $didId,
+                        'attempt' => $attempt,
+                        'max_attempts' => $maxAttempts,
+                    ]);
+
+                    // Exponential backoff: 100ms, 200ms, 400ms
+                    usleep(100000 * (2 ** ($attempt - 1)));
+                } else {
+                    Log::error('Ring group lock acquisition failed after retries', [
+                        'ring_group_id' => $ringGroup->id,
+                        'did_id' => $didId,
+                        'attempts' => $attempt,
+                    ]);
+                }
+            } catch (\RuntimeException $e) {
+                // Database lock failure (Redis degradation)
+                Log::error('Ring group lock acquisition failed (database fallback)', [
                     'ring_group_id' => $ringGroup->id,
-                    'lock_key' => $lockKey,
-                ]);
-                // Continue without lock - better to route with potentially stale data
-                // than to fail the call completely
-            }
-
-            // Refresh ring group to get latest data
-            $ringGroup->refresh();
-            $members = $ringGroup->getMembers();
-
-            if ($members->isEmpty()) {
-                Log::error('Ring group has no active members', [
-                    'did_id' => $didNumber->id,
-                    'ring_group_id' => $ringGroup->id,
+                    'did_id' => $didId,
+                    'error' => $e->getMessage(),
                 ]);
 
-                return $this->handleRingGroupFallback($ringGroup);
-            }
-
-            $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())
-                ->filter()
-                ->values()
-                ->toArray();
-
-            if (empty($sipUris)) {
-                Log::error('Ring group members have no SIP URIs', [
-                    'did_id' => $didNumber->id,
-                    'ring_group_id' => $ringGroup->id,
-                ]);
-
-                return $this->handleRingGroupFallback($ringGroup);
-            }
-
-            Log::info('Routing call to ring group', [
-                'did_id' => $didNumber->id,
-                'ring_group_id' => $ringGroup->id,
-                'strategy' => $ringGroup->strategy->value,
-                'member_count' => count($sipUris),
-            ]);
-
-            // For v1, we'll support simultaneous ringing
-            // Round-robin and sequential would require additional state management
-            if ($ringGroup->strategy === RingGroupStrategy::SIMULTANEOUS) {
-                return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
-            }
-
-            // TODO: Implement round-robin and sequential strategies
-            return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
-        } finally {
-            // Always release the lock if acquired
-            if (isset($lock)) {
-                $lock->release();
+                return CxmlBuilder::busy('Ring group temporarily unavailable. Please try again.');
             }
         }
+
+        // All retries exhausted
+        return CxmlBuilder::busy('Ring group temporarily unavailable. Please try again.');
+    }
+
+    /**
+     * Route to ring group with mandatory lock acquisition.
+     *
+     * @param RingGroup $ringGroup
+     * @param int $didId
+     * @return string CXML response
+     * @throws LockTimeoutException If lock cannot be acquired
+     * @throws \RuntimeException If database lock fails
+     */
+    private function routeRingGroupWithLock(RingGroup $ringGroup, int $didId): string
+    {
+        $lockKey = "lock:ring_group:{$ringGroup->id}";
+        $startTime = microtime(true);
+
+        // Use resilient cache service for lock with database fallback
+        $cxml = $this->resilientCache->lock(
+            $lockKey,
+            function () use ($ringGroup, $didId) {
+                // Get fresh member list with lock held
+                $ringGroup->refresh();
+                $members = $ringGroup->getMembers();
+
+                if ($members->isEmpty()) {
+                    Log::error('Ring group has no active members', [
+                        'did_id' => $didId,
+                        'ring_group_id' => $ringGroup->id,
+                    ]);
+
+                    return $this->handleRingGroupFallback($ringGroup);
+                }
+
+                $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())
+                    ->filter()
+                    ->values()
+                    ->toArray();
+
+                if (empty($sipUris)) {
+                    Log::error('Ring group members have no SIP URIs', [
+                        'did_id' => $didId,
+                        'ring_group_id' => $ringGroup->id,
+                    ]);
+
+                    return $this->handleRingGroupFallback($ringGroup);
+                }
+
+                Log::info('Routing call to ring group', [
+                    'did_id' => $didId,
+                    'ring_group_id' => $ringGroup->id,
+                    'strategy' => $ringGroup->strategy->value,
+                    'member_count' => count($sipUris),
+                ]);
+
+                // For v1, we'll support simultaneous ringing
+                // Round-robin and sequential would require additional state management
+                if ($ringGroup->strategy === RingGroupStrategy::SIMULTANEOUS) {
+                    return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+                }
+
+                // TODO: Implement round-robin and sequential strategies
+                return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+            },
+            5,  // Lock duration in seconds
+            3   // Wait timeout in seconds
+        );
+
+        // Record lock acquisition metrics
+        $duration = microtime(true) - $startTime;
+        $this->recordLockMetric($lockKey, true, $duration);
+
+        return $cxml;
+    }
+
+    /**
+     * Record lock acquisition metrics for monitoring.
+     *
+     * @param string $lockKey
+     * @param bool $acquired
+     * @param float $duration
+     */
+    private function recordLockMetric(string $lockKey, bool $acquired, float $duration): void
+    {
+        Log::info('Ring group lock acquisition', [
+            'lock_key' => $lockKey,
+            'acquired' => $acquired,
+            'duration_ms' => round($duration * 1000, 2),
+        ]);
+
+        // TODO: Send to metrics system (Prometheus, CloudWatch, etc.) in Phase 4
     }
 
     /**
