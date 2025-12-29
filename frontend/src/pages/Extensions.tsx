@@ -256,6 +256,7 @@ export default function ExtensionsComplete() {
    const [showExtensionDetail, setShowExtensionDetail] = useState(false);
    const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
    const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+   const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
 
   // Form state
   const [formData, setFormData] = useState<ExtensionFormData>({
@@ -349,8 +350,21 @@ export default function ExtensionsComplete() {
    // Reset password mutation
    const resetPasswordMutation = useMutation({
      mutationFn: (extensionId: string) => extensionsService.resetPassword(extensionId),
-     onSuccess: (data) => {
+     onSuccess: (data, extensionId) => {
        queryClient.invalidateQueries({ queryKey: ['extensions'] });
+
+       // Store the new password temporarily for display
+       setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
+
+       // Automatically hide the password after 30 seconds for security
+       setTimeout(() => {
+         setTempPasswords(prev => {
+           const next = new Map(prev);
+           next.delete(extensionId);
+           return next;
+         });
+       }, 30000);
+
        toast.success(
          `Password reset successfully! New password: ${data.new_password}`,
          {
@@ -1356,7 +1370,7 @@ export default function ExtensionsComplete() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm">
-                          {visiblePasswords.has(extension.id) ? (extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
+                          {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
                         </span>
                         <div className="flex items-center gap-1">
                           <Button
@@ -1376,7 +1390,7 @@ export default function ExtensionsComplete() {
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0"
-                            onClick={() => copyPassword(extension.sip_config?.password || 'Not set', extension.extension_number)}
+                            onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
                             title="Copy password"
                           >
                             <Copy className="h-4 w-4" />
