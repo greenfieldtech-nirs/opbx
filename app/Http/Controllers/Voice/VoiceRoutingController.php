@@ -415,6 +415,16 @@ class VoiceRoutingController extends Controller
         // Tenant Isolation - Load destination extension scoped to organization
         $destinationExtension = $this->cache->getExtension($organizationId, $normalizedTo);
 
+        Log::info('Voice routing: Destination extension lookup result', [
+            'call_sid' => $callSid,
+            'to' => $normalizedTo,
+            'organization_id' => $organizationId,
+            'extension_found' => $destinationExtension ? 'yes' : 'no',
+            'extension_id' => $destinationExtension?->id,
+            'extension_type' => $destinationExtension?->type->value,
+            'extension_status' => $destinationExtension?->status->value,
+        ]);
+
         // Validation Step 1: Check if extension exists (enforces tenant isolation)
         if (!$destinationExtension) {
             Log::warning('Voice routing: Destination extension not found or not in organization', [
@@ -627,6 +637,14 @@ class VoiceRoutingController extends Controller
                 'announce_join_leave' => $conferenceRoom->announce_join_leave,
             ]);
 
+            Log::info('Voice routing: About to generate conference CXML', [
+                'call_sid' => $callSid,
+                'conference_identifier' => $conferenceIdentifier,
+                'max_participants' => $conferenceRoom->max_participants,
+                'mute_on_entry' => $conferenceRoom->mute_on_entry,
+                'announce_join_leave' => $conferenceRoom->announce_join_leave,
+            ]);
+
             try {
                 $cxml = CxmlBuilder::joinConference(
                     $conferenceIdentifier,
@@ -634,6 +652,12 @@ class VoiceRoutingController extends Controller
                     $conferenceRoom->mute_on_entry,
                     $conferenceRoom->announce_join_leave
                 );
+
+                Log::info('Voice routing: CXML generation succeeded', [
+                    'call_sid' => $callSid,
+                    'cxml_length' => strlen($cxml),
+                    'cxml' => $cxml,
+                ]);
             } catch (\Exception $e) {
                 Log::error('Voice routing: CXML generation failed', [
                     'call_sid' => $callSid,
@@ -693,6 +717,10 @@ class VoiceRoutingController extends Controller
      */
     private function generateConferenceIdentifier(string $conferenceName): string
     {
+        Log::info('Voice routing: Generating conference identifier', [
+            'original_name' => $conferenceName,
+        ]);
+
         // Remove spaces and convert to lowercase
         $identifier = strtolower(str_replace(' ', '', $conferenceName));
 
@@ -703,6 +731,11 @@ class VoiceRoutingController extends Controller
         if (empty($identifier)) {
             $identifier = 'conference';
         }
+
+        Log::info('Voice routing: Conference identifier generated', [
+            'original_name' => $conferenceName,
+            'clean_identifier' => $identifier,
+        ]);
 
         return $identifier;
     }

@@ -196,8 +196,9 @@ class CxmlBuilder
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
         $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
 
-        // Add conference identifier as text content
-        $conference->textContent = $conferenceIdentifier;
+        // Add conference identifier as text node
+        $textNode = $this->document->createTextNode($conferenceIdentifier);
+        $conference->appendChild($textNode);
 
         $this->response->appendChild($conference);
 
