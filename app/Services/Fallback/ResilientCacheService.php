@@ -198,6 +198,35 @@ class ResilientCacheService
     }
 
     /**
+     * Get TTL (time to live) for a cached key in seconds.
+     *
+     * @param string $key Cache key
+     * @return int TTL in seconds, 0 if expired or not found
+     */
+    public function getTtl(string $key): int
+    {
+        if ($this->isRedisAvailable()) {
+            try {
+                // Get TTL from Redis (returns -1 if no expiry, -2 if key doesn't exist)
+                $redis = Cache::getStore()->getRedis();
+                $ttl = $redis->ttl($key);
+
+                return max(0, $ttl); // Return 0 for expired/missing keys
+
+            } catch (RedisConnectionException | \RedisException $e) {
+                Log::warning('Redis TTL lookup failed', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->markRedisUnavailable();
+            }
+        }
+
+        return 0;
+    }
+
+    /**
      * Check if Redis is available.
      *
      * Uses cached health check with periodic re-checks.

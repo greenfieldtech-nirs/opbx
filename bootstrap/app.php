@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhook.signature' => \App\Http\Middleware\VerifyCloudonixSignature::class,
             'webhook.idempotency' => \App\Http\Middleware\EnsureWebhookIdempotency::class,
             'voice.webhook.auth' => \App\Http\Middleware\VerifyVoiceWebhookAuth::class,
+            'rate_limit_org' => \App\Http\Middleware\RateLimitPerOrganization::class,
         ]);
 
         // Configure authentication to return JSON for API routes instead of redirecting
