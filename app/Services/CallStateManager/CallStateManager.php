@@ -7,14 +7,34 @@ namespace App\Services\CallStateManager;
 use App\Enums\CallStatus;
 use App\Models\CallLog;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
 /**
  * Manages call state transitions with Redis-backed locking and caching.
+ *
+ * This class ensures atomic state transitions using:
+ * - Distributed locks (Redis) to prevent race conditions
+ * - Database transactions to ensure consistency
+ * - Cache updates only after successful DB commits
  */
 class CallStateManager
 {
+    /**
+     * Fields that can be updated during state transitions.
+     *
+     * This whitelist prevents arbitrary field updates and ensures
+     * only expected data is written during transitions.
+     */
+    private const ALLOWED_TRANSITION_FIELDS = [
+        'answered_at',
+        'ended_at',
+        'duration',
+        'hangup_cause',
+        'recording_url',
+    ];
+
     private int $lockTimeout;
     private int $stateTtl;
 
@@ -131,6 +151,16 @@ class CallStateManager
 
     /**
      * Transition call to a new status.
+     *
+     * This method ensures atomic state transitions using:
+     * 1. Distributed lock (prevents race conditions)
+     * 2. Database transaction (ensures consistency)
+     * 3. Cache update only after successful DB commit
+     *
+     * @param CallLog $callLog The call log to transition
+     * @param CallStatus $newStatus The target status
+     * @param array<string, mixed>|null $additionalData Additional fields to update (must be whitelisted)
+     * @return bool True if transition succeeded, false otherwise
      */
     public function transitionTo(
         CallLog $callLog,
@@ -151,33 +181,81 @@ class CallStateManager
                 return false;
             }
 
-            // Update call log
-            $callLog->status = $newStatus;
+            // Validate additional data fields if provided
+            if ($additionalData && !$this->validateAdditionalData($additionalData)) {
+                Log::warning('Invalid additional data fields in state transition', [
+                    'call_id' => $callLog->call_id,
+                    'invalid_fields' => array_keys(array_diff_key(
+                        $additionalData,
+                        array_flip(self::ALLOWED_TRANSITION_FIELDS)
+                    )),
+                ]);
 
-            if ($additionalData) {
-                foreach ($additionalData as $key => $value) {
-                    if (in_array($key, $callLog->getFillable(), true)) {
-                        $callLog->$key = $value;
-                    }
-                }
+                return false;
             }
 
-            $callLog->save();
+            // Wrap database operations in transaction
+            $success = DB::transaction(function () use ($callLog, $newStatus, $additionalData) {
+                // Update call log status
+                $callLog->status = $newStatus;
 
-            // Update cache
-            $this->setState($callLog->call_id, [
-                'status' => $newStatus->value,
-                'updated_at' => now()->toIso8601String(),
-            ]);
+                // Update whitelisted additional fields
+                if ($additionalData) {
+                    foreach ($additionalData as $key => $value) {
+                        if (in_array($key, self::ALLOWED_TRANSITION_FIELDS, true)) {
+                            $callLog->$key = $value;
+                        }
+                    }
+                }
 
-            Log::info('Call state transitioned', [
-                'call_id' => $callLog->call_id,
-                'from_status' => $currentStatus->value,
-                'to_status' => $newStatus->value,
-            ]);
+                // Save to database - will rollback if this fails
+                $callLog->save();
 
-            return true;
+                return true;
+            });
+
+            // Only update cache after successful database commit
+            if ($success) {
+                $this->setState($callLog->call_id, [
+                    'status' => $newStatus->value,
+                    'updated_at' => now()->toIso8601String(),
+                ]);
+
+                Log::info('Call state transitioned successfully', [
+                    'call_id' => $callLog->call_id,
+                    'from_status' => $currentStatus->value,
+                    'to_status' => $newStatus->value,
+                    'additional_fields' => $additionalData ? array_keys($additionalData) : [],
+                ]);
+            } else {
+                Log::error('Database transaction failed during state transition', [
+                    'call_id' => $callLog->call_id,
+                    'from_status' => $currentStatus->value,
+                    'to_status' => $newStatus->value,
+                ]);
+            }
+
+            return $success;
         }) ?? false;
+    }
+
+    /**
+     * Validate that additional data only contains whitelisted fields.
+     *
+     * This prevents arbitrary field updates during state transitions.
+     *
+     * @param array<string, mixed> $data
+     * @return bool True if all fields are whitelisted
+     */
+    private function validateAdditionalData(array $data): bool
+    {
+        foreach (array_keys($data) as $key) {
+            if (!in_array($key, self::ALLOWED_TRANSITION_FIELDS, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
