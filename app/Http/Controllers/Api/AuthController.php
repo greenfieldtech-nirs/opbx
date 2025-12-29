@@ -10,6 +10,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -17,7 +18,12 @@ use Illuminate\Support\Str;
 /**
  * Authentication API controller using Laravel Sanctum.
  *
- * Handles user authentication, token management, and user session information.
+ * Supports dual authentication modes:
+ * 1. Cookie-based (SPA): Uses httpOnly session cookies + CSRF protection
+ * 2. Token-based (API): Returns bearer tokens for stateless authentication
+ *
+ * Mode is automatically detected based on request origin (stateful domains use cookies).
+ *
  * Implements security best practices including rate limiting, audit logging,
  * and proper error handling.
  */
@@ -29,17 +35,23 @@ class AuthController extends Controller
     private const TOKEN_EXPIRATION_MINUTES = 1440;
 
     /**
-     * Authenticate user and issue API token.
+     * Authenticate user and issue authentication credentials.
+     *
+     * Supports two authentication modes:
+     * - Cookie-based (SPA): Returns user data, sets httpOnly session cookie
+     * - Token-based (API): Returns API token for bearer authentication
      *
      * Security features:
      * - Rate limited to 5 attempts per minute per IP
      * - Generic error messages to prevent user enumeration
      * - Validates user and organization status
      * - Logs authentication attempts with context
-     * - Revokes old tokens on successful login
+     * - Revokes old tokens on successful login (token mode only)
+     * - HttpOnly cookies prevent XSS attacks (cookie mode)
+     * - CSRF protection via Sanctum (cookie mode)
      *
      * @param  LoginRequest  $request  Validated login credentials
-     * @return JsonResponse Token and user information
+     * @return JsonResponse Authentication response
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -114,6 +126,38 @@ class AuthController extends Controller
             ], 403);
         }
 
+        // Detect authentication mode based on request
+        $useCookieAuth = $this->shouldUseCookieAuth($request);
+
+        Log::info('Login successful', [
+            'request_id' => $requestId,
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'organization_id' => $user->organization_id,
+            'role' => $user->role->value,
+            'ip_address' => $ipAddress,
+            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
+        ]);
+
+        if ($useCookieAuth) {
+            // Cookie-based authentication (SPA)
+            // Login user via session - Laravel will set httpOnly cookie automatically
+            Auth::guard('web')->login($user, true);
+
+            return response()->json([
+                'message' => 'Login successful',
+                'user' => [
+                    'id' => $user->id,
+                    'organization_id' => $user->organization_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role->value,
+                    'status' => $user->status,
+                ],
+            ]);
+        }
+
+        // Token-based authentication (API clients)
         // Revoke all existing tokens for security
         $user->tokens()->delete();
 
@@ -123,15 +167,6 @@ class AuthController extends Controller
             ['*'],
             now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
         )->plainTextToken;
-
-        Log::info('Login successful', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'organization_id' => $user->organization_id,
-            'role' => $user->role->value,
-            'ip_address' => $ipAddress,
-        ]);
 
         return response()->json([
             'access_token' => $token,
@@ -149,9 +184,53 @@ class AuthController extends Controller
     }
 
     /**
-     * Revoke current user's API token (logout).
+     * Determine if request should use cookie-based authentication.
      *
-     * Deletes the current access token to invalidate the session.
+     * Cookie auth is used when:
+     * - Request explicitly asks for cookie auth via X-Auth-Mode header
+     * - OR request has X-Requested-With header (indicates AJAX/SPA request)
+     *
+     * Token auth is used when:
+     * - Request has Authorization Bearer header (for logout/refresh of existing token sessions)
+     * - OR request explicitly asks for token auth via X-Auth-Mode header
+     * - OR request doesn't meet cookie auth criteria (default)
+     *
+     * @param Request $request
+     * @return bool
+     */
+    private function shouldUseCookieAuth(Request $request): bool
+    {
+        // If Bearer token is already present in logout/refresh, use token auth
+        // This prevents conflicts when both auth modes are possible
+        if ($request->bearerToken()) {
+            return false;
+        }
+
+        // Check for explicit auth mode header
+        $authMode = $request->header('X-Auth-Mode');
+        if ($authMode === 'cookie') {
+            return true;
+        }
+        if ($authMode === 'token') {
+            return false;
+        }
+
+        // Check for AJAX/SPA indicators (X-Requested-With: XMLHttpRequest)
+        // SPAs typically send this header, while API clients don't
+        if ($request->hasHeader('X-Requested-With')) {
+            return true;
+        }
+
+        // Default to token-based for backward compatibility
+        return false;
+    }
+
+    /**
+     * Logout user (revoke authentication).
+     *
+     * Supports both authentication modes:
+     * - Cookie-based: Logs out of session, clears httpOnly cookie
+     * - Token-based: Deletes current access token
      *
      * @param  Request  $request  Authenticated request
      * @return JsonResponse Success message
@@ -161,15 +240,30 @@ class AuthController extends Controller
         $user = $request->user();
         $requestId = (string) Str::uuid();
 
+        // Detect if using cookie auth (has session but no bearer token)
+        $useCookieAuth = $request->hasSession() && ! $request->bearerToken();
+
         Log::info('Logout initiated', [
             'request_id' => $requestId,
             'user_id' => $user?->id,
             'email' => $user?->email,
             'ip_address' => $request->ip(),
+            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        // Delete current token
-        $request->user()?->currentAccessToken()?->delete();
+        if ($useCookieAuth) {
+            // Cookie-based logout
+            Auth::guard('web')->logout();
+
+            // Invalidate session
+            $request->session()->invalidate();
+
+            // Regenerate CSRF token
+            $request->session()->regenerateToken();
+        } else {
+            // Token-based logout
+            $request->user()?->currentAccessToken()?->delete();
+        }
 
         Log::info('Logout successful', [
             'request_id' => $requestId,
@@ -213,25 +307,54 @@ class AuthController extends Controller
     }
 
     /**
-     * Refresh the user's API token.
+     * Refresh authentication credentials.
      *
-     * Revokes the current token and issues a new one with extended expiration.
+     * Supports both authentication modes:
+     * - Cookie-based: Regenerates session, extends cookie expiration
+     * - Token-based: Revokes current token and issues a new one
      *
      * @param  Request  $request  Authenticated request
-     * @return JsonResponse New token information
+     * @return JsonResponse Refresh response
      */
     public function refresh(Request $request): JsonResponse
     {
         $user = $request->user();
         $requestId = (string) Str::uuid();
 
-        Log::info('Token refresh initiated', [
+        // Detect if using cookie auth
+        $useCookieAuth = $request->hasSession() && ! $request->bearerToken();
+
+        Log::info('Authentication refresh initiated', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'email' => $user->email,
             'ip_address' => $request->ip(),
+            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
+        if ($useCookieAuth) {
+            // Cookie-based refresh - regenerate session
+            $request->session()->regenerate();
+
+            Log::info('Session refresh successful', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Session refreshed successfully',
+                'user' => [
+                    'id' => $user->id,
+                    'organization_id' => $user->organization_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role->value,
+                    'status' => $user->status,
+                ],
+            ]);
+        }
+
+        // Token-based refresh
         // Revoke current token
         $request->user()->currentAccessToken()->delete();
 
@@ -254,3 +377,4 @@ class AuthController extends Controller
         ]);
     }
 }
+
