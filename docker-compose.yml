@@ -145,15 +145,22 @@ services:
   redis:
     image: redis:7-alpine
     container_name: opbx_redis
+    # SECURITY: Remove port exposure for production deployments
+    # Redis should only be accessible within the Docker network
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
       - opbx
-    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --bind 0.0.0.0
+      --protected-mode yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "sh", "-c", "redis-cli -a ${REDIS_PASSWORD} ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

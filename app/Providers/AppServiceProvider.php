@@ -47,6 +47,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Production security validation: Ensure Redis password is configured
+        if ($this->app->environment('production')) {
+            if (empty(config('database.redis.default.password'))) {
+                throw new \RuntimeException(
+                    'Redis password must be set in production. ' .
+                    'Set REDIS_PASSWORD in your .env file. ' .
+                    'Generate a secure password: php artisan generate:password'
+                );
+            }
+        }
+
         // Register model policies
         Gate::policy(\App\Models\Extension::class, \App\Policies\ExtensionPolicy::class);
         Gate::policy(\App\Models\User::class, \App\Policies\UserPolicy::class);
