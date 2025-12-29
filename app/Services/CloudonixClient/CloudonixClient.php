@@ -6,8 +6,11 @@ namespace App\Services\CloudonixClient;
 
 use App\Models\CloudonixSettings;
 use App\Models\Organization;
+use App\Services\CircuitBreaker\CircuitBreaker;
+use App\Services\CircuitBreaker\CircuitBreakerOpenException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -24,6 +27,7 @@ class CloudonixClient
     private int $timeout;
     private ?string $domainUuid;
     private ?string $customerId;
+    private CircuitBreaker $circuitBreaker;
 
     /**
      * Create a new CloudonixClient instance.
@@ -73,6 +77,14 @@ class CloudonixClient
                 throw new \RuntimeException('Cloudonix API token is not configured');
             }
         }
+
+        // Initialize circuit breaker with configured thresholds
+        $this->circuitBreaker = new CircuitBreaker(
+            serviceName: 'cloudonix-api',
+            failureThreshold: (int) config('circuit-breaker.cloudonix.failure_threshold', 5),
+            timeoutSeconds: (int) config('circuit-breaker.cloudonix.timeout', 30),
+            retryAfterSeconds: (int) config('circuit-breaker.cloudonix.retry_after', 60)
+        );
     }
 
     /**
@@ -90,6 +102,67 @@ class CloudonixClient
     }
 
     /**
+     * Execute an API call with circuit breaker protection.
+     *
+     * @param callable $callback The API call to execute
+     * @param string $cacheKey Optional cache key for fallback data
+     * @param mixed $fallbackValue Fallback value if circuit is open and no cache
+     * @return mixed
+     */
+    protected function withCircuitBreaker(callable $callback, ?string $cacheKey = null, mixed $fallbackValue = null): mixed
+    {
+        try {
+            return $this->circuitBreaker->call(
+                callback: $callback,
+                fallback: function () use ($cacheKey, $fallbackValue) {
+                    // Try cached data first
+                    if ($cacheKey && Cache::has($cacheKey)) {
+                        Log::info('Circuit breaker: returning cached data', [
+                            'cache_key' => $cacheKey,
+                        ]);
+
+                        return Cache::get($cacheKey);
+                    }
+
+                    // Return fallback value
+                    Log::warning('Circuit breaker: returning fallback value', [
+                        'has_cache_key' => $cacheKey !== null,
+                        'has_fallback' => $fallbackValue !== null,
+                    ]);
+
+                    return $fallbackValue;
+                }
+            );
+        } catch (CircuitBreakerOpenException $e) {
+            // Circuit is open and no fallback available
+            Log::error('Circuit breaker open - API call failed', [
+                'service' => 'cloudonix-api',
+                'cache_key' => $cacheKey,
+            ]);
+
+            return $fallbackValue;
+        }
+    }
+
+    /**
+     * Get circuit breaker status for monitoring.
+     *
+     * @return array<string, mixed>
+     */
+    public function getCircuitBreakerStatus(): array
+    {
+        return $this->circuitBreaker->getStatus();
+    }
+
+    /**
+     * Manually reset the circuit breaker.
+     */
+    public function resetCircuitBreaker(): void
+    {
+        $this->circuitBreaker->reset();
+    }
+
+    /**
      * Get call status by call ID.
      *
      * @param string $callId The Cloudonix call ID
@@ -97,29 +170,42 @@ class CloudonixClient
      */
     public function getCallStatus(string $callId): ?array
     {
-        try {
-            $response = $this->client()
-                ->get("/calls/{$callId}");
+        $cacheKey = "cloudonix:call_status:{$callId}";
 
-            if ($response->successful()) {
-                return $response->json();
-            }
+        return $this->withCircuitBreaker(
+            callback: function () use ($callId, $cacheKey) {
+                try {
+                    $response = $this->client()
+                        ->get("/calls/{$callId}");
 
-            Log::warning('Failed to get call status from Cloudonix', [
-                'call_id' => $callId,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
+                    if ($response->successful()) {
+                        $data = $response->json();
 
-            return null;
-        } catch (\Exception $e) {
-            Log::error('Exception while getting call status from Cloudonix', [
-                'call_id' => $callId,
-                'exception' => $e->getMessage(),
-            ]);
+                        // Cache successful responses for 30 seconds
+                        Cache::put($cacheKey, $data, now()->addSeconds(30));
 
-            return null;
-        }
+                        return $data;
+                    }
+
+                    Log::warning('Failed to get call status from Cloudonix', [
+                        'call_id' => $callId,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while getting call status from Cloudonix', [
+                        'call_id' => $callId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: $cacheKey,
+            fallbackValue: null
+        );
     }
 
     /**
@@ -130,29 +216,42 @@ class CloudonixClient
      */
     public function getCallCdr(string $callId): ?array
     {
-        try {
-            $response = $this->client()
-                ->get("/calls/{$callId}/cdr");
+        $cacheKey = "cloudonix:cdr:{$callId}";
 
-            if ($response->successful()) {
-                return $response->json();
-            }
+        return $this->withCircuitBreaker(
+            callback: function () use ($callId, $cacheKey) {
+                try {
+                    $response = $this->client()
+                        ->get("/calls/{$callId}/cdr");
 
-            Log::warning('Failed to get CDR from Cloudonix', [
-                'call_id' => $callId,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
+                    if ($response->successful()) {
+                        $data = $response->json();
 
-            return null;
-        } catch (\Exception $e) {
-            Log::error('Exception while getting CDR from Cloudonix', [
-                'call_id' => $callId,
-                'exception' => $e->getMessage(),
-            ]);
+                        // Cache CDRs for 5 minutes (they don't change once created)
+                        Cache::put($cacheKey, $data, now()->addMinutes(5));
 
-            return null;
-        }
+                        return $data;
+                    }
+
+                    Log::warning('Failed to get CDR from Cloudonix', [
+                        'call_id' => $callId,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while getting CDR from Cloudonix', [
+                        'call_id' => $callId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: $cacheKey,
+            fallbackValue: null
+        );
     }
 
     /**
@@ -162,33 +261,39 @@ class CloudonixClient
      */
     public function hangupCall(string $callId): bool
     {
-        try {
-            $response = $this->client()
-                ->delete("/calls/{$callId}");
+        return $this->withCircuitBreaker(
+            callback: function () use ($callId) {
+                try {
+                    $response = $this->client()
+                        ->delete("/calls/{$callId}");
 
-            if ($response->successful()) {
-                Log::info('Successfully hung up call', [
-                    'call_id' => $callId,
-                ]);
+                    if ($response->successful()) {
+                        Log::info('Successfully hung up call', [
+                            'call_id' => $callId,
+                        ]);
 
-                return true;
-            }
+                        return true;
+                    }
 
-            Log::warning('Failed to hangup call', [
-                'call_id' => $callId,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
+                    Log::warning('Failed to hangup call', [
+                        'call_id' => $callId,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
 
-            return false;
-        } catch (\Exception $e) {
-            Log::error('Exception while hanging up call', [
-                'call_id' => $callId,
-                'exception' => $e->getMessage(),
-            ]);
+                    return false;
+                } catch (\Exception $e) {
+                    Log::error('Exception while hanging up call', [
+                        'call_id' => $callId,
+                        'exception' => $e->getMessage(),
+                    ]);
 
-            return false;
-        }
+                    throw $e;
+                }
+            },
+            cacheKey: null, // No caching for write operations
+            fallbackValue: false
+        );
     }
 
     /**
@@ -199,29 +304,42 @@ class CloudonixClient
      */
     public function listCalls(array $filters = []): ?array
     {
-        try {
-            $response = $this->client()
-                ->get('/calls', $filters);
+        $cacheKey = 'cloudonix:calls:' . md5(json_encode($filters));
 
-            if ($response->successful()) {
-                return $response->json();
-            }
+        return $this->withCircuitBreaker(
+            callback: function () use ($filters, $cacheKey) {
+                try {
+                    $response = $this->client()
+                        ->get('/calls', $filters);
 
-            Log::warning('Failed to list calls from Cloudonix', [
-                'filters' => $filters,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
+                    if ($response->successful()) {
+                        $data = $response->json();
 
-            return null;
-        } catch (\Exception $e) {
-            Log::error('Exception while listing calls from Cloudonix', [
-                'filters' => $filters,
-                'exception' => $e->getMessage(),
-            ]);
+                        // Cache call lists for 10 seconds (they change frequently)
+                        Cache::put($cacheKey, $data, now()->addSeconds(10));
 
-            return null;
-        }
+                        return $data;
+                    }
+
+                    Log::warning('Failed to list calls from Cloudonix', [
+                        'filters' => $filters,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while listing calls from Cloudonix', [
+                        'filters' => $filters,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: $cacheKey,
+            fallbackValue: []
+        );
     }
 
     // =========================================================================
