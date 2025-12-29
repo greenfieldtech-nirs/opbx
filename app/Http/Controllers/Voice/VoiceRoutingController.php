@@ -646,34 +646,12 @@ class VoiceRoutingController extends Controller
             ]);
 
             try {
-                // Debug: Check if CxmlBuilder class exists
-                if (!class_exists('App\Services\CxmlBuilder\CxmlBuilder')) {
-                    Log::error('Voice routing: CxmlBuilder class not found');
-                    return $this->cxmlErrorResponse('CxmlBuilder class not found');
-                }
-
-                Log::info('Voice routing: CxmlBuilder class found, creating instance');
-
-                // Try creating instance and calling methods directly
-                $builder = new CxmlBuilder();
-                Log::info('Voice routing: CxmlBuilder instance created');
-
-                $builder->conference(
+                $cxml = CxmlBuilder::joinConference(
                     $conferenceIdentifier,
-                    true, // startOnEnter
-                    false, // endOnExit
                     $conferenceRoom->max_participants,
-                    null, // waitUrl
                     $conferenceRoom->mute_on_entry,
                     $conferenceRoom->announce_join_leave
                 );
-                Log::info('Voice routing: Conference method called on builder');
-
-                $cxml = $builder->build();
-                Log::info('Voice routing: Build method called', [
-                    'cxml_length' => strlen($cxml),
-                    'cxml' => $cxml,
-                ]);
 
                 Log::info('Voice routing: CXML generation succeeded', [
                     'call_sid' => $callSid,

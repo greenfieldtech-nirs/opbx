@@ -6,7 +6,6 @@ namespace App\Services\CxmlBuilder;
 
 use DOMDocument;
 use DOMElement;
-use Illuminate\Support\Facades\Log;
 
 /**
  * CXML response builder for Cloudonix voice applications.
@@ -181,53 +180,27 @@ class CxmlBuilder
         bool $muteOnEntry = false,
         bool $announceJoinLeave = false
     ): self {
-        Log::info('CxmlBuilder: Starting conference element creation', [
-            'conference_identifier' => $conferenceIdentifier,
-            'start_on_enter' => $startOnEnter,
-            'end_on_exit' => $endOnExit,
-            'max_participants' => $maxParticipants,
-            'wait_url' => $waitUrl,
-            'mute_on_entry' => $muteOnEntry,
-            'announce_join_leave' => $announceJoinLeave,
-        ]);
-
         $conference = $this->document->createElement('Conference');
-        Log::info('CxmlBuilder: Conference element created');
 
         $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
-        Log::info('CxmlBuilder: Set startConferenceOnEnter attribute');
-
         $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
-        Log::info('CxmlBuilder: Set endConferenceOnExit attribute');
 
         if ($maxParticipants !== null) {
             $conference->setAttribute('maxParticipants', (string) $maxParticipants);
-            Log::info('CxmlBuilder: Set maxParticipants attribute', ['value' => $maxParticipants]);
         }
 
         if ($waitUrl !== null) {
-            $escapedWaitUrl = htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-            $conference->setAttribute('waitUrl', $escapedWaitUrl);
-            Log::info('CxmlBuilder: Set waitUrl attribute', ['original' => $waitUrl, 'escaped' => $escapedWaitUrl]);
+            $conference->setAttribute('waitUrl', htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
         }
 
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
-        Log::info('CxmlBuilder: Set muteOnEntry attribute');
-
         $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
-        Log::info('CxmlBuilder: Set announceJoinLeave attribute');
 
         // Add conference identifier as text node
         $textNode = $this->document->createTextNode($conferenceIdentifier);
-        Log::info('CxmlBuilder: Created text node', ['content' => $conferenceIdentifier]);
-
         $conference->appendChild($textNode);
-        Log::info('CxmlBuilder: Appended text node to conference element');
 
         $this->response->appendChild($conference);
-        Log::info('CxmlBuilder: Appended conference element to response');
-
-        Log::info('CxmlBuilder: Conference method completed successfully');
 
         return $this;
     }
@@ -375,15 +348,7 @@ class CxmlBuilder
         bool $muteOnEntry = false,
         bool $announceJoinLeave = false
     ): string {
-        Log::info('CxmlBuilder: joinConference static method called', [
-            'conference_identifier' => $conferenceIdentifier,
-            'max_participants' => $maxParticipants,
-            'mute_on_entry' => $muteOnEntry,
-            'announce_join_leave' => $announceJoinLeave,
-        ]);
-
         $builder = new self();
-        Log::info('CxmlBuilder: Created new CxmlBuilder instance');
 
         $builder->conference(
             $conferenceIdentifier,
@@ -394,15 +359,8 @@ class CxmlBuilder
             $muteOnEntry,
             $announceJoinLeave
         );
-        Log::info('CxmlBuilder: Called conference method on builder');
 
-        $result = $builder->build();
-        Log::info('CxmlBuilder: Called build method', [
-            'result_length' => strlen($result),
-            'result' => $result,
-        ]);
-
-        return $result;
+        return $builder->build();
     }
 
     /**
@@ -421,22 +379,11 @@ class CxmlBuilder
      */
     public function build(): string
     {
-        Log::info('CxmlBuilder: build method called');
-
         $xml = $this->document->saveXML();
-        Log::info('CxmlBuilder: saveXML called', [
-            'xml_result' => $xml,
-            'xml_length' => $xml ? strlen($xml) : 0,
-        ]);
 
         if ($xml === false) {
-            Log::error('CxmlBuilder: saveXML returned false');
             throw new \RuntimeException('Failed to generate CXML');
         }
-
-        Log::info('CxmlBuilder: build method completed successfully', [
-            'final_xml' => $xml,
-        ]);
 
         return $xml;
     }
