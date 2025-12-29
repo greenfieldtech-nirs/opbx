@@ -198,7 +198,7 @@ class CloudonixWebhookController extends Controller
                     'event_id' => $validated['eventId'],
                     'existing_id' => $existingUpdate->id,
                 ]);
-                return response('', 200);
+            return response('', 201); // HTTP 201 Created - resource successfully created
             }
 
             // Process and store session update
@@ -257,7 +257,10 @@ class CloudonixWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            return response()->json(['error' => 'Internal server error'], 500);
+            return response()->json([
+                'error' => 'Session update processing failed',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -321,15 +324,21 @@ class CloudonixWebhookController extends Controller
                 ]);
             }
 
-            // Return CDR ID to indicate successful insertion
-            return response()->json([
-                'cdr_id' => $cdr->id,
-                'status' => 'success',
-            ], 200);
+            // Return 201 No Content to indicate successful creation
+            return response('', 201);
 
         } catch (\Exception $e) {
-            // Use trait method for consistent error handling
-            return $this->handleWebhookException($e, $callId);
+            Log::error('CDR processing failed', [
+                'call_id' => $callId,
+                'organization_id' => $organizationId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Call Detail Record processing failed',
+                'message' => 'Failed to process the call detail record. Please check the logs for more details.'
+            ], 500);
         }
     }
 
