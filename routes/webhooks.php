@@ -25,10 +25,11 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
         ->name('webhooks.cloudonix.call-status');
 
     Route::post('/cdr', [CloudonixWebhookController::class, 'cdr'])
-        ->middleware(['cloudonix.request.auth', 'webhook.idempotency', 'throttle:webhooks'])
+        ->middleware(['webhook.signature', 'webhook.idempotency', 'throttle:webhooks'])
         ->name('webhooks.cloudonix.cdr');
 
     Route::post('/session-update', [CloudonixWebhookController::class, 'sessionUpdate'])
+        ->middleware(['webhook.signature', 'throttle:webhooks'])
         ->name('webhooks.cloudonix.session-update');
 });
 
@@ -48,17 +49,17 @@ use App\Http\Controllers\Voice\VoiceRoutingController;
 Route::prefix('voice')->group(function (): void {
     // Main inbound call routing endpoint
     Route::post('/route', [VoiceRoutingController::class, 'handleInbound'])
-        ->middleware(['cloudonix.request.auth', 'throttle:voice'])
+        ->middleware(['voice.webhook.auth', 'throttle:voice'])
         ->name('voice.route');
 
     // IVR digit input callback
     Route::post('/ivr-input', [VoiceRoutingController::class, 'handleIvrInput'])
-        ->middleware(['cloudonix.request.auth', 'throttle:voice'])
+        ->middleware(['voice.webhook.auth', 'throttle:voice'])
         ->name('voice.ivr-input');
 
     // Ring group callback for sequential routing (round robin, priority, etc.)
     Route::post('/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
-        ->middleware(['cloudonix.request.auth', 'throttle:voice'])
+        ->middleware(['voice.webhook.auth', 'throttle:voice'])
         ->name('voice.ring-group-callback');
 
     // Voice routing health check
