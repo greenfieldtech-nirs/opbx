@@ -842,4 +842,56 @@ class ExtensionControllerTest extends TestCase
 
         $response->assertStatus(404);
     }
+
+    /**
+     * Test that SIP passwords are never exposed in API responses.
+     *
+     * This is a critical security test to prevent toll fraud.
+     * Extension passwords must be hidden in all API responses.
+     */
+    public function test_extension_password_never_exposed_in_api(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        // Create extension with a known password
+        $secretPassword = 'secret123456';
+        $extension = Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->pbxUser->id,
+            'extension_number' => '1001',
+            'password' => $secretPassword,
+            'type' => ExtensionType::USER,
+            'status' => UserStatus::ACTIVE,
+            'voicemail_enabled' => false,
+            'configuration' => [],
+        ]);
+
+        // Test GET /extensions/{id} - show single extension
+        $response = $this->getJson("/api/v1/extensions/{$extension->id}");
+
+        $response->assertStatus(200);
+        $this->assertArrayNotHasKey('password', $response->json('extension'));
+        $response->assertJsonMissing(['password' => $secretPassword]);
+
+        // Test GET /extensions - list all extensions
+        $listResponse = $this->getJson('/api/v1/extensions');
+
+        $listResponse->assertStatus(200);
+        $extensionData = $listResponse->json('data.0');
+        $this->assertArrayNotHasKey('password', $extensionData);
+        $listResponse->assertJsonMissing(['password' => $secretPassword]);
+
+        // Verify the password field is actually set in the database
+        $this->assertDatabaseHas('extensions', [
+            'id' => $extension->id,
+            'password' => $secretPassword,
+        ]);
+
+        // Verify toArray() doesn't expose password
+        $freshExtension = Extension::find($extension->id);
+        $this->assertArrayNotHasKey('password', $freshExtension->toArray());
+
+        // Verify explicit getSipPassword() method still works
+        $this->assertEquals($secretPassword, $freshExtension->getSipPassword());
+    }
 }

@@ -27,7 +27,8 @@ class ExtensionResource extends JsonResource
             'organization_id' => $this->organization_id,
             'user_id' => $this->user_id,
             'extension_number' => $this->extension_number,
-            'password' => $this->password,
+            // password field intentionally excluded for security
+            // Use Extension::getSipPassword() method when password access is needed
             'name' => $this->friendly_name ?? $this->user?->name ?? 'Unassigned',
             'type' => $this->type->value,
             'status' => $this->status->value,

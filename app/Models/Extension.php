@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Log;
 
 #[ScopedBy([OrganizationScope::class])]
 class Extension extends Model
@@ -35,6 +36,18 @@ class Extension extends Model
         'status',
         'voicemail_enabled',
         'configuration',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * This prevents SIP passwords from being exposed in API responses,
+     * protecting against toll fraud and unauthorized access.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'password',
     ];
 
     /**
@@ -218,5 +231,58 @@ class Extension extends Model
     public function scopeUnassigned(Builder $query): Builder
     {
         return $query->whereNull('user_id');
+    }
+
+    /**
+     * Get the SIP password for this extension.
+     *
+     * This method provides explicit, audited access to the password field.
+     * All accesses are logged for security monitoring.
+     *
+     * @return string
+     */
+    public function getSipPassword(): string
+    {
+        Log::info('SIP password accessed', [
+            'extension_id' => $this->id,
+            'extension_number' => $this->extension_number,
+            'organization_id' => $this->organization_id,
+            'accessed_by' => auth()->id(),
+        ]);
+
+        return $this->password;
+    }
+
+    /**
+     * Regenerate the SIP password for this extension.
+     *
+     * Generates a new cryptographically secure password and saves it.
+     * The regeneration is logged for audit purposes.
+     *
+     * @return string The new password
+     */
+    public function regeneratePassword(): string
+    {
+        $this->password = $this->generateSecurePassword();
+        $this->save();
+
+        Log::info('SIP password regenerated', [
+            'extension_id' => $this->id,
+            'extension_number' => $this->extension_number,
+            'organization_id' => $this->organization_id,
+            'regenerated_by' => auth()->id(),
+        ]);
+
+        return $this->password;
+    }
+
+    /**
+     * Generate a cryptographically secure password for SIP authentication.
+     *
+     * @return string A 32-character hexadecimal string
+     */
+    private function generateSecurePassword(): string
+    {
+        return bin2hex(random_bytes(16)); // 32 character hex string
     }
 }
