@@ -22,13 +22,11 @@ class ExtensionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'id' => $this->id,
             'organization_id' => $this->organization_id,
             'user_id' => $this->user_id,
             'extension_number' => $this->extension_number,
-            // password field intentionally excluded for security
-            // Use Extension::getSipPassword() method when password access is needed
             'name' => $this->friendly_name ?? $this->user?->name ?? 'Unassigned',
             'type' => $this->type->value,
             'status' => $this->status->value,
@@ -38,5 +36,17 @@ class ExtensionResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
+
+        // Include password for USER type extensions when accessed by authorized users
+        // This allows the UI to display passwords for IP phone configuration
+        if ($this->type->value === 'user') {
+            $data['sip_config'] = [
+                'username' => $this->extension_number,
+                'password' => $this->getSipPassword(),
+                'server' => config('cloudonix.sip_server', 'sip.cloudonix.io'),
+            ];
+        }
+
+        return $data;
     }
 }

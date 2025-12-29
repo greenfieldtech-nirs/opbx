@@ -699,6 +699,69 @@ class ExtensionController extends Controller
     }
 
     /**
+     * Get the password for the specified extension.
+     *
+     * @param Request $request
+     * @param Extension $extension
+     * @return JsonResponse
+     */
+    public function getPassword(Request $request, Extension $extension): JsonResponse
+    {
+        $requestId = (string) Str::uuid();
+        $currentUser = $request->user();
+
+        if (!$currentUser) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        // Only Owner and PBX Admin can view extension passwords
+        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
+            return response()->json([
+                'error' => 'Unauthorized',
+                'message' => 'Only Owner and PBX Admin can view extension passwords.',
+            ], 403);
+        }
+
+        // Tenant scope check
+        if ($extension->organization_id !== $currentUser->organization_id) {
+            Log::warning('Cross-tenant extension password access attempt', [
+                'request_id' => $requestId,
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_extension_id' => $extension->id,
+                'target_organization_id' => $extension->organization_id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Extension not found.',
+            ], 404);
+        }
+
+        // Only USER type extensions have passwords
+        if ($extension->type !== \App\Enums\ExtensionType::USER) {
+            return response()->json([
+                'error' => 'Not Applicable',
+                'message' => 'Only PBX User extensions have passwords.',
+            ], 400);
+        }
+
+        Log::info('Extension password accessed', [
+            'request_id' => $requestId,
+            'user_id' => $currentUser->id,
+            'organization_id' => $currentUser->organization_id,
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+        ]);
+
+        return response()->json([
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'password' => $extension->getSipPassword(),
+        ]);
+    }
+
+    /**
      * Perform bi-directional sync between local extensions and Cloudonix.
      *
      * @param Request $request
