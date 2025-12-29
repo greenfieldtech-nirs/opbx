@@ -143,7 +143,7 @@ class CxmlBuilder
     }
 
     /**
-     * Add Conference verb to connect call to a conference room.
+     * Add Dial verb with nested Conference for conference room access.
      *
      * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
      * @param bool $startOnEnter Start conference when participant enters
@@ -152,16 +152,24 @@ class CxmlBuilder
      * @param string|null $waitUrl URL for hold music while waiting
      * @param bool $muteOnEntry Mute participant when they enter
      * @param bool $announceJoinLeave Announce when participants join/leave
+     * @param int|null $timeout Dial timeout in seconds
      */
-    public function conference(
+    public function dialConference(
         string $conferenceIdentifier,
         bool $startOnEnter = true,
         bool $endOnExit = false,
         ?int $maxParticipants = null,
         ?string $waitUrl = null,
         bool $muteOnEntry = false,
-        bool $announceJoinLeave = false
+        bool $announceJoinLeave = false,
+        ?int $timeout = null
     ): self {
+        $dial = $this->document->createElement('Dial');
+
+        if ($timeout !== null) {
+            $dial->setAttribute('timeout', (string) $timeout);
+        }
+
         $conference = $this->document->createElement('Conference');
 
         $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
@@ -181,7 +189,8 @@ class CxmlBuilder
         // Add conference identifier as text content
         $conference->textContent = $conferenceIdentifier;
 
-        $this->response->appendChild($conference);
+        $dial->appendChild($conference);
+        $this->response->appendChild($dial);
 
         return $this;
     }
@@ -238,7 +247,7 @@ class CxmlBuilder
     }
 
     /**
-     * Build a conference room response.
+     * Build a conference room response with Dial wrapper.
      *
      * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
      * @param int|null $maxParticipants Maximum participants
@@ -252,14 +261,15 @@ class CxmlBuilder
         bool $announceJoinLeave = false
     ): string {
         $builder = new self();
-        $builder->conference(
+        $builder->dialConference(
             $conferenceIdentifier,
             true, // startOnEnter
             false, // endOnExit
             $maxParticipants,
             null, // waitUrl
             $muteOnEntry,
-            $announceJoinLeave
+            $announceJoinLeave,
+            null // timeout
         );
 
         return $builder->build();
