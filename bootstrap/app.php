@@ -48,6 +48,55 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Prevent sensitive request data from being logged in exceptions
+        // These keys will be masked with ******* in logs
+        $exceptions->dontFlash([
+            'current_password',
+            'password',
+            'password_confirmation',
+            'new_password',
+            'new_password_confirmation',
+        ]);
+
+        // Hide sensitive headers and input from exception context
+        // This prevents them from appearing in error logs and reports
+        $exceptions->stopIgnoring([]);
+        $exceptions->context(function ($request) {
+            $context = [];
+
+            // Add safe request data to context
+            if ($request) {
+                $context['url'] = $request->fullUrl();
+                $context['method'] = $request->method();
+                $context['ip'] = $request->ip();
+
+                // Sanitize input - remove sensitive keys
+                $input = $request->except([
+                    'password',
+                    'password_confirmation',
+                    'current_password',
+                    'new_password',
+                    'new_password_confirmation',
+                    'token',
+                    'access_token',
+                    'api_key',
+                    'api_token',
+                    'secret',
+                    'webhook_secret',
+                    'sip_password',
+                    'domain_api_key',
+                    'domain_requests_api_key',
+                    'domain_cdr_auth_key',
+                ]);
+
+                if (! empty($input)) {
+                    $context['input'] = $input;
+                }
+            }
+
+            return $context;
+        });
+
         // Handle authorization exceptions for API routes
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
