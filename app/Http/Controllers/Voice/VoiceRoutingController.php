@@ -450,9 +450,15 @@ class VoiceRoutingController extends Controller
             return $this->cxmlResponse(CxmlBuilder::unavailable('The extension number you are trying to reach is disabled, goodbye.'));
         }
 
-        // Validation Step 3: Check extension type (Step 2: only support 'user' type for now)
-        if ($destinationExtension->type !== ExtensionType::USER) {
-            Log::warning('Voice routing: Extension type not supported in Step 2', [
+        // Validation Step 3: Check extension type
+        if ($destinationExtension->type === ExtensionType::USER) {
+            // Handle USER type extensions (existing logic)
+            return $this->routeToUserExtension($destinationExtension, $normalizedTo, $from, $callSid);
+        } elseif ($destinationExtension->type === ExtensionType::CONFERENCE) {
+            // Handle CONFERENCE type extensions
+            return $this->routeToConference($destinationExtension, $organizationId, $callSid);
+        } else {
+            Log::warning('Voice routing: Extension type not supported', [
                 'call_sid' => $callSid,
                 'to' => $normalizedTo,
                 'extension_id' => $destinationExtension->id,
@@ -463,14 +469,26 @@ class VoiceRoutingController extends Controller
 
             return $this->cxmlResponse(CxmlBuilder::unavailable('The extension you are trying to reach is not available at this time.'));
         }
+    }
 
+    /**
+     * Route call to a user extension (existing logic extracted)
+     *
+     * @param Extension $extension
+     * @param string $normalizedTo
+     * @param string $from
+     * @param string $callSid
+     * @return Response
+     */
+    private function routeToUserExtension(Extension $extension, string $normalizedTo, string $from, string $callSid): Response
+    {
         // Validation Step 4 (Phase 1 Step 3): Check if user is assigned to extension
-        if (!$destinationExtension->user) {
+        if (!$extension->user) {
             Log::warning('Voice routing: Extension has no user assigned', [
                 'call_sid' => $callSid,
                 'to' => $normalizedTo,
-                'extension_id' => $destinationExtension->id,
-                'organization_id' => $organizationId,
+                'extension_id' => $extension->id,
+                'organization_id' => $extension->organization_id,
                 'reason' => 'no_user_assigned',
             ]);
 
@@ -478,14 +496,14 @@ class VoiceRoutingController extends Controller
         }
 
         // Validation Step 5 (Phase 1 Step 3): Check if assigned user is active
-        if (!$destinationExtension->user->isActive()) {
+        if (!$extension->user->isActive()) {
             Log::warning('Voice routing: Extension user is inactive', [
                 'call_sid' => $callSid,
                 'to' => $normalizedTo,
-                'extension_id' => $destinationExtension->id,
-                'user_id' => $destinationExtension->user->id,
-                'user_status' => $destinationExtension->user->status->value,
-                'organization_id' => $organizationId,
+                'extension_id' => $extension->id,
+                'user_id' => $extension->user->id,
+                'user_status' => $extension->user->status->value,
+                'organization_id' => $extension->organization_id,
                 'reason' => 'user_inactive',
             ]);
 
@@ -494,16 +512,92 @@ class VoiceRoutingController extends Controller
 
         Log::info('Voice routing: Extension and user validated successfully, generating Dial CXML', [
             'call_sid' => $callSid,
-            'extension_id' => $destinationExtension->id,
-            'extension_number' => $destinationExtension->extension_number,
-            'extension_type' => $destinationExtension->type->value,
-            'extension_status' => $destinationExtension->status->value,
-            'user_id' => $destinationExtension->user->id,
-            'user_status' => $destinationExtension->user->status->value,
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'extension_type' => $extension->type->value,
+            'extension_status' => $extension->status->value,
+            'user_id' => $extension->user->id,
+            'user_status' => $extension->user->status->value,
         ]);
 
         // Generate Dial CXML for internal call
         return $this->cxmlResponse(CxmlBuilder::simpleDial($normalizedTo, $from));
+    }
+
+    /**
+     * Route call to a conference room
+     *
+     * @param Extension $extension
+     * @param int $organizationId
+     * @param string $callSid
+     * @return Response
+     */
+    private function routeToConference(Extension $extension, int $organizationId, string $callSid): Response
+    {
+        // Get the conference room from extension configuration
+        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
+
+        if (!$conferenceRoomId) {
+            Log::warning('Voice routing: Conference extension has no conference_room_id configured', [
+                'call_sid' => $callSid,
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId,
+                'reason' => 'missing_conference_room_id',
+            ]);
+
+            return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is not properly configured.'));
+        }
+
+        // Load the conference room
+        $conferenceRoom = \App\Models\ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$conferenceRoom) {
+            Log::warning('Voice routing: Conference room not found or not in organization', [
+                'call_sid' => $callSid,
+                'extension_id' => $extension->id,
+                'conference_room_id' => $conferenceRoomId,
+                'organization_id' => $organizationId,
+                'reason' => 'conference_room_not_found',
+            ]);
+
+            return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room not found.'));
+        }
+
+        // Check if conference room is active
+        if ($conferenceRoom->status !== \App\Enums\UserStatus::ACTIVE) {
+            Log::warning('Voice routing: Conference room is not active', [
+                'call_sid' => $callSid,
+                'extension_id' => $extension->id,
+                'conference_room_id' => $conferenceRoom->id,
+                'conference_room_status' => $conferenceRoom->status->value,
+                'organization_id' => $organizationId,
+                'reason' => 'conference_room_inactive',
+            ]);
+
+            return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is currently unavailable.'));
+        }
+
+        Log::info('Voice routing: Routing call to conference room', [
+            'call_sid' => $callSid,
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'conference_room_id' => $conferenceRoom->id,
+            'conference_room_name' => $conferenceRoom->name,
+            'max_participants' => $conferenceRoom->max_participants,
+            'organization_id' => $organizationId,
+        ]);
+
+        // Generate Conference CXML
+        return $this->cxmlResponse(CxmlBuilder::joinConference(
+            $conferenceRoom->name,
+            $conferenceRoom->max_participants,
+            $conferenceRoom->mute_on_entry,
+            $conferenceRoom->announce_join_leave
+        ));
     }
 
     /**

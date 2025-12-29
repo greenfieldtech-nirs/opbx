@@ -123,21 +123,43 @@ class CxmlBuilder
     }
 
     /**
-     * Add Voicemail verb to send call to voicemail.
+     * Add Conference verb to connect call to a conference room.
+     *
+     * @param string $name Conference room name
+     * @param bool $startOnEnter Start conference when participant enters
+     * @param bool $endOnExit End conference when last participant exits
+     * @param int|null $maxParticipants Maximum number of participants
+     * @param string|null $waitUrl URL for hold music while waiting
+     * @param bool $muteOnEntry Mute participant when they enter
+     * @param bool $announceJoinLeave Announce when participants join/leave
      */
-    public function voicemail(?string $transcribe = null, ?string $action = null): self
-    {
-        $voicemail = $this->document->createElement('Voicemail');
+    public function conference(
+        string $name,
+        bool $startOnEnter = true,
+        bool $endOnExit = false,
+        ?int $maxParticipants = null,
+        ?string $waitUrl = null,
+        bool $muteOnEntry = false,
+        bool $announceJoinLeave = false
+    ): self {
+        $conference = $this->document->createElement('Conference');
 
-        if ($transcribe !== null) {
-            $voicemail->setAttribute('transcribe', $transcribe);
+        $conference->setAttribute('name', htmlspecialchars($name, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
+        $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
+
+        if ($maxParticipants !== null) {
+            $conference->setAttribute('maxParticipants', (string) $maxParticipants);
         }
 
-        if ($action !== null) {
-            $voicemail->setAttribute('action', $action);
+        if ($waitUrl !== null) {
+            $conference->setAttribute('waitUrl', htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
         }
 
-        $this->response->appendChild($voicemail);
+        $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
+        $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
+
+        $this->response->appendChild($conference);
 
         return $this;
     }
@@ -242,6 +264,34 @@ class CxmlBuilder
         if ($hangupAfter) {
             $builder->hangup();
         }
+
+        return $builder->build();
+    }
+
+    /**
+     * Build a conference room response.
+     *
+     * @param string $conferenceName Name of the conference room
+     * @param int|null $maxParticipants Maximum participants
+     * @param bool $muteOnEntry Whether to mute participants on entry
+     * @param bool $announceJoinLeave Whether to announce joins/leaves
+     */
+    public static function joinConference(
+        string $conferenceName,
+        ?int $maxParticipants = null,
+        bool $muteOnEntry = false,
+        bool $announceJoinLeave = false
+    ): string {
+        $builder = new self();
+        $builder->conference(
+            $conferenceName,
+            true, // startOnEnter
+            false, // endOnExit
+            $maxParticipants,
+            null, // waitUrl
+            $muteOnEntry,
+            $announceJoinLeave
+        );
 
         return $builder->build();
     }
