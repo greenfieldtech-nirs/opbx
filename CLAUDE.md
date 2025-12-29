@@ -254,6 +254,27 @@ Example implementation:
 - Optional: OpenTelemetry hooks if minimal
 
 ========================
+12A) WEBHOOK AUTHENTICATION
+========================
+OpBX uses two authentication methods for Cloudonix webhooks:
+
+Voice Routing (Real-time):
+- Middleware: VerifyVoiceWebhookAuth (alias: voice.webhook.auth)
+- Method: Bearer token authentication
+- Organization-specific: domain_requests_api_key from CloudonixSettings
+- Returns: CXML error responses
+- Used for: /api/voice/route, /api/voice/ivr-input, /api/voice/ring-group-callback
+
+Status/CDR Webhooks (Asynchronous):
+- Middleware: VerifyCloudonixSignature (alias: webhook.signature)
+- Method: HMAC-SHA256 signature (or domain UUID for CDR)
+- Global secret: CLOUDONIX_WEBHOOK_SECRET in .env
+- Returns: JSON error responses
+- Used for: /api/webhooks/cloudonix/call-initiated, /call-status, /session-update, /cdr
+
+For detailed documentation, see: docs/WEBHOOK-AUTHENTICATION.md
+
+========================
 13) REQUIRED AGENT DELEGATION
 ========================
 api-designer:

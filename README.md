@@ -792,6 +792,7 @@ docker compose exec app php artisan queue:retry all
 
 ## Documentation
 
+- **Webhook Authentication**: `docs/WEBHOOK-AUTHENTICATION.md` - Complete guide to webhook security and authentication methods
 - **Cache System**: `docs/VOICE_ROUTING_CACHE.md` - Comprehensive Redis caching documentation
 - **API Reference**: `docs/API.md` (planned)
 - **Architecture**: `docs/ARCHITECTURE.md` (planned)
