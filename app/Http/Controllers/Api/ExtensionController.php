@@ -569,12 +569,14 @@ class ExtensionController extends Controller
      *
      * @param Request $request
      * @param Extension $extension
+     * @param PasswordGenerator $passwordGenerator
      * @param CloudonixSubscriberService $subscriberService
      * @return JsonResponse
      */
     public function resetPassword(
         Request $request,
         Extension $extension,
+        PasswordGenerator $passwordGenerator,
         CloudonixSubscriberService $subscriberService
     ): JsonResponse {
         $requestId = (string) Str::uuid();
@@ -617,8 +619,12 @@ class ExtensionController extends Controller
         ]);
 
         try {
-            // Generate new password
-            $newPassword = $extension->regeneratePassword();
+            // Generate new memorable password using the same method as extension creation
+            $newPassword = $passwordGenerator->generate();
+
+            // Update the extension with the new password
+            $extension->password = $newPassword;
+            $extension->save();
 
             // Reload extension to get updated data
             $extension->refresh();
