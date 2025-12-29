@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Voice;
 use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Models\BusinessHoursSchedule;
 use App\Models\DidNumber;
 use App\Models\Extension;
@@ -33,6 +34,8 @@ use Illuminate\Support\Facades\Log;
  */
 class VoiceRoutingController extends Controller
 {
+    use HandlesWebhookErrors;
+
     /**
      * Constructor
      *
@@ -69,73 +72,87 @@ class VoiceRoutingController extends Controller
             'organization_id' => $organizationId,
         ]);
 
-        // If organization not identified by middleware, we can't route
-        if (!$organizationId) {
-            Log::warning('Voice routing: No organization ID found', [
-                'call_sid' => $callSid,
-                'to' => $to,
-            ]);
-            return $this->cxmlResponse(CxmlBuilder::simpleHangup());
-        }
-
-        // Step 7: Check business hours (if configured)
-        $businessHoursResponse = $this->checkBusinessHours($organizationId, $callSid);
-        if ($businessHoursResponse) {
-            return $businessHoursResponse;
-        }
-
-        // Classify call according to section 3.2.0 of CORE_ROUTING_SPECIFICATION.md
-        $callType = $this->classifyCall($from, $to, $organizationId);
-
-        Log::info('Voice routing: Call classified', [
-            'call_sid' => $callSid,
-            'call_type' => $callType,
-        ]);
-
-        // If call doesn't match internal or external rules, check for security violations
-        if ($callType === 'invalid') {
-            // Security check: Detect if external caller is trying to dial E.164 number
-            // This is a potential security violation (toll fraud attempt)
-            $normalizedFrom = $this->normalizePhoneNumber($from);
-            $normalizedTo = $this->normalizePhoneNumber($to);
-
-            // Step 8: Check if From is NOT an internal extension (with caching)
-            $fromExtension = $this->cache->getExtension($organizationId, $normalizedFrom);
-
-            // Apply filters
-            $fromExtensionExists = $fromExtension &&
-                in_array($fromExtension->type, [ExtensionType::USER, ExtensionType::AI_ASSISTANT], true) &&
-                $fromExtension->isActive();
-
-            // If external caller is trying to reach E.164 number: security violation
-            if (!$fromExtensionExists && $this->isE164($normalizedTo)) {
-                Log::warning('Voice routing: Security violation - external caller attempting E.164 dial', [
+        try {
+            // If organization not identified by middleware, we can't route
+            if (!$organizationId) {
+                Log::warning('Voice routing: No organization ID found', [
                     'call_sid' => $callSid,
-                    'from' => $from,
                     'to' => $to,
-                    'organization_id' => $organizationId,
-                    'reason' => 'security_violation_e164',
                 ]);
-
-                return $this->cxmlResponse(CxmlBuilder::unavailable('Security violation, no outbound dialing allowed'));
+                return $this->cxmlResponse(CxmlBuilder::simpleHangup());
             }
 
-            // Other invalid scenarios: silent hangup
-            return $this->cxmlResponse(CxmlBuilder::simpleHangup());
+            // Step 7: Check business hours (if configured)
+            $businessHoursResponse = $this->checkBusinessHours($organizationId, $callSid);
+            if ($businessHoursResponse) {
+                return $businessHoursResponse;
+            }
+
+            // Classify call according to section 3.2.0 of CORE_ROUTING_SPECIFICATION.md
+            $callType = $this->classifyCall($from, $to, $organizationId);
+
+            Log::info('Voice routing: Call classified', [
+                'call_sid' => $callSid,
+                'call_type' => $callType,
+            ]);
+
+            // If call doesn't match internal or external rules, check for security violations
+            if ($callType === 'invalid') {
+                // Security check: Detect if external caller is trying to dial E.164 number
+                // This is a potential security violation (toll fraud attempt)
+                $normalizedFrom = $this->normalizePhoneNumber($from);
+                $normalizedTo = $this->normalizePhoneNumber($to);
+
+                // Step 8: Check if From is NOT an internal extension (with caching)
+                $fromExtension = $this->cache->getExtension($organizationId, $normalizedFrom);
+
+                // Apply filters
+                $fromExtensionExists = $fromExtension &&
+                    in_array($fromExtension->type, [ExtensionType::USER, ExtensionType::AI_ASSISTANT], true) &&
+                    $fromExtension->isActive();
+
+                // If external caller is trying to reach E.164 number: security violation
+                if (!$fromExtensionExists && $this->isE164($normalizedTo)) {
+                    Log::warning('Voice routing: Security violation - external caller attempting E.164 dial', [
+                        'call_sid' => $callSid,
+                        'from' => $from,
+                        'to' => $to,
+                        'organization_id' => $organizationId,
+                        'reason' => 'security_violation_e164',
+                    ]);
+
+                    return $this->cxmlResponse(CxmlBuilder::unavailable('Security violation, no outbound dialing allowed'));
+                }
+
+                // Other invalid scenarios: silent hangup
+                return $this->cxmlResponse(CxmlBuilder::simpleHangup());
+            }
+
+            // Phase 1: Route internal calls (extension-to-extension)
+            if ($callType === 'internal') {
+                return $this->routeInternalCall($from, $to, $organizationId, $callSid);
+            }
+
+            // Phase 0: Return placeholder CXML for external calls (not yet implemented)
+            $message = sprintf(
+                'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: %s.',
+                $callType ?? 'unknown'
+            );
+
+            return $this->cxmlResponse(CxmlBuilder::sayWithHangup($message, true));
+
+        } catch (\Exception $e) {
+            // Handle unexpected errors gracefully - return CXML error response
+            Log::error('Voice routing: Unexpected error', [
+                'call_sid' => $callSid,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Return CXML error response instead of 500
+            return $this->cxmlErrorResponse('Service temporarily unavailable. Please try again.');
         }
-
-        // Phase 1: Route internal calls (extension-to-extension)
-        if ($callType === 'internal') {
-            return $this->routeInternalCall($from, $to, $organizationId, $callSid);
-        }
-
-        // Phase 0: Return placeholder CXML for external calls (not yet implemented)
-        $message = sprintf(
-            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: %s.',
-            $callType ?? 'unknown'
-        );
-
-        return $this->cxmlResponse(CxmlBuilder::sayWithHangup($message, true));
     }
 
     /**

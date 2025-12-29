@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Webhooks;
 
+use App\Exceptions\Webhook\WebhookBusinessLogicException;
+use App\Exceptions\Webhook\WebhookTransientException;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
 use App\Http\Requests\Webhook\CallStatusRequest;
 use App\Http\Requests\Webhook\CdrRequest;
@@ -23,6 +26,8 @@ use Illuminate\Support\Facades\Log;
  */
 class CloudonixWebhookController extends Controller
 {
+    use HandlesWebhookErrors;
+
     public function __construct(
         private readonly CallRoutingService $routingService
     ) {
@@ -170,6 +175,15 @@ class CloudonixWebhookController extends Controller
             'payload' => $request->all(),
         ]);
 
+        // Validate organization was identified by middleware
+        if (!$organizationId) {
+            Log::warning('CDR webhook missing organization ID', [
+                'call_id' => $callId,
+            ]);
+
+            throw new WebhookBusinessLogicException('Organization not identified');
+        }
+
         // Process CDR synchronously so we can return proper response
         try {
             $cdr = \App\Models\CallDetailRecord::createFromWebhook($request->all(), $organizationId);
@@ -211,19 +225,10 @@ class CloudonixWebhookController extends Controller
                 'cdr_id' => $cdr->id,
                 'status' => 'success',
             ], 200);
-        } catch (\Exception $e) {
-            Log::error('Failed to create CDR', [
-                'call_id' => $callId,
-                'organization_id' => $organizationId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'payload' => $request->all(),
-            ]);
 
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to store CDR: ' . $e->getMessage(),
-            ], 500);
+        } catch (\Exception $e) {
+            // Use trait method for consistent error handling
+            return $this->handleWebhookException($e, $callId);
         }
     }
 
