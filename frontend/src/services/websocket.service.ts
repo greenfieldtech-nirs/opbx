@@ -17,7 +17,7 @@ export class WebSocketService {
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectDelay = 3000;
+  private reconnectDelay = 10000; // Increased from 3000ms to 10000ms for slower reconnection
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnected = false;
 
@@ -40,7 +40,6 @@ export class WebSocketService {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
         this.isConnected = true;
         this.reconnectAttempts = 0;
 
@@ -53,21 +52,20 @@ export class WebSocketService {
           const message = JSON.parse(event.data);
           this.handleMessage(message);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          // Silently handle parsing errors
         }
       };
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      this.ws.onerror = () => {
+        // Silently handle WebSocket errors
       };
 
       this.ws.onclose = () => {
-        console.log('WebSocket closed');
         this.isConnected = false;
         this.attemptReconnect(organizationId);
       };
     } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
+      // Silently handle connection errors
     }
   }
 
@@ -112,12 +110,10 @@ export class WebSocketService {
    */
   private attemptReconnect(organizationId: string): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnect attempts reached');
       return;
     }
 
     this.reconnectAttempts++;
-    console.log(`Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
 
     this.reconnectTimer = setTimeout(() => {
       this.connect(organizationId);
@@ -130,12 +126,10 @@ export class WebSocketService {
   private handleMessage(message: { event: string; data: CallPresenceUpdate; channel?: string }): void {
     // Handle different event types
     if (message.event === 'pusher:connection_established') {
-      console.log('WebSocket connection established');
       return;
     }
 
     if (message.event === 'pusher_internal:subscription_succeeded') {
-      console.log('Subscribed to channel:', message.channel);
       return;
     }
 
@@ -177,7 +171,7 @@ export class WebSocketService {
         try {
           callback(data);
         } catch (error) {
-          console.error('Error in WebSocket callback:', error);
+          // Silently handle callback errors
         }
       });
     }
@@ -189,7 +183,7 @@ export class WebSocketService {
         try {
           callback(data);
         } catch (error) {
-          console.error('Error in WebSocket wildcard callback:', error);
+          // Silently handle callback errors
         }
       });
     }
