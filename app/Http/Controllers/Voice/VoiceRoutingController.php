@@ -581,23 +581,52 @@ class VoiceRoutingController extends Controller
             return $this->cxmlResponse(CxmlBuilder::unavailable('Conference room is currently unavailable.'));
         }
 
+        // Generate clean conference identifier (letters and digits only)
+        $conferenceIdentifier = $this->generateConferenceIdentifier($conferenceRoom->name);
+
         Log::info('Voice routing: Routing call to conference room', [
             'call_sid' => $callSid,
             'extension_id' => $extension->id,
             'extension_number' => $extension->extension_number,
             'conference_room_id' => $conferenceRoom->id,
             'conference_room_name' => $conferenceRoom->name,
+            'conference_identifier' => $conferenceIdentifier,
             'max_participants' => $conferenceRoom->max_participants,
             'organization_id' => $organizationId,
         ]);
 
-        // Generate Conference CXML
+        // Generate Conference CXML with Dial wrapper
         return $this->cxmlResponse(CxmlBuilder::joinConference(
-            $conferenceRoom->name,
+            $conferenceIdentifier,
             $conferenceRoom->max_participants,
             $conferenceRoom->mute_on_entry,
             $conferenceRoom->announce_join_leave
         ));
+    }
+
+    /**
+     * Generate a clean conference identifier from conference room name.
+     *
+     * Removes spaces and special characters, keeping only letters and digits.
+     * Used as the conference identifier in CXML.
+     *
+     * @param string $conferenceName
+     * @return string
+     */
+    private function generateConferenceIdentifier(string $conferenceName): string
+    {
+        // Remove spaces and convert to lowercase
+        $identifier = strtolower(str_replace(' ', '', $conferenceName));
+
+        // Remove all non-alphanumeric characters
+        $identifier = preg_replace('/[^a-z0-9]/', '', $identifier);
+
+        // Ensure it's not empty (fallback to generic name)
+        if (empty($identifier)) {
+            $identifier = 'conference';
+        }
+
+        return $identifier;
     }
 
     /**
