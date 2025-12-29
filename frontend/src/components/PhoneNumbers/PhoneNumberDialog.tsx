@@ -96,10 +96,10 @@ export function PhoneNumberDialog({
     }
   }, [open, phoneNumber]);
 
-  // Fetch available extensions (active only)
+  // Fetch available extensions (active only, with user relationship)
   const { data: extensionsData } = useQuery({
-    queryKey: ['extensions', { status: 'active', per_page: 100 }],
-    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100 }),
+    queryKey: ['extensions', { status: 'active', per_page: 100, with: 'user' }],
+    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100, with: 'user' }),
     enabled: open && formData.routing_type === 'extension',
   });
 
@@ -357,7 +357,7 @@ export function PhoneNumberDialog({
                   <SelectContent>
                     {availableExtensions.map((ext) => (
                       <SelectItem key={ext.id} value={ext.id}>
-                        {ext.extension_number} - {ext.name || 'Unnamed'}
+                        {ext.extension_number} - {ext.user?.name || 'Unassigned'}
                       </SelectItem>
                     ))}
                   </SelectContent>
