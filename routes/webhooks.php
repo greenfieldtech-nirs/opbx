@@ -29,7 +29,7 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
         ->name('webhooks.cloudonix.cdr');
 
     Route::post('/session-update', [CloudonixWebhookController::class, 'sessionUpdate'])
-        ->middleware(['webhook.signature', 'rate_limit_org:webhook'])
+        ->middleware(['webhook.signature'])  // High-velocity endpoint - no rate limiting
         ->name('webhooks.cloudonix.session-update');
 });
 

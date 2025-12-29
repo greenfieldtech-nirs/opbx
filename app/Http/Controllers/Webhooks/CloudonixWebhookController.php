@@ -15,6 +15,7 @@ use App\Jobs\ProcessCDRJob;
 use App\Jobs\ProcessInboundCallJob;
 use App\Jobs\UpdateCallStatusJob;
 use App\Models\DidNumber;
+use App\Models\SessionUpdate;
 use App\Services\CallRouting\CallRoutingService;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -136,28 +137,125 @@ class CloudonixWebhookController extends Controller
     }
 
     /**
-     * Handle call status update webhook.
-     * This is called by Cloudonix when call status changes.
+     * Handle session update webhook.
+     * Session updates are sent during call progress for monitoring and debugging.
      */
-    public function callStatus(CallStatusRequest $request): Response
+    public function sessionUpdate(\Illuminate\Http\Request $request): Response
     {
-        $callId = $request->input('CallSid') ?? $request->input('call_id');
-        $status = $request->input('CallStatus') ?? $request->input('status');
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $payload = $request->all();
 
-        Log::info('Received call-status webhook', [
-            'call_id' => $callId,
-            'status' => $status,
-            'payload' => $request->all(),
+        Log::info('Processing session-update webhook', [
+            'request_id' => $requestId,
+            'session_id' => $payload['id'] ?? null,
+            'event_id' => $payload['eventId'] ?? null,
+            'action' => $payload['action'] ?? null,
+            'status' => $payload['status'] ?? null,
         ]);
 
-        // Dispatch job to process status update asynchronously
-        UpdateCallStatusJob::dispatch([
-            'call_id' => $callId,
-            'status' => $status,
-            'webhook_data' => $request->all(),
-        ]);
+        try {
+            // Validate required fields
+            $validated = $request->validate([
+                'id' => 'required|integer',
+                'eventId' => 'required|string',
+                'domainId' => 'required|integer',
+                'domain' => 'required|string',
+                'subscriberId' => 'required|integer',
+                'callerId' => 'required|string',
+                'destination' => 'required|string',
+                'direction' => 'required|in:incoming,outgoing',
+                'status' => 'required|string',
+                'createdAt' => 'required|string',
+                'modifiedAt' => 'required|string',
+                'action' => 'required|string',
+                'reason' => 'required|string',
+                'callIds' => 'required|array',
+                'profile' => 'required|array',
+            ]);
 
-        return response('', 200);
+            // Get organization ID from middleware
+            $organizationId = $request->attributes->get('_organization_id');
+            if (!$organizationId) {
+                Log::error('Session update: Organization not identified', [
+                    'request_id' => $requestId,
+                    'session_id' => $validated['id'],
+                    'event_id' => $validated['eventId'],
+                ]);
+                return response()->json(['error' => 'Organization not identified'], 400);
+            }
+
+            // Check for duplicate event (idempotency)
+            $existingUpdate = SessionUpdate::where('organization_id', $organizationId)
+                ->where('event_id', $validated['eventId'])
+                ->first();
+
+            if ($existingUpdate) {
+                Log::info('Session update: Duplicate event ignored', [
+                    'request_id' => $requestId,
+                    'event_id' => $validated['eventId'],
+                    'existing_id' => $existingUpdate->id,
+                ]);
+                return response('', 200);
+            }
+
+            // Process and store session update
+            $sessionUpdate = new SessionUpdate([
+                'organization_id' => $organizationId,
+                'session_id' => $validated['id'],
+                'event_id' => $validated['eventId'],
+                'domain_id' => $validated['domainId'],
+                'domain' => $validated['domain'],
+                'subscriber_id' => $validated['subscriberId'],
+                'outgoing_subscriber_id' => $validated['outgoingSubscriberId'] ?? null,
+                'caller_id' => $this->normalizePhoneNumber($validated['callerId']),
+                'destination' => $this->normalizePhoneNumber($validated['destination']),
+                'direction' => $validated['direction'],
+                'status' => $validated['status'],
+                'session_created_at' => $validated['createdAt'],
+                'session_modified_at' => $validated['modifiedAt'],
+                'call_start_time' => $validated['callStartTime'] ?? null,
+                'start_time' => isset($validated['startTime']) ? $validated['startTime'] : null,
+                'call_answer_time' => $validated['callAnswerTime'] ?? null,
+                'answer_time' => isset($validated['answerTime']) ? $validated['answerTime'] : null,
+                'time_limit' => $validated['timeLimit'] ?? null,
+                'vapp_server' => $validated['vappServer'] ?? null,
+                'action' => $validated['action'],
+                'reason' => $validated['reason'],
+                'last_error' => $validated['lastError'] ?? null,
+                'call_ids' => $validated['callIds'],
+                'profile' => $validated['profile'],
+            ]);
+
+            $sessionUpdate->save();
+
+            Log::info('Session update stored successfully', [
+                'request_id' => $requestId,
+                'session_update_id' => $sessionUpdate->id,
+                'session_id' => $validated['id'],
+                'event_id' => $validated['eventId'],
+                'organization_id' => $organizationId,
+            ]);
+
+            return response('', 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Session update validation failed', [
+                'request_id' => $requestId,
+                'errors' => $e->errors(),
+                'payload' => $payload,
+            ]);
+            return response()->json(['error' => 'Validation failed', 'details' => $e->errors()], 400);
+
+        } catch (\Exception $e) {
+            Log::error('Session update processing failed', [
+                'request_id' => $requestId,
+                'session_id' => $payload['id'] ?? null,
+                'event_id' => $payload['eventId'] ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'Internal server error'], 500);
+        }
     }
 
     /**
