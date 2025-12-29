@@ -65,11 +65,6 @@ class VerifyCloudonixSignature
 
             // Skip verification if disabled (e.g., development/testing)
             if (! config('cloudonix.verify_signature', true)) {
-                Log::warning('Webhook signature verification is DISABLED', [
-                    'ip' => $request->ip(),
-                    'path' => $request->path(),
-                ]);
-
                 return $next($request);
             }
         } catch (WebhookValidationException $e) {
