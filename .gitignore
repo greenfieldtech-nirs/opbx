@@ -12,6 +12,8 @@
 .env.test
 auth.json
 config/secrets.php
+/.opencode/
+.opencode/
 
 # ============================================================================
 # API Keys & Credentials (Sensitive)
