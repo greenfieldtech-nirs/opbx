@@ -25,8 +25,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $driver = Schema::getConnection()->getDriverName();
+
         // Disable foreign key checks to allow dropping tables
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        } elseif ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF;');
+        }
 
         // Drop all tables in reverse order
         Schema::dropIfExists('business_hours_exception_time_ranges');
@@ -37,7 +43,11 @@ return new class extends Migration
         Schema::dropIfExists('business_hours');
 
         // Re-enable foreign key checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } elseif ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = ON;');
+        }
 
         // Create business_hours_schedules table
         Schema::create('business_hours_schedules', function (Blueprint $table) {

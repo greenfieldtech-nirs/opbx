@@ -12,9 +12,53 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Update the type enum to include all extension types
-        // Remove 'virtual' and 'custom_logic', add 'ring_group', 'ivr', 'ai_assistant', 'forward'
-        DB::statement("ALTER TABLE extensions MODIFY COLUMN type ENUM('user','conference','ring_group','ivr','ai_assistant','forward') NOT NULL DEFAULT 'user'");
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            // SQLite: Need to drop index first, then recreate the column
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->dropIndex(['organization_id', 'type']); // Drop composite index
+            });
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->string('type_temp')->default('user')->after('type');
+            });
+
+            DB::table('extensions')->update([
+                'type_temp' => DB::raw('type')
+            ]);
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->dropColumn('type');
+            });
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->enum('type', [
+                    'user',
+                    'conference',
+                    'ring_group',
+                    'ivr',
+                    'ai_assistant',
+                    'forward'
+                ])->default('user')->after('user_id');
+            });
+
+            DB::table('extensions')->update([
+                'type' => DB::raw('type_temp')
+            ]);
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->dropColumn('type_temp');
+            });
+
+            // Recreate the index
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->index(['organization_id', 'type']);
+            });
+        } else {
+            // MySQL/PostgreSQL: Can use ALTER COLUMN
+            DB::statement("ALTER TABLE extensions MODIFY COLUMN type ENUM('user','conference','ring_group','ivr','ai_assistant','forward') NOT NULL DEFAULT 'user'");
+        }
     }
 
     /**
@@ -22,8 +66,50 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert back to the original enum values
-        // Note: This will fail if there are extensions with ring_group, ivr, ai_assistant, or forward types
-        DB::statement("ALTER TABLE extensions MODIFY COLUMN type ENUM('user','virtual','conference') NOT NULL DEFAULT 'user'");
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            // SQLite: Need to drop index first, then recreate the column
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->dropIndex(['organization_id', 'type']); // Drop composite index
+            });
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->string('type_temp')->default('user')->after('type');
+            });
+
+            DB::table('extensions')->update([
+                'type_temp' => DB::raw('type')
+            ]);
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->dropColumn('type');
+            });
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->enum('type', [
+                    'user',
+                    'virtual',
+                    'conference'
+                ])->default('user')->after('user_id');
+            });
+
+            DB::table('extensions')->update([
+                'type' => DB::raw('type_temp')
+            ]);
+
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->dropColumn('type_temp');
+            });
+
+            // Recreate the index
+            Schema::table('extensions', function (Blueprint $table) {
+                $table->index(['organization_id', 'type']);
+            });
+        } else {
+            // MySQL/PostgreSQL: Can use ALTER COLUMN
+            // Note: This will fail if there are extensions with ring_group, ivr, ai_assistant, or forward types
+            DB::statement("ALTER TABLE extensions MODIFY COLUMN type ENUM('user','virtual','conference') NOT NULL DEFAULT 'user'");
+        }
     }
 };

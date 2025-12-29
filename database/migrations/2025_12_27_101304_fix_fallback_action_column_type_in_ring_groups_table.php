@@ -12,8 +12,40 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Change fallback_action from JSON to ENUM
-        DB::statement("ALTER TABLE ring_groups MODIFY COLUMN fallback_action ENUM('extension', 'hangup') DEFAULT 'extension'");
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            // SQLite: Need to recreate the column
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->string('fallback_action_temp')->default('extension')->after('fallback_action');
+            });
+
+            DB::table('ring_groups')->update([
+                'fallback_action_temp' => DB::raw('fallback_action')
+            ]);
+
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->dropColumn('fallback_action');
+            });
+
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->enum('fallback_action', [
+                    'extension',
+                    'hangup'
+                ])->default('extension')->after('strategy');
+            });
+
+            DB::table('ring_groups')->update([
+                'fallback_action' => DB::raw('fallback_action_temp')
+            ]);
+
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->dropColumn('fallback_action_temp');
+            });
+        } else {
+            // MySQL/PostgreSQL: Can use ALTER COLUMN
+            DB::statement("ALTER TABLE ring_groups MODIFY COLUMN fallback_action ENUM('extension', 'hangup') DEFAULT 'extension'");
+        }
     }
 
     /**
@@ -21,7 +53,37 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert back to JSON (though this is unlikely to be needed)
-        DB::statement("ALTER TABLE ring_groups MODIFY COLUMN fallback_action JSON NULL");
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            // SQLite: Need to recreate the column
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->text('fallback_action_temp')->nullable()->after('fallback_action');
+            });
+
+            DB::table('ring_groups')->update([
+                'fallback_action_temp' => DB::raw('fallback_action')
+            ]);
+
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->dropColumn('fallback_action');
+            });
+
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->json('fallback_action')->nullable()->after('strategy');
+            });
+
+            DB::table('ring_groups')->update([
+                'fallback_action' => DB::raw('fallback_action_temp')
+            ]);
+
+            Schema::table('ring_groups', function (Blueprint $table) {
+                $table->dropColumn('fallback_action_temp');
+            });
+        } else {
+            // MySQL/PostgreSQL: Can use ALTER COLUMN
+            // Revert back to JSON (though this is unlikely to be needed)
+            DB::statement("ALTER TABLE ring_groups MODIFY COLUMN fallback_action JSON NULL");
+        }
     }
 };
