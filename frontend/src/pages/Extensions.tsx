@@ -1322,7 +1322,7 @@ export default function ExtensionsComplete() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm">
-                          {visiblePasswords.has(extension.id) ? extension.password : '••••••••••••••••'}
+                          {visiblePasswords.has(extension.id) ? (extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
                         </span>
                         <div className="flex items-center gap-1">
                           <Button
@@ -1342,7 +1342,7 @@ export default function ExtensionsComplete() {
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0"
-                            onClick={() => copyPassword(extension.password, extension.extension_number)}
+                            onClick={() => copyPassword(extension.sip_config?.password || 'Not set', extension.extension_number)}
                             title="Copy password"
                           >
                             <Copy className="h-4 w-4" />
