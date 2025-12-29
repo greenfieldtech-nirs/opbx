@@ -10,7 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BusinessHoursSchedule;
 use App\Models\DidNumber;
 use App\Models\Extension;
-use App\Services\Cxml\CxmlBuilder;
+use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -36,11 +36,9 @@ class VoiceRoutingController extends Controller
     /**
      * Constructor
      *
-     * @param CxmlBuilder $cxmlBuilder CXML response builder
      * @param VoiceRoutingCacheService $cache Voice routing cache service
      */
     public function __construct(
-        private readonly CxmlBuilder $cxmlBuilder,
         private readonly VoiceRoutingCacheService $cache
     ) {
     }
@@ -77,7 +75,7 @@ class VoiceRoutingController extends Controller
                 'call_sid' => $callSid,
                 'to' => $to,
             ]);
-            return $this->cxmlBuilder->hangup();
+            return $this->cxmlResponse(CxmlBuilder::simpleHangup());
         }
 
         // Step 7: Check business hours (if configured)
@@ -119,11 +117,11 @@ class VoiceRoutingController extends Controller
                     'reason' => 'security_violation_e164',
                 ]);
 
-                return $this->cxmlBuilder->unavailable('Security violation, no outbound dialing allowed');
+                return $this->cxmlResponse(CxmlBuilder::unavailable('Security violation, no outbound dialing allowed'));
             }
 
             // Other invalid scenarios: silent hangup
-            return $this->cxmlBuilder->hangup();
+            return $this->cxmlResponse(CxmlBuilder::simpleHangup());
         }
 
         // Phase 1: Route internal calls (extension-to-extension)
@@ -137,7 +135,7 @@ class VoiceRoutingController extends Controller
             $callType ?? 'unknown'
         );
 
-        return $this->cxmlBuilder->say($message, hangupAfter: true);
+        return $this->cxmlResponse(CxmlBuilder::sayWithHangup($message, true));
     }
 
     /**
@@ -163,10 +161,8 @@ class VoiceRoutingController extends Controller
 
         // Phase 0: Return placeholder CXML
         // Phase 5+: Implement IVR routing logic
-        return $this->cxmlBuilder->say(
-            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.',
-            hangupAfter: true
-        );
+        $message = 'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.';
+        return $this->cxmlResponse(CxmlBuilder::sayWithHangup($message, true));
     }
 
     /**
@@ -195,10 +191,8 @@ class VoiceRoutingController extends Controller
 
         // Phase 0: Return placeholder CXML
         // Phase 4+: Implement sequential ring group logic
-        return $this->cxmlBuilder->say(
-            'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.',
-            hangupAfter: true
-        );
+        $message = 'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.';
+        return $this->cxmlResponse(CxmlBuilder::sayWithHangup($message, true));
     }
 
     /**
@@ -336,7 +330,7 @@ class VoiceRoutingController extends Controller
                 'severity' => 'CRITICAL',
             ]);
 
-            return $this->cxmlBuilder->unavailable('Call routing error. Please contact support.');
+            return $this->cxmlResponse(CxmlBuilder::unavailable('Call routing error. Please contact support.'));
         }
 
         Log::info('Voice routing: FROM extension validated for organization', [
@@ -368,7 +362,7 @@ class VoiceRoutingController extends Controller
                     'reason' => 'extension_type_cannot_make_outbound_calls',
                 ]);
 
-                return $this->cxmlBuilder->unavailable('Your extension type is not permitted to make outbound calls.');
+                return $this->cxmlResponse(CxmlBuilder::unavailable('Your extension type is not permitted to make outbound calls.'));
             }
 
             // Validate E.164 number format is correct
@@ -381,7 +375,7 @@ class VoiceRoutingController extends Controller
                     'reason' => 'invalid_e164_format',
                 ]);
 
-                return $this->cxmlBuilder->unavailable('The phone number you dialed is invalid. Please check the number and try again.');
+                return $this->cxmlResponse(CxmlBuilder::unavailable('The phone number you dialed is invalid. Please check the number and try again.'));
             }
 
             // Log successful outbound routing
@@ -396,7 +390,7 @@ class VoiceRoutingController extends Controller
             ]);
 
             // Generate Dial CXML for outbound call
-            return $this->cxmlBuilder->dial($normalizedTo, $from);
+            return $this->cxmlResponse(CxmlBuilder::simpleDial($normalizedTo, $from));
         }
 
         // Step 4 & 8: Look up destination extension with caching
@@ -413,7 +407,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'extension_not_found_or_tenant_isolation',
             ]);
 
-            return $this->cxmlBuilder->unavailable('The extension number you are trying to reach is invalid, please try again.');
+            return $this->cxmlResponse(CxmlBuilder::unavailable('The extension number you are trying to reach is invalid, please try again.'));
         }
 
         // Step 4: Log successful tenant isolation for destination
@@ -436,7 +430,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'extension_inactive',
             ]);
 
-            return $this->cxmlBuilder->unavailable('The extension number you are trying to reach is disabled, goodbye.');
+            return $this->cxmlResponse(CxmlBuilder::unavailable('The extension number you are trying to reach is disabled, goodbye.'));
         }
 
         // Validation Step 3: Check extension type (Step 2: only support 'user' type for now)
@@ -450,7 +444,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'unsupported_extension_type',
             ]);
 
-            return $this->cxmlBuilder->unavailable('The extension you are trying to reach is not available at this time.');
+            return $this->cxmlResponse(CxmlBuilder::unavailable('The extension you are trying to reach is not available at this time.'));
         }
 
         // Validation Step 4 (Phase 1 Step 3): Check if user is assigned to extension
@@ -463,7 +457,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'no_user_assigned',
             ]);
 
-            return $this->cxmlBuilder->unavailable('This extension is not associated with any user. Please associate the extension and try again.');
+            return $this->cxmlResponse(CxmlBuilder::unavailable('This extension is not associated with any user. Please associate the extension and try again.'));
         }
 
         // Validation Step 5 (Phase 1 Step 3): Check if assigned user is active
@@ -478,7 +472,7 @@ class VoiceRoutingController extends Controller
                 'reason' => 'user_inactive',
             ]);
 
-            return $this->cxmlBuilder->unavailable('The user you are trying to reach is currently unavailable.');
+            return $this->cxmlResponse(CxmlBuilder::unavailable('The user you are trying to reach is currently unavailable.'));
         }
 
         Log::info('Voice routing: Extension and user validated successfully, generating Dial CXML', [
@@ -492,7 +486,7 @@ class VoiceRoutingController extends Controller
         ]);
 
         // Generate Dial CXML for internal call
-        return $this->cxmlBuilder->dial($normalizedTo, $from);
+        return $this->cxmlResponse(CxmlBuilder::simpleDial($normalizedTo, $from));
     }
 
     /**
@@ -584,6 +578,18 @@ class VoiceRoutingController extends Controller
     }
 
     /**
+     * Convert CXML string to HTTP Response
+     *
+     * @param string $cxml CXML content
+     * @return Response
+     */
+    private function cxmlResponse(string $cxml): Response
+    {
+        return response($cxml, 200)
+            ->header('Content-Type', 'application/xml');
+    }
+
+    /**
      * Check business hours and return closed message if outside hours
      *
      * Phase 1 Step 7: Basic Business Hours Check
@@ -638,7 +644,7 @@ class VoiceRoutingController extends Controller
 
             $closedMessage = 'Thank you for calling. We are currently closed. Please call back during our business hours.';
 
-            return $this->cxmlBuilder->unavailable($closedMessage);
+            return $this->cxmlResponse(CxmlBuilder::unavailable($closedMessage));
         }
 
         // Business is open, proceed with normal routing

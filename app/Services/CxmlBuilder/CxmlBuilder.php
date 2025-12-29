@@ -194,6 +194,70 @@ class CxmlBuilder
     }
 
     /**
+     * Build an unavailable response.
+     *
+     * @param string $message The unavailable message
+     */
+    public static function unavailable(string $message = 'The extension you are trying to reach is unavailable.'): string
+    {
+        $builder = new self();
+        $builder->say($message . ' Goodbye.')
+            ->hangup();
+
+        return $builder->build();
+    }
+
+    /**
+     * Build a simple dial response.
+     *
+     * @param string $destination The destination to dial
+     * @param string|null $callerId Optional caller ID
+     * @param int|null $timeout Optional timeout in seconds
+     */
+    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null): string
+    {
+        $builder = new self();
+        $builder->dial($destination, $timeout, null);
+
+        return $builder->build();
+    }
+
+    /**
+     * Build a say with optional hangup response.
+     *
+     * @param string $message The message to say
+     * @param bool $hangupAfter Whether to hangup after saying
+     * @param string|null $voice Voice type
+     * @param string|null $language Language code
+     */
+    public static function sayWithHangup(
+        string $message,
+        bool $hangupAfter = false,
+        ?string $voice = null,
+        ?string $language = null
+    ): string {
+        $builder = new self();
+        $builder->say($message, $voice, $language);
+
+        if ($hangupAfter) {
+            $builder->hangup();
+        }
+
+        return $builder->build();
+    }
+
+    /**
+     * Build a simple hangup response.
+     */
+    public static function simpleHangup(): string
+    {
+        $builder = new self();
+        $builder->hangup();
+
+        return $builder->build();
+    }
+
+    /**
      * Build the CXML response as an XML string.
      */
     public function build(): string
@@ -205,6 +269,18 @@ class CxmlBuilder
         }
 
         return $xml;
+    }
+
+    /**
+     * Convert the CXML to a Laravel HTTP Response.
+     *
+     * @param int $status HTTP status code (default: 200)
+     * @return \Illuminate\Http\Response
+     */
+    public function toResponse(int $status = 200): \Illuminate\Http\Response
+    {
+        return response($this->build(), $status)
+            ->header('Content-Type', 'application/xml');
     }
 
     /**
