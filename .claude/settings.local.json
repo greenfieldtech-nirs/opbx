@@ -61,7 +61,8 @@
       "Bash(xargs:*)",
       "Bash(xargs cat:*)",
       "Bash(./opbx_bootstrap.sh:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(timeout 120 npm run build)"
     ]
   }
 }

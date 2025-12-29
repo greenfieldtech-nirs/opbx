@@ -59,10 +59,6 @@ export const router = createBrowserRouter([
         element: <ConferenceRooms />,
       },
       {
-        path: 'dids',
-        element: <PhoneNumbers />,
-      },
-      {
         path: 'phone-numbers',
         element: <PhoneNumbers />,
       },
