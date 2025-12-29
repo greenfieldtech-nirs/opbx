@@ -114,6 +114,8 @@ Route::prefix('v1')->group(function (): void {
         // Extensions
         Route::get('extensions/sync/compare', [ExtensionController::class, 'compareSync']);
         Route::post('extensions/sync', [ExtensionController::class, 'performSync']);
+        Route::put('extensions/{extension}/reset-password', [ExtensionController::class, 'resetPassword'])
+            ->name('extensions.reset-password');
         Route::apiResource('extensions', ExtensionController::class);
 
         // Conference Rooms
