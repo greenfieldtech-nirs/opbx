@@ -14,6 +14,7 @@ use App\Http\Requests\Webhook\CdrRequest;
 use App\Jobs\ProcessCDRJob;
 use App\Jobs\ProcessInboundCallJob;
 use App\Jobs\UpdateCallStatusJob;
+use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
 use App\Services\CallRouting\CallRoutingService;
@@ -173,13 +174,15 @@ class CloudonixWebhookController extends Controller
                 'profile' => 'required|array',
             ]);
 
-            // Get organization ID from middleware
-            $organizationId = $request->attributes->get('_organization_id');
+            // Identify organization from Cloudonix domain
+            $organizationId = $this->identifyOrganizationFromDomain($validated['domain'], $validated['domainId']);
             if (!$organizationId) {
-                Log::error('Session update: Organization not identified', [
+                Log::error('Session update: Organization not identified from domain', [
                     'request_id' => $requestId,
                     'session_id' => $validated['id'],
                     'event_id' => $validated['eventId'],
+                    'domain' => $validated['domain'],
+                    'domain_id' => $validated['domainId'],
                 ]);
                 return response()->json(['error' => 'Organization not identified'], 400);
             }
@@ -331,18 +334,17 @@ class CloudonixWebhookController extends Controller
     }
 
     /**
-     * Handle session update webhook.
-     * This is called by Cloudonix to update session state during calls.
-     * Currently a mock endpoint that accepts all updates.
+     * Identify organization from Cloudonix domain information.
      */
-    public function sessionUpdate(\Illuminate\Http\Request $request): Response
+    private function identifyOrganizationFromDomain(string $domain, int $domainId): ?int
     {
-        // Mock endpoint: Just log and return 200 OK always
-        Log::info('Received session-update webhook', [
-            'payload' => $request->all(),
-        ]);
+        // Try to find organization by domain name or domain ID
+        $settings = CloudonixSettings::where(function ($query) use ($domain, $domainId) {
+            $query->where('domain_name', $domain)
+                  ->orWhere('cloudonix_domain_id', $domainId);
+        })->first();
 
-        return response('', 200);
+        return $settings?->organization_id;
     }
 
     /**
