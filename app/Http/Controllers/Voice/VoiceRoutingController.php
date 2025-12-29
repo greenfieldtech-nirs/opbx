@@ -627,17 +627,45 @@ class VoiceRoutingController extends Controller
                 'announce_join_leave' => $conferenceRoom->announce_join_leave,
             ]);
 
-            $cxml = CxmlBuilder::joinConference(
-                $conferenceIdentifier,
-                $conferenceRoom->max_participants,
-                $conferenceRoom->mute_on_entry,
-                $conferenceRoom->announce_join_leave
-            );
+            try {
+                $cxml = CxmlBuilder::joinConference(
+                    $conferenceIdentifier,
+                    $conferenceRoom->max_participants,
+                    $conferenceRoom->mute_on_entry,
+                    $conferenceRoom->announce_join_leave
+                );
+            } catch (\Exception $e) {
+                Log::error('Voice routing: CXML generation failed', [
+                    'call_sid' => $callSid,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                return $this->cxmlErrorResponse('CXML generation failed');
+            }
 
             Log::info('Voice routing: Generated conference CXML', [
                 'call_sid' => $callSid,
-                'cxml' => $cxml,
+                'conference_identifier' => $conferenceIdentifier,
+                'cxml_length' => strlen($cxml),
+                'cxml_preview' => substr($cxml, 0, 200) . (strlen($cxml) > 200 ? '...' : ''),
             ]);
+
+            // Validate XML structure
+            libxml_use_internal_errors(true);
+            $dom = new \DOMDocument();
+            $isValid = $dom->loadXML($cxml);
+            $errors = libxml_get_errors();
+            libxml_clear_errors();
+            libxml_use_internal_errors(false);
+
+            if (!$isValid || !empty($errors)) {
+                Log::error('Voice routing: Invalid CXML generated', [
+                    'call_sid' => $callSid,
+                    'cxml' => $cxml,
+                    'xml_errors' => array_map(fn($e) => $e->message, $errors),
+                ]);
+                return $this->cxmlErrorResponse('CXML generation error');
+            }
 
             return $this->cxmlResponse($cxml);
 

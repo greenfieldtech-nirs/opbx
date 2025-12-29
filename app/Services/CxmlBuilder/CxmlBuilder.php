@@ -84,39 +84,11 @@ class CxmlBuilder
         return $this;
     }
 
-    /**
-     * Add Dial verb with nested Conference for conference room access.
-     *
-     * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
-     * @param bool $startOnEnter Start conference when participant enters
-     * @param bool $endOnExit End conference when last participant exits
-     * @param int|null $maxParticipants Maximum number of participants
-     * @param string|null $waitUrl URL for hold music while waiting
-     * @param bool $muteOnEntry Mute participant when they enter
-     * @param bool $announceJoinLeave Announce when participants join/leave
-     * @param int|null $timeout Dial timeout in seconds
-     */
-    public function dialConference(
-        string $conferenceIdentifier,
-        bool $startOnEnter = true,
-        bool $endOnExit = false,
-        ?int $maxParticipants = null,
-        ?string $waitUrl = null,
-        bool $muteOnEntry = false,
-        bool $announceJoinLeave = false,
-        ?int $timeout = null
-    ): self {
-        $dial = $this->document->createElement('Dial');
 
-        if ($timeout !== null) {
-            $dial->setAttribute('timeout', (string) $timeout);
-        }
 
         $conference = $this->document->createElement('Conference');
 
-        // Set conference name as an attribute instead of text content
-        $conference->setAttribute('name', htmlspecialchars($conferenceIdentifier, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
-
+        // Set conference parameters as attributes
         $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
         $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
 
@@ -130,6 +102,10 @@ class CxmlBuilder
 
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
         $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
+
+        // Add conference identifier as text node (as per Cloudonix spec)
+        $textNode = $this->document->createTextNode($conferenceIdentifier);
+        $conference->appendChild($textNode);
 
         $dial->appendChild($conference);
         $this->response->appendChild($dial);
@@ -185,32 +161,48 @@ class CxmlBuilder
     }
 
     /**
-     * Add Dial verb with nested Conference for conference room access.
+     * Add Conference verb to connect call to a conference room.
      *
-     * @param string $conferenceName Conference room name (used as identifier)
+     * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
      * @param bool $startOnEnter Start conference when participant enters
      * @param bool $endOnExit End conference when last participant exits
      * @param int|null $maxParticipants Maximum number of participants
      * @param string|null $waitUrl URL for hold music while waiting
      * @param bool $muteOnEntry Mute participant when they enter
      * @param bool $announceJoinLeave Announce when participants join/leave
-     * @param int|null $timeout Dial timeout in seconds
      */
-    public function dialConference(
-        string $conferenceName,
+    public function conference(
+        string $conferenceIdentifier,
         bool $startOnEnter = true,
         bool $endOnExit = false,
         ?int $maxParticipants = null,
         ?string $waitUrl = null,
         bool $muteOnEntry = false,
-        bool $announceJoinLeave = false,
-        ?int $timeout = null
+        bool $announceJoinLeave = false
     ): self {
-        $dial = $this->document->createElement('Dial');
+        $conference = $this->document->createElement('Conference');
 
-        if ($timeout !== null) {
-            $dial->setAttribute('timeout', (string) $timeout);
+        $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
+        $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
+
+        if ($maxParticipants !== null) {
+            $conference->setAttribute('maxParticipants', (string) $maxParticipants);
         }
+
+        if ($waitUrl !== null) {
+            $conference->setAttribute('waitUrl', htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        }
+
+        $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
+        $conference->setAttribute('announceJoinLeave', $announceJoinLeave ? 'true' : 'false');
+
+        // Add conference identifier as text content
+        $conference->textContent = $conferenceIdentifier;
+
+        $this->response->appendChild($conference);
+
+        return $this;
+    }
 
         $conference = $this->document->createElement('Conference');
 
@@ -342,7 +334,7 @@ class CxmlBuilder
     }
 
     /**
-     * Build a conference room response using Dial with nested Conference.
+     * Build a conference room response.
      *
      * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
      * @param int|null $maxParticipants Maximum participants
@@ -356,15 +348,14 @@ class CxmlBuilder
         bool $announceJoinLeave = false
     ): string {
         $builder = new self();
-        $builder->dialConference(
+        $builder->conference(
             $conferenceIdentifier,
             true, // startOnEnter
             false, // endOnExit
             $maxParticipants,
             null, // waitUrl
             $muteOnEntry,
-            $announceJoinLeave,
-            null // timeout
+            $announceJoinLeave
         );
 
         return $builder->build();
