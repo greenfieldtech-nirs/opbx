@@ -149,3 +149,4 @@ temp/
 /storage/framework/sessions/*
 *.session
 .token
+reports/
