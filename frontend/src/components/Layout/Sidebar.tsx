@@ -32,7 +32,7 @@ const navigation: NavItem[] = [
   { name: 'Users', href: '/users', icon: Users, roles: ['owner', 'pbx_admin'] },
   { name: 'Extensions', href: '/extensions', icon: Phone },
   { name: 'Conference Rooms', href: '/conference-rooms', icon: Video },
-  { name: 'Phone Numbers', href: '/dids', icon: PhoneCall, roles: ['owner', 'pbx_admin'] },
+  { name: 'Phone Numbers', href: '/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin'] },
   { name: 'Ring Groups', href: '/ring-groups', icon: UserPlus },
   { name: 'Business Hours', href: '/business-hours', icon: Clock },
   { name: 'Call Logs', href: '/call-logs', icon: FileText },
