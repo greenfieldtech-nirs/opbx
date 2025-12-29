@@ -19,7 +19,14 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register service singletons
         $this->app->singleton(
-            \App\Services\CloudonixClient\CloudonixClient::class
+            \App\Services\CloudonixClient\CloudonixClient::class,
+            function ($app) {
+                // Instantiate without requiring credentials for ad-hoc validation use cases
+                return new \App\Services\CloudonixClient\CloudonixClient(
+                    settings: null,
+                    requireCredentials: false
+                );
+            }
         );
 
         $this->app->singleton(
@@ -28,10 +35,6 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(
             \App\Services\CallRouting\CallRoutingService::class
-        );
-
-        $this->app->singleton(
-            \App\Services\CloudonixApiClient::class
         );
 
         $this->app->singleton(

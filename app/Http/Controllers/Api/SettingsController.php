@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\UpdateCloudonixSettingsRequest;
 use App\Http\Requests\Settings\ValidateCloudonixRequest;
 use App\Models\CloudonixSettings;
-use App\Services\CloudonixApiClient;
+use App\Services\CloudonixClient\CloudonixClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +25,7 @@ class SettingsController extends Controller
      * Create a new controller instance.
      */
     public function __construct(
-        private readonly CloudonixApiClient $cloudonixClient
+        private readonly CloudonixClient $cloudonixClient
     ) {}
 
     /**

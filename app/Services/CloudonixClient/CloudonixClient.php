@@ -29,9 +29,10 @@ class CloudonixClient
      * Create a new CloudonixClient instance.
      *
      * @param CloudonixSettings|Organization|null $settings Organization settings or Organization model
-     * @throws \RuntimeException If API token is not configured
+     * @param bool $requireCredentials Whether to require credentials at instantiation (default: true)
+     * @throws \RuntimeException If API token is not configured and credentials are required
      */
-    public function __construct(CloudonixSettings|Organization|null $settings = null)
+    public function __construct(CloudonixSettings|Organization|null $settings = null, bool $requireCredentials = true)
     {
         // Validate base URL configuration
         $baseUrl = config('cloudonix.api.base_url');
@@ -56,7 +57,7 @@ class CloudonixClient
             $this->token = $settings->domain_api_key;
             $this->domainUuid = $settings->domain_uuid;
 
-            if (empty($this->token) || empty($this->domainUuid)) {
+            if ($requireCredentials && (empty($this->token) || empty($this->domainUuid))) {
                 throw new \RuntimeException(
                     'Organization Cloudonix settings are not properly configured. ' .
                     'Both domain_api_key and domain_uuid are required. ' .
@@ -65,10 +66,10 @@ class CloudonixClient
             }
         } else {
             // Fall back to global config for backward compatibility (call management)
-            $this->token = config('cloudonix.api.token');
+            $this->token = config('cloudonix.api.token', '');
             $this->domainUuid = null;
 
-            if (empty($this->token)) {
+            if ($requireCredentials && empty($this->token)) {
                 throw new \RuntimeException('Cloudonix API token is not configured');
             }
         }
@@ -220,6 +221,140 @@ class CloudonixClient
             ]);
 
             return null;
+        }
+    }
+
+    // =========================================================================
+    // Domain Management Methods
+    // =========================================================================
+
+    /**
+     * Validate domain credentials by fetching domain details.
+     *
+     * Makes a GET request to /customers/self/domains/{domain-uuid}
+     * to verify that the API key is valid and has access to the domain.
+     *
+     * @param string $domainUuid The domain UUID to validate
+     * @param string $apiKey The API key (Bearer token) to authenticate with
+     * @return array{valid: bool, profile: array<string, mixed>|null} Validation result with domain profile data
+     */
+    public function validateDomain(string $domainUuid, string $apiKey): array
+    {
+        try {
+            Log::info('Validating Cloudonix domain credentials', [
+                'domain_uuid' => $domainUuid,
+                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+            ]);
+
+            // Create temporary client with provided credentials
+            $tempClient = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->baseUrl($this->baseUrl);
+
+            $response = $tempClient->get("/customers/self/domains/{$domainUuid}");
+
+            $success = $response->successful();
+            $domainProfile = $success ? $response->json() : null;
+
+            Log::info('Cloudonix domain validation result', [
+                'domain_uuid' => $domainUuid,
+                'status_code' => $response->status(),
+                'success' => $success,
+                'has_profile' => $domainProfile !== null,
+            ]);
+
+            return [
+                'valid' => $success,
+                'profile' => $domainProfile,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Cloudonix domain validation failed', [
+                'domain_uuid' => $domainUuid,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return [
+                'valid' => false,
+                'profile' => null,
+            ];
+        }
+    }
+
+    /**
+     * Update domain profile settings in Cloudonix.
+     *
+     * Makes a PUT request to /customers/self/domains/{domain-uuid}
+     * to update domain configuration settings like call-timeout and recording format.
+     *
+     * @param string $domainUuid The domain UUID to update
+     * @param string $apiKey The API key (Bearer token) to authenticate with
+     * @param array<string, mixed> $profileData Profile settings to update (call-timeout, recording-media-type, etc.)
+     * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
+     */
+    public function updateDomain(string $domainUuid, string $apiKey, array $profileData): array
+    {
+        try {
+            Log::info('Updating Cloudonix domain profile', [
+                'domain_uuid' => $domainUuid,
+                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'profile_data' => $profileData,
+            ]);
+
+            // Create temporary client with provided credentials
+            $tempClient = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->baseUrl($this->baseUrl);
+
+            $response = $tempClient->put(
+                "/customers/self/domains/{$domainUuid}",
+                ['profile' => $profileData]
+            );
+
+            $success = $response->successful();
+            $responseBody = $response->json();
+
+            Log::info('Cloudonix domain update result', [
+                'domain_uuid' => $domainUuid,
+                'status_code' => $response->status(),
+                'success' => $success,
+            ]);
+
+            if (!$success) {
+                $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
+
+                return [
+                    'success' => false,
+                    'message' => "Failed to update Cloudonix domain: {$errorMessage}",
+                    'data' => $responseBody,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Domain profile updated successfully in Cloudonix.',
+                'data' => $responseBody,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Cloudonix domain update failed', [
+                'domain_uuid' => $domainUuid,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => "Exception during Cloudonix update: {$e->getMessage()}",
+                'data' => null,
+            ];
         }
     }
 

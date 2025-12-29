@@ -8,7 +8,7 @@ use App\Enums\UserRole;
 use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\User;
-use App\Services\CloudonixApiClient;
+use App\Services\CloudonixClient\CloudonixClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -336,14 +336,14 @@ class CloudonixSettingsTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        // Mock the CloudonixApiClient
-        $mockClient = Mockery::mock(CloudonixApiClient::class);
+        // Mock the CloudonixClient
+        $mockClient = Mockery::mock(CloudonixClient::class);
         $mockClient->shouldReceive('validateDomain')
             ->once()
             ->with('550e8400-e29b-41d4-a716-446655440000', 'valid-api-key')
-            ->andReturn(true);
+            ->andReturn(['valid' => true, 'profile' => []]);
 
-        $this->app->instance(CloudonixApiClient::class, $mockClient);
+        $this->app->instance(CloudonixClient::class, $mockClient);
 
         $response = $this->postJson('/api/v1/settings/cloudonix/validate', [
             'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
@@ -364,14 +364,14 @@ class CloudonixSettingsTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        // Mock the CloudonixApiClient
-        $mockClient = Mockery::mock(CloudonixApiClient::class);
+        // Mock the CloudonixClient
+        $mockClient = Mockery::mock(CloudonixClient::class);
         $mockClient->shouldReceive('validateDomain')
             ->once()
             ->with('550e8400-e29b-41d4-a716-446655440000', 'invalid-api-key')
-            ->andReturn(false);
+            ->andReturn(['valid' => false, 'profile' => null]);
 
-        $this->app->instance(CloudonixApiClient::class, $mockClient);
+        $this->app->instance(CloudonixClient::class, $mockClient);
 
         $response = $this->postJson('/api/v1/settings/cloudonix/validate', [
             'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
