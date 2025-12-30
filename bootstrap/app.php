@@ -61,17 +61,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // Hide sensitive headers and input from exception context
         // This prevents them from appearing in error logs and reports
         $exceptions->stopIgnoring([]);
-        $exceptions->context(function ($request) {
+        $exceptions->context(function ($data) {
             $context = [];
 
             // Add safe request data to context
-            if ($request) {
-                $context['url'] = $request->fullUrl();
-                $context['method'] = $request->method();
-                $context['ip'] = $request->ip();
+            if ($data instanceof \Illuminate\Http\Request) {
+                $context['url'] = $data->fullUrl();
+                $context['method'] = $data->method();
+                $context['ip'] = $data->ip();
 
                 // Sanitize input - remove sensitive keys
-                $input = $request->except([
+                $input = $data->except([
                     'password',
                     'password_confirmation',
                     'current_password',

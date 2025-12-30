@@ -1,0 +1,298 @@
+openapi: 3.0.3
+info:
+  title: OPBX Authentication API
+  description: |
+    Authentication endpoints for user login, logout, and session management.
+    Supports both token-based and cookie-based authentication flows.
+  version: 1.0.0
+  contact:
+    name: OPBX Development Team
+
+servers:
+  - url: http://localhost/api/v1
+    description: Local development server
+  - url: https://api.opbx.cloudonix.com/api/v1
+    description: Production server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Laravel Sanctum Bearer token authentication
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "admin@example.com"
+        password:
+          type: string
+          format: password
+          description: User password
+          example: "password123"
+        remember:
+          type: boolean
+          description: Remember login session
+          default: false
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: Bearer token for API authentication
+          example: "1|abc123def456"
+        token_type:
+          type: string
+          enum: [Bearer]
+          example: "Bearer"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        organization_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        role:
+          type: string
+          enum: [owner, admin, agent, reporter]
+          example: "admin"
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+        errors:
+          type: object
+          description: Detailed validation errors
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+        errors:
+          type: object
+          description: Field-specific validation errors
+          example:
+            email: ["The email field is required."]
+            password: ["The password must be at least 8 characters."]
+
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      description: |
+        Authenticate a user and return an access token.
+
+        Supports both token-based authentication (returns JWT token)
+        and cookie-based authentication (sets session cookie).
+
+        Rate limited to 5 attempts per minute per IP address.
+      operationId: login
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: "admin@example.com"
+              password: "password123"
+              remember: false
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                user:
+                  id: 1
+                  organization_id: 1
+                  name: "Admin User"
+                  email: "admin@example.com"
+                  role: "owner"
+                  email_verified_at: "2025-01-01T00:00:00.000000Z"
+                  created_at: "2025-01-01T00:00:00.000000Z"
+                  updated_at: "2025-01-01T00:00:00.000000Z"
+                token: "1|abc123def456ghi789"
+                token_type: "Bearer"
+
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Invalid login credentials."
+
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "Validation failed"
+                errors:
+                  email: ["The email field is required."]
+                  password: ["The password field is required."]
+
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Too many login attempts. Please try again later."
+
+  /auth/logout:
+    post:
+      summary: User logout
+      description: |
+        Revoke the current access token and log out the user.
+
+        Requires authentication via Bearer token.
+      operationId: logout
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+
+        '401':
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Unauthenticated."
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: |
+        Generate a new access token for the authenticated user.
+
+        Requires authentication via Bearer token.
+      operationId: refreshToken
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: New Bearer token
+                    example: "2|xyz789uvw123"
+                  token_type:
+                    type: string
+                    enum: [Bearer]
+                    example: "Bearer"
+
+        '401':
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Unauthenticated."
+
+  /auth/me:
+    get:
+      summary: Get current user information
+      description: |
+        Retrieve information about the currently authenticated user.
+
+        Requires authentication via Bearer token.
+      operationId: getCurrentUser
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User information retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+
+        '401':
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Unauthenticated."
+
+tags:
+  - name: Authentication
+    description: |
+      User authentication and session management endpoints.
+
+      Supports token-based authentication with Laravel Sanctum.
+      Rate limited to prevent brute force attacks.

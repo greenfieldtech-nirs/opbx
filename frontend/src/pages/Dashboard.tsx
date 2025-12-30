@@ -6,11 +6,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { callLogsService } from '@/services/callLogs.service';
 import { extensionsService } from '@/services/extensions.service';
 import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { phoneNumbersService } from '@/services/dids.service';
 import { cdrService } from '@/services/cdr.service';
+import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Phone, Users, PhoneCall, Activity, LayoutDashboard } from 'lucide-react';
 import { formatPhoneNumber, formatTimeAgo, getDispositionColor } from '@/utils/formatters';
@@ -21,15 +21,16 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   // Fetch active calls count
-  const { data: activeCalls, isLoading: activeCallsLoading } = useQuery({
-    queryKey: ['active-calls'],
+  const { data: activeCallsResponse, isLoading: activeCallsLoading } = useQuery({
+    queryKey: ['active-calls-dashboard'],
     queryFn: async () => {
-      const calls = await callLogsService.getActiveCalls();
-      return calls.length;
+      return await sessionUpdatesService.getActiveCalls();
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 25000, // Consider data fresh for 25 seconds
+    refetchInterval: 15000, // Refresh every 15 seconds for dashboard
+    staleTime: 10000, // Consider data fresh for 10 seconds
   });
+
+  const activeCalls = activeCallsResponse?.meta.total_active_calls || 0;
 
   // Fetch extensions count
   const { data: extensionsCount, isLoading: extensionsLoading } = useQuery({

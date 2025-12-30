@@ -5,15 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Webhooks;
 
 use App\Exceptions\Webhook\WebhookBusinessLogicException;
-use App\Exceptions\Webhook\WebhookTransientException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
-use App\Http\Requests\Webhook\CallStatusRequest;
 use App\Http\Requests\Webhook\CdrRequest;
-use App\Jobs\ProcessCDRJob;
 use App\Jobs\ProcessInboundCallJob;
-use App\Jobs\UpdateCallStatusJob;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
@@ -32,8 +28,7 @@ class CloudonixWebhookController extends Controller
 
     public function __construct(
         private readonly CallRoutingService $routingService
-    ) {
-    }
+    ) {}
 
     /**
      * Handle inbound call initiated webhook.
@@ -64,7 +59,7 @@ class CloudonixWebhookController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$didNumber) {
+        if (! $didNumber) {
             Log::warning('DID not found for webhook', [
                 'call_id' => $callId,
                 'to_number' => $toNumber,
@@ -78,7 +73,7 @@ class CloudonixWebhookController extends Controller
         }
 
         // Validate organization exists and is active
-        if (!$didNumber->organization) {
+        if (! $didNumber->organization) {
             Log::error('DID belongs to non-existent organization', [
                 'call_id' => $callId,
                 'did_id' => $didNumber->id,
@@ -143,7 +138,7 @@ class CloudonixWebhookController extends Controller
      */
     public function sessionUpdate(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
     {
-        $requestId = (string)\Illuminate\Support\Str::uuid();
+        $requestId = (string) \Illuminate\Support\Str::uuid();
         $payload = $request->all();
 
         Log::info('Processing session-update webhook', [
@@ -158,25 +153,31 @@ class CloudonixWebhookController extends Controller
             // Validate required fields
             $validated = $request->validate([
                 'id' => 'required|integer',
-                'eventId' => 'required|string',
-                'domainId' => 'required|integer',
-                'domain' => 'required|string',
+                'eventId' => 'nullable|string',
+                'domainId' => 'nullable|integer',
+                'domain' => 'nullable|string',
                 'subscriberId' => 'nullable|integer',
-                'callerId' => 'required|string',
+                'callerId' => 'nullable|string',
                 'destination' => 'required|string',
                 'direction' => 'nullable|in:incoming,outgoing',
-                'status' => 'required|string',
+                'status' => 'nullable|string',
                 'createdAt' => 'required|string',
                 'modifiedAt' => 'required|string',
+                'callStartTime' => 'nullable|integer',
+                'callAnswerTime' => 'nullable|integer',
+                'answerTime' => 'nullable|string',
+                'timeLimit' => 'nullable|integer',
+                'vappServer' => 'nullable|string',
                 'action' => 'required|string',
                 'reason' => 'nullable|string',
+                'lastError' => 'nullable|string',
                 'callIds' => 'nullable|array',
                 'profile' => 'nullable|array',
             ]);
 
             // Filter events by status - only process specific statuses
             $allowedStatuses = ['processing', 'ringing', 'connected', 'answer'];
-            if (!in_array($validated['status'], $allowedStatuses, true)) {
+            if (! in_array($validated['status'], $allowedStatuses)) {
                 Log::info('Session update ignored - status not in allowed list', [
                     'request_id' => $requestId,
                     'session_id' => $validated['id'],
@@ -186,12 +187,12 @@ class CloudonixWebhookController extends Controller
                 ]);
 
                 // Return 200 OK to acknowledge receipt but indicate no processing
-                return response('', 200);
+                return response()->json(['error' => 'Discarded Content'], 204);
             }
 
             // Identify organization from Cloudonix domain
             $organizationId = $this->identifyOrganizationFromDomain($validated['domain']);
-            if (!$organizationId) {
+            if (! $organizationId) {
                 Log::error('Session update: Organization not identified from domain', [
                     'request_id' => $requestId,
                     'session_id' => $validated['id'],
@@ -199,7 +200,8 @@ class CloudonixWebhookController extends Controller
                     'domain' => $validated['domain'],
                     'domain_id' => $validated['domainId'],
                 ]);
-                return response()->json(['error' => 'Organization not identified'], 400);
+
+                return response()->json(['error' => 'Organization not identified'], 403);
             }
 
             // Check for duplicate event (idempotency)
@@ -213,6 +215,7 @@ class CloudonixWebhookController extends Controller
                     'event_id' => $validated['eventId'],
                     'existing_id' => $existingUpdate->id,
                 ]);
+
                 return response()->json(['message' => 'Session record updated successfully'], 200);
             }
 
@@ -240,8 +243,8 @@ class CloudonixWebhookController extends Controller
                 'action' => $validated['action'],
                 'reason' => $validated['reason'],
                 'last_error' => $validated['lastError'] ?? null,
-                'call_ids' => $validated['callIds'],
-                'profile' => $validated['profile'],
+                'call_ids' => $validated['callIds'] ?? [],
+                'profile' => $validated['profile'] ?? [],
             ]);
 
             $sessionUpdate->save();
@@ -261,7 +264,8 @@ class CloudonixWebhookController extends Controller
                 'errors' => $e->errors(),
                 'payload' => $payload,
             ]);
-            return response()->json(['error' => 'Validation failed', 'details' => $e->errors()], 400);
+
+            return response()->json(['error' => 'Validation failed', 'details' => $e->errors()], 403);
         } catch (\Exception $e) {
             Log::error('Session update processing failed', [
                 'request_id' => $requestId,
@@ -270,9 +274,11 @@ class CloudonixWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return response()->json([
                 'error' => 'Session update processing failed',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ], 500);
         }
     }
@@ -293,7 +299,7 @@ class CloudonixWebhookController extends Controller
         ]);
 
         // Validate organization was identified by middleware
-        if (!$organizationId) {
+        if (! $organizationId) {
             Log::warning('CDR webhook missing organization ID', [
                 'call_id' => $callId,
             ]);
@@ -325,8 +331,8 @@ class CloudonixWebhookController extends Controller
                     $updateData['recording_url'] = $request->input('recording_url');
                 }
 
-                if (!$callLog->duration && $request->has('duration')) {
-                    $updateData['duration'] = (int)$request->input('duration');
+                if (! $callLog->duration && $request->has('duration')) {
+                    $updateData['duration'] = (int) $request->input('duration');
                 }
 
                 $callLog->update($updateData);
@@ -335,6 +341,27 @@ class CloudonixWebhookController extends Controller
                     'call_id' => $callId,
                     'call_log_id' => $callLog->id,
                 ]);
+            }
+
+            // Create session update record for final call status
+            try {
+                $this->createSessionUpdateFromCDR($request, $organizationId);
+
+                Log::info('Session update created from CDR', [
+                    'call_id' => $callId,
+                    'organization_id' => $organizationId,
+                    'disposition' => $request->input('disposition'),
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to create session update from CDR', [
+                    'call_id' => $callId,
+                    'organization_id' => $organizationId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                // Don't fail the entire CDR processing for session update failure
+                // Just log the error and continue
             }
 
             // Return 204 No Content to indicate successful creation
@@ -349,7 +376,7 @@ class CloudonixWebhookController extends Controller
 
             return response()->json([
                 'error' => 'Call Detail Record processing failed',
-                'message' => 'Failed to process the call detail record. Please check the logs for more details.'
+                'message' => 'Failed to process the call detail record. Please check the logs for more details.',
             ], 500);
         }
     }
@@ -366,11 +393,92 @@ class CloudonixWebhookController extends Controller
     }
 
     /**
+     * Create a session update record from CDR data to indicate final call status.
+     */
+    private function createSessionUpdateFromCDR(CdrRequest $request, int $organizationId): void
+    {
+        $sessionId = $request->input('session.id') ?? $request->input('call_id');
+        $disposition = $request->input('disposition');
+
+        // Use the disposition directly as the final status
+        $status = $disposition;
+
+        // Generate unique event ID for this final status update (use md5 for length constraint)
+        $eventId = md5('cdr-final-'.$request->input('call_id').'-'.time());
+
+        // Check for duplicate (idempotency) - don't create if final status already exists
+        $existingFinalUpdate = SessionUpdate::where('organization_id', $organizationId)
+            ->where('session_id', $sessionId)
+            ->where('action', 'cdr_final_status')
+            ->first();
+
+        if ($existingFinalUpdate) {
+            Log::info('CDR final status update already exists', [
+                'call_id' => $request->input('call_id'),
+                'session_id' => $sessionId,
+                'existing_id' => $existingFinalUpdate->id,
+            ]);
+
+            return;
+        }
+
+        // Get session data
+        $sessionData = $request->input('session', []);
+        $callStartTimeMs = $sessionData['callStartTime'] ?? null;
+        $callAnswerTimeMs = $sessionData['callAnswerTime'] ?? null;
+
+        // Convert milliseconds to seconds for Carbon timestamps
+        $callStartTimeSeconds = $callStartTimeMs ? intval($callStartTimeMs / 1000) : null;
+        $callAnswerTimeSeconds = $callAnswerTimeMs ? intval($callAnswerTimeMs / 1000) : null;
+
+        // Create session update record for final call status
+        $sessionUpdate = new SessionUpdate([
+            'organization_id' => $organizationId,
+            'session_id' => $sessionId,
+            'event_id' => $eventId,
+            'domain_id' => $sessionData['domainId'] ?? null,
+            'domain' => $request->input('domain'),
+            'subscriber_id' => null, // Subscriber is UUID in CDR, not integer ID
+            'caller_id' => $this->normalizePhoneNumber($request->input('from')),
+            'destination' => $this->normalizePhoneNumber($request->input('to')),
+            'direction' => 'incoming', // Assume incoming for CDR events
+            'status' => $status,
+            'session_created_at' => $callStartTimeSeconds
+                ? \Carbon\Carbon::createFromTimestamp($callStartTimeSeconds)
+                : now(),
+            'session_modified_at' => now(),
+            'call_start_time' => $callStartTimeMs,
+            'call_answer_time' => $callAnswerTimeMs,
+            'time_limit' => $sessionData['timeLimit'] ?? null,
+            'vapp_server' => $request->input('vapp_server'),
+            'action' => 'cdr_final_status',
+            'reason' => $disposition, // Store original disposition
+            'call_ids' => [$request->input('call_id')],
+            'profile' => [
+                'cdr_data' => $request->all(),
+                'final_disposition' => $disposition,
+                'duration' => $request->input('duration'),
+                'billsec' => $request->input('billsec'),
+            ],
+        ]);
+
+        $sessionUpdate->save();
+
+        Log::info('Session update created from CDR', [
+            'session_update_id' => $sessionUpdate->id,
+            'call_id' => $request->input('call_id'),
+            'session_id' => $sessionId,
+            'disposition' => $disposition,
+            'mapped_status' => $status,
+        ]);
+    }
+
+    /**
      * Normalize phone number to E.164 format.
      */
     private function normalizePhoneNumber(?string $number): ?string
     {
-        if (!$number) {
+        if (! $number) {
             return null;
         }
 
@@ -378,8 +486,8 @@ class CloudonixWebhookController extends Controller
         $number = preg_replace('/[^0-9+]/', '', $number);
 
         // Ensure + prefix for E.164
-        if (!str_starts_with($number, '+')) {
-            $number = '+' . $number;
+        if (! str_starts_with($number, '+')) {
+            $number = '+'.$number;
         }
 
         return $number;

@@ -418,7 +418,75 @@ export interface CallLogStatistics {
 }
 
 // ============================================================================
-// Live Calls / Presence
+// Session Updates / Active Calls
+// ============================================================================
+
+export interface ActiveCall {
+  session_id: number;
+  session_token: string | null;
+  caller_id: string | null;
+  destination: string | null;
+  direction: 'incoming' | 'outgoing' | null;
+  status: 'processing' | 'ringing' | 'connected';
+  session_created_at: string;
+  last_updated_at: string;
+  duration_seconds: number;
+  formatted_duration: string;
+  domain: string | null;
+  subscriber_id: number | null;
+  call_ids: string[];
+  has_qos_data: boolean;
+}
+
+export interface ActiveCallsResponse {
+  data: ActiveCall[];
+  meta: {
+    total_active_calls: number;
+    by_status: {
+      processing: number;
+      ringing: number;
+      connected: number;
+    };
+    by_direction: {
+      incoming: number;
+      outgoing: number;
+    };
+    last_updated: string;
+    cache_expires_in: number;
+  };
+}
+
+export interface SessionEvent {
+  id: number;
+  event_id: string;
+  status: string;
+  action: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface SessionDetails {
+  session_id: number;
+  events: SessionEvent[];
+}
+
+export interface ActiveCallsStats {
+  total_active: number;
+  by_status: {
+    processing: number;
+    ringing: number;
+    connected: number;
+  };
+  by_direction: {
+    incoming: number;
+    outgoing: number;
+  };
+  average_duration: number;
+  longest_call: number;
+}
+
+// ============================================================================
+// Live Calls / Presence (Legacy - kept for compatibility)
 // ============================================================================
 
 export interface LiveCall {

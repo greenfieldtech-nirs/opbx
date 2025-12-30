@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\Api\SessionUpdateController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -149,6 +150,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/{callDetailRecord}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
         });
 
+
+
         // Settings (Owner only)
         Route::prefix('settings')->group(function (): void {
             Route::get('cloudonix', [SettingsController::class, 'getCloudonixSettings'])->name('settings.cloudonix.show');
@@ -156,5 +159,12 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
         });
+    });
+
+    // Session Updates - NOT rate limited (real-time polling endpoints)
+    Route::middleware(['auth:sanctum', 'tenant.scope'])->prefix('session-updates')->group(function (): void {
+        Route::get('/active', [SessionUpdateController::class, 'getActiveCalls'])->name('session-updates.active');
+        Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
+        Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
     });
 });

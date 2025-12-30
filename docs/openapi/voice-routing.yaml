@@ -1,0 +1,424 @@
+openapi: 3.0.3
+info:
+  title: OPBX Voice Routing API
+  description: |
+    Real-time call routing endpoints that receive webhooks from Cloudonix CPaaS
+    and return CXML (Cloudonix XML) responses to control call flow.
+  version: 1.0.0
+  contact:
+    name: OPBX Development Team
+
+servers:
+  - url: http://localhost
+    description: Local development server
+  - url: https://your-domain.com
+    description: Production server
+
+components:
+  schemas:
+    VoiceRoutingRequest:
+      type: object
+      description: Incoming webhook payload from Cloudonix for voice routing decisions
+      properties:
+        CallSid:
+          type: string
+          description: Unique call identifier from Cloudonix
+          example: "CA1234567890abcdef"
+        From:
+          type: string
+          description: Caller's phone number (E.164 format)
+          example: "+1234567890"
+        To:
+          type: string
+          description: Dialed destination number
+          example: "+0987654321"
+        Direction:
+          type: string
+          enum: [inbound, outbound]
+          description: Call direction
+          example: "inbound"
+        CallStatus:
+          type: string
+          description: Current call status
+          example: "ringing"
+        Domain:
+          type: string
+          description: Cloudonix domain identifier
+          example: "yourdomain.cloudonix.net"
+        SessionData:
+          type: object
+          nullable: true
+          description: Optional session data passed through call flow
+        ApiVersion:
+          type: string
+          description: Cloudonix API version
+          example: "2010-04-01"
+
+    IvrInputRequest:
+      type: object
+      description: IVR digit input callback payload
+      properties:
+        CallSid:
+          type: string
+          description: Unique call identifier
+          example: "CA1234567890abcdef"
+        Digits:
+          type: string
+          description: DTMF digits entered by caller
+          example: "123"
+        From:
+          type: string
+          description: Caller's phone number
+          example: "+1234567890"
+        To:
+          type: string
+          description: Current destination
+          example: "+0987654321"
+
+    RingGroupCallbackRequest:
+      type: object
+      description: Ring group sequential callback payload
+      properties:
+        CallSid:
+          type: string
+          description: Unique call identifier
+          example: "CA1234567890abcdef"
+        RingGroupId:
+          type: integer
+          description: Ring group identifier
+          example: 1
+        CurrentIndex:
+          type: integer
+          description: Current position in ring sequence
+          example: 2
+        From:
+          type: string
+          description: Caller's phone number
+          example: "+1234567890"
+
+    CxmlResponse:
+      type: object
+      description: CXML response containing routing instructions
+      properties:
+        Response:
+          type: object
+          properties:
+            Dial:
+              type: object
+              description: Dial command with destination
+              properties:
+                Number:
+                  type: string
+                  description: Phone number to dial
+                  example: "+1234567890"
+                Timeout:
+                  type: integer
+                  description: Ring timeout in seconds
+                  example: 30
+            Say:
+              type: object
+              description: Text-to-speech command
+              properties:
+                Voice:
+                  type: string
+                  description: Voice to use for TTS
+                  example: "alice"
+                Language:
+                  type: string
+                  description: Language for TTS
+                  example: "en-US"
+                Text:
+                  type: string
+                  description: Text to speak
+                  example: "Welcome to our PBX system"
+            Hangup:
+              type: object
+              description: Terminate the call
+            Conference:
+              type: object
+              description: Conference room command
+              properties:
+                name:
+                  type: string
+                  description: Conference room name
+                  example: "main-conference"
+                startConferenceOnEnter:
+                  type: boolean
+                  description: Start conference when participant enters
+                  example: true
+                endConferenceOnExit:
+                  type: boolean
+                  description: End conference when last participant exits
+                  example: false
+                maxParticipants:
+                  type: integer
+                  description: Maximum participants allowed
+                  example: 10
+                muteOnEntry:
+                  type: boolean
+                  description: Mute participants when they enter
+                  example: false
+                announceJoinLeave:
+                  type: boolean
+                  description: Announce when participants join/leave
+                  example: true
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-12-30T12:00:00.000000Z"
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [connected, disconnected]
+              example: "connected"
+            redis:
+              type: string
+              enum: [connected, disconnected]
+              example: "connected"
+            cache:
+              type: string
+              enum: [connected, disconnected]
+              example: "connected"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "routing_error"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Extension not found or inactive"
+
+paths:
+  /voice/route:
+    post:
+      summary: Main Call Routing Endpoint
+      description: |
+        Primary voice routing endpoint that receives inbound calls from Cloudonix
+        and determines how to route them based on organizational configuration.
+
+        This endpoint performs:
+        - Call classification (internal vs external)
+        - Extension lookup and validation
+        - Business hours checking
+        - Security validation (toll fraud prevention)
+        - Route determination and CXML generation
+
+        Returns CXML instructions for Cloudonix to execute.
+      operationId: routeInboundCall
+      tags:
+        - Voice Routing
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VoiceRoutingRequest'
+            example:
+              CallSid: "CA1234567890abcdef"
+              From: "+1234567890"
+              To: "+0987654321"
+              Direction: "inbound"
+              CallStatus: "ringing"
+              Domain: "yourdomain.cloudonix.net"
+      responses:
+        '200':
+          description: Routing decision made, CXML returned
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+              example: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Response>
+                  <Dial>
+                    <Number>+1234567890</Number>
+                    <Timeout>30</Timeout>
+                  </Dial>
+                </Response>
+
+        '400':
+          description: Invalid request or routing error
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+              example: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Response>
+                  <Say voice="alice" language="en-US">
+                    Invalid extension number, please try again.
+                  </Say>
+                  <Hangup/>
+                </Response>
+
+        '500':
+          description: Server error - returns safe CXML response
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+              example: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Response>
+                  <Say voice="alice" language="en-US">
+                    System temporarily unavailable, please try again later.
+                  </Say>
+                  <Hangup/>
+                </Response>
+
+  /voice/ivr-input:
+    post:
+      summary: IVR Digit Input Callback
+      description: |
+        Handles DTMF digit input from callers during IVR interactions.
+
+        This endpoint is called when callers press digits in response to IVR menus.
+        The system processes the input and determines the next routing action.
+      operationId: handleIvrInput
+      tags:
+        - Voice Routing
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IvrInputRequest'
+            example:
+              CallSid: "CA1234567890abcdef"
+              Digits: "1"
+              From: "+1234567890"
+              To: "+0987654321"
+      responses:
+        '200':
+          description: IVR input processed, next action returned
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+
+        '400':
+          description: Invalid IVR input
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+
+        '500':
+          description: Server error
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+
+  /voice/ring-group-callback:
+    post:
+      summary: Ring Group Sequential Callback
+      description: |
+        Handles callbacks for sequential ring group routing.
+
+        When a ring group uses sequential/round-robin strategies,
+        this endpoint is called to determine the next destination
+        in the sequence when the current destination doesn't answer.
+      operationId: handleRingGroupCallback
+      tags:
+        - Voice Routing
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RingGroupCallbackRequest'
+            example:
+              CallSid: "CA1234567890abcdef"
+              RingGroupId: 1
+              CurrentIndex: 2
+              From: "+1234567890"
+      responses:
+        '200':
+          description: Next ring group destination determined
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+
+        '400':
+          description: Invalid ring group configuration
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+
+        '500':
+          description: Server error
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CxmlResponse'
+
+  /voice/health:
+    get:
+      summary: Voice Routing Health Check
+      description: |
+        Health check endpoint for voice routing services.
+
+        Verifies connectivity to required services (database, Redis, cache)
+        and returns system status for monitoring purposes.
+      operationId: voiceHealthCheck
+      tags:
+        - Health Checks
+      responses:
+        '200':
+          description: All services healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                timestamp: "2025-12-30T12:00:00.000000Z"
+                services:
+                  database: "connected"
+                  redis: "connected"
+                  cache: "connected"
+
+        '503':
+          description: Service unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "unhealthy"
+                timestamp: "2025-12-30T12:00:00.000000Z"
+                services:
+                  database: "disconnected"
+                  redis: "connected"
+                  cache: "connected"
+
+tags:
+  - name: Voice Routing
+    description: |
+      Real-time call routing endpoints that process Cloudonix webhooks
+      and return CXML instructions for call control.
+
+      These endpoints are critical for call flow and must respond
+      within seconds to avoid caller timeout.
+
+  - name: Health Checks
+    description: |
+      Health check endpoints for monitoring system status
+      and service connectivity.
