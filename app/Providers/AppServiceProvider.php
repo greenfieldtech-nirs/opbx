@@ -41,6 +41,28 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(
             \App\Services\VoiceRouting\VoiceRoutingCacheService::class
         );
+
+        // Register Voice Routing Strategies
+        $this->app->tag([
+            \App\Services\VoiceRouting\Strategies\UserRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\RingGroupRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\ConferenceRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class,
+        ], 'voice_routing.strategies');
+
+        // Register Voice Routing Manager
+        $this->app->singleton(
+            \App\Services\VoiceRouting\VoiceRoutingManager::class,
+            function ($app) {
+                return new \App\Services\VoiceRouting\VoiceRoutingManager(
+                    $app->make(\App\Services\Security\RoutingSentryService::class),
+                    $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class),
+                    $app->tagged('voice_routing.strategies')
+                );
+            }
+        );
     }
 
     /**

@@ -102,7 +102,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // But CxmlBuilder uses 'action' attribute.
 
         $nextAttempt = $index + 1;
-        $callbackUrl = route('webhook.voice.callback.ring-group', [
+        $callbackUrl = route('voice.ring-group-callback', [
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
             // Pass necessary context
