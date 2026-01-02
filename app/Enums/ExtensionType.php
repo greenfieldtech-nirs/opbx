@@ -13,6 +13,7 @@ enum ExtensionType: string
     case AI_ASSISTANT = 'ai_assistant';
     case CUSTOM_LOGIC = 'custom_logic';
     case FORWARD = 'forward';
+    case QUEUE = 'queue';
 
     /**
      * Get human-readable label for the extension type.
@@ -21,14 +22,15 @@ enum ExtensionType: string
      */
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::USER => 'User Extension',
             self::CONFERENCE => 'Conference Room',
             self::RING_GROUP => 'Ring Group',
             self::IVR => 'IVR Menu',
             self::AI_ASSISTANT => 'AI Assistant',
             self::CUSTOM_LOGIC => 'Custom Logic',
-            self::FORWARD => 'Call Forward',
+            self::FORWARD => 'Call Forwarding',
+            self::QUEUE => 'Call Queue',
         };
     }
 
@@ -39,7 +41,7 @@ enum ExtensionType: string
      */
     public function description(): string
     {
-        return match($this) {
+        return match ($this) {
             self::USER => 'Direct extension for a user',
             self::CONFERENCE => 'Conference room for multiple participants',
             self::RING_GROUP => 'Ring multiple extensions simultaneously or sequentially',
@@ -90,7 +92,7 @@ enum ExtensionType: string
      */
     public function requiredConfigFields(): array
     {
-        return match($this) {
+        return match ($this) {
             self::USER => [],
             self::CONFERENCE => ['conference_room_id'],
             self::RING_GROUP => ['ring_group_id'],

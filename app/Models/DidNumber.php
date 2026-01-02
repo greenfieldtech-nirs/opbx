@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[ScopedBy([OrganizationScope::class])]
 class DidNumber extends Model
@@ -221,5 +222,12 @@ class DidNumber extends Model
     public function setConferenceRoom(?ConferenceRoom $conferenceRoom): void
     {
         $this->attributes['_conference_room'] = $conferenceRoom;
+    }
+
+    public function sentryBlacklists(): BelongsToMany
+    {
+        return $this->belongsToMany(SentryBlacklist::class, 'did_sentry_blacklist')
+            ->withPivot('priority')
+            ->orderByPivot('priority', 'desc');
     }
 }
