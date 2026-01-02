@@ -134,6 +134,13 @@ class Extension extends Model
      */
     public function getSipUri(): ?string
     {
+        // For PBX User extensions, Cloudonix handles routing internally
+        // Just return the extension number
+        if ($this->type === ExtensionType::USER) {
+            return $this->extension_number;
+        }
+
+        // For other extension types, check configuration for SIP URI
         if (!$this->configuration || !isset($this->configuration['sip_uri'])) {
             return null;
         }
@@ -148,7 +155,7 @@ class Extension extends Model
      */
     public function hasSipUri(): bool
     {
-        return !empty($this->getSipUri());
+        return $this->getSipUri() !== null;
     }
 
     /**

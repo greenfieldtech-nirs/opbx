@@ -7,6 +7,7 @@ namespace App\Services\VoiceRouting;
 use App\Enums\ExtensionType;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
+use App\Models\Extension;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\Security\RoutingSentryService;
@@ -50,11 +51,10 @@ class VoiceRoutingManager
             return $businessHoursResponse;
         }
 
-        // 1. Resolve Destination (DID or Internal Extension)
-        // We first check if the 'To' number matches a DID
-        $did = DidNumber::where('phone_number', $to)
-            ->where('organization_id', $orgId)
-            ->where('status', 'active')
+        // 1. Resolve Target (DID or Extension)
+        // First check if it's a DID
+        $did = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('phone_number', $to)
             ->first();
 
         // If not a DID, it might be an internal extension dialing another extension (or internal transfer)
@@ -140,20 +140,23 @@ class VoiceRoutingManager
         $config = $did->routing_config ?? [];
         $type = $did->routing_type; // 'extension', 'ring_group', 'conference_room' ... matches checks?
 
-        if ($type === 'extension') {
-            $extId = $config['extension_id'] ?? null;
-            if ($extId) {
-                // We should use the repository/cache to get the extension
-                $extension = \App\Models\Extension::find($extId); // Should use cache/repo
-                return $extension ? ['extension' => $extension] : [];
+        if ($did->routing_type === 'extension') {
+            $extensionId = $config['extension_id'] ?? null;
+            if ($extensionId) {
+                $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($extensionId);
+                if ($extension) {
+                    return ['extension' => $extension];
+                }
             }
         }
 
-        if ($type === 'ring_group') {
+        if ($did->routing_type === 'ring_group') {
             $rgId = $config['ring_group_id'] ?? null;
             if ($rgId) {
-                $rg = RingGroup::find($rgId);
-                return $rg ? ['ring_group' => $rg] : [];
+                $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($rgId);
+                if ($rg) {
+                    return ['ring_group' => $rg];
+                }
             }
         }
 
@@ -229,14 +232,15 @@ class VoiceRoutingManager
                 200,
                 ['Content-Type' => 'text/xml']
             );
+        }
+
+        return null;
+    }
+
     public function handleIvrInput(Request $request): Response
     {
         // Placeholder for IVR input handling
         $message = 'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.';
         return response(CxmlBuilder::sayWithHangup($message, true), 200, ['Content-Type' => 'text/xml']);
-    }
-}
-
-        return null;
     }
 }

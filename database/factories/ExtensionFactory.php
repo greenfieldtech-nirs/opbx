@@ -29,6 +29,7 @@ class ExtensionFactory extends Factory
             'type' => ExtensionType::USER,
             'status' => UserStatus::ACTIVE,
             'voicemail_enabled' => false,
+            'password' => 'secret',
             'configuration' => [
                 'sip_uri' => 'sip:' . fake()->unique()->numberBetween(1000, 9999) . '@example.com',
             ],
@@ -40,7 +41,7 @@ class ExtensionFactory extends Factory
      */
     public function withUser(?User $user = null): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'user_id' => $user?->id ?? User::factory(),
         ]);
     }
@@ -50,7 +51,7 @@ class ExtensionFactory extends Factory
      */
     public function inactive(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => UserStatus::INACTIVE,
         ]);
     }
@@ -60,7 +61,7 @@ class ExtensionFactory extends Factory
      */
     public function withVoicemail(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'voicemail_enabled' => true,
         ]);
     }
@@ -70,7 +71,7 @@ class ExtensionFactory extends Factory
      */
     public function withoutConfiguration(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'configuration' => null,
         ]);
     }
@@ -80,7 +81,7 @@ class ExtensionFactory extends Factory
      */
     public function withEmptyConfiguration(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'configuration' => [],
         ]);
     }

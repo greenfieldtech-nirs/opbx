@@ -9,13 +9,13 @@ use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 #[ScopedBy([OrganizationScope::class])]
 class RingGroup extends Model
@@ -102,27 +102,27 @@ class RingGroup extends Model
      * - Linked to this ring group via ring_group_members
      * - Have status ACTIVE
      * - Ordered by priority
-     *
-     * @return Collection
      */
     public function getMembers(): Collection
     {
-        return $this->members()
-            ->with(['extension' => function ($query) {
-                $query->select('id', 'extension_number', 'user_id', 'status', 'configuration');
-            }])
-            ->whereHas('extension', function ($query) {
-                $query->where('status', UserStatus::ACTIVE->value);
-            })
-            ->orderBy('priority', 'asc')
+        // Use direct query to avoid Eloquent relationship issues with global scopes
+        return \DB::table('ring_group_members')
+            ->join('extensions', 'ring_group_members.extension_id', '=', 'extensions.id')
+            ->where('ring_group_members.ring_group_id', $this->id)
+            ->where('extensions.status', UserStatus::ACTIVE->value)
+            ->where('extensions.organization_id', $this->organization_id)
+            ->select('extensions.*')
+            ->orderBy('ring_group_members.priority', 'asc')
             ->get()
-            ->pluck('extension');
+            ->map(function ($row) {
+                // Convert to Extension model instance
+                return \App\Models\Extension::withoutGlobalScopes()->find($row->id);
+            })
+            ->filter(); // Remove any null extensions
     }
 
     /**
      * Get count of active members in this ring group.
-     *
-     * @return int
      */
     public function getActiveMemberCount(): int
     {
@@ -131,10 +131,6 @@ class RingGroup extends Model
 
     /**
      * Scope query to ring groups in a specific organization.
-     *
-     * @param Builder $query
-     * @param int|string $organizationId
-     * @return Builder
      */
     public function scopeForOrganization(Builder $query, int|string $organizationId): Builder
     {
@@ -143,10 +139,6 @@ class RingGroup extends Model
 
     /**
      * Scope query to ring groups with a specific strategy.
-     *
-     * @param Builder $query
-     * @param RingGroupStrategy $strategy
-     * @return Builder
      */
     public function scopeWithStrategy(Builder $query, RingGroupStrategy $strategy): Builder
     {
@@ -155,10 +147,6 @@ class RingGroup extends Model
 
     /**
      * Scope query to ring groups with a specific status.
-     *
-     * @param Builder $query
-     * @param RingGroupStatus $status
-     * @return Builder
      */
     public function scopeWithStatus(Builder $query, RingGroupStatus $status): Builder
     {
@@ -167,10 +155,6 @@ class RingGroup extends Model
 
     /**
      * Scope query to search ring groups by name or description.
-     *
-     * @param Builder $query
-     * @param string $search
-     * @return Builder
      */
     public function scopeSearch(Builder $query, string $search): Builder
     {
@@ -182,9 +166,6 @@ class RingGroup extends Model
 
     /**
      * Scope query to active ring groups only.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {

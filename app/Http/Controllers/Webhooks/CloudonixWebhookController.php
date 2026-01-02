@@ -53,17 +53,60 @@ class CloudonixWebhookController extends Controller
         $fromNumber = $this->normalizePhoneNumber($from);
         $toNumber = $this->normalizePhoneNumber($to);
 
-        // Find organization by DID (with eager loading)
-        $didNumber = DidNumber::with('organization:id,name,status')
-            ->where('phone_number', $toNumber)
-            ->where('status', 'active')
-            ->first();
+        // Determine call direction and find organization
+        $direction = $request->input('Direction') ?? 'unknown';
+        $organizationId = null;
+        $organization = null;
 
-        if (! $didNumber) {
-            Log::warning('DID not found for webhook', [
+        // For internal calls (subscriber direction), check extensions first
+        if ($direction === 'subscriber') {
+            // Find organization by checking if extension exists within any organization
+            $extension = \App\Models\Extension::with('organization:id,name,status')
+                ->where('extension_number', $toNumber)
+                ->where('status', 'active')
+                ->first();
+
+            if ($extension && $extension->organization) {
+                $organization = $extension->organization;
+                $organizationId = $organization->id;
+
+                Log::info('Found organization via extension for internal call', [
+                    'call_id' => $callId,
+                    'to_number' => $toNumber,
+                    'organization_id' => $organizationId,
+                    'extension_id' => $extension->id,
+                    'extension_type' => $extension->type->value,
+                ]);
+            }
+        }
+
+        // If no organization found via extension, try DID-based lookup (external calls)
+        if (! $organizationId) {
+            $didNumber = DidNumber::with('organization:id,name,status')
+                ->where('phone_number', $toNumber)
+                ->where('status', 'active')
+                ->first();
+
+            if ($didNumber && $didNumber->organization) {
+                $organization = $didNumber->organization;
+                $organizationId = $organization->id;
+
+                Log::info('Found organization via DID for external call', [
+                    'call_id' => $callId,
+                    'to_number' => $toNumber,
+                    'organization_id' => $organizationId,
+                    'did_id' => $didNumber->id,
+                ]);
+            }
+        }
+
+        // Validate organization was found
+        if (! $organizationId || ! $organization) {
+            Log::warning('No organization found for call (neither extension nor DID)', [
                 'call_id' => $callId,
                 'to_number' => $toNumber,
                 'from' => $fromNumber,
+                'direction' => $direction,
             ]);
 
             return response(
@@ -72,27 +115,12 @@ class CloudonixWebhookController extends Controller
             )->header('Content-Type', 'application/xml');
         }
 
-        // Validate organization exists and is active
-        if (! $didNumber->organization) {
-            Log::error('DID belongs to non-existent organization', [
+        // Validate organization is active
+        if ($organization->status !== \App\Enums\UserStatus::ACTIVE) {
+            Log::error('Organization is not active', [
                 'call_id' => $callId,
-                'did_id' => $didNumber->id,
-                'phone_number' => $toNumber,
-                'organization_id' => $didNumber->organization_id,
-            ]);
-
-            return response(
-                '<Response><Say>Service temporarily unavailable.</Say><Hangup/></Response>',
-                200
-            )->header('Content-Type', 'application/xml');
-        }
-
-        if ($didNumber->organization->status !== 'active') {
-            Log::warning('Call to inactive organization', [
-                'call_id' => $callId,
-                'did_id' => $didNumber->id,
-                'organization_id' => $didNumber->organization_id,
-                'organization_status' => $didNumber->organization->status,
+                'organization_id' => $organizationId,
+                'organization_status' => $organization->status->value,
             ]);
 
             return response(
@@ -103,25 +131,63 @@ class CloudonixWebhookController extends Controller
 
         Log::info('Webhook validated for organization', [
             'call_id' => $callId,
-            'organization_id' => $didNumber->organization_id,
-            'organization_name' => $didNumber->organization->name,
-            'did_number' => $toNumber,
+            'organization_id' => $organizationId,
+            'organization_name' => $organization->name,
+            'to_number' => $toNumber,
+            'direction' => $direction,
         ]);
 
-        // Dispatch job to process webhook asynchronously
+        // Handle routing based on call type
+        if ($direction === 'subscriber') {
+            // Internal call - check if it's a direct extension dial
+            $extension = \App\Models\Extension::where('organization_id', $organizationId)
+                ->where('extension_number', $toNumber)
+                ->where('status', 'active')
+                ->first();
+
+            if ($extension) {
+                // Direct extension routing
+                Log::info('Routing internal call to extension', [
+                    'call_id' => $callId,
+                    'extension_id' => $extension->id,
+                    'extension_type' => $extension->type->value,
+                ]);
+
+                $cxml = $this->routeExtensionDirectly($extension, $request, $organizationId);
+            } else {
+                // No direct extension found, fall back to DID routing
+                Log::info('No direct extension found, falling back to DID routing', [
+                    'call_id' => $callId,
+                    'to_number' => $toNumber,
+                ]);
+
+                $cxml = $this->routingService->routeInboundCall(
+                    $toNumber,
+                    $fromNumber,
+                    $organizationId
+                );
+            }
+        } else {
+            // External call - use DID-based routing
+            Log::info('Routing external call via DID', [
+                'call_id' => $callId,
+                'to_number' => $toNumber,
+            ]);
+
+            $cxml = $this->routingService->routeInboundCall(
+                $toNumber,
+                $fromNumber,
+                $organizationId
+            );
+        }
+
+        // Dispatch job to process webhook asynchronously (CDR creation)
         ProcessInboundCallJob::dispatch([
             'call_id' => $callId,
             'from_number' => $fromNumber,
             'to_number' => $toNumber,
             'webhook_data' => $request->all(),
         ]);
-
-        // Generate and return CXML routing decision
-        $cxml = $this->routingService->routeInboundCall(
-            $toNumber,
-            $fromNumber,
-            $didNumber->organization_id
-        );
 
         Log::info('Returning CXML response', [
             'call_id' => $callId,
@@ -130,6 +196,158 @@ class CloudonixWebhookController extends Controller
 
         return response($cxml, 200)
             ->header('Content-Type', 'application/xml');
+    }
+
+    /**
+     * Route call directly to an extension based on its type
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return string CXML response
+     */
+    private function routeExtensionDirectly(\App\Models\Extension $extension, $request, int $organizationId): string
+    {
+        return match ($extension->type) {
+            \App\Enums\ExtensionType::USER => $this->routeUserExtensionDirectly($extension),
+            \App\Enums\ExtensionType::CONFERENCE => $this->routeConferenceExtensionDirectly($extension, $organizationId),
+            \App\Enums\ExtensionType::RING_GROUP => $this->routeRingGroupExtensionDirectly($extension, $organizationId),
+            default => \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension type not supported'),
+        };
+    }
+
+    /**
+     * Route directly to a user extension
+     *
+     * @return string CXML response
+     */
+    private function routeUserExtensionDirectly(\App\Models\Extension $extension): string
+    {
+        if (! $extension->user || ! $extension->user->isActive()) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension user not available');
+        }
+
+        $sipUri = $extension->getSipUri();
+        if (! $sipUri) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension has no SIP configuration');
+        }
+
+        return \App\Services\CxmlBuilder\CxmlBuilder::simpleDial($sipUri);
+    }
+
+    /**
+     * Route directly to a conference extension
+     *
+     * @return string CXML response
+     */
+    private function routeConferenceExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
+    {
+        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
+
+        if (! $conferenceRoomId) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Conference room not configured');
+        }
+
+        $conferenceRoom = \App\Models\ConferenceRoom::where('id', $conferenceRoomId)
+            ->where('organization_id', $organizationId)
+            ->where('status', \App\Enums\UserStatus::ACTIVE)
+            ->first();
+
+        if (! $conferenceRoom) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Conference room not found');
+        }
+
+        $conferenceIdentifier = $this->generateConferenceIdentifier($conferenceRoom->name);
+
+        return \App\Services\CxmlBuilder\CxmlBuilder::conference(
+            $conferenceIdentifier,
+            $conferenceRoom->pin
+        );
+    }
+
+    /**
+     * Route directly to a ring group extension
+     *
+     * @return string CXML response
+     */
+    private function routeRingGroupExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
+    {
+        $ringGroupId = $extension->configuration['ring_group_id'] ?? null;
+
+        if (! $ringGroupId) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Ring group not configured');
+        }
+
+        $ringGroup = \App\Models\RingGroup::where('id', $ringGroupId)
+            ->where('organization_id', $organizationId)
+            ->where('status', \App\Enums\UserStatus::ACTIVE)
+            ->first();
+
+        if (! $ringGroup) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Ring group not found');
+        }
+
+        $members = $ringGroup->getMembers()->filter(fn (\App\Models\Extension $ext) => $ext->isActive());
+        $sipUris = $members->map(fn (\App\Models\Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
+
+        if (empty($sipUris)) {
+            // Handle fallback
+            $fallback = $ringGroup->fallback_action;
+
+            return match ($fallback['action'] ?? 'hangup') {
+                'extension' => $this->routeFallbackExtensionDirectly($fallback),
+                'voicemail' => \App\Services\CxmlBuilder\CxmlBuilder::sendToVoicemail(),
+                'busy' => \App\Services\CxmlBuilder\CxmlBuilder::busy($fallback['message'] ?? null),
+                default => \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup(),
+            };
+        }
+
+        return \App\Services\CxmlBuilder\CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+    }
+
+    /**
+     * Route to fallback extension directly
+     *
+     * @return string CXML response
+     */
+    private function routeFallbackExtensionDirectly(array $fallbackConfig): string
+    {
+        $extensionId = $fallbackConfig['extension_id'] ?? null;
+
+        if (! $extensionId) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
+        }
+
+        $extension = \App\Models\Extension::find($extensionId);
+
+        if (! $extension || ! $extension->isActive()) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
+        }
+
+        $sipUri = $extension->getSipUri();
+
+        if (! $sipUri) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
+        }
+
+        return \App\Services\CxmlBuilder\CxmlBuilder::simpleDial($sipUri);
+    }
+
+    /**
+     * Generate a clean conference identifier from conference room name
+     */
+    private function generateConferenceIdentifier(string $conferenceName): string
+    {
+        // Convert to lowercase and keep only letters, numbers, and spaces
+        $clean = preg_replace('/[^a-zA-Z0-9\s]/', '', strtolower($conferenceName));
+
+        // Replace spaces with underscores and limit length
+        $identifier = preg_replace('/\s+/', '_', trim($clean));
+
+        // Ensure it's not empty and limit to 32 characters
+        if (empty($identifier)) {
+            $identifier = 'conference';
+        }
+
+        return substr($identifier, 0, 32);
     }
 
     /**
