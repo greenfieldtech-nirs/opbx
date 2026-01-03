@@ -581,6 +581,62 @@ export interface CDRFilters {
   disposition?: string;
 }
 
+// ============================================================================
+// Routing Sentry
+// ============================================================================
+
+export interface RoutingSentrySettings {
+  velocity_limit: number;
+  volume_limit: number;
+  default_action: 'allow' | 'block' | 'flag';
+}
+
+export interface SentryBlacklist {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  status: Status;
+  items_count?: number;
+  items?: SentryBlacklistItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SentryBlacklistItem {
+  id: string;
+  blacklist_id: string;
+  phone_number: string;
+  reason?: string;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreSentryBlacklistRequest {
+  name: string;
+  description?: string;
+  status: Status;
+}
+
+export interface UpdateSentryBlacklistRequest {
+  name?: string;
+  description?: string;
+  status?: Status;
+}
+
+export interface StoreSentryBlacklistItemRequest {
+  phone_number: string;
+  reason?: string;
+  expires_at?: string;
+}
+
+export interface UpdateSentrySettingsRequest {
+  velocity_limit: number;
+  volume_limit: number;
+  default_action: 'allow' | 'block' | 'flag';
+}
+
 // User/Extension status types
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 export type ExtensionStatus = 'active' | 'inactive';

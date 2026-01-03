@@ -24,6 +24,7 @@ const CallLogs = lazy(() => import('@/pages/CallLogs'));
 const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const SentryManagement = lazy(() => import('@/pages/SentryManagement'));
 
 export const router = createBrowserRouter([
   {
@@ -87,6 +88,14 @@ export const router = createBrowserRouter([
         element: (
           <OwnerRoute>
             <Settings />
+          </OwnerRoute>
+        ),
+      },
+      {
+        path: 'sentry',
+        element: (
+          <OwnerRoute>
+            <SentryManagement />
           </OwnerRoute>
         ),
       },

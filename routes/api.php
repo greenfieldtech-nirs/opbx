@@ -14,6 +14,9 @@ use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\SessionUpdateController;
+use App\Http\Controllers\Api\RoutingSentryController;
+use App\Http\Controllers\Api\SentryBlacklistController;
+use App\Http\Controllers\Api\SentryBlacklistItemController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -158,6 +161,16 @@ Route::prefix('v1')->group(function (): void {
             Route::put('cloudonix', [SettingsController::class, 'updateCloudonixSettings'])->name('settings.cloudonix.update');
             Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
+        });
+
+        // Routing Sentry
+        Route::prefix('sentry')->group(function (): void {
+            Route::get('settings', [RoutingSentryController::class, 'getSettings'])->name('sentry.settings.show');
+            Route::put('settings', [RoutingSentryController::class, 'updateSettings'])->name('sentry.settings.update');
+
+            Route::apiResource('blacklists', SentryBlacklistController::class);
+            Route::post('blacklists/{blacklist}/items', [SentryBlacklistItemController::class, 'store'])->name('sentry.blacklists.items.store');
+            Route::delete('blacklists/{blacklist}/items/{item}', [SentryBlacklistItemController::class, 'destroy'])->name('sentry.blacklists.items.destroy');
         });
     });
 

@@ -15,9 +15,39 @@ class SentryBlacklistItem extends Model
     protected $fillable = [
         'sentry_blacklist_id',
         'pattern',
+        'phone_number',
         'reason',
         'created_by',
+        'expires_at',
     ];
+
+    protected $appends = [
+        'phone_number',
+    ];
+
+    protected $hidden = [
+        'pattern',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Map phone_number to pattern for convenience and frontend consistency.
+     */
+    public function setPhoneNumberAttribute($value): void
+    {
+        $this->attributes['pattern'] = $value;
+    }
+
+    public function getPhoneNumberAttribute(): string
+    {
+        return $this->pattern;
+    }
 
     public function blacklist(): BelongsTo
     {

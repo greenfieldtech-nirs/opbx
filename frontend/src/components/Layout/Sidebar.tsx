@@ -17,6 +17,7 @@ import {
   FileText,
   Activity,
   Video,
+  Shield,
 } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -37,6 +38,7 @@ const navigation: NavItem[] = [
   { name: 'Business Hours', href: '/business-hours', icon: Clock },
   { name: 'Call Logs', href: '/call-logs', icon: FileText },
   { name: 'Live Calls', href: '/live-calls', icon: Activity },
+  { name: 'Routing Sentry', href: '/sentry', icon: Shield, roles: ['owner', 'pbx_admin'] },
 ];
 
 export function Sidebar() {

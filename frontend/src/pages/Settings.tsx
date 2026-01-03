@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { settingsService } from '@/services/settings.service';
+import { sentryService } from '@/services/sentry.service';
 import { getApiErrorMessage } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +48,9 @@ import {
   Info,
   XCircle,
   FileText,
+  Shield,
+  Zap,
+  BarChart3,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -62,6 +66,10 @@ const settingsSchema = z.object({
   webhook_base_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
   no_answer_timeout: z.number().min(5, 'Minimum 5 seconds').max(120, 'Maximum 120 seconds'),
   recording_format: z.enum(['wav', 'mp3']),
+  // Sentry settings
+  velocity_limit: z.number().min(0, 'Must be at least 0'),
+  volume_limit: z.number().min(0, 'Must be at least 0'),
+  default_action: z.enum(['allow', 'block', 'flag']),
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -79,7 +87,6 @@ export default function Settings() {
   // Settings form
   const {
     register,
-    handleSubmit,
     formState: { errors },
     reset,
     control,
@@ -95,6 +102,9 @@ export default function Settings() {
       webhook_base_url: '',
       no_answer_timeout: 60,
       recording_format: 'mp3',
+      velocity_limit: 10,
+      volume_limit: 100,
+      default_action: 'block',
     },
   });
 
@@ -105,7 +115,11 @@ export default function Settings() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const data = await settingsService.getCloudonixSettings();
+        const [data, sentryData] = await Promise.all([
+          settingsService.getCloudonixSettings(),
+          sentryService.getSettings(),
+        ]);
+
         setSettingsData(data);
 
         // Reset form with loaded data
@@ -117,6 +131,9 @@ export default function Settings() {
           webhook_base_url: data.webhook_base_url || '',
           no_answer_timeout: data.no_answer_timeout,
           recording_format: data.recording_format,
+          velocity_limit: sentryData.velocity_limit,
+          volume_limit: sentryData.volume_limit,
+          default_action: sentryData.default_action,
         });
 
         // Note: validation status is handled by the validation effect below
@@ -199,11 +216,19 @@ export default function Settings() {
           };
 
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
+
+          // Save Sentry settings
+          await sentryService.updateSettings({
+            velocity_limit: currentFormValues.velocity_limit,
+            volume_limit: currentFormValues.volume_limit,
+            default_action: currentFormValues.default_action,
+          });
+
           setSettingsData(savedSettings);
 
           const settingsApplied = result.profile_settings &&
             (result.profile_settings.no_answer_timeout !== undefined ||
-             result.profile_settings.recording_format !== undefined);
+              result.profile_settings.recording_format !== undefined);
 
           toast.success('Settings validated and saved successfully', {
             description: settingsApplied
@@ -213,7 +238,11 @@ export default function Settings() {
 
           // Refresh settings to verify persistence
           try {
-            const refreshedSettings = await settingsService.getCloudonixSettings();
+            const [refreshedSettings, refreshedSentry] = await Promise.all([
+              settingsService.getCloudonixSettings(),
+              sentryService.getSettings(),
+            ]);
+
             setSettingsData(refreshedSettings);
 
             // Update form with refreshed data
@@ -225,6 +254,9 @@ export default function Settings() {
               webhook_base_url: refreshedSettings.webhook_base_url || '',
               no_answer_timeout: refreshedSettings.no_answer_timeout,
               recording_format: refreshedSettings.recording_format,
+              velocity_limit: refreshedSentry.velocity_limit,
+              volume_limit: refreshedSentry.volume_limit,
+              default_action: refreshedSentry.default_action,
             });
           } catch (refreshError) {
             console.warn('Failed to refresh settings after save:', refreshError);
@@ -757,6 +789,130 @@ export default function Settings() {
                 </div>
               </div>
 
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Routing Sentry Defaults */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Routing Sentry Defaults
+            </CardTitle>
+            <CardDescription>
+              Global security defaults for voice routing. These apply to all calls unless overridden by specific rules.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Velocity Limit */}
+                <div className="space-y-2">
+                  <Label htmlFor="velocity_limit" className="flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    Velocity Limit (calls/min)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          Maximum number of calls allowed from a single source per minute.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    id="velocity_limit"
+                    type="number"
+                    min={0}
+                    disabled={isValidating}
+                    {...register('velocity_limit', { valueAsNumber: true })}
+                  />
+                  {errors.velocity_limit && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {errors.velocity_limit.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Volume Limit */}
+                <div className="space-y-2">
+                  <Label htmlFor="volume_limit" className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Volume Limit (concurrent)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          Maximum number of concurrent calls allow for the organization.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    id="volume_limit"
+                    type="number"
+                    min={0}
+                    disabled={isValidating}
+                    {...register('volume_limit', { valueAsNumber: true })}
+                  />
+                  {errors.volume_limit && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {errors.volume_limit.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Default Action */}
+              <div className="space-y-2">
+                <Label htmlFor="default_action" className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Sentry Default Action
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>
+                        The action to take when a call exceeds defined limits.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <Controller
+                  name="default_action"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={isValidating}
+                    >
+                      <SelectTrigger id="default_action">
+                        <SelectValue placeholder="Select action" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="allow">Allow (Log only)</SelectItem>
+                        <SelectItem value="block">Block</SelectItem>
+                        <SelectItem value="flag">Flag (Add to monitoring)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.default_action && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    {errors.default_action.message}
+                  </p>
+                )}
+              </div>
             </form>
           </CardContent>
         </Card>
