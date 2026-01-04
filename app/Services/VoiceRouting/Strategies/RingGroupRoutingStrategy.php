@@ -85,20 +85,22 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             return $this->handleFallback($ringGroup);
         }
 
-        // Get member at current attempt index
-        // Attempts are 1-based (from SessionData) or 0 (initial)
-        // If initial, we want member index 0. If attempt 1 (meaning first tried), we want index 1.
+        // Get ring turns (default to 1 if not set)
+        $ringTurns = max(1, $ringGroup->ring_turns ?? 1);
+        $memberCount = $members->count();
+        $totalAttemptsAllowed = $memberCount * $ringTurns;
 
-        $index = $attempt === 0 ? 0 : $attempt;
-
-        // If we exhausted all members (index >= count), look at ring_turns (loops)
-        // For simple sequential, we usually iterate once.
-        if ($index >= $members->count()) {
+        // If we've exhausted all ring turns, fallback
+        if ($attempt >= $totalAttemptsAllowed) {
             return $this->handleFallback($ringGroup);
         }
 
+        // Calculate which member to try in this attempt
+        // Using modulo to cycle through members for each ring turn
+        $memberIndex = $attempt % $memberCount;
+
         // Get the specific member
-        $member = $members->values()->get($index);
+        $member = $members->values()->get($memberIndex);
 
         if (!$member) {
             return $this->handleFallback($ringGroup);
@@ -115,7 +117,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Cloudonix CXML Dial Action supports params? Usually as URL query params.
         // But CxmlBuilder uses 'action' attribute.
 
-        $nextAttempt = $index + 1;
+        $nextAttempt = $attempt + 1;
 
         // Get the organization's webhook base URL for consistent callback URLs
         $organizationId = $request->input('_organization_id');
