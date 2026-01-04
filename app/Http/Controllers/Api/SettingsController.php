@@ -483,15 +483,55 @@ class SettingsController extends Controller
                     'full_response' => $appData,
                 ]);
             } else {
-                // Use existing application
+                // Use existing application but check if URL needs updating
                 $applicationId = $settings->voice_application_id;
 
-                Log::info('[VOICE_APP_SETUP] Using existing voice application', [
+                // Generate expected webhook URL for comparison
+                $expectedWebhookUrl = "{$baseUrl}/api/voice/route";
+
+                Log::info('[VOICE_APP_SETUP] Using existing voice application - checking if URL update needed', [
                     'request_id' => $requestId,
                     'user_id' => $userId,
                     'organization_id' => $organizationId,
                     'application_id' => $applicationId,
+                    'expected_webhook_url' => $expectedWebhookUrl,
                 ]);
+
+                // Check if we need to update the application URL
+                // We can't easily check the current URL without an API call, so we'll update it proactively
+                // when webhook_base_url changes (which would change the expected URL)
+                $updateResult = $this->cloudonixClient->updateVoiceApplication(
+                    $settings->domain_uuid,
+                    $settings->domain_api_key,
+                    $applicationId,
+                    [
+                        'url' => $expectedWebhookUrl,
+                        'method' => 'POST',
+                        'profile' => new \stdClass(), // Ensure profile is an object
+                    ]
+                );
+
+                if (!$updateResult['success']) {
+                    Log::warning('[VOICE_APP_SETUP] Failed to update voice application URL', [
+                        'request_id' => $requestId,
+                        'user_id' => $userId,
+                        'organization_id' => $organizationId,
+                        'application_id' => $applicationId,
+                        'expected_url' => $expectedWebhookUrl,
+                        'error' => $updateResult['message'],
+                    ]);
+
+                    // Don't fail the whole process for URL update issues
+                    // The application might still work with the old URL
+                } else {
+                    Log::info('[VOICE_APP_SETUP] Voice application URL updated successfully', [
+                        'request_id' => $requestId,
+                        'user_id' => $userId,
+                        'organization_id' => $organizationId,
+                        'application_id' => $applicationId,
+                        'new_url' => $expectedWebhookUrl,
+                    ]);
+                }
             }
 
             Log::info('[VOICE_APP_SETUP] Setting default application for domain', [

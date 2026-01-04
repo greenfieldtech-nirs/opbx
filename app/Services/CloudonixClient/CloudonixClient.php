@@ -627,6 +627,83 @@ class CloudonixClient
         }
     }
 
+    /**
+     * Update a voice application in Cloudonix.
+     *
+     * Makes a PUT request to /customers/{customer-id}/domains/{domain-id}/applications/{application-id}
+     * to update the voice application configuration, including the URL endpoint.
+     *
+     * @param string $domainUuid The domain UUID
+     * @param string $apiKey The API key (Bearer token) to authenticate with
+     * @param int $applicationId The application ID to update
+     * @param array<string, mixed> $applicationData Application configuration to update (url, method, profile, etc.)
+     * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
+     */
+    public function updateVoiceApplication(string $domainUuid, string $apiKey, int $applicationId, array $applicationData): array
+    {
+        try {
+            Log::info('Updating Cloudonix voice application', [
+                'domain_uuid' => $domainUuid,
+                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'application_id' => $applicationId,
+                'application_data' => $applicationData,
+            ]);
+
+            // Create temporary client with provided credentials
+            $tempClient = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->baseUrl($this->baseUrl);
+
+            $response = $tempClient->put(
+                "/customers/{$this->customerId}/domains/{$domainUuid}/applications/{$applicationId}",
+                $applicationData
+            );
+
+            $success = $response->successful();
+            $responseBody = $response->json();
+
+            Log::info('Cloudonix voice application update result', [
+                'domain_uuid' => $domainUuid,
+                'application_id' => $applicationId,
+                'status_code' => $response->status(),
+                'success' => $success,
+            ]);
+
+            if (!$success) {
+                $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
+
+                return [
+                    'success' => false,
+                    'message' => "Failed to update voice application: {$errorMessage}",
+                    'data' => $responseBody,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Voice application updated successfully.',
+                'data' => $responseBody,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Cloudonix voice application update failed', [
+                'domain_uuid' => $domainUuid,
+                'application_id' => $applicationId,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => "Exception during voice application update: {$e->getMessage()}",
+                'data' => null,
+            ];
+        }
+    }
+
     // =========================================================================
     // Subscriber Management Methods
     // =========================================================================
