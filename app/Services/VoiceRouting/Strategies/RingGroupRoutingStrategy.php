@@ -103,17 +103,16 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         $nextAttempt = $index + 1;
 
-        // Build callback URL using the same scheme and host as the current request
+        // Build callback URL using the same base URL as the current request
         // to ensure HTTPS is used when the routing endpoint is called over HTTPS
-        $scheme = $request->getScheme();
-        $host = $request->getHost();
+        $baseUrl = $request->getSchemeAndHttpHost();
         $relativeUrl = route('voice.ring-group-callback', [
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
             // Pass necessary context
             'session_data' => json_encode(['ring_group_id' => $ringGroup->id, 'attempt_number' => $nextAttempt])
         ], false); // Get relative URL
-        $callbackUrl = "{$scheme}://{$host}{$relativeUrl}";
+        $callbackUrl = $baseUrl . $relativeUrl;
 
         // Also need to construct SessionData xml element if strictly required, 
         // but CxmlBuilder -> dial(...) takes 'action'. 
