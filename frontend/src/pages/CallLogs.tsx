@@ -19,8 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
-import XMLViewer from 'react-xml-viewer';
-import JsonViewer from 'react18-json-view';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
@@ -428,22 +426,9 @@ export default function CallLogs() {
                             </div>
                             <div>
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <div className="border rounded bg-gray-900 p-2">
-                                <XMLViewer
-                                  xml={execution.source}
-                                  theme={{
-                                    attributeKeyColor: '#9cdcfe',
-                                    attributeValueColor: '#ce9178',
-                                    cdataColor: '#d4d4d4',
-                                    commentColor: '#6a9955',
-                                    tagColor: '#569cd6',
-                                    textColor: '#d4d4d4',
-                                    separatorColor: '#d4d4d4'
-                                  }}
-                                  indentSize={2}
-                                  collapsible={true}
-                                />
-                              </div>
+                              <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded border overflow-x-auto font-mono whitespace-pre-wrap">
+                                {execution.source}
+                              </pre>
                             </div>
                           </div>
                         ))}
@@ -459,14 +444,14 @@ export default function CallLogs() {
                   {selectedCdr.raw_cdr ? (
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <div className="border rounded bg-gray-900 p-4 overflow-x-auto">
-                        <JsonViewer
-                          data={selectedCdr.raw_cdr}
-                          theme="githubDark"
-                          shouldExpandNode={() => false}
-                          style={{ fontSize: '12px', backgroundColor: 'transparent' }}
-                        />
-                      </div>
+                      <details className="border rounded bg-gray-900 overflow-x-auto">
+                        <summary className="cursor-pointer p-3 text-gray-100 hover:bg-gray-800 font-medium text-sm">
+                          Raw CDR Data (Click to expand/collapse)
+                        </summary>
+                        <pre className="text-xs bg-gray-900 text-gray-100 p-3 border-t font-mono whitespace-pre-wrap">
+                          {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
+                        </pre>
+                      </details>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
