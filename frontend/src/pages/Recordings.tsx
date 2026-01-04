@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Eye, Pause, Play, Plus, Search, Upload, Loader2 } from 'lucide-react';
+import { Database, Download, Eye, Pause, Play, Plus, Search, Trash2, Upload, Loader2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import api from '@/services/api';
 
@@ -39,6 +39,11 @@ const recordingsService = {
 
   download: async (id: number) => {
     const response = await api.get(`/recordings/${id}/download`);
+    return response.data;
+  },
+
+  delete: async (id: number) => {
+    const response = await api.delete(`/recordings/${id}`);
     return response.data;
   },
 };
@@ -104,10 +109,28 @@ export default function Recordings() {
     },
   });
 
+  // Delete recording mutation
+  const deleteRecordingMutation = useMutation({
+    mutationFn: (id: number) => recordingsService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recordings'] });
+      toast.success('Recording deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete recording: ' + error.message);
+    },
+  });
+
 
 
   const handleDownload = (recording: any) => {
     downloadRecordingMutation.mutate(recording.id);
+  };
+
+  const handleDelete = (recording: any) => {
+    if (confirm(`Are you sure you want to delete "${recording.name}"? This action cannot be undone.`)) {
+      deleteRecordingMutation.mutate(recording.id);
+    }
   };
 
   const handlePlayback = async (recording: any) => {
@@ -309,6 +332,16 @@ export default function Recordings() {
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       Details
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(recording)}
+                      disabled={deleteRecordingMutation.isPending}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete
                     </Button>
                   </div>
                 </div>

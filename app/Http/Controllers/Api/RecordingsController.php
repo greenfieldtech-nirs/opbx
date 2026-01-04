@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRecordingRequest;
 use App\Http\Requests\UpdateRecordingRequest;
@@ -257,6 +258,12 @@ class RecordingsController extends Controller
     public function destroy(Request $request, Recording $recording): JsonResponse
     {
         $user = $request->user();
+        // Check if user has permission to delete recordings
+        if (!$user->hasRole(UserRole::OWNER) && !$user->hasRole(UserRole::PBX_ADMIN)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Log the deletion attempt
 
         // Log the deletion attempt
         $this->accessService->logFileAccess($recording, $user->id, 'deleted', [
