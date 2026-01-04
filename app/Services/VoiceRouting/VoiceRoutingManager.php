@@ -194,13 +194,22 @@ class VoiceRoutingManager
     public function routeRingGroupCallback(Request $request): Response
     {
         $rgId = $request->input('ring_group_id') ?? $request->input('SessionData.ring_group_id');
+        $organizationId = (int) $request->input('_organization_id');
 
         if (!$rgId) {
             return response(CxmlBuilder::unavailable('Ring group context missing'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        $rg = RingGroup::find($rgId);
+        $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $rgId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
         if (!$rg) {
+            Log::warning('VoiceRoutingManager: Ring group not found in callback', [
+                'ring_group_id' => $rgId,
+                'organization_id' => $organizationId
+            ]);
             return response(CxmlBuilder::unavailable('Ring group not found'), 200, ['Content-Type' => 'text/xml']);
         }
 
