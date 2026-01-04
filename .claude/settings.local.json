@@ -64,7 +64,8 @@
       "Bash(mkdir:*)",
       "Bash(timeout 120 npm run build)",
       "Bash(git reset:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(docker-compose build:*)"
     ]
   }
 }
