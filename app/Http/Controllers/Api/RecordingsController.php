@@ -8,7 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRecordingRequest;
 use App\Http\Requests\UpdateRecordingRequest;
 use App\Http\Resources\RecordingResource;
+use App\Jobs\ProcessRecordingUpload;
+use App\Jobs\ValidateRemoteUrl;
 use App\Models\Recording;
+use App\Services\Recording\RecordingRemoteService;
+use App\Services\Recording\RecordingUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,19 +20,11 @@ use Illuminate\Support\Str;
 
 class RecordingsController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $query = Recording::query()
-            ->with(['creator', 'updater'])
-            ->orderBy('created_at', 'desc');
-
-        // Filter by type if specified
-        if ($request->has('type') && in_array($request->type, ['upload', 'remote'])) {
-            $query->where('type', $request->type);
-        }
+    public function __construct(
+        private readonly RecordingUploadService $uploadService,
+        private readonly RecordingRemoteService $remoteService
+    ) {
+    }
 
         // Filter by status if specified
         if ($request->has('status') && in_array($request->status, ['active', 'inactive'])) {
@@ -69,27 +65,52 @@ class RecordingsController extends Controller
         $user = $request->user();
         $validated = $request->validated();
 
-        if ($validated['type'] === 'upload') {
-            // Handle file upload
-            $file = $request->file('file');
-            $originalName = $file->getClientOriginalName();
-            $extension = $file->getClientOriginalExtension();
-            $fileSize = $file->getSize();
-            $mimeType = $file->getMimeType();
+        try {
+            if ($validated['type'] === 'upload') {
+                // Handle file upload using the service
+                $file = $request->file('file');
+                $recording = $this->uploadService->uploadFile($file, $validated['name'], $user);
 
-            // Generate unique filename
-            $filename = Str::uuid() . '_' . Str::slug(pathinfo($originalName, PATHINFO_FILENAME)) . '.' . $extension;
+                // Dispatch job for post-processing (metadata extraction)
+                ProcessRecordingUpload::dispatch($recording->id);
 
-            // Store file in recordings directory under organization
-            $path = $file->storeAs(
-                "recordings/{$user->organization_id}",
-                $filename,
-                'local'
-            );
+            } else {
+                // Handle remote URL
+                $validationResult = $this->remoteService->validateUrl($validated['remote_url']);
 
-            if (!$path) {
-                return response()->json(['error' => 'Failed to store file'], 500);
+                if (!$validationResult['success']) {
+                    return response()->json([
+                        'error' => 'Invalid remote URL',
+                        'message' => $validationResult['message'] ?? 'URL validation failed',
+                    ], 422);
+                }
+
+                $recording = Recording::create([
+                    'organization_id' => $user->organization_id,
+                    'name' => $validated['name'],
+                    'type' => 'remote',
+                    'remote_url' => $validated['remote_url'],
+                    'status' => 'active',
+                    'created_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]);
+
+                // Dispatch job for URL validation and info extraction
+                ValidateRemoteUrl::dispatch($recording->id);
             }
+
+            return response()->json([
+                'message' => 'Recording created successfully',
+                'data' => new RecordingResource($recording->load(['creator', 'updater'])),
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to create recording',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
             $recording = Recording::create([
                 'organization_id' => $user->organization_id,
@@ -159,14 +180,39 @@ class RecordingsController extends Controller
     }
 
     /**
+     * Download the specified recording file.
+     */
+    public function download(Recording $recording): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+    {
+        if (!$recording->isUploaded()) {
+            return response()->json(['error' => 'Only uploaded recordings can be downloaded'], 400);
+        }
+
+        if (!$recording->file_path) {
+            return response()->json(['error' => 'File not found'], 404);
+        }
+
+        $filePath = storage_path("app/recordings/{$recording->organization_id}/{$recording->file_path}");
+
+        if (!file_exists($filePath)) {
+            return response()->json(['error' => 'File not found on disk'], 404);
+        }
+
+        return response()->download($filePath, $recording->original_filename ?? $recording->file_path);
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(Recording $recording): JsonResponse
     {
         // Delete the file if it's an uploaded recording
         if ($recording->isUploaded() && $recording->file_path) {
-            $filePath = "recordings/{$recording->organization_id}/{$recording->file_path}";
-            Storage::disk('local')->delete($filePath);
+            $filePath = storage_path("app/recordings/{$recording->organization_id}/{$recording->file_path}");
+
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
         }
 
         $recording->delete();

@@ -156,6 +156,8 @@ Route::prefix('v1')->group(function (): void {
 
         // Recordings (Owner/Admin only)
         Route::apiResource('recordings', RecordingsController::class);
+        Route::get('recordings/{recording}/download', [RecordingsController::class, 'download'])
+            ->name('recordings.download');
 
         // Settings (Owner only)
         Route::prefix('settings')->group(function (): void {
