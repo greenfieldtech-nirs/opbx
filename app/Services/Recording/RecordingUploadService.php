@@ -25,9 +25,9 @@ class RecordingUploadService
     ];
 
     /**
-     * Maximum file size in bytes (5MB).
+     * Maximum file size in bytes (from config).
      */
-    private const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    private const MAX_FILE_SIZE = 5 * 1024 * 1024; // Will be overridden by config in validateFile()
 
     /**
      * Upload and process an audio file.
@@ -96,24 +96,99 @@ class RecordingUploadService
      */
     private function validateFile(UploadedFile $file): void
     {
+        $maxSize = config('recordings.max_file_size_kb', 5120) * 1024; // Convert KB to bytes
+        $allowedMimeTypes = config('recordings.allowed_mime_types', self::ALLOWED_MIME_TYPES);
+        $allowedExtensions = config('recordings.allowed_extensions', ['mp3', 'wav']);
+
         // Check file size
-        if ($file->getSize() > self::MAX_FILE_SIZE) {
-            throw new \Exception('File size exceeds the maximum allowed size of 5MB.');
+        if ($file->getSize() > $maxSize) {
+            $maxSizeMB = $maxSize / (1024 * 1024);
+            throw new \Exception("File size exceeds the maximum allowed size of {$maxSizeMB}MB.");
         }
 
         // Check MIME type
         $mimeType = $file->getMimeType();
-        if (!in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
+        if (!in_array($mimeType, $allowedMimeTypes, true)) {
             throw new \Exception('Invalid file type. Only MP3 and WAV files are allowed.');
         }
 
-        // Additional security check: ensure the file extension matches the MIME type
+        // Additional security check: ensure the file extension matches allowed extensions
         $extension = strtolower($file->getClientOriginalExtension());
-        $allowedExtensions = ['mp3', 'wav'];
-
         if (!in_array($extension, $allowedExtensions, true)) {
             throw new \Exception('Invalid file extension. Only .mp3 and .wav files are allowed.');
         }
+
+        // Security: Check for malicious file signatures
+        $this->checkFileContent($file);
+
+        // Security: Ensure filename doesn't contain dangerous characters
+        $originalName = $file->getClientOriginalName();
+        if ($this->containsDangerousCharacters($originalName)) {
+            throw new \Exception('Filename contains invalid characters.');
+        }
+    }
+
+    /**
+     * Check file content for basic security issues.
+     *
+     * @param UploadedFile $file
+     * @throws \Exception If suspicious content is detected
+     */
+    private function checkFileContent(UploadedFile $file): void
+    {
+        // Read first few bytes to check for common file signatures
+        $handle = fopen($file->getRealPath(), 'rb');
+        if ($handle) {
+            $header = fread($handle, 12);
+            fclose($handle);
+
+            // Check for MP3 signature (ID3 or MPEG frame)
+            if ($file->getMimeType() === 'audio/mpeg') {
+                if (!preg_match('/^(ID3|\xFF[\xFB\xF3\xE3])/', $header)) {
+                    throw new \Exception('File does not appear to be a valid MP3 file.');
+                }
+            }
+
+            // Check for WAV signature
+            if ($file->getMimeType() === 'audio/wav' || $file->getMimeType() === 'audio/x-wav') {
+                if (substr($header, 0, 4) !== 'RIFF' || substr($header, 8, 4) !== 'WAVE') {
+                    throw new \Exception('File does not appear to be a valid WAV file.');
+                }
+            }
+
+            // Check for potentially dangerous content (very basic check)
+            if (preg_match('/<\?php|<script|javascript:/i', $header)) {
+                throw new \Exception('File contains potentially dangerous content.');
+            }
+        }
+    }
+
+    /**
+     * Check if filename contains dangerous characters.
+     *
+     * @param string $filename
+     * @return bool
+     */
+    private function containsDangerousCharacters(string $filename): bool
+    {
+        // Check for directory traversal attempts
+        if (str_contains($filename, '..') || str_contains($filename, '/')) {
+            return true;
+        }
+
+        // Check for null bytes or other dangerous characters
+        if (str_contains($filename, "\0") || str_contains($filename, "\r") || str_contains($filename, "\n")) {
+            return true;
+        }
+
+        // Check for Windows reserved names
+        $reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+        $baseName = pathinfo($filename, PATHINFO_FILENAME);
+        if (in_array(strtoupper($baseName), $reservedNames, true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

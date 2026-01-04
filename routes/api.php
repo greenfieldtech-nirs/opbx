@@ -158,6 +158,8 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('recordings', RecordingsController::class);
         Route::get('recordings/{recording}/download', [RecordingsController::class, 'download'])
             ->name('recordings.download');
+        Route::get('recordings/download/{token}', [RecordingsController::class, 'secureDownload'])
+            ->name('recordings.secure-download');
 
         // Settings (Owner only)
         Route::prefix('settings')->group(function (): void {

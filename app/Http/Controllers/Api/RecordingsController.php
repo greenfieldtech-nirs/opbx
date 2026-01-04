@@ -11,6 +11,7 @@ use App\Http\Resources\RecordingResource;
 use App\Jobs\ProcessRecordingUpload;
 use App\Jobs\ValidateRemoteUrl;
 use App\Models\Recording;
+use App\Services\Recording\RecordingAccessService;
 use App\Services\Recording\RecordingRemoteService;
 use App\Services\Recording\RecordingUploadService;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,8 @@ class RecordingsController extends Controller
 {
     public function __construct(
         private readonly RecordingUploadService $uploadService,
-        private readonly RecordingRemoteService $remoteService
+        private readonly RecordingRemoteService $remoteService,
+        private readonly RecordingAccessService $accessService
     ) {
     }
 
@@ -71,8 +73,17 @@ class RecordingsController extends Controller
                 $file = $request->file('file');
                 $recording = $this->uploadService->uploadFile($file, $validated['name'], $user);
 
-                // Dispatch job for post-processing (metadata extraction)
-                ProcessRecordingUpload::dispatch($recording->id);
+        // Log the creation
+        $this->accessService->logFileAccess($recording, $user->id, 'created', [
+            'type' => 'upload',
+            'file_size' => $recording->file_size,
+            'mime_type' => $recording->mime_type,
+        ]);
+
+        // Dispatch job for post-processing (metadata extraction)
+        if (config('recordings.queue_processing_enabled', true)) {
+            ProcessRecordingUpload::dispatch($recording->id);
+        }
 
             } else {
                 // Handle remote URL
@@ -95,8 +106,16 @@ class RecordingsController extends Controller
                     'updated_by' => $user->id,
                 ]);
 
+                // Log the creation
+                $this->accessService->logFileAccess($recording, $user->id, 'created', [
+                    'type' => 'remote',
+                    'remote_url' => $validated['remote_url'],
+                ]);
+
                 // Dispatch job for URL validation and info extraction
-                ValidateRemoteUrl::dispatch($recording->id);
+                if (config('recordings.queue_processing_enabled', true)) {
+                    ValidateRemoteUrl::dispatch($recording->id);
+                }
             }
 
             return response()->json([
@@ -180,12 +199,48 @@ class RecordingsController extends Controller
     }
 
     /**
-     * Download the specified recording file.
+     * Generate a secure download URL for the specified recording file.
      */
-    public function download(Recording $recording): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+    public function download(Request $request, Recording $recording): JsonResponse
     {
+        $user = $request->user();
+
         if (!$recording->isUploaded()) {
             return response()->json(['error' => 'Only uploaded recordings can be downloaded'], 400);
+        }
+
+        // Generate secure access token
+        $token = $this->accessService->generateAccessToken($recording, $user->id);
+
+        // Log the access attempt
+        $this->accessService->logFileAccess($recording, $user->id, 'download_requested', [
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        return response()->json([
+            'download_url' => route('recordings.secure-download', ['token' => $token]),
+            'filename' => $recording->original_filename ?? $recording->file_path,
+            'expires_in' => 1800, // 30 minutes
+        ]);
+    }
+
+    /**
+     * Securely download a recording file using an access token.
+     */
+    public function secureDownload(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+    {
+        $token = $request->query('token');
+        $user = $request->user();
+
+        if (!$token || !$user) {
+            return response()->json(['error' => 'Invalid access token'], 401);
+        }
+
+        $recording = $this->accessService->validateAccessToken($token, $user->id);
+
+        if (!$recording) {
+            return response()->json(['error' => 'Access denied or token expired'], 403);
         }
 
         if (!$recording->file_path) {
@@ -198,21 +253,33 @@ class RecordingsController extends Controller
             return response()->json(['error' => 'File not found on disk'], 404);
         }
 
+        // Log the successful download
+        $this->accessService->logFileAccess($recording, $user->id, 'downloaded', [
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'file_size' => $recording->file_size,
+        ]);
+
         return response()->download($filePath, $recording->original_filename ?? $recording->file_path);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Recording $recording): JsonResponse
+    public function destroy(Request $request, Recording $recording): JsonResponse
     {
-        // Delete the file if it's an uploaded recording
+        $user = $request->user();
+
+        // Log the deletion attempt
+        $this->accessService->logFileAccess($recording, $user->id, 'deleted', [
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        // Securely delete the file if it's an uploaded recording
         if ($recording->isUploaded() && $recording->file_path) {
             $filePath = storage_path("app/recordings/{$recording->organization_id}/{$recording->file_path}");
-
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
+            $this->accessService->secureDelete($filePath);
         }
 
         $recording->delete();
