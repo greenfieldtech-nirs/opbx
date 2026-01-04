@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
+import JsonView from 'react18-json-view';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 
 
@@ -444,19 +445,18 @@ export default function CallLogs() {
                   {selectedCdr.raw_cdr ? (
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                        <details className="border rounded overflow-hidden">
-                            <summary
-                                className="cursor-pointer p-3 bg-slate-800 text-slate-100 hover:bg-slate-700 font-medium text-sm border-b">
-                                Raw CDR Data (Click to expand/collapse)
-                            </summary>
-
-                            <JsonView src={selectedCdr.raw_cdr} />
-
-                            <pre
-                                className="text-xs bg-slate-900 text-slate-100 p-3 font-mono leading-relaxed whitespace-pre-wrap max-w-full">
-                          {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
-                        </pre>
-                        </details>
+                      <details className="border rounded overflow-hidden">
+                        <summary className="cursor-pointer p-3 bg-slate-800 text-slate-100 hover:bg-slate-700 font-medium text-sm border-b">
+                          Raw CDR Data (Click to expand/collapse)
+                        </summary>
+                        <div className="bg-slate-900 p-3">
+                          <JsonView
+                            value={selectedCdr.raw_cdr}
+                            shouldExpandNode={() => false}
+                            style={{ fontSize: '12px' }}
+                          />
+                        </div>
+                      </details>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
