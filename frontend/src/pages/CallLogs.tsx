@@ -418,13 +418,13 @@ export default function CallLogs() {
                             </div>
                             <div className="mb-2">
                               <div className="text-xs font-medium text-gray-700 mb-1">URL:</div>
-                              <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-all">
+                              <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-words">
                                 {execution.url}
                               </div>
                             </div>
                             <div>
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap border">
+                              <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap border">
                                 {execution.source}
                               </pre>
                             </div>
