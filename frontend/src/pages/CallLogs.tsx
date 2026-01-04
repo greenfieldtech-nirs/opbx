@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
+import JsonViewer from 'json-viewer';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
@@ -340,7 +341,7 @@ export default function CallLogs() {
 
       {/* CDR Details Dialog */}
       <Dialog open={showCdrDetails} onOpenChange={setShowCdrDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Call Detail Record</DialogTitle>
             <DialogDescription>
@@ -442,9 +443,13 @@ export default function CallLogs() {
                   {selectedCdr.raw_cdr ? (
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-xs">
-                        {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
-                      </pre>
+                      <div className="border rounded-lg overflow-x-auto bg-white">
+                        <JsonViewer
+                          data={selectedCdr.raw_cdr}
+                          theme="light"
+                          expandDepth={1}
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
