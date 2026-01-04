@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
-import JsonView from 'react18-json-view';
+import JsonViewer from '@meetelise/searchable-react-json-view';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 
 
@@ -450,10 +450,11 @@ export default function CallLogs() {
                           Raw CDR Data (Click to expand/collapse)
                         </summary>
                         <div className="bg-slate-900 p-3">
-                          <JsonView
-                            value={selectedCdr.raw_cdr}
-                            shouldExpandNode={() => false}
-                            style={{ fontSize: '12px' }}
+                          <JsonViewer
+                            data={selectedCdr.raw_cdr}
+                            theme="dark"
+                            searchable={false}
+                            defaultExpandLevel={0}
                           />
                         </div>
                       </details>
