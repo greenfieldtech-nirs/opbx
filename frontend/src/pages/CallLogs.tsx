@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
-import PureXMLViewer from 'pure-xml-view';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
@@ -425,9 +424,9 @@ export default function CallLogs() {
                             </div>
                             <div>
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <div className="border rounded bg-white">
-                                <PureXMLViewer xml={execution.source} />
-                              </div>
+                              <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap border">
+                                {execution.source}
+                              </pre>
                             </div>
                           </div>
                         ))}
