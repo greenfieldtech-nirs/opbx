@@ -23,6 +23,41 @@ import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 
+// XML syntax highlighter
+function highlightXml(xml: string): string {
+  return xml
+    // XML declarations
+    .replace(/(&lt;\?xml[^&]*&gt;)/g, '<span style="color: #569cd6">$1</span>')
+    // Opening and closing tags
+    .replace(/(&lt;\/?[a-zA-Z][^&]*?&gt;)/g, '<span style="color: #569cd6">$1</span>')
+    // Self-closing tags
+    .replace(/(&lt;[a-zA-Z][^&]*?\/&gt;)/g, '<span style="color: #569cd6">$1</span>')
+    // Attributes
+    .replace(/([a-zA-Z-]+)="([^"]*)"/g, '<span style="color: #9cdcfe">$1</span>=<span style="color: #ce9178">"$2"</span>')
+    // Text content
+    .replace(/(>)([^<>&]+)(<)/g, '$1<span style="color: #d4d4d4">$2</span>$3')
+    // Comments
+    .replace(/(&lt;!--[^&]*--&gt;)/g, '<span style="color: #6a9955">$1</span>');
+}
+
+// JSON syntax highlighter with folding
+function highlightJson(jsonString: string): { html: string; foldable: boolean } {
+  try {
+    const obj = JSON.parse(jsonString);
+    const highlighted = JSON.stringify(obj, null, 2)
+      .replace(/"([^"]+)":/g, '<span style="color: #9cdcfe">"$1"</span>:<span style="color: #d4d4d4">')
+      .replace(/: "([^"]+)"/g, ': <span style="color: #ce9178">"$1"</span>')
+      .replace(/: ([^,\]\}\n]+)/g, ': <span style="color: #b5cea8">$1</span>')
+      .replace(/([{[])/g, '<span style="color: #ffd700; font-weight: bold">$1</span>')
+      .replace(/([}\]])/g, '<span style="color: #ffd700; font-weight: bold">$1</span>')
+      .replace(/,/g, '<span style="color: #d4d4d4">,</span>');
+
+    return { html: highlighted, foldable: true };
+  } catch {
+    return { html: jsonString, foldable: false };
+  }
+}
+
 
 
 export default function CallLogs() {
@@ -424,9 +459,14 @@ export default function CallLogs() {
                             </div>
                             <div>
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap border">
-                                {execution.source}
-                              </pre>
+                              <div className="bg-gray-900 p-3 rounded overflow-x-auto border">
+                                <pre
+                                  className="text-xs font-mono whitespace-pre-wrap"
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlightXml(execution.source)
+                                  }}
+                                />
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -442,9 +482,14 @@ export default function CallLogs() {
                   {selectedCdr.raw_cdr ? (
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <pre className="p-4 bg-gray-50 text-gray-900 rounded-lg overflow-x-auto text-xs whitespace-pre-wrap border">
-                        {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
-                      </pre>
+                      <div className="bg-gray-900 p-4 rounded-lg overflow-x-auto border">
+                        <pre
+                          className="text-xs font-mono whitespace-pre-wrap"
+                          dangerouslySetInnerHTML={{
+                            __html: highlightJson(JSON.stringify(selectedCdr.raw_cdr, null, 2)).html
+                          }}
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
