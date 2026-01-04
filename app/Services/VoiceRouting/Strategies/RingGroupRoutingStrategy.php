@@ -51,7 +51,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         $targets = [];
         foreach ($members as $member) {
-            $targets[] = sprintf('sip:%s@%s', $member->extension_number, $request->input('Domain'));
+            $targets[] = $member->extension_number;
         }
 
         return response(
@@ -90,7 +90,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             return $this->handleFallback($ringGroup);
         }
 
-        $sipUri = sprintf('sip:%s@%s', $member->extension_number, $request->input('Domain'));
+        $sipUri = $member->extension_number;
 
         // Build Action URL for next attempt
         // We need a URL that points back to the VoiceRoutingController callback handler

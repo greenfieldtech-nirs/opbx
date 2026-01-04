@@ -78,29 +78,22 @@ class VoiceRoutingManager
         $extension = $this->cache->getExtension($orgId, $to);
         if ($extension && $extension->isActive()) {
             // Internal call routing to an Extension
-            // We need a dummy DID model or handle internal calls slightly differently in interface?
-            // The RoutingStrategy interface requires DidNumber.
-            // This suggests my Interface design assumed DID-based routing primarily.
-            // If internal, `DidNumber` might be null or we need to adapt.
-            // Let's create a temporary/mock DidNumber context or make DidNumber nullable in interface.
-            // But existing implementations might depend on it.
-            // 'UserRoutingStrategy' didn't use $did heavily, others might not either.
+            Log::info('VoiceRoutingManager: Internal extension destination', [
+                'extension' => $extension->extension_number,
+                'type' => $extension->type->value
+            ]);
 
-            // Refactoring Interface is risky now.
-            // I'll create a transient DidNumber instance for internal calls if strictly needed,
-            // or pass null if I update specific strategies to handle it.
-            // But simpler: The implementation plan Phase 5.1 says "Resolve Destination".
+            // Create destination array based on extension type
+            $destination = $this->resolveExtensionDestination($extension, $orgId);
 
-            // Let's assume for now we only route DID calls via this manager method, 
-            // OR we create a synthetic DID wrapper.
-
-            Log::info('VoiceRoutingManager: Internal extension destination', ['extension' => $extension->extension_number]);
-
-            // We need to match strategy for the Extension itself.
-            // UserRoutingStrategy handles ExtensionType::USER
-
-            // Create a synthetic destination array
-            $destination = ['extension' => $extension];
+            if (empty($destination)) {
+                Log::warning('VoiceRoutingManager: Could not resolve destination for extension', [
+                    'extension' => $extension->extension_number,
+                    'type' => $extension->type->value,
+                    'org_id' => $orgId
+                ]);
+                return response(CxmlBuilder::unavailable('Extension configuration error'), 200, ['Content-Type' => 'text/xml']);
+            }
 
             return $this->executeStrategy($extension->type, $request, new DidNumber(), $destination);
         }
@@ -215,6 +208,78 @@ class VoiceRoutingManager
 
         // Execute Ring Group Strategy
         return $this->executeStrategy(ExtensionType::RING_GROUP, $request, new DidNumber(), $destination);
+    }
+
+    private function resolveExtensionDestination(Extension $extension, int $organizationId): array
+    {
+        return match ($extension->type) {
+            ExtensionType::USER => ['extension' => $extension],
+            ExtensionType::CONFERENCE => $this->resolveConferenceDestination($extension, $organizationId),
+            ExtensionType::RING_GROUP => $this->resolveRingGroupDestination($extension, $organizationId),
+            ExtensionType::IVR => ['extension' => $extension], // IVR routing not yet implemented
+            ExtensionType::AI_ASSISTANT => ['extension' => $extension], // AI routing not yet implemented
+            ExtensionType::CUSTOM_LOGIC => ['extension' => $extension], // Custom logic not yet implemented
+            ExtensionType::FORWARD => ['extension' => $extension], // Forward routing not yet implemented
+            ExtensionType::QUEUE => ['extension' => $extension], // Queue routing not yet implemented
+        };
+    }
+
+    private function resolveConferenceDestination(Extension $extension, int $organizationId): array
+    {
+        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
+        if (!$conferenceRoomId) {
+            Log::warning('VoiceRoutingManager: Conference extension missing conference_room_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        $room = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$room) {
+            Log::warning('VoiceRoutingManager: Conference room not found', [
+                'extension_id' => $extension->id,
+                'conference_room_id' => $conferenceRoomId,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        return ['conference_room' => $room];
+    }
+
+    private function resolveRingGroupDestination(Extension $extension, int $organizationId): array
+    {
+        $ringGroupId = $extension->configuration['ring_group_id'] ?? null;
+        if (!$ringGroupId) {
+            Log::warning('VoiceRoutingManager: Ring group extension missing ring_group_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$ringGroup) {
+            Log::warning('VoiceRoutingManager: Ring group not found', [
+                'extension_id' => $extension->id,
+                'ring_group_id' => $ringGroupId,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        return ['ring_group' => $ringGroup];
     }
 
     private function checkBusinessHours(int $organizationId, string $callSid): ?Response
