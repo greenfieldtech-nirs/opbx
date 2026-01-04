@@ -36,6 +36,19 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Check if this is a callback (subsequent attempt) or initial call
         $attempt = (int) $request->input('SessionData.attempt_number', 0);
 
+        // If attempt number is not in SessionData, try to get it from query params or session_data
+        if ($attempt === 0) {
+            $attempt = (int) $request->input('attempt_number', 0);
+            if ($attempt === 0) {
+                // Try to extract from session_data JSON
+                $sessionDataJson = $request->input('session_data');
+                if ($sessionDataJson) {
+                    $sessionData = json_decode($sessionDataJson, true);
+                    $attempt = (int) ($sessionData['attempt_number'] ?? 0);
+                }
+            }
+        }
+
         if ($ringGroup->strategy === StrategyEnum::SIMULTANEOUS) {
             return $this->handleSimultaneous($ringGroup, $request);
         }

@@ -196,6 +196,17 @@ class VoiceRoutingManager
         $rgId = $request->input('ring_group_id') ?? $request->input('SessionData.ring_group_id');
         $organizationId = (int) $request->input('_organization_id');
 
+        // Extract attempt number from query params or session_data JSON
+        $attempt = (int) $request->input('attempt_number', 0);
+        if ($attempt === 0) {
+            // Try to extract from session_data JSON if not in query params
+            $sessionDataJson = $request->input('session_data');
+            if ($sessionDataJson) {
+                $sessionData = json_decode($sessionDataJson, true);
+                $attempt = (int) ($sessionData['attempt_number'] ?? 0);
+            }
+        }
+
         if (!$rgId) {
             return response(CxmlBuilder::unavailable('Ring group context missing'), 200, ['Content-Type' => 'text/xml']);
         }
