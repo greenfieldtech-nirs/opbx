@@ -418,7 +418,75 @@ export interface CallLogStatistics {
 }
 
 // ============================================================================
-// Live Calls / Presence
+// Session Updates / Active Calls
+// ============================================================================
+
+export interface ActiveCall {
+  session_id: number;
+  session_token: string | null;
+  caller_id: string | null;
+  destination: string | null;
+  direction: 'incoming' | 'outgoing' | null;
+  status: 'processing' | 'ringing' | 'connected';
+  session_created_at: string;
+  last_updated_at: string;
+  duration_seconds: number;
+  formatted_duration: string;
+  domain: string | null;
+  subscriber_id: number | null;
+  call_ids: string[];
+  has_qos_data: boolean;
+}
+
+export interface ActiveCallsResponse {
+  data: ActiveCall[];
+  meta: {
+    total_active_calls: number;
+    by_status: {
+      processing: number;
+      ringing: number;
+      connected: number;
+    };
+    by_direction: {
+      incoming: number;
+      outgoing: number;
+    };
+    last_updated: string;
+    cache_expires_in: number;
+  };
+}
+
+export interface SessionEvent {
+  id: number;
+  event_id: string;
+  status: string;
+  action: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface SessionDetails {
+  session_id: number;
+  events: SessionEvent[];
+}
+
+export interface ActiveCallsStats {
+  total_active: number;
+  by_status: {
+    processing: number;
+    ringing: number;
+    connected: number;
+  };
+  by_direction: {
+    incoming: number;
+    outgoing: number;
+  };
+  average_duration: number;
+  longest_call: number;
+}
+
+// ============================================================================
+// Live Calls / Presence (Legacy - kept for compatibility)
 // ============================================================================
 
 export interface LiveCall {
@@ -511,6 +579,62 @@ export interface CDRFilters {
   from_date?: string; // ISO date string
   to_date?: string; // ISO date string
   disposition?: string;
+}
+
+// ============================================================================
+// Routing Sentry
+// ============================================================================
+
+export interface RoutingSentrySettings {
+  velocity_limit: number;
+  volume_limit: number;
+  default_action: 'allow' | 'block' | 'flag';
+}
+
+export interface SentryBlacklist {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  status: Status;
+  items_count?: number;
+  items?: SentryBlacklistItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SentryBlacklistItem {
+  id: string;
+  blacklist_id: string;
+  phone_number: string;
+  reason?: string;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreSentryBlacklistRequest {
+  name: string;
+  description?: string;
+  status: Status;
+}
+
+export interface UpdateSentryBlacklistRequest {
+  name?: string;
+  description?: string;
+  status?: Status;
+}
+
+export interface StoreSentryBlacklistItemRequest {
+  phone_number: string;
+  reason?: string;
+  expires_at?: string;
+}
+
+export interface UpdateSentrySettingsRequest {
+  velocity_limit: number;
+  volume_limit: number;
+  default_action: 'allow' | 'block' | 'flag';
 }
 
 // User/Extension status types

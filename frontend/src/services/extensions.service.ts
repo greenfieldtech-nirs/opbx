@@ -71,12 +71,21 @@ export const extensionsService = {
       .then(res => res.data);
   },
 
-  /**
-   * Perform extensions sync
-   * POST /extensions/sync
-   */
-  performSync: (): Promise<{ message: string; to_cloudonix: any; from_cloudonix: any }> => {
-    return api.post<{ message: string; to_cloudonix: any; from_cloudonix: any }>('/extensions/sync')
-      .then(res => res.data);
-  },
+   /**
+    * Reset extension password
+    * PUT /extensions/:id/reset-password
+    */
+   resetPassword: (id: string): Promise<{ message: string; new_password: string; extension: Extension; cloudonix_warning?: any }> => {
+     return api.put<{ message: string; new_password: string; extension: Extension; cloudonix_warning?: any }>(`/extensions/${id}/reset-password`)
+       .then(res => res.data);
+   },
+
+   /**
+    * Perform extensions sync
+    * POST /extensions/sync
+    */
+   performSync: (): Promise<{ message: string; to_cloudonix: any; from_cloudonix: any }> => {
+     return api.post<{ message: string; to_cloudonix: any; from_cloudonix: any }>('/extensions/sync')
+       .then(res => res.data);
+   },
 };

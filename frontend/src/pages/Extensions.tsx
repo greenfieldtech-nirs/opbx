@@ -41,8 +41,9 @@ import {
   Calendar,
   Activity,
   PhoneForwarded,
-  Sparkles,
-  RefreshCw,
+   Sparkles,
+   RefreshCw,
+   Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -251,9 +252,11 @@ export default function ExtensionsComplete() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
-  const [showExtensionDetail, setShowExtensionDetail] = useState(false);
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+   const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
+   const [showExtensionDetail, setShowExtensionDetail] = useState(false);
+   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+   const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
 
   // Form state
   const [formData, setFormData] = useState<ExtensionFormData>({
@@ -344,45 +347,90 @@ export default function ExtensionsComplete() {
     },
   });
 
-  // Sync mutation
-  const syncMutation = useMutation({
-    mutationFn: () => extensionsService.performSync(),
-    onMutate: () => {
-      setIsSyncing(true);
-      toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
-      setIsSyncNeeded(false);
-      const toCreated = data.to_cloudonix?.created || 0;
-      const fromCreated = data.from_cloudonix?.created || 0;
-      toast.success(
-        `Extensions synchronized! Created ${toCreated} in Cloudonix, imported ${fromCreated} from Cloudonix`,
-        { id: 'sync-extensions' }
-      );
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
-      toast.error(message, { id: 'sync-extensions' });
-    },
-    onSettled: () => {
-      setIsSyncing(false);
-    },
-  });
+   // Reset password mutation
+   const resetPasswordMutation = useMutation({
+     mutationFn: (extensionId: string) => extensionsService.resetPassword(extensionId),
+     onSuccess: (data, extensionId) => {
+       queryClient.invalidateQueries({ queryKey: ['extensions'] });
+
+       // Store the new password temporarily for display
+       setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
+
+       // Automatically hide the password after 30 seconds for security
+       setTimeout(() => {
+         setTempPasswords(prev => {
+           const next = new Map(prev);
+           next.delete(extensionId);
+           return next;
+         });
+       }, 30000);
+
+       toast.success(
+         `Password reset successfully! New password: ${data.new_password}`,
+         {
+           duration: 10000,
+           action: {
+             label: 'Copy',
+             onClick: () => {
+               navigator.clipboard.writeText(data.new_password).then(() => {
+                 toast.success('Password copied to clipboard!');
+               });
+             },
+           },
+         }
+       );
+
+       // Show Cloudonix warning if present
+       if (data.cloudonix_warning) {
+         toast.warning(data.cloudonix_warning.message, { duration: 8000 });
+       }
+     },
+     onError: (error: any) => {
+       const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to reset extension password';
+       toast.error(message);
+     },
+   });
+
+   // Sync mutation
+   const syncMutation = useMutation({
+     mutationFn: () => extensionsService.performSync(),
+     onMutate: () => {
+       setIsSyncing(true);
+       toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
+     },
+     onSuccess: (data) => {
+       queryClient.invalidateQueries({ queryKey: ['extensions'] });
+       setIsSyncNeeded(false);
+       const toCreated = data.to_cloudonix?.created || 0;
+       const fromCreated = data.from_cloudonix?.created || 0;
+       toast.success(
+         `Extensions synchronized! Created ${toCreated} in Cloudonix, imported ${fromCreated} from Cloudonix`,
+         { id: 'sync-extensions' }
+       );
+     },
+     onError: (error: any) => {
+       const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
+       toast.error(message, { id: 'sync-extensions' });
+     },
+     onSettled: () => {
+       setIsSyncing(false);
+     },
+   });
 
   // Handle sync button click
   const handleSync = () => {
     syncMutation.mutate();
   };
 
-  // Check user permissions
-  const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
-  const canEdit = (extension: Extension) => {
-    if (['owner', 'pbx_admin'].includes(currentUser.role)) return true;
-    if (currentUser.role === 'pbx_user' && extension.user_id === currentUser.id) return true;
-    return false;
-  };
-  const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
+   // Check user permissions
+   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
+   const canEdit = (extension: Extension) => {
+     if (['owner', 'pbx_admin'].includes(currentUser.role)) return true;
+     if (currentUser.role === 'pbx_user' && extension.user_id === currentUser.id) return true;
+     return false;
+   };
+   const canResetPassword = ['owner', 'pbx_admin'].includes(currentUser.role);
+   const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = currentUser.role === 'reporter';
 
   // Client-side assignment filter (backend doesn't expose this yet)
@@ -1263,7 +1311,9 @@ export default function ExtensionsComplete() {
                     {getSortIcon('extension_number')}
                   </div>
                 </TableHead>
-                <TableHead>Password</TableHead>
+                {displayedExtensions.some(ext => ext.type === 'user') && (
+                  <TableHead>Password</TableHead>
+                )}
                 <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
                   <div className="flex items-center gap-2">
                     Type
@@ -1289,7 +1339,7 @@ export default function ExtensionsComplete() {
             <TableBody>
               {displayedExtensions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 7 : 6} className="text-center py-12">
                     <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No extensions found</h3>
                     <p className="text-muted-foreground mb-4">
@@ -1318,38 +1368,44 @@ export default function ExtensionsComplete() {
                       >
                         {extension.extension_number}
                       </button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">
-                          {visiblePasswords.has(extension.id) ? extension.password : '••••••••••••••••'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => togglePasswordVisibility(extension.id)}
-                            title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
-                          >
-                            {visiblePasswords.has(extension.id) ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => copyPassword(extension.password, extension.extension_number)}
-                            title="Copy password"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </TableCell>
+                     </TableCell>
+                     {displayedExtensions.some(ext => ext.type === 'user') && (
+                       <TableCell>
+                         {extension.type === 'user' ? (
+                           <div className="flex items-center gap-2">
+                             <span className="font-mono text-sm">
+                               {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
+                             </span>
+                             <div className="flex items-center gap-1">
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-7 w-7 p-0"
+                                 onClick={() => togglePasswordVisibility(extension.id)}
+                                 title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
+                               >
+                                 {visiblePasswords.has(extension.id) ? (
+                                   <EyeOff className="h-4 w-4" />
+                                 ) : (
+                                   <Eye className="h-4 w-4" />
+                                 )}
+                               </Button>
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-7 w-7 p-0"
+                                 onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
+                                 title="Copy password"
+                               >
+                                 <Copy className="h-4 w-4" />
+                               </Button>
+                             </div>
+                           </div>
+                         ) : (
+                           <span className="text-muted-foreground">-</span>
+                         )}
+                       </TableCell>
+                     )}
                     <TableCell>{getTypeBadge(extension.type)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {getConfigurationDisplay(extension)}
@@ -1381,19 +1437,33 @@ export default function ExtensionsComplete() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
-                              {canEdit(extension) && (
-                                <>
-                                  <DropdownMenuItem onClick={() => openEditDialog(extension)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Extension
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleToggleStatus(extension)}>
-                                    <Activity className="h-4 w-4 mr-2" />
-                                    {extension.status === 'active' ? 'Deactivate' : 'Activate'}
-                                  </DropdownMenuItem>
-                                </>
-                              )}
+                               {canEdit(extension) && (
+                                 <>
+                                   <DropdownMenuItem onClick={() => openEditDialog(extension)}>
+                                     <Edit className="h-4 w-4 mr-2" />
+                                     Edit Extension
+                                   </DropdownMenuItem>
+                                   {canResetPassword && extension.type === 'user' && (
+                                     <>
+                                       <DropdownMenuSeparator />
+                                       <DropdownMenuItem
+                                         onClick={() => {
+                                           setSelectedExtension(extension);
+                                           setShowResetPasswordDialog(true);
+                                         }}
+                                       >
+                                         <Key className="h-4 w-4 mr-2" />
+                                         Reset Password
+                                       </DropdownMenuItem>
+                                     </>
+                                   )}
+                                   <DropdownMenuSeparator />
+                                   <DropdownMenuItem onClick={() => handleToggleStatus(extension)}>
+                                     <Activity className="h-4 w-4 mr-2" />
+                                     {extension.status === 'active' ? 'Deactivate' : 'Activate'}
+                                   </DropdownMenuItem>
+                                 </>
+                               )}
                               {canDelete && (
                                 <>
                                   <DropdownMenuSeparator />
@@ -1673,6 +1743,66 @@ export default function ExtensionsComplete() {
               Cancel
             </Button>
             <Button onClick={handleEditExtension}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Confirmation Dialog */}
+      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Extension Password?</DialogTitle>
+            <DialogDescription>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="text-amber-600 mt-0.5">⚠️</div>
+                  <div className="text-sm">
+                    <strong>This action cannot be undone.</strong>
+                    <div className="mt-2 space-y-1 text-amber-800">
+                      <div>• A new secure password will be generated</div>
+                      <div>• All active SIP sessions will be disconnected</div>
+                      <div>• IP phones will need to be reconfigured</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-sm">
+                  Extension: <strong>{selectedExtension?.extension_number}</strong>
+                  {selectedExtension?.user && (
+                    <div className="mt-1">
+                      Assigned to: <strong>{selectedExtension.user.name}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowResetPasswordDialog(false);
+                setSelectedExtension(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedExtension) {
+                  resetPasswordMutation.mutate(selectedExtension.id, {
+                    onSuccess: () => {
+                      setShowResetPasswordDialog(false);
+                      setSelectedExtension(null);
+                    },
+                  });
+                }
+              }}
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

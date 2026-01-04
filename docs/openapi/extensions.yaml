@@ -1,0 +1,741 @@
+openapi: 3.0.3
+info:
+  title: OPBX Extensions Management API
+  description: |
+    Extension management endpoints for creating, configuring, and managing PBX extensions.
+    Supports various extension types including users, conference rooms, ring groups, IVR menus, and AI assistants.
+  version: 1.0.0
+  contact:
+    name: OPBX Development Team
+
+servers:
+  - url: http://localhost/api/v1
+    description: Local development server
+  - url: https://api.opbx.cloudonix.com/api/v1
+    description: Production server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Laravel Sanctum Bearer token authentication
+
+  schemas:
+    Extension:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique extension identifier
+          example: 1
+        organization_id:
+          type: integer
+          description: Organization this extension belongs to
+          example: 1
+        user_id:
+          type: integer
+          nullable: true
+          description: Associated user ID (for user-type extensions)
+          example: 2
+        extension_number:
+          type: string
+          description: Extension number (unique within organization)
+          example: "1001"
+        name:
+          type: string
+          description: Display name for the extension
+          example: "John Doe's Extension"
+        password:
+          type: string
+          description: SIP password (hidden in responses)
+          example: null
+        cloudonix_subscriber_id:
+          type: string
+          nullable: true
+          description: Cloudonix subscriber identifier
+          example: "sub_123456"
+        cloudonix_uuid:
+          type: string
+          nullable: true
+          description: Cloudonix UUID
+          example: "uuid-12345"
+        cloudonix_synced:
+          type: boolean
+          description: Whether extension is synced with Cloudonix
+          example: true
+        type:
+          type: string
+          enum: [user, conference, ring_group, ivr, ai_assistant, custom_logic, forward]
+          description: Extension type
+          example: "user"
+        status:
+          type: string
+          enum: [active, inactive]
+          description: Extension status
+          example: "active"
+        voicemail_enabled:
+          type: boolean
+          description: Whether voicemail is enabled
+          example: true
+        configuration:
+          type: object
+          description: Type-specific configuration data
+          example:
+            conference_room_id: 1
+        created_at:
+          type: string
+          format: date-time
+          description: When the extension was created
+        updated_at:
+          type: string
+          format: date-time
+          description: When the extension was last updated
+
+    ExtensionCollection:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Extension'
+        links:
+          type: object
+          properties:
+            first:
+              type: string
+            last:
+              type: string
+            prev:
+              type: string
+              nullable: true
+            next:
+              type: string
+              nullable: true
+        meta:
+          type: object
+          properties:
+            current_page:
+              type: integer
+            from:
+              type: integer
+            last_page:
+              type: integer
+            per_page:
+              type: integer
+            to:
+              type: integer
+            total:
+              type: integer
+
+    CreateExtensionRequest:
+      type: object
+      required:
+        - extension_number
+        - name
+        - type
+      properties:
+        extension_number:
+          type: string
+          pattern: '^[0-9]+$'
+          minLength: 1
+          maxLength: 10
+          description: Extension number (digits only, unique within organization)
+          example: "1001"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Display name for the extension
+          example: "John Doe's Extension"
+        password:
+          type: string
+          minLength: 6
+          maxLength: 32
+          description: SIP password (auto-generated if not provided)
+          example: "securePass123"
+        user_id:
+          type: integer
+          nullable: true
+          description: Associated user ID (required for user-type extensions)
+          example: 2
+        type:
+          type: string
+          enum: [user, conference, ring_group, ivr, ai_assistant, custom_logic, forward]
+          description: Extension type
+          example: "user"
+        voicemail_enabled:
+          type: boolean
+          description: Whether voicemail is enabled
+          default: true
+          example: true
+        configuration:
+          type: object
+          description: Type-specific configuration
+          example:
+            conference_room_id: 1
+
+    UpdateExtensionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Display name for the extension
+        user_id:
+          type: integer
+          nullable: true
+          description: Associated user ID
+        voicemail_enabled:
+          type: boolean
+          description: Whether voicemail is enabled
+        configuration:
+          type: object
+          description: Type-specific configuration
+
+    SyncComparison:
+      type: object
+      properties:
+        local_count:
+          type: integer
+          description: Number of extensions in local database
+          example: 5
+        cloudonix_count:
+          type: integer
+          description: Number of extensions in Cloudonix
+          example: 4
+        to_create:
+          type: array
+          items:
+            type: object
+            properties:
+              extension_number:
+                type: string
+              name:
+                type: string
+          description: Extensions that exist in Cloudonix but not locally
+        to_delete:
+          type: array
+          items:
+            type: object
+            properties:
+              extension_number:
+                type: string
+              name:
+                type: string
+          description: Extensions that exist locally but not in Cloudonix
+
+    SyncResult:
+      type: object
+      properties:
+        created:
+          type: integer
+          description: Number of extensions created
+          example: 1
+        deleted:
+          type: integer
+          description: Number of extensions deleted
+          example: 0
+        updated:
+          type: integer
+          description: Number of extensions updated
+          example: 2
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              extension_number:
+                type: string
+              error:
+                type: string
+          description: Any sync errors encountered
+
+    ExtensionPassword:
+      type: object
+      properties:
+        password:
+          type: string
+          description: Current SIP password for the extension
+          example: "securePass123"
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+        errors:
+          type: object
+          description: Detailed validation errors
+
+  parameters:
+    ExtensionId:
+      name: extension
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Unique extension identifier
+      example: 1
+
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 15
+      description: Number of items per page
+
+paths:
+  /extensions:
+    get:
+      summary: List extensions
+      description: |
+        Retrieve a paginated list of extensions in the organization.
+
+        Extensions are automatically scoped to the authenticated user's organization.
+        Results include all extension types and their current status.
+      operationId: listExtensions
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Extensions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtensionCollection'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create extension
+      description: |
+        Create a new extension in the organization.
+
+        Extension numbers must be unique within the organization.
+        Passwords are auto-generated if not provided.
+      operationId: createExtension
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExtensionRequest'
+            example:
+              extension_number: "1001"
+              name: "John Doe's Extension"
+              type: "user"
+              user_id: 2
+              voicemail_enabled: true
+      responses:
+        '201':
+          description: Extension created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extension:
+                    $ref: '#/components/schemas/Extension'
+                  message:
+                    type: string
+                    example: "Extension created successfully"
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extensions/sync/compare:
+    get:
+      summary: Compare extension sync status
+      description: |
+        Compare local extensions with Cloudonix to identify differences.
+
+        Returns counts and lists of extensions that need to be created or deleted
+        to synchronize the local database with Cloudonix.
+      operationId: compareExtensionSync
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sync comparison completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncComparison'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extensions/sync:
+    post:
+      summary: Synchronize extensions with Cloudonix
+      description: |
+        Perform synchronization between local extensions and Cloudonix.
+
+        This will create, update, and delete extensions as needed to match
+        the Cloudonix configuration. Requires admin-level permissions.
+      operationId: performExtensionSync
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sync completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/SyncResult'
+                  message:
+                    type: string
+                    example: "Extension sync completed"
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extensions/{extension}:
+    get:
+      summary: Get extension details
+      description: |
+        Retrieve detailed information about a specific extension.
+
+        Extensions can only be viewed within the authenticated user's organization.
+      operationId: getExtension
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExtensionId'
+      responses:
+        '200':
+          description: Extension details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extension:
+                    $ref: '#/components/schemas/Extension'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - extension not in your organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Extension not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update extension
+      description: |
+        Update an existing extension's configuration.
+
+        Extensions can only be updated within the authenticated user's organization.
+      operationId: updateExtension
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExtensionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExtensionRequest'
+            example:
+              name: "John Smith's Extension"
+              voicemail_enabled: false
+      responses:
+        '200':
+          description: Extension updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extension:
+                    $ref: '#/components/schemas/Extension'
+                  message:
+                    type: string
+                    example: "Extension updated successfully"
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions or extension not in your organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Extension not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Delete extension
+      description: |
+        Delete an extension from the organization.
+
+        Extensions can only be deleted within the authenticated user's organization.
+        This will also remove the extension from Cloudonix if synced.
+      operationId: deleteExtension
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExtensionId'
+      responses:
+        '200':
+          description: Extension deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Extension deleted successfully"
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions or extension not in your organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Extension not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extensions/{extension}/password:
+    get:
+      summary: Get extension password
+      description: |
+        Retrieve the SIP password for an extension.
+
+        Passwords are sensitive information and should only be displayed
+        when necessary for troubleshooting or initial setup.
+      operationId: getExtensionPassword
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExtensionId'
+      responses:
+        '200':
+          description: Extension password retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtensionPassword'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions or extension not in your organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Extension not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /extensions/{extension}/reset-password:
+    put:
+      summary: Reset extension password
+      description: |
+        Generate a new random password for the extension.
+
+        This will update both the local database and Cloudonix if the extension is synced.
+        The old password will be invalidated immediately.
+      operationId: resetExtensionPassword
+      tags:
+        - Extensions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExtensionId'
+      responses:
+        '200':
+          description: Extension password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extension:
+                    $ref: '#/components/schemas/Extension'
+                  new_password:
+                    type: string
+                    description: The new generated password
+                    example: "newSecurePass456"
+                  message:
+                    type: string
+                    example: "Extension password reset successfully"
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '403':
+          description: Forbidden - insufficient permissions or extension not in your organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Extension not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: Extensions
+    description: |
+      Extension management endpoints for PBX configuration.
+
+      Extensions represent phone endpoints in the PBX system and can be
+      of various types (users, conference rooms, ring groups, etc.).
+      All operations are automatically scoped to the authenticated user's organization.

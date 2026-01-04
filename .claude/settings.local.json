@@ -63,7 +63,9 @@
       "Bash(./opbx_bootstrap.sh:*)",
       "Bash(mkdir:*)",
       "Bash(timeout 120 npm run build)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(rm:*)",
+      "Bash(docker-compose build:*)"
     ]
   }
 }

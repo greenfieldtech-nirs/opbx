@@ -24,15 +24,15 @@ class CallRoutingService
 
     public function __construct()
     {
-        $this->resilientCache = new ResilientCacheService();
+        $this->resilientCache = new ResilientCacheService;
     }
 
     /**
      * Route an inbound call based on DID configuration.
      *
-     * @param string $toNumber The called DID number
-     * @param string $fromNumber The caller number
-     * @param int $organizationId The organization ID
+     * @param  string  $toNumber  The called DID number
+     * @param  string  $fromNumber  The caller number
+     * @param  int  $organizationId  The organization ID
      * @return string CXML response
      */
     public function routeInboundCall(string $toNumber, string $fromNumber, int $organizationId): string
@@ -49,7 +49,7 @@ class CallRoutingService
             ->where('status', 'active')
             ->first();
 
-        if (!$didNumber) {
+        if (! $didNumber) {
             Log::warning('DID not found or inactive', [
                 'to_number' => $toNumber,
                 'organization_id' => $organizationId,
@@ -75,7 +75,7 @@ class CallRoutingService
     {
         $extensionId = $didNumber->getTargetExtensionId();
 
-        if (!$extensionId) {
+        if (! $extensionId) {
             Log::error('Extension ID not found in routing config', [
                 'did_id' => $didNumber->id,
                 'routing_config' => $didNumber->routing_config,
@@ -89,7 +89,7 @@ class CallRoutingService
             ->where('status', 'active')
             ->first();
 
-        if (!$extension) {
+        if (! $extension) {
             Log::error('Extension not found or inactive', [
                 'did_id' => $didNumber->id,
                 'extension_id' => $extensionId,
@@ -100,7 +100,7 @@ class CallRoutingService
 
         $sipUri = $extension->getSipUri();
 
-        if (!$sipUri) {
+        if (! $sipUri) {
             Log::error('Extension has no SIP URI', [
                 'did_id' => $didNumber->id,
                 'extension_id' => $extensionId,
@@ -125,7 +125,7 @@ class CallRoutingService
     {
         $ringGroupId = $didNumber->getTargetRingGroupId();
 
-        if (!$ringGroupId) {
+        if (! $ringGroupId) {
             Log::error('Ring group ID not found in routing config', [
                 'did_id' => $didNumber->id,
                 'routing_config' => $didNumber->routing_config,
@@ -139,7 +139,7 @@ class CallRoutingService
             ->where('status', 'active')
             ->first();
 
-        if (!$ringGroup) {
+        if (! $ringGroup) {
             Log::error('Ring group not found or inactive', [
                 'did_id' => $didNumber->id,
                 'ring_group_id' => $ringGroupId,
@@ -155,9 +155,6 @@ class CallRoutingService
     /**
      * Route to ring group with lock acquisition and retry logic.
      *
-     * @param RingGroup $ringGroup
-     * @param int $didId
-     * @param int $maxAttempts
      * @return string CXML response
      */
     private function routeRingGroupWithRetry(RingGroup $ringGroup, int $didId, int $maxAttempts = 3): string
@@ -209,9 +206,8 @@ class CallRoutingService
     /**
      * Route to ring group with mandatory lock acquisition.
      *
-     * @param RingGroup $ringGroup
-     * @param int $didId
      * @return string CXML response
+     *
      * @throws LockTimeoutException If lock cannot be acquired
      * @throws \RuntimeException If database lock fails
      */
@@ -280,10 +276,6 @@ class CallRoutingService
 
     /**
      * Record lock acquisition metrics for monitoring.
-     *
-     * @param string $lockKey
-     * @param bool $acquired
-     * @param float $duration
      */
     private function recordLockMetric(string $lockKey, bool $acquired, float $duration): void
     {
@@ -303,7 +295,7 @@ class CallRoutingService
     {
         $businessHoursId = $didNumber->getTargetBusinessHoursId();
 
-        if (!$businessHoursId) {
+        if (! $businessHoursId) {
             Log::error('Business hours ID not found in routing config', [
                 'did_id' => $didNumber->id,
                 'routing_config' => $didNumber->routing_config,
@@ -317,7 +309,7 @@ class CallRoutingService
             ->where('status', 'active')
             ->first();
 
-        if (!$businessHours) {
+        if (! $businessHours) {
             Log::error('Business hours not found or inactive', [
                 'did_id' => $didNumber->id,
                 'business_hours_id' => $businessHoursId,
@@ -369,7 +361,7 @@ class CallRoutingService
     {
         $fallback = $ringGroup->fallback_action;
 
-        if (!$fallback || !isset($fallback['action'])) {
+        if (! $fallback || ! isset($fallback['action'])) {
             return CxmlBuilder::busy();
         }
 
@@ -378,5 +370,67 @@ class CallRoutingService
             'busy' => CxmlBuilder::busy($fallback['message'] ?? null),
             default => CxmlBuilder::busy(),
         };
+    }
+
+    /**
+     * Route directly to a ring group (for extension-based routing)
+     *
+     * @return string CXML response
+     */
+    public function routeToRingGroupDirect(int $ringGroupId, int $organizationId): string
+    {
+        $ringGroup = RingGroup::where('organization_id', $organizationId)
+            ->where('id', $ringGroupId)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $ringGroup) {
+            return CxmlBuilder::unavailable('Ring group not found');
+        }
+
+        $members = $ringGroup->getMembers()->filter(fn (Extension $ext) => $ext->isActive());
+        $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
+
+        if (empty($sipUris)) {
+            // Handle fallback
+            $fallback = $ringGroup->fallback_action;
+
+            return match ($fallback['action'] ?? 'hangup') {
+                'extension' => $this->routeToFallbackExtension($fallback),
+                'voicemail' => CxmlBuilder::sendToVoicemail(),
+                'busy' => CxmlBuilder::busy($fallback['message'] ?? null),
+                default => CxmlBuilder::simpleHangup(),
+            };
+        }
+
+        return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+    }
+
+    /**
+     * Route to fallback extension
+     *
+     * @return string CXML response
+     */
+    private function routeToFallbackExtension(array $fallbackConfig): string
+    {
+        $extensionId = $fallbackConfig['extension_id'] ?? null;
+
+        if (! $extensionId) {
+            return CxmlBuilder::simpleHangup();
+        }
+
+        $extension = Extension::find($extensionId);
+
+        if (! $extension || ! $extension->isActive()) {
+            return CxmlBuilder::simpleHangup();
+        }
+
+        $sipUri = $extension->getSipUri();
+
+        if (! $sipUri) {
+            return CxmlBuilder::simpleHangup();
+        }
+
+        return CxmlBuilder::simpleDial($sipUri);
     }
 }

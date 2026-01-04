@@ -103,7 +103,6 @@ export class EchoService {
    */
   connect(token: string): void {
     if (this.echo || this.isConnecting) {
-      console.log('[Echo] Already connected or connecting');
       return;
     }
 
@@ -116,25 +115,22 @@ export class EchoService {
       // Listen to connection events from Pusher
       const pusher = (this.echo as any).connector.pusher;
 
-      pusher.connection.bind('connected', () => {
-        console.log('[Echo] WebSocket connected successfully');
-        this.connectionState = 'connected';
-        this.isConnecting = false;
-      });
+       pusher.connection.bind('connected', () => {
+         this.connectionState = 'connected';
+         this.isConnecting = false;
+       });
 
-      pusher.connection.bind('disconnected', () => {
-        console.log('[Echo] WebSocket disconnected');
-        this.connectionState = 'disconnected';
-      });
+       pusher.connection.bind('disconnected', () => {
+         this.connectionState = 'disconnected';
+       });
 
-      pusher.connection.bind('error', (error: any) => {
-        console.error('[Echo] WebSocket error:', error);
-        this.isConnecting = false;
-      });
+       pusher.connection.bind('error', () => {
+         this.isConnecting = false;
+       });
 
-      pusher.connection.bind('state_change', (states: any) => {
-        console.log('[Echo] Connection state:', states.current);
-      });
+       pusher.connection.bind('state_change', () => {
+         // Silently handle state changes
+       });
 
     } catch (error) {
       console.error('[Echo] Failed to create Echo instance:', error);
@@ -156,7 +152,6 @@ export class EchoService {
 
     // Don't resubscribe to the same organization
     if (this.currentOrganizationId === organizationId) {
-      console.log('[Echo] Already subscribed to organization:', organizationId);
       return;
     }
 
@@ -167,49 +162,41 @@ export class EchoService {
 
     this.currentOrganizationId = organizationId;
 
-    console.log('[Echo] Subscribing to organization presence channel:', organizationId);
-
     const channel = this.echo.join(`presence.org.${organizationId}`)
       .here((members: PresenceMember[]) => {
-        console.log('[Echo] Current members in channel:', members);
         if (callbacks.onPresenceUpdate) {
           callbacks.onPresenceUpdate(members);
         }
       })
       .joining((member: PresenceMember) => {
-        console.log('[Echo] Member joined:', member.name);
         if (callbacks.onMemberJoined) {
           callbacks.onMemberJoined(member);
         }
       })
       .leaving((member: PresenceMember) => {
-        console.log('[Echo] Member left:', member.name);
         if (callbacks.onMemberLeft) {
           callbacks.onMemberLeft(member);
         }
       })
-      .error((error: any) => {
-        console.error('[Echo] Channel error:', error);
+      .error(() => {
+        // Silently handle channel errors
       });
 
     // Subscribe to call events with dot prefix (Laravel Echo format)
     if (callbacks.onCallInitiated) {
       channel.listen('.call.initiated', (data: CallInitiatedData) => {
-        console.log('[Echo] Call initiated:', data.call_id);
         callbacks.onCallInitiated!(data);
       });
     }
 
     if (callbacks.onCallAnswered) {
       channel.listen('.call.answered', (data: CallAnsweredData) => {
-        console.log('[Echo] Call answered:', data.call_id);
         callbacks.onCallAnswered!(data);
       });
     }
 
     if (callbacks.onCallEnded) {
       channel.listen('.call.ended', (data: CallEndedData) => {
-        console.log('[Echo] Call ended:', data.call_id);
         callbacks.onCallEnded!(data);
       });
     }
@@ -220,18 +207,16 @@ export class EchoService {
    */
   leaveOrganization(): void {
     if (this.echo && this.currentOrganizationId) {
-      console.log('[Echo] Leaving organization channel:', this.currentOrganizationId);
       this.echo.leave(`presence.org.${this.currentOrganizationId}`);
       this.currentOrganizationId = null;
     }
   }
 
   /**
-   * Disconnect from WebSocket server
-   */
+    * Disconnect from WebSocket server
+    */
   disconnect(): void {
     if (this.echo) {
-      console.log('[Echo] Disconnecting from WebSocket server');
       this.leaveOrganization();
       this.echo.disconnect();
       this.echo = null;

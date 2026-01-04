@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, Info } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 interface PhoneNumberDialogProps {
   open: boolean;
@@ -448,6 +448,14 @@ export function PhoneNumberDialog({
                 )}
               </div>
             )}
+            {/* Sentry Protection Info */}
+            <Alert className="bg-blue-50 border-blue-200">
+              <ShieldCheck className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-700 text-xs">
+                This number is automatically protected by <strong>Routing Sentry</strong>.
+                Inbound call velocity and volume are monitored based on global settings.
+              </AlertDescription>
+            </Alert>
           </div>
         </div>
 

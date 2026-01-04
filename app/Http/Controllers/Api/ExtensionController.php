@@ -565,6 +565,203 @@ class ExtensionController extends Controller
     }
 
     /**
+     * Reset the password for the specified extension.
+     *
+     * @param Request $request
+     * @param Extension $extension
+     * @param PasswordGenerator $passwordGenerator
+     * @param CloudonixSubscriberService $subscriberService
+     * @return JsonResponse
+     */
+    public function resetPassword(
+        Request $request,
+        Extension $extension,
+        PasswordGenerator $passwordGenerator,
+        CloudonixSubscriberService $subscriberService
+    ): JsonResponse {
+        $requestId = (string) Str::uuid();
+        $currentUser = $request->user();
+
+        if (!$currentUser) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        // Only Owner and PBX Admin can reset extension passwords
+        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
+            return response()->json([
+                'error' => 'Unauthorized',
+                'message' => 'Only Owner and PBX Admin can reset extension passwords.',
+            ], 403);
+        }
+
+        // Tenant scope check
+        if ($extension->organization_id !== $currentUser->organization_id) {
+            Log::warning('Cross-tenant extension password reset attempt', [
+                'request_id' => $requestId,
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_extension_id' => $extension->id,
+                'target_organization_id' => $extension->organization_id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Extension not found.',
+            ], 404);
+        }
+
+        Log::info('Resetting extension password', [
+            'request_id' => $requestId,
+            'user_id' => $currentUser->id,
+            'organization_id' => $currentUser->organization_id,
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+        ]);
+
+        try {
+            // Generate new memorable password using the same method as extension creation
+            $newPassword = $passwordGenerator->generate();
+
+            // Update the extension with the new password
+            $extension->password = $newPassword;
+            $extension->save();
+
+            // Reload extension to get updated data
+            $extension->refresh();
+            $extension->load('user:id,organization_id,name,email,role,status');
+
+            Log::info('Extension password reset successfully', [
+                'request_id' => $requestId,
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+            ]);
+
+            // Sync to Cloudonix if USER type extension and already synced
+            $cloudonixWarning = null;
+            if ($extension->type === ExtensionType::USER && $extension->cloudonix_synced) {
+                $syncResult = $subscriberService->syncToCloudnonix($extension, true);
+
+                if ($syncResult['success']) {
+                    Log::info('Extension password synced to Cloudonix', [
+                        'request_id' => $requestId,
+                        'extension_id' => $extension->id,
+                        'subscriber_id' => $extension->cloudonix_subscriber_id,
+                    ]);
+                } else {
+                    Log::warning('Failed to sync extension password to Cloudonix (non-blocking)', [
+                        'request_id' => $requestId,
+                        'extension_id' => $extension->id,
+                        'error' => $syncResult['error'] ?? 'Unknown error',
+                        'details' => $syncResult['details'] ?? [],
+                    ]);
+
+                    // Prepare warning message for API response
+                    $cloudonixWarning = [
+                        'message' => 'Extension password reset locally but Cloudonix sync failed',
+                        'error' => $syncResult['error'] ?? 'Unknown error',
+                        'details' => $syncResult['details'] ?? [],
+                    ];
+                }
+
+                // Refresh to get any updated fields
+                $extension->refresh();
+            }
+
+            $response = [
+                'message' => 'Extension password reset successfully.',
+                'new_password' => $newPassword,
+                'extension' => new ExtensionResource($extension),
+            ];
+
+            // Include Cloudonix warning if sync failed
+            if ($cloudonixWarning) {
+                $response['cloudonix_warning'] = $cloudonixWarning;
+            }
+
+            return response()->json($response);
+        } catch (\Exception $e) {
+            Log::error('Failed to reset extension password', [
+                'request_id' => $requestId,
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'extension_id' => $extension->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to reset extension password',
+                'message' => 'An error occurred while resetting the extension password.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get the password for the specified extension.
+     *
+     * @param Request $request
+     * @param Extension $extension
+     * @return JsonResponse
+     */
+    public function getPassword(Request $request, Extension $extension): JsonResponse
+    {
+        $requestId = (string) Str::uuid();
+        $currentUser = $request->user();
+
+        if (!$currentUser) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        // Only Owner and PBX Admin can view extension passwords
+        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
+            return response()->json([
+                'error' => 'Unauthorized',
+                'message' => 'Only Owner and PBX Admin can view extension passwords.',
+            ], 403);
+        }
+
+        // Tenant scope check
+        if ($extension->organization_id !== $currentUser->organization_id) {
+            Log::warning('Cross-tenant extension password access attempt', [
+                'request_id' => $requestId,
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_extension_id' => $extension->id,
+                'target_organization_id' => $extension->organization_id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Extension not found.',
+            ], 404);
+        }
+
+        // Only USER type extensions have passwords
+        if ($extension->type !== \App\Enums\ExtensionType::USER) {
+            return response()->json([
+                'error' => 'Not Applicable',
+                'message' => 'Only PBX User extensions have passwords.',
+            ], 400);
+        }
+
+        Log::info('Extension password accessed', [
+            'request_id' => $requestId,
+            'user_id' => $currentUser->id,
+            'organization_id' => $currentUser->organization_id,
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+        ]);
+
+        return response()->json([
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'password' => $extension->getSipPassword(),
+        ]);
+    }
+
+    /**
      * Perform bi-directional sync between local extensions and Cloudonix.
      *
      * @param Request $request

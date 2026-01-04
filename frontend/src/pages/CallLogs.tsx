@@ -17,10 +17,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
+import { JsonViewer } from '@textea/json-viewer';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
+
+
+
+
 
 export default function CallLogs() {
   // CDR state
@@ -340,22 +348,22 @@ export default function CallLogs() {
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Call Detail Record</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-all">
               Complete CDR information for call ID: {selectedCdr?.call_id}
             </DialogDescription>
           </DialogHeader>
           {selectedCdr && (
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-muted-foreground">From</div>
-                  <div className="text-base">{formatPhoneNumber(selectedCdr.from)}</div>
+                  <div className="text-base break-words">{formatPhoneNumber(selectedCdr.from)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-muted-foreground">To</div>
-                  <div className="text-base">{formatPhoneNumber(selectedCdr.to)}</div>
+                  <div className="text-base break-words">{formatPhoneNumber(selectedCdr.to)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-muted-foreground">Disposition</div>
                   <div>
                     <span
@@ -368,56 +376,123 @@ export default function CallLogs() {
                     </span>
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-muted-foreground">Session Time</div>
-                  <div className="text-base">{formatDateTime(selectedCdr.session_timestamp)}</div>
+                  <div className="text-base break-words">{formatDateTime(selectedCdr.session_timestamp)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-muted-foreground">Total Duration</div>
-                  <div className="text-base">{selectedCdr.duration_formatted}</div>
+                  <div className="text-base break-words">{selectedCdr.duration_formatted}</div>
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Connected Duration</div>
-                  <div className="text-base">{selectedCdr.billsec_formatted}</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-muted-foreground">Connected Time</div>
+                  <div className="text-base break-words">{selectedCdr.billsec_formatted}</div>
                 </div>
-                {selectedCdr.call_start_time && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Call Start</div>
-                    <div className="text-base">{formatDateTime(selectedCdr.call_start_time)}</div>
-                  </div>
-                )}
-                {selectedCdr.call_answer_time && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Call Answer</div>
-                    <div className="text-base">{formatDateTime(selectedCdr.call_answer_time)}</div>
-                  </div>
-                )}
-                {selectedCdr.call_end_time && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Call End</div>
-                    <div className="text-base">{formatDateTime(selectedCdr.call_end_time)}</div>
-                  </div>
-                )}
-                <div>
+                <div className="min-w-0">
                   <div className="text-sm font-medium text-muted-foreground">Domain</div>
-                  <div className="text-base">{selectedCdr.domain}</div>
+                  <div className="text-base break-all">{selectedCdr.domain}</div>
                 </div>
                 {selectedCdr.rated_cost !== null && selectedCdr.rated_cost !== undefined && (
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-sm font-medium text-muted-foreground">Cost</div>
-                    <div className="text-base">${selectedCdr.rated_cost.toFixed(4)}</div>
+                    <div className="text-base break-words">${selectedCdr.rated_cost.toFixed(4)}</div>
                   </div>
                 )}
               </div>
 
-              {selectedCdr.raw_cdr && (
-                <div>
-                  <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                  <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-xs">
-                    {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
-                  </pre>
-                </div>
-              )}
+              <Tabs defaultValue="executions" className="w-full min-w-0">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="executions">Application Executions</TabsTrigger>
+                  <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="executions" className="space-y-4 min-w-0">
+                  {selectedCdr.raw_cdr?.session?.profile?.application ? (
+                    <div className="space-y-4 min-w-0">
+                      {selectedCdr.raw_cdr.session.profile.application
+                        .sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime())
+                        .map((execution: any, index: number) => (
+                          <div key={index} className="border rounded-lg p-4 bg-gray-50 min-w-0">
+                            <div className="flex items-center justify-between mb-2 gap-2">
+                              <div className="text-sm font-medium text-gray-900 min-w-0 break-words">
+                                Execution #{index + 1}
+                              </div>
+                              <div className="text-xs text-gray-500 whitespace-nowrap shrink-0">
+                                {formatDateTime(execution.time)}
+                              </div>
+                            </div>
+                            <div className="mb-2 min-w-0">
+                              <div className="text-xs font-medium text-gray-700 mb-1">URL:</div>
+                              <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-all overflow-wrap-anywhere max-w-full">
+                                {execution.url}
+                              </div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
+                              <div className="rounded border overflow-auto max-w-full">
+                                <SyntaxHighlighter
+                                  language="xml"
+                                  style={vscDarkPlus}
+                                  customStyle={{
+                                    margin: 0,
+                                    fontSize: '0.75rem',
+                                    lineHeight: '1.5',
+                                    maxWidth: '100%',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word',
+                                  }}
+                                  wrapLongLines={true}
+                                  showLineNumbers={true}
+                                  lineNumberStyle={{
+                                    minWidth: '2.5em',
+                                  }}
+                                >
+                                  {execution.source}
+                                </SyntaxHighlighter>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No application execution data available for this call.
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="raw-data" className="min-w-0">
+                  {selectedCdr.raw_cdr ? (
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
+                      <div className="border rounded overflow-x-auto bg-slate-900 max-w-full">
+                        <div className="p-4 min-w-0">
+                          <JsonViewer
+                            value={selectedCdr.raw_cdr}
+                            theme="dark"
+                            defaultInspectDepth={1}
+                            enableClipboard={true}
+                            displayDataTypes={false}
+                            quotesOnKeys={false}
+                            style={{
+                              backgroundColor: '#0f172a',
+                              fontSize: '0.875rem',
+                              wordBreak: 'break-word',
+                              overflowWrap: 'break-word',
+                              maxWidth: '100%',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No raw CDR data available.
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           )}
         </DialogContent>

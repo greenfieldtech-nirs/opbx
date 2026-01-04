@@ -29,7 +29,7 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
         ->name('webhooks.cloudonix.cdr');
 
     Route::post('/session-update', [CloudonixWebhookController::class, 'sessionUpdate'])
-        ->middleware(['webhook.signature', 'rate_limit_org:webhook'])
+        ->middleware(['webhook.signature'])  // High-velocity endpoint - no rate limiting
         ->name('webhooks.cloudonix.session-update');
 });
 
@@ -57,14 +57,17 @@ Route::prefix('voice')->group(function (): void {
         ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
         ->name('voice.ivr-input');
 
-    // Ring group callback for sequential routing (round robin, priority, etc.)
-    Route::post('/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
-        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
-        ->name('voice.ring-group-callback');
-
     // Voice routing health check
     Route::get('/health', [VoiceRoutingController::class, 'health'])
         ->name('voice.health');
+});
+
+// Action-related callbacks
+Route::prefix('callbacks')->group(function (): void {
+    // Ring group callback for sequential routing (round robin, priority, etc.)
+    Route::post('/voice/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
+        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
+        ->name('voice.ring-group-callback');
 });
 
 // Health check endpoint

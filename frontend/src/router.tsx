@@ -22,8 +22,10 @@ const RingGroups = lazy(() => import('@/pages/RingGroups'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
 const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
+const Recordings = lazy(() => import('@/pages/Recordings'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const SentryManagement = lazy(() => import('@/pages/SentryManagement'));
 
 export const router = createBrowserRouter([
   {
@@ -75,6 +77,10 @@ export const router = createBrowserRouter([
         element: <CallLogs />,
       },
       {
+        path: 'recordings',
+        element: <Recordings />,
+      },
+      {
         path: 'live-calls',
         element: <LiveCalls />,
       },
@@ -87,6 +93,14 @@ export const router = createBrowserRouter([
         element: (
           <OwnerRoute>
             <Settings />
+          </OwnerRoute>
+        ),
+      },
+      {
+        path: 'sentry',
+        element: (
+          <OwnerRoute>
+            <SentryManagement />
           </OwnerRoute>
         ),
       },

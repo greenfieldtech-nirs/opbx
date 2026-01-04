@@ -18,6 +18,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $domain_api_key
  * @property string|null $domain_requests_api_key
  * @property string|null $webhook_base_url
+ * @property int|null $voice_application_id
+ * @property string|null $voice_application_uuid
+ * @property string|null $voice_application_name
  * @property int $no_answer_timeout
  * @property string $recording_format
  * @property \Illuminate\Support\Carbon $created_at
@@ -47,6 +50,9 @@ class CloudonixSettings extends Model
         'domain_api_key',
         'domain_requests_api_key',
         'webhook_base_url',
+        'voice_application_id',
+        'voice_application_uuid',
+        'voice_application_name',
         'no_answer_timeout',
         'recording_format',
     ];

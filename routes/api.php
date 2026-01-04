@@ -10,9 +10,14 @@ use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\Api\SessionUpdateController;
+use App\Http\Controllers\Api\RoutingSentryController;
+use App\Http\Controllers\Api\SentryBlacklistController;
+use App\Http\Controllers\Api\SentryBlacklistItemController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -92,6 +97,11 @@ Route::prefix('v1')->group(function (): void {
         });
     });
 
+    // Public token-authenticated routes (for HTML5 audio/video elements that can't send auth headers)
+    // These routes use self-authenticating tokens instead of Sanctum middleware
+    Route::get('recordings/download', [RecordingsController::class, 'secureDownload'])
+        ->name('recordings.secure-download');
+
     // Protected API routes
     Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
@@ -114,6 +124,10 @@ Route::prefix('v1')->group(function (): void {
         // Extensions
         Route::get('extensions/sync/compare', [ExtensionController::class, 'compareSync']);
         Route::post('extensions/sync', [ExtensionController::class, 'performSync']);
+        Route::get('extensions/{extension}/password', [ExtensionController::class, 'getPassword'])
+            ->name('extensions.password');
+        Route::put('extensions/{extension}/reset-password', [ExtensionController::class, 'resetPassword'])
+            ->name('extensions.reset-password');
         Route::apiResource('extensions', ExtensionController::class);
 
         // Conference Rooms
@@ -145,6 +159,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/{callDetailRecord}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
         });
 
+        // Recordings (Owner/Admin only)
+        Route::apiResource('recordings', RecordingsController::class);
+        Route::get('recordings/{recording}/download', [RecordingsController::class, 'download'])
+            ->name('recordings.download');
+
         // Settings (Owner only)
         Route::prefix('settings')->group(function (): void {
             Route::get('cloudonix', [SettingsController::class, 'getCloudonixSettings'])->name('settings.cloudonix.show');
@@ -152,5 +171,22 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
         });
+
+        // Routing Sentry
+        Route::prefix('sentry')->group(function (): void {
+            Route::get('settings', [RoutingSentryController::class, 'getSettings'])->name('sentry.settings.show');
+            Route::put('settings', [RoutingSentryController::class, 'updateSettings'])->name('sentry.settings.update');
+
+            Route::apiResource('blacklists', SentryBlacklistController::class);
+            Route::post('blacklists/{blacklist}/items', [SentryBlacklistItemController::class, 'store'])->name('sentry.blacklists.items.store');
+            Route::delete('blacklists/{blacklist}/items/{item}', [SentryBlacklistItemController::class, 'destroy'])->name('sentry.blacklists.items.destroy');
+        });
+    });
+
+    // Session Updates - NOT rate limited (real-time polling endpoints)
+    Route::middleware(['auth:sanctum', 'tenant.scope'])->prefix('session-updates')->group(function (): void {
+        Route::get('/active', [SessionUpdateController::class, 'getActiveCalls'])->name('session-updates.active');
+        Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
+        Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
     });
 });

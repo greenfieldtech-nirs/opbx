@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings, Bell, ChevronDown } from 'lucide-react';
+import { LogOut, User, Settings, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Header() {
@@ -45,11 +45,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-        </Button>
+
 
         {/* User Menu Dropdown */}
         <DropdownMenu>

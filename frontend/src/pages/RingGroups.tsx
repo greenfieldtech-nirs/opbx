@@ -80,7 +80,55 @@ import {
   Info,
   ArrowUpDown,
   RefreshCw,
+  GripVertical,
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable item component for drag-and-drop
+interface SortableItemProps {
+  id: string;
+  children: React.ReactNode;
+}
+
+function SortableItem({ id, children }: SortableItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}
 
 export default function RingGroups() {
   const queryClient = useQueryClient();
@@ -103,10 +151,37 @@ export default function RingGroups() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end for sequential strategy
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const oldIndex = formData.members?.findIndex((member) => member.extension_id === active.id) ?? -1;
+      const newIndex = formData.members?.findIndex((member) => member.extension_id === over.id) ?? -1;
+
+      if (oldIndex !== -1 && newIndex !== -1 && formData.members) {
+        const newMembers = arrayMove(formData.members, oldIndex, newIndex);
+        // Update priorities based on new order
+        const updatedMembers = newMembers.map((member, index) => ({
+          ...member,
+          priority: index + 1,
+        }));
+        setFormData({ ...formData, members: updatedMembers });
+      }
+    }
+  };
 
   // Dialog states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -446,55 +521,7 @@ export default function RingGroups() {
     });
   };
 
-  const updateMemberPriority = (index: number, priority: number) => {
-    const currentMembers = formData.members || [];
-    const newMembers = [...currentMembers];
-    newMembers[index] = {
-      ...newMembers[index],
-      priority: Math.max(1, Math.min(100, priority)),
-    };
 
-    setFormData({
-      ...formData,
-      members: newMembers,
-    });
-  };
-
-  const moveMemberUp = (index: number) => {
-    if (index === 0) return;
-    const currentMembers = formData.members || [];
-    const newMembers = [...currentMembers];
-    [newMembers[index - 1], newMembers[index]] = [newMembers[index], newMembers[index - 1]];
-
-    // Recalculate priorities
-    const reorderedMembers = newMembers.map((member, i) => ({
-      ...member,
-      priority: i + 1,
-    }));
-
-    setFormData({
-      ...formData,
-      members: reorderedMembers,
-    });
-  };
-
-  const moveMemberDown = (index: number) => {
-    const currentMembers = formData.members || [];
-    if (index === currentMembers.length - 1) return;
-    const newMembers = [...currentMembers];
-    [newMembers[index], newMembers[index + 1]] = [newMembers[index + 1], newMembers[index]];
-
-    // Recalculate priorities
-    const reorderedMembers = newMembers.map((member, i) => ({
-      ...member,
-      priority: i + 1,
-    }));
-
-    setFormData({
-      ...formData,
-      members: reorderedMembers,
-    });
-  };
 
   const getAvailableExtensionsForMember = (currentMemberExtensionId?: string) => {
     const currentMembers = formData.members || [];
@@ -592,84 +619,123 @@ export default function RingGroups() {
               </div>
             )}
 
-            {formData.members && formData.members.length > 0 && (
-              <div className="border rounded-lg divide-y">
-                {formData.members.map((member, index) => (
-                  <div key={index} className="p-3 flex items-center gap-3">
-                    <div className="flex flex-col gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => moveMemberUp(index)}
-                        disabled={index === 0}
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => moveMemberDown(index)}
-                        disabled={index === (formData.members?.length || 0) - 1}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </div>
+             {formData.members && formData.members.length > 0 && (
+               <>
+                 {formData.strategy === 'sequential' ? (
+                   <DndContext
+                     sensors={sensors}
+                     collisionDetection={closestCenter}
+                     onDragEnd={handleDragEnd}
+                   >
+                     <SortableContext
+                       items={formData.members.map(m => m.extension_id)}
+                       strategy={verticalListSortingStrategy}
+                     >
+                       <div className="border rounded-lg divide-y">
+                         {formData.members.map((member, index) => (
+                           <SortableItem key={member.extension_id} id={member.extension_id}>
+                             <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
+                               <div className="cursor-grab">
+                                 <GripVertical className="h-4 w-4 text-gray-400" />
+                               </div>
 
-                    <div className="flex-1">
-                      <Select
-                        value={member.extension_id}
-                        onValueChange={(value) => updateMemberExtension(index, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                            <SelectItem key={ext.id} value={ext.id}>
-                              {ext.extension_number} - {ext.name || 'Unassigned'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                               <div className="flex-1">
+                                 <Select
+                                   value={member.extension_id}
+                                   onValueChange={(value) => updateMemberExtension(index, value)}
+                                 >
+                                   <SelectTrigger>
+                                     <SelectValue />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                       <SelectItem key={ext.id} value={ext.id}>
+                                         {ext.extension_number} - {ext.name || 'Unassigned'}
+                                       </SelectItem>
+                                     ))}
+                                   </SelectContent>
+                                 </Select>
+                               </div>
 
-                    {formData.strategy === 'sequential' && (
-                      <div className="w-24">
-                        <Input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={member.priority}
-                          onChange={(e) =>
-                            updateMemberPriority(index, parseInt(e.target.value))
-                          }
-                          placeholder="Priority"
-                        />
-                      </div>
-                    )}
+                               <Button
+                                 type="button"
+                                 variant="ghost"
+                                 size="sm"
+                                 onClick={() => removeMember(index)}
+                               >
+                                 <X className="h-4 w-4" />
+                               </Button>
+                             </div>
+                           </SortableItem>
+                         ))}
+                       </div>
+                     </SortableContext>
+                   </DndContext>
+                 ) : (
+                   <div className="border rounded-lg divide-y">
+                     {formData.members.map((member, index) => (
+                       <div key={index} className="p-3 flex items-center gap-3">
+                         <div className="flex flex-col gap-1">
+                           <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             className="h-6 w-6 p-0"
+                             onClick={() => moveMemberUp(index)}
+                             disabled={index === 0}
+                           >
+                             <ChevronUp className="h-4 w-4" />
+                           </Button>
+                           <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             className="h-6 w-6 p-0"
+                             onClick={() => moveMemberDown(index)}
+                             disabled={index === (formData.members?.length || 0) - 1}
+                           >
+                             <ChevronDown className="h-4 w-4" />
+                           </Button>
+                         </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeMember(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+                         <div className="flex-1">
+                           <Select
+                             value={member.extension_id}
+                             onValueChange={(value) => updateMemberExtension(index, value)}
+                           >
+                             <SelectTrigger>
+                               <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent>
+                               {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                 <SelectItem key={ext.id} value={ext.id}>
+                                   {ext.extension_number} - {ext.name || 'Unassigned'}
+                                 </SelectItem>
+                               ))}
+                             </SelectContent>
+                           </Select>
+                         </div>
 
-            {formData.strategy === 'sequential' && (
-              <p className="text-xs text-muted-foreground">
-                Priority order: Lower numbers ring first (1 = highest priority)
-              </p>
-            )}
+                         <Button
+                           type="button"
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => removeMember(index)}
+                         >
+                           <X className="h-4 w-4" />
+                         </Button>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+               </>
+             )}
+
+             {formData.strategy === 'sequential' && (
+               <p className="text-xs text-muted-foreground">
+                 Drag and drop to reorder the ringing sequence. Extensions will ring in the order shown from top to bottom.
+               </p>
+             )}
           </div>
 
           {/* Strategy */}
