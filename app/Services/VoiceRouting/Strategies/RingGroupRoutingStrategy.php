@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
+use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStrategy as StrategyEnum;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
+use App\Models\Extension;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
@@ -150,9 +152,33 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
     private function handleFallback(RingGroup $ringGroup): Response
     {
-        // TODO: Implement proper fallback actions (Voicemail, Redirect, Hangup)
+        $fallbackAction = $ringGroup->fallback_action;
+
+        if ($fallbackAction === RingGroupFallbackAction::EXTENSION) {
+            $fallbackExtensionId = $ringGroup->fallback_extension_id;
+
+            if ($fallbackExtensionId) {
+                $fallbackExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('id', $fallbackExtensionId)
+                    ->where('organization_id', $ringGroup->organization_id)
+                    ->first();
+
+                if ($fallbackExtension && $fallbackExtension->isActive()) {
+                    // Route to the fallback extension
+                    return response(
+                        CxmlBuilder::dialExtension($fallbackExtension->extension_number, $ringGroup->timeout ?? 30),
+                        200,
+                        ['Content-Type' => 'text/xml']
+                    );
+                }
+            }
+
+            // If fallback extension not found or invalid, fall back to hangup
+        }
+
+        // Default fallback: hangup with message
         return response(
-            CxmlBuilder::unavailable('No agents available.'),
+            CxmlBuilder::unavailable('No agents available. Goodbye.'),
             200,
             ['Content-Type' => 'text/xml']
         );
