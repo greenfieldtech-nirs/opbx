@@ -63,9 +63,10 @@ export default function Recordings() {
       if (audioElement) {
         audioElement.pause();
         audioElement.src = '';
+        setAudioElement(null);
       }
     };
-  }, [audioElement]);
+  }, []); // Only run on unmount
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
@@ -158,19 +159,27 @@ export default function Recordings() {
         // Stop any currently playing audio
         if (audioElement) {
           audioElement.pause();
+          audioElement.src = ''; // Clear the source to free resources
+          setAudioElement(null);
         }
 
         const audio = new Audio(audioSrc);
+
         audio.addEventListener('ended', () => {
           setCurrentlyPlaying(null);
           setAudioElement(null);
         });
 
         audio.addEventListener('error', () => {
-          toast.error('Failed to play recording');
+          // Only show error if audio is not paused and we're still trying to play this recording
+          if (!audio.paused && currentlyPlaying === recording.id) {
+            toast.error('Failed to play recording');
+          }
           setCurrentlyPlaying(null);
           setAudioElement(null);
         });
+
+        setAudioElement(audio);
 
         await audio.play();
         setCurrentlyPlaying(recording.id);
@@ -298,7 +307,6 @@ export default function Recordings() {
                       size="sm"
                       variant="outline"
                       onClick={() => handlePlayback(recording)}
-                      disabled={downloadRecordingMutation.isPending && recording.id === downloadRecordingMutation.variables}
                     >
                       {currentlyPlaying === recording.id ? (
                         <>
