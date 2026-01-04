@@ -19,8 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
@@ -428,23 +426,9 @@ export default function CallLogs() {
                             </div>
                             <div>
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <div className="border rounded overflow-hidden">
-                                <SyntaxHighlighter
-                                  language="xml"
-                                  style={vscDarkPlus}
-                                  customStyle={{
-                                    margin: 0,
-                                    padding: '12px',
-                                    fontSize: '12px',
-                                    lineHeight: '1.4',
-                                    backgroundColor: '#1e1e1e'
-                                  }}
-                                  wrapLines={true}
-                                  wrapLongLines={true}
-                                >
-                                  {execution.source}
-                                </SyntaxHighlighter>
-                              </div>
+                              <pre className="text-xs bg-slate-900 text-slate-100 p-3 rounded border overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap max-w-full">
+                                {execution.source}
+                              </pre>
                             </div>
                           </div>
                         ))}
@@ -461,26 +445,12 @@ export default function CallLogs() {
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
                       <details className="border rounded overflow-hidden">
-                        <summary className="cursor-pointer p-3 bg-gray-800 text-gray-100 hover:bg-gray-700 font-medium text-sm border-b">
+                        <summary className="cursor-pointer p-3 bg-slate-800 text-slate-100 hover:bg-slate-700 font-medium text-sm border-b">
                           Raw CDR Data (Click to expand/collapse)
                         </summary>
-                        <div className="bg-gray-900">
-                          <SyntaxHighlighter
-                            language="json"
-                            style={vscDarkPlus}
-                            customStyle={{
-                              margin: 0,
-                              padding: '12px',
-                              fontSize: '12px',
-                              lineHeight: '1.4',
-                              backgroundColor: '#1e1e1e'
-                            }}
-                            wrapLines={true}
-                            wrapLongLines={true}
-                          >
-                            {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
-                          </SyntaxHighlighter>
-                        </div>
+                        <pre className="text-xs bg-slate-900 text-slate-100 p-3 font-mono leading-relaxed whitespace-pre-wrap max-w-full">
+                          {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
+                        </pre>
                       </details>
                     </div>
                   ) : (
