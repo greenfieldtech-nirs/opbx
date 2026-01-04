@@ -6,6 +6,7 @@ namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupStrategy as StrategyEnum;
+use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -103,9 +104,14 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         $nextAttempt = $index + 1;
 
-        // Build callback URL using the same base URL as the current request
-        // to ensure HTTPS is used when the routing endpoint is called over HTTPS
-        $baseUrl = $request->getSchemeAndHttpHost();
+        // Get the organization's webhook base URL for consistent callback URLs
+        $organizationId = $request->input('_organization_id');
+        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
+
+        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
+            ? rtrim($cloudonixSettings->webhook_base_url, '/')
+            : $request->getSchemeAndHttpHost();
+
         $relativeUrl = route('voice.ring-group-callback', [
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
