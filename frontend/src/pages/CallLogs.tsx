@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
-import JsonViewer from '@meetelise/searchable-react-json-view';
+import JsonViewer from '@microlink/react-json-view';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 
 
@@ -451,10 +451,10 @@ export default function CallLogs() {
                         </summary>
                         <div className="bg-slate-900 p-3">
                           <JsonViewer
-                            data={selectedCdr.raw_cdr}
+                            src={selectedCdr.raw_cdr}
                             theme="dark"
-                            searchable={false}
-                            defaultExpandLevel={0}
+                            collapseStringsAfterLength={100}
+                            collapsed={true}
                           />
                         </div>
                       </details>
