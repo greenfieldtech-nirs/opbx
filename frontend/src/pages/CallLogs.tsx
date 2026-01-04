@@ -444,14 +444,19 @@ export default function CallLogs() {
                   {selectedCdr.raw_cdr ? (
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <details className="border rounded overflow-hidden">
-                        <summary className="cursor-pointer p-3 bg-slate-800 text-slate-100 hover:bg-slate-700 font-medium text-sm border-b">
-                          Raw CDR Data (Click to expand/collapse)
-                        </summary>
-                        <pre className="text-xs bg-slate-900 text-slate-100 p-3 font-mono leading-relaxed whitespace-pre-wrap max-w-full">
+                        <details className="border rounded overflow-hidden">
+                            <summary
+                                className="cursor-pointer p-3 bg-slate-800 text-slate-100 hover:bg-slate-700 font-medium text-sm border-b">
+                                Raw CDR Data (Click to expand/collapse)
+                            </summary>
+
+                            <JsonView src={selectedCdr.raw_cdr} />
+
+                            <pre
+                                className="text-xs bg-slate-900 text-slate-100 p-3 font-mono leading-relaxed whitespace-pre-wrap max-w-full">
                           {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
                         </pre>
-                      </details>
+                        </details>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
