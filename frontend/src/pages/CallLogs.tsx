@@ -17,27 +17,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Code } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
+import PureXMLViewer from 'pure-xml-view';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 
-// Simple XML syntax highlighter
-function highlightXml(xml: string): string {
-  return xml
-    // XML declarations
-    .replace(/(&lt;\?xml[^&]*&gt;)/g, '<span class="text-blue-400">$1</span>')
-    // Opening tags
-    .replace(/(&lt;\/?[a-zA-Z][^&]*?&gt;)/g, '<span class="text-blue-600">$1</span>')
-    // Self-closing tags
-    .replace(/(&lt;[a-zA-Z][^&]*?\/&gt;)/g, '<span class="text-blue-600">$1</span>')
-    // Attributes
-    .replace(/( [a-zA-Z-]+="[^"]*")/g, '<span class="text-green-600">$1</span>')
-    // Attribute names
-    .replace(/([a-zA-Z-]+)="([^"]*)"/g, '<span class="text-yellow-600">$1</span>="<span class="text-orange-400">$2</span>"')
-    // Comments
-    .replace(/(&lt;!--[^&]*--&gt;)/g, '<span class="text-gray-500">$1</span>');
-}
+
 
 export default function CallLogs() {
   // CDR state
@@ -394,27 +381,9 @@ export default function CallLogs() {
                   <div className="text-base">{selectedCdr.duration_formatted}</div>
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Connected Duration</div>
+                  <div className="text-sm font-medium text-muted-foreground">Connected Time</div>
                   <div className="text-base">{selectedCdr.billsec_formatted}</div>
                 </div>
-                {selectedCdr.call_start_time && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Call Start</div>
-                    <div className="text-base">{formatDateTime(selectedCdr.call_start_time)}</div>
-                  </div>
-                )}
-                {selectedCdr.call_answer_time && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Call Answer</div>
-                    <div className="text-base">{formatDateTime(selectedCdr.call_answer_time)}</div>
-                  </div>
-                )}
-                {selectedCdr.call_end_time && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Call End</div>
-                    <div className="text-base">{formatDateTime(selectedCdr.call_end_time)}</div>
-                  </div>
-                )}
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Domain</div>
                   <div className="text-base">{selectedCdr.domain}</div>
@@ -427,57 +396,64 @@ export default function CallLogs() {
                 )}
               </div>
 
-              {selectedCdr.raw_cdr && (
-                <div>
-                  <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                  <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-xs">
-                    {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
-                  </pre>
-                </div>
-              )}
+              <Tabs defaultValue="executions" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="executions">Application Executions</TabsTrigger>
+                  <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
+                </TabsList>
 
-              {/* Application Executions */}
-              {selectedCdr.raw_cdr?.session?.profile?.application && (
-                <div>
-                  <div className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Code className="h-4 w-4" />
-                    Application Executions
-                  </div>
-                  <div className="space-y-4">
-                    {selectedCdr.raw_cdr.session.profile.application
-                      .sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime())
-                      .map((execution: any, index: number) => (
-                        <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="text-sm font-medium text-gray-900">
-                              Execution #{index + 1}
+                <TabsContent value="executions" className="space-y-4">
+                  {selectedCdr.raw_cdr?.session?.profile?.application ? (
+                    <div className="space-y-4">
+                      {selectedCdr.raw_cdr.session.profile.application
+                        .sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime())
+                        .map((execution: any, index: number) => (
+                          <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-sm font-medium text-gray-900">
+                                Execution #{index + 1}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {formatDateTime(execution.time)}
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {formatDateTime(execution.time)}
+                            <div className="mb-2">
+                              <div className="text-xs font-medium text-gray-700 mb-1">URL:</div>
+                              <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-all">
+                                {execution.url}
+                              </div>
                             </div>
-                          </div>
-                          <div className="mb-2">
-                            <div className="text-xs font-medium text-gray-700 mb-1">URL:</div>
-                            <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-all">
-                              {execution.url}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                            <div className="bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto font-mono text-xs">
-                              <pre
-                                className="whitespace-pre-wrap"
-                                dangerouslySetInnerHTML={{
-                                  __html: highlightXml(execution.source)
-                                }}
-                              />
+                            <div>
+                              <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
+                              <div className="border rounded bg-white">
+                                <PureXMLViewer xml={execution.source} />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No application execution data available for this call.
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="raw-data">
+                  {selectedCdr.raw_cdr ? (
+                    <div>
+                      <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
+                      <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-xs">
+                        {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No raw CDR data available.
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           )}
         </DialogContent>
