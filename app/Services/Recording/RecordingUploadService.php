@@ -48,11 +48,11 @@ class RecordingUploadService
         $extension = $file->getClientOriginalExtension();
         $filename = $this->generateSecureFilename($originalName, $extension);
 
-        // Store the file
+        // Store the file in the recordings disk
         $path = $file->storeAs(
-            "recordings/{$user->organization_id}",
+            "{$user->organization_id}",
             $filename,
-            'local'
+            'recordings'
         );
 
         if (!$path) {

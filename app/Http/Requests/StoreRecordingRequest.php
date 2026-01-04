@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRecordingRequest extends FormRequest
@@ -11,7 +12,8 @@ class StoreRecordingRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth()->user()->hasRole(['owner', 'admin']);
+        $user = auth()->user();
+        return $user->hasRole(UserRole::OWNER) || $user->hasRole(UserRole::PBX_ADMIN);
     }
 
     /**

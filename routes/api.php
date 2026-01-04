@@ -97,6 +97,11 @@ Route::prefix('v1')->group(function (): void {
         });
     });
 
+    // Public token-authenticated routes (for HTML5 audio/video elements that can't send auth headers)
+    // These routes use self-authenticating tokens instead of Sanctum middleware
+    Route::get('recordings/download', [RecordingsController::class, 'secureDownload'])
+        ->name('recordings.secure-download');
+
     // Protected API routes
     Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
@@ -158,8 +163,6 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('recordings', RecordingsController::class);
         Route::get('recordings/{recording}/download', [RecordingsController::class, 'download'])
             ->name('recordings.download');
-        Route::get('recordings/download/{token}', [RecordingsController::class, 'secureDownload'])
-            ->name('recordings.secure-download');
 
         // Settings (Owner only)
         Route::prefix('settings')->group(function (): void {

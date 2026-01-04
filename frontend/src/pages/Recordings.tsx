@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Eye, Filter, Plus, Search, Upload, X, Loader2 } from 'lucide-react';
+import { Database, Download, Eye, Pause, Play, Plus, Search, Upload, Loader2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
-import { cn } from '@/lib/utils';
+import api from '@/services/api';
+
+// Type definitions
+interface FormProps {
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,35 +21,25 @@ import { toast } from 'sonner';
 // API service for recordings
 const recordingsService = {
   getAll: async (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`/api/recordings?${queryString}`);
-    if (!response.ok) throw new Error('Failed to fetch recordings');
-    return response.json();
+    const response = await api.get('/recordings', { params });
+    return response.data;
   },
 
   create: async (data: any) => {
-    const isFormData = data instanceof FormData;
-    const response = await fetch('/api/recordings', {
-      method: 'POST',
-      headers: isFormData ? {} : { 'Content-Type': 'application/json' },
-      body: isFormData ? data : JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error('Failed to create recording');
-    return response.json();
+    const response = await api.post('/recordings', data);
+    return response.data;
   },
 
-  delete: async (id: number) => {
-    const response = await fetch(`/api/recordings/${id}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete recording');
-    return response.json();
+  update: async (id: number, data: any) => {
+    const response = await api.put(`/recordings/${id}`, data);
+    return response.data;
   },
+
+
 
   download: async (id: number) => {
-    const response = await fetch(`/api/recordings/${id}/download`);
-    if (!response.ok) throw new Error('Failed to get download URL');
-    return response.json();
+    const response = await api.get(`/recordings/${id}/download`);
+    return response.data;
   },
 };
 
@@ -50,6 +47,20 @@ export default function Recordings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Audio playback state
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+
+  // Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.src = '';
+      }
+    };
+  }, [audioElement]);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
@@ -80,17 +91,7 @@ export default function Recordings() {
     },
   });
 
-  // Delete recording mutation
-  const deleteRecordingMutation = useMutation({
-    mutationFn: (id: number) => recordingsService.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recordings'] });
-      toast.success('Recording deleted successfully');
-    },
-    onError: (error) => {
-      toast.error('Failed to delete recording: ' + error.message);
-    },
-  });
+
 
   // Download recording mutation
   const downloadRecordingMutation = useMutation({
@@ -103,14 +104,58 @@ export default function Recordings() {
     },
   });
 
-  const handleDelete = (recording: any) => {
-    if (confirm(`Are you sure you want to delete "${recording.name}"?`)) {
-      deleteRecordingMutation.mutate(recording.id);
-    }
-  };
+
 
   const handleDownload = (recording: any) => {
     downloadRecordingMutation.mutate(recording.id);
+  };
+
+  const handlePlayback = async (recording: any) => {
+    if (currentlyPlaying === recording.id) {
+      // Currently playing this recording, pause it
+      if (audioElement) {
+        audioElement.pause();
+        setCurrentlyPlaying(null);
+        setAudioElement(null);
+      }
+    } else {
+      // Start playing this recording
+      try {
+        let audioSrc = '';
+
+        if (recording.type === 'upload') {
+          // For uploaded files, get the download URL
+          const downloadResponse = await recordingsService.download(recording.id);
+          audioSrc = downloadResponse.download_url;
+        } else {
+          // For remote files, use the remote URL directly
+          audioSrc = recording.remote_url;
+        }
+
+        // Stop any currently playing audio
+        if (audioElement) {
+          audioElement.pause();
+        }
+
+        const audio = new Audio(audioSrc);
+        audio.addEventListener('ended', () => {
+          setCurrentlyPlaying(null);
+          setAudioElement(null);
+        });
+
+        audio.addEventListener('error', () => {
+          toast.error('Failed to play recording');
+          setCurrentlyPlaying(null);
+          setAudioElement(null);
+        });
+
+        await audio.play();
+        setCurrentlyPlaying(recording.id);
+        setAudioElement(audio);
+      } catch (error) {
+        toast.error('Failed to start playback');
+      }
+    }
   };
 
   if (error) {
@@ -226,6 +271,25 @@ export default function Recordings() {
                   </div>
 
                   <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePlayback(recording)}
+                      disabled={downloadRecordingMutation.isPending && recording.id === downloadRecordingMutation.variables}
+                    >
+                      {currentlyPlaying === recording.id ? (
+                        <>
+                          <Pause className="h-3 w-3 mr-1" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3 w-3 mr-1" />
+                          Play
+                        </>
+                      )}
+                    </Button>
+
                     {recording.type === 'upload' && (
                       <Button
                         size="sm"
@@ -245,15 +309,6 @@ export default function Recordings() {
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       Details
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDelete(recording)}
-                      disabled={deleteRecordingMutation.isPending}
-                    >
-                      <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
@@ -341,7 +396,7 @@ export default function Recordings() {
 }
 
 // Upload Form Component
-function UploadForm({ onSubmit, onCancel, isLoading }: any) {
+function UploadForm({ onSubmit, onCancel, isLoading }: FormProps) {
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -396,7 +451,7 @@ function UploadForm({ onSubmit, onCancel, isLoading }: any) {
 }
 
 // Remote URL Form Component
-function RemoteUrlForm({ onSubmit, onCancel, isLoading }: any) {
+function RemoteUrlForm({ onSubmit, onCancel, isLoading }: FormProps) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 

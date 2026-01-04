@@ -44,10 +44,10 @@ class RecordingAccessService
      * Validate an access token and return the recording if valid.
      *
      * @param string $token
-     * @param int $userId
+     * @param int|null $userId If null, uses user ID from token (for token-only access like audio playback)
      * @return Recording|null
      */
-    public function validateAccessToken(string $token, int $userId): ?Recording
+    public function validateAccessToken(string $token, ?int $userId = null): ?Recording
     {
         try {
             $decrypted = Crypt::decryptString($token);
@@ -71,8 +71,8 @@ class RecordingAccessService
                 return null;
             }
 
-            // Check user access
-            if ($payload['user_id'] !== $userId) {
+            // Check user access (skip if userId is null for token-only access)
+            if ($userId !== null && $payload['user_id'] !== $userId) {
                 Log::warning('Access token user mismatch', [
                     'token_user_id' => $payload['user_id'],
                     'request_user_id' => $userId,
@@ -81,22 +81,24 @@ class RecordingAccessService
                 return null;
             }
 
-            // Get and validate recording
-            $recording = Recording::find($payload['recording_id']);
+            // Get and validate recording (bypass OrganizationScope since token validates org_id)
+            $recording = Recording::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                ->find($payload['recording_id']);
 
             if (!$recording ||
                 $recording->organization_id !== $payload['organization_id'] ||
                 !$recording->isActive()) {
                 Log::warning('Invalid recording access', [
                     'recording_id' => $payload['recording_id'],
-                    'user_id' => $userId,
+                    'user_id' => $userId ?? $payload['user_id'],
                 ]);
                 return null;
             }
 
             Log::info('Valid access token used', [
                 'recording_id' => $recording->id,
-                'user_id' => $userId,
+                'user_id' => $userId ?? $payload['user_id'],
+                'access_type' => $userId === null ? 'token_only' : 'authenticated',
             ]);
 
             return $recording;

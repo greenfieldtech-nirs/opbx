@@ -28,6 +28,13 @@ class RecordingsController extends Controller
     ) {
     }
 
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $query = Recording::query();
+
         // Filter by status if specified
         if ($request->has('status') && in_array($request->status, ['active', 'inactive'])) {
             $query->where('status', $request->status);
@@ -131,37 +138,6 @@ class RecordingsController extends Controller
         }
     }
 
-            $recording = Recording::create([
-                'organization_id' => $user->organization_id,
-                'name' => $validated['name'],
-                'type' => 'upload',
-                'file_path' => $filename,
-                'original_filename' => $originalName,
-                'file_size' => $fileSize,
-                'mime_type' => $mimeType,
-                'status' => 'active',
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]);
-        } else {
-            // Handle remote URL
-            $recording = Recording::create([
-                'organization_id' => $user->organization_id,
-                'name' => $validated['name'],
-                'type' => 'remote',
-                'remote_url' => $validated['remote_url'],
-                'status' => 'active',
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
-            ]);
-        }
-
-        return response()->json([
-            'message' => 'Recording created successfully',
-            'data' => new RecordingResource($recording->load(['creator', 'updater'])),
-        ], 201);
-    }
-
     /**
      * Display the specified resource.
      */
@@ -219,7 +195,7 @@ class RecordingsController extends Controller
         ]);
 
         return response()->json([
-            'download_url' => route('recordings.secure-download', ['token' => $token]),
+            'download_url' => route('recordings.secure-download') . '?token=' . urlencode($token),
             'filename' => $recording->original_filename ?? $recording->file_path,
             'expires_in' => 1800, // 30 minutes
         ]);
@@ -231,13 +207,15 @@ class RecordingsController extends Controller
     public function secureDownload(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
     {
         $token = $request->query('token');
-        $user = $request->user();
 
-        if (!$token || !$user) {
+        if (!$token) {
             return response()->json(['error' => 'Invalid access token'], 401);
         }
 
-        $recording = $this->accessService->validateAccessToken($token, $user->id);
+        // For token-based access, we allow access with just the token
+        // The token contains user information and is cryptographically validated
+        $user = $request->user(); // May be null for token-only access (like audio playback)
+        $recording = $this->accessService->validateAccessToken($token, $user ? $user->id : null);
 
         if (!$recording) {
             return response()->json(['error' => 'Access denied or token expired'], 403);
@@ -253,11 +231,21 @@ class RecordingsController extends Controller
             return response()->json(['error' => 'File not found on disk'], 404);
         }
 
+        // Extract user ID from token payload for logging (since $user may be null)
+        try {
+            $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($token);
+            $payload = json_decode($decrypted, true);
+            $userId = $payload['user_id'] ?? ($user ? $user->id : null);
+        } catch (\Exception $e) {
+            $userId = $user ? $user->id : null;
+        }
+
         // Log the successful download
-        $this->accessService->logFileAccess($recording, $user->id, 'downloaded', [
+        $this->accessService->logFileAccess($recording, $userId, 'downloaded', [
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'file_size' => $recording->file_size,
+            'access_type' => $user ? 'authenticated' : 'token_only',
         ]);
 
         return response()->download($filePath, $recording->original_filename ?? $recording->file_path);
