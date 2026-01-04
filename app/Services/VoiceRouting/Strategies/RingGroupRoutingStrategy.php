@@ -102,15 +102,18 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // But CxmlBuilder uses 'action' attribute.
 
         $nextAttempt = $index + 1;
-        $callbackUrl = route('voice.ring-group-callback', [
+
+        // Build callback URL using the same scheme and host as the current request
+        // to ensure HTTPS is used when the routing endpoint is called over HTTPS
+        $scheme = $request->getScheme();
+        $host = $request->getHost();
+        $relativeUrl = route('voice.ring-group-callback', [
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
             // Pass necessary context
             'session_data' => json_encode(['ring_group_id' => $ringGroup->id, 'attempt_number' => $nextAttempt])
-            // Note: Cloudonix typically handles session data persistence if configured, 
-            // or we pass it in query params. 
-            // Let's assume standard Laravel route generation with query params.
-        ]);
+        ], false); // Get relative URL
+        $callbackUrl = "{$scheme}://{$host}{$relativeUrl}";
 
         // Also need to construct SessionData xml element if strictly required, 
         // but CxmlBuilder -> dial(...) takes 'action'. 
