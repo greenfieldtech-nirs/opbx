@@ -280,9 +280,6 @@ export default function Recordings() {
                       ) : (
                         <Badge variant="outline">🔗 Remote</Badge>
                       )}
-                      <span className="text-xs">
-                        {recording.formatted_file_size || 'Unknown size'}
-                      </span>
                     </CardDescription>
                   </div>
                   <Badge
@@ -297,7 +294,6 @@ export default function Recordings() {
               <CardContent className="pt-0">
                 <div className="space-y-3">
                   <div className="text-sm text-muted-foreground">
-                    <div>Duration: {recording.formatted_duration || 'Unknown'}</div>
                     <div>Created: {formatDateTime(recording.created_at)}</div>
                     <div>By: {recording.created_by}</div>
                   </div>
@@ -561,14 +557,7 @@ function RecordingDetails({ recording }: { recording: any }) {
             {recording.status}
           </Badge>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground">File Size</label>
-          <p>{recording.formatted_file_size}</p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground">Duration</label>
-          <p>{recording.formatted_duration}</p>
-        </div>
+
         <div>
           <label className="block text-sm font-medium text-muted-foreground">MIME Type</label>
           <p>{recording.mime_type || 'Unknown'}</p>
