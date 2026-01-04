@@ -377,7 +377,7 @@ class CloudonixWebhookController extends Controller
                 'subscriberId' => 'nullable|integer',
                 'callerId' => 'nullable|string',
                 'destination' => 'required|string',
-                'direction' => 'nullable|in:incoming,outgoing',
+                'direction' => 'nullable|in:incoming,outgoing,internal',
                 'status' => 'nullable|string',
                 'createdAt' => 'required|string',
                 'modifiedAt' => 'required|string',
