@@ -137,7 +137,7 @@ class RecordingRemoteService
             }
 
             $context = stream_context_create($contextOptions);
-            $headers = @get_headers($url, 1, $context);
+            $headers = @get_headers($url, true, $context);
 
             if ($headers === false) {
                 return false;
@@ -186,7 +186,7 @@ class RecordingRemoteService
                 ],
             ]);
 
-            $headers = @get_headers($url, 1, $context);
+            $headers = @get_headers($url, true, $context);
 
             if ($headers !== false) {
                 $info['reachable'] = true;
