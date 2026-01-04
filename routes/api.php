@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
@@ -153,7 +154,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/{callDetailRecord}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
         });
 
-
+        // Recordings (Owner/Admin only)
+        Route::apiResource('recordings', RecordingsController::class);
 
         // Settings (Owner only)
         Route::prefix('settings')->group(function (): void {
