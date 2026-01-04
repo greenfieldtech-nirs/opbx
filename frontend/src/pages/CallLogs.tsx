@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
-import JsonView from '@uiw/react-json-view';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
@@ -443,14 +442,9 @@ export default function CallLogs() {
                   {selectedCdr.raw_cdr ? (
                     <div>
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <div className="border rounded-lg overflow-x-auto bg-white">
-                        <JsonView
-                          value={selectedCdr.raw_cdr}
-                          style={{ padding: '16px' }}
-                          displayDataTypes={false}
-                          collapsed={1}
-                        />
-                      </div>
+                      <pre className="p-4 bg-gray-50 text-gray-900 rounded-lg overflow-x-auto text-xs whitespace-pre-wrap border">
+                        {JSON.stringify(selectedCdr.raw_cdr, null, 2)}
+                      </pre>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
