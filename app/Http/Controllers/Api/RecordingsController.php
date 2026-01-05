@@ -52,15 +52,7 @@ class RecordingsController extends Controller
 
         $recordings = $query->paginate(20);
 
-        return response()->json([
-            'data' => RecordingResource::collection($recordings),
-            'meta' => [
-                'current_page' => $recordings->currentPage(),
-                'last_page' => $recordings->lastPage(),
-                'per_page' => $recordings->perPage(),
-                'total' => $recordings->total(),
-            ],
-        ]);
+        return $recordings;
     }
 
     /**

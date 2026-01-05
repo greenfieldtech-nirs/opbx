@@ -31,11 +31,26 @@ export interface ServiceInstance<T = any> {
  */
 export function createResourceService<T>(resource: string): ServiceInstance<T> {
   return {
-    getAll: (params?: Record<string, any>) => api.get(`/${resource}`, { params }),
-    getById: (id: string | number) => api.get(`/${resource}/${id}`),
-    create: (data: Partial<T>) => api.post(`/${resource}`, data),
-    update: (id: string | number, data: Partial<T>) => api.put(`/${resource}/${id}`, data),
-    delete: (id: string | number) => api.delete(`/${resource}/${id}`),
+    getAll: async (params?: Record<string, any>) => {
+      const response = await api.get(`/${resource}`, { params });
+      return response.data;
+    },
+    getById: async (id: string | number) => {
+      const response = await api.get(`/${resource}/${id}`);
+      return response.data;
+    },
+    create: async (data: Partial<T>) => {
+      const response = await api.post(`/${resource}`, data);
+      return response.data;
+    },
+    update: async (id: string | number, data: Partial<T>) => {
+      const response = await api.put(`/${resource}/${id}`, data);
+      return response.data;
+    },
+    delete: async (id: string | number) => {
+      const response = await api.delete(`/${resource}/${id}`);
+      return response.data;
+    },
   };
 }
 
