@@ -149,7 +149,7 @@ class CxmlBuilder
      * @param string|null $serviceToken Optional service authentication token
      * @param array<string, mixed> $params Additional service parameters
      */
-    public function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): self
+    public function addDialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): self
     {
         $dial = $this->document->createElement('Dial');
         $service = $this->document->createElement('Service', htmlspecialchars($serviceUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
@@ -378,7 +378,27 @@ class CxmlBuilder
     public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): string
     {
         $builder = new self();
-        $builder->dialService($serviceUrl, $serviceToken, $params);
+        $builder->addDialService($serviceUrl, $serviceToken, $params);
+
+        return $builder->build();
+    }
+
+    /**
+     * Build service provider dialing response with provider and phone number.
+     *
+     * Used for Cloudonix Service providers like Retell, VAPI, etc.
+     *
+     * @param string $provider The service provider name (e.g., 'retell', 'vapi')
+     * @param string $phoneNumber The service provider phone number
+     */
+    public static function dialServiceProvider(string $provider, string $phoneNumber): string
+    {
+        $builder = new self();
+        $dial = $builder->document->createElement('Dial');
+        $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        $service->setAttribute('provider', $provider);
+        $dial->appendChild($service);
+        $builder->response->appendChild($dial);
 
         return $builder->build();
     }

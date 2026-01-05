@@ -50,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy::class,
         ], 'voice_routing.strategies');
 
         // Register Voice Routing Manager

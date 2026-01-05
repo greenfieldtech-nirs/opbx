@@ -28,18 +28,37 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         }
 
         // Extract service provider configuration from extension
+        // Support both new columns and legacy configuration JSON
         $config = $extension->configuration ?? [];
-        $serviceUrl = $config['service_url'] ?? null;
-        $serviceToken = $config['service_token'] ?? null;
-        $serviceParams = $config['service_params'] ?? [];
 
-        if (!$serviceUrl) {
-            return response(CxmlBuilder::unavailable('AI Agent service URL not configured'), 200, ['Content-Type' => 'text/xml']);
+        // Check new columns first (preferred format)
+        if ($extension->service_url) {
+            $serviceUrl = $extension->service_url;
+            $serviceToken = $extension->service_token;
+            $serviceParams = $extension->service_params ?? [];
+
+            if (!$serviceUrl) {
+                return response(CxmlBuilder::unavailable('AI Agent service URL not configured'), 200, ['Content-Type' => 'text/xml']);
+            }
+
+            return response(
+                CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
         }
 
-        // Route to AI Agent Service Provider using <Service> noun
+        // Fall back to legacy configuration format
+        $provider = $config['provider'] ?? null;
+        $phoneNumber = $config['phone_number'] ?? null;
+
+        if (!$provider || !$phoneNumber) {
+            return response(CxmlBuilder::unavailable('AI Agent provider or phone number not configured'), 200, ['Content-Type' => 'text/xml']);
+        }
+
+        // Route to AI Agent Service Provider using <Service> noun with provider and phone number
         return response(
-            CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams),
+            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
             200,
             ['Content-Type' => 'text/xml']
         );

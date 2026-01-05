@@ -239,7 +239,7 @@ class VoiceRoutingManager
             ExtensionType::IVR => ['extension' => $extension], // IVR routing not yet implemented
             ExtensionType::AI_ASSISTANT => $this->resolveAiAssistantDestination($extension, $organizationId),
             ExtensionType::CUSTOM_LOGIC => ['extension' => $extension], // Custom logic not yet implemented
-            ExtensionType::FORWARD => ['extension' => $extension], // Forward routing not yet implemented
+            ExtensionType::FORWARD => ['extension' => $extension],
             ExtensionType::QUEUE => ['extension' => $extension], // Queue routing not yet implemented
         };
     }
