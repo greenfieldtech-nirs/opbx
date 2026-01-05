@@ -145,10 +145,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: opbx_redis
-    # SECURITY: Remove port exposure for production deployments
-    # Redis should only be accessible within the Docker network
+    # SECURITY: Redis port exposure is disabled by default for security
+    # Set REDIS_EXPOSE_PORT in .env to enable external access (not recommended for production)
+    # Redis remains accessible within the Docker network at port 6379
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_EXPOSE_PORT:-}:6379"
     volumes:
       - redis_data:/data
     networks:

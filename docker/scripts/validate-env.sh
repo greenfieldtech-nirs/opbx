@@ -79,10 +79,18 @@ if [[ -n "$DB_PASSWORD" ]]; then
 fi
 
 # Check Redis port exposure warning
-if [[ -n "$REDIS_EXPOSE_PORT" ]] && [[ "$REDIS_EXPOSE_PORT" != "false" ]]; then
+if [[ -n "$REDIS_EXPOSE_PORT" ]]; then
     echo -e "${YELLOW}⚠ WARNING: REDIS_EXPOSE_PORT is set to ${REDIS_EXPOSE_PORT}${NC}"
-    echo -e "${YELLOW}  Redis port will be exposed to the network${NC}"
-    echo -e "${YELLOW}  Ensure this is intended for production deployments${NC}"
+    echo -e "${YELLOW}  Redis port will be exposed externally to host${NC}"
+    echo -e "${YELLOW}  This increases attack surface and is NOT recommended for production${NC}"
+
+    if [[ "$APP_ENV" == "production" ]]; then
+        echo -e "${RED}✗ CRITICAL: Redis port exposure in production is strongly discouraged${NC}"
+        echo -e "${RED}  Please remove REDIS_EXPOSE_PORT or set it to empty${NC}"
+        VALIDATION_FAILED=1
+    fi
+else
+    echo -e "${GREEN}✓ Redis port exposure disabled (secure for production)${NC}"
 fi
 
 # Final status
