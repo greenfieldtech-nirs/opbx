@@ -8,8 +8,10 @@ use App\Enums\ExtensionType;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\IvrStateService;
 use App\Services\Security\RoutingSentryService;
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
 use Illuminate\Http\Request;
@@ -25,6 +27,7 @@ class VoiceRoutingManager
     public function __construct(
         private readonly RoutingSentryService $sentry,
         private readonly VoiceRoutingCacheService $cache,
+        private readonly IvrStateService $ivrStateService,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
@@ -131,7 +134,7 @@ class VoiceRoutingManager
     private function resolveDestination(DidNumber $did): array
     {
         $config = $did->routing_config ?? [];
-        $type = $did->routing_type; // 'extension', 'ring_group', 'conference_room' ... matches checks?
+        $type = $did->routing_type; // 'extension', 'ring_group', 'conference_room', 'ivr_menu' ... matches checks?
 
         if ($did->routing_type === 'extension') {
             $extensionId = $config['extension_id'] ?? null;
@@ -161,6 +164,16 @@ class VoiceRoutingManager
             }
         }
 
+        if ($type === 'ivr_menu') {
+            $ivrMenuId = $config['ivr_menu_id'] ?? null;
+            if ($ivrMenuId) {
+                $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($ivrMenuId);
+                if ($ivrMenu) {
+                    return ['ivr_menu' => $ivrMenu];
+                }
+            }
+        }
+
         return [];
     }
 
@@ -174,6 +187,9 @@ class VoiceRoutingManager
         }
         if (isset($destination['conference_room'])) {
             return ExtensionType::CONFERENCE;
+        }
+        if (isset($destination['ivr_menu'])) {
+            return ExtensionType::IVR;
         }
 
         return null;
@@ -331,8 +347,241 @@ class VoiceRoutingManager
 
     public function handleIvrInput(Request $request): Response
     {
-        // Placeholder for IVR input handling
-        $message = 'Hello. This is the Open PBX voice routing system. Phase zero placeholder response. Call type: unknown.';
-        return response(CxmlBuilder::sayWithHangup($message, true), 200, ['Content-Type' => 'text/xml']);
+        $callSid = $request->input('CallSid');
+        $digits = $request->input('Digits', '');
+        $menuId = (int) $request->query('menu_id');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('IVR Input: Processing DTMF input', [
+            'call_sid' => $callSid,
+            'digits' => $digits,
+            'menu_id' => $menuId,
+            'org_id' => $orgId,
+        ]);
+
+        // Check idempotency
+        $eventId = $request->input('CallSid') . ':' . $request->input('SequenceNumber', 'unknown');
+        if ($this->ivrStateService->isEventProcessed($eventId)) {
+            Log::info('IVR Input: Duplicate event detected, ignoring', [
+                'call_sid' => $callSid,
+                'event_id' => $eventId,
+            ]);
+            return response(CxmlBuilder::hangup(), 200, ['Content-Type' => 'text/xml']);
+        }
+
+        // Mark event as processed
+        $this->ivrStateService->markEventProcessed($eventId);
+
+        // Validate menu exists and belongs to organization
+        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $menuId)
+            ->where('organization_id', $orgId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$ivrMenu) {
+            Log::warning('IVR Input: Menu not found or inactive', [
+                'call_sid' => $callSid,
+                'menu_id' => $menuId,
+                'org_id' => $orgId,
+            ]);
+            return response(
+                CxmlBuilder::sayWithHangup('Menu configuration error.', true),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        // Get current call state
+        $callState = $this->ivrStateService->getCallState($callSid);
+
+        if (!$callState) {
+            Log::warning('IVR Input: No call state found', [
+                'call_sid' => $callSid,
+                'menu_id' => $menuId,
+            ]);
+            return response(
+                CxmlBuilder::sayWithHangup('Call state error. Please try again.', true),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        // Handle no input (timeout)
+        if (empty($digits)) {
+            return $this->handleNoInput($request, $ivrMenu, $callState);
+        }
+
+        // Find matching option
+        $option = $ivrMenu->findOptionByDigits($digits);
+
+        if ($option) {
+            // Valid option selected
+            return $this->handleValidOption($request, $ivrMenu, $option);
+        } else {
+            // Invalid option
+            return $this->handleInvalidOption($request, $ivrMenu, $callState, $digits);
+        }
+    }
+
+    /**
+     * Handle case where caller provides no input (timeout).
+     */
+    private function handleNoInput(Request $request, IvrMenu $ivrMenu, array $callState): Response
+    {
+        $callSid = $request->input('CallSid');
+        $turnCount = $this->ivrStateService->incrementTurnCount($callSid);
+
+        Log::info('IVR Input: No input provided (timeout)', [
+            'call_sid' => $callSid,
+            'menu_id' => $ivrMenu->id,
+            'turn_count' => $turnCount,
+            'max_turns' => $ivrMenu->max_turns,
+        ]);
+
+        if ($this->ivrStateService->isMaxTurnsExceeded($callSid, $ivrMenu->max_turns)) {
+            // Max turns exceeded, route to failover
+            return $this->routeToFailoverDestination($request, $ivrMenu);
+        }
+
+        // Replay menu
+        $destination = ['ivr_menu' => $ivrMenu];
+        return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber(), $destination);
+    }
+
+    /**
+     * Handle valid option selection.
+     */
+    private function handleValidOption(Request $request, IvrMenu $ivrMenu, $option): Response
+    {
+        $callSid = $request->input('CallSid');
+        $digits = $request->input('Digits');
+
+        Log::info('IVR Input: Valid option selected', [
+            'call_sid' => $callSid,
+            'menu_id' => $ivrMenu->id,
+            'digits' => $digits,
+            'destination_type' => $option->destination_type->value,
+            'destination_id' => $option->destination_id,
+        ]);
+
+        // Route to the selected destination
+        return $this->routeToOptionDestination($request, $option);
+    }
+
+    /**
+     * Handle invalid option selection.
+     */
+    private function handleInvalidOption(Request $request, IvrMenu $ivrMenu, array $callState, string $digits): Response
+    {
+        $callSid = $request->input('CallSid');
+        $turnCount = $this->ivrStateService->incrementTurnCount($callSid);
+
+        Log::info('IVR Input: Invalid option selected', [
+            'call_sid' => $callSid,
+            'menu_id' => $ivrMenu->id,
+            'digits' => $digits,
+            'turn_count' => $turnCount,
+            'max_turns' => $ivrMenu->max_turns,
+        ]);
+
+        if ($this->ivrStateService->isMaxTurnsExceeded($callSid, $ivrMenu->max_turns)) {
+            // Max turns exceeded, route to failover
+            return $this->routeToFailoverDestination($request, $ivrMenu);
+        }
+
+        // Play error message and replay menu
+        $errorMessage = 'Invalid option. Please try again.';
+        $destination = ['ivr_menu' => $ivrMenu];
+        $ivrStrategy = new \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy($this->ivrStateService);
+
+        // First play error, then menu
+        $errorCxml = CxmlBuilder::say($errorMessage, true);
+        $menuResponse = $ivrStrategy->route($request, new DidNumber(), $destination);
+
+        // Combine responses (this is a simplification - in practice you might need a more complex CXML structure)
+        return $menuResponse;
+    }
+
+    /**
+     * Route call to option destination.
+     */
+    private function routeToOptionDestination(Request $request, $option): Response
+    {
+        $destination = [];
+
+        switch ($option->destination_type) {
+            case \App\Enums\IvrDestinationType::EXTENSION:
+                $extension = \App\Models\Extension::find($option->destination_id);
+                if ($extension) {
+                    $destination = ['extension' => $extension];
+                    return $this->executeStrategy($extension->type, $request, new DidNumber(), $destination);
+                }
+                break;
+
+            case \App\Enums\IvrDestinationType::RING_GROUP:
+                $ringGroup = \App\Models\RingGroup::find($option->destination_id);
+                if ($ringGroup) {
+                    $destination = ['ring_group' => $ringGroup];
+                    return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber(), $destination);
+                }
+                break;
+
+            case \App\Enums\IvrDestinationType::CONFERENCE_ROOM:
+                $conferenceRoom = \App\Models\ConferenceRoom::find($option->destination_id);
+                if ($conferenceRoom) {
+                    $destination = ['conference_room' => $conferenceRoom];
+                    return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber(), $destination);
+                }
+                break;
+
+            case \App\Enums\IvrDestinationType::IVR_MENU:
+                $ivrMenu = \App\Models\IvrMenu::find($option->destination_id);
+                if ($ivrMenu) {
+                    $destination = ['ivr_menu' => $ivrMenu];
+                    return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber(), $destination);
+                }
+                break;
+        }
+
+        // Fallback for invalid destination
+        Log::error('IVR Input: Invalid destination for option', [
+            'option_id' => $option->id,
+            'destination_type' => $option->destination_type->value,
+            'destination_id' => $option->destination_id,
+        ]);
+
+        return response(
+            CxmlBuilder::sayWithHangup('Destination configuration error.', true),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
+    }
+
+    /**
+     * Route call to IVR menu failover destination.
+     */
+    private function routeToFailoverDestination(Request $request, IvrMenu $ivrMenu): Response
+    {
+        $callSid = $request->input('CallSid');
+
+        Log::info('IVR Input: Routing to failover destination', [
+            'call_sid' => $callSid,
+            'menu_id' => $ivrMenu->id,
+            'failover_type' => $ivrMenu->failover_destination_type->value,
+            'failover_id' => $ivrMenu->failover_destination_id,
+        ]);
+
+        if ($ivrMenu->failover_destination_type === \App\Enums\IvrDestinationType::HANGUP) {
+            return response(CxmlBuilder::hangup(), 200, ['Content-Type' => 'text/xml']);
+        }
+
+        // Route to failover destination (similar to option routing)
+        $mockOption = (object) [
+            'destination_type' => $ivrMenu->failover_destination_type,
+            'destination_id' => $ivrMenu->failover_destination_id,
+        ];
+
+        return $this->routeToOptionDestination($request, $mockOption);
     }
 }

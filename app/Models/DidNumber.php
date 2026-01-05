@@ -109,6 +109,18 @@ class DidNumber extends Model
     }
 
     /**
+     * Get the routing target IVR menu ID.
+     */
+    public function getTargetIvrMenuId(): ?int
+    {
+        if ($this->routing_type === 'ivr_menu' && isset($this->routing_config['ivr_menu_id'])) {
+            return (int) $this->routing_config['ivr_menu_id'];
+        }
+
+        return null;
+    }
+
+    /**
      * Get the extension for extension routing (loaded via query).
      *
      * Note: This is not a true Eloquent relationship due to JSON field limitation.
@@ -193,6 +205,27 @@ class DidNumber extends Model
     }
 
     /**
+     * Get the IVR menu for IVR menu routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getIvrMenuAttribute(): ?IvrMenu
+    {
+        $ivrMenuId = $this->getTargetIvrMenuId();
+        if ($ivrMenuId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_ivr_menu', $this->attributes)) {
+            return $this->attributes['_ivr_menu'];
+        }
+
+        return IvrMenu::find($ivrMenuId);
+    }
+
+    /**
      * Manually set the extension relationship.
      */
     public function setExtension(?Extension $extension): void
@@ -222,6 +255,14 @@ class DidNumber extends Model
     public function setConferenceRoom(?ConferenceRoom $conferenceRoom): void
     {
         $this->attributes['_conference_room'] = $conferenceRoom;
+    }
+
+    /**
+     * Manually set the IVR menu relationship.
+     */
+    public function setIvrMenu(?IvrMenu $ivrMenu): void
+    {
+        $this->attributes['_ivr_menu'] = $ivrMenu;
     }
 
     public function sentryBlacklists(): BelongsToMany
