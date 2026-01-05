@@ -31,7 +31,6 @@ use Illuminate\Support\Str;
 class ExtensionController extends Controller
 {
     use ApiRequestHandler;
-{
     /**
      * Display a paginated list of extensions.
      *

@@ -13,7 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class SentryBlacklistController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     public function index(Request $request): JsonResponse
     {
         $blacklists = SentryBlacklist::where('organization_id', $this->getAuthenticatedUser($request)->organization_id)

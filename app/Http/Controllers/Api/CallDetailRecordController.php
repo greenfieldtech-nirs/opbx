@@ -17,7 +17,8 @@ use Illuminate\Http\JsonResponse;
  * Provides access to CDR data with filtering and pagination.
  */
 class CallDetailRecordController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     /**
      * List CDRs for the authenticated user's organization.
      *

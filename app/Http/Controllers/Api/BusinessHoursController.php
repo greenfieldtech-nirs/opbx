@@ -29,7 +29,8 @@ use Illuminate\Support\Str;
  * All operations are tenant-scoped to the authenticated user's organization.
  */
 class BusinessHoursController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     /**
      * Display a paginated list of business hours schedules.
      *

@@ -12,7 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SentryBlacklistItemController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     public function store(StoreSentryBlacklistItemRequest $request, SentryBlacklist $blacklist): JsonResponse
     {
         if ($blacklist->organization_id !== $this->getAuthenticatedUser($request)->organization_id) {

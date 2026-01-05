@@ -25,7 +25,8 @@ use Illuminate\Support\Str;
  * All operations are tenant-scoped to the authenticated user's organization.
  */
 class ConferenceRoomController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     /**
      * Display a paginated list of conference rooms.
      */

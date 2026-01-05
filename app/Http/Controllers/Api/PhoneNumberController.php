@@ -34,7 +34,8 @@ use Illuminate\Support\Str;
  * - SQL injection prevention via Eloquent ORM
  */
 class PhoneNumberController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     /**
      * Display a paginated list of phone numbers.
      *

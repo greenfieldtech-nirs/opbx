@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class RecordingsController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     public function __construct(
         private readonly RecordingUploadService $uploadService,
         private readonly RecordingRemoteService $remoteService,

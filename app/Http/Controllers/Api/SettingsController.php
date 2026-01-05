@@ -20,7 +20,8 @@ use Illuminate\Support\Str;
  * Handles organization-level settings including Cloudonix integration.
  */
 class SettingsController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     /**
      * Create a new controller instance.
      */

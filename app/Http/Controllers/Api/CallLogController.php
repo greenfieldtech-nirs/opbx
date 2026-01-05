@@ -13,7 +13,8 @@ use Illuminate\Http\Request;
  * Call log API controller (read-only).
  */
 class CallLogController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     /**
      * List call logs for the authenticated user's organization.
      */

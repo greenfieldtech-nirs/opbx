@@ -10,7 +10,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RoutingSentryController extends Controller
-    use ApiRequestHandler;{
+{
+    use ApiRequestHandler;
     public function getSettings(Request $request): JsonResponse
     {
         $organization = $this->getAuthenticatedUser($request)->organization;
