@@ -42,7 +42,7 @@ class ExtensionController extends Controller
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
 
-        Gate::authorize('viewAny', Extension::class);
+        $this->authorize('viewAny', Extension::class);
 
         // Build query
         $query = Extension::query()
@@ -238,7 +238,7 @@ class ExtensionController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('view', $extension);
+        $this->authorize('view', $extension);
 
         // Tenant scope check
         if ($extension->organization_id !== $currentUser->organization_id) {
@@ -428,7 +428,7 @@ class ExtensionController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('delete', $extension);
+        $this->authorize('delete', $extension);
 
         // Tenant scope check
         if ($extension->organization_id !== $currentUser->organization_id) {
@@ -518,7 +518,7 @@ class ExtensionController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('viewAny', Extension::class);
+        $this->authorize('viewAny', Extension::class);
 
         Log::info('Comparing extensions with Cloudonix', [
             'request_id' => $requestId,

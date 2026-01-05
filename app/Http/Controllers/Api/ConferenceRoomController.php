@@ -42,7 +42,7 @@ class ConferenceRoomController extends Controller
             abort(401, 'Unauthenticated');
         }
 
-        Gate::authorize('viewAny', ConferenceRoom::class);
+        $this->authorize('viewAny', ConferenceRoom::class);
 
         // Build query
         $query = ConferenceRoom::query()
@@ -170,7 +170,7 @@ class ConferenceRoomController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('view', $conferenceRoom);
+        $this->authorize('view', $conferenceRoom);
 
         // Tenant scope check
         if ($conferenceRoom->organization_id !== $currentUser->organization_id) {
@@ -296,7 +296,7 @@ class ConferenceRoomController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('delete', $conferenceRoom);
+        $this->authorize('delete', $conferenceRoom);
 
         // Tenant scope check
         if ($conferenceRoom->organization_id !== $currentUser->organization_id) {

@@ -49,7 +49,7 @@ class BusinessHoursController extends Controller
             abort(401, 'Unauthenticated');
         }
 
-        Gate::authorize('viewAny', BusinessHoursSchedule::class);
+        $this->authorize('viewAny', BusinessHoursSchedule::class);
 
         Log::info('Retrieving business hours schedules list', [
             'request_id' => $requestId,
@@ -205,7 +205,7 @@ class BusinessHoursController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('view', $businessHour);
+        $this->authorize('view', $businessHour);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
@@ -349,7 +349,7 @@ class BusinessHoursController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('delete', $businessHour);
+        $this->authorize('delete', $businessHour);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
@@ -422,7 +422,7 @@ class BusinessHoursController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('duplicate', $businessHour);
+        $this->authorize('duplicate', $businessHour);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
