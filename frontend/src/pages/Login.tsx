@@ -81,7 +81,7 @@ export default function Login() {
           <div className="max-w-lg mx-auto space-y-8">
             {/* Logo */}
             <div className="flex items-center justify-center mb-8">
-              <img src={opbxLogo} alt="OPBX Logo" className="h-16 w-auto" />
+              <img src={opbxLogo} alt="OPBX Logo" className="h-32 w-auto" />
             </div>
 
             {/* Welcome Message */}
