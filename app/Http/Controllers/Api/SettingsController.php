@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
  * Handles organization-level settings including Cloudonix integration.
  */
 class SettingsController extends Controller
-{
+    use ApiRequestHandler;{
     /**
      * Create a new controller instance.
      */
@@ -36,7 +36,7 @@ class SettingsController extends Controller
      */
     public function getCloudonixSettings(): JsonResponse
     {
-        $requestId = (string) Str::uuid();
+        $requestId = $this->getRequestId();
         $user = auth()->user();
 
         if (!$user) {
@@ -92,8 +92,8 @@ class SettingsController extends Controller
      */
     public function updateCloudonixSettings(UpdateCloudonixSettingsRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -242,8 +242,8 @@ class SettingsController extends Controller
      */
     public function validateCloudonixCredentials(ValidateCloudonixRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -338,7 +338,7 @@ class SettingsController extends Controller
      */
     public function generateRequestsApiKey(): JsonResponse
     {
-        $requestId = (string) Str::uuid();
+        $requestId = $this->getRequestId();
         $user = auth()->user();
 
         if (!$user) {

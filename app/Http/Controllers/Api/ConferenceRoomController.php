@@ -25,14 +25,14 @@ use Illuminate\Support\Str;
  * All operations are tenant-scoped to the authenticated user's organization.
  */
 class ConferenceRoomController extends Controller
-{
+    use ApiRequestHandler;{
     /**
      * Display a paginated list of conference rooms.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
@@ -99,8 +99,8 @@ class ConferenceRoomController extends Controller
      */
     public function store(StoreConferenceRoomRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -159,8 +159,8 @@ class ConferenceRoomController extends Controller
      */
     public function show(Request $request, ConferenceRoom $conferenceRoom): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -201,8 +201,8 @@ class ConferenceRoomController extends Controller
      */
     public function update(UpdateConferenceRoomRequest $request, ConferenceRoom $conferenceRoom): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -285,8 +285,8 @@ class ConferenceRoomController extends Controller
      */
     public function destroy(Request $request, ConferenceRoom $conferenceRoom): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);

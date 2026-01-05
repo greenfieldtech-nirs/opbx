@@ -13,10 +13,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class SentryBlacklistController extends Controller
-{
+    use ApiRequestHandler;{
     public function index(Request $request): JsonResponse
     {
-        $blacklists = SentryBlacklist::where('organization_id', $request->user()->organization_id)
+        $blacklists = SentryBlacklist::where('organization_id', $this->getAuthenticatedUser($request)->organization_id)
             ->withCount('items')
             ->get();
 
@@ -27,7 +27,7 @@ class SentryBlacklistController extends Controller
     {
         $blacklist = SentryBlacklist::create(array_merge(
             $request->validated(),
-            ['organization_id' => $request->user()->organization_id]
+            ['organization_id' => $this->getAuthenticatedUser($request)->organization_id]
         ));
 
         return response()->json(['data' => $blacklist], 201);
@@ -35,7 +35,7 @@ class SentryBlacklistController extends Controller
 
     public function show(Request $request, SentryBlacklist $blacklist): JsonResponse
     {
-        if ($blacklist->organization_id !== $request->user()->organization_id) {
+        if ($blacklist->organization_id !== $this->getAuthenticatedUser($request)->organization_id) {
             return response()->json(['message' => 'Not Found'], 404);
         }
 
@@ -46,7 +46,7 @@ class SentryBlacklistController extends Controller
 
     public function update(UpdateSentryBlacklistRequest $request, SentryBlacklist $blacklist): JsonResponse
     {
-        if ($blacklist->organization_id !== $request->user()->organization_id) {
+        if ($blacklist->organization_id !== $this->getAuthenticatedUser($request)->organization_id) {
             return response()->json(['message' => 'Not Found'], 404);
         }
 
@@ -57,7 +57,7 @@ class SentryBlacklistController extends Controller
 
     public function destroy(Request $request, SentryBlacklist $blacklist): JsonResponse
     {
-        if ($blacklist->organization_id !== $request->user()->organization_id) {
+        if ($blacklist->organization_id !== $this->getAuthenticatedUser($request)->organization_id) {
             return response()->json(['message' => 'Not Found'], 404);
         }
 

@@ -10,10 +10,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RoutingSentryController extends Controller
-{
+    use ApiRequestHandler;{
     public function getSettings(Request $request): JsonResponse
     {
-        $organization = $request->user()->organization;
+        $organization = $this->getAuthenticatedUser($request)->organization;
         $settings = $organization->settings['routing_sentry'] ?? [
             'velocity_limit' => 10,
             'volume_limit' => 100,
@@ -25,7 +25,7 @@ class RoutingSentryController extends Controller
 
     public function updateSettings(UpdateSentrySettingsRequest $request): JsonResponse
     {
-        $organization = $request->user()->organization;
+        $organization = $this->getAuthenticatedUser($request)->organization;
         $settings = $organization->settings ?? [];
         $settings['routing_sentry'] = $request->validated();
 

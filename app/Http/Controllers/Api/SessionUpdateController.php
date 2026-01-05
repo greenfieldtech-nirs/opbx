@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  * All operations are automatically scoped to the authenticated user's organization.
  */
 class SessionUpdateController extends Controller
-{
+    use ApiRequestHandler;{
     /**
      * Get active calls for the authenticated user's organization.
      *
