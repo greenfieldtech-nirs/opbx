@@ -45,6 +45,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
+import logger from '@/utils/logger';
 import { extensionsService } from '@/services/extensions.service';
 import { cn } from '@/lib/utils';
 import {
@@ -1479,7 +1480,7 @@ const HolidayImportButton: React.FC<HolidayImportButtonProps> = ({ onImportHolid
       setCountries(sortedCountries);
     } catch (err) {
       setError('Failed to load countries. Please try again.');
-      console.error('Error fetching countries:', err);
+      logger.error('Error fetching countries:', { error: err });
     } finally {
       setLoadingCountries(false);
     }
@@ -1502,10 +1503,10 @@ const HolidayImportButton: React.FC<HolidayImportButtonProps> = ({ onImportHolid
 
       const data = await response.json();
       setHolidays(data);
-    } catch (err) {
-      setError('Failed to load holidays. Please try again.');
-      console.error('Error fetching holidays:', err);
-    } finally {
+      } catch (err) {
+        setError('Failed to load holidays. Please try again.');
+        logger.error('Error fetching holidays:', { error: err });
+      } finally {
       setLoadingHolidays(false);
     }
   };

@@ -7,6 +7,7 @@
 
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import logger from '@/utils/logger';
 
 // Make Pusher available globally for Laravel Echo
 window.Pusher = Pusher;
@@ -133,7 +134,7 @@ export class EchoService {
        });
 
     } catch (error) {
-      console.error('[Echo] Failed to create Echo instance:', error);
+      logger.error('[Echo] Failed to create Echo instance:', { error });
       this.isConnecting = false;
       this.connectionState = 'disconnected';
     }

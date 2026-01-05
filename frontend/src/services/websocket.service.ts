@@ -7,6 +7,7 @@
 
 import { storage } from '@/utils/storage';
 import type { CallPresenceUpdate } from '@/types/api.types';
+import logger from '@/utils/logger';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:6001';
 
@@ -27,7 +28,7 @@ export class WebSocketService {
   connect(organizationId: string): void {
     const token = storage.getToken();
     if (!token) {
-      console.error('No auth token found');
+      logger.error('No auth token found');
       return;
     }
 

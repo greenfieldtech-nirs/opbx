@@ -7,6 +7,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { storage } from '@/utils/storage';
 import type { APIError } from '@/types';
+import logger from '@/utils/logger';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
@@ -53,12 +54,12 @@ api.interceptors.response.use(
 
     // Handle 403 Forbidden (insufficient permissions)
     if (error.response?.status === 403) {
-      console.error('Insufficient permissions');
+      logger.error('Insufficient permissions');
     }
 
     // Handle network errors
     if (!error.response) {
-      console.error('Network error - check your connection');
+      logger.error('Network error - check your connection');
     }
 
     return Promise.reject(error);
