@@ -757,7 +757,6 @@ class ExtensionController extends Controller
         return response()->json([
             'extension_id' => $extension->id,
             'extension_number' => $extension->extension_number,
-            'password' => $extension->getSipPassword(),
         ]);
     }
 
