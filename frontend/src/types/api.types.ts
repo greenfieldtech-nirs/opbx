@@ -76,7 +76,13 @@ export type RingGroupFallbackAction = 'extension' | 'hangup';
 export type RingGroupStatus = 'active' | 'inactive';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room';
+export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu';
+
+// IVR Destination Type
+export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'hangup';
+
+// IVR Menu Status
+export type IvrMenuStatus = 'active' | 'inactive';
 
 // ============================================================================
 // Organization
@@ -320,6 +326,75 @@ export interface UpdateRingGroupRequest {
   status?: RingGroupStatus;
   members?: Array<{
     extension_id: string;
+    priority: number;
+  }>;
+}
+
+// ============================================================================
+// IVR Menus
+// ============================================================================
+
+export interface IvrMenuOption {
+  id?: string;
+  ivr_menu_id?: string;
+  input_digits: string;
+  description?: string;
+  destination_type: IvrDestinationType;
+  destination_id: string;
+  priority: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface IvrMenu {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  audio_file_path?: string;
+  tts_text?: string;
+  max_turns: number;
+  failover_destination_type: IvrDestinationType;
+  failover_destination_id?: string;
+  status: IvrMenuStatus;
+  options: IvrMenuOption[];
+  options_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateIvrMenuRequest {
+  name: string;
+  description?: string;
+  audio_file_path?: string;
+  tts_text?: string;
+  max_turns: number;
+  failover_destination_type: IvrDestinationType;
+  failover_destination_id?: string;
+  status: IvrMenuStatus;
+  options: Array<{
+    input_digits: string;
+    description?: string;
+    destination_type: IvrDestinationType;
+    destination_id: string;
+    priority: number;
+  }>;
+}
+
+export interface UpdateIvrMenuRequest {
+  name?: string;
+  description?: string;
+  audio_file_path?: string;
+  tts_text?: string;
+  max_turns?: number;
+  failover_destination_type?: IvrDestinationType;
+  failover_destination_id?: string;
+  status?: IvrMenuStatus;
+  options?: Array<{
+    input_digits: string;
+    description?: string;
+    destination_type: IvrDestinationType;
+    destination_id: string;
     priority: number;
   }>;
 }
