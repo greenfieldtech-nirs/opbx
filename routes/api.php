@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
+use App\Http\Controllers\Api\IvrMenuController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
@@ -136,6 +137,9 @@ Route::prefix('v1')->group(function (): void {
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
+
+        // IVR Menus
+        Route::apiResource('ivr-menus', IvrMenuController::class);
 
         // Business Hours
         Route::apiResource('business-hours', BusinessHoursController::class);
