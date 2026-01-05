@@ -29,7 +29,7 @@ use Illuminate\Support\Str;
  * All operations are tenant-scoped to the authenticated user's organization.
  */
 class BusinessHoursController extends Controller
-{
+    use ApiRequestHandler;{
     /**
      * Display a paginated list of business hours schedules.
      *
@@ -38,8 +38,8 @@ class BusinessHoursController extends Controller
      */
     public function index(Request $request): BusinessHoursScheduleCollection
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
@@ -115,8 +115,8 @@ class BusinessHoursController extends Controller
      */
     public function store(StoreBusinessHoursScheduleRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -194,8 +194,8 @@ class BusinessHoursController extends Controller
      */
     public function show(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -243,8 +243,8 @@ class BusinessHoursController extends Controller
      */
     public function update(UpdateBusinessHoursScheduleRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -338,8 +338,8 @@ class BusinessHoursController extends Controller
      */
     public function destroy(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -411,8 +411,8 @@ class BusinessHoursController extends Controller
      */
     public function duplicate(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);

@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class RecordingsController extends Controller
-{
+    use ApiRequestHandler;{
     public function __construct(
         private readonly RecordingUploadService $uploadService,
         private readonly RecordingRemoteService $remoteService,
@@ -72,7 +72,7 @@ class RecordingsController extends Controller
      */
     public function store(StoreRecordingRequest $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
         $validated = $request->validated();
 
         try {
@@ -162,7 +162,7 @@ class RecordingsController extends Controller
      */
     public function update(UpdateRecordingRequest $request, Recording $recording): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
         $validated = $request->validated();
 
         $recording->update(array_merge($validated, [
@@ -180,7 +180,7 @@ class RecordingsController extends Controller
      */
     public function download(Request $request, Recording $recording): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$recording->isUploaded()) {
             return response()->json(['error' => 'Only uploaded recordings can be downloaded'], 400);
@@ -215,7 +215,7 @@ class RecordingsController extends Controller
 
         // For token-based access, we allow access with just the token
         // The token contains user information and is cryptographically validated
-        $user = $request->user(); // May be null for token-only access (like audio playback)
+        $user = $this->getAuthenticatedUser($request); // May be null for token-only access (like audio playback)
         $recording = $this->accessService->validateAccessToken($token, $user ? $user->id : null);
 
         if (!$recording) {
@@ -257,7 +257,7 @@ class RecordingsController extends Controller
      */
     public function destroy(Request $request, Recording $recording): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
         // Check if user has permission to delete recordings
         if (!$user->hasRole(UserRole::OWNER) && !$user->hasRole(UserRole::PBX_ADMIN)) {
             return response()->json(['error' => 'Unauthorized'], 403);
