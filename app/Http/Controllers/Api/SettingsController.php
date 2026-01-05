@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
+use App\Http\Requests\Settings\UpdateCloudonixSettingsRequest;
 use App\Http\Requests\Settings\ValidateCloudonixRequest;
 use App\Models\CloudonixSettings;
 use App\Services\CloudonixClient\CloudonixClient;
