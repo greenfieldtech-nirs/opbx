@@ -1,5 +1,19 @@
 #!/bin/bash
+
 set -e
+
+# Run environment validation before starting application
+echo "Validating environment variables..."
+if [ -f /docker/scripts/validate-env.sh ]; then
+    /docker/scripts/validate-env.sh
+    VALIDATION_EXIT_CODE=$?
+    if [ $VALIDATION_EXIT_CODE -ne 0 ]; then
+        echo "ERROR: Environment validation failed"
+        exit 1
+    fi
+else
+    echo "WARNING: Environment validation script not found, skipping..."
+fi
 
 # Wait for MySQL to be ready
 echo "Waiting for MySQL to be ready..."
