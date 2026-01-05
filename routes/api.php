@@ -127,6 +127,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('extensions/{extension}/password', [ExtensionController::class, 'getPassword'])
             ->name('extensions.password');
         Route::put('extensions/{extension}/reset-password', [ExtensionController::class, 'resetPassword'])
+            ->middleware(['auth:sanctum', 'sensitive-operations'])
             ->name('extensions.reset-password');
         Route::apiResource('extensions', ExtensionController::class);
 

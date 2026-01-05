@@ -65,7 +65,10 @@
       "Bash(timeout 120 npm run build)",
       "Bash(git reset:*)",
       "Bash(rm:*)",
-      "Bash(docker-compose build:*)"
+      "Bash(docker-compose build:*)",
+      "Bash(/tmp/test_recording_playback.sh)",
+      "Bash(/tmp/test_upload_debug.sh)",
+      "Bash(/tmp/test_upload_and_play.sh)"
     ]
   }
 }
