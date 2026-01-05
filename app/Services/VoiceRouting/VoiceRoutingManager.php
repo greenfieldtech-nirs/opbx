@@ -237,7 +237,7 @@ class VoiceRoutingManager
             ExtensionType::CONFERENCE => $this->resolveConferenceDestination($extension, $organizationId),
             ExtensionType::RING_GROUP => $this->resolveRingGroupDestination($extension, $organizationId),
             ExtensionType::IVR => ['extension' => $extension], // IVR routing not yet implemented
-            ExtensionType::AI_ASSISTANT => ['extension' => $extension], // AI routing not yet implemented
+            ExtensionType::AI_ASSISTANT => $this->resolveAiAssistantDestination($extension, $organizationId),
             ExtensionType::CUSTOM_LOGIC => ['extension' => $extension], // Custom logic not yet implemented
             ExtensionType::FORWARD => ['extension' => $extension], // Forward routing not yet implemented
             ExtensionType::QUEUE => ['extension' => $extension], // Queue routing not yet implemented
@@ -271,6 +271,13 @@ class VoiceRoutingManager
         }
 
         return ['conference_room' => $room];
+    }
+
+    private function resolveAiAssistantDestination(Extension $extension, int $organizationId): array
+    {
+        // AI Assistant routing is handled by the AiAgentRoutingStrategy
+        // Configuration is extracted in the strategy itself
+        return ['extension' => $extension];
     }
 
     private function resolveRingGroupDestination(Extension $extension, int $organizationId): array

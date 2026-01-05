@@ -143,6 +143,35 @@ class CxmlBuilder
     }
 
     /**
+     * Add Service noun to Dial verb for service provider forwarding.
+     *
+     * @param string $serviceUrl The service provider URL
+     * @param string|null $serviceToken Optional service authentication token
+     * @param array<string, mixed> $params Additional service parameters
+     */
+    public function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): self
+    {
+        $dial = $this->document->createElement('Dial');
+        $service = $this->document->createElement('Service', htmlspecialchars($serviceUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+
+        if ($serviceToken !== null) {
+            $service->setAttribute('token', $serviceToken);
+        }
+
+        // Add any additional parameters
+        foreach ($params as $key => $value) {
+            if ($value !== null) {
+                $service->setAttribute($key, (string) $value);
+            }
+        }
+
+        $dial->appendChild($service);
+        $this->response->appendChild($dial);
+
+        return $this;
+    }
+
+    /**
      * Add Dial verb with nested Conference for conference room access.
      *
      * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
@@ -335,6 +364,21 @@ class CxmlBuilder
     {
         $builder = new self();
         $builder->hangup();
+
+        return $builder->build();
+    }
+
+    /**
+     * Build service provider dialing response.
+     *
+     * @param string $serviceUrl The service provider URL
+     * @param string|null $serviceToken Optional service authentication token
+     * @param array<string, mixed> $params Additional service parameters
+     */
+    public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): string
+    {
+        $builder = new self();
+        $builder->dialService($serviceUrl, $serviceToken, $params);
 
         return $builder->build();
     }

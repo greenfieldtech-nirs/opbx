@@ -27,11 +27,19 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        $sipUri = sprintf('sip:%s@%s', $extension->extension_number, $request->input('Domain'));
+        // Extract service provider configuration from extension
+        $config = $extension->configuration ?? [];
+        $serviceUrl = $config['service_url'] ?? null;
+        $serviceToken = $config['service_token'] ?? null;
+        $serviceParams = $config['service_params'] ?? [];
 
-        // Route to AI Agent (same as user for now, but semantically distinct)
+        if (!$serviceUrl) {
+            return response(CxmlBuilder::unavailable('AI Agent service URL not configured'), 200, ['Content-Type' => 'text/xml']);
+        }
+
+        // Route to AI Agent Service Provider using <Service> noun
         return response(
-            CxmlBuilder::dialExtension($sipUri, 60),
+            CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams),
             200,
             ['Content-Type' => 'text/xml']
         );
