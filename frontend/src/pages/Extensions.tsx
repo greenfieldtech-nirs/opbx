@@ -206,7 +206,7 @@ export default function ExtensionsComplete() {
         setSyncComparison(result);
         setIsSyncNeeded(result.needs_sync);
       } catch (error) {
-        console.error('Failed to check sync status:', error);
+        logger.error('Failed to check sync status:', { error });
         // Don't show error toast, just fail silently
       }
     };

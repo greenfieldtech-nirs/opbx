@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { settingsService } from '@/services/settings.service';
+import logger from '@/utils/logger';
 import { sentryService } from '@/services/sentry.service';
 import { getApiErrorMessage } from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -139,7 +140,7 @@ export default function Settings() {
         // Note: validation status is handled by the validation effect below
       } catch (error) {
         toast.error('Failed to load settings');
-        console.error('Settings load error:', error);
+        logger.error('Settings load error:', { error });
       } finally {
         setIsLoading(false);
       }

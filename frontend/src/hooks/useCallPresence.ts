@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { echoService, type CallInitiatedData, type CallAnsweredData, type CallEndedData, type PresenceMember } from '@/services/echo.service';
 import { useAuth } from './useAuth';
+import logger from '@/utils/logger';
 
 export interface ActiveCall {
   call_id: string;
@@ -40,7 +41,7 @@ export function useCallPresence(): CallPresenceState {
 
   // Handle call initiated event
   const handleCallInitiated = useCallback((data: CallInitiatedData) => {
-    console.log('[useCallPresence] Call initiated:', data.call_id);
+    logger.debug('[useCallPresence] Call initiated:', { callId: data.call_id });
 
     setActiveCalls(prev => {
       // Check if call already exists (prevent duplicates)
@@ -62,7 +63,7 @@ export function useCallPresence(): CallPresenceState {
 
   // Handle call answered event
   const handleCallAnswered = useCallback((data: CallAnsweredData) => {
-    console.log('[useCallPresence] Call answered:', data.call_id);
+    logger.debug('[useCallPresence] Call answered:', { callId: data.call_id });
 
     setActiveCalls(prev => prev.map(call =>
       call.call_id === data.call_id
@@ -78,19 +79,19 @@ export function useCallPresence(): CallPresenceState {
 
   // Handle call ended event
   const handleCallEnded = useCallback((data: CallEndedData) => {
-    console.log('[useCallPresence] Call ended:', data.call_id);
+    logger.debug('[useCallPresence] Call ended:', { callId: data.call_id });
 
     setActiveCalls(prev => prev.filter(call => call.call_id !== data.call_id));
   }, []);
 
   // Handle presence updates
   const handlePresenceUpdate = useCallback((members: PresenceMember[]) => {
-    console.log('[useCallPresence] Online members:', members.length);
+    logger.debug('[useCallPresence] Online members:', { count: members.length });
     setOnlineMembers(members);
   }, []);
 
   const handleMemberJoined = useCallback((member: PresenceMember) => {
-    console.log('[useCallPresence] Member joined:', member.name);
+    logger.debug('[useCallPresence] Member joined:', { memberName: member.name });
     setOnlineMembers(prev => {
       // Prevent duplicates
       if (prev.some(m => m.id === member.id)) {
@@ -101,7 +102,7 @@ export function useCallPresence(): CallPresenceState {
   }, []);
 
   const handleMemberLeft = useCallback((member: PresenceMember) => {
-    console.log('[useCallPresence] Member left:', member.name);
+    logger.debug('[useCallPresence] Member left:', { memberName: member.name });
     setOnlineMembers(prev => prev.filter(m => m.id !== member.id));
   }, []);
 
@@ -139,7 +140,7 @@ export function useCallPresence(): CallPresenceState {
         setConnectionState('disconnected');
       };
     } catch (error) {
-      console.error('[useCallPresence] Failed to setup call presence:', error);
+      logger.error('[useCallPresence] Failed to setup call presence:', { error });
       setConnectionState('disconnected');
     }
   }, [
