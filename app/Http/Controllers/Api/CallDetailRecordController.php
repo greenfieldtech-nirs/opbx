@@ -8,7 +8,8 @@ use App\Http\Controllers\Controller;
 
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
+
+use App\Http\Resources\CallDetailRecordResource;
 use App\Models\CallDetailRecord;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
