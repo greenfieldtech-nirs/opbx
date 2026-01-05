@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\RingGroup\StoreRingGroupRequest;
 use App\Http\Requests\RingGroup\UpdateRingGroupRequest;
 use App\Models\RingGroup;
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
  */
 class RingGroupController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Display a paginated list of ring groups.
      *
@@ -34,8 +36,8 @@ class RingGroupController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -141,8 +143,8 @@ class RingGroupController extends Controller
      */
     public function store(StoreRingGroupRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -222,8 +224,8 @@ class RingGroupController extends Controller
      */
     public function show(Request $request, RingGroup $ringGroup): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -269,8 +271,8 @@ class RingGroupController extends Controller
      */
     public function update(UpdateRingGroupRequest $request, RingGroup $ringGroup): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -400,8 +402,8 @@ class RingGroupController extends Controller
      */
     public function destroy(Request $request, RingGroup $ringGroup): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
