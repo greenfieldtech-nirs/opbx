@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\User;
@@ -25,6 +26,7 @@ use Illuminate\Support\Str;
  */
 class UsersController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Display a paginated list of users.
      *
@@ -33,12 +35,8 @@ class UsersController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         // Check authorization using policy
         $this->authorize('viewAny', User::class);
@@ -131,12 +129,8 @@ class UsersController extends Controller
      */
     public function store(CreateUserRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         // Check authorization using policy
         $this->authorize('create', User::class);
@@ -205,12 +199,8 @@ class UsersController extends Controller
      */
     public function show(Request $request, User $user): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         // Check authorization using policy
         $this->authorize('view', $user);
@@ -255,12 +245,8 @@ class UsersController extends Controller
      */
     public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         // Check authorization using policy
         $this->authorize('update', $user);
@@ -355,12 +341,8 @@ class UsersController extends Controller
      */
     public function destroy(Request $request, User $user): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         // Check authorization using policy
         $this->authorize('delete', $user);
