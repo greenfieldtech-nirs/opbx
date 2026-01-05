@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Sentry\StoreSentryBlacklistRequest;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\Sentry\UpdateSentryBlacklistRequest;
 use App\Models\SentryBlacklist;
 use Illuminate\Http\JsonResponse;

@@ -6,6 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\ConferenceRoom\UpdateConferenceRoomRequest;
 use App\Http\Resources\ConferenceRoomResource;

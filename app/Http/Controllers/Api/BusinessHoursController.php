@@ -6,7 +6,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\BusinessHoursStatus;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\BusinessHours\UpdateBusinessHoursScheduleRequest;
 use App\Http\Resources\BusinessHoursScheduleCollection;
 use App\Http\Resources\BusinessHoursScheduleResource;
