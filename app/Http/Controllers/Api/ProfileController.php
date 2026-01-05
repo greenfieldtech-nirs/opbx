@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Profile\UpdateOrganizationRequest;
 use App\Http\Requests\Profile\UpdatePasswordRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
@@ -24,6 +25,7 @@ use Illuminate\Support\Str;
  */
 class ProfileController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Get current user's profile.
      *
@@ -35,7 +37,7 @@ class ProfileController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
 
         return response()->json([
             'user' => [
@@ -76,8 +78,8 @@ class ProfileController extends Controller
      */
     public function update(UpdateProfileRequest $request): JsonResponse
     {
-        $user = $request->user();
-        $requestId = (string) Str::uuid();
+        $user = $this->getAuthenticatedUser($request);
+        $requestId = $this->getRequestId();
 
         $originalData = [
             'name' => $user->name,
@@ -179,14 +181,13 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'PROFILE_UPDATE_FAILED',
-                    'message' => 'Failed to update profile. Please try again.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 500);
+            return $this->logAndRespond(
+                ['error' => $e->getMessage()],
+                'Failed to update profile. Please try again.',
+                500,
+                'PROFILE_UPDATE_FAILED',
+                $requestId
+            );
         }
     }
 
@@ -202,9 +203,9 @@ class ProfileController extends Controller
      */
     public function updateOrganization(UpdateOrganizationRequest $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
         $organization = $user->organization;
-        $requestId = (string) Str::uuid();
+        $requestId = $this->getRequestId();
 
         $originalData = [
             'name' => $organization->name,
@@ -266,14 +267,13 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'ORGANIZATION_UPDATE_FAILED',
-                    'message' => 'Failed to update organization. Please try again.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 500);
+            return $this->logAndRespond(
+                ['error' => $e->getMessage()],
+                'Failed to update organization. Please try again.',
+                500,
+                'ORGANIZATION_UPDATE_FAILED',
+                $requestId
+            );
         }
     }
 
@@ -291,8 +291,8 @@ class ProfileController extends Controller
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
-        $user = $request->user();
-        $requestId = (string) Str::uuid();
+        $user = $this->getAuthenticatedUser($request);
+        $requestId = $this->getRequestId();
 
         Log::info('Password change initiated', [
             'request_id' => $requestId,
@@ -334,14 +334,13 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'PASSWORD_UPDATE_FAILED',
-                    'message' => 'Failed to update password. Please try again.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 500);
+            return $this->logAndRespond(
+                ['error' => $e->getMessage()],
+                'Failed to update password. Please try again.',
+                500,
+                'PASSWORD_UPDATE_FAILED',
+                $requestId
+            );
         }
     }
 }
