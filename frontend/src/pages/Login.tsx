@@ -74,10 +74,10 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" style={{ fontFamily: 'Roboto, sans-serif' }}>
       <div className="grid lg:grid-cols-2 min-h-screen">
         {/* Left Side - Branding & Welcome */}
-        <div className="flex flex-col justify-center p-12 bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="flex flex-col justify-center p-12 bg-gray-900">
           <div className="max-w-lg mx-auto space-y-8">
             {/* Logo */}
             <div className="flex items-center justify-center mb-8">
@@ -86,20 +86,20 @@ export default function Login() {
 
             {/* Welcome Message */}
             <div className="space-y-4 text-center">
-              <h1 className="text-5xl font-bold text-gray-900">
+              <h1 className="text-5xl font-bold text-white">
                 Welcome to
               </h1>
-              <h2 className="text-4xl font-bold text-gray-900">
+              <h2 className="text-4xl font-bold text-blue-400">
                 OPBX
               </h2>
-              <p className="text-lg text-gray-600 mt-4">
+              <p className="text-lg text-blue-200 mt-4">
                 Open-source Business PBX powered by Cloudonix
               </p>
             </div>
 
             {/* Additional Info */}
             <div className="text-center pt-8">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-400">
                 Professional PBX solution for modern businesses
               </p>
             </div>
