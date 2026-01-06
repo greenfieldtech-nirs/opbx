@@ -120,10 +120,15 @@ export default function IVRMenus() {
   });
 
   // Available destinations for dropdowns
-  const { data: availableDestinations } = useQuery({
+  const { data: availableDestinations, isLoading: destinationsLoading, error: destinationsError } = useQuery({
     queryKey: ['ivr-available-destinations'],
     queryFn: () => ivrMenusService.getAvailableDestinations(),
   });
+
+  // Debug logging
+  console.log('Available destinations:', availableDestinations);
+  console.log('Destinations loading:', destinationsLoading);
+  console.log('Destinations error:', destinationsError);
 
   // Available recordings for audio selection
   const { data: recordingsData } = useQuery({
@@ -777,26 +782,47 @@ export default function IVRMenus() {
                                   <SelectValue placeholder="Select destination" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                    <SelectItem key={ext.id} value={ext.id}>
-                                      {ext.label}
+                                  {destinationsLoading ? (
+                                    <SelectItem value="" disabled>
+                                      Loading destinations...
                                     </SelectItem>
-                                  ))}
-                                  {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
-                                    <SelectItem key={rg.id} value={rg.id}>
-                                      {rg.label}
+                                  ) : destinationsError ? (
+                                    <SelectItem value="" disabled>
+                                      Error loading destinations
                                     </SelectItem>
-                                  ))}
-                                  {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
-                                    <SelectItem key={cr.id} value={cr.id}>
-                                      {cr.label}
-                                    </SelectItem>
-                                  ))}
-                                  {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
-                                    <SelectItem key={menu.id} value={menu.id}>
-                                      {menu.label}
-                                    </SelectItem>
-                                  ))}
+                                  ) : (
+                                    <>
+                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
+                                        <SelectItem key={ext.id} value={ext.id}>
+                                          {ext.label}
+                                        </SelectItem>
+                                      ))}
+                                      {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
+                                        <SelectItem key={rg.id} value={rg.id}>
+                                          {rg.label}
+                                        </SelectItem>
+                                      ))}
+                                      {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
+                                        <SelectItem key={cr.id} value={cr.id}>
+                                          {cr.label}
+                                        </SelectItem>
+                                      ))}
+                                      {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
+                                        <SelectItem key={menu.id} value={menu.id}>
+                                          {menu.label}
+                                        </SelectItem>
+                                      ))}
+                                      {(!availableDestinations ||
+                                        (option.destination_type === 'extension' && availableDestinations.extensions?.length === 0) ||
+                                        (option.destination_type === 'ring_group' && availableDestinations.ring_groups?.length === 0) ||
+                                        (option.destination_type === 'conference_room' && availableDestinations.conference_rooms?.length === 0) ||
+                                        (option.destination_type === 'ivr_menu' && availableDestinations.ivr_menus?.length === 0)) && (
+                                        <SelectItem value="" disabled>
+                                          No {option.destination_type?.replace('_', ' ')}s available
+                                        </SelectItem>
+                                      )}
+                                    </>
+                                  )}
                                 </SelectContent>
                               </Select>
                             </div>
