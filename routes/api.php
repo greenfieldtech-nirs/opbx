@@ -140,6 +140,7 @@ Route::prefix('v1')->group(function (): void {
 
         // IVR Menus
         Route::apiResource('ivr-menus', IvrMenuController::class);
+        Route::get('ivr-menus/available-destinations', [IvrMenuController::class, 'getAvailableDestinations']);
 
         // Business Hours
         Route::apiResource('business-hours', BusinessHoursController::class);
