@@ -6,17 +6,22 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { ivrMenusService, type AvailableDestinations } from '@/services/ivrMenus.service';
+import { extensionsService } from '@/services/extensions.service';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   IvrMenu,
   IvrMenuStatus,
+  IvrDestinationType,
   CreateIvrMenuRequest,
   UpdateIvrMenuRequest,
+  Extension,
 } from '@/types/api.types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -41,6 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Plus,
   Search,
@@ -51,6 +57,9 @@ import {
   Eye,
   ArrowUpDown,
   RefreshCw,
+  X,
+  Upload,
+  Mic,
 } from 'lucide-react';
 
 export default function IVRMenus() {
@@ -75,15 +84,26 @@ export default function IVRMenus() {
   const [selectedMenu, setSelectedMenu] = useState<IvrMenu | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState<Partial<IvrMenu>>({
+  const [formData, setFormData] = useState<Partial<IvrMenu & { options: Array<{
+    input_digits: string;
+    description?: string;
+    destination_type: IvrDestinationType;
+    destination_id: string;
+  }> }>>({
     name: '',
     description: '',
     audio_file_path: '',
     tts_text: '',
     max_turns: 3,
-    failover_destination_type: 'hangup',
-    status: 'active',
+    failover_destination_type: 'hangup' as IvrDestinationType,
+    status: 'active' as IvrMenuStatus,
     options: [],
+  });
+
+  // Available destinations for dropdowns
+  const { data: availableDestinations } = useQuery({
+    queryKey: ['ivr-available-destinations'],
+    queryFn: () => ivrMenusService.getAvailableDestinations(),
   });
 
   // Fetch IVR menus
@@ -201,6 +221,37 @@ export default function IVRMenus() {
     };
 
     createMutation.mutate(requestData);
+  };
+
+  // Add new menu option
+  const addMenuOption = () => {
+    setFormData({
+      ...formData,
+      options: [
+        ...(formData.options || []),
+        {
+          input_digits: '',
+          description: '',
+          destination_type: 'extension',
+          destination_id: '',
+        },
+      ],
+    });
+  };
+
+  // Remove menu option
+  const removeMenuOption = (index: number) => {
+    setFormData({
+      ...formData,
+      options: (formData.options || []).filter((_, i) => i !== index),
+    });
+  };
+
+  // Update menu option
+  const updateMenuOption = (index: number, field: string, value: any) => {
+    const updatedOptions = [...(formData.options || [])];
+    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
+    setFormData({ ...formData, options: updatedOptions });
   };
 
   // Open edit dialog
@@ -422,46 +473,313 @@ export default function IVRMenus() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create IVR Menu</DialogTitle>
             <DialogDescription>
               Configure a new interactive voice response menu
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Main Menu"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Input
-                value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Optional description"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Status</label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value as IvrMenuStatus })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="basic">Basic</TabsTrigger>
+              <TabsTrigger value="audio">Audio</TabsTrigger>
+              <TabsTrigger value="options">Options</TabsTrigger>
+              <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name || ''}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Main Menu"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value as IvrMenuStatus })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional description of the IVR menu"
+                  rows={3}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="audio" className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="audio-file"
+                      name="audio-type"
+                      checked={!formData.tts_text}
+                      onChange={() => setFormData({ ...formData, tts_text: '', audio_file_path: formData.audio_file_path || '' })}
+                    />
+                    <Label htmlFor="audio-file">Audio File</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="text-to-speech"
+                      name="audio-type"
+                      checked={!!formData.tts_text}
+                      onChange={() => setFormData({ ...formData, audio_file_path: '', tts_text: formData.tts_text || '' })}
+                    />
+                    <Label htmlFor="text-to-speech">Text-to-Speech</Label>
+                  </div>
+                </div>
+
+                {!formData.tts_text ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="audio-file">Audio File Path</Label>
+                    <Input
+                      id="audio-file"
+                      value={formData.audio_file_path || ''}
+                      onChange={(e) => setFormData({ ...formData, audio_file_path: e.target.value })}
+                      placeholder="Path to audio file (e.g., /audio/welcome.mp3)"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Upload audio files to your server and provide the path here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="tts-text">Text to Speak</Label>
+                    <Textarea
+                      id="tts-text"
+                      value={formData.tts_text || ''}
+                      onChange={(e) => setFormData({ ...formData, tts_text: e.target.value })}
+                      placeholder="Enter the text that will be converted to speech"
+                      rows={4}
+                    />
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="options" className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-base font-medium">Menu Options</Label>
+                  <Button type="button" onClick={addMenuOption} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Option
+                  </Button>
+                </div>
+
+                {(formData.options || []).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Phone className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No menu options configured</p>
+                    <p className="text-sm">Add options below to define how callers navigate your IVR menu</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(formData.options || []).map((option, index) => (
+                      <Card key={index}>
+                        <CardContent className="p-4">
+                          <div className="grid grid-cols-12 gap-4 items-end">
+                            <div className="col-span-2">
+                              <Label>Digits *</Label>
+                              <Input
+                                value={option.input_digits}
+                                onChange={(e) => updateMenuOption(index, 'input_digits', e.target.value)}
+                                placeholder="1"
+                                maxLength={10}
+                              />
+                            </div>
+                            <div className="col-span-3">
+                              <Label>Description</Label>
+                              <Input
+                                value={option.description || ''}
+                                onChange={(e) => updateMenuOption(index, 'description', e.target.value)}
+                                placeholder="Press 1 for sales"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Label>Type</Label>
+                              <Select
+                                value={option.destination_type}
+                                onValueChange={(value) => updateMenuOption(index, 'destination_type', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="extension">Extension</SelectItem>
+                                  <SelectItem value="ring_group">Ring Group</SelectItem>
+                                  <SelectItem value="conference_room">Conference</SelectItem>
+                                  <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-4">
+                              <Label>Destination</Label>
+                              <Select
+                                value={option.destination_id}
+                                onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select destination" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableDestinations?.extensions?.map((ext) => (
+                                    <SelectItem key={ext.id} value={ext.id}>
+                                      {ext.label}
+                                    </SelectItem>
+                                  ))}
+                                  {availableDestinations?.ring_groups?.map((rg) => (
+                                    <SelectItem key={rg.id} value={rg.id}>
+                                      {rg.label}
+                                    </SelectItem>
+                                  ))}
+                                  {availableDestinations?.conference_rooms?.map((cr) => (
+                                    <SelectItem key={cr.id} value={cr.id}>
+                                      {cr.label}
+                                    </SelectItem>
+                                  ))}
+                                  {availableDestinations?.ivr_menus?.map((menu) => (
+                                    <SelectItem key={menu.id} value={menu.id}>
+                                      {menu.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeMenuOption(index)}
+                                className="w-full"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="advanced" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="max-turns">Maximum Turns</Label>
+                  <Select
+                    value={String(formData.max_turns || 3)}
+                    onValueChange={(value) => setFormData({ ...formData, max_turns: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                        <SelectItem key={num} value={String(num)}>
+                          {num}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How many times to replay the menu on invalid input
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="failover-type">Failover Destination</Label>
+                  <Select
+                    value={formData.failover_destination_type}
+                    onValueChange={(value) => setFormData({
+                      ...formData,
+                      failover_destination_type: value as IvrDestinationType,
+                      failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hangup">Hang Up</SelectItem>
+                      <SelectItem value="extension">Extension</SelectItem>
+                      <SelectItem value="ring_group">Ring Group</SelectItem>
+                      <SelectItem value="conference_room">Conference Room</SelectItem>
+                      <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
+                <div className="space-y-2">
+                  <Label>Failover Destination</Label>
+                  <Select
+                    value={formData.failover_destination_id || ''}
+                    onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select failover destination" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.failover_destination_type === 'extension' &&
+                        availableDestinations?.extensions?.map((ext) => (
+                          <SelectItem key={ext.id} value={ext.id}>
+                            {ext.label}
+                          </SelectItem>
+                        ))}
+                      {formData.failover_destination_type === 'ring_group' &&
+                        availableDestinations?.ring_groups?.map((rg) => (
+                          <SelectItem key={rg.id} value={rg.id}>
+                            {rg.label}
+                          </SelectItem>
+                        ))}
+                      {formData.failover_destination_type === 'conference_room' &&
+                        availableDestinations?.conference_rooms?.map((cr) => (
+                          <SelectItem key={cr.id} value={cr.id}>
+                            {cr.label}
+                          </SelectItem>
+                        ))}
+                      {formData.failover_destination_type === 'ivr_menu' &&
+                        availableDestinations?.ivr_menus?.map((menu) => (
+                          <SelectItem key={menu.id} value={menu.id}>
+                            {menu.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               Cancel
