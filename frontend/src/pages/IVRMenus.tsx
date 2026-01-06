@@ -595,7 +595,7 @@ export default function IVRMenus() {
                     <div className="space-y-2">
                       <Label htmlFor="audio-source">Audio Source</Label>
                       <Select
-                        value={formData.audio_file_path?.startsWith('http') ? 'remote' : 'recording'}
+                        value={typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? 'remote' : 'recording'}
                         onValueChange={(value) => {
                           if (value === 'remote') {
                             setFormData({ ...formData, audio_file_path: 'https://' });
@@ -614,7 +614,7 @@ export default function IVRMenus() {
                       </Select>
                     </div>
 
-                    {formData.audio_file_path?.startsWith('http') ? (
+                    {typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? (
                       <div className="space-y-2">
                         <Label htmlFor="audio-url">Remote Audio URL</Label>
                         <Input
