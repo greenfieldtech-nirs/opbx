@@ -124,7 +124,7 @@ export default function IVRMenus() {
   // Available destinations for dropdowns - using existing API endpoints
   const { data: extensionsData, isLoading: extensionsLoading, error: extensionsError } = useQuery({
     queryKey: ['ivr-extensions'],
-    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100 }),
+    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100, with: 'user' }),
   });
 
   const { data: ringGroupsData, isLoading: ringGroupsLoading, error: ringGroupsError } = useQuery({
@@ -146,7 +146,7 @@ export default function IVRMenus() {
   const availableDestinations = {
     extensions: extensionsData?.data?.map(ext => ({
       id: ext.id,
-      label: `Ext ${ext.extension_number} - ${ext.user?.name || 'Unassigned'}`
+      label: `Ext ${ext.extension_number} - ${ext.user?.name || ext.name || 'Unassigned'}`
     })) || [],
     ring_groups: ringGroupsData?.data?.map(rg => ({
       id: rg.id,
