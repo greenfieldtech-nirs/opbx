@@ -14,7 +14,7 @@ class VolumeCheck implements SentryCheck
 
     public function check(Request $request, DidNumber $did): bool
     {
-        $settings = $did->organization->settings['sentry_settings'] ?? [];
+        $settings = $did->organization->settings['routing_sentry'] ?? [];
 
         // Check limits for different windows if configured
         $windows = [
