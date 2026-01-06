@@ -6,8 +6,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ivrMenusService, type AvailableDestinations } from '@/services/ivrMenus.service';
+import { ivrMenusService } from '@/services/ivrMenus.service';
 import { extensionsService } from '@/services/extensions.service';
+import { ringGroupsService } from '@/services/ringGroups.service';
+import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -119,11 +121,49 @@ export default function IVRMenus() {
     options: [],
   });
 
-  // Available destinations for dropdowns
-  const { data: availableDestinations, isLoading: destinationsLoading, error: destinationsError } = useQuery({
-    queryKey: ['ivr-available-destinations'],
-    queryFn: () => ivrMenusService.getAvailableDestinations(),
+  // Available destinations for dropdowns - using existing API endpoints
+  const { data: extensionsData, isLoading: extensionsLoading, error: extensionsError } = useQuery({
+    queryKey: ['ivr-extensions'],
+    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100 }),
   });
+
+  const { data: ringGroupsData, isLoading: ringGroupsLoading, error: ringGroupsError } = useQuery({
+    queryKey: ['ivr-ring-groups'],
+    queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  const { data: conferenceRoomsData, isLoading: conferenceRoomsLoading, error: conferenceRoomsError } = useQuery({
+    queryKey: ['ivr-conference-rooms'],
+    queryFn: () => conferenceRoomsService.getAll({ per_page: 100 }),
+  });
+
+  const { data: ivrMenusList, isLoading: ivrMenusLoading, error: ivrMenusError } = useQuery({
+    queryKey: ['ivr-menus-list'],
+    queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  // Combine all destinations
+  const availableDestinations = {
+    extensions: extensionsData?.data?.map(ext => ({
+      id: ext.id,
+      label: `Ext ${ext.extension_number} - ${ext.user?.name || 'Unassigned'}`
+    })) || [],
+    ring_groups: ringGroupsData?.data?.map(rg => ({
+      id: rg.id,
+      label: `Ring Group: ${rg.name}`
+    })) || [],
+    conference_rooms: conferenceRoomsData?.data?.map(cr => ({
+      id: cr.id,
+      label: `Conference: ${cr.name}`
+    })) || [],
+    ivr_menus: ivrMenusList?.data?.map(menu => ({
+      id: menu.id,
+      label: `IVR Menu: ${menu.name}`
+    })) || []
+  };
+
+  const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading;
+  const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError;
 
 
 

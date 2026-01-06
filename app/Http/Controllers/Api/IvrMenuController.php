@@ -7,11 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Enums\IvrMenuStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Models\ConferenceRoom;
-use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
-use App\Models\RingGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -373,102 +370,6 @@ class IvrMenuController extends Controller
             return response()->json([
                 'error' => 'Failed to update IVR menu',
                 'message' => 'An error occurred while updating the IVR menu.',
-            ], 500);
-        }
-    }
-
-    /**
-     * Get available destinations for IVR menu options.
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function getAvailableDestinations(Request $request): JsonResponse
-    {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
-        Log::info('Retrieving available destinations for IVR menus', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-        ]);
-
-        try {
-            $extensions = Extension::where('organization_id', $user->organization_id)
-                ->where('status', 'active')
-                ->select('id', 'extension_number', 'name')
-                ->get()
-                ->map(function ($ext) {
-                    return [
-                        'id' => $ext->id,
-                        'label' => "Ext {$ext->extension_number} - " . ($ext->name ?: 'Unassigned'),
-                    ];
-                });
-
-            $ringGroups = RingGroup::where('organization_id', $user->organization_id)
-                ->where('status', 'active')
-                ->select('id', 'name')
-                ->get()
-                ->map(function ($rg) {
-                    return [
-                        'id' => $rg->id,
-                        'label' => "Ring Group: {$rg->name}",
-                    ];
-                });
-
-            $conferenceRooms = ConferenceRoom::where('organization_id', $user->organization_id)
-                ->select('id', 'name')
-                ->get()
-                ->map(function ($cr) {
-                    return [
-                        'id' => $cr->id,
-                        'label' => "Conference: {$cr->name}",
-                    ];
-                });
-
-            $ivrMenus = IvrMenu::where('organization_id', $user->organization_id)
-                ->where('status', 'active')
-                ->select('id', 'name')
-                ->get()
-                ->map(function ($menu) {
-                    return [
-                        'id' => $menu->id,
-                        'label' => "IVR Menu: {$menu->name}",
-                    ];
-                });
-
-            Log::info('Available destinations retrieved successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'extensions_count' => $extensions->count(),
-                'ring_groups_count' => $ringGroups->count(),
-                'conference_rooms_count' => $conferenceRooms->count(),
-                'ivr_menus_count' => $ivrMenus->count(),
-            ]);
-
-            return response()->json([
-                'extensions' => $extensions,
-                'ring_groups' => $ringGroups,
-                'conference_rooms' => $conferenceRooms,
-                'ivr_menus' => $ivrMenus,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to retrieve available destinations', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to retrieve available destinations',
-                'message' => 'An error occurred while loading destination options.',
             ], 500);
         }
     }

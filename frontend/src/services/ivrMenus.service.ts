@@ -74,12 +74,4 @@ export const ivrMenusService = {
   async delete(id: string): Promise<void> {
     await api.delete(`/ivr-menus/${id}`);
   },
-
-  /**
-   * Get available destination options for IVR menu configuration
-   */
-  async getAvailableDestinations(): Promise<AvailableDestinations> {
-    const response = await api.get<AvailableDestinations>('/ivr-menus/available-destinations');
-    return response.data;
-  },
 };
