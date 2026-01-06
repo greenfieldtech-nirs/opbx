@@ -33,14 +33,6 @@ return new class extends Migration
     }
 
     /**
-     * Create options table after menus table is created.
-     */
-    public function up(): void
-    {
-        // This empty method avoids duplicate up() calls
-    }
-
-    /**
      * Reverse the migrations.
      */
     public function down(): void
