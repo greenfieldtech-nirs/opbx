@@ -640,7 +640,7 @@ export default function IVRMenus() {
                           <SelectContent>
                             {recordingsData?.data?.map((recording: any) => (
                               <SelectItem key={recording.id} value={recording.file_path || recording.id}>
-                                {recording.name || `Recording ${recording.id}`}
+                                {recording.name || `Recording ${recording.id}`} {recording.file_path ? `(${recording.file_path})` : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -750,7 +750,10 @@ export default function IVRMenus() {
                               <Label>Type</Label>
                               <Select
                                 value={option.destination_type}
-                                onValueChange={(value) => updateMenuOption(index, 'destination_type', value)}
+                                onValueChange={(value) => {
+                                  updateMenuOption(index, 'destination_type', value);
+                                  updateMenuOption(index, 'destination_id', ''); // Reset destination when type changes
+                                }}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
