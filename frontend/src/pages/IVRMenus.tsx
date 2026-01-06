@@ -551,7 +551,15 @@ export default function IVRMenus() {
       </Card>
 
       {/* Create Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (open) {
+            resetForm();
+          }
+        }}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create IVR Menu</DialogTitle>
@@ -567,6 +575,12 @@ export default function IVRMenus() {
               <TabsTrigger value="options">Options</TabsTrigger>
               <TabsTrigger value="advanced">Advanced</TabsTrigger>
             </TabsList>
+
+            {/* Debug: Show current form data */}
+            {/* <div className="mb-4 p-2 bg-gray-100 text-xs">
+              <strong>Debug - Form Data:</strong>
+              <pre>{JSON.stringify(formData, null, 2)}</pre>
+            </div> */}
 
             <TabsContent value="basic" className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
