@@ -125,10 +125,7 @@ export default function IVRMenus() {
     queryFn: () => ivrMenusService.getAvailableDestinations(),
   });
 
-  // Debug logging
-  console.log('Available destinations:', availableDestinations);
-  console.log('Destinations loading:', destinationsLoading);
-  console.log('Destinations error:', destinationsError);
+
 
   // Available recordings for audio selection
   const { data: recordingsData } = useQuery({
@@ -783,13 +780,13 @@ export default function IVRMenus() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   {destinationsLoading ? (
-                                    <SelectItem value="" disabled>
+                                    <div className="px-2 py-1 text-sm text-muted-foreground">
                                       Loading destinations...
-                                    </SelectItem>
+                                    </div>
                                   ) : destinationsError ? (
-                                    <SelectItem value="" disabled>
+                                    <div className="px-2 py-1 text-sm text-destructive">
                                       Error loading destinations
-                                    </SelectItem>
+                                    </div>
                                   ) : (
                                     <>
                                       {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
@@ -812,15 +809,21 @@ export default function IVRMenus() {
                                           {menu.label}
                                         </SelectItem>
                                       ))}
-                                      {(!availableDestinations ||
-                                        (option.destination_type === 'extension' && availableDestinations.extensions?.length === 0) ||
-                                        (option.destination_type === 'ring_group' && availableDestinations.ring_groups?.length === 0) ||
-                                        (option.destination_type === 'conference_room' && availableDestinations.conference_rooms?.length === 0) ||
-                                        (option.destination_type === 'ivr_menu' && availableDestinations.ivr_menus?.length === 0)) && (
-                                        <SelectItem value="" disabled>
-                                          No {option.destination_type?.replace('_', ' ')}s available
-                                        </SelectItem>
-                                      )}
+                                      {(() => {
+                                        const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
+                                          option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
+                                          option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
+                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0;
+
+                                        if (!hasOptions && !destinationsLoading && !destinationsError) {
+                                          return (
+                                            <div className="px-2 py-1 text-sm text-muted-foreground">
+                                              No {option.destination_type?.replace('_', ' ')}s available
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                     </>
                                   )}
                                 </SelectContent>
