@@ -13,9 +13,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::dropIfExists('ivr_menu_options');
-        Schema::dropIfExists('ivr_menus');
-        Schema::create('ivr_menus', function (Blueprint $table) {
+        // Only create the table if it doesn't exist (idempotent)
+        if (!Schema::hasTable('ivr_menus')) {
+            Schema::create('ivr_menus', function (Blueprint $table) {
             $table->id();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
             $table->string('name', 255);
@@ -31,6 +31,7 @@ return new class extends Migration
             $table->index(['organization_id', 'status'], 'idx_ivr_menus_org_status');
             $table->index(['organization_id', 'name'], 'idx_ivr_menus_org_name');
         });
+        }
     }
 
     /**

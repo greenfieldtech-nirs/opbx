@@ -13,8 +13,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::dropIfExists('ivr_menu_options');
-        Schema::create('ivr_menu_options', function (Blueprint $table) {
+        // Only create the table if it doesn't exist (idempotent)
+        if (!Schema::hasTable('ivr_menu_options')) {
+            Schema::create('ivr_menu_options', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ivr_menu_id')->constrained()->cascadeOnDelete();
             $table->string('input_digits', 10);
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->unique(['ivr_menu_id', 'input_digits'], 'unique_menu_digits');
             $table->index(['ivr_menu_id', 'priority'], 'idx_ivr_menu_options_menu_priority');
         });
+        }
     }
 
     /**
