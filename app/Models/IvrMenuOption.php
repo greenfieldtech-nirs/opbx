@@ -67,14 +67,14 @@ class IvrMenuOption extends Model
      */
     public function getDestinationName(): string
     {
-        $destination = $this->destination;
+        $destination = $this->destination()->first();
 
         if (!$destination) {
             return 'Invalid Destination';
         }
 
         return match ($this->destination_type) {
-            IvrDestinationType::EXTENSION => "Ext {$destination->extension_number} - {$destination->name ?? 'Unassigned'}",
+            IvrDestinationType::EXTENSION => "Ext {$destination->extension_number} - " . ($destination->name ?: 'Unassigned'),
             IvrDestinationType::RING_GROUP => "Ring Group: {$destination->name}",
             IvrDestinationType::CONFERENCE_ROOM => "Conference: {$destination->name}",
             IvrDestinationType::IVR_MENU => "IVR Menu: {$destination->name}",
@@ -86,7 +86,7 @@ class IvrMenuOption extends Model
      */
     public function isValidDestination(): bool
     {
-        $destination = $this->destination;
+        $destination = $this->destination()->first();
 
         if (!$destination) {
             return false;
