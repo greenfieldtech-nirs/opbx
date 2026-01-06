@@ -717,12 +717,26 @@ export default function IVRMenus() {
                           <div className="grid grid-cols-12 gap-4 items-end">
                             <div className="col-span-2">
                               <Label>Digits *</Label>
-                              <Input
-                                value={option.input_digits}
-                                onChange={(e) => updateMenuOption(index, 'input_digits', e.target.value)}
-                                placeholder="1"
-                                maxLength={10}
-                              />
+                              <div>
+                                <Input
+                                  value={option.input_digits}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    // Only allow digits and some special characters (*, #)
+                                    if (/^[0-9*#]*$/.test(value)) {
+                                      updateMenuOption(index, 'input_digits', value);
+                                    }
+                                  }}
+                                  placeholder="1"
+                                  maxLength={10}
+                                  className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
+                                />
+                                {option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) && (
+                                  <p className="text-sm text-red-500 mt-1">
+                                    Only digits (0-9), asterisk (*), and pound (#) are allowed
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="col-span-3">
                               <Label>Description</Label>
@@ -754,27 +768,28 @@ export default function IVRMenus() {
                               <Select
                                 value={option.destination_id}
                                 onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
+                                disabled={!option.destination_type}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select destination" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {availableDestinations?.extensions?.map((ext) => (
+                                  {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
                                     <SelectItem key={ext.id} value={ext.id}>
                                       {ext.label}
                                     </SelectItem>
                                   ))}
-                                  {availableDestinations?.ring_groups?.map((rg) => (
+                                  {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
                                     <SelectItem key={rg.id} value={rg.id}>
                                       {rg.label}
                                     </SelectItem>
                                   ))}
-                                  {availableDestinations?.conference_rooms?.map((cr) => (
+                                  {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
                                     <SelectItem key={cr.id} value={cr.id}>
                                       {cr.label}
                                     </SelectItem>
                                   ))}
-                                  {availableDestinations?.ivr_menus?.map((menu) => (
+                                  {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
                                     <SelectItem key={menu.id} value={menu.id}>
                                       {menu.label}
                                     </SelectItem>
