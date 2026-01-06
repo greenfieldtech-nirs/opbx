@@ -14,6 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::dropIfExists('ivr_menu_options');
+        Schema::dropIfExists('ivr_menus');
         Schema::create('ivr_menus', function (Blueprint $table) {
             $table->id();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
