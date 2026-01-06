@@ -13,6 +13,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Drop table if it exists to handle migration conflicts
+        Schema::dropIfExists('ivr_menu_options');
+
         Schema::create('ivr_menu_options', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ivr_menu_id')->constrained()->cascadeOnDelete();
