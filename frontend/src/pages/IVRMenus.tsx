@@ -8,6 +8,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService, type AvailableDestinations } from '@/services/ivrMenus.service';
 import { extensionsService } from '@/services/extensions.service';
+import { createResourceService } from '@/services/createResourceService';
+import { cloudonixService } from '@/services/cloudonix.service';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   IvrMenu,
@@ -17,6 +19,9 @@ import type {
   UpdateIvrMenuRequest,
   Extension,
 } from '@/types/api.types';
+
+// Create recordings service
+const recordingsService = createResourceService('recordings');
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,6 +94,8 @@ export default function IVRMenus() {
     description?: string;
     audio_file_path?: string;
     tts_text?: string;
+    tts_voice?: string;
+    useTTS: boolean;
     max_turns: number;
     failover_destination_type: IvrDestinationType;
     failover_destination_id?: string;
@@ -104,6 +111,8 @@ export default function IVRMenus() {
     description: '',
     audio_file_path: '',
     tts_text: '',
+    tts_voice: 'en-US-Neural2-A',
+    useTTS: false,
     max_turns: 3,
     failover_destination_type: 'hangup',
     status: 'active',
@@ -114,6 +123,20 @@ export default function IVRMenus() {
   const { data: availableDestinations } = useQuery({
     queryKey: ['ivr-available-destinations'],
     queryFn: () => ivrMenusService.getAvailableDestinations(),
+  });
+
+  // Available recordings for audio selection
+  const { data: recordingsData } = useQuery({
+    queryKey: ['recordings'],
+    queryFn: () => recordingsService.getAll({ per_page: 100 }),
+  });
+
+  // Cloudonix voices for TTS (cached for 30 days)
+  const { data: voicesData } = useQuery({
+    queryKey: ['cloudonix-voices'],
+    queryFn: () => cloudonixService.getVoices(),
+    staleTime: 30 * 24 * 60 * 60 * 1000, // 30 days
+    cacheTime: 30 * 24 * 60 * 60 * 1000, // 30 days
   });
 
   // Fetch IVR menus
@@ -198,6 +221,8 @@ export default function IVRMenus() {
       description: '',
       audio_file_path: '',
       tts_text: '',
+      tts_voice: 'en-US-Neural2-A',
+      useTTS: false,
       max_turns: 3,
       failover_destination_type: 'hangup',
       status: 'active',
@@ -215,8 +240,8 @@ export default function IVRMenus() {
     const requestData: CreateIvrMenuRequest = {
       name: formData.name,
       description: formData.description,
-      audio_file_path: formData.audio_file_path,
-      tts_text: formData.tts_text,
+      audio_file_path: formData.useTTS ? undefined : formData.audio_file_path,
+      tts_text: formData.useTTS ? formData.tts_text : undefined,
       max_turns: formData.max_turns || 3,
       failover_destination_type: formData.failover_destination_type as any,
       failover_destination_id: formData.failover_destination_id,
@@ -272,6 +297,8 @@ export default function IVRMenus() {
       description: menu.description,
       audio_file_path: menu.audio_file_path,
       tts_text: menu.tts_text,
+      tts_voice: 'en-US-Neural2-A', // Default voice
+      useTTS: !!menu.tts_text,
       max_turns: menu.max_turns,
       failover_destination_type: menu.failover_destination_type,
       failover_destination_id: menu.failover_destination_id,
@@ -546,8 +573,8 @@ export default function IVRMenus() {
                       type="radio"
                       id="audio-file"
                       name="audio-type"
-                      checked={!formData.tts_text}
-                      onChange={() => setFormData({ ...formData, tts_text: '', audio_file_path: formData.audio_file_path || '' })}
+                      checked={!formData.useTTS}
+                      onChange={() => setFormData({ ...formData, useTTS: false, tts_text: '', audio_file_path: formData.audio_file_path || '' })}
                     />
                     <Label htmlFor="audio-file">Audio File</Label>
                   </div>
@@ -556,36 +583,111 @@ export default function IVRMenus() {
                       type="radio"
                       id="text-to-speech"
                       name="audio-type"
-                      checked={!!formData.tts_text}
-                      onChange={() => setFormData({ ...formData, audio_file_path: '', tts_text: formData.tts_text || '' })}
+                      checked={formData.useTTS}
+                      onChange={() => setFormData({ ...formData, useTTS: true, audio_file_path: '', tts_text: formData.tts_text || '' })}
                     />
                     <Label htmlFor="text-to-speech">Text-to-Speech</Label>
                   </div>
                 </div>
 
-                {!formData.tts_text ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="audio-file">Audio File Path</Label>
-                    <Input
-                      id="audio-file"
-                      value={formData.audio_file_path || ''}
-                      onChange={(e) => setFormData({ ...formData, audio_file_path: e.target.value })}
-                      placeholder="Path to audio file (e.g., /audio/welcome.mp3)"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Upload audio files to your server and provide the path here
-                    </p>
+                {!formData.useTTS ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="audio-source">Audio Source</Label>
+                      <Select
+                        value={formData.audio_file_path?.startsWith('http') ? 'remote' : 'recording'}
+                        onValueChange={(value) => {
+                          if (value === 'remote') {
+                            setFormData({ ...formData, audio_file_path: 'https://' });
+                          } else {
+                            setFormData({ ...formData, audio_file_path: '' });
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="recording">From Recordings</SelectItem>
+                          <SelectItem value="remote">Remote URL</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {formData.audio_file_path?.startsWith('http') ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="audio-url">Remote Audio URL</Label>
+                        <Input
+                          id="audio-url"
+                          value={formData.audio_file_path || ''}
+                          onChange={(e) => setFormData({ ...formData, audio_file_path: e.target.value })}
+                          placeholder="https://example.com/audio/welcome.mp3"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Enter a full URL to an audio file (MP3, WAV, etc.)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="recording-select">Select Recording</Label>
+                        <Select
+                          value={formData.audio_file_path || ''}
+                          onValueChange={(value) => setFormData({ ...formData, audio_file_path: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a recording" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {recordingsData?.data?.map((recording: any) => (
+                              <SelectItem key={recording.id} value={recording.file_path || recording.id}>
+                                {recording.name || `Recording ${recording.id}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground">
+                          Select from uploaded recordings or upload new ones in the Recordings page
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="tts-text">Text to Speak</Label>
-                    <Textarea
-                      id="tts-text"
-                      value={formData.tts_text || ''}
-                      onChange={(e) => setFormData({ ...formData, tts_text: e.target.value })}
-                      placeholder="Enter the text that will be converted to speech"
-                      rows={4}
-                    />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="tts-voice">Voice Selection</Label>
+                      <Select
+                        value={formData.tts_voice || 'en-US-Neural2-A'}
+                        onValueChange={(value) => setFormData({ ...formData, tts_voice: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {voicesData?.map((voice: any) => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              {voice.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        Choose the voice for text-to-speech conversion
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tts-text">Text to Speak</Label>
+                      <Textarea
+                        id="tts-text"
+                        value={formData.tts_text || ''}
+                        onChange={(e) => setFormData({ ...formData, tts_text: e.target.value })}
+                        placeholder="Enter the text that will be converted to speech"
+                        rows={4}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Maximum 1000 characters. Use SSML tags for advanced formatting.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
