@@ -84,19 +84,29 @@ export default function IVRMenus() {
   const [selectedMenu, setSelectedMenu] = useState<IvrMenu | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState<Partial<IvrMenu & { options: Array<{
-    input_digits: string;
+  const [formData, setFormData] = useState<{
+    name: string;
     description?: string;
-    destination_type: IvrDestinationType;
-    destination_id: string;
-  }> }>>({
+    audio_file_path?: string;
+    tts_text?: string;
+    max_turns: number;
+    failover_destination_type: IvrDestinationType;
+    failover_destination_id?: string;
+    status: IvrMenuStatus;
+    options: Array<{
+      input_digits: string;
+      description?: string;
+      destination_type: IvrDestinationType;
+      destination_id: string;
+    }>;
+  }>({
     name: '',
     description: '',
     audio_file_path: '',
     tts_text: '',
     max_turns: 3,
-    failover_destination_type: 'hangup' as IvrDestinationType,
-    status: 'active' as IvrMenuStatus,
+    failover_destination_type: 'hangup',
+    status: 'active',
     options: [],
   });
 
@@ -228,11 +238,11 @@ export default function IVRMenus() {
     setFormData({
       ...formData,
       options: [
-        ...(formData.options || []),
+        ...formData.options,
         {
           input_digits: '',
           description: '',
-          destination_type: 'extension',
+          destination_type: 'extension' as IvrDestinationType,
           destination_id: '',
         },
       ],
@@ -248,8 +258,8 @@ export default function IVRMenus() {
   };
 
   // Update menu option
-  const updateMenuOption = (index: number, field: string, value: any) => {
-    const updatedOptions = [...(formData.options || [])];
+  const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
+    const updatedOptions = [...formData.options];
     updatedOptions[index] = { ...updatedOptions[index], [field]: value };
     setFormData({ ...formData, options: updatedOptions });
   };

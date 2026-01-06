@@ -76,7 +76,7 @@ export type RingGroupFallbackAction = 'extension' | 'hangup';
 export type RingGroupStatus = 'active' | 'inactive';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu';
+export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
 
 // IVR Destination Type
 export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'hangup';
