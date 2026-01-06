@@ -139,6 +139,7 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('ring-groups', RingGroupController::class);
 
         // IVR Menus
+        Route::get('ivr-menus/voices', [IvrMenuController::class, 'getVoices'])->name('ivr-menus.voices');
         Route::apiResource('ivr-menus', IvrMenuController::class);
 
         // Business Hours

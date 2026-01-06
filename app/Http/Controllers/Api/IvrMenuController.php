@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Enums\IvrMenuStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\StoreIvrMenuRequest;
+use App\Http\Requests\UpdateIvrMenuRequest;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +25,70 @@ use Illuminate\Support\Facades\Log;
 class IvrMenuController extends Controller
 {
     use ApiRequestHandler;
+
+    /**
+     * Get available TTS voices for IVR menus.
+     *
+     * @return JsonResponse
+     */
+    public function getVoices(): JsonResponse
+    {
+        // Return common TTS voices supported by Cloudonix
+        // In production, this could be fetched from Cloudonix API or cached from CloudonixSettings
+        $voices = [
+            [
+                'id' => 'en-US-Neural2-A',
+                'name' => 'English US - Female (Neural)',
+                'language' => 'en-US',
+                'gender' => 'female',
+                'premium' => false,
+            ],
+            [
+                'id' => 'en-US-Neural2-D',
+                'name' => 'English US - Male (Neural)',
+                'language' => 'en-US',
+                'gender' => 'male',
+                'premium' => false,
+            ],
+            [
+                'id' => 'en-GB-Neural2-A',
+                'name' => 'English UK - Female (Neural)',
+                'language' => 'en-GB',
+                'gender' => 'female',
+                'premium' => true,
+            ],
+            [
+                'id' => 'en-GB-Neural2-D',
+                'name' => 'English UK - Male (Neural)',
+                'language' => 'en-GB',
+                'gender' => 'male',
+                'premium' => true,
+            ],
+            [
+                'id' => 'es-ES-Neural2-A',
+                'name' => 'Spanish - Female (Neural)',
+                'language' => 'es-ES',
+                'gender' => 'female',
+                'premium' => true,
+            ],
+            [
+                'id' => 'fr-FR-Neural2-A',
+                'name' => 'French - Female (Neural)',
+                'language' => 'fr-FR',
+                'gender' => 'female',
+                'premium' => true,
+            ],
+            [
+                'id' => 'de-DE-Neural2-A',
+                'name' => 'German - Female (Neural)',
+                'language' => 'de-DE',
+                'gender' => 'female',
+                'premium' => true,
+            ],
+        ];
+
+        return response()->json(['data' => $voices]);
+    }
 
     /**
      * Display a paginated list of IVR menus.
@@ -46,15 +112,21 @@ class IvrMenuController extends Controller
         ]);
 
         // Build query with eager loading
+        // For dropdown requests (per_page=100), don't load options to improve performance
+        $isDropdownRequest = $request->input('per_page') == 100;
+
         $query = IvrMenu::query()
-            ->forOrganization($user->organization_id)
-            ->with([
+            ->forOrganization($user->organization_id);
+
+        if (!$isDropdownRequest) {
+            $query->with([
                 'options' => function ($query) {
                     $query->select('id', 'ivr_menu_id', 'input_digits', 'description', 'destination_type', 'destination_id', 'priority')
                         ->orderBy('priority', 'asc');
                 },
             ])
             ->withCount('options');
+        }
 
         // Apply filters
         if ($request->has('status')) {
@@ -115,10 +187,10 @@ class IvrMenuController extends Controller
     /**
      * Store a newly created IVR menu.
      *
-     * @param Request $request
+     * @param StoreIvrMenuRequest $request
      * @return JsonResponse
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreIvrMenuRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
@@ -127,22 +199,7 @@ class IvrMenuController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:1000',
-            'audio_file_path' => 'nullable|string|max:500',
-            'tts_text' => 'nullable|string|max:1000',
-            'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,hangup',
-            'failover_destination_id' => 'nullable|integer',
-            'status' => 'required|string|in:active,inactive',
-            'options' => 'required|array|min:1|max:20',
-            'options.*.input_digits' => 'required|string|max:10',
-            'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu',
-            'options.*.destination_id' => 'required|integer',
-            'options.*.priority' => 'required|integer|min:1|max:20',
-        ]);
+        $validated = $request->validated();
 
         Log::info('Creating new IVR menu', [
             'request_id' => $requestId,
@@ -260,11 +317,11 @@ class IvrMenuController extends Controller
     /**
      * Update the specified IVR menu.
      *
-     * @param Request $request
+     * @param UpdateIvrMenuRequest $request
      * @param IvrMenu $ivrMenu
      * @return JsonResponse
      */
-    public function update(Request $request, IvrMenu $ivrMenu): JsonResponse
+    public function update(UpdateIvrMenuRequest $request, IvrMenu $ivrMenu): JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
@@ -289,22 +346,7 @@ class IvrMenuController extends Controller
             ], 404);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:1000',
-            'audio_file_path' => 'nullable|string|max:500',
-            'tts_text' => 'nullable|string|max:1000',
-            'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,hangup',
-            'failover_destination_id' => 'nullable|integer',
-            'status' => 'required|string|in:active,inactive',
-            'options' => 'required|array|min:1|max:20',
-            'options.*.input_digits' => 'required|string|max:10',
-            'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu',
-            'options.*.destination_id' => 'required|integer',
-            'options.*.priority' => 'required|integer|min:1|max:20',
-        ]);
+        $validated = $request->validated();
 
         Log::info('Updating IVR menu', [
             'request_id' => $requestId,
@@ -406,16 +448,62 @@ class IvrMenuController extends Controller
             ], 404);
         }
 
-        // Check if IVR menu is referenced by other IVR menus or DID routing
-        $isReferenced = DB::table('ivr_menu_options')
+        // Check if IVR menu is referenced by other IVR menus
+        $referencingMenus = DB::table('ivr_menu_options')
+            ->join('ivr_menus', 'ivr_menu_options.ivr_menu_id', '=', 'ivr_menus.id')
+            ->where('ivr_menu_options.destination_type', 'ivr_menu')
+            ->where('ivr_menu_options.destination_id', $ivrMenu->id)
+            ->where('ivr_menus.organization_id', $user->organization_id)
+            ->select('ivr_menus.id', 'ivr_menus.name')
+            ->distinct()
+            ->get();
+
+        // Check if IVR menu is used as failover in other menus
+        $failoverMenus = IvrMenu::where('organization_id', $user->organization_id)
+            ->where('failover_destination_type', 'ivr_menu')
+            ->where('failover_destination_id', $ivrMenu->id)
+            ->where('id', '!=', $ivrMenu->id)
+            ->select('id', 'name')
+            ->get();
+
+        // Check if IVR menu is referenced by DID routing
+        $referencingDids = DB::table('phone_numbers')
             ->where('destination_type', 'ivr_menu')
             ->where('destination_id', $ivrMenu->id)
-            ->exists();
+            ->where('organization_id', $user->organization_id)
+            ->select('id', 'phone_number')
+            ->get();
 
-        if ($isReferenced) {
+        $hasReferences = $referencingMenus->isNotEmpty() || $failoverMenus->isNotEmpty() || $referencingDids->isNotEmpty();
+
+        if ($hasReferences) {
+            $references = [];
+
+            if ($referencingMenus->isNotEmpty()) {
+                $references['ivr_menus'] = $referencingMenus->map(fn($menu) => [
+                    'id' => $menu->id,
+                    'name' => $menu->name,
+                ])->toArray();
+            }
+
+            if ($failoverMenus->isNotEmpty()) {
+                $references['failover_menus'] = $failoverMenus->map(fn($menu) => [
+                    'id' => $menu->id,
+                    'name' => $menu->name,
+                ])->toArray();
+            }
+
+            if ($referencingDids->isNotEmpty()) {
+                $references['phone_numbers'] = $referencingDids->map(fn($did) => [
+                    'id' => $did->id,
+                    'phone_number' => $did->phone_number,
+                ])->toArray();
+            }
+
             return response()->json([
                 'error' => 'Cannot delete IVR menu',
-                'message' => 'This IVR menu is referenced by other menus and cannot be deleted.',
+                'message' => 'This IVR menu is being used and cannot be deleted. Please remove all references first.',
+                'references' => $references,
             ], 409);
         }
 

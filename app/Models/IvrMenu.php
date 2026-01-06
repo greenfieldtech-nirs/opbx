@@ -30,6 +30,7 @@ class IvrMenu extends Model
         'description',
         'audio_file_path',
         'tts_text',
+        'tts_voice',
         'max_turns',
         'failover_destination_type',
         'failover_destination_id',
