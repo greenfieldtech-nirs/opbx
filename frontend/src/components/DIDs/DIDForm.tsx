@@ -23,17 +23,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService } from '@/services/ringGroups.service';
 import { businessHoursService } from '@/services/businessHours.service';
+import { ivrMenusService } from '@/services/ivrMenus.service';
 import type { DIDNumber, CreateDIDRequest, UpdateDIDRequest, RoutingType } from '@/types/api.types';
 
 // Validation schema
 const didSchema = z.object({
   did_number: z.string().min(10, 'Phone number must be at least 10 digits'),
   country_code: z.string().min(1, 'Country code is required'),
-  routing_type: z.enum(['extension', 'ring_group', 'business_hours', 'voicemail'] as const),
+  routing_type: z.enum(['extension', 'ring_group', 'business_hours', 'conference_room', 'ivr_menu', 'voicemail'] as const),
   routing_config: z.object({
     extension_id: z.string().optional(),
     ring_group_id: z.string().optional(),
     business_hours_id: z.string().optional(),
+    conference_room_id: z.string().optional(),
+    ivr_menu_id: z.string().optional(),
     voicemail_greeting: z.string().optional(),
   }),
   status: z.enum(['active', 'inactive'] as const),
@@ -69,6 +72,12 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
     queryFn: () => businessHoursService.getAll({ per_page: 100 }),
   });
 
+  // Fetch IVR menus for routing options
+  const { data: ivrMenusData } = useQuery({
+    queryKey: ['ivr-menus'],
+    queryFn: () => ivrMenusService.getAll({ per_page: 100 }),
+  });
+
   const {
     register,
     handleSubmit,
@@ -85,6 +94,8 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
         extension_id: did?.routing_config?.extension_id || '',
         ring_group_id: did?.routing_config?.ring_group_id || '',
         business_hours_id: did?.routing_config?.business_hours_id || '',
+        conference_room_id: did?.routing_config?.conference_room_id || '',
+        ivr_menu_id: did?.routing_config?.ivr_menu_id || '',
         voicemail_greeting: did?.routing_config?.voicemail_greeting || '',
       },
       status: did?.status || 'active',
@@ -192,7 +203,9 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
           <SelectContent>
             <SelectItem value="extension">Direct to Extension</SelectItem>
             <SelectItem value="ring_group">Ring Group</SelectItem>
+            <SelectItem value="ivr_menu">IVR Menu</SelectItem>
             <SelectItem value="business_hours">Business Hours Routing</SelectItem>
+            <SelectItem value="conference_room">Conference Room</SelectItem>
             <SelectItem value="voicemail">Voicemail</SelectItem>
           </SelectContent>
         </Select>
@@ -246,6 +259,30 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
                 {ringGroupsData?.data?.map((group) => (
                   <SelectItem key={group.id} value={group.id}>
                     {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {routingType === 'ivr_menu' && (
+          <div className="space-y-2">
+            <Label htmlFor="ivr_menu_id">
+              Target IVR Menu <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={watch('routing_config.ivr_menu_id') || ''}
+              onValueChange={(value) => setValue('routing_config.ivr_menu_id', value)}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="ivr_menu_id">
+                <SelectValue placeholder="Select IVR menu" />
+              </SelectTrigger>
+              <SelectContent>
+                {ivrMenusData?.data?.map((menu) => (
+                  <SelectItem key={menu.id} value={menu.id}>
+                    {menu.name} ({menu.options_count} options)
                   </SelectItem>
                 ))}
               </SelectContent>
