@@ -76,7 +76,8 @@ class IvrStateService
         }
 
         $newState = array_merge($currentState, $updates);
-        return Redis::setex($key, self::CALL_STATE_TTL, json_encode($newState));
+        $result = Redis::setex($key, self::CALL_STATE_TTL, json_encode($newState));
+        return $result === true || $result === 'OK';
     }
 
     /**
@@ -133,7 +134,7 @@ class IvrStateService
     public function isEventProcessed(string $eventId): bool
     {
         $key = $this->getIdempotencyKey($eventId);
-        return Redis::exists($key);
+        return (bool) Redis::exists($key);
     }
 
     /**
@@ -145,7 +146,8 @@ class IvrStateService
     public function markEventProcessed(string $eventId): bool
     {
         $key = $this->getIdempotencyKey($eventId);
-        return Redis::setex($key, self::IDEMPOTENCY_TTL, 'processed');
+        $result = Redis::setex($key, self::IDEMPOTENCY_TTL, 'processed');
+        return $result === true || $result === 'OK';
     }
 
     /**
