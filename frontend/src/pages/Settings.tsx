@@ -33,25 +33,25 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Settings as SettingsIcon,
-  Globe,
-  Key,
-  RefreshCw,
-  Clock,
-  Mic,
-  Link as LinkIcon,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  XCircle,
-  FileText,
-  Shield,
-  Zap,
-  BarChart3,
+   Settings as SettingsIcon,
+   Globe,
+   Key,
+   RefreshCw,
+   Clock,
+   Mic,
+   Link as LinkIcon,
+   Copy,
+   Eye,
+   EyeOff,
+   Loader2,
+   CheckCircle2,
+   AlertCircle,
+   Info,
+   XCircle,
+   FileText,
+   Shield,
+   Zap,
+   BarChart3,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -201,6 +201,10 @@ export default function Settings() {
             setValue('recording_format', result.profile_settings.recording_format);
             currentFormValues.recording_format = result.profile_settings.recording_format;
           }
+          if (result.profile_settings.cloudonix_package !== undefined) {
+            setValue('cloudonix_package', result.profile_settings.cloudonix_package);
+            currentFormValues.cloudonix_package = result.profile_settings.cloudonix_package;
+          }
         }
 
         // Step 3: Save all settings to local DB and sync to Cloudonix
@@ -214,6 +218,7 @@ export default function Settings() {
             webhook_base_url: currentFormValues.webhook_base_url || undefined,
             no_answer_timeout: currentFormValues.no_answer_timeout,
             recording_format: currentFormValues.recording_format,
+            cloudonix_package: currentFormValues.cloudonix_package || undefined,
           };
 
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
@@ -448,13 +453,20 @@ export default function Settings() {
                       )}
                     </button>
                   </div>
-                  {errors.domain_api_key && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <XCircle className="h-3 w-3" />
-                      {errors.domain_api_key.message}
-                    </p>
-                  )}
-                </div>
+                   {errors.domain_api_key && (
+                     <p className="text-sm text-destructive flex items-center gap-1">
+                       <XCircle className="h-3 w-3" />
+                       {errors.domain_api_key.message}
+                     </p>
+                   )}
+
+                   {/* Cloudonix Package Display */}
+                   {settingsData?.cloudonix_package && (
+                     <p className="text-xs text-muted-foreground pt-1">
+                       Cloudonix Package: <span className="font-mono">{settingsData.cloudonix_package}</span>
+                     </p>
+                   )}
+                 </div>
               </div>
 
               {/* Validate and Save Button */}

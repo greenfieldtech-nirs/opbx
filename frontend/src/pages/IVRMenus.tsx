@@ -12,6 +12,7 @@ import { ringGroupsService } from '@/services/ringGroups.service';
 import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
+import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   IvrMenu,
@@ -20,6 +21,7 @@ import type {
   CreateIvrMenuRequest,
   UpdateIvrMenuRequest,
 } from '@/types/api.types';
+import type { CloudonixSettings } from '@/types';
 
 // Create recordings service
 const recordingsService = createResourceService('recordings');
@@ -72,7 +74,8 @@ const VoiceSelector: React.FC<{
   voices: any[];
   filters: any;
   onRefresh?: () => void;
-}> = ({ value, onChange, voices, filters, onRefresh }) => {
+  cloudonixSettings?: CloudonixSettings;
+}> = ({ value, onChange, voices, filters, onRefresh, cloudonixSettings }) => {
   // Helper function to get language name from code
   const getLanguageName = (languageCode: string): string => {
     const language = filters?.languages?.find((lang: any) => lang.code === languageCode);
@@ -83,7 +86,10 @@ const VoiceSelector: React.FC<{
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [providerFilter, setProviderFilter] = useState<string>('all');
-  const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>('all');
+
+  // Restrict to standard voices only for Free Tier users
+  const isFreeTier = cloudonixSettings?.cloudonix_package === 'Free Tier';
+  const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>(isFreeTier ? 'standard' : 'all');
 
   const filteredVoices = voices.filter((voice: any) => {
     const matchesSearch = searchTerm === '' ||
@@ -195,16 +201,29 @@ const VoiceSelector: React.FC<{
         {/* Pricing filter */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Pricing</Label>
-          <Select value={pricingFilter} onValueChange={(value: 'all' | 'standard' | 'premium') => setPricingFilter(value)}>
+          <Select
+            value={pricingFilter}
+            onValueChange={(value: 'all' | 'standard' | 'premium') => {
+              if (isFreeTier && value === 'premium') return; // Prevent selecting premium for Free Tier
+              setPricingFilter(value);
+            }}
+          >
             <SelectTrigger className="h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Tiers</SelectItem>
+              {!isFreeTier && <SelectItem value="all">All Tiers</SelectItem>}
               <SelectItem value="standard">Standard</SelectItem>
-              <SelectItem value="premium">Premium</SelectItem>
+              <SelectItem value="premium" disabled={isFreeTier}>
+                Premium {isFreeTier && "(Upgrade required)"}
+              </SelectItem>
             </SelectContent>
           </Select>
+          {isFreeTier && (
+            <p className="text-xs text-amber-600">
+              Free Tier limited to standard voices. Upgrade to access premium voices.
+            </p>
+          )}
         </div>
       </div>
 
@@ -390,6 +409,13 @@ export default function IVRMenus() {
 
   const voices = voicesData?.data || [];
   const filters = voicesData?.filters || {};
+
+  // Fetch Cloudonix settings to check package tier
+  const { data: cloudonixSettings } = useQuery({
+    queryKey: ['cloudonix-settings'],
+    queryFn: () => settingsService.getCloudonixSettings(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
 
 
@@ -1017,6 +1043,7 @@ export default function IVRMenus() {
                         voices={voices}
                         filters={filters}
                         onRefresh={refreshVoices}
+                        cloudonixSettings={cloudonixSettings}
                       />
 
                      <div className="space-y-2">
@@ -1472,6 +1499,7 @@ export default function IVRMenus() {
                         voices={voices}
                         filters={filters}
                         onRefresh={refreshVoices}
+                        cloudonixSettings={cloudonixSettings}
                       />
 
                      <div className="space-y-2">
