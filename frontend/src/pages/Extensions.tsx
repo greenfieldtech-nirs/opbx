@@ -539,8 +539,13 @@ export default function ExtensionsComplete() {
         return `${members.length} members`;
       }
       case 'ivr': {
-        const menu = extension.configuration?.menu || {};
-        return `${Object.keys(menu).length} menu options`;
+        // Find the IVR menu name by ID
+        const ivrId = extension.configuration?.ivr_id;
+        if (ivrId) {
+          const ivrMenu = ivrMenus.find(menu => menu.id === ivrId.toString());
+          return ivrMenu ? ivrMenu.name : `IVR Menu ${ivrId}`;
+        }
+        return 'No IVR menu selected';
       }
       case 'ai_assistant': {
         return extension.configuration?.provider || 'Not configured';
@@ -2020,12 +2025,29 @@ export default function ExtensionsComplete() {
                           </div>
                         </>
                       )}
-                      {selectedExtension.type === 'forward' && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Forward To:</span>
-                          <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
-                        </div>
-                      )}
+                       {selectedExtension.type === 'ivr' && (
+                         <>
+                           <div className="flex justify-between">
+                             <span className="text-sm text-muted-foreground">IVR Menu:</span>
+                             <span className="text-sm font-medium">
+                               {(() => {
+                                 const ivrId = selectedExtension.configuration?.ivr_id;
+                                 if (ivrId) {
+                                   const ivrMenu = ivrMenus.find(menu => menu.id === ivrId.toString());
+                                   return ivrMenu ? ivrMenu.name : `IVR Menu ${ivrId}`;
+                                 }
+                                 return 'No IVR menu selected';
+                               })()}
+                             </span>
+                           </div>
+                         </>
+                       )}
+                       {selectedExtension.type === 'forward' && (
+                         <div className="flex justify-between">
+                           <span className="text-sm text-muted-foreground">Forward To:</span>
+                           <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
+                         </div>
+                       )}
                     </div>
                   </div>
                 )}

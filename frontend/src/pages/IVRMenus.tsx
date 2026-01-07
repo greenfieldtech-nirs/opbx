@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/ivrMenus.service';
 import { extensionsService } from '@/services/extensions.service';
@@ -65,6 +65,215 @@ import {
   X,
 } from 'lucide-react';
 
+// Voice selector component with search and advanced filters
+const VoiceSelector: React.FC<{
+  value: string;
+  onChange: (voiceId: string) => void;
+  voices: any[];
+  filters: any;
+  onRefresh?: () => void;
+}> = ({ value, onChange, voices, filters, onRefresh }) => {
+  // Helper function to get language name from code
+  const getLanguageName = (languageCode: string): string => {
+    const language = filters?.languages?.find((lang: any) => lang.code === languageCode);
+    return language?.name || languageCode;
+  };
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [languageFilter, setLanguageFilter] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<string>('all');
+  const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>('all');
+
+  const filteredVoices = voices.filter((voice: any) => {
+    const matchesSearch = searchTerm === '' ||
+                         voice.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (voice.provider && voice.provider.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         voice.language.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLanguage = languageFilter === 'all' || voice.language === languageFilter;
+    const matchesGender = genderFilter === 'all' || voice.gender === genderFilter;
+    const matchesProvider = providerFilter === 'all' || voice.provider === providerFilter;
+    const matchesPricing = pricingFilter === 'all' || voice.pricing === pricingFilter;
+    return matchesSearch && matchesLanguage && matchesGender && matchesProvider && matchesPricing;
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label htmlFor="voice-select">Select Voice</Label>
+        {onRefresh && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            className="h-8 px-3"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        )}
+      </div>
+
+      {/* Search input */}
+      <Input
+        placeholder="Search voices by name, provider, or language..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+
+      {/* Filter row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {/* Language filter */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Language</Label>
+          <Select value={languageFilter} onValueChange={setLanguageFilter}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Languages</SelectItem>
+              {filters?.languages?.map((lang: any) => (
+                <SelectItem key={lang.code} value={lang.code}>
+                  {lang.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Gender filter */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Gender</Label>
+          <Select value={genderFilter} onValueChange={setGenderFilter}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Genders</SelectItem>
+              {filters?.genders?.map((gender: string) => (
+                <SelectItem key={gender} value={gender}>
+                  <div className="flex items-center gap-2">
+                    <span className="capitalize">{gender}</span>
+                    <Badge
+                      variant="secondary"
+                      className={`text-xs ${
+                        gender === 'female'
+                          ? 'bg-pink-100 text-pink-800 border-pink-200'
+                          : gender === 'male'
+                          ? 'bg-blue-100 text-blue-800 border-blue-200'
+                          : 'bg-gray-100 text-gray-800 border-gray-200'
+                      }`}
+                    >
+                      {gender}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Provider filter */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Provider</Label>
+          <Select value={providerFilter} onValueChange={setProviderFilter}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Providers</SelectItem>
+              {filters?.providers?.map((provider: string) => (
+                <SelectItem key={provider} value={provider}>
+                  {provider}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Pricing filter */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Pricing</Label>
+          <Select value={pricingFilter} onValueChange={(value: 'all' | 'standard' | 'premium') => setPricingFilter(value)}>
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Tiers</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Voice selection */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Voice</Label>
+        <Select value={value || 'Cloudonix-Neural:Zoe'} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a voice" />
+          </SelectTrigger>
+          <SelectContent>
+            {filteredVoices.length === 0 ? (
+              <div className="p-2 text-center text-sm text-muted-foreground">
+                Loading voices... Please wait...
+              </div>
+            ) : (
+              filteredVoices.map((voice: any) => {
+                const languageProviderPricing = `${getLanguageName(voice.language)} / ${voice.provider} / ${voice.pricing}`;
+
+                return (
+                  <SelectItem key={voice.id} value={voice.id}>
+                    <div className="flex items-center w-full">
+                      <Badge
+                        variant="secondary"
+                        className="bg-gray-100 text-gray-800 border-gray-200"
+                        style={{
+                          width: '400px',
+                          padding: '8px 8px',
+                          marginLeft: '12px',
+                          marginRight: '12px'
+                        }}
+                      >
+                        {languageProviderPricing}
+                      </Badge>
+                      <Badge
+                        variant="secondary"
+                        className={`text-center ${
+                          voice.gender === 'female'
+                            ? 'bg-pink-100 text-pink-800 border-pink-200'
+                            : voice.gender === 'male'
+                            ? 'bg-blue-100 text-blue-800 border-blue-200'
+                            : 'bg-gray-100 text-gray-800 border-gray-200'
+                        }`}
+                        style={{
+                          width: '72px',
+                          padding: '8px 8px',
+                          marginLeft: '12px',
+                          marginRight: '12px'
+                        }}
+                      >
+                        {voice.gender}
+                      </Badge>
+                      <span className="font-bold">{voice.name}</span>
+                    </div>
+                  </SelectItem>
+                );
+              })
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        {filteredVoices.length} voices available • Standard voices are free, premium voices may incur additional costs
+      </p>
+    </div>
+  );
+};
+
 export default function IVRMenus() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -91,6 +300,7 @@ export default function IVRMenus() {
     name: string;
     description?: string;
     audio_file_path?: string;
+    recording_id?: number;
     tts_text?: string;
     tts_voice?: string;
     useTTS: boolean;
@@ -108,6 +318,7 @@ export default function IVRMenus() {
     name: '',
     description: '',
     audio_file_path: '',
+    recording_id: undefined,
     tts_text: '',
     tts_voice: 'en-US-Neural2-A',
     useTTS: false,
@@ -170,12 +381,27 @@ export default function IVRMenus() {
   });
 
   // Cloudonix voices for TTS (cached for 30 days)
-  const { data: voicesData } = useQuery({
+  const { data: voicesData, refetch: refetchVoices } = useQuery({
     queryKey: ['cloudonix-voices'],
     queryFn: () => cloudonixService.getVoices(),
     staleTime: 30 * 24 * 60 * 60 * 1000, // 30 days
     gcTime: 30 * 24 * 60 * 60 * 1000, // 30 days (gcTime replaces cacheTime in newer versions)
   });
+
+  const voices = voicesData?.data || [];
+  const filters = voicesData?.filters || {};
+
+
+
+  // Function to refresh voices
+  const refreshVoices = async () => {
+    try {
+      await refetchVoices();
+      toast.success('Voices list refreshed successfully');
+    } catch (error) {
+      toast.error('Failed to refresh voices list');
+    }
+  };
 
   // Fetch IVR menus
   const { data: ivrMenusData, isLoading, error, refetch, isRefetching } = useQuery({
@@ -203,7 +429,9 @@ export default function IVRMenus() {
   const createMutation = useMutation({
     mutationFn: (data: CreateIvrMenuRequest) => ivrMenusService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'] });
+      // Invalidate all IVR menu queries including those with parameters
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
       setIsCreateDialogOpen(false);
       resetForm();
       toast.success('IVR menu created successfully');
@@ -217,7 +445,9 @@ export default function IVRMenus() {
     mutationFn: ({ id, data }: { id: string; data: UpdateIvrMenuRequest }) =>
       ivrMenusService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'] });
+      // Invalidate all IVR menu queries including those with parameters
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
       setIsEditDialogOpen(false);
       setSelectedMenu(null);
       resetForm();
@@ -231,7 +461,9 @@ export default function IVRMenus() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ivrMenusService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'] });
+      // Invalidate all IVR menu queries including those with parameters
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
       setIsDeleteDialogOpen(false);
       setSelectedMenu(null);
       toast.success('IVR menu deleted successfully');
@@ -258,7 +490,7 @@ export default function IVRMenus() {
       description: '',
       audio_file_path: '',
       tts_text: '',
-      tts_voice: 'en-US-Neural2-A',
+    tts_voice: 'Cloudonix-Neural:Zoe',
       useTTS: false,
       max_turns: 3,
       failover_destination_type: 'hangup',
@@ -292,7 +524,8 @@ export default function IVRMenus() {
     const requestData: CreateIvrMenuRequest = {
       name: formData.name,
       description: formData.description,
-      audio_file_path: formData.useTTS ? undefined : formData.audio_file_path,
+      audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
+      recording_id: formData.useTTS ? undefined : formData.recording_id,
       tts_text: formData.useTTS ? formData.tts_text : undefined,
       tts_voice: formData.useTTS ? formData.tts_voice : undefined,
       max_turns: formData.max_turns || 3,
@@ -338,7 +571,8 @@ export default function IVRMenus() {
     const requestData: UpdateIvrMenuRequest = {
       name: formData.name,
       description: formData.description,
-      audio_file_path: formData.useTTS ? undefined : formData.audio_file_path,
+      audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
+      recording_id: formData.useTTS ? undefined : formData.recording_id,
       tts_text: formData.useTTS ? formData.tts_text : undefined,
       tts_voice: formData.useTTS ? formData.tts_voice : undefined,
       max_turns: formData.max_turns || 3,
@@ -396,7 +630,7 @@ export default function IVRMenus() {
       description: menu.description,
       audio_file_path: menu.audio_file_path,
       tts_text: menu.tts_text,
-      tts_voice: menu.tts_voice || 'en-US-Neural2-A', // Load from menu or default
+      tts_voice: menu.tts_voice || 'Cloudonix-Neural:Zoe', // Load from menu or default
       useTTS: !!menu.tts_text,
       max_turns: menu.max_turns,
       failover_destination_type: menu.failover_destination_type,
@@ -752,55 +986,41 @@ export default function IVRMenus() {
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <Label htmlFor="recording-select">Select Recording</Label>
+                       <div className="space-y-2">
+                         <Label htmlFor="recording-select">Select Recording</Label>
                         <Select
-                          value={formData.audio_file_path || ''}
-                          onValueChange={(value) => setFormData({ ...formData, audio_file_path: value })}
+                          value={formData.recording_id?.toString() || ''}
+                          onValueChange={(value) => setFormData({ ...formData, recording_id: value ? parseInt(value) : undefined, audio_file_path: '' })}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose a recording" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {recordingsData?.data?.map((recording: any) => (
-                              <SelectItem key={recording.id} value={recording.file_path || recording.id}>
-                                {recording.name || `Recording ${recording.id}`} {recording.file_path ? `(${recording.file_path})` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Choose a recording" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {recordingsData?.data?.map((recording: any) => (
+                             <SelectItem key={recording.id} value={recording.id.toString()}>
+                               {recording.name || `Recording ${recording.id}`}
+                             </SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
                         <p className="text-sm text-muted-foreground">
                           Select from uploaded recordings or upload new ones in the Recordings page
                         </p>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="tts-voice">Voice Selection</Label>
-                      <Select
+                 ) : (
+                   <div className="space-y-4">
+                      <VoiceSelector
                         value={formData.tts_voice || 'en-US-Neural2-A'}
-                        onValueChange={(value) => setFormData({ ...formData, tts_voice: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(voicesData || []).map((voice: any) => (
-                            <SelectItem key={voice.id} value={voice.id}>
-                              {voice.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">
-                        Choose the voice for text-to-speech conversion
-                      </p>
-                    </div>
+                        onChange={(value) => setFormData({ ...formData, tts_voice: value })}
+                        voices={voices}
+                        filters={filters}
+                        onRefresh={refreshVoices}
+                      />
 
-                    <div className="space-y-2">
-                      <Label htmlFor="tts-text">Text to Speak</Label>
+                     <div className="space-y-2">
+                       <Label htmlFor="tts-text">Text to Speak</Label>
                       <Textarea
                         id="tts-text"
                         value={formData.tts_text || ''}
@@ -1224,52 +1444,38 @@ export default function IVRMenus() {
                       <div className="space-y-2">
                         <Label htmlFor="edit-recording-select">Select Recording</Label>
                         <Select
-                          value={formData.audio_file_path || ''}
-                          onValueChange={(value) => setFormData({ ...formData, audio_file_path: value })}
+                          value={formData.recording_id?.toString() || ''}
+                          onValueChange={(value) => setFormData({ ...formData, recording_id: value ? parseInt(value) : undefined, audio_file_path: '' })}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose a recording" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {recordingsData?.data?.map((recording: any) => (
-                              <SelectItem key={recording.id} value={recording.file_path || recording.id}>
-                                {recording.name || `Recording ${recording.id}`} {recording.file_path ? `(${recording.file_path})` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Choose a recording" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {recordingsData?.data?.map((recording: any) => (
+                             <SelectItem key={recording.id} value={recording.id.toString()}>
+                               {recording.name || `Recording ${recording.id}`}
+                             </SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
                         <p className="text-sm text-muted-foreground">
                           Select from uploaded recordings or upload new ones in the Recordings page
                         </p>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-tts-voice">Voice Selection</Label>
-                      <Select
+                 ) : (
+                   <div className="space-y-4">
+                      <VoiceSelector
                         value={formData.tts_voice || 'en-US-Neural2-A'}
-                        onValueChange={(value) => setFormData({ ...formData, tts_voice: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(voicesData || []).map((voice: any) => (
-                            <SelectItem key={voice.id} value={voice.id}>
-                              {voice.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">
-                        Choose the voice for text-to-speech conversion
-                      </p>
-                    </div>
+                        onChange={(value) => setFormData({ ...formData, tts_voice: value })}
+                        voices={voices}
+                        filters={filters}
+                        onRefresh={refreshVoices}
+                      />
 
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-tts-text">Text to Speak</Label>
+                     <div className="space-y-2">
+                       <Label htmlFor="edit-tts-text">Text to Speak</Label>
                       <Textarea
                         id="edit-tts-text"
                         value={formData.tts_text || ''}

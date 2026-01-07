@@ -31,7 +31,27 @@ class UpdateIvrMenuRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'audio_file_path' => 'nullable|string|max:500',
+            'audio_file_path' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    // Accept either a string URL or an integer recording ID
+                    if (is_string($value) && strlen($value) > 500) {
+                        $fail('The audio file path may not be greater than 500 characters.');
+                    } elseif (!is_string($value) && !is_int($value) && $value !== null) {
+                        $fail('The audio file path must be a string URL or a recording ID.');
+                    }
+
+                    // If it's an integer, validate it exists as a recording
+                    if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+                        $recordingId = (int) $value;
+                        $exists = \App\Models\Recording::where('id', $recordingId)->exists();
+                        if (!$exists) {
+                            $fail('The selected recording does not exist.');
+                        }
+                    }
+                },
+            ],
+            'recording_id' => 'nullable|integer|exists:recordings,id',
             'tts_text' => 'nullable|string|max:1000',
             'tts_voice' => 'nullable|string|max:50',
             'max_turns' => 'required|integer|min:1|max:9',
@@ -85,6 +105,50 @@ class UpdateIvrMenuRequest extends FormRequest
             ],
             'options.*.priority' => 'required|integer|min:1|max:20',
         ];
+    }
+
+    /**
+     * Configure the validator instance.
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $recordingId = $this->input('recording_id');
+            $audioFilePath = $this->input('audio_file_path');
+            $ttsText = $this->input('tts_text');
+
+            // Cannot have both recording_id and tts_text
+            if ($recordingId && $ttsText) {
+                $validator->errors()->add(
+                    'recording_id',
+                    'Cannot specify both a recording and Text-to-Speech text. Please choose one audio source.'
+                );
+            }
+
+            // Cannot have both recording_id and audio_file_path (direct URL)
+            if ($recordingId && $audioFilePath) {
+                $validator->errors()->add(
+                    'recording_id',
+                    'Cannot specify both a recording and a direct audio URL. Please choose one audio source.'
+                );
+            }
+
+            // Cannot have both direct audio_file_path and tts_text
+            if ($audioFilePath && $ttsText) {
+                $validator->errors()->add(
+                    'audio_file_path',
+                    'Cannot specify both a direct audio URL and Text-to-Speech text. Please choose one audio source.'
+                );
+            }
+
+            // Must have at least one audio source
+            if (!$recordingId && !$audioFilePath && !$ttsText) {
+                $validator->errors()->add(
+                    'audio_configuration',
+                    'An IVR menu must have either a recording, direct audio URL, or Text-to-Speech text configured.'
+                );
+            }
+        });
     }
 
     /**

@@ -102,6 +102,7 @@ class IvrMenuControllerTest extends TestCase
     {
         $data = [
             'name' => 'Test Menu',
+            'tts_text' => 'Welcome to our service',
             'max_turns' => 3,
             'failover_destination_type' => 'hangup',
             'status' => 'active',

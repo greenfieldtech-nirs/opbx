@@ -35,10 +35,10 @@ class IvrMenuService
             'audio_file_path' => 'nullable|string|max:500',
             'tts_text' => 'nullable|string|max:1000',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => ['required', Rule::in(IvrDestinationType::values())],
+            'failover_destination_type' => ['required', Rule::in(['extension', 'ring_group', 'conference_room', 'ivr_menu', 'hangup'])],
             'failover_destination_id' => [
                 Rule::requiredIf(function () use ($data) {
-                    return ($data['failover_destination_type'] ?? null) !== IvrDestinationType::HANGUP->value;
+                    return (isset($data['failover_destination_type']) ? $data['failover_destination_type'] : null) !== 'hangup';
                 }),
                 'nullable',
                 'integer'
@@ -52,7 +52,7 @@ class IvrMenuService
                 'regex:/^[0-9*#]+$/',
                 // Custom rule to ensure unique digits within the menu
                 function ($attribute, $value, $fail) use ($data, $excludeMenuId) {
-                    $this->validateUniqueDigits($value, $data['options'] ?? [], $attribute, $fail, $excludeMenuId);
+                    $this->validateUniqueDigits($value, isset($data['options']) ? $data['options'] : [], $attribute, $fail, $excludeMenuId);
                 },
             ],
             'options.*.description' => 'nullable|string|max:255',
@@ -64,6 +64,8 @@ class IvrMenuService
         $validator->after(function ($validator) use ($data) {
             $this->validateDestinations($validator, $data);
             $this->validatePriorities($validator, $data);
+            $this->validateAudioConfiguration($validator, $data);
+            $this->validateAudioSourceConsistency($validator, $data);
         });
 
         return $validator->validate();
@@ -74,14 +76,14 @@ class IvrMenuService
      */
     private function validateDestinations($validator, array $data): void
     {
-        $organizationId = auth()->user()->organization_id ?? null;
+        $organizationId = auth()->user() ? auth()->user()->organization_id : null;
         if (!$organizationId) {
             return;
         }
 
-        foreach ($data['options'] ?? [] as $index => $option) {
-            $destinationType = $option['destination_type'] ?? null;
-            $destinationId = $option['destination_id'] ?? null;
+        foreach (isset($data['options']) ? $data['options'] : [] as $index => $option) {
+            $destinationType = isset($option['destination_type']) ? $option['destination_type'] : null;
+            $destinationId = isset($option['destination_id']) ? $option['destination_id'] : null;
 
             if (!$destinationType || !$destinationId) {
                 continue;
@@ -157,8 +159,8 @@ class IvrMenuService
     private function validatePriorities($validator, array $data): void
     {
         $priorities = [];
-        foreach ($data['options'] ?? [] as $index => $option) {
-            $priority = $option['priority'] ?? null;
+        foreach (isset($data['options']) ? $data['options'] : [] as $index => $option) {
+            $priority = isset($option['priority']) ? $option['priority'] : null;
             if ($priority !== null) {
                 if (in_array($priority, $priorities)) {
                     $validator->errors()->add(
@@ -168,6 +170,68 @@ class IvrMenuService
                 }
                 $priorities[] = $priority;
             }
+        }
+    }
+
+    /**
+     * Validate that only one audio configuration is provided.
+     * An IVR menu can have either TTS text or an audio file, not both.
+     */
+    private function validateAudioConfiguration($validator, array $data): void
+    {
+        $audioFilePath = isset($data['audio_file_path']) ? $data['audio_file_path'] : null;
+        $ttsText = isset($data['tts_text']) ? $data['tts_text'] : null;
+
+        // If both are provided, it's an error
+        if (!empty($audioFilePath) && !empty($ttsText)) {
+            $validator->errors()->add(
+                'audio_configuration',
+                'An IVR menu can have either a static audio file OR Text-to-Speech text, not both. Please choose one audio method.'
+            );
+        }
+
+        // If neither is provided, it's also an error (menu needs some audio)
+        if (empty($audioFilePath) && empty($ttsText)) {
+            $validator->errors()->add(
+                'audio_configuration',
+                'An IVR menu must have either a static audio file or Text-to-Speech text configured.'
+            );
+        }
+    }
+
+    /**
+     * Validate that audio source parameters are consistent.
+     * Cannot have both recording_id and tts_text, etc.
+     */
+    private function validateAudioSourceConsistency($validator, array $data): void
+    {
+        $recordingId = isset($data['recording_id']) ? $data['recording_id'] : null;
+        $audioFilePath = isset($data['audio_file_path']) ? $data['audio_file_path'] : null;
+        $ttsText = isset($data['tts_text']) ? $data['tts_text'] : null;
+
+        // Cannot have both recording_id and tts_text
+        if ($recordingId && $ttsText) {
+            $validator->errors()->add(
+                'recording_id',
+                'Cannot specify both a recording and Text-to-Speech text. Please choose one audio source.'
+            );
+        }
+
+        // Cannot have both recording_id and audio_file_path (direct URL)
+        if ($recordingId && $audioFilePath) {
+            $validator->errors()->add(
+                'recording_id',
+                'Cannot specify both a recording and a direct audio URL. Please choose one audio source.'
+            );
+        }
+
+        // Cannot have both direct audio_file_path and tts_text (this is handled by validateAudioConfiguration)
+        // but we can add it here for clarity
+        if ($audioFilePath && $ttsText) {
+            $validator->errors()->add(
+                'audio_file_path',
+                'Cannot specify both a direct audio URL and Text-to-Speech text. Please choose one audio source.'
+            );
         }
     }
 
@@ -183,7 +247,7 @@ class IvrMenuService
                 continue;
             }
 
-            if (($option['input_digits'] ?? '') === $digits) {
+            if ((isset($option['input_digits']) ? $option['input_digits'] : '') === $digits) {
                 $fail("Input digits '{$digits}' are already used by another option in this menu.");
                 return;
             }
@@ -289,10 +353,12 @@ class IvrMenuService
                 ->where('status', 'active')
                 ->select('id', 'extension_number', 'name')
                 ->get()
-                ->map(fn($ext) => [
-                    'id' => $ext->id,
-                    'label' => "Ext {$ext->extension_number} - {$ext->name ?? 'Unassigned'}",
-                ]),
+                ->map(function($ext) {
+                    return [
+                        'id' => $ext->id,
+                        'label' => "Ext {$ext->extension_number} - " . ($ext->name ?: 'Unassigned'),
+                    ];
+                }),
 
             'ring_groups' => RingGroup::where('organization_id', $organizationId)
                 ->where('status', 'active')

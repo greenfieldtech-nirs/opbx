@@ -107,11 +107,13 @@ class IvrRoutingStrategy implements RoutingStrategy
         }
 
         if ($ivrMenu->tts_text) {
-            return CxmlBuilder::sayXml($ivrMenu->tts_text, 'en-US');
+            // Use the selected voice, fallback to Cloudonix-Neural:Zoe if not set
+            $voice = $ivrMenu->tts_voice ?: 'Cloudonix-Neural:Zoe';
+            return CxmlBuilder::sayXml($ivrMenu->tts_text, $voice);
         }
 
         // Default fallback message
-        return CxmlBuilder::sayXml('Please enter the number for your desired option.', 'en-US');
+        return CxmlBuilder::sayXml('Please enter the number for your desired option.', 'Cloudonix-Neural:Zoe');
     }
 
     /**
