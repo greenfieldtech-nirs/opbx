@@ -421,7 +421,7 @@ class VoiceRoutingManager
                     'call_sid' => $callSid,
                     'event_id' => $eventId,
                 ]);
-                return response(CxmlBuilder::hangup(), 200, ['Content-Type' => 'text/xml']);
+                return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
             }
 
             // Mark event as processed
@@ -702,7 +702,7 @@ class VoiceRoutingManager
         ]);
 
         if ($ivrMenu->failover_destination_type === \App\Enums\IvrDestinationType::HANGUP) {
-            return response(CxmlBuilder::hangup(), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
         }
 
         // Route to failover destination (similar to option routing)
