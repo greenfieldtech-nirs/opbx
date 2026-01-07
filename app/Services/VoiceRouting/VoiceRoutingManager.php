@@ -452,6 +452,15 @@ class VoiceRoutingManager
                 'menu_id' => $menuId,
                 'menu_name' => $ivrMenu->name,
                 'options_count' => $ivrMenu->options->count(),
+                'options' => $ivrMenu->options->map(function ($option) {
+                    return [
+                        'id' => $option->id,
+                        'input_digits' => $option->input_digits,
+                        'description' => $option->description,
+                        'destination_type' => $option->destination_type->value,
+                        'destination_id' => $option->destination_id,
+                    ];
+                })->toArray(),
             ]);
 
             // Get current call state
@@ -597,6 +606,13 @@ class VoiceRoutingManager
     {
         try {
             $destination = [];
+            Log::info('IVR Input: Attempting to get validated destination', [
+                'call_sid' => $request->input('CallSid'),
+                'option_id' => $option->id,
+                'destination_type' => $option->destination_type->value,
+                'destination_id' => $option->destination_id,
+            ]);
+
             $validatedDestination = $option->getValidatedDestination();
 
             if (!$validatedDestination) {
@@ -614,13 +630,24 @@ class VoiceRoutingManager
                 );
             }
 
+            Log::info('IVR Input: Validated destination found', [
+                'call_sid' => $request->input('CallSid'),
+                'option_id' => $option->id,
+                'destination_type' => $option->destination_type->value,
+                'destination_id' => $option->destination_id,
+                'validated_destination_id' => $validatedDestination->id,
+                'validated_destination_type' => get_class($validatedDestination),
+            ]);
+
             switch ($option->destination_type) {
                 case \App\Enums\IvrDestinationType::EXTENSION:
                     Log::info('IVR Input: Routing to extension', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
+                        'destination_id' => $option->destination_id,
                         'extension_id' => $validatedDestination->id,
                         'extension_number' => $validatedDestination->extension_number,
+                        'extension_type' => $validatedDestination->type->value,
                     ]);
                     $destination = ['extension' => $validatedDestination];
                     return $this->executeStrategy($validatedDestination->type, $request, new DidNumber(), $destination);
