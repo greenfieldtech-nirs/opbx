@@ -39,14 +39,26 @@ class ProcessRecordingUpload implements ShouldQueue
      */
     public function handle(RecordingUploadService $uploadService): void
     {
-        $recording = Recording::find($this->recordingId);
+        Log::info('ProcessRecordingUpload: Starting job', [
+            'recording_id' => $this->recordingId,
+        ]);
+
+        // Temporarily disable organization scope for job processing
+        $recording = Recording::withoutGlobalScopes()->find($this->recordingId);
 
         if (!$recording) {
             Log::warning('ProcessRecordingUpload: Recording not found', [
                 'recording_id' => $this->recordingId,
+                'total_recordings' => Recording::withoutGlobalScopes()->count(),
+                'latest_recording_id' => Recording::withoutGlobalScopes()->max('id'),
             ]);
             return;
         }
+
+        Log::info('ProcessRecordingUpload: Recording found', [
+            'recording_id' => $this->recordingId,
+            'name' => $recording->name,
+        ]);
 
         if (!$recording->isUploaded()) {
             Log::warning('ProcessRecordingUpload: Recording is not an upload', [
@@ -62,20 +74,26 @@ class ProcessRecordingUpload implements ShouldQueue
                 'filename' => $recording->file_path,
             ]);
 
-            // Get the full file path
-            $filePath = storage_path("app/recordings/{$recording->organization_id}/{$recording->file_path}");
+            // Get the file from MinIO storage
+            $storagePath = "{$recording->organization_id}/{$recording->file_path}";
 
-            if (!file_exists($filePath)) {
-                Log::error('ProcessRecordingUpload: File not found', [
+            if (!Storage::disk('recordings')->exists($storagePath)) {
+                Log::error('ProcessRecordingUpload: File not found in MinIO storage', [
                     'recording_id' => $this->recordingId,
-                    'file_path' => $filePath,
+                    'storage_path' => $storagePath,
                 ]);
                 return;
             }
 
-            // Extract additional metadata if needed
-            // Since FFMPEG is not available, we'll use basic file operations
-            $fileSize = filesize($filePath);
+            // Download file to temporary location for processing
+            $tempFile = tempnam(sys_get_temp_dir(), 'recording_');
+            try {
+                $fileContent = Storage::disk('recordings')->get($storagePath);
+                file_put_contents($tempFile, $fileContent);
+
+                // Extract additional metadata if needed
+                // Since FFMPEG is not available, we'll use basic file operations
+                $fileSize = strlen($fileContent);
 
             // Update file size if it wasn't captured during upload
             if ($recording->file_size !== $fileSize) {
@@ -87,21 +105,28 @@ class ProcessRecordingUpload implements ShouldQueue
                 ]);
             }
 
-            // For WAV files, try to extract duration from header
-            if ($recording->mime_type === 'audio/wav') {
-                $duration = $this->extractWavDuration($filePath);
-                if ($duration > 0) {
-                    $recording->update(['duration_seconds' => $duration]);
-                    Log::info('ProcessRecordingUpload: Extracted WAV duration', [
-                        'recording_id' => $this->recordingId,
-                        'duration_seconds' => $duration,
-                    ]);
+                // For WAV files, try to extract duration from header
+                if ($recording->mime_type === 'audio/wav') {
+                    $duration = $this->extractWavDuration($tempFile);
+                    if ($duration > 0) {
+                        $recording->update(['duration_seconds' => $duration]);
+                        Log::info('ProcessRecordingUpload: Extracted WAV duration', [
+                            'recording_id' => $this->recordingId,
+                            'duration_seconds' => $duration,
+                        ]);
+                    }
+                }
+
+                Log::info('ProcessRecordingUpload: Processing completed', [
+                    'recording_id' => $this->recordingId,
+                ]);
+
+            } finally {
+                // Clean up temporary file
+                if (file_exists($tempFile)) {
+                    unlink($tempFile);
                 }
             }
-
-            Log::info('ProcessRecordingUpload: Processing completed', [
-                'recording_id' => $this->recordingId,
-            ]);
 
         } catch (\Exception $e) {
             Log::error('ProcessRecordingUpload: Processing failed', [

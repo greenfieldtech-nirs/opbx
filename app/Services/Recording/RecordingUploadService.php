@@ -49,18 +49,47 @@ class RecordingUploadService
         $filename = $this->generateSecureFilename($originalName, $extension);
 
         // Store the file in the recordings disk
-        $path = $file->storeAs(
-            "{$user->organization_id}",
-            $filename,
-            'recordings'
-        );
+        Log::info('RecordingUploadService: Storing file', [
+            'organization_id' => $user->organization_id,
+            'filename' => $filename,
+            'disk' => 'recordings'
+        ]);
 
-        if (!$path) {
-            throw new \Exception('Failed to store the uploaded file.');
+        try {
+            $path = $file->storeAs(
+                "{$user->organization_id}",
+                $filename,
+                'recordings'
+            );
+
+            Log::info('RecordingUploadService: File stored successfully', [
+                'path' => $path,
+                'organization_id' => $user->organization_id,
+                'filename' => $filename
+            ]);
+
+            if (!$path) {
+                throw new \Exception('Failed to store the uploaded file.');
+            }
+        } catch (\Exception $e) {
+            Log::error('RecordingUploadService: File storage failed', [
+                'error' => $e->getMessage(),
+                'organization_id' => $user->organization_id,
+                'filename' => $filename,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
 
         // Extract metadata
         $metadata = $this->extractMetadata($file);
+
+        Log::info('RecordingUploadService: Creating recording in database', [
+            'organization_id' => $user->organization_id,
+            'name' => $name,
+            'filename' => $filename,
+            'file_size' => $file->getSize(),
+        ]);
 
         // Create the recording
         $recording = Recording::create([

@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\StoreRecordingRequest;
 use App\Http\Requests\UpdateRecordingRequest;
 use App\Http\Resources\RecordingResource;
 use App\Jobs\ProcessRecordingUpload;
@@ -16,6 +17,7 @@ use App\Models\Recording;
 use App\Services\Recording\RecordingAccessService;
 use App\Services\Recording\RecordingRemoteService;
 use App\Services\Recording\RecordingUploadService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -64,7 +66,7 @@ class RecordingsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreRecordingRequest $request): JsonResponse
+    public function store(StoreRecordingRequest $request): \Illuminate\Http\JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
         $validated = $request->validated();
@@ -86,6 +88,11 @@ class RecordingsController extends Controller
         if (config('recordings.queue_processing_enabled', true)) {
             ProcessRecordingUpload::dispatch($recording->id);
         }
+
+                return response()->json([
+                    'message' => 'Recording created successfully',
+                    'data' => new RecordingResource($recording->load(['creator', 'updater'])),
+                ], 201);
 
             } else {
                 // Handle remote URL
@@ -136,7 +143,7 @@ class RecordingsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Recording $recording): JsonResponse
+    public function show(Recording $recording): \Illuminate\Http\JsonResponse
     {
         return response()->json([
             'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -154,7 +161,7 @@ class RecordingsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateRecordingRequest $request, Recording $recording): JsonResponse
+    public function update(UpdateRecordingRequest $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
         $validated = $request->validated();
@@ -172,7 +179,7 @@ class RecordingsController extends Controller
     /**
      * Generate a secure download URL for the specified recording file.
      */
-    public function download(Request $request, Recording $recording): JsonResponse
+    public function download(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
 
@@ -220,10 +227,10 @@ class RecordingsController extends Controller
             return response()->json(['error' => 'File not found'], 404);
         }
 
-        $filePath = storage_path("app/recordings/{$recording->organization_id}/{$recording->file_path}");
-
-        if (!file_exists($filePath)) {
-            return response()->json(['error' => 'File not found on disk'], 404);
+        // Check if file exists in MinIO storage
+        $filePath = "{$recording->organization_id}/{$recording->file_path}";
+        if (!Storage::disk('recordings')->exists($filePath)) {
+            return response()->json(['error' => 'File not found in storage'], 404);
         }
 
         // Extract user ID from token payload for logging (since $user may be null)
@@ -243,13 +250,22 @@ class RecordingsController extends Controller
             'access_type' => $user ? 'authenticated' : 'token_only',
         ]);
 
-        return response()->download($filePath, $recording->original_filename ?? $recording->file_path);
+        // Generate temporary signed URL for MinIO/S3
+        $temporaryUrl = Storage::disk('recordings')->temporaryUrl(
+            $filePath,
+            now()->addMinutes(30), // URL valid for 30 minutes
+            [
+                'ResponseContentDisposition' => 'attachment; filename="' . ($recording->original_filename ?? $recording->file_path) . '"'
+            ]
+        );
+
+        return redirect($temporaryUrl);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, Recording $recording): JsonResponse
+    public function destroy(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
         // Check if user has permission to delete recordings
@@ -265,10 +281,19 @@ class RecordingsController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
-        // Securely delete the file if it's an uploaded recording
+        // Delete the file from MinIO storage if it's an uploaded recording
         if ($recording->isUploaded() && $recording->file_path) {
-            $filePath = storage_path("app/recordings/{$recording->organization_id}/{$recording->file_path}");
-            $this->accessService->secureDelete($filePath);
+            $filePath = "{$recording->organization_id}/{$recording->file_path}";
+            try {
+                Storage::disk('recordings')->delete($filePath);
+            } catch (\Exception $e) {
+                // Log the error but don't fail the deletion - the database record will still be deleted
+                Log::warning('Failed to delete file from MinIO storage', [
+                    'recording_id' => $recording->id,
+                    'file_path' => $filePath,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $recording->delete();
