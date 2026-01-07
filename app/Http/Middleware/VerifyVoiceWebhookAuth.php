@@ -135,6 +135,11 @@ class VerifyVoiceWebhookAuth
      */
     private function identifyOrganization(?string $toNumber, ?string $fromNumber): ?int
     {
+        Log::debug('Voice Webhook: Identifying organization', [
+            'to_number' => $toNumber,
+            'from_number' => $fromNumber,
+        ]);
+
         // Try to identify organization by DID (external call scenario)
         $didNumber = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('phone_number', $toNumber)
@@ -142,6 +147,10 @@ class VerifyVoiceWebhookAuth
             ->first();
 
         if ($didNumber) {
+            Log::debug('Voice Webhook: Organization identified by DID', [
+                'did_number' => $toNumber,
+                'organization_id' => $didNumber->organization_id,
+            ]);
             return $didNumber->organization_id;
         }
 
@@ -155,9 +164,51 @@ class VerifyVoiceWebhookAuth
                 ->first();
 
             if ($fromExtension) {
+                Log::debug('Voice Webhook: Organization identified by extension', [
+                    'extension_number' => $fromNumber,
+                    'organization_id' => $fromExtension->organization_id,
+                ]);
                 return $fromExtension->organization_id;
             }
+
+            // For IVR callbacks, also check if To number might be an extension
+            // This handles cases where the call flow changes the number context
+            $toExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                ->where('extension_number', $toNumber)
+                ->whereIn('type', ['user', 'ai_assistant'])
+                ->where('status', 'active')
+                ->first();
+
+            if ($toExtension) {
+                Log::debug('Voice Webhook: Organization identified by To extension (IVR callback)', [
+                    'extension_number' => $toNumber,
+                    'organization_id' => $toExtension->organization_id,
+                ]);
+                return $toExtension->organization_id;
+            }
         }
+
+        // Try reverse lookup - check if To number is an extension
+        if ($toNumber) {
+            $toExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                ->where('extension_number', $toNumber)
+                ->whereIn('type', ['user', 'ai_assistant'])
+                ->where('status', 'active')
+                ->first();
+
+            if ($toExtension) {
+                Log::debug('Voice Webhook: Organization identified by To extension (fallback)', [
+                    'extension_number' => $toNumber,
+                    'organization_id' => $toExtension->organization_id,
+                ]);
+                return $toExtension->organization_id;
+            }
+        }
+
+        Log::warning('Voice Webhook: Unable to identify organization from numbers', [
+            'to_number' => $toNumber,
+            'from_number' => $fromNumber,
+        ]);
 
         return null;
     }

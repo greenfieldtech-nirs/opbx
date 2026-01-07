@@ -89,15 +89,45 @@ class IvrMenuOption extends Model
         $destination = $this->destination()->first();
 
         if (!$destination) {
+            Log::warning('IVR Option: Destination model not found', [
+                'option_id' => $this->id,
+                'ivr_menu_id' => $this->ivr_menu_id,
+                'destination_type' => $this->destination_type->value,
+                'destination_id' => $this->destination_id,
+            ]);
             return false;
         }
 
         // Additional validation based on destination type
-        return match ($this->destination_type) {
+        $isValid = match ($this->destination_type) {
             IvrDestinationType::EXTENSION => $destination->status === 'active',
             IvrDestinationType::RING_GROUP => $destination->isActive(),
             IvrDestinationType::CONFERENCE_ROOM => true, // Conference rooms don't have status
             IvrDestinationType::IVR_MENU => $destination->isActive(),
         };
+
+        if (!$isValid) {
+            Log::warning('IVR Option: Destination exists but is not active', [
+                'option_id' => $this->id,
+                'ivr_menu_id' => $this->ivr_menu_id,
+                'destination_type' => $this->destination_type->value,
+                'destination_id' => $this->destination_id,
+                'destination_status' => $destination->status ?? 'unknown',
+            ]);
+        }
+
+        return $isValid;
+    }
+
+    /**
+     * Get destination model with error handling.
+     */
+    public function getValidatedDestination()
+    {
+        if (!$this->isValidDestination()) {
+            return null;
+        }
+
+        return $this->destination()->first();
     }
 }
