@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\IvrDestinationType;
+use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -64,6 +65,37 @@ class IvrMenuOption extends Model
     }
 
     /**
+     * Get destination with fallback lookup for extensions.
+     * If lookup by ID fails, try lookup by extension number.
+     */
+    public function getDestinationWithFallback()
+    {
+        $destination = $this->destination()->first();
+
+        // If destination not found by ID and it's an extension, try by extension number
+        if (!$destination && $this->destination_type === IvrDestinationType::EXTENSION) {
+            Log::debug('IVR Option: Extension not found by ID, trying by number', [
+                'option_id' => $this->id,
+                'destination_id' => $this->destination_id,
+            ]);
+
+            $destination = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                ->where('extension_number', (string) $this->destination_id)
+                ->first();
+
+            if ($destination) {
+                Log::info('IVR Option: Extension found by number instead of ID', [
+                    'option_id' => $this->id,
+                    'extension_number' => $this->destination_id,
+                    'extension_id' => $destination->id,
+                ]);
+            }
+        }
+
+        return $destination;
+    }
+
+    /**
      * Get the destination name for display.
      */
     public function getDestinationName(): string
@@ -87,7 +119,14 @@ class IvrMenuOption extends Model
      */
     public function isValidDestination(): bool
     {
-        $destination = $this->destination()->first();
+        Log::debug('IVR Option: Checking destination validity', [
+            'option_id' => $this->id,
+            'ivr_menu_id' => $this->ivr_menu_id,
+            'destination_type' => $this->destination_type->value,
+            'destination_id' => $this->destination_id,
+        ]);
+
+        $destination = $this->getDestinationWithFallback();
 
         if (!$destination) {
             Log::warning('IVR Option: Destination model not found', [
@@ -99,13 +138,26 @@ class IvrMenuOption extends Model
             return false;
         }
 
+        Log::debug('IVR Option: Destination model found', [
+            'option_id' => $this->id,
+            'destination_model' => get_class($destination),
+            'destination_id' => $destination->id,
+        ]);
+
         // Additional validation based on destination type
         $isValid = match ($this->destination_type) {
-            IvrDestinationType::EXTENSION => $destination->status === 'active',
+            IvrDestinationType::EXTENSION => $destination->status === 'active' || $destination->status === UserStatus::ACTIVE,
             IvrDestinationType::RING_GROUP => $destination->isActive(),
             IvrDestinationType::CONFERENCE_ROOM => true, // Conference rooms don't have status
             IvrDestinationType::IVR_MENU => $destination->isActive(),
         };
+
+        Log::debug('IVR Option: Destination validation result', [
+            'option_id' => $this->id,
+            'destination_type' => $this->destination_type->value,
+            'destination_status' => $destination->status ?? 'no status',
+            'is_valid' => $isValid,
+        ]);
 
         if (!$isValid) {
             Log::warning('IVR Option: Destination exists but is not active', [
@@ -129,6 +181,6 @@ class IvrMenuOption extends Model
             return null;
         }
 
-        return $this->destination()->first();
+        return $this->getDestinationWithFallback();
     }
 }
