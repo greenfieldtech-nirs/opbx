@@ -66,7 +66,7 @@ class IvrRoutingStrategy implements RoutingStrategy
         $callSid = $request->input('CallSid');
 
         // Determine what to play/say
-        $audioContent = $this->getAudioContent($ivrMenu, $baseUrl);
+        $audioContent = $this->getAudioContent($request, $ivrMenu, $baseUrl);
 
         // Create Gather verb for DTMF collection
         $relativeUrl = route('voice.ivr-input', [], false) . '?menu_id=' . $ivrMenu->id;
@@ -98,11 +98,11 @@ class IvrRoutingStrategy implements RoutingStrategy
     /**
      * Get audio content for the IVR menu (file or TTS).
      */
-    private function getAudioContent(IvrMenu $ivrMenu, string $baseUrl): string
+    private function getAudioContent(Request $request, IvrMenu $ivrMenu, string $baseUrl): string
     {
         // Priority: audio file > TTS text > default message
         if ($ivrMenu->audio_file_path) {
-            $audioUrl = $this->resolveAudioUrl($ivrMenu->audio_file_path, $baseUrl);
+            $audioUrl = $this->resolveAudioUrl($request, $ivrMenu->audio_file_path, $baseUrl);
             return CxmlBuilder::playXml($audioUrl);
         }
 
@@ -117,15 +117,15 @@ class IvrRoutingStrategy implements RoutingStrategy
     /**
      * Resolve audio file path to a full URL that Cloudonix can fetch.
      */
-    private function resolveAudioUrl(string $audioPath, string $baseUrl): string
+    private function resolveAudioUrl(Request $request, string $audioPath, string $baseUrl): string
     {
-        // If it's already a full URL, use it as-is
+        // If it's already a full URL, use it as-is (remote URL scenario)
         if (str_starts_with($audioPath, 'http://') || str_starts_with($audioPath, 'https://')) {
             return $audioPath;
         }
 
-        // For now, assume audio files are served from the application's storage
-        // This might need to be changed to use a proper IVR audio serving endpoint
-        return $baseUrl . '/storage/ivr/' . $audioPath;
+        // For MinIO-stored files, use the public proxy route
+        $orgId = (int) $request->input('_organization_id');
+        return $baseUrl . '/api/storage/recordings/' . $orgId . '/' . urlencode($audioPath);
     }
 }

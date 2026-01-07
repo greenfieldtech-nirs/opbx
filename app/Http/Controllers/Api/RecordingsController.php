@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class RecordingsController extends Controller
@@ -371,5 +372,132 @@ class RecordingsController extends Controller
         return response()->json([
             'message' => 'Recording deleted successfully',
         ]);
+    }
+
+    /**
+     * Serve MinIO files for external access (used by Cloudonix for IVR audio files).
+     * This is a public endpoint that proxies MinIO files without authentication.
+     */
+    public function serveMinioFile(Request $request, string $path): \Illuminate\Http\Response
+    {
+        try {
+            // Parse the path to extract organization_id and filename
+            $pathParts = explode('/', $path, 2);
+            if (count($pathParts) !== 2) {
+                return response()->json(['error' => 'Invalid path format'], 400);
+            }
+
+            $organization_id = $pathParts[0];
+            $filename = $pathParts[1];
+
+            // Convert organization_id to int for proper type handling
+            $orgId = (int) $organization_id;
+
+            // Construct the MinIO path
+            $filePath = "{$orgId}/{$filename}";
+
+            Log::info('MinIO file request', [
+                'path' => $path,
+                'organization_id' => $orgId,
+                'filename' => $filename,
+                'file_path' => $filePath,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+        // Check if file exists in MinIO storage first
+        $exists = Storage::disk('recordings')->exists($filePath);
+        Log::info('MinIO file existence check', [
+            'file_path' => $filePath,
+            'exists' => $exists,
+        ]);
+
+        $fileContent = null;
+        $source = 'minio';
+
+        if ($exists) {
+            // Get file content from MinIO
+            $fileContent = Storage::disk('recordings')->get($filePath);
+        } else {
+            // Fallback: check local storage (for legacy IVR files)
+            $localPath = "ivr/{$filename}";
+            $localExists = Storage::disk('public')->exists($localPath);
+            Log::info('Local file fallback check', [
+                'local_path' => $localPath,
+                'exists' => $localExists,
+            ]);
+
+            if ($localExists) {
+                $fileContent = Storage::disk('public')->get($localPath);
+                $source = 'local';
+                Log::info('Serving file from local storage', [
+                    'file_path' => $filePath,
+                    'local_path' => $localPath,
+                ]);
+            }
+        }
+
+        if (!$fileContent) {
+            Log::warning('Audio file not found in any storage', [
+                'path' => $path,
+                'file_path' => $filePath,
+                'local_path' => "ivr/{$filename}",
+                'organization_id' => $orgId,
+                'filename' => $filename,
+            ]);
+            return response()->json(['error' => 'File not found'], 404);
+        }
+
+        // Get MIME type from file extension or default to audio
+        $mimeType = $this->getMimeTypeFromFilename($filename);
+
+        // Log external access for monitoring
+        Log::info('External audio file access', [
+            'path' => $path,
+            'organization_id' => $orgId,
+            'filename' => $filename,
+            'file_path' => $filePath,
+            'source' => $source,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'mime_type' => $mimeType,
+        ]);
+
+        return response($fileContent, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => strlen($fileContent),
+            'Cache-Control' => 'public, max-age=300', // Cache for 5 minutes
+            'Access-Control-Allow-Origin' => '*', // Allow cross-origin for Cloudonix
+        ]);
+        } catch (\Exception $e) {
+            Log::error('Error serving MinIO file', [
+                'path' => $path,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Internal server error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get MIME type from filename extension.
+     */
+    private function getMimeTypeFromFilename(string $filename): string
+    {
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'wav' => 'audio/wav',
+            'mp3' => 'audio/mpeg',
+            'ogg' => 'audio/ogg',
+            'm4a' => 'audio/m4a',
+            'aac' => 'audio/aac',
+            'flac' => 'audio/flac',
+            default => 'audio/wav', // Default fallback
+        };
     }
 }

@@ -29,7 +29,20 @@ use Illuminate\Support\Facades\Route;
 | These routes handle the REST API for PBX configuration and management.
 | All routes require authentication via Laravel Sanctum.
 |
+
 */
+
+
+
+// Test route for debugging
+Route::get('test/audio', function () {
+    return response()->json(['status' => 'ok', 'message' => 'Audio route is working']);
+});
+
+// Public routes for external services (Cloudonix) to access audio files
+Route::get('storage/recordings/{path}', [\App\Http\Controllers\Api\RecordingsController::class, 'serveMinioFile'])
+    ->name('storage.recordings.serve')
+    ->where('path', '[0-9]+/.+');
 
 // Health check routes (public)
 Route::get('/health', function () {
