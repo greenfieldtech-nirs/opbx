@@ -74,7 +74,6 @@ class StoreIvrMenuRequest extends FormRequest
             'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu',
             'options.*.destination_id' => [
                 'required',
-                'integer',
                 function ($attribute, $value, $fail) {
                     // Extract the index from the attribute (e.g., "options.0.destination_id" -> 0)
                     preg_match('/options\.(\d+)\.destination_id/', $attribute, $matches);
@@ -83,6 +82,23 @@ class StoreIvrMenuRequest extends FormRequest
                         $options = $this->input('options', []);
                         if (isset($options[$index]['destination_type'])) {
                             $destinationType = $options[$index]['destination_type'];
+
+                            // Validate data type based on destination type
+                            if ($destinationType === 'extension') {
+                                // For extensions, destination_id should be a string (extension number)
+                                if (!is_string($value) && !is_numeric($value)) {
+                                    $fail("Extension destination must be a valid extension number.");
+                                    return;
+                                }
+                            } else {
+                                // For other types, destination_id should be an integer (model ID)
+                                if (!is_int($value) && !ctype_digit((string) $value)) {
+                                    $fail("Destination ID must be a valid integer.");
+                                    return;
+                                }
+                                $value = (int) $value;
+                            }
+
                             if (!$this->destinationExists($destinationType, $value)) {
                                 $fail("The selected destination does not exist.");
                             }
@@ -148,21 +164,19 @@ class StoreIvrMenuRequest extends FormRequest
             return false;
         }
 
-        // Cast to int for database query
-        $id = (int) $id;
         $organizationId = $user->organization_id;
 
         return match ($type) {
-            'extension' => Extension::where('id', $id)
+            'extension' => Extension::where('extension_number', (string) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
-            'ring_group' => RingGroup::where('id', $id)
+            'ring_group' => RingGroup::where('id', (int) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
-            'conference_room' => ConferenceRoom::where('id', $id)
+            'conference_room' => ConferenceRoom::where('id', (int) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
-            'ivr_menu' => IvrMenu::where('id', $id)
+            'ivr_menu' => IvrMenu::where('id', (int) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
             default => false,

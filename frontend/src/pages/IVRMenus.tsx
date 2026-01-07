@@ -372,6 +372,7 @@ export default function IVRMenus() {
   const availableDestinations = {
     extensions: extensionsData?.data?.map(ext => ({
       id: String(ext.id),
+      extension_number: ext.extension_number,
       label: `Ext ${ext.extension_number} - ${ext.user?.name || 'Unassigned'}`
     })) || [],
     ring_groups: ringGroupsData?.data?.map(rg => ({
@@ -650,8 +651,10 @@ export default function IVRMenus() {
   // Update menu option
   const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
     const updatedOptions = [...formData.options];
-    // Convert destination_id from string to number for backend compatibility
-    const processedValue = field === 'destination_id' && value !== '' ? parseInt(value, 10) : value;
+    // For extensions, destination_id is the extension number (string)
+    // For other types, destination_id is the model ID (converted to number)
+    const processedValue = field === 'destination_id' && value !== '' &&
+      updatedOptions[index].destination_type !== 'extension' ? parseInt(value, 10) : value;
     updatedOptions[index] = { ...updatedOptions[index], [field]: processedValue };
     setFormData({ ...formData, options: updatedOptions });
   };
@@ -1183,11 +1186,11 @@ export default function IVRMenus() {
                                     </div>
                                   ) : (
                                     <>
-                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                        <SelectItem key={ext.id} value={ext.id}>
-                                          {ext.label}
-                                        </SelectItem>
-                                      ))}
+                                       {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
+                                         <SelectItem key={ext.id} value={ext.extension_number}>
+                                           {ext.label}
+                                         </SelectItem>
+                                       ))}
                                       {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
                                         <SelectItem key={rg.id} value={rg.id}>
                                           {rg.label}
@@ -1639,11 +1642,11 @@ export default function IVRMenus() {
                                     </div>
                                   ) : (
                                     <>
-                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                        <SelectItem key={ext.id} value={ext.id}>
-                                          {ext.label}
-                                        </SelectItem>
-                                      ))}
+                                       {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
+                                         <SelectItem key={ext.id} value={ext.extension_number}>
+                                           {ext.label}
+                                         </SelectItem>
+                                       ))}
                                       {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
                                         <SelectItem key={rg.id} value={rg.id}>
                                           {rg.label}

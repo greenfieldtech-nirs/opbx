@@ -65,18 +65,17 @@ class IvrMenuOption extends Model
     }
 
     /**
-     * Get destination with fallback lookup for extensions.
-     * If lookup by ID fails, try lookup by extension number.
+     * Get destination with smart lookup.
+     * For extensions, destination_id is treated as extension number.
+     * For other types, it's treated as ID.
      */
     public function getDestinationWithFallback()
     {
-        $destination = $this->destination()->first();
-
-        // If destination not found by ID and it's an extension, try by extension number
-        if (!$destination && $this->destination_type === IvrDestinationType::EXTENSION) {
-            Log::debug('IVR Option: Extension not found by ID, trying by number', [
+        if ($this->destination_type === IvrDestinationType::EXTENSION) {
+            // For extensions, destination_id is the extension number
+            Log::debug('IVR Option: Looking up extension by number', [
                 'option_id' => $this->id,
-                'destination_id' => $this->destination_id,
+                'extension_number' => $this->destination_id,
             ]);
 
             $destination = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
@@ -84,15 +83,23 @@ class IvrMenuOption extends Model
                 ->first();
 
             if ($destination) {
-                Log::info('IVR Option: Extension found by number instead of ID', [
+                Log::debug('IVR Option: Extension found by number', [
                     'option_id' => $this->id,
                     'extension_number' => $this->destination_id,
                     'extension_id' => $destination->id,
                 ]);
+            } else {
+                Log::warning('IVR Option: Extension not found by number', [
+                    'option_id' => $this->id,
+                    'extension_number' => $this->destination_id,
+                ]);
             }
+
+            return $destination;
         }
 
-        return $destination;
+        // For other destination types, use the relationship (destination_id is the model ID)
+        return $this->destination()->first();
     }
 
     /**
