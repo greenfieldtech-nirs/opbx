@@ -16,6 +16,7 @@ import { extensionsService } from '@/services/extensions.service';
 import { usersService } from '@/services/users.service';
 import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { ringGroupsService } from '@/services/ringGroups.service';
+import { ivrMenusService } from '@/services/ivrMenus.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,
@@ -133,7 +134,8 @@ const mockRingGroups = [
   { id: 'ring-3', name: 'Management' },
 ];
 
-// TODO: Replace with real API call to fetch IVR menus
+// IVR menus are now fetched from API via ivrMenusService
+// This mock data is kept for reference but no longer used
 const mockIVRMenus = [
   { id: '1', name: 'Main Menu' },
   { id: '2', name: 'After Hours Menu' },
@@ -292,6 +294,15 @@ export default function ExtensionsComplete() {
   });
 
   const ringGroups = ringGroupsData?.data || [];
+
+  // Fetch IVR menus for IVR extension type
+  const { data: ivrMenusData } = useQuery({
+    queryKey: ['ivr-menus', { per_page: 100, status: 'active' }],
+    queryFn: () => ivrMenusService.getAll({ per_page: 100, status: 'active' }),
+    enabled: formData.type === 'ivr',
+  });
+
+  const ivrMenus = ivrMenusData?.data || [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -908,7 +919,7 @@ export default function ExtensionsComplete() {
                 <SelectValue placeholder="Select an IVR menu" />
               </SelectTrigger>
               <SelectContent>
-                {mockIVRMenus.map((ivr) => (
+                {ivrMenus.map((ivr) => (
                   <SelectItem key={ivr.id} value={ivr.id}>
                     {ivr.name}
                   </SelectItem>

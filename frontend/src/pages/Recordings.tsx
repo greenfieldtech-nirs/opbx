@@ -141,8 +141,8 @@ export default function Recordings() {
         let audioSrc = '';
 
         if (recording.type === 'upload') {
-          // For uploaded files, get download URL
-          audioSrc = recording.recording_url;
+          // For uploaded files, use public URL
+          audioSrc = recording.public_url;
         } else {
           // For remote files, use remote URL directly
           audioSrc = recording.remote_url;
