@@ -152,6 +152,30 @@ Authentication and profile management.
 | ProfileController | `show` | `GET /api/v1/profile` | Get current user profile |
 | ProfileController | `update` | `PUT /api/v1/profile` | Update user profile |
 
+### RecordingsController
+**Location**: `app/Http/Controllers/Api/RecordingsController.php`
+
+Manages audio recordings with MinIO storage integration.
+
+| Method | Route | Functionality |
+|--------|-------|---------------|
+| `index` | `GET /api/v1/recordings` | List recordings with search/filters |
+| `store` | `POST /api/v1/recordings` | Upload file or create remote URL reference |
+| `show` | `GET /api/v1/recordings/{id}` | Get recording details |
+| `update` | `PUT /api/v1/recordings/{id}` | Update recording metadata |
+| `destroy` | `DELETE /api/v1/recordings/{id}` | Delete recording and file |
+| `download` | `GET /api/v1/recordings/{id}/download` | Generate secure download URL |
+| `secureDownload` | `GET /api/recordings/download` | Serve file from MinIO (token auth, handles both streaming & download) |
+
+**Key Features**:
+- MinIO S3-compatible storage backend
+- Unified token-based access for both playback and download
+- Smart content-type detection (streaming vs attachment)
+- Support for uploaded files and remote URLs
+- File validation (MIME type, size limits)
+- Organization-scoped storage (`{org_id}/filename`)
+- Automatic request type detection (audio streaming vs file download)
+
 ### SettingsController
 **Location**: `app/Http/Controllers/Api/SettingsController.php`
 

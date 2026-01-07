@@ -268,6 +268,40 @@ Cloudonix API configuration per organization.
 | `api_key` | string | Encrypted API key |
 | `webhook_secret` | string | Encrypted webhook secret |
 
+### Recording
+**Location**: `app/Models/Recording.php`
+
+Audio file management with MinIO storage integration.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | bigint | Primary key |
+| `organization_id` | bigint | Foreign key to organizations |
+| `name` | string | Recording display name |
+| `type` | enum | upload/remote |
+| `file_path` | string | MinIO storage path (for uploads) |
+| `remote_url` | string | External audio URL (for remote) |
+| `original_filename` | string | Original uploaded filename |
+| `file_size` | bigint | File size in bytes |
+| `mime_type` | string | Audio MIME type |
+| `duration_seconds` | integer | Audio duration |
+| `status` | enum | active/inactive |
+
+**Methods**:
+- `getPublicUrl()`: Legacy URL generation (deprecated)
+- `getPlaybackUrl(int $userId)`: Token-based URL for audio streaming
+- `getDownloadUrl(int $userId)`: Token-based URL for secure file download
+- `isUploaded()`: Check if locally stored
+- `isRemote()`: Check if external URL reference
+
+**Storage Architecture**:
+- Files stored in MinIO with organization-scoped paths: `{org_id}/{filename}`
+- Unified token-based access for both playback and download
+- Single secure download endpoint handles both streaming and attachment
+- Automatic content-type detection based on request headers
+- RecordingResource uses static user context for token generation
+- Support for both uploaded files and remote URL references
+
 ### ConferenceRoom
 **Location**: `app/Models/ConferenceRoom.php`
 

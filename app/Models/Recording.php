@@ -113,6 +113,8 @@ class Recording extends Model
 
     /**
      * Get the public URL for the recording.
+     *
+     * @deprecated Use getPlaybackUrl() or getDownloadUrl() instead
      */
     public function getPublicUrl(): string
     {
@@ -125,6 +127,62 @@ class Recording extends Model
         }
 
         return '';
+    }
+
+    /**
+     * Get the playback URL for the recording.
+     * For uploaded files, returns token-based URL to secure download endpoint.
+     * For remote files, returns the remote URL directly.
+     *
+     * @param int $userId The user ID to generate the token for
+     */
+    public function getPlaybackUrl(int $userId): string
+    {
+        if ($this->isRemote()) {
+            return $this->remote_url;
+        }
+
+        if ($this->isUploaded()) {
+            // Use the same token-based approach as download
+            $accessService = app(\App\Services\Recording\RecordingAccessService::class);
+            $token = $accessService->generateAccessToken($this, $userId);
+
+            return route('recordings.secure-download') . '?token=' . urlencode($token);
+        }
+
+        return '';
+    }
+
+    /**
+     * Get the download URL for the recording.
+     * For uploaded files, generates a token-based URL to the secure download endpoint.
+     *
+     * @param int $userId The user ID to generate the token for
+     */
+    public function getDownloadUrl(int $userId): string
+    {
+        if ($this->isUploaded()) {
+            // Import the access service to generate a token
+            $accessService = app(\App\Services\Recording\RecordingAccessService::class);
+            $token = $accessService->generateAccessToken($this, $userId);
+
+            return route('recordings.secure-download') . '?token=' . urlencode($token);
+        }
+
+        return '';
+    }
+
+    /**
+     * Generate a temporary signed URL for MinIO storage.
+     */
+    private function generateTemporaryUrl(int $minutes): string
+    {
+        $filePath = "{$this->organization_id}/{$this->file_path}";
+
+        return \Illuminate\Support\Facades\Storage::disk('recordings')->temporaryUrl(
+            $filePath,
+            now()->addMinutes($minutes)
+        );
     }
 
     /**

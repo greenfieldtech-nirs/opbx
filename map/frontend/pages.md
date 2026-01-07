@@ -219,19 +219,27 @@ Interactive voice response configuration.
 #### Recordings Page
 **Location**: `frontend/src/pages/Recordings.tsx`
 
-Call recording management.
+Call recording management with MinIO storage integration.
 
 **Features**:
-- Recording listing with playback
-- Search and filtering
-- Download functionality
-- Retention policy display
-- Storage usage statistics
+- Recording listing with real-time playback
+- Search and filtering by type/status
+- Secure download with correct filenames
+- Support for uploaded files (WAV/MP3) and remote URLs
+- MinIO S3-compatible storage backend
+- Temporary signed URLs for secure access
 
 **Components Used**:
-- `RecordingPlayer` - Audio playback
-- `RecordingTable` - File listing
-- `DownloadButton` - File download
+- `RecordingPlayer` - Audio playback using temporary URLs
+- `RecordingTable` - File listing with metadata
+- `DownloadButton` - Secure file download with proper filenames
+
+**Storage Architecture**:
+- Files stored in MinIO object storage
+- Temporary signed URLs for playback (10-minute expiry)
+- Temporary signed URLs for download (30-minute expiry)
+- Support for both uploaded files and remote URL references
+- Automatic filename preservation and MIME type detection
 
 ### Administration
 

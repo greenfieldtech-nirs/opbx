@@ -38,6 +38,17 @@ class RecordingsController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
+        $user = $this->getAuthenticatedUser();
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            // This shouldn't happen for authenticated endpoints, but return error if it does
+            abort(401, 'Authentication required');
+        }
+
+        // Set the current user ID for resource generation
+        RecordingResource::setCurrentUserId($user->id);
+
         $query = Recording::query();
 
         // Filter by status if specified
@@ -68,7 +79,12 @@ class RecordingsController extends Controller
      */
     public function store(StoreRecordingRequest $request): \Illuminate\Http\JsonResponse
     {
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            return $user;
+        }
         $validated = $request->validated();
 
         try {
@@ -89,6 +105,7 @@ class RecordingsController extends Controller
             ProcessRecordingUpload::dispatch($recording->id);
         }
 
+                RecordingResource::setCurrentUserId($user->id);
                 return response()->json([
                     'message' => 'Recording created successfully',
                     'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -127,6 +144,7 @@ class RecordingsController extends Controller
                 }
             }
 
+            RecordingResource::setCurrentUserId($user->id);
             return response()->json([
                 'message' => 'Recording created successfully',
                 'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -143,8 +161,16 @@ class RecordingsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Recording $recording): \Illuminate\Http\JsonResponse
+    public function show(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
+        $user = $this->getAuthenticatedUser();
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            return $user;
+        }
+
+        RecordingResource::setCurrentUserId($user->id);
         return response()->json([
             'data' => new RecordingResource($recording->load(['creator', 'updater'])),
         ]);
@@ -163,13 +189,19 @@ class RecordingsController extends Controller
      */
     public function update(UpdateRecordingRequest $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            return $user;
+        }
         $validated = $request->validated();
 
         $recording->update(array_merge($validated, [
             'updated_by' => $user->id,
         ]));
 
+        RecordingResource::setCurrentUserId($user->id);
         return response()->json([
             'message' => 'Recording updated successfully',
             'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -181,7 +213,12 @@ class RecordingsController extends Controller
      */
     public function download(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            return $user;
+        }
 
         if (!$recording->isUploaded()) {
             return response()->json(['error' => 'Only uploaded recordings can be downloaded'], 400);
@@ -197,16 +234,18 @@ class RecordingsController extends Controller
         ]);
 
         return response()->json([
-            'download_url' => route('recordings.secure-download') . '?token=' . urlencode($token),
+            'download_url' => '/api/v1/recordings/download?token=' . urlencode($token),
             'filename' => $recording->original_filename ?? $recording->file_path,
             'expires_in' => 1800, // 30 minutes
         ]);
     }
 
+
+
     /**
-     * Securely download a recording file using an access token.
+     * Securely serve a recording file using an access token (handles both streaming and downloading).
      */
-    public function secureDownload(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+    public function secureDownload(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse|\Illuminate\Http\JsonResponse
     {
         $token = $request->query('token');
 
@@ -216,8 +255,15 @@ class RecordingsController extends Controller
 
         // For token-based access, we allow access with just the token
         // The token contains user information and is cryptographically validated
-        $user = $this->getAuthenticatedUser($request); // May be null for token-only access (like audio playback)
-        $recording = $this->accessService->validateAccessToken($token, $user ? $user->id : null);
+        $user = $this->getAuthenticatedUser(); // May be null for token-only access (like audio playback)
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            // For token-only access, we allow anonymous access with just the token
+            $recording = $this->accessService->validateAccessToken($token, null);
+        } else {
+            $recording = $this->accessService->validateAccessToken($token, $user->id);
+        }
 
         if (!$recording) {
             return response()->json(['error' => 'Access denied or token expired'], 403);
@@ -233,6 +279,9 @@ class RecordingsController extends Controller
             return response()->json(['error' => 'File not found in storage'], 404);
         }
 
+        // Get file content from MinIO
+        $fileContent = Storage::disk('recordings')->get($filePath);
+
         // Extract user ID from token payload for logging (since $user may be null)
         try {
             $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($token);
@@ -242,24 +291,40 @@ class RecordingsController extends Controller
             $userId = $user ? $user->id : null;
         }
 
-        // Log the successful download
-        $this->accessService->logFileAccess($recording, $userId, 'downloaded', [
+        // Determine if this is for streaming (audio playback) or downloading
+        // Check Accept header or Sec-Fetch-Dest header
+        $isStreaming = $request->header('Sec-Fetch-Dest') === 'audio' ||
+                      $request->header('Accept') === 'audio/*' ||
+                      str_contains($request->header('Accept', ''), 'audio');
+
+        $accessType = $isStreaming ? 'streamed' : 'downloaded';
+
+        // Log the successful access
+        $this->accessService->logFileAccess($recording, $userId, $accessType, [
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
-            'file_size' => $recording->file_size,
+            'file_size' => strlen($fileContent),
             'access_type' => $user ? 'authenticated' : 'token_only',
+            'request_type' => $isStreaming ? 'streaming' : 'download',
         ]);
 
-        // Generate temporary signed URL for MinIO/S3
-        $temporaryUrl = Storage::disk('recordings')->temporaryUrl(
-            $filePath,
-            now()->addMinutes(30), // URL valid for 30 minutes
-            [
-                'ResponseContentDisposition' => 'attachment; filename="' . ($recording->original_filename ?? $recording->file_path) . '"'
-            ]
-        );
+        $headers = [
+            'Content-Type' => $recording->mime_type ?? 'application/octet-stream',
+            'Content-Length' => strlen($fileContent),
+            'Cache-Control' => 'no-cache',
+        ];
 
-        return redirect($temporaryUrl);
+        if ($isStreaming) {
+            // For streaming (audio playback), don't set Content-Disposition
+            $headers['Accept-Ranges'] = 'bytes';
+        } else {
+            // For downloading, set attachment disposition
+            $headers['Content-Disposition'] = 'attachment; filename="' . ($recording->original_filename ?? $recording->file_path) . '"';
+        }
+
+        return response()->stream(function () use ($fileContent) {
+            echo $fileContent;
+        }, 200, $headers);
     }
 
     /**
@@ -267,7 +332,12 @@ class RecordingsController extends Controller
      */
     public function destroy(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
+
+        // Handle unauthenticated response
+        if ($user instanceof \Illuminate\Http\JsonResponse) {
+            return $user;
+        }
         // Check if user has permission to delete recordings
         if (!$user->hasRole(UserRole::OWNER) && !$user->hasRole(UserRole::PBX_ADMIN)) {
             return response()->json(['error' => 'Unauthorized'], 403);
