@@ -619,12 +619,18 @@ export default function IVRMenus() {
 
   // Add new menu option
   const addMenuOption = () => {
+    // Find the highest digit in existing options and increment by 1
+    const existingDigits = formData.options
+      .map(option => parseInt(option.input_digits))
+      .filter(digit => !isNaN(digit));
+    const nextDigit = existingDigits.length > 0 ? Math.max(...existingDigits) + 1 : 1;
+
     setFormData({
       ...formData,
       options: [
         ...formData.options,
         {
-          input_digits: '',
+          input_digits: nextDigit.toString(),
           description: '',
           destination_type: 'extension' as IvrDestinationType,
           destination_id: '',
@@ -644,7 +650,9 @@ export default function IVRMenus() {
   // Update menu option
   const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
     const updatedOptions = [...formData.options];
-    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
+    // Convert destination_id from string to number for backend compatibility
+    const processedValue = field === 'destination_id' && value !== '' ? parseInt(value, 10) : value;
+    updatedOptions[index] = { ...updatedOptions[index], [field]: processedValue };
     setFormData({ ...formData, options: updatedOptions });
   };
 
@@ -1157,7 +1165,7 @@ export default function IVRMenus() {
                               <Label>Destination</Label>
                               <Select
                                 key={`destination-${index}-${option.destination_type}`}
-                                value={option.destination_id}
+                                value={option.destination_id?.toString() || ''}
                                 onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
                                 disabled={!option.destination_type}
                               >
@@ -1613,7 +1621,7 @@ export default function IVRMenus() {
                               <Label>Destination</Label>
                               <Select
                                 key={`destination-${index}-${option.destination_type}`}
-                                value={option.destination_id}
+                                value={option.destination_id?.toString() || ''}
                                 onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
                                 disabled={!option.destination_type}
                               >
