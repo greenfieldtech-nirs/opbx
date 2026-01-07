@@ -248,16 +248,40 @@ class VoiceRoutingManager
 
     private function resolveExtensionDestination(Extension $extension, int $organizationId): array
     {
-        return match ($extension->type) {
-            ExtensionType::USER => ['extension' => $extension],
-            ExtensionType::CONFERENCE => $this->resolveConferenceDestination($extension, $organizationId),
-            ExtensionType::RING_GROUP => $this->resolveRingGroupDestination($extension, $organizationId),
-            ExtensionType::IVR => ['extension' => $extension], // IVR routing not yet implemented
-            ExtensionType::AI_ASSISTANT => $this->resolveAiAssistantDestination($extension, $organizationId),
-            ExtensionType::CUSTOM_LOGIC => ['extension' => $extension], // Custom logic not yet implemented
-            ExtensionType::FORWARD => ['extension' => $extension],
-            ExtensionType::QUEUE => ['extension' => $extension], // Queue routing not yet implemented
-        };
+        $extensionType = $extension->type;
+
+        // Handle both enum and string types for backward compatibility
+        if ($extensionType instanceof ExtensionType) {
+            $typeValue = $extensionType->value;
+        } else {
+            $typeValue = (string) $extensionType;
+        }
+
+        // Use if statements instead of match for better debugging and reliability
+        if ($typeValue === 'user') {
+            return ['extension' => $extension];
+        } elseif ($typeValue === 'conference') {
+            return $this->resolveConferenceDestination($extension, $organizationId);
+        } elseif ($typeValue === 'ring_group') {
+            return $this->resolveRingGroupDestination($extension, $organizationId);
+        } elseif ($typeValue === 'ivr') {
+            return $this->resolveIvrDestination($extension, $organizationId);
+        } elseif ($typeValue === 'ai_assistant') {
+            return $this->resolveAiAssistantDestination($extension, $organizationId);
+        } elseif ($typeValue === 'custom_logic') {
+            return ['extension' => $extension]; // Custom logic not yet implemented
+        } elseif ($typeValue === 'forward') {
+            return ['extension' => $extension];
+        } elseif ($typeValue === 'queue') {
+            return ['extension' => $extension]; // Queue routing not yet implemented
+        } else {
+            Log::warning('VoiceRoutingManager: Unknown extension type, falling back to extension', [
+                'extension_number' => $extension->extension_number,
+                'type_raw' => $extensionType,
+                'type_value' => $typeValue
+            ]);
+            return ['extension' => $extension]; // Fallback for unknown types
+        }
     }
 
     private function resolveConferenceDestination(Extension $extension, int $organizationId): array
@@ -323,6 +347,35 @@ class VoiceRoutingManager
         }
 
         return ['ring_group' => $ringGroup];
+    }
+
+    private function resolveIvrDestination(Extension $extension, int $organizationId): array
+    {
+        $ivrMenuId = $extension->configuration['ivr_id'] ?? null;
+        if (!$ivrMenuId) {
+            Log::warning('VoiceRoutingManager: IVR extension missing ivr_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ivrMenuId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$ivrMenu) {
+            Log::warning('VoiceRoutingManager: IVR menu not found', [
+                'extension_id' => $extension->id,
+                'ivr_menu_id' => $ivrMenuId,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        return ['ivr_menu' => $ivrMenu];
     }
 
     private function checkBusinessHours(int $organizationId, string $callSid): ?Response
