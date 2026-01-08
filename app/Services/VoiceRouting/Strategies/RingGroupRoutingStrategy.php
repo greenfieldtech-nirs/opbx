@@ -158,8 +158,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             $fallbackExtensionId = $ringGroup->fallback_extension_id;
 
             if ($fallbackExtensionId) {
-                $fallbackExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                    ->where('id', $fallbackExtensionId)
+                $fallbackExtension = Extension::where('id', $fallbackExtensionId)
                     ->where('organization_id', $ringGroup->organization_id)
                     ->first();
 

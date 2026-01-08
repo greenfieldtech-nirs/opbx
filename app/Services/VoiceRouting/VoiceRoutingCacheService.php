@@ -67,8 +67,7 @@ class VoiceRoutingCacheService
                         'extension_number' => $extensionNumber,
                     ]);
 
-                    return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                        ->with('user')
+                    return Extension::with('user')
                         ->where('organization_id', $organizationId)
                         ->where('extension_number', $extensionNumber)
                         ->first();
@@ -93,8 +92,7 @@ class VoiceRoutingCacheService
                 'error' => $e->getMessage(),
             ]);
 
-            return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->with('user')
+            return Extension::with('user')
                 ->where('organization_id', $organizationId)
                 ->where('extension_number', $extensionNumber)
                 ->first();
@@ -123,8 +121,7 @@ class VoiceRoutingCacheService
                         'organization_id' => $organizationId,
                     ]);
 
-                    return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                        ->where('organization_id', $organizationId)
+                    return BusinessHoursSchedule::where('organization_id', $organizationId)
                         ->active()
                         ->with(['scheduleDays.timeRanges', 'exceptions.timeRanges'])
                         ->first();
@@ -147,8 +144,7 @@ class VoiceRoutingCacheService
                 'error' => $e->getMessage(),
             ]);
 
-            return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('organization_id', $organizationId)
+            return BusinessHoursSchedule::where('organization_id', $organizationId)
                 ->active()
                 ->with(['scheduleDays.timeRanges', 'exceptions.timeRanges'])
                 ->first();

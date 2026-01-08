@@ -55,8 +55,7 @@ class ForwardRoutingStrategy implements RoutingStrategy
         // Case 3: Internal extension number
         $organizationId = $extension->organization_id;
 
-        $targetExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('organization_id', $organizationId)
+        $targetExtension = Extension::where('organization_id', $organizationId)
             ->where('extension_number', $forwardTo)
             ->first();
 

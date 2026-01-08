@@ -55,9 +55,9 @@ class VoiceRoutingManager
         }
 
         // 1. Resolve Target (DID or Extension)
-        // First check if it's a DID
-        $did = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('phone_number', $to)
+        // First check if it's a DID (scoped to authenticated organization)
+        $did = DidNumber::where('phone_number', $to)
+            ->where('organization_id', $orgId)
             ->first();
 
         // If not a DID, it might be an internal extension dialing another extension (or internal transfer)
@@ -139,7 +139,7 @@ class VoiceRoutingManager
         if ($did->routing_type === 'extension') {
             $extensionId = $config['extension_id'] ?? null;
             if ($extensionId) {
-                $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($extensionId);
+                $extension = Extension::where('organization_id', $did->organization_id)->find($extensionId);
                 if ($extension) {
                     return ['extension' => $extension];
                 }
@@ -149,7 +149,7 @@ class VoiceRoutingManager
         if ($did->routing_type === 'ring_group') {
             $rgId = $config['ring_group_id'] ?? null;
             if ($rgId) {
-                $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($rgId);
+                $rg = RingGroup::where('organization_id', $did->organization_id)->find($rgId);
                 if ($rg) {
                     return ['ring_group' => $rg];
                 }
@@ -167,7 +167,7 @@ class VoiceRoutingManager
         if ($type === 'ivr_menu') {
             $ivrMenuId = $config['ivr_menu_id'] ?? null;
             if ($ivrMenuId) {
-                $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($ivrMenuId);
+                $ivrMenu = IvrMenu::where('organization_id', $did->organization_id)->find($ivrMenuId);
                 if ($ivrMenu) {
                     return ['ivr_menu' => $ivrMenu];
                 }
@@ -227,8 +227,7 @@ class VoiceRoutingManager
             return response(CxmlBuilder::unavailable('Ring group context missing'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $rgId)
+        $rg = RingGroup::where('id', $rgId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -296,8 +295,7 @@ class VoiceRoutingManager
             return [];
         }
 
-        $room = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $conferenceRoomId)
+        $room = ConferenceRoom::where('id', $conferenceRoomId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -332,8 +330,7 @@ class VoiceRoutingManager
             return [];
         }
 
-        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $ringGroupId)
+        $ringGroup = RingGroup::where('id', $ringGroupId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -361,8 +358,7 @@ class VoiceRoutingManager
             return [];
         }
 
-        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $ivrMenuId)
+        $ivrMenu = IvrMenu::where('id', $ivrMenuId)
             ->where('organization_id', $organizationId)
             ->first();
 

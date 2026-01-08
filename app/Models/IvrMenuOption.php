@@ -78,8 +78,8 @@ class IvrMenuOption extends Model
                 'extension_number' => $this->destination_id,
             ]);
 
-            $destination = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('extension_number', (string) $this->destination_id)
+            $destination = Extension::where('extension_number', (string) $this->destination_id)
+                ->where('organization_id', $this->ivrMenu->organization_id)
                 ->first();
 
             if ($destination) {
@@ -102,18 +102,18 @@ class IvrMenuOption extends Model
         $destination = null;
         switch ($this->destination_type) {
             case IvrDestinationType::RING_GROUP:
-                $destination = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                    ->where('id', $this->destination_id)
+                $destination = RingGroup::where('id', $this->destination_id)
+                    ->where('organization_id', $this->ivrMenu->organization_id)
                     ->first();
                 break;
             case IvrDestinationType::CONFERENCE_ROOM:
-                $destination = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                    ->where('id', $this->destination_id)
+                $destination = ConferenceRoom::where('id', $this->destination_id)
+                    ->where('organization_id', $this->ivrMenu->organization_id)
                     ->first();
                 break;
             case IvrDestinationType::IVR_MENU:
-                $destination = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                    ->where('id', $this->destination_id)
+                $destination = IvrMenu::where('id', $this->destination_id)
+                    ->where('organization_id', $this->ivrMenu->organization_id)
                     ->first();
                 break;
         }
