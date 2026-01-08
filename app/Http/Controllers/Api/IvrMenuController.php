@@ -807,9 +807,9 @@ class IvrMenuController extends Controller
             ->get();
 
         // Check if IVR menu is referenced by DID routing
-        $referencingDids = DB::table('phone_numbers')
-            ->where('destination_type', 'ivr_menu')
-            ->where('destination_id', $ivrMenu->id)
+        $referencingDids = DB::table('did_numbers')
+            ->where('routing_type', 'ivr_menu')
+            ->where('routing_config->ivr_menu_id', $ivrMenu->id)
             ->where('organization_id', $user->organization_id)
             ->select('id', 'phone_number')
             ->get();
