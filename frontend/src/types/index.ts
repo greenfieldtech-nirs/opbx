@@ -652,14 +652,15 @@ export interface CloudonixSettings {
   domain_api_key: string | null;
   domain_requests_api_key: string | null;
   webhook_base_url: string | null;
-  no_answer_timeout: number;
-  recording_format: RecordingFormat;
-  callback_url?: string | null;
-  cdr_url?: string | null;
-  is_configured: boolean;
-  has_webhook_auth: boolean;
-  created_at: string;
-  updated_at: string;
+   no_answer_timeout: number;
+   recording_format: RecordingFormat;
+   cloudonix_package: string | null;
+   callback_url?: string | null;
+   cdr_url?: string | null;
+   is_configured: boolean;
+   has_webhook_auth: boolean;
+   created_at: string;
+   updated_at: string;
 }
 
 export interface UpdateCloudonixSettingsRequest {
@@ -670,6 +671,7 @@ export interface UpdateCloudonixSettingsRequest {
   webhook_base_url?: string;
   no_answer_timeout?: number;
   recording_format?: RecordingFormat;
+  cloudonix_package?: string;
 }
 
 export interface ValidateCloudonixCredentialsRequest {

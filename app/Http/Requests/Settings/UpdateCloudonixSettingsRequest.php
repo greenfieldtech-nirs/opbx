@@ -36,6 +36,7 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'webhook_base_url' => ['nullable', 'string', 'url', 'max:255'],
             'no_answer_timeout' => ['required', 'integer', 'min:5', 'max:120'],
             'recording_format' => ['required', 'string', 'in:wav,mp3'],
+            'cloudonix_package' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -54,6 +55,7 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'webhook_base_url' => 'webhook base URL',
             'no_answer_timeout' => 'no answer timeout',
             'recording_format' => 'recording format',
+            'cloudonix_package' => 'Cloudonix package',
         ];
     }
 

@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $voice_application_name
  * @property int $no_answer_timeout
  * @property string $recording_format
+ * @property string|null $cloudonix_package
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
  * @property-read Organization $organization
@@ -55,6 +56,7 @@ class CloudonixSettings extends Model
         'voice_application_name',
         'no_answer_timeout',
         'recording_format',
+        'cloudonix_package',
     ];
 
     /**

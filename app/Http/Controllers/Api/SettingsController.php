@@ -69,21 +69,22 @@ class SettingsController extends Controller
         }
 
         return response()->json([
-            'settings' => [
-                'id' => $settings->id,
-                'organization_id' => $settings->organization_id,
-                'domain_uuid' => $settings->domain_uuid,
-                'domain_name' => $settings->domain_name,
-                'domain_api_key' => $settings->domain_api_key, // Show real key (owner only)
-                'domain_requests_api_key' => $settings->domain_requests_api_key, // Show real key (owner only)
-                'webhook_base_url' => $settings->webhook_base_url,
-                'no_answer_timeout' => $settings->no_answer_timeout,
-                'recording_format' => $settings->recording_format,
-                'is_configured' => $settings->isConfigured(),
-                'has_webhook_auth' => $settings->hasWebhookAuth(),
-                'created_at' => $settings->created_at->toIso8601String(),
-                'updated_at' => $settings->updated_at->toIso8601String(),
-            ],
+             'settings' => [
+                 'id' => $settings->id,
+                 'organization_id' => $settings->organization_id,
+                 'domain_uuid' => $settings->domain_uuid,
+                 'domain_name' => $settings->domain_name,
+                 'domain_api_key' => $settings->domain_api_key, // Show real key (owner only)
+                 'domain_requests_api_key' => $settings->domain_requests_api_key, // Show real key (owner only)
+                 'webhook_base_url' => $settings->webhook_base_url,
+                 'no_answer_timeout' => $settings->no_answer_timeout,
+                 'recording_format' => $settings->recording_format,
+                 'cloudonix_package' => $settings->cloudonix_package,
+                 'is_configured' => $settings->isConfigured(),
+                 'has_webhook_auth' => $settings->hasWebhookAuth(),
+                 'created_at' => $settings->created_at->toIso8601String(),
+                 'updated_at' => $settings->updated_at->toIso8601String(),
+             ],
             'callback_url' => $settings->getCallbackUrl(),
             'cdr_url' => $settings->getCdrUrl(),
         ]);
@@ -294,6 +295,11 @@ class SettingsController extends Controller
                     if (in_array($format, ['wav', 'mp3'], true)) {
                         $profileSettings['recording_format'] = $format;
                     }
+                }
+
+                // Extract tenant billing package information
+                if (isset($domainProfile['tenant']['billingPlan']['package']['name'])) {
+                    $profileSettings['cloudonix_package'] = $domainProfile['tenant']['billingPlan']['package']['name'];
                 }
             }
 

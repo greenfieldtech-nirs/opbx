@@ -19,6 +19,7 @@ const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
 const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = lazy(() => import('@/pages/RingGroups'));
+const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
 const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
@@ -64,14 +65,18 @@ export const router = createBrowserRouter([
         path: 'phone-numbers',
         element: <PhoneNumbers />,
       },
-      {
-        path: 'ring-groups',
-        element: <RingGroups />,
-      },
-      {
-        path: 'business-hours',
-        element: <BusinessHours />,
-      },
+       {
+         path: 'ring-groups',
+         element: <RingGroups />,
+       },
+       {
+         path: 'ivr-menus',
+         element: <IVRMenus />,
+       },
+       {
+         path: 'business-hours',
+         element: <BusinessHours />,
+       },
       {
         path: 'call-logs',
         element: <CallLogs />,

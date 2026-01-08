@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Database, Download, Eye, Pause, Play, Plus, Search, Trash2, Upload, Loader2, Filter, X } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
+import { storage } from '@/utils/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -82,28 +83,44 @@ export default function Recordings() {
     },
   });
 
-  // Download recording mutation
-  const downloadRecordingMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/v1/recordings/${id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `recording-${id}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    },
-    onError: (error: any) => {
-      toast.error('Failed to download recording: ' + error.message);
-    },
-  });
+   // Download recording mutation
+   const downloadRecordingMutation = useMutation({
+     mutationFn: async (recording: any) => {
+       // Step 1: Get the secure download URL and filename from API
+       const response = await fetch(`/api/v1/recordings/${recording.id}/download`, {
+      headers: {
+        'Authorization': `Bearer ${storage.getToken()}`,
+      },
+       });
+
+       if (!response.ok) {
+         throw new Error('Failed to get download URL');
+       }
+
+       const data = await response.json();
+
+       // Step 2: Download from the secure MinIO URL
+       const downloadResponse = await fetch(data.download_url);
+       if (!downloadResponse.ok) {
+         throw new Error('Failed to download file from storage');
+       }
+
+       const blob = await downloadResponse.blob();
+
+       // Step 3: Create download with correct filename
+       const url = window.URL.createObjectURL(blob);
+       const a = document.createElement('a');
+       a.href = url;
+       a.download = data.filename;
+       document.body.appendChild(a);
+       a.click();
+       window.URL.revokeObjectURL(url);
+       document.body.removeChild(a);
+     },
+     onError: (error: any) => {
+       toast.error('Failed to download recording: ' + error.message);
+     },
+   });
 
   // Delete recording mutation
   const deleteRecordingMutation = useMutation({
@@ -118,7 +135,7 @@ export default function Recordings() {
   });
 
   const handleDownload = (recording: any) => {
-    downloadRecordingMutation.mutate(recording.id);
+    downloadRecordingMutation.mutate(recording);
   };
 
   const handleDelete = (recording: any) => {
@@ -141,8 +158,8 @@ export default function Recordings() {
         let audioSrc = '';
 
         if (recording.type === 'upload') {
-          // For uploaded files, get download URL
-          audioSrc = recording.recording_url;
+          // For uploaded files, use the API stream endpoint
+          audioSrc = recording.playback_url;
         } else {
           // For remote files, use remote URL directly
           audioSrc = recording.remote_url;

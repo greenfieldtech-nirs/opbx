@@ -51,6 +51,7 @@ services:
     environment:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL:-http://localhost}
       - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_DATABASE=${DB_DATABASE:-opbx}
@@ -58,6 +59,12 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-secret}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_REGION=us-east-1
+      - MINIO_BUCKET=recordings
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_USE_PATH_STYLE=true
     depends_on:
       mysql:
         condition: service_healthy
@@ -166,6 +173,28 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: opbx_minio
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console (Web UI)
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+    volumes:
+      - minio_data:/data
+    networks:
+      - opbx
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   soketi:
     image: 'quay.io/soketi/soketi:latest-16-alpine'
     container_name: opbx_websocket
@@ -217,4 +246,6 @@ volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local
