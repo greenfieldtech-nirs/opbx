@@ -71,16 +71,18 @@ class IvrRoutingStrategy implements RoutingStrategy
         // Create Gather verb for DTMF collection
         $relativeUrl = route('voice.ivr-input', [], false) . '?menu_id=' . $ivrMenu->id;
         $gatherAction = $baseUrl . $relativeUrl;
-        $gatherTimeout = 10; // 10 seconds
+        $interDigitTimeout = $ivrMenu->inter_digit_timeout ?? 2; // Default 2 seconds
+        $maxTimeout = $ivrMenu->max_timeout ?? 3; // Default 3 seconds
         $gatherFinishOnKey = '#'; // End input on #
 
         $cxml = CxmlBuilder::gather(
             $audioContent,
             $gatherAction,
-            $gatherTimeout,
+            $interDigitTimeout,
             $gatherFinishOnKey,
             1, // min digits
-            10 // max digits
+            10, // max digits
+            $maxTimeout
         );
 
         Log::info('IVR Routing: Presenting menu to caller', [

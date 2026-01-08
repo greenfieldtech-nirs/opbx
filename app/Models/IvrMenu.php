@@ -31,6 +31,8 @@ class IvrMenu extends Model
         'audio_file_path',
         'tts_text',
         'tts_voice',
+        'max_timeout',
+        'inter_digit_timeout',
         'max_turns',
         'failover_destination_type',
         'failover_destination_id',
@@ -48,6 +50,8 @@ class IvrMenu extends Model
             'status' => IvrMenuStatus::class,
             'failover_destination_type' => IvrDestinationType::class,
             'max_turns' => 'integer',
+            'max_timeout' => 'integer',
+            'inter_digit_timeout' => 'integer',
         ];
     }
 

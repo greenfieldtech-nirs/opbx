@@ -54,6 +54,8 @@ class UpdateIvrMenuRequest extends FormRequest
             'recording_id' => 'nullable|integer|exists:recordings,id',
             'tts_text' => 'nullable|string|max:1000',
             'tts_voice' => 'nullable|string|max:50',
+            'max_timeout' => 'required|integer|min:1|max:30',
+            'inter_digit_timeout' => 'required|integer|min:1|max:30',
             'max_turns' => 'required|integer|min:1|max:9',
             'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,hangup',
             'failover_destination_id' => [

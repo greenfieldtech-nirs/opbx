@@ -323,6 +323,8 @@ export default function IVRMenus() {
     tts_text?: string;
     tts_voice?: string;
     useTTS: boolean;
+    max_timeout: number;
+    inter_digit_timeout: number;
     max_turns: number;
     failover_destination_type: IvrDestinationType;
     failover_destination_id?: string;
@@ -341,6 +343,8 @@ export default function IVRMenus() {
     tts_text: '',
     tts_voice: 'en-US-Neural2-A',
     useTTS: false,
+    max_timeout: 3,
+    inter_digit_timeout: 2,
     max_turns: 3,
     failover_destination_type: 'hangup',
     status: 'active',
@@ -555,6 +559,8 @@ export default function IVRMenus() {
       recording_id: formData.useTTS ? undefined : formData.recording_id,
       tts_text: formData.useTTS ? formData.tts_text : undefined,
       tts_voice: formData.useTTS ? formData.tts_voice : undefined,
+      max_timeout: formData.max_timeout || 3,
+      inter_digit_timeout: formData.inter_digit_timeout || 2,
       max_turns: formData.max_turns || 3,
       failover_destination_type: formData.failover_destination_type as any,
       failover_destination_id: formData.failover_destination_id,
@@ -602,6 +608,8 @@ export default function IVRMenus() {
       recording_id: formData.useTTS ? undefined : formData.recording_id,
       tts_text: formData.useTTS ? formData.tts_text : undefined,
       tts_voice: formData.useTTS ? formData.tts_voice : undefined,
+      max_timeout: formData.max_timeout || 3,
+      inter_digit_timeout: formData.inter_digit_timeout || 2,
       max_turns: formData.max_turns || 3,
       failover_destination_type: formData.failover_destination_type as any,
       failover_destination_id: formData.failover_destination_id,
@@ -669,6 +677,8 @@ export default function IVRMenus() {
       tts_text: menu.tts_text,
       tts_voice: menu.tts_voice || 'Cloudonix-Neural:Zoe', // Load from menu or default
       useTTS: !!menu.tts_text,
+      max_timeout: menu.max_timeout || 3,
+      inter_digit_timeout: menu.inter_digit_timeout || 2,
       max_turns: menu.max_turns,
       failover_destination_type: menu.failover_destination_type,
       failover_destination_id: menu.failover_destination_id,
@@ -1249,6 +1259,50 @@ export default function IVRMenus() {
             <TabsContent value="advanced" className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label htmlFor="max-timeout">Max Timeout (seconds)</Label>
+                  <Select
+                    value={String(formData.max_timeout || 3)}
+                    onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={String(num)}>
+                          {num}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How long to wait for the user to first input speech or DTMF
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
+                  <Select
+                    value={String(formData.inter_digit_timeout || 2)}
+                    onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={String(num)}>
+                          {num}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How long to wait between DTMF digits
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="max-turns">Maximum Turns</Label>
                   <Select
                     value={String(formData.max_turns || 3)}
@@ -1704,6 +1758,50 @@ export default function IVRMenus() {
 
             <TabsContent value="advanced" className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-max-timeout">Max Timeout (seconds)</Label>
+                  <Select
+                    value={String(formData.max_timeout || 3)}
+                    onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={String(num)}>
+                          {num}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How long to wait for the user to first input speech or DTMF
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
+                  <Select
+                    value={String(formData.inter_digit_timeout || 2)}
+                    onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={String(num)}>
+                          {num}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    How long to wait between DTMF digits
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="edit-max-turns">Maximum Turns</Label>
                   <Select

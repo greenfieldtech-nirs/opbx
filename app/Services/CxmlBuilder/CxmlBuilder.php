@@ -419,7 +419,8 @@ class CxmlBuilder
         int $timeout = 5,
         string $finishOnKey = '#',
         int $minDigits = 1,
-        int $maxDigits = 1
+        int $maxDigits = 1,
+        ?int $maxTimeout = null
     ): self {
         $gather = $this->document->createElement('Gather');
 
@@ -428,6 +429,10 @@ class CxmlBuilder
         $gather->setAttribute('finishOnKey', $finishOnKey);
         $gather->setAttribute('minDigits', (string) $minDigits);
         $gather->setAttribute('maxDigits', (string) $maxDigits);
+
+        if ($maxTimeout !== null) {
+            $gather->setAttribute('maxTimeout', (string) $maxTimeout);
+        }
 
         // Parse and append nested verbs
         $tempDoc = new DOMDocument();
@@ -463,10 +468,11 @@ class CxmlBuilder
         int $timeout = 5,
         string $finishOnKey = '#',
         int $minDigits = 1,
-        int $maxDigits = 1
+        int $maxDigits = 1,
+        ?int $maxTimeout = null
     ): string {
         $builder = new self();
-        return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits)->build();
+        return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits, $maxTimeout)->build();
     }
 
     /**
