@@ -36,25 +36,11 @@ class UserRoutingStrategy implements RoutingStrategy
         // E.164 normalization for caller ID if needed, or use From
         $from = $request->input('From');
 
-        // Check if user has SIP credentials or a phone number to dial
-        // For PBX User, we typically dial the SIP URI associated with the user/extension
-        // Assuming formatting: sip:EXTENSION@DOMAIN
-
-        $sipUri = sprintf('sip:%s@%s', $extension->extension_number, $request->input('Domain'));
-
-        // We can uses CxmlBuilder::dialSip($sipUri, $from) if available, or simpleDial if it handles SIP.
-        // Looking at CxmlBuilder usage in existing controller, it uses simpleDial($normalizedTo, $from).
-        // Since we are routing TO an internal extension, we should probably Dial the SIP user.
-        // However, the current controller logic for internal calls uses:
-        // CxmlBuilder::simpleDial($normalizedTo, $from) for outbound
-        // But for internal extension-to-extension, let's see what the legacy controller did.
-
-        // Legacy controller:
-        // return $this->routeToUserExtension($destinationExtension, $from, $to, $callSid);
-        // which did: return $this->cxmlResponse(CxmlBuilder::dialSip($sipEndpoint, $from, $timeout));
+        // For internal extension dialing, use just the extension number
+        // This creates <Number> tags instead of <Sip> tags for proper internal routing
 
         return response(
-            CxmlBuilder::dialExtension($sipUri, 30),
+            CxmlBuilder::dialExtension($extension->extension_number, 30),
             200,
             ['Content-Type' => 'text/xml']
         );
