@@ -26,18 +26,18 @@ class AuthTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
-            'role' => UserRole::ADMIN,
+            'role' => UserRole::PBX_ADMIN,
             'status' => 'active',
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'test@example.com',
             'password' => 'password',
         ]);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'token',
+                'access_token',
                 'user' => [
                     'id',
                     'name',
@@ -57,17 +57,16 @@ class AuthTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
-            'role' => UserRole::ADMIN,
+            'role' => UserRole::PBX_ADMIN,
             'status' => 'active',
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'test@example.com',
             'password' => 'wrong-password',
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+        $response->assertStatus(401);
     }
 
     public function test_user_cannot_login_if_inactive(): void
@@ -79,16 +78,16 @@ class AuthTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
-            'role' => UserRole::ADMIN,
+            'role' => UserRole::PBX_ADMIN,
             'status' => 'inactive',
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'test@example.com',
             'password' => 'password',
         ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(403);
     }
 
     public function test_authenticated_user_can_get_profile(): void
@@ -100,7 +99,7 @@ class AuthTest extends TestCase
         ]);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/auth/me');
+            ->getJson('/api/v1/auth/me');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -125,7 +124,7 @@ class AuthTest extends TestCase
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->postJson('/api/auth/logout');
+            ->postJson('/api/v1/auth/logout');
 
         $response->assertStatus(200);
 

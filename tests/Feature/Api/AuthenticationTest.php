@@ -48,7 +48,7 @@ class AuthenticationTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => Hash::make('password123'),
-            'role' => UserRole::ADMIN,
+            'role' => UserRole::PBX_ADMIN,
             'status' => 'active',
         ]);
     }
@@ -83,7 +83,7 @@ class AuthenticationTest extends TestCase
                 'user' => [
                     'email' => 'test@example.com',
                     'name' => 'Test User',
-                    'role' => 'admin',
+                    'role' => 'pbx_admin',
                     'status' => 'active',
                 ],
             ]);
@@ -329,7 +329,7 @@ class AuthenticationTest extends TestCase
                     'id' => $this->user->id,
                     'email' => 'test@example.com',
                     'name' => 'Test User',
-                    'role' => 'admin',
+                    'role' => 'pbx_admin',
                     'status' => 'active',
                     'organization' => [
                         'id' => $this->organization->id,

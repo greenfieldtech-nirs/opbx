@@ -86,4 +86,40 @@ trait ApiRequestHandler
             return response()->json(['error' => 'Operation failed'], 500);
         }
     }
+
+    /**
+     * Log error and return standardized error response.
+     *
+     * @param array $details Additional details to include in response
+     * @param string $message Error message
+     * @param int $status HTTP status code
+     * @param string $errorCode Application error code
+     * @param string $requestId Request ID for correlation
+     * @return JsonResponse
+     */
+    protected function logAndRespondError(
+        array $details,
+        string $message,
+        int $status,
+        string $errorCode,
+        string $requestId
+    ): JsonResponse {
+        Log::warning('Authentication error', [
+            'request_id' => $requestId,
+            'error_code' => $errorCode,
+            'status' => $status,
+            'message' => $message,
+            'details' => $details,
+            'ip_address' => request()->ip(),
+        ]);
+
+        return response()->json([
+            'error' => [
+                'code' => $errorCode,
+                'message' => $message,
+                'details' => $details,
+                'request_id' => $requestId,
+            ],
+        ], $status);
+    }
 }
