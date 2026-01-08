@@ -98,8 +98,27 @@ class IvrMenuOption extends Model
             return $destination;
         }
 
-        // For other destination types, use the relationship (destination_id is the model ID)
-        return $this->destination()->first();
+        // For other destination types, bypass organization scope
+        $destination = null;
+        switch ($this->destination_type) {
+            case IvrDestinationType::RING_GROUP:
+                $destination = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('id', $this->destination_id)
+                    ->first();
+                break;
+            case IvrDestinationType::CONFERENCE_ROOM:
+                $destination = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('id', $this->destination_id)
+                    ->first();
+                break;
+            case IvrDestinationType::IVR_MENU:
+                $destination = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('id', $this->destination_id)
+                    ->first();
+                break;
+        }
+
+        return $destination;
     }
 
     /**
