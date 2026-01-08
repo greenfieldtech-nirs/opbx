@@ -414,18 +414,8 @@ class VoiceRoutingManager
                 'sequence_number' => $request->input('SequenceNumber', 'unknown'),
             ]);
 
-            // Check idempotency
-            $eventId = $request->input('CallSid') . ':' . $request->input('SequenceNumber', 'unknown');
-            if ($this->ivrStateService->isEventProcessed($eventId)) {
-                Log::info('IVR Input: Duplicate event detected, ignoring', [
-                    'call_sid' => $callSid,
-                    'event_id' => $eventId,
-                ]);
-                return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
-            }
-
-            // Mark event as processed
-            $this->ivrStateService->markEventProcessed($eventId);
+        // Note: Idempotency checking removed for IVR input to allow users to correct their input
+        // Users may press wrong digits and need to make subsequent attempts
 
             // Validate menu exists and belongs to organization
             $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
