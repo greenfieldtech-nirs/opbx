@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,7 @@ use Illuminate\Support\Str;
  */
 class AuthController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Token expiration time in minutes (24 hours).
      */
@@ -55,7 +57,7 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
+        $requestId = $this->getRequestId();
         $ipAddress = $request->ip();
 
         Log::info('Login attempt initiated', [
@@ -75,14 +77,13 @@ class AuthController extends Controller
                 'user_exists' => $user !== null,
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'UNAUTHORIZED',
-                    'message' => 'Invalid credentials.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 401);
+            return $this->logAndRespond(
+                ['email' => $request->input('email')],
+                'Invalid credentials.',
+                401,
+                'UNAUTHORIZED',
+                $requestId
+            );
         }
 
         // Check user status
@@ -95,14 +96,13 @@ class AuthController extends Controller
                 'ip_address' => $ipAddress,
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'ACCOUNT_INACTIVE',
-                    'message' => 'Your account is not active. Please contact support.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 403);
+            return $this->logAndRespond(
+                ['account_inactive' => true],
+                'Your account is not active. Please contact support.',
+                403,
+                'ACCOUNT_INACTIVE',
+                $requestId
+            );
         }
 
         // Check organization status
@@ -116,14 +116,13 @@ class AuthController extends Controller
                 'ip_address' => $ipAddress,
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'ORGANIZATION_INACTIVE',
-                    'message' => 'Your organization is not active. Please contact support.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 403);
+            return $this->logAndRespond(
+                ['organization_id' => $user->organization_id],
+                'Your organization is not active. Please contact support.',
+                403,
+                'ORGANIZATION_INACTIVE',
+                $requestId
+            );
         }
 
         // Detect authentication mode based on request
@@ -237,8 +236,8 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $requestId = (string) Str::uuid();
+        $user = $this->getAuthenticatedUser($request);
+        $requestId = $this->getRequestId();
 
         // Detect if using cookie auth (has session but no bearer token)
         $useCookieAuth = $request->hasSession() && ! $request->bearerToken();
@@ -285,7 +284,7 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
 
         return response()->json([
             'user' => [
@@ -318,8 +317,8 @@ class AuthController extends Controller
      */
     public function refresh(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $requestId = (string) Str::uuid();
+        $user = $this->getAuthenticatedUser($request);
+        $requestId = $this->getRequestId();
 
         // Detect if using cookie auth
         $useCookieAuth = $request->hasSession() && ! $request->bearerToken();

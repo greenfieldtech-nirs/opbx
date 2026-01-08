@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { settingsService } from '@/services/settings.service';
+import logger from '@/utils/logger';
 import { sentryService } from '@/services/sentry.service';
 import { getApiErrorMessage } from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -32,25 +33,25 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Settings as SettingsIcon,
-  Globe,
-  Key,
-  RefreshCw,
-  Clock,
-  Mic,
-  Link as LinkIcon,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  XCircle,
-  FileText,
-  Shield,
-  Zap,
-  BarChart3,
+   Settings as SettingsIcon,
+   Globe,
+   Key,
+   RefreshCw,
+   Clock,
+   Mic,
+   Link as LinkIcon,
+   Copy,
+   Eye,
+   EyeOff,
+   Loader2,
+   CheckCircle2,
+   AlertCircle,
+   Info,
+   XCircle,
+   FileText,
+   Shield,
+   Zap,
+   BarChart3,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -139,7 +140,7 @@ export default function Settings() {
         // Note: validation status is handled by the validation effect below
       } catch (error) {
         toast.error('Failed to load settings');
-        console.error('Settings load error:', error);
+        logger.error('Settings load error:', { error });
       } finally {
         setIsLoading(false);
       }
@@ -200,6 +201,10 @@ export default function Settings() {
             setValue('recording_format', result.profile_settings.recording_format);
             currentFormValues.recording_format = result.profile_settings.recording_format;
           }
+          if (result.profile_settings.cloudonix_package !== undefined) {
+            setValue('cloudonix_package', result.profile_settings.cloudonix_package);
+            currentFormValues.cloudonix_package = result.profile_settings.cloudonix_package;
+          }
         }
 
         // Step 3: Save all settings to local DB and sync to Cloudonix
@@ -213,6 +218,7 @@ export default function Settings() {
             webhook_base_url: currentFormValues.webhook_base_url || undefined,
             no_answer_timeout: currentFormValues.no_answer_timeout,
             recording_format: currentFormValues.recording_format,
+            cloudonix_package: currentFormValues.cloudonix_package || undefined,
           };
 
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
@@ -336,7 +342,20 @@ export default function Settings() {
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div className="container mx-auto py-8 px-4 max-w-4xl relative">
+        {/* Loading overlay during validation/save */}
+        {isValidating && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+            <div className="bg-background border rounded-lg p-6 shadow-lg flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="font-medium">Saving Settings</p>
+                <p className="text-sm text-muted-foreground">Validating and applying your configuration...</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
             <SettingsIcon className="h-8 w-8" />
@@ -345,7 +364,7 @@ export default function Settings() {
           <p className="mt-2 text-gray-600">Configure your OPBX integration with Cloudonix</p>
         </div>
 
-        <Card>
+        <Card className={isValidating ? 'pointer-events-none opacity-60' : ''}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5" />
@@ -421,11 +440,12 @@ export default function Settings() {
                       disabled={isValidating}
                       {...register('domain_api_key')}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowDomainApiKey(!showDomainApiKey)}
-                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                    >
+                     <button
+                       type="button"
+                       onClick={() => setShowDomainApiKey(!showDomainApiKey)}
+                       disabled={isValidating}
+                       className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
                       {showDomainApiKey ? (
                         <EyeOff className="h-4 w-4" />
                       ) : (
@@ -433,13 +453,20 @@ export default function Settings() {
                       )}
                     </button>
                   </div>
-                  {errors.domain_api_key && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <XCircle className="h-3 w-3" />
-                      {errors.domain_api_key.message}
-                    </p>
-                  )}
-                </div>
+                   {errors.domain_api_key && (
+                     <p className="text-sm text-destructive flex items-center gap-1">
+                       <XCircle className="h-3 w-3" />
+                       {errors.domain_api_key.message}
+                     </p>
+                   )}
+
+                   {/* Cloudonix Package Display */}
+                   {settingsData?.cloudonix_package && (
+                     <p className="text-xs text-muted-foreground pt-1">
+                       Cloudonix Package: <span className="font-mono">{settingsData.cloudonix_package}</span>
+                     </p>
+                   )}
+                 </div>
               </div>
 
               {/* Validate and Save Button */}
@@ -506,11 +533,12 @@ export default function Settings() {
                       disabled={isValidating}
                       {...register('domain_requests_api_key')}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowRequestsApiKey(!showRequestsApiKey)}
-                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                    >
+                     <button
+                       type="button"
+                       onClick={() => setShowRequestsApiKey(!showRequestsApiKey)}
+                       disabled={isValidating}
+                       className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
                       {showRequestsApiKey ? (
                         <EyeOff className="h-4 w-4" />
                       ) : (
@@ -557,13 +585,14 @@ export default function Settings() {
                         {generatedKey}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopyToClipboard(generatedKey, 'API Key')}
-                      className="flex-shrink-0"
-                    >
+                     <Button
+                       type="button"
+                       variant="ghost"
+                       size="sm"
+                       onClick={() => handleCopyToClipboard(generatedKey, 'API Key')}
+                       disabled={isValidating}
+                       className="flex-shrink-0"
+                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -729,15 +758,15 @@ export default function Settings() {
                       disabled
                       className="flex-1"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        settingsData?.cdr_url &&
-                        handleCopyToClipboard(settingsData.cdr_url, 'CDR Endpoint URL')
-                      }
-                      disabled={!settingsData?.cdr_url}
-                    >
+                     <Button
+                       type="button"
+                       variant="outline"
+                       onClick={() =>
+                         settingsData?.cdr_url &&
+                         handleCopyToClipboard(settingsData.cdr_url, 'CDR Endpoint URL')
+                       }
+                       disabled={!settingsData?.cdr_url || isValidating}
+                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -771,15 +800,15 @@ export default function Settings() {
                       disabled
                       className="flex-1"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        settingsData?.callback_url &&
-                        handleCopyToClipboard(settingsData.callback_url, 'Callback URL')
-                      }
-                      disabled={!settingsData?.callback_url}
-                    >
+                     <Button
+                       type="button"
+                       variant="outline"
+                       onClick={() =>
+                         settingsData?.callback_url &&
+                         handleCopyToClipboard(settingsData.callback_url, 'Callback URL')
+                       }
+                       disabled={!settingsData?.callback_url || isValidating}
+                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -794,7 +823,7 @@ export default function Settings() {
         </Card>
 
         {/* Routing Sentry Defaults */}
-        <Card className="mt-8">
+        <Card className={`mt-8 ${isValidating ? 'pointer-events-none opacity-60' : ''}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />

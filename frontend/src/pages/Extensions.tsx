@@ -16,6 +16,7 @@ import { extensionsService } from '@/services/extensions.service';
 import { usersService } from '@/services/users.service';
 import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { ringGroupsService } from '@/services/ringGroups.service';
+import { ivrMenusService } from '@/services/ivrMenus.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,
@@ -133,7 +134,8 @@ const mockRingGroups = [
   { id: 'ring-3', name: 'Management' },
 ];
 
-// TODO: Replace with real API call to fetch IVR menus
+// IVR menus are now fetched from API via ivrMenusService
+// This mock data is kept for reference but no longer used
 const mockIVRMenus = [
   { id: '1', name: 'Main Menu' },
   { id: '2', name: 'After Hours Menu' },
@@ -206,7 +208,7 @@ export default function ExtensionsComplete() {
         setSyncComparison(result);
         setIsSyncNeeded(result.needs_sync);
       } catch (error) {
-        console.error('Failed to check sync status:', error);
+        logger.error('Failed to check sync status:', { error });
         // Don't show error toast, just fail silently
       }
     };
@@ -292,6 +294,15 @@ export default function ExtensionsComplete() {
   });
 
   const ringGroups = ringGroupsData?.data || [];
+
+  // Fetch IVR menus for IVR extension type
+  const { data: ivrMenusData } = useQuery({
+    queryKey: ['ivr-menus', { per_page: 100, status: 'active' }],
+    queryFn: () => ivrMenusService.getAll({ per_page: 100, status: 'active' }),
+    enabled: formData.type === 'ivr',
+  });
+
+  const ivrMenus = ivrMenusData?.data || [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -528,8 +539,13 @@ export default function ExtensionsComplete() {
         return `${members.length} members`;
       }
       case 'ivr': {
-        const menu = extension.configuration?.menu || {};
-        return `${Object.keys(menu).length} menu options`;
+        // Find the IVR menu name by ID
+        const ivrId = extension.configuration?.ivr_id;
+        if (ivrId) {
+          const ivrMenu = ivrMenus.find(menu => menu.id === ivrId.toString());
+          return ivrMenu ? ivrMenu.name : `IVR Menu ${ivrId}`;
+        }
+        return 'No IVR menu selected';
       }
       case 'ai_assistant': {
         return extension.configuration?.provider || 'Not configured';
@@ -908,7 +924,7 @@ export default function ExtensionsComplete() {
                 <SelectValue placeholder="Select an IVR menu" />
               </SelectTrigger>
               <SelectContent>
-                {mockIVRMenus.map((ivr) => (
+                {ivrMenus.map((ivr) => (
                   <SelectItem key={ivr.id} value={ivr.id}>
                     {ivr.name}
                   </SelectItem>
@@ -2009,12 +2025,29 @@ export default function ExtensionsComplete() {
                           </div>
                         </>
                       )}
-                      {selectedExtension.type === 'forward' && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Forward To:</span>
-                          <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
-                        </div>
-                      )}
+                       {selectedExtension.type === 'ivr' && (
+                         <>
+                           <div className="flex justify-between">
+                             <span className="text-sm text-muted-foreground">IVR Menu:</span>
+                             <span className="text-sm font-medium">
+                               {(() => {
+                                 const ivrId = selectedExtension.configuration?.ivr_id;
+                                 if (ivrId) {
+                                   const ivrMenu = ivrMenus.find(menu => menu.id === ivrId.toString());
+                                   return ivrMenu ? ivrMenu.name : `IVR Menu ${ivrId}`;
+                                 }
+                                 return 'No IVR menu selected';
+                               })()}
+                             </span>
+                           </div>
+                         </>
+                       )}
+                       {selectedExtension.type === 'forward' && (
+                         <div className="flex justify-between">
+                           <span className="text-sm text-muted-foreground">Forward To:</span>
+                           <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
+                         </div>
+                       )}
                     </div>
                   </div>
                 )}

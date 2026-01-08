@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Extension\StoreExtensionRequest;
 use App\Http\Requests\Extension\UpdateExtensionRequest;
 use App\Http\Resources\ExtensionResource;
@@ -29,6 +30,7 @@ use Illuminate\Support\Str;
  */
 class ExtensionController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Display a paginated list of extensions.
      *
@@ -37,14 +39,10 @@ class ExtensionController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
-
-        Gate::authorize('viewAny', Extension::class);
+        $this->authorize('viewAny', Extension::class);
 
         // Build query
         $query = Extension::query()
@@ -128,12 +126,8 @@ class ExtensionController extends Controller
         CloudonixSubscriberService $subscriberService
     ): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         $validated = $request->validated();
 
@@ -237,14 +231,14 @@ class ExtensionController extends Controller
      */
     public function show(Request $request, Extension $extension): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('view', $extension);
+        $this->authorize('view', $extension);
 
         // Tenant scope check
         if ($extension->organization_id !== $currentUser->organization_id) {
@@ -291,8 +285,8 @@ class ExtensionController extends Controller
         CloudonixSubscriberService $subscriberService
     ): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -427,14 +421,14 @@ class ExtensionController extends Controller
         CloudonixSubscriberService $subscriberService
     ): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('delete', $extension);
+        $this->authorize('delete', $extension);
 
         // Tenant scope check
         if ($extension->organization_id !== $currentUser->organization_id) {
@@ -517,14 +511,14 @@ class ExtensionController extends Controller
      */
     public function compareSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('viewAny', Extension::class);
+        $this->authorize('viewAny', Extension::class);
 
         Log::info('Comparing extensions with Cloudonix', [
             'request_id' => $requestId,
@@ -579,8 +573,8 @@ class ExtensionController extends Controller
         PasswordGenerator $passwordGenerator,
         CloudonixSubscriberService $subscriberService
     ): JsonResponse {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -707,8 +701,8 @@ class ExtensionController extends Controller
      */
     public function getPassword(Request $request, Extension $extension): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -757,7 +751,6 @@ class ExtensionController extends Controller
         return response()->json([
             'extension_id' => $extension->id,
             'extension_number' => $extension->extension_number,
-            'password' => $extension->getSipPassword(),
         ]);
     }
 
@@ -770,8 +763,8 @@ class ExtensionController extends Controller
      */
     public function performSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);

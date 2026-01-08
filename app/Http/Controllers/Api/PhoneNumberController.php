@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
 use App\Models\BusinessHoursSchedule;
@@ -35,6 +38,7 @@ use Illuminate\Support\Str;
  */
 class PhoneNumberController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Display a paginated list of phone numbers.
      *
@@ -48,8 +52,8 @@ class PhoneNumberController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
@@ -118,8 +122,8 @@ class PhoneNumberController extends Controller
      */
     public function show(Request $request, DidNumber $phoneNumber): PhoneNumberResource
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
@@ -150,8 +154,8 @@ class PhoneNumberController extends Controller
      */
     public function store(StorePhoneNumberRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
@@ -219,8 +223,8 @@ class PhoneNumberController extends Controller
      */
     public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
@@ -284,8 +288,8 @@ class PhoneNumberController extends Controller
      */
     public function destroy(Request $request, DidNumber $phoneNumber): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');

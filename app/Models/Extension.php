@@ -36,6 +36,9 @@ class Extension extends Model
         'status',
         'voicemail_enabled',
         'configuration',
+        'service_url',
+        'service_token',
+        'service_params',
     ];
 
     /**
@@ -63,6 +66,7 @@ class Extension extends Model
             'voicemail_enabled' => 'boolean',
             'cloudonix_synced' => 'boolean',
             'configuration' => 'array',
+            'service_params' => 'array',
         ];
     }
 

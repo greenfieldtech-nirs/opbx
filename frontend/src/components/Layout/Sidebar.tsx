@@ -19,6 +19,7 @@ import {
   Video,
   Shield,
   Volume2,
+  Menu,
 } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -36,6 +37,7 @@ const navigation: NavItem[] = [
   { name: 'Conference Rooms', href: '/conference-rooms', icon: Video },
   { name: 'Phone Numbers', href: '/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin'] },
   { name: 'Ring Groups', href: '/ring-groups', icon: UserPlus },
+  { name: 'IVR Menus', href: '/ivr-menus', icon: Menu },
   { name: 'Business Hours', href: '/business-hours', icon: Clock },
   { name: 'Call Logs', href: '/call-logs', icon: FileText },
   { name: 'Recordings', href: '/recordings', icon: Volume2, roles: ['owner', 'admin'] },

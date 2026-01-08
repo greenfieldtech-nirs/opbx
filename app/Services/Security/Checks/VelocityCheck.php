@@ -15,7 +15,7 @@ class VelocityCheck implements SentryCheck
     public function check(Request $request, DidNumber $did): bool
     {
         // 1. Get organization settings
-        $settings = $did->organization->settings['sentry_settings'] ?? [];
+        $settings = $did->organization->settings['routing_sentry'] ?? [];
 
         // 2. Check if velocity check is enabled
         if (empty($settings['velocity_limit_enabled'])) {

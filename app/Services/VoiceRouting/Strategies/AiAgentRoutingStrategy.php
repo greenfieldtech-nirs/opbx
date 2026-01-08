@@ -27,11 +27,38 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        $sipUri = sprintf('sip:%s@%s', $extension->extension_number, $request->input('Domain'));
+        // Extract service provider configuration from extension
+        // Support both new columns and legacy configuration JSON
+        $config = $extension->configuration ?? [];
 
-        // Route to AI Agent (same as user for now, but semantically distinct)
+        // Check new columns first (preferred format)
+        if ($extension->service_url) {
+            $serviceUrl = $extension->service_url;
+            $serviceToken = $extension->service_token;
+            $serviceParams = $extension->service_params ?? [];
+
+            if (!$serviceUrl) {
+                return response(CxmlBuilder::unavailable('AI Agent service URL not configured'), 200, ['Content-Type' => 'text/xml']);
+            }
+
+            return response(
+                CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        // Fall back to legacy configuration format
+        $provider = $config['provider'] ?? null;
+        $phoneNumber = $config['phone_number'] ?? null;
+
+        if (!$provider || !$phoneNumber) {
+            return response(CxmlBuilder::unavailable('AI Agent provider or phone number not configured'), 200, ['Content-Type' => 'text/xml']);
+        }
+
+        // Route to AI Agent Service Provider using <Service> noun with provider and phone number
         return response(
-            CxmlBuilder::dialExtension($sipUri, 60),
+            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
             200,
             ['Content-Type' => 'text/xml']
         );

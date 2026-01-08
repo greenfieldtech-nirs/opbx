@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
+use App\Http\Controllers\Api\IvrMenuController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
@@ -28,7 +29,20 @@ use Illuminate\Support\Facades\Route;
 | These routes handle the REST API for PBX configuration and management.
 | All routes require authentication via Laravel Sanctum.
 |
+
 */
+
+
+
+// Test route for debugging
+Route::get('test/audio', function () {
+    return response()->json(['status' => 'ok', 'message' => 'Audio route is working']);
+});
+
+// Public routes for external services (Cloudonix) to access audio files
+Route::get('storage/recordings/{path}', [\App\Http\Controllers\Api\RecordingsController::class, 'serveMinioFile'])
+    ->name('storage.recordings.serve')
+    ->where('path', '[0-9]+/.+');
 
 // Health check routes (public)
 Route::get('/health', function () {
@@ -127,6 +141,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('extensions/{extension}/password', [ExtensionController::class, 'getPassword'])
             ->name('extensions.password');
         Route::put('extensions/{extension}/reset-password', [ExtensionController::class, 'resetPassword'])
+            ->middleware(['auth:sanctum', 'sensitive-operations'])
             ->name('extensions.reset-password');
         Route::apiResource('extensions', ExtensionController::class);
 
@@ -135,6 +150,10 @@ Route::prefix('v1')->group(function (): void {
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
+
+        // IVR Menus
+        Route::get('ivr-menus/voices', [IvrMenuController::class, 'getVoices'])->name('ivr-menus.voices');
+        Route::apiResource('ivr-menus', IvrMenuController::class);
 
         // Business Hours
         Route::apiResource('business-hours', BusinessHoursController::class);

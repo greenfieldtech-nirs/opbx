@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Profile\UpdateOrganizationRequest;
 use App\Http\Requests\Profile\UpdatePasswordRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
@@ -24,6 +25,7 @@ use Illuminate\Support\Str;
  */
 class ProfileController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Get current user's profile.
      *
@@ -35,7 +37,7 @@ class ProfileController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
 
         return response()->json([
             'user' => [
@@ -76,8 +78,8 @@ class ProfileController extends Controller
      */
     public function update(UpdateProfileRequest $request): JsonResponse
     {
-        $user = $request->user();
-        $requestId = (string) Str::uuid();
+        $user = $this->getAuthenticatedUser($request);
+        $requestId = $this->getRequestId();
 
         $originalData = [
             'name' => $user->name,
@@ -94,46 +96,43 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use ($user) {
+                // Update user profile - only update fields that are present
+                $fieldsToUpdate = [
+                    'name',
+                    'email',
+                    'phone',
+                    'street_address',
+                    'city',
+                    'state_province',
+                    'postal_code',
+                    'country',
+                ];
 
-            // Update user profile - only update fields that are present
-            $fieldsToUpdate = [
-                'name',
-                'email',
-                'phone',
-                'street_address',
-                'city',
-                'state_province',
-                'postal_code',
-                'country',
-            ];
-
-            foreach ($fieldsToUpdate as $field) {
-                if ($request->has($field)) {
-                    $user->{$field} = $request->input($field);
+                foreach ($fieldsToUpdate as $field) {
+                    if ($request->has($field)) {
+                        $user->{$field} = $request->input($field);
+                    }
                 }
-            }
 
-            // Handle role change if requested
-            // Authorization is already checked in UpdateProfileRequest
-            if ($request->has('role')) {
-                $newRole = $request->input('role');
+                // Handle role change if requested
+                if ($request->has('role')) {
+                    $newRole = $request->input('role');
 
-                Log::info('Role change requested', [
-                    'request_id' => $requestId,
-                    'user_id' => $user->id,
-                    'old_role' => $originalData['role'],
-                    'new_role' => $newRole,
-                    'changed_by' => $request->user()->id,
-                    'ip_address' => $request->ip(),
-                ]);
+                    Log::info('Role change requested', [
+                        'request_id' => $requestId,
+                        'user_id' => $user->id,
+                        'old_role' => $originalData['role'],
+                        'new_role' => $newRole,
+                        'changed_by' => $request->user()->id,
+                        'ip_address' => $request->ip(),
+                    ]);
 
-                $user->role = $newRole;
-            }
+                    $user->role = $newRole;
+                }
 
-            $user->save();
-
-            DB::commit();
+                $user->save();
+            });
 
             $logData = [
                 'request_id' => $requestId,
@@ -170,7 +169,6 @@ class ProfileController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
 
             Log::error('Profile update failed', [
                 'request_id' => $requestId,
@@ -179,15 +177,13 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'PROFILE_UPDATE_FAILED',
-                    'message' => 'Failed to update profile. Please try again.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 500);
-        }
+            return $this->logAndRespond(
+                ['error' => $e->getMessage()],
+                'Failed to update profile. Please try again.',
+                500,
+                'PROFILE_UPDATE_FAILED',
+                $requestId
+            );
     }
 
     /**
@@ -202,9 +198,9 @@ class ProfileController extends Controller
      */
     public function updateOrganization(UpdateOrganizationRequest $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->getAuthenticatedUser($request);
         $organization = $user->organization;
-        $requestId = (string) Str::uuid();
+        $requestId = $this->getRequestId();
 
         $originalData = [
             'name' => $organization->name,
@@ -219,19 +215,18 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use ($user, $organization) {
+                // Update organization - only update fields that are present
+                if ($request->has('name')) {
+                    $organization->name = $request->input('name');
+                }
+                if ($request->has('timezone')) {
+                    $organization->timezone = $request->input('timezone');
+                }
 
-            // Update organization - only update fields that are present
-            if ($request->has('name')) {
-                $organization->name = $request->input('name');
-            }
-            if ($request->has('timezone')) {
-                $organization->timezone = $request->input('timezone');
-            }
-
-            $organization->save();
-
-            DB::commit();
+                $organization->save();
+                $user->save();
+            });
 
             Log::info('Organization updated successfully', [
                 'request_id' => $requestId,
@@ -256,7 +251,6 @@ class ProfileController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
 
             Log::error('Organization update failed', [
                 'request_id' => $requestId,
@@ -266,14 +260,13 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'ORGANIZATION_UPDATE_FAILED',
-                    'message' => 'Failed to update organization. Please try again.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 500);
+            return $this->logAndRespond(
+                ['error' => $e->getMessage()],
+                'Failed to update organization. Please try again.',
+                500,
+                'ORGANIZATION_UPDATE_FAILED',
+                $requestId
+            );
         }
     }
 
@@ -291,8 +284,8 @@ class ProfileController extends Controller
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
-        $user = $request->user();
-        $requestId = (string) Str::uuid();
+        $user = $this->getAuthenticatedUser($request);
+        $requestId = $this->getRequestId();
 
         Log::info('Password change initiated', [
             'request_id' => $requestId,
@@ -302,30 +295,28 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use ($user) {
+                // Update password with bcrypt hashing
+                $user->password = Hash::make($request->input('new_password'));
+                $user->save();
 
-            // Update password with bcrypt hashing
-            $user->password = Hash::make($request->input('new_password'));
-            $user->save();
+                // Revoke all existing tokens for security
+                $user->tokens()->delete();
 
-            // Revoke all existing tokens for security
-            $user->tokens()->delete();
+                DB::commit();
 
-            DB::commit();
+                Log::info('Password changed successfully', [
+                    'request_id' => $requestId,
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'tokens_revoked' => true,
+                    'ip_address' => $request->ip(),
+                ]);
 
-            Log::info('Password changed successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'tokens_revoked' => true,
-                'ip_address' => $request->ip(),
-            ]);
-
-            return response()->json([
-                'message' => 'Password updated successfully. Please log in again with your new password.',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+                return response()->json([
+                    'message' => 'Password updated successfully. Please log in again with your new password.',
+                ]);
+            });
 
             Log::error('Password change failed', [
                 'request_id' => $requestId,
@@ -334,14 +325,13 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => [
-                    'code' => 'PASSWORD_UPDATE_FAILED',
-                    'message' => 'Failed to update password. Please try again.',
-                    'details' => [],
-                    'request_id' => $requestId,
-                ],
-            ], 500);
+            return $this->logAndRespond(
+                ['error' => $e->getMessage()],
+                'Failed to update password. Please try again.',
+                500,
+                'PASSWORD_UPDATE_FAILED',
+                $requestId
+            );
         }
     }
 }

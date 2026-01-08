@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\SessionUpdate;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +21,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SessionUpdateController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Get active calls for the authenticated user's organization.
      *

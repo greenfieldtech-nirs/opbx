@@ -952,4 +952,29 @@ class CloudonixClient
             return null;
         }
     }
+
+    /**
+     * Get available voices for the domain.
+     *
+     * @param string $domainUuid
+     * @return array
+     * @throws \RuntimeException
+     */
+    public function getVoices(string $domainUuid): array
+    {
+        return $this->circuitBreaker->call(function () use ($domainUuid) {
+            $response = $this->client()->get("/domains/{$domainUuid}/resources/voices");
+
+            if ($response->failed()) {
+                Log::warning('Cloudonix API: Failed to fetch voices', [
+                    'domain_uuid' => $domainUuid,
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                throw new \RuntimeException('Failed to fetch voices from Cloudonix API');
+            }
+
+            return $response->json();
+        });
+    }
 }

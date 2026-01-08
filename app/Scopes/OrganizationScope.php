@@ -37,6 +37,12 @@ class OrganizationScope implements Scope
             return (int) $user->organization_id;
         }
 
+        // Log when no organization ID is found
+        \Illuminate\Support\Facades\Log::debug('OrganizationScope: No authenticated user or organization_id', [
+            'user' => $user ? $user->id : null,
+            'has_organization_id' => $user && isset($user->organization_id),
+        ]);
+
         return null;
     }
 }

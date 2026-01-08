@@ -6,7 +6,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\BusinessHoursStatus;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\BusinessHours\UpdateBusinessHoursScheduleRequest;
 use App\Http\Resources\BusinessHoursScheduleCollection;
 use App\Http\Resources\BusinessHoursScheduleResource;
@@ -30,6 +33,7 @@ use Illuminate\Support\Str;
  */
 class BusinessHoursController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Display a paginated list of business hours schedules.
      *
@@ -38,14 +42,14 @@ class BusinessHoursController extends Controller
      */
     public function index(Request $request): BusinessHoursScheduleCollection
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
         }
 
-        Gate::authorize('viewAny', BusinessHoursSchedule::class);
+        $this->authorize('viewAny', BusinessHoursSchedule::class);
 
         Log::info('Retrieving business hours schedules list', [
             'request_id' => $requestId,
@@ -115,8 +119,8 @@ class BusinessHoursController extends Controller
      */
     public function store(StoreBusinessHoursScheduleRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -194,14 +198,14 @@ class BusinessHoursController extends Controller
      */
     public function show(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('view', $businessHour);
+        $this->authorize('view', $businessHour);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
@@ -243,8 +247,8 @@ class BusinessHoursController extends Controller
      */
     public function update(UpdateBusinessHoursScheduleRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -338,14 +342,14 @@ class BusinessHoursController extends Controller
      */
     public function destroy(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('delete', $businessHour);
+        $this->authorize('delete', $businessHour);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
@@ -411,14 +415,14 @@ class BusinessHoursController extends Controller
      */
     public function duplicate(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('duplicate', $businessHour);
+        $this->authorize('duplicate', $businessHour);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {

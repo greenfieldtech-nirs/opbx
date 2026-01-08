@@ -6,6 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\ConferenceRoom\UpdateConferenceRoomRequest;
 use App\Http\Resources\ConferenceRoomResource;
@@ -26,19 +29,20 @@ use Illuminate\Support\Str;
  */
 class ConferenceRoomController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * Display a paginated list of conference rooms.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $requestId = (string) Str::uuid();
-        $user = $request->user();
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser($request);
 
         if (!$user) {
             abort(401, 'Unauthenticated');
         }
 
-        Gate::authorize('viewAny', ConferenceRoom::class);
+        $this->authorize('viewAny', ConferenceRoom::class);
 
         // Build query
         $query = ConferenceRoom::query()
@@ -99,8 +103,8 @@ class ConferenceRoomController extends Controller
      */
     public function store(StoreConferenceRoomRequest $request): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -159,14 +163,14 @@ class ConferenceRoomController extends Controller
      */
     public function show(Request $request, ConferenceRoom $conferenceRoom): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('view', $conferenceRoom);
+        $this->authorize('view', $conferenceRoom);
 
         // Tenant scope check
         if ($conferenceRoom->organization_id !== $currentUser->organization_id) {
@@ -201,8 +205,8 @@ class ConferenceRoomController extends Controller
      */
     public function update(UpdateConferenceRoomRequest $request, ConferenceRoom $conferenceRoom): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
@@ -285,14 +289,14 @@ class ConferenceRoomController extends Controller
      */
     public function destroy(Request $request, ConferenceRoom $conferenceRoom): JsonResponse
     {
-        $requestId = (string) Str::uuid();
-        $currentUser = $request->user();
+        $requestId = $this->getRequestId();
+        $currentUser = $this->getAuthenticatedUser($request);
 
         if (!$currentUser) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        Gate::authorize('delete', $conferenceRoom);
+        $this->authorize('delete', $conferenceRoom);
 
         // Tenant scope check
         if ($conferenceRoom->organization_id !== $currentUser->organization_id) {

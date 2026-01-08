@@ -178,7 +178,7 @@ export default function Profile() {
         });
       } catch (error) {
         toast.error('Failed to load profile data');
-        console.error('Profile load error:', error);
+        logger.error('Profile load error:', { error });
       } finally {
         setIsLoading(false);
       }

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\CallLog;
+
+
+use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,6 +17,7 @@ use Illuminate\Http\Request;
  */
 class CallLogController extends Controller
 {
+    use ApiRequestHandler;
     /**
      * List call logs for the authenticated user's organization.
      */
