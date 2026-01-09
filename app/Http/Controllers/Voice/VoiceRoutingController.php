@@ -9,6 +9,7 @@ use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 
 class VoiceRoutingController extends Controller
 {
@@ -23,6 +24,16 @@ class VoiceRoutingController extends Controller
      */
     public function handleInbound(Request $request): Response
     {
+        $orgId = $request->input('_organization_id');
+
+        Log::info('VoiceRoutingController: Handling inbound request', [
+            'to' => $request->input('To'),
+            'from' => $request->input('From'),
+            'domain' => $request->input('Domain'),
+            'organization_id' => $orgId,
+            'has_org_id' => $orgId !== null,
+        ]);
+
         return $this->manager->handleInbound($request);
     }
 

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\IvrDestinationType;
 use App\Enums\UserStatus;
+use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -69,18 +70,58 @@ class IvrMenuOption extends Model
      * For extensions, destination_id is treated as extension number.
      * For other types, it's treated as ID.
      */
-    public function getDestinationWithFallback()
+    public function getDestinationWithFallback(?IvrMenu $ivrMenu = null)
     {
+        Log::info('DEBUG: getDestinationWithFallback called', [
+            'option_id' => $this->id,
+            'ivr_menu_param' => $ivrMenu !== null,
+            'ivr_menu_param_type' => $ivrMenu ? gettype($ivrMenu) : 'null',
+            'ivr_menu_relationship' => $this->ivrMenu !== null,
+        ]);
+
+        $ivrMenu = $ivrMenu ?? $this->ivrMenu;
+
+        Log::debug('IvrMenuOption: Using IVR menu', [
+            'ivr_menu' => $ivrMenu,
+            'ivr_menu_type' => gettype($ivrMenu),
+            'ivr_menu_class' => $ivrMenu ? get_class($ivrMenu) : 'null',
+            'ivr_menu_id' => $ivrMenu?->id,
+            'ivr_menu_org_id' => $ivrMenu?->organization_id,
+            'ivr_menu_attributes' => $ivrMenu ? $ivrMenu->getAttributes() : null,
+        ]);
+
         if ($this->destination_type === IvrDestinationType::EXTENSION) {
             // For extensions, destination_id is the extension number
             Log::debug('IVR Option: Looking up extension by number', [
                 'option_id' => $this->id,
                 'extension_number' => $this->destination_id,
+                'organization_id' => $ivrMenu?->organization_id,
+                'ivr_menu_is_null' => $ivrMenu === null,
+                'ivr_menu_has_org_id' => $ivrMenu && property_exists($ivrMenu, 'organization_id'),
             ]);
 
-            $destination = Extension::where('extension_number', (string) $this->destination_id)
-                ->where('organization_id', $this->ivrMenu->organization_id)
+            if ($ivrMenu === null) {
+                Log::error('IVR Option: IVR menu is null when trying to access organization_id');
+                return null;
+            }
+
+            $orgId = $ivrMenu->organization_id;
+            Log::debug('IVR Option: Extracted organization_id', [
+                'org_id' => $orgId,
+                'org_id_type' => gettype($orgId),
+            ]);
+
+            $destination = Extension::withoutGlobalScope(OrganizationScope::class)
+                ->where('extension_number', (string) $this->destination_id)
+                ->where('organization_id', $orgId)
                 ->first();
+
+            Log::debug('IVR Option: Extension lookup result', [
+                'extension_found' => $destination !== null,
+                'extension_id' => $destination?->id,
+                'extension_type' => $destination?->type,
+                'extension_status' => $destination?->status,
+            ]);
 
             if ($destination) {
                 Log::debug('IVR Option: Extension found by number', [
@@ -92,6 +133,7 @@ class IvrMenuOption extends Model
                 Log::warning('IVR Option: Extension not found by number', [
                     'option_id' => $this->id,
                     'extension_number' => $this->destination_id,
+                    'organization_id' => $ivrMenu->organization_id,
                 ]);
             }
 
@@ -100,23 +142,38 @@ class IvrMenuOption extends Model
 
         // For other destination types, bypass organization scope
         $destination = null;
+        Log::debug('IVR Option: Looking up non-extension destination', [
+            'destination_type' => $this->destination_type->value,
+            'destination_id' => $this->destination_id,
+            'organization_id' => $ivrMenu->organization_id,
+        ]);
+
         switch ($this->destination_type) {
             case IvrDestinationType::RING_GROUP:
-                $destination = RingGroup::where('id', $this->destination_id)
-                    ->where('organization_id', $this->ivrMenu->organization_id)
+                $destination = RingGroup::withoutGlobalScope(OrganizationScope::class)
+                    ->where('id', $this->destination_id)
+                    ->where('organization_id', $ivrMenu->organization_id)
                     ->first();
                 break;
             case IvrDestinationType::CONFERENCE_ROOM:
-                $destination = ConferenceRoom::where('id', $this->destination_id)
-                    ->where('organization_id', $this->ivrMenu->organization_id)
+                $destination = ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+                    ->where('id', $this->destination_id)
+                    ->where('organization_id', $ivrMenu->organization_id)
                     ->first();
                 break;
             case IvrDestinationType::IVR_MENU:
-                $destination = IvrMenu::where('id', $this->destination_id)
-                    ->where('organization_id', $this->ivrMenu->organization_id)
+                $destination = IvrMenu::withoutGlobalScope(OrganizationScope::class)
+                    ->where('id', $this->destination_id)
+                    ->where('organization_id', $ivrMenu->organization_id)
                     ->first();
                 break;
         }
+
+        Log::debug('IVR Option: Non-extension destination lookup result', [
+            'destination_type' => $this->destination_type->value,
+            'destination_found' => $destination !== null,
+            'destination_id' => $destination?->id,
+        ]);
 
         return $destination;
     }
@@ -143,7 +200,7 @@ class IvrMenuOption extends Model
     /**
      * Validate that the destination exists and is accessible.
      */
-    public function isValidDestination(): bool
+    public function isValidDestination(?IvrMenu $ivrMenu = null): bool
     {
         Log::debug('IVR Option: Checking destination validity', [
             'option_id' => $this->id,
@@ -152,7 +209,7 @@ class IvrMenuOption extends Model
             'destination_id' => $this->destination_id,
         ]);
 
-        $destination = $this->getDestinationWithFallback();
+        $destination = $this->getDestinationWithFallback($ivrMenu);
 
         if (!$destination) {
             Log::warning('IVR Option: Destination model not found', [
@@ -201,12 +258,23 @@ class IvrMenuOption extends Model
     /**
      * Get destination model with error handling.
      */
-    public function getValidatedDestination()
+    public function getValidatedDestination(?IvrMenu $ivrMenu = null)
     {
-        if (!$this->isValidDestination()) {
+        Log::info('DEBUG: getValidatedDestination called', [
+            'option_id' => $this->id,
+            'ivr_menu_passed' => $ivrMenu !== null,
+            'ivr_menu_type' => $ivrMenu ? gettype($ivrMenu) : 'null',
+            'ivr_menu_class' => $ivrMenu ? get_class($ivrMenu) : 'null',
+            'ivr_menu_id' => $ivrMenu?->id,
+            'ivr_menu_org_id' => $ivrMenu?->organization_id,
+        ]);
+
+        if (!$this->isValidDestination($ivrMenu)) {
+            Log::debug('IvrMenuOption: Destination is not valid');
             return null;
         }
 
-        return $this->getDestinationWithFallback();
+        Log::debug('IvrMenuOption: Calling getDestinationWithFallback');
+        return $this->getDestinationWithFallback($ivrMenu);
     }
 }

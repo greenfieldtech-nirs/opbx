@@ -10,6 +10,7 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
+use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\IvrStateService;
 use App\Services\Security\RoutingSentryService;
@@ -48,6 +49,12 @@ class VoiceRoutingManager
             'org_id' => $orgId
         ]);
 
+        Log::info('VoiceRoutingManager: Starting routing logic', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId
+        ]);
+
         // 0. Check Business Hours
         $businessHoursResponse = $this->checkBusinessHours($orgId, $request->input('CallSid', ''));
         if ($businessHoursResponse) {
@@ -56,29 +63,42 @@ class VoiceRoutingManager
 
         // 1. Resolve Target (DID or Extension)
         // First check if it's a DID (scoped to authenticated organization)
-        $did = DidNumber::where('phone_number', $to)
+        Log::info('VoiceRoutingManager: Checking for DID', [
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
+
+        $did = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('phone_number', $to)
             ->where('organization_id', $orgId)
             ->first();
 
-        // If not a DID, it might be an internal extension dialing another extension (or internal transfer)
-        // But handleInbound acts on the 'To' number.
-        // If the call arrives at this controller, it's either from PSTN (to a DID) 
-        // OR checks for Internal calls were done in classification.
-        // The Controller's classifyCall logic distinguished 'internal' vs 'external'.
+        Log::info('VoiceRoutingManager: DID lookup result', [
+            'did_found' => $did !== null,
+            'did_id' => $did?->id,
+            'did_phone_number' => $did?->phone_number,
+            'did_routing_type' => $did?->routing_type,
+        ]);
 
-        // If we are replacing the controller logic, we need to handle both.
-        // However, `handleInbound` suggests we are routing *to* something.
-
-        if ($did) {
-            return $this->routeDidCall($request, $did);
-        }
-
-        // Check if it's an internal extension
+        // If not a DID, it might be an internal extension
         // Using cache service to look up extension by number
         // Normalize number logic might be needed here, or assumed normalized by middleware/controller
-        // Cloudonix usually sends E.164. Extension numbers might be 4 digits.
+
+        Log::info('VoiceRoutingManager: Checking for extension', [
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
 
         $extension = $this->cache->getExtension($orgId, $to);
+
+        Log::info('VoiceRoutingManager: Extension lookup result', [
+            'extension_found' => $extension !== null,
+            'extension_id' => $extension?->id,
+            'extension_number' => $extension?->extension_number,
+            'extension_type' => $extension?->type?->value,
+            'extension_status' => $extension?->status,
+            'extension_active' => $extension?->isActive(),
+        ]);
         if ($extension && $extension->isActive()) {
             // Internal call routing to an Extension
             Log::info('VoiceRoutingManager: Internal extension destination', [
@@ -88,6 +108,13 @@ class VoiceRoutingManager
 
             // Create destination array based on extension type
             $destination = $this->resolveExtensionDestination($extension, $orgId);
+
+            Log::info('VoiceRoutingManager: Extension destination resolution', [
+                'extension' => $extension->extension_number,
+                'type' => $extension->type->value,
+                'destination' => $destination,
+                'destination_empty' => empty($destination),
+            ]);
 
             if (empty($destination)) {
                 Log::warning('VoiceRoutingManager: Could not resolve destination for extension', [
@@ -100,6 +127,11 @@ class VoiceRoutingManager
 
             return $this->executeStrategy($extension->type, $request, new DidNumber(), $destination);
         }
+
+        Log::info('VoiceRoutingManager: No destination found, returning unavailable', [
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
 
         return response(CxmlBuilder::unavailable('Destination not found'), 200, ['Content-Type' => 'text/xml']);
     }
@@ -139,7 +171,9 @@ class VoiceRoutingManager
         if ($did->routing_type === 'extension') {
             $extensionId = $config['extension_id'] ?? null;
             if ($extensionId) {
-                $extension = Extension::where('organization_id', $did->organization_id)->find($extensionId);
+                $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('organization_id', $did->organization_id)
+                    ->find($extensionId);
                 if ($extension) {
                     return ['extension' => $extension];
                 }
@@ -149,7 +183,9 @@ class VoiceRoutingManager
         if ($did->routing_type === 'ring_group') {
             $rgId = $config['ring_group_id'] ?? null;
             if ($rgId) {
-                $rg = RingGroup::where('organization_id', $did->organization_id)->find($rgId);
+                $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('organization_id', $did->organization_id)
+                    ->find($rgId);
                 if ($rg) {
                     return ['ring_group' => $rg];
                 }
@@ -167,7 +203,9 @@ class VoiceRoutingManager
         if ($type === 'ivr_menu') {
             $ivrMenuId = $config['ivr_menu_id'] ?? null;
             if ($ivrMenuId) {
-                $ivrMenu = IvrMenu::where('organization_id', $did->organization_id)->find($ivrMenuId);
+                $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('organization_id', $did->organization_id)
+                    ->find($ivrMenuId);
                 if ($ivrMenu) {
                     return ['ivr_menu' => $ivrMenu];
                 }
@@ -227,7 +265,8 @@ class VoiceRoutingManager
             return response(CxmlBuilder::unavailable('Ring group context missing'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        $rg = RingGroup::where('id', $rgId)
+        $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $rgId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -249,6 +288,13 @@ class VoiceRoutingManager
     {
         $extensionType = $extension->type;
 
+        Log::info('VoiceRoutingManager: Resolving extension destination', [
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'extension_type_raw' => $extensionType,
+            'organization_id' => $organizationId,
+        ]);
+
         // Handle both enum and string types for backward compatibility
         if ($extensionType instanceof ExtensionType) {
             $typeValue = $extensionType->value;
@@ -256,8 +302,13 @@ class VoiceRoutingManager
             $typeValue = (string) $extensionType;
         }
 
+        Log::info('VoiceRoutingManager: Extension type resolved', [
+            'type_value' => $typeValue,
+        ]);
+
         // Use if statements instead of match for better debugging and reliability
         if ($typeValue === 'user') {
+            Log::debug('VoiceRoutingManager: User extension destination', ['extension' => $extension->extension_number]);
             return ['extension' => $extension];
         } elseif ($typeValue === 'conference') {
             return $this->resolveConferenceDestination($extension, $organizationId);
@@ -295,7 +346,8 @@ class VoiceRoutingManager
             return [];
         }
 
-        $room = ConferenceRoom::where('id', $conferenceRoomId)
+        $room = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -358,7 +410,8 @@ class VoiceRoutingManager
             return [];
         }
 
-        $ivrMenu = IvrMenu::where('id', $ivrMenuId)
+        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ivrMenuId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -547,8 +600,8 @@ class VoiceRoutingManager
             'destination_id' => $option->destination_id,
         ]);
 
-        // Route to the selected destination
-        return $this->routeToOptionDestination($request, $option);
+            // Route to the selected destination
+            return $this->routeToOptionDestination($request, $option, $ivrMenu);
     }
 
     /**
@@ -573,39 +626,49 @@ class VoiceRoutingManager
         }
 
         // Play error message and replay menu
-        $errorMessage = 'Invalid option. Please try again.';
+        $errorMessage = 'Invalid menu option, please try again.';
         $destination = ['ivr_menu' => $ivrMenu];
         $ivrStrategy = new \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy($this->ivrStateService);
 
-        // First play error, then menu
-        $errorCxml = CxmlBuilder::say($errorMessage, true);
-        $menuResponse = $ivrStrategy->route($request, new DidNumber(), $destination);
-
-        // Combine responses (this is a simplification - in practice you might need a more complex CXML structure)
-        return $menuResponse;
+        // Pass error message to IVR strategy - it will be included in the Gather operation
+        return $ivrStrategy->route($request, new DidNumber(), $destination, $errorMessage);
     }
 
     /**
      * Route call to option destination.
      */
-    private function routeToOptionDestination(Request $request, $option): Response
+    private function routeToOptionDestination(Request $request, $option, IvrMenu $ivrMenu): Response
     {
+        Log::info('DEBUG: routeToOptionDestination called', [
+            'ivr_menu_type' => gettype($ivrMenu),
+            'ivr_menu_class' => get_class($ivrMenu),
+            'ivr_menu_id' => $ivrMenu->id,
+            'ivr_menu_org_id' => $ivrMenu->organization_id,
+        ]);
+
         try {
             $destination = [];
             Log::info('IVR Input: Attempting to get validated destination', [
                 'call_sid' => $request->input('CallSid'),
-                'option_id' => $option->id,
-                'destination_type' => $option->destination_type->value,
+                'option_id' => $option->id ?? 'mock',
+                'destination_type' => $option->destination_type->value ?? $option->destination_type,
                 'destination_id' => $option->destination_id,
+                'ivr_menu_id' => $ivrMenu->id,
+                'ivr_menu_org_id' => $ivrMenu->organization_id,
             ]);
 
-            $validatedDestination = $option->getValidatedDestination();
+            $validatedDestination = $option->getValidatedDestination($ivrMenu);
+
+            Log::debug('IVR Input: getValidatedDestination result', [
+                'validated_destination' => $validatedDestination,
+                'is_null' => $validatedDestination === null,
+            ]);
 
             if (!$validatedDestination) {
                 Log::error('IVR Input: Destination validation failed', [
                     'call_sid' => $request->input('CallSid'),
-                    'option_id' => $option->id,
-                    'destination_type' => $option->destination_type->value,
+                    'option_id' => $option->id ?? 'mock',
+                    'destination_type' => is_object($option->destination_type) ? $option->destination_type->value : $option->destination_type,
                     'destination_id' => $option->destination_id,
                 ]);
 
@@ -618,8 +681,8 @@ class VoiceRoutingManager
 
             Log::info('IVR Input: Validated destination found', [
                 'call_sid' => $request->input('CallSid'),
-                'option_id' => $option->id,
-                'destination_type' => $option->destination_type->value,
+                'option_id' => $option->id ?? 'mock',
+                'destination_type' => is_object($option->destination_type) ? $option->destination_type->value : $option->destination_type,
                 'destination_id' => $option->destination_id,
                 'validated_destination_id' => $validatedDestination->id,
                 'validated_destination_type' => get_class($validatedDestination),
@@ -629,13 +692,19 @@ class VoiceRoutingManager
                 case \App\Enums\IvrDestinationType::EXTENSION:
                     Log::info('IVR Input: Routing to extension', [
                         'call_sid' => $request->input('CallSid'),
-                        'option_id' => $option->id,
+                        'option_id' => $option->id ?? 'mock',
                         'destination_id' => $option->destination_id,
                         'extension_id' => $validatedDestination->id,
                         'extension_number' => $validatedDestination->extension_number,
                         'extension_type' => $validatedDestination->type->value,
                     ]);
                     $destination = ['extension' => $validatedDestination];
+
+                    Log::info('IVR Input: About to execute strategy', [
+                        'extension_type' => $validatedDestination->type,
+                        'extension_type_value' => $validatedDestination->type->value,
+                    ]);
+
                     return $this->executeStrategy($validatedDestination->type, $request, new DidNumber(), $destination);
 
                 case \App\Enums\IvrDestinationType::RING_GROUP:
@@ -718,12 +787,83 @@ class VoiceRoutingManager
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
         }
 
-        // Route to failover destination (similar to option routing)
-        $mockOption = (object) [
-            'destination_type' => $ivrMenu->failover_destination_type,
-            'destination_id' => $ivrMenu->failover_destination_id,
+        // Route to failover destination directly
+        return $this->routeToDestination($request, $ivrMenu->failover_destination_type, $ivrMenu->failover_destination_id, $ivrMenu);
+    }
+
+    private function routeToDestination(Request $request, $destinationType, $destinationId, IvrMenu $ivrMenu): Response
+    {
+        Log::info('IVR Input: Routing to destination', [
+            'call_sid' => $request->input('CallSid'),
+            'destination_type' => is_object($destinationType) ? $destinationType->value : $destinationType,
+            'destination_id' => $destinationId,
+            'ivr_menu_id' => $ivrMenu->id,
+        ]);
+
+        // Create a temporary destination object for validation
+        $tempDestination = (object) [
+            'destination_type' => $destinationType,
+            'destination_id' => $destinationId,
         ];
 
-        return $this->routeToOptionDestination($request, $mockOption);
+        // Use the same validation logic as getValidatedDestination
+        $validatedDestination = null;
+
+        if ($destinationType === \App\Enums\IvrDestinationType::EXTENSION) {
+            $validatedDestination = Extension::withoutGlobalScope(OrganizationScope::class)
+                ->where('extension_number', (string) $destinationId)
+                ->where('organization_id', $ivrMenu->organization_id)
+                ->first();
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::RING_GROUP) {
+            $validatedDestination = RingGroup::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $destinationId)
+                ->where('organization_id', $ivrMenu->organization_id)
+                ->first();
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::CONFERENCE_ROOM) {
+            $validatedDestination = ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $destinationId)
+                ->where('organization_id', $ivrMenu->organization_id)
+                ->first();
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::IVR_MENU) {
+            $validatedDestination = IvrMenu::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $destinationId)
+                ->where('organization_id', $ivrMenu->organization_id)
+                ->first();
+        }
+
+        if (!$validatedDestination) {
+            Log::error('IVR Input: Destination validation failed for failover', [
+                'call_sid' => $request->input('CallSid'),
+                'destination_type' => is_object($destinationType) ? $destinationType->value : $destinationType,
+                'destination_id' => $destinationId,
+            ]);
+
+            return response(
+                CxmlBuilder::sayWithHangup('Destination is no longer available.', true),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        // Route based on destination type
+        if ($destinationType === \App\Enums\IvrDestinationType::EXTENSION) {
+            $destination = ['extension' => $validatedDestination];
+            return $this->executeStrategy($validatedDestination->type, $request, new DidNumber(), $destination);
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::RING_GROUP) {
+            $destination = ['ring_group' => $validatedDestination];
+            return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber(), $destination);
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::CONFERENCE_ROOM) {
+            $destination = ['conference_room' => $validatedDestination];
+            return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber(), $destination);
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::IVR_MENU) {
+            $destination = ['ivr_menu' => $validatedDestination];
+            return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber(), $destination);
+        }
+
+        return response(
+            CxmlBuilder::sayWithHangup('Unknown destination type.', true),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
     }
 }
