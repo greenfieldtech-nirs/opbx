@@ -277,29 +277,26 @@ export default function ExtensionsComplete() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Fetch conference rooms for conference extension type
+  // Fetch conference rooms for table display
   const { data: conferenceRoomsData } = useQuery({
     queryKey: ['conference-rooms', { per_page: 100, status: 'active' }],
     queryFn: () => conferenceRoomsService.getAll({ per_page: 100, status: 'active' }),
-    enabled: formData.type === 'conference',
   });
 
   const conferenceRooms = conferenceRoomsData?.data || [];
 
-  // Fetch ring groups for ring group extension type
+  // Fetch ring groups for table display
   const { data: ringGroupsData } = useQuery({
     queryKey: ['ring-groups', { per_page: 100, status: 'active' }],
     queryFn: () => ringGroupsService.getAll({ per_page: 100, status: 'active' }),
-    enabled: formData.type === 'ring_group',
   });
 
   const ringGroups = ringGroupsData?.data || [];
 
-  // Fetch IVR menus for IVR extension type
+  // Fetch IVR menus for table display
   const { data: ivrMenusData } = useQuery({
     queryKey: ['ivr-menus', { per_page: 100, status: 'active' }],
     queryFn: () => ivrMenusService.getAll({ per_page: 100, status: 'active' }),
-    enabled: formData.type === 'ivr',
   });
 
   const ivrMenus = ivrMenusData?.data || [];
@@ -520,39 +517,71 @@ export default function ExtensionsComplete() {
     );
   };
 
-  // Get configuration display for table
-  const getConfigurationDisplay = (extension: Extension) => {
-    switch (extension.type) {
-      case 'user':
-      case 'forward': {
-        if (extension.user_id && extension.user) {
-          return extension.user.name;
+  // Get details badge with type-specific styling
+  const getDetailsBadge = (extension: Extension) => {
+    const getBadgeConfig = (type: ExtensionType) => {
+      const configs = {
+        user: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: UserCheck },
+        conference: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
+        ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+        ivr: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+        ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+        forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
+      };
+      return configs[type] || configs.user;
+    };
+
+    const getBadgeContent = (extension: Extension) => {
+      switch (extension.type) {
+        case 'user':
+          return extension.user ? extension.user.name : 'Unassigned';
+        case 'conference': {
+          const conferenceRoomId = extension.configuration?.conference_room_id;
+          if (conferenceRoomId) {
+            const conferenceRoom = conferenceRooms.find(room => room.id == conferenceRoomId);
+            return conferenceRoom ? conferenceRoom.name : `ID ${conferenceRoomId}`;
+          }
+          return 'Not configured';
         }
-        return 'Unassigned';
-      }
-      case 'conference': {
-        const max = extension.configuration?.max_participants || 10;
-        return `Max ${max} participants`;
-      }
-      case 'ring_group': {
-        const members = extension.configuration?.members || [];
-        return `${members.length} members`;
-      }
-      case 'ivr': {
-        // Find the IVR menu name by ID
-        const ivrId = extension.configuration?.ivr_id;
-        if (ivrId) {
-          const ivrMenu = ivrMenus.find(menu => menu.id === ivrId.toString());
-          return ivrMenu ? ivrMenu.name : `IVR Menu ${ivrId}`;
+        case 'ring_group': {
+          const ringGroupId = extension.configuration?.ring_group_id;
+          if (ringGroupId) {
+            const ringGroup = ringGroups.find(group => group.id == ringGroupId);
+            return ringGroup ? ringGroup.name : `ID ${ringGroupId}`;
+          }
+          return 'Not configured';
         }
-        return 'No IVR menu selected';
+        case 'ivr': {
+          const ivrId = extension.configuration?.ivr_id;
+          if (ivrId) {
+            const ivrMenu = ivrMenus.find(menu => menu.id == ivrId);
+            return ivrMenu ? ivrMenu.name : `ID ${ivrId}`;
+          }
+          return 'Not configured';
+        }
+        case 'ai_assistant': {
+          const provider = extension.configuration?.provider || 'Unknown';
+          const phoneNumber = extension.configuration?.phone_number || 'Not set';
+          return `${phoneNumber} @ ${provider}`;
+        }
+        case 'forward': {
+          return extension.configuration?.forward_to || 'Not configured';
+        }
+        default:
+          return 'Unknown';
       }
-      case 'ai_assistant': {
-        return extension.configuration?.provider || 'Not configured';
-      }
-      default:
-        return '-';
-    }
+    };
+
+    const config = getBadgeConfig(extension.type);
+    const Icon = config.icon;
+    const content = getBadgeContent(extension);
+
+    return (
+      <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
+        <Icon className="h-3.5 w-3.5" />
+        {content}
+      </Badge>
+    );
   };
 
   // Validate form
@@ -1319,43 +1348,44 @@ export default function ExtensionsComplete() {
       <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('extension_number')}>
-                  <div className="flex items-center gap-2">
-                    Extension Number
-                    {getSortIcon('extension_number')}
-                  </div>
-                </TableHead>
-                {displayedExtensions.some(ext => ext.type === 'user') && (
-                  <TableHead>Password</TableHead>
-                )}
-                <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
-                  <div className="flex items-center gap-2">
-                    Type
-                    {getSortIcon('type')}
-                  </div>
-                </TableHead>
-                <TableHead>Configuration</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
-                  <div className="flex items-center gap-2">
-                    Status
-                    {getSortIcon('status')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                  <div className="flex items-center gap-2">
-                    Created
-                    {getSortIcon('created_at')}
-                  </div>
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+             <TableHeader>
+               <TableRow>
+                 <TableHead className="cursor-pointer" onClick={() => handleSort('extension_number')}>
+                   <div className="flex items-center gap-2">
+                     Extension Number
+                     {getSortIcon('extension_number')}
+                   </div>
+                 </TableHead>
+                 {displayedExtensions.some(ext => ext.type === 'user') && (
+                   <TableHead>Password</TableHead>
+                 )}
+                 <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
+                   <div className="flex items-center gap-2">
+                     Type
+                     {getSortIcon('type')}
+                   </div>
+                 </TableHead>
+                 <TableHead>Assigned To</TableHead>
+                 <TableHead>Details</TableHead>
+                 <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
+                   <div className="flex items-center gap-2">
+                     Status
+                     {getSortIcon('status')}
+                   </div>
+                 </TableHead>
+                 <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
+                   <div className="flex items-center gap-2">
+                     Created
+                     {getSortIcon('created_at')}
+                   </div>
+                 </TableHead>
+                 <TableHead className="text-right">Actions</TableHead>
+               </TableRow>
+             </TableHeader>
             <TableBody>
-              {displayedExtensions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 7 : 6} className="text-center py-12">
+               {displayedExtensions.length === 0 ? (
+                 <TableRow>
+                   <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 8 : 7} className="text-center py-12">
                     <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No extensions found</h3>
                     <p className="text-muted-foreground mb-4">
@@ -1422,10 +1452,13 @@ export default function ExtensionsComplete() {
                          )}
                        </TableCell>
                      )}
-                    <TableCell>{getTypeBadge(extension.type)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {getConfigurationDisplay(extension)}
-                    </TableCell>
+                     <TableCell>{getTypeBadge(extension.type)}</TableCell>
+                     <TableCell className="text-sm text-muted-foreground">
+                       {extension.type === 'user' && extension.user ? extension.user.name : '-'}
+                     </TableCell>
+                     <TableCell>
+                       {getDetailsBadge(extension)}
+                     </TableCell>
                     <TableCell>
                       <Badge className={cn(getStatusColor(extension.status))}>
                         {extension.status}
@@ -1970,47 +2003,200 @@ export default function ExtensionsComplete() {
                   </div>
                 </div>
 
-                {/* Type-specific configuration display */}
-                {selectedExtension.configuration && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Configuration</h3>
+                 {/* Type-specific configuration display */}
+                 {selectedExtension.configuration && selectedExtension.type !== 'user' && (
+                   <div className="space-y-3">
+                     <h3 className="text-sm font-semibold text-muted-foreground">Configuration</h3>
                     <div className="p-4 bg-muted rounded-lg space-y-2">
                       {selectedExtension.type === 'conference' && (
                         <>
-                          {selectedExtension.configuration.conference_pin && (
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">PIN:</span>
-                              <span className="text-sm font-medium">{selectedExtension.configuration.conference_pin}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Max Participants:</span>
-                            <span className="text-sm font-medium">{selectedExtension.configuration.max_participants}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Recording:</span>
-                            <span className="text-sm font-medium">
-                              {selectedExtension.configuration.recording_enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                          </div>
+                          {(() => {
+                            const conferenceRoomId = selectedExtension.configuration?.conference_room_id;
+                            const conferenceRoom = conferenceRoomId ? conferenceRooms.find(room => room.id == conferenceRoomId) : null;
+
+                            if (!conferenceRoom) {
+                              return (
+                                <div className="text-sm text-muted-foreground">
+                                  Conference room not found or not configured
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Conference Room:</span>
+                                  <span className="text-sm font-medium">{conferenceRoom.name}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Max Participants:</span>
+                                  <span className="text-sm font-medium">{conferenceRoom.max_participants}</span>
+                                </div>
+                                {conferenceRoom.pin && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">PIN:</span>
+                                    <span className="text-sm font-medium font-mono">{conferenceRoom.pin}</span>
+                                  </div>
+                                )}
+                                {conferenceRoom.pin_required && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">PIN Required:</span>
+                                    <span className="text-sm font-medium">Yes</span>
+                                  </div>
+                                )}
+                                {conferenceRoom.host_pin && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Host PIN:</span>
+                                    <span className="text-sm font-medium font-mono">{conferenceRoom.host_pin}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Recording:</span>
+                                  <span className="text-sm font-medium">
+                                    {conferenceRoom.recording_enabled ? 'Enabled' : 'Disabled'}
+                                  </span>
+                                </div>
+                                {conferenceRoom.recording_enabled && conferenceRoom.recording_auto_start && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Auto-Start Recording:</span>
+                                    <span className="text-sm font-medium">Yes</span>
+                                  </div>
+                                )}
+                                {conferenceRoom.recording_enabled && conferenceRoom.recording_webhook_url && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Recording Webhook:</span>
+                                    <span className="text-sm font-medium font-mono text-xs break-all">{conferenceRoom.recording_webhook_url}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Wait for Host:</span>
+                                  <span className="text-sm font-medium">
+                                    {conferenceRoom.wait_for_host ? 'Yes' : 'No'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Mute on Entry:</span>
+                                  <span className="text-sm font-medium">
+                                    {conferenceRoom.mute_on_entry ? 'Yes' : 'No'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Announce Join/Leave:</span>
+                                  <span className="text-sm font-medium">
+                                    {conferenceRoom.announce_join_leave ? 'Yes' : 'No'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Music on Hold:</span>
+                                  <span className="text-sm font-medium">
+                                    {conferenceRoom.music_on_hold ? 'Yes' : 'No'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Talk Detection:</span>
+                                  <span className="text-sm font-medium">
+                                    {conferenceRoom.talk_detection_enabled ? 'Enabled' : 'Disabled'}
+                                  </span>
+                                </div>
+                                {conferenceRoom.talk_detection_enabled && conferenceRoom.talk_detection_webhook_url && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Talk Detection Webhook:</span>
+                                    <span className="text-sm font-medium font-mono text-xs break-all">{conferenceRoom.talk_detection_webhook_url}</span>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </>
                       )}
                       {selectedExtension.type === 'ring_group' && (
                         <>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Strategy:</span>
-                            <span className="text-sm font-medium capitalize">
-                              {selectedExtension.configuration.strategy?.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Members:</span>
-                            <span className="text-sm font-medium">{selectedExtension.configuration.members?.length || 0}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Timeout:</span>
-                            <span className="text-sm font-medium">{selectedExtension.configuration.timeout}s</span>
-                          </div>
+                          {(() => {
+                            const ringGroupId = selectedExtension.configuration?.ring_group_id;
+                            const ringGroup = ringGroupId ? ringGroups.find(group => group.id == ringGroupId) : null;
+
+                            if (!ringGroup) {
+                              return (
+                                <div className="text-sm text-muted-foreground">
+                                  Ring group not found or not configured
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Ring Group:</span>
+                                  <span className="text-sm font-medium">{ringGroup.name}</span>
+                                </div>
+                                {ringGroup.description && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Description:</span>
+                                    <span className="text-sm font-medium">{ringGroup.description}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Strategy:</span>
+                                  <span className="text-sm font-medium">
+                                    {ringGroup.strategy?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Members:</span>
+                                  <span className="text-sm font-medium">{ringGroup.members?.length || 0}</span>
+                                </div>
+                                {ringGroup.members && ringGroup.members.length > 0 && (
+                                  <div className="space-y-1">
+                                    <span className="text-sm text-muted-foreground">Member Extensions:</span>
+                                    <div className="ml-4 space-y-1">
+                                      {ringGroup.members.map((member: any, index: number) => (
+                                        <div key={member.id || index} className="flex justify-between text-xs">
+                                          <span>{member.extension_number || `Extension ${member.id}`}</span>
+                                          <span className="text-muted-foreground">
+                                            Priority: {member.priority || index + 1}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Timeout:</span>
+                                  <span className="text-sm font-medium">{ringGroup.timeout}s</span>
+                                </div>
+                                {ringGroup.strategy === 'round_robin' && ringGroup.ring_turns && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Ring Turns:</span>
+                                    <span className="text-sm font-medium">{ringGroup.ring_turns}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Fallback Action:</span>
+                                  <span className="text-sm font-medium capitalize">
+                                    {ringGroup.fallback_action?.replace('_', ' ')}
+                                  </span>
+                                </div>
+                                {ringGroup.fallback_action === 'extension' && ringGroup.fallback_extension && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Fallback Extension:</span>
+                                    <span className="text-sm font-medium font-mono">
+                                      {ringGroup.fallback_extension.extension_number}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Status:</span>
+                                  <Badge className={cn(
+                                    ringGroup.status === 'active'
+                                      ? 'bg-green-100 text-green-800 border-green-200'
+                                      : 'bg-gray-100 text-gray-800 border-gray-200'
+                                  )}>
+                                    {ringGroup.status}
+                                  </Badge>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </>
                       )}
                       {selectedExtension.type === 'ai_assistant' && (
@@ -2025,23 +2211,151 @@ export default function ExtensionsComplete() {
                           </div>
                         </>
                       )}
-                       {selectedExtension.type === 'ivr' && (
-                         <>
-                           <div className="flex justify-between">
-                             <span className="text-sm text-muted-foreground">IVR Menu:</span>
-                             <span className="text-sm font-medium">
-                               {(() => {
-                                 const ivrId = selectedExtension.configuration?.ivr_id;
-                                 if (ivrId) {
-                                   const ivrMenu = ivrMenus.find(menu => menu.id === ivrId.toString());
-                                   return ivrMenu ? ivrMenu.name : `IVR Menu ${ivrId}`;
-                                 }
-                                 return 'No IVR menu selected';
-                               })()}
-                             </span>
-                           </div>
-                         </>
-                       )}
+                        {selectedExtension.type === 'ivr' && (
+                          <>
+                            {(() => {
+                              const ivrId = selectedExtension.configuration?.ivr_id;
+                              const ivrMenu = ivrId ? ivrMenus.find(menu => menu.id == ivrId) : null;
+
+                              if (!ivrMenu) {
+                                return (
+                                  <div className="text-sm text-muted-foreground">
+                                    IVR menu not found or not configured
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">IVR Menu:</span>
+                                    <span className="text-sm font-medium">{ivrMenu.name}</span>
+                                  </div>
+                                  {ivrMenu.description && (
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Description:</span>
+                                      <span className="text-sm font-medium">{ivrMenu.description}</span>
+                                    </div>
+                                  )}
+                                  <div className="space-y-2">
+                                    <span className="text-sm text-muted-foreground">Audio Configuration:</span>
+                                    <div className="ml-4 space-y-1">
+                                      {ivrMenu.audio_file_path && (
+                                        <div className="text-xs">
+                                          <span className="font-medium">File:</span> {ivrMenu.audio_file_path}
+                                        </div>
+                                      )}
+                                      {ivrMenu.tts_text && (
+                                        <div className="text-xs">
+                                          <span className="font-medium">TTS Text:</span> "{ivrMenu.tts_text}"
+                                        </div>
+                                      )}
+                                      {ivrMenu.tts_voice && (
+                                        <div className="text-xs">
+                                          <span className="font-medium">Voice:</span> {ivrMenu.tts_voice}
+                                        </div>
+                                      )}
+                                      {!ivrMenu.audio_file_path && !ivrMenu.tts_text && (
+                                        <div className="text-xs text-muted-foreground">No audio configured</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Max Timeout:</span>
+                                    <span className="text-sm font-medium">{ivrMenu.max_timeout}s</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Inter-digit Timeout:</span>
+                                    <span className="text-sm font-medium">{ivrMenu.inter_digit_timeout}s</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Max Turns:</span>
+                                    <span className="text-sm font-medium">{ivrMenu.max_turns}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Failover Action:</span>
+                                    <span className="text-sm font-medium capitalize">
+                                      {ivrMenu.failover_destination_type?.replace('_', ' ') || 'None'}
+                                    </span>
+                                  </div>
+                                  {ivrMenu.failover_destination_type && ivrMenu.failover_destination_id && (
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Failover Destination:</span>
+                                      <span className="text-sm font-medium">
+                                        {(() => {
+                                          switch (ivrMenu.failover_destination_type) {
+                                            case 'extension':
+                                              const ext = extensions?.find(e => e.id == ivrMenu.failover_destination_id);
+                                              return ext ? `Ext ${ext.extension_number}` : `Extension ${ivrMenu.failover_destination_id}`;
+                                            case 'ring_group':
+                                              const rg = ringGroups?.find(g => g.id == ivrMenu.failover_destination_id);
+                                              return rg ? rg.name : `Ring Group ${ivrMenu.failover_destination_id}`;
+                                            case 'conference_room':
+                                              const cr = conferenceRooms?.find(r => r.id == ivrMenu.failover_destination_id);
+                                              return cr ? cr.name : `Conference ${ivrMenu.failover_destination_id}`;
+                                            case 'ivr_menu':
+                                              const ivr = ivrMenus?.find(m => m.id == ivrMenu.failover_destination_id);
+                                              return ivr ? ivr.name : `IVR Menu ${ivrMenu.failover_destination_id}`;
+                                            default:
+                                              return ivrMenu.failover_destination_id;
+                                          }
+                                        })()}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Status:</span>
+                                    <Badge className={cn(
+                                      ivrMenu.status === 'active'
+                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                        : 'bg-gray-100 text-gray-800 border-gray-200'
+                                    )}>
+                                      {ivrMenu.status}
+                                    </Badge>
+                                  </div>
+                                  {ivrMenu.options && ivrMenu.options.length > 0 && (
+                                    <div className="space-y-2">
+                                      <span className="text-sm text-muted-foreground">Menu Options:</span>
+                                      <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
+                                        {ivrMenu.options.map((option: any, index: number) => (
+                                          <div key={option.id || index} className="text-xs border rounded p-2 bg-muted/50">
+                                            <div className="flex justify-between items-center mb-1">
+                                              <span className="font-medium">Press {option.input_digits}</span>
+                                              <span className="text-muted-foreground">Priority: {option.priority}</span>
+                                            </div>
+                                            {option.description && (
+                                              <div className="mb-1 text-muted-foreground">{option.description}</div>
+                                            )}
+                                            <div className="text-muted-foreground">
+                                              → {(() => {
+                                                switch (option.destination_type) {
+                                                  case 'extension':
+                                                    const ext = extensions?.find(e => e.extension_number == option.destination_id);
+                                                    return ext ? `Ext ${ext.extension_number}` : `Extension ${option.destination_id}`;
+                                                  case 'ring_group':
+                                                    const rg = ringGroups?.find(g => g.id == option.destination_id);
+                                                    return rg ? `Ring Group: ${rg.name}` : `Ring Group ${option.destination_id}`;
+                                                  case 'conference_room':
+                                                    const cr = conferenceRooms?.find(r => r.id == option.destination_id);
+                                                    return cr ? `Conference: ${cr.name}` : `Conference ${option.destination_id}`;
+                                                  case 'ivr_menu':
+                                                    const ivr = ivrMenus?.find(m => m.id == option.destination_id);
+                                                    return ivr ? `IVR Menu: ${ivr.name}` : `IVR Menu ${option.destination_id}`;
+                                                  default:
+                                                    return `${option.destination_type}: ${option.destination_id}`;
+                                                }
+                                              })()}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </>
+                        )}
                        {selectedExtension.type === 'forward' && (
                          <div className="flex justify-between">
                            <span className="text-sm text-muted-foreground">Forward To:</span>
