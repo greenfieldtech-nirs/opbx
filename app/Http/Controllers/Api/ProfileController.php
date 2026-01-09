@@ -196,7 +196,6 @@ class ProfileController extends Controller
      * @param  UpdateOrganizationRequest  $request  Validated organization update data
      * @return JsonResponse Updated organization data
      */
-    /*
     public function updateOrganization(UpdateOrganizationRequest $request): JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
@@ -269,7 +268,6 @@ class ProfileController extends Controller
             );
         }
     }
-    */
 
     /**
      * Update current user's password.
