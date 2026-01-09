@@ -17,7 +17,6 @@ import {
   FileText,
   Activity,
   Video,
-  Shield,
   Volume2,
   Menu,
 } from 'lucide-react';
@@ -42,7 +41,7 @@ const navigation: NavItem[] = [
   { name: 'Call Logs', href: '/call-logs', icon: FileText },
   { name: 'Recordings', href: '/recordings', icon: Volume2, roles: ['owner', 'admin'] },
   { name: 'Live Calls', href: '/live-calls', icon: Activity },
-  { name: 'Routing Sentry', href: '/sentry', icon: Shield, roles: ['owner', 'pbx_admin'] },
+
 ];
 
 export function Sidebar() {
