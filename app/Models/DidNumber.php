@@ -265,10 +265,5 @@ class DidNumber extends Model
         $this->attributes['_ivr_menu'] = $ivrMenu;
     }
 
-    public function sentryBlacklists(): BelongsToMany
-    {
-        return $this->belongsToMany(SentryBlacklist::class, 'did_sentry_blacklist')
-            ->withPivot('priority')
-            ->orderByPivot('priority', 'desc');
-    }
+
 }

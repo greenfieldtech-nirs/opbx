@@ -13,7 +13,7 @@ use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\IvrStateService;
-use App\Services\Security\RoutingSentryService;
+
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -26,7 +26,6 @@ class VoiceRoutingManager
     private Collection $strategies;
 
     public function __construct(
-        private readonly RoutingSentryService $sentry,
         private readonly VoiceRoutingCacheService $cache,
         private readonly IvrStateService $ivrStateService,
         iterable $strategies = []
@@ -138,13 +137,7 @@ class VoiceRoutingManager
 
     private function routeDidCall(Request $request, DidNumber $did): Response
     {
-        // 2. Security Check (Sentry)
-        $sentryResult = $this->sentry->checkInbound($request, $did);
-        if (!$sentryResult['allowed']) {
-            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
-        }
-
-        // 3. Resolve Final Destination based on DID routing_type
+        // 2. Resolve Final Destination based on DID routing_type
         $destination = $this->resolveDestination($did);
 
         if (empty($destination)) {
