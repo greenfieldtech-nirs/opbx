@@ -2,7 +2,7 @@ import { User } from '@/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react'
+import { Edit, Trash2, Eye } from 'lucide-react'
 import { getRoleColor, getRoleDisplayName, getStatusColor, formatDate } from '@/utils/formatters'
 
 interface UserTableProps {

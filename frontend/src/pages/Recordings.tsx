@@ -20,9 +20,6 @@ import { cn } from '@/lib/utils';
 
 export default function Recordings() {
   const [recordingsPage, setRecordingsPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
 
   // Form state for filters

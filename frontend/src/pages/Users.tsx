@@ -7,10 +7,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersService } from '@/services/users.service';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Trash2, Edit, UserCheck, Users, RefreshCw } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, UserCheck, UsersIcon, RefreshCw } from 'lucide-react';
 import { formatDate, getRoleColor, getStatusColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -55,7 +55,7 @@ export default function Users() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Users className="h-8 w-8" />
+              <UsersIcon className="h-8 w-8" />
               Users
             </h1>
             <p className="text-muted-foreground mt-1">Manage user accounts and permissions</p>

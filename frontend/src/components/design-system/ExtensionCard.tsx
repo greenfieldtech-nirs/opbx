@@ -34,7 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Hash, MoreVertical, Pencil, Trash2, User, Users, Inbox } from 'lucide-react';
+import { Hash, MoreVertical, Pencil, Trash2, User, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type ExtensionType = 'user' | 'virtual' | 'queue';

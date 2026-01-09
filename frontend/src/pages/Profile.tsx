@@ -29,7 +29,7 @@ import {
   SelectGroup,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
 import {
   User,
   Mail,
@@ -53,9 +53,9 @@ import type {
   ProfileData,
 } from '@/types';
 import { generateStrongPassword } from '@/utils/passwordGenerator';
-import { TIMEZONES, getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
-import { COUNTRIES, searchCountries } from '@/utils/countries';
-import { getRoleLabel, getRoleColor, canEditRoles } from '@/utils/roleHelpers';
+import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
+import { COUNTRIES } from '@/utils/countries';
+import { getRoleLabel, getRoleColor } from '@/utils/roleHelpers';
 import type { UserRole } from '@/types';
 
 // Organization form validation schema
@@ -149,7 +149,7 @@ export default function Profile() {
     resolver: zodResolver(passwordSchema),
   });
 
-  const newPassword = watchPassword('new_password');
+
 
   // Load profile data on mount
   useEffect(() => {

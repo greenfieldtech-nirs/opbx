@@ -21,33 +21,30 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,
   Search,
-  Filter,
-  X,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Phone,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
-  UserCheck,
-  UserX,
-  Users,
-  Menu,
-  Bot,
-  ArrowRight,
-  Check,
-  Calendar,
-  Activity,
-  PhoneForwarded,
-   Sparkles,
+   X,
+   MoreVertical,
+   Edit,
+   Trash2,
+   Phone,
+   Copy,
+   ChevronDown,
+   ChevronUp,
+   Eye,
+   EyeOff,
+   UserCheck,
+   UserX,
+   Users,
+   Menu,
+   Bot,
+   ArrowRight,
+   Check,
+   Activity,
    RefreshCw,
    Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
+import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,8 +88,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import type { Extension, ExtensionType, Status, CreateExtensionRequest, UpdateExtensionRequest } from '@/types';
 
 // Sort direction type
@@ -121,54 +116,7 @@ interface ExtensionFormData {
   forward_to: string;
 }
 
-// Mock data for dropdowns (will be loaded from API later)
-const mockConferenceRooms = [
-  { id: 'conf-1', name: 'Main Conference Room', number: '8000' },
-  { id: 'conf-2', name: 'Executive Board Room', number: '8001' },
-  { id: 'conf-3', name: 'Team Standup Room', number: '8002' },
-];
 
-const mockRingGroups = [
-  { id: 'ring-1', name: 'Sales Team' },
-  { id: 'ring-2', name: 'Support Team' },
-  { id: 'ring-3', name: 'Management' },
-];
-
-// IVR menus are now fetched from API via ivrMenusService
-// This mock data is kept for reference but no longer used
-const mockIVRMenus = [
-  { id: '1', name: 'Main Menu' },
-  { id: '2', name: 'After Hours Menu' },
-  { id: '3', name: 'Sales Department Menu' },
-];
-
-// Mock Cloudonix Container Applications (will be loaded from Cloudonix API)
-const mockContainerApplications = [
-  {
-    name: 'Business Hours Routing',
-    blocks: [
-      { name: 'check-business-hours', label: 'Check Business Hours' },
-      { name: 'route-to-department', label: 'Route to Department' },
-      { name: 'send-to-voicemail', label: 'Send to Voicemail' },
-    ]
-  },
-  {
-    name: 'Emergency Handler',
-    blocks: [
-      { name: 'detect-emergency', label: 'Detect Emergency Keywords' },
-      { name: 'priority-queue', label: 'Priority Queue Handler' },
-      { name: 'notify-supervisor', label: 'Notify Supervisor' },
-    ]
-  },
-  {
-    name: 'VIP Customer Router',
-    blocks: [
-      { name: 'identify-vip', label: 'Identify VIP Customer' },
-      { name: 'route-to-account-manager', label: 'Route to Account Manager' },
-      { name: 'fallback-routing', label: 'Fallback Routing' },
-    ]
-  },
-];
 
 export default function ExtensionsComplete() {
   const queryClient = useQueryClient();
@@ -552,7 +500,14 @@ export default function ExtensionsComplete() {
           return 'Not configured';
         }
         case 'ivr': {
-          const ivrId = extension.configuration?.ivr_id;
+          // Handle configuration as object or direct value
+          let ivrId: any = null;
+          if (typeof extension.configuration === 'object' && extension.configuration) {
+            ivrId = extension.configuration.ivr_id || extension.configuration.ivr_menu_id;
+          } else {
+            // Configuration might be just the IVR menu ID
+            ivrId = extension.configuration;
+          }
           if (ivrId) {
             const ivrMenu = ivrMenus.find(menu => menu.id == ivrId);
             return ivrMenu ? ivrMenu.name : `ID ${ivrId}`;
@@ -670,6 +625,7 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ivr_id, 10);
           if (!isNaN(parsed)) {
             configuration.ivr_id = parsed;
+            configuration.ivr_menu_id = parsed; // Also set for routing compatibility
           }
         }
         break;
@@ -743,6 +699,7 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ivr_id, 10);
           if (!isNaN(parsed)) {
             configuration.ivr_id = parsed;
+            configuration.ivr_menu_id = parsed; // Also set for routing compatibility
           }
         }
         break;
@@ -854,20 +811,50 @@ export default function ExtensionsComplete() {
 
   // Open edit dialog
   const openEditDialog = (extension: Extension) => {
+    console.log('=== openEditDialog called ===');
+    console.log('Extension:', extension);
+    console.log('Extension configuration:', extension.configuration);
+
     setSelectedExtension(extension);
+
+    // Handle configuration parsing
+    let config = extension.configuration;
+    let ivrId: any = null;
+
+    console.log('Config type:', typeof config);
+    console.log('Config value:', config);
+
+    if (typeof config === 'object' && config) {
+      // Configuration is an object
+      console.log('Configuration is an object, checking for ivr_id and ivr_menu_id');
+      console.log('config.ivr_id:', config.ivr_id);
+      console.log('config.ivr_menu_id:', config.ivr_menu_id);
+      ivrId = config.ivr_id || config.ivr_menu_id;
+      console.log('Selected ivrId from object:', ivrId, '(using:', config.ivr_id ? 'ivr_id' : 'ivr_menu_id', ')');
+    } else {
+      // Configuration might be just the IVR menu ID
+      console.log('Configuration is not an object, using as direct value');
+      ivrId = config;
+      console.log('ivrId from direct value:', ivrId);
+    }
+
+    console.log('Final ivrId for form:', ivrId);
+    console.log('ivrId as string:', ivrId ? ivrId.toString() : 'empty');
+    console.log('=== end openEditDialog ===');
+
     setFormData({
       extension_number: extension.extension_number,
       type: extension.type,
       status: extension.status,
       user_id: extension.user_id ? extension.user_id.toString() : 'unassigned',
-      conference_room_id: extension.configuration?.conference_room_id ? extension.configuration.conference_room_id.toString() : '',
-      ring_group_id: extension.configuration?.ring_group_id ? extension.configuration.ring_group_id.toString() : '',
-      ivr_id: extension.configuration?.ivr_id ? extension.configuration.ivr_id.toString() : '',
-      ai_provider: extension.configuration?.provider || '',
-      ai_phone_number: extension.configuration?.phone_number || '',
-      container_application_name: extension.configuration?.container_application_name || '',
-      container_block_name: extension.configuration?.container_block_name || '',
-      forward_to: extension.configuration?.forward_to || '',
+      conference_room_id: (typeof config === 'object' && config?.conference_room_id) ? config.conference_room_id.toString() : '',
+      ring_group_id: (typeof config === 'object' && config?.ring_group_id) ? config.ring_group_id.toString() : '',
+      ivr_id: ivrId ? ivrId.toString() : '',
+      ai_provider: (typeof config === 'object' && config?.provider) ? config.provider : '',
+      ai_phone_number: (typeof config === 'object' && config?.phone_number) ? config.phone_number : '',
+      container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
+      container_block_name: (typeof config === 'object' && config?.container_block_name) ? config.container_block_name : '',
+      forward_to: (typeof config === 'object' && config?.forward_to) ? config.forward_to : '',
     });
     setShowEditDialog(true);
   };
@@ -947,17 +934,29 @@ export default function ExtensionsComplete() {
             </Label>
             <Select
               value={formData.ivr_id}
-              onValueChange={(value) => setFormData({ ...formData, ivr_id: value })}
+              onValueChange={(value) => {
+                console.log('IVR Select onValueChange:', value);
+                setFormData({ ...formData, ivr_id: value });
+              }}
             >
               <SelectTrigger id="ivr_id">
                 <SelectValue placeholder="Select an IVR menu" />
               </SelectTrigger>
               <SelectContent>
-                {ivrMenus.map((ivr) => (
-                  <SelectItem key={ivr.id} value={ivr.id}>
-                    {ivr.name}
-                  </SelectItem>
-                ))}
+                {console.log('Rendering IVR options, formData.ivr_id:', formData.ivr_id, 'ivrMenus:', ivrMenus.map(m => ({id: m.id, name: m.name})))}
+                {ivrMenus.map((ivr) => {
+                  const optionValue = ivr.id.toString();
+                  const isSelected = formData.ivr_id === optionValue;
+                  console.log(`IVR Option: ${ivr.name}, value: "${optionValue}", selected: ${isSelected}`);
+                  return (
+                    <SelectItem
+                      key={ivr.id}
+                      value={optionValue}
+                    >
+                      {ivr.name}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
@@ -2214,7 +2213,14 @@ export default function ExtensionsComplete() {
                         {selectedExtension.type === 'ivr' && (
                           <>
                             {(() => {
-                              const ivrId = selectedExtension.configuration?.ivr_id;
+                              // Handle configuration as object or direct value
+                              let ivrId: any = null;
+                              if (typeof selectedExtension.configuration === 'object' && selectedExtension.configuration) {
+                                ivrId = selectedExtension.configuration.ivr_id || selectedExtension.configuration.ivr_menu_id;
+                              } else {
+                                // Configuration might be just the IVR menu ID
+                                ivrId = selectedExtension.configuration;
+                              }
                               const ivrMenu = ivrId ? ivrMenus.find(menu => menu.id == ivrId) : null;
 
                               if (!ivrMenu) {

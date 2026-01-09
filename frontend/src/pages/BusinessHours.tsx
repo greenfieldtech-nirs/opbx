@@ -37,7 +37,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -57,18 +56,15 @@ import {
   type DayOfWeek,
   type ScheduleStatus,
   type ExceptionType,
-  type Holiday,
-  type Country,
-  mockBusinessHoursSchedules,
-  mockDidBusinessHours,
-  mockExtensions,
-  getScheduleSummary,
-  getDetailedHours,
-  isValidTimeFormat,
-  isEndTimeAfterStart,
-  formatExceptionDate,
-  getNextScheduleId,
-  getNextExceptionId,
+   type Country,
+   mockDidBusinessHours,
+   mockExtensions,
+   getScheduleSummary,
+   getDetailedHours,
+   isValidTimeFormat,
+   isEndTimeAfterStart,
+   formatExceptionDate,
+   getNextExceptionId,
   getNextTimeRangeId,
 } from '@/mock/businessHours';
 

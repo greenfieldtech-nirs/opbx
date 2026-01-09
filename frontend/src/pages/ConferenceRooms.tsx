@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Phone,
   Plus,
   Search,
   Filter,
@@ -13,7 +12,6 @@ import {
   Mic,
   Video,
   ChevronDown,
-  X,
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -70,7 +68,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { useAuth } from '@/hooks/useAuth';
