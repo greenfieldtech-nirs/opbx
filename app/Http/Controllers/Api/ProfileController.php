@@ -96,7 +96,7 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user) {
+            DB::transaction(function () use ($user, $request) {
                 // Update user profile - only update fields that are present
                 $fieldsToUpdate = [
                     'name',
@@ -294,15 +294,13 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user) {
+            DB::transaction(function () use ($user, $request) {
                 // Update password with bcrypt hashing
                 $user->password = Hash::make($request->input('new_password'));
                 $user->save();
 
                 // Revoke all existing tokens for security
                 $user->tokens()->delete();
-
-                DB::commit();
 
                 Log::info('Password changed successfully', [
                     'request_id' => $requestId,
