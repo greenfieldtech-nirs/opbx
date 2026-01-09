@@ -811,36 +811,18 @@ export default function ExtensionsComplete() {
 
   // Open edit dialog
   const openEditDialog = (extension: Extension) => {
-    console.log('=== openEditDialog called ===');
-    console.log('Extension:', extension);
-    console.log('Extension configuration:', extension.configuration);
-
     setSelectedExtension(extension);
 
     // Handle configuration parsing
     let config = extension.configuration;
     let ivrId: any = null;
-
-    console.log('Config type:', typeof config);
-    console.log('Config value:', config);
-
     if (typeof config === 'object' && config) {
       // Configuration is an object
-      console.log('Configuration is an object, checking for ivr_id and ivr_menu_id');
-      console.log('config.ivr_id:', config.ivr_id);
-      console.log('config.ivr_menu_id:', config.ivr_menu_id);
       ivrId = config.ivr_id || config.ivr_menu_id;
-      console.log('Selected ivrId from object:', ivrId, '(using:', config.ivr_id ? 'ivr_id' : 'ivr_menu_id', ')');
     } else {
       // Configuration might be just the IVR menu ID
-      console.log('Configuration is not an object, using as direct value');
       ivrId = config;
-      console.log('ivrId from direct value:', ivrId);
     }
-
-    console.log('Final ivrId for form:', ivrId);
-    console.log('ivrId as string:', ivrId ? ivrId.toString() : 'empty');
-    console.log('=== end openEditDialog ===');
 
     setFormData({
       extension_number: extension.extension_number,
@@ -934,29 +916,20 @@ export default function ExtensionsComplete() {
             </Label>
             <Select
               value={formData.ivr_id}
-              onValueChange={(value) => {
-                console.log('IVR Select onValueChange:', value);
-                setFormData({ ...formData, ivr_id: value });
-              }}
+              onValueChange={(value) => setFormData({ ...formData, ivr_id: value })}
             >
               <SelectTrigger id="ivr_id">
                 <SelectValue placeholder="Select an IVR menu" />
               </SelectTrigger>
               <SelectContent>
-                {console.log('Rendering IVR options, formData.ivr_id:', formData.ivr_id, 'ivrMenus:', ivrMenus.map(m => ({id: m.id, name: m.name})))}
-                {ivrMenus.map((ivr) => {
-                  const optionValue = ivr.id.toString();
-                  const isSelected = formData.ivr_id === optionValue;
-                  console.log(`IVR Option: ${ivr.name}, value: "${optionValue}", selected: ${isSelected}`);
-                  return (
-                    <SelectItem
-                      key={ivr.id}
-                      value={optionValue}
-                    >
-                      {ivr.name}
-                    </SelectItem>
-                  );
-                })}
+                {ivrMenus.map((ivr) => (
+                  <SelectItem
+                    key={ivr.id}
+                    value={ivr.id.toString()}
+                  >
+                    {ivr.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
