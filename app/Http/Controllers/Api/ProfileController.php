@@ -177,7 +177,7 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['error' => $e->getMessage()],
                 'Failed to update profile. Please try again.',
                 500,
@@ -259,7 +259,7 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['error' => $e->getMessage()],
                 'Failed to update organization. Please try again.',
                 500,
@@ -322,7 +322,7 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['error' => $e->getMessage()],
                 'Failed to update password. Please try again.',
                 500,
