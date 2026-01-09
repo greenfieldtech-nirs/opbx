@@ -26,13 +26,15 @@ use Illuminate\Support\Str;
 class ProfileController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Get current user's profile.
      *
      * Returns detailed profile information for the authenticated user
      * including organization details.
      *
-     * @param  Request  $request  Authenticated request
+     * @param Request $request Authenticated request
+     *
      * @return JsonResponse User profile data
      */
     public function show(Request $request): JsonResponse
@@ -73,7 +75,8 @@ class ProfileController extends Controller
      * Email uniqueness is validated across the users table.
      * All changes are logged for audit purposes.
      *
-     * @param  UpdateProfileRequest  $request  Validated profile update data
+     * @param UpdateProfileRequest $request Validated profile update data
+     *
      * @return JsonResponse Updated user profile
      */
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -169,7 +172,6 @@ class ProfileController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-
             Log::error('Profile update failed', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -184,6 +186,7 @@ class ProfileController extends Controller
                 'PROFILE_UPDATE_FAILED',
                 $requestId
             );
+        }
     }
 
     /**
@@ -193,7 +196,8 @@ class ProfileController extends Controller
      * Only users with the OWNER role can perform this operation.
      * All changes are logged for audit purposes.
      *
-     * @param  UpdateOrganizationRequest  $request  Validated organization update data
+     * @param UpdateOrganizationRequest $request Validated organization update data
+     *
      * @return JsonResponse Updated organization data
      */
     public function updateOrganization(UpdateOrganizationRequest $request): JsonResponse
@@ -250,7 +254,6 @@ class ProfileController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-
             Log::error('Organization update failed', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -278,7 +281,8 @@ class ProfileController extends Controller
      * Password is hashed using bcrypt before storage.
      * All authentication tokens are revoked after password change for security.
      *
-     * @param  UpdatePasswordRequest  $request  Validated password change data
+     * @param UpdatePasswordRequest $request Validated password change data
+     *
      * @return JsonResponse Success message
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
@@ -327,6 +331,22 @@ class ProfileController extends Controller
                 'Failed to update password. Please try again.',
                 500,
                 'PASSWORD_UPDATE_FAILED',
+                $requestId
+            );
+        } catch (\Exception $e) {
+            Log::error('Organization update failed', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $organization->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->logAndRespondError(
+                ['error' => $e->getMessage()],
+                'Failed to update organization. Please try again.',
+                500,
+                'ORGANIZATION_UPDATE_FAILED',
                 $requestId
             );
         }
