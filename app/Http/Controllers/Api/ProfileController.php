@@ -215,7 +215,7 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user, $organization) {
+            DB::transaction(function () use ($user, $organization, $request) {
                 // Update organization - only update fields that are present
                 if ($request->has('name')) {
                     $organization->name = $request->input('name');
@@ -225,7 +225,6 @@ class ProfileController extends Controller
                 }
 
                 $organization->save();
-                $user->save();
             });
 
             Log::info('Organization updated successfully', [
