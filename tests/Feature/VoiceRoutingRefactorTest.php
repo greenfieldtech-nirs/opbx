@@ -9,6 +9,7 @@ use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\RingGroup;
 use App\Models\User;
+use App\Services\RoutingSentryService;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Log;
@@ -122,6 +123,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['ring_group_id' => $ringGroup->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -141,6 +143,7 @@ class VoiceRoutingRefactorTest extends TestCase
     /** @test */
     public function it_routes_internal_extension_call()
     {
+        $this->mock(RoutingSentryService::class, function ($mock) {
             // Sentry check is skipped for internal calls in current Manager implementation
             $mock->shouldReceive('checkInbound')->never();
         });
@@ -176,6 +179,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $aiExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -214,6 +218,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $aiExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -327,6 +332,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $forwardExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -363,6 +369,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $forwardExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -403,6 +410,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $forwardExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -436,6 +444,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $forwardExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
@@ -472,6 +481,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'routing_config' => ['extension_id' => $forwardExtension->id],
         ]);
 
+        $this->mock(RoutingSentryService::class, function ($mock) {
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 

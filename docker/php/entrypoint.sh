@@ -2,6 +2,10 @@
 
 set -e
 
+# Fix file permissions for Laravel
+echo "Fixing file permissions..."
+chmod -R 755 /var/www/html 2>/dev/null || echo "Some files could not be modified (expected for .git files)"
+
 # Run environment validation before starting application
 echo "Validating environment variables..."
 if [ -f /docker/scripts/validate-env.sh ]; then

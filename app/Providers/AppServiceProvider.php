@@ -46,6 +46,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\IvrStateService::class
         );
 
+        $this->app->singleton(
+            \App\Services\RoutingSentryService::class
+        );
+
         // Register Voice Routing Strategies
         $this->app->tag([
             \App\Services\VoiceRouting\Strategies\UserRoutingStrategy::class,

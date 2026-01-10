@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,8 +13,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Note: SQLite treats ENUMs as TEXT, so no schema change is needed
-        // The application will now accept 'internal' as a valid direction value
+        Schema::table('outbound_whitelists', function (Blueprint $table) {
+            $table->string('name')->after('organization_id');
+        });
     }
 
     /**
@@ -20,7 +23,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Remove any 'internal' direction values
-        \DB::table('session_updates')->where('direction', 'internal')->update(['direction' => 'outgoing']);
+        Schema::table('outbound_whitelists', function (Blueprint $table) {
+            $table->dropColumn('name');
+        });
     }
 };

@@ -7,7 +7,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authService } from '@/services/auth.service';
 import { storage } from '@/utils/storage';
-import type { User, LoginRequest } from '@/types/api.types';
+import type { User, LoginRequest } from '@/types';
 import { getApiErrorMessage } from '@/services/api';
 
 interface AuthContextType {

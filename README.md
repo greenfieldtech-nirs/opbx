@@ -204,6 +204,8 @@ docker compose exec app php artisan --version
 
 ### Step 5: Configure ngrok (Local Development)
 
+**📖 For detailed ngrok setup instructions, see: [`docs/NGROK_SETUP_GUIDE.md`](docs/NGROK_SETUP_GUIDE.md)**
+
 Get your ngrok public URL:
 
 ```bash

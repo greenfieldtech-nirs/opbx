@@ -9,6 +9,7 @@ use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
+use App\Models\OutboundWhitelist;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -125,6 +126,46 @@ class VoiceRoutingManager
             }
 
             return $this->executeStrategy($extension->type, $request, new DidNumber(), $destination);
+        }
+
+        // Check for outbound whitelist routing if call is from internal extension
+        Log::info('VoiceRoutingManager: Checking for outbound whitelist routing', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        $callerExtension = $this->cache->getExtension($orgId, $from);
+
+        Log::info('VoiceRoutingManager: Caller extension lookup result', [
+            'from' => $from,
+            'org_id' => $orgId,
+            'caller_extension_found' => $callerExtension !== null,
+            'caller_extension_id' => $callerExtension?->id,
+            'caller_extension_active' => $callerExtension?->isActive(),
+        ]);
+
+        if ($callerExtension && $callerExtension->isActive()) {
+            // Call is from an internal extension, check outbound whitelist
+            $whitelistEntry = $this->findOutboundWhitelistEntry($orgId, $to);
+
+            if ($whitelistEntry) {
+                Log::info('VoiceRoutingManager: Outbound whitelist match found, routing via trunk', [
+                    'to' => $to,
+                    'from' => $from,
+                    'org_id' => $orgId,
+                    'whitelist_entry_id' => $whitelistEntry->id,
+                    'destination_country' => $whitelistEntry->destination_country,
+                    'destination_prefix' => $whitelistEntry->destination_prefix,
+                    'outbound_trunk_name' => $whitelistEntry->outbound_trunk_name,
+                ]);
+
+                return response(
+                    CxmlBuilder::simpleDial($to, $from, 30, $whitelistEntry->outbound_trunk_name),
+                    200,
+                    ['Content-Type' => 'text/xml']
+                );
+            }
         }
 
         Log::info('VoiceRoutingManager: No destination found, returning unavailable', [
@@ -438,6 +479,406 @@ class VoiceRoutingManager
         }
 
         return null;
+    }
+
+    /**
+     * Find outbound whitelist entry that matches the destination number.
+     *
+     * Matches against both country codes and additional prefixes:
+     * 1. Extract country calling code from destination number (e.g., "+1" from "+15551234567")
+     * 2. Convert calling code to country code (e.g., "+1" -> "US")
+     * 3. Find entries where destination_country matches either:
+     *    - The ISO country code (e.g., "US", "IL", "GB")
+     *    - The calling code directly (e.g., "+1", "+972", "+44")
+     * 4. Within those matches, check destination_prefix for additional matching
+     * 5. Return the longest matching prefix
+     *
+     * @param int $organizationId
+     * @param string $destinationNumber
+     * @return OutboundWhitelist|null
+     */
+    private function findOutboundWhitelistEntry(int $organizationId, string $destinationNumber): ?OutboundWhitelist
+    {
+        // Get all outbound whitelist entries for the organization
+        $whitelistEntries = OutboundWhitelist::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->get();
+
+        Log::info('VoiceRoutingManager: Checking outbound whitelist entries', [
+            'organization_id' => $organizationId,
+            'destination_number' => $destinationNumber,
+            'whitelist_entries_count' => $whitelistEntries->count(),
+        ]);
+
+        // Extract country calling code from destination number
+        $callingCode = $this->extractCallingCode($destinationNumber);
+        $countryCode = $callingCode ? $this->callingCodeToCountryCode($callingCode) : null;
+
+        Log::info('VoiceRoutingManager: Extracted calling code and country code', [
+            'destination_number' => $destinationNumber,
+            'calling_code' => $callingCode,
+            'country_code' => $countryCode,
+        ]);
+
+        $matches = [];
+
+        foreach ($whitelistEntries as $entry) {
+            $matchScore = 0;
+            $matchReason = '';
+
+            // Check country code match (both ISO codes and calling codes)
+            if ($countryCode && $entry->destination_country === $countryCode) {
+                $matchScore += 10; // Country match has high priority
+                $matchReason .= 'country_match ';
+            } elseif ($callingCode && $entry->destination_country === $callingCode) {
+                $matchScore += 10; // Calling code match has same high priority
+                $matchReason .= 'calling_code_match ';
+            } elseif ($callingCode && $entry->destination_country === ltrim($callingCode, '+')) {
+                $matchScore += 10; // Calling code without + match has same high priority
+                $matchReason .= 'calling_code_no_plus_match ';
+            }
+
+            // Check prefix match
+            if (!empty($entry->destination_prefix)) {
+                // Normalize destination_prefix by removing spaces
+                $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
+
+                // If prefix starts with +, it's a full international prefix
+                if (str_starts_with($normalizedPrefix, '+')) {
+                    if (str_starts_with($destinationNumber, $normalizedPrefix)) {
+                        $prefixLength = strlen($normalizedPrefix);
+                        $matchScore += $prefixLength; // Longer prefixes get higher scores
+                        $matchReason .= "full_prefix_match({$prefixLength}) ";
+                    }
+                } else {
+                    // If prefix doesn't start with +, check if it matches within the country
+                    // For country-matched entries, check if the number (without country code) starts with prefix
+                    if ($countryCode && $entry->destination_country === $countryCode && $callingCode) {
+                        $numberWithoutCountryCode = substr($destinationNumber, strlen($callingCode));
+                        if (str_starts_with($numberWithoutCountryCode, $normalizedPrefix)) {
+                            $prefixLength = strlen($normalizedPrefix);
+                            $matchScore += $prefixLength;
+                            $matchReason .= "additional_prefix_match({$prefixLength}) ";
+                        }
+                    }
+                    // Also check for direct prefix match (backward compatibility)
+                    elseif (str_starts_with($destinationNumber, $normalizedPrefix)) {
+                        $prefixLength = strlen($normalizedPrefix);
+                        $matchScore += $prefixLength;
+                        $matchReason .= "direct_prefix_match({$prefixLength}) ";
+                    }
+                }
+            }
+
+            if ($matchScore > 0) {
+                $matches[] = [
+                    'entry' => $entry,
+                    'score' => $matchScore,
+                    'reason' => trim($matchReason),
+                ];
+            }
+        }
+
+        // Sort by score (highest first) and return the best match
+        if (!empty($matches)) {
+            usort($matches, fn($a, $b) => $b['score'] <=> $a['score']);
+            $bestMatch = $matches[0];
+
+            Log::info('VoiceRoutingManager: Outbound whitelist match found', [
+                'destination_number' => $destinationNumber,
+                'calling_code' => $callingCode,
+                'country_code' => $countryCode,
+                'matched_country' => $bestMatch['entry']->destination_country,
+                'matched_prefix' => $bestMatch['entry']->destination_prefix,
+                'outbound_trunk_name' => $bestMatch['entry']->outbound_trunk_name,
+                'match_score' => $bestMatch['score'],
+                'match_reason' => $bestMatch['reason'],
+            ]);
+
+            return $bestMatch['entry'];
+        }
+
+        Log::info('VoiceRoutingManager: No outbound whitelist match found', [
+            'organization_id' => $organizationId,
+            'destination_number' => $destinationNumber,
+            'calling_code' => $callingCode,
+            'country_code' => $countryCode,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Extract calling code from a phone number.
+     * Supports E.164 format numbers starting with + and calling codes without +.
+     *
+     * @param string $phoneNumber
+     * @return string|null The calling code (e.g., "+1", "+44") or null if not found
+     */
+    private function extractCallingCode(string $phoneNumber): ?string
+    {
+        // Remove any non-digit characters except +
+        $cleanedNumber = preg_replace('/[^\d+]/', '', $phoneNumber);
+
+        // If number starts with +, process as E.164 format
+        if (str_starts_with($cleanedNumber, '+')) {
+            $digits = substr($cleanedNumber, 1);
+
+            // Try different calling code lengths (4-1 digits) - longest first
+            for ($length = 4; $length >= 1; $length--) {
+                $potentialCode = substr($digits, 0, $length);
+                $callingCode = '+' . $potentialCode;
+                if ($this->isValidCallingCode($callingCode) && $this->callingCodeToCountryCode($callingCode) !== null) {
+                    return $callingCode;
+                }
+            }
+        } else {
+            // Number doesn't start with +, try to extract calling code from beginning
+            // Try different calling code lengths (4-1 digits) - longest first
+            for ($length = 4; $length >= 1; $length--) {
+                $potentialCode = substr($cleanedNumber, 0, $length);
+                $callingCode = '+' . $potentialCode;
+                if ($this->isValidCallingCode($callingCode) && $this->callingCodeToCountryCode($callingCode) !== null) {
+                    return $callingCode;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Convert calling code to country code.
+     * Uses a mapping of common calling codes to ISO country codes.
+     *
+     * @param string $callingCode
+     * @return string|null The ISO country code or null if not found
+     */
+    private function callingCodeToCountryCode(string $callingCode): ?string
+    {
+        $callingCodeMap = [
+            '+1' => 'US',     // United States, Canada, etc.
+            '+7' => 'RU',     // Russia, Kazakhstan
+            '+20' => 'EG',    // Egypt
+            '+27' => 'ZA',    // South Africa
+            '+30' => 'GR',    // Greece
+            '+31' => 'NL',    // Netherlands
+            '+32' => 'BE',    // Belgium
+            '+33' => 'FR',    // France
+            '+34' => 'ES',    // Spain
+            '+36' => 'HU',    // Hungary
+            '+39' => 'IT',    // Italy
+            '+40' => 'RO',    // Romania
+            '+41' => 'CH',    // Switzerland
+            '+43' => 'AT',    // Austria
+            '+44' => 'GB',    // United Kingdom
+            '+45' => 'DK',    // Denmark
+            '+46' => 'SE',    // Sweden
+            '+47' => 'NO',    // Norway
+            '+48' => 'PL',    // Poland
+            '+49' => 'DE',    // Germany
+            '+51' => 'PE',    // Peru
+            '+52' => 'MX',    // Mexico
+            '+53' => 'CU',    // Cuba
+            '+54' => 'AR',    // Argentina
+            '+55' => 'BR',    // Brazil
+            '+56' => 'CL',    // Chile
+            '+57' => 'CO',    // Colombia
+            '+58' => 'VE',    // Venezuela
+            '+60' => 'MY',    // Malaysia
+            '+61' => 'AU',    // Australia
+            '+62' => 'ID',    // Indonesia
+            '+63' => 'PH',    // Philippines
+            '+64' => 'NZ',    // New Zealand
+            '+65' => 'SG',    // Singapore
+            '+66' => 'TH',    // Thailand
+            '+81' => 'JP',    // Japan
+            '+82' => 'KR',    // South Korea
+            '+84' => 'VN',    // Vietnam
+            '+86' => 'CN',    // China
+            '+90' => 'TR',    // Turkey
+            '+91' => 'IN',    // India
+            '+92' => 'PK',    // Pakistan
+            '+93' => 'AF',    // Afghanistan
+            '+94' => 'LK',    // Sri Lanka
+            '+95' => 'MM',    // Myanmar
+            '+98' => 'IR',    // Iran
+            '+212' => 'MA',   // Morocco
+            '+213' => 'DZ',   // Algeria
+            '+216' => 'TN',   // Tunisia
+            '+218' => 'LY',   // Libya
+            '+220' => 'GM',   // Gambia
+            '+221' => 'SN',   // Senegal
+            '+222' => 'MR',   // Mauritania
+            '+223' => 'ML',   // Mali
+            '+224' => 'GN',   // Guinea
+            '+225' => 'CI',   // Ivory Coast
+            '+226' => 'BF',   // Burkina Faso
+            '+227' => 'NE',   // Niger
+            '+228' => 'TG',   // Togo
+            '+229' => 'BJ',   // Benin
+            '+230' => 'MU',   // Mauritius
+            '+231' => 'LR',   // Liberia
+            '+232' => 'SL',   // Sierra Leone
+            '+233' => 'GH',   // Ghana
+            '+234' => 'NG',   // Nigeria
+            '+235' => 'TD',   // Chad
+            '+236' => 'CF',   // Central African Republic
+            '+237' => 'CM',   // Cameroon
+            '+238' => 'CV',   // Cape Verde
+            '+239' => 'ST',   // Sao Tome and Principe
+            '+240' => 'GQ',   // Equatorial Guinea
+            '+241' => 'GA',   // Gabon
+            '+242' => 'CG',   // Congo
+            '+243' => 'CD',   // Democratic Republic of the Congo
+            '+244' => 'AO',   // Angola
+            '+245' => 'GW',   // Guinea-Bissau
+            '+246' => 'IO',   // British Indian Ocean Territory
+            '+248' => 'SC',   // Seychelles
+            '+249' => 'SD',   // Sudan
+            '+250' => 'RW',   // Rwanda
+            '+251' => 'ET',   // Ethiopia
+            '+252' => 'SO',   // Somalia
+            '+253' => 'DJ',   // Djibouti
+            '+254' => 'KE',   // Kenya
+            '+255' => 'TZ',   // Tanzania
+            '+256' => 'UG',   // Uganda
+            '+257' => 'BI',   // Burundi
+            '+258' => 'MZ',   // Mozambique
+            '+260' => 'ZM',   // Zambia
+            '+261' => 'MG',   // Madagascar
+            '+262' => 'RE',   // Reunion
+            '+263' => 'ZW',   // Zimbabwe
+            '+264' => 'NA',   // Namibia
+            '+265' => 'MW',   // Malawi
+            '+266' => 'LS',   // Lesotho
+            '+267' => 'BW',   // Botswana
+            '+268' => 'SZ',   // Eswatini
+            '+269' => 'KM',   // Comoros
+            '+290' => 'SH',   // Saint Helena
+            '+291' => 'ER',   // Eritrea
+            '+297' => 'AW',   // Aruba
+            '+298' => 'FO',   // Faroe Islands
+            '+299' => 'GL',   // Greenland
+            '+350' => 'GI',   // Gibraltar
+            '+351' => 'PT',   // Portugal
+            '+352' => 'LU',   // Luxembourg
+            '+353' => 'IE',   // Ireland
+            '+354' => 'IS',   // Iceland
+            '+355' => 'AL',   // Albania
+            '+356' => 'MT',   // Malta
+            '+357' => 'CY',   // Cyprus
+            '+358' => 'FI',   // Finland
+            '+359' => 'BG',   // Bulgaria
+            '+370' => 'LT',   // Lithuania
+            '+371' => 'LV',   // Latvia
+            '+372' => 'EE',   // Estonia
+            '+373' => 'MD',   // Moldova
+            '+374' => 'AM',   // Armenia
+            '+375' => 'BY',   // Belarus
+            '+376' => 'AD',   // Andorra
+            '+377' => 'MC',   // Monaco
+            '+378' => 'SM',   // San Marino
+            '+380' => 'UA',   // Ukraine
+            '+381' => 'RS',   // Serbia
+            '+382' => 'ME',   // Montenegro
+            '+383' => 'XK',   // Kosovo
+            '+385' => 'HR',   // Croatia
+            '+386' => 'SI',   // Slovenia
+            '+387' => 'BA',   // Bosnia and Herzegovina
+            '+389' => 'MK',   // North Macedonia
+            '+420' => 'CZ',   // Czech Republic
+            '+421' => 'SK',   // Slovakia
+            '+423' => 'LI',   // Liechtenstein
+            '+500' => 'FK',   // Falkland Islands
+            '+501' => 'BZ',   // Belize
+            '+502' => 'GT',   // Guatemala
+            '+503' => 'SV',   // El Salvador
+            '+504' => 'HN',   // Honduras
+            '+505' => 'NI',   // Nicaragua
+            '+506' => 'CR',   // Costa Rica
+            '+507' => 'PA',   // Panama
+            '+508' => 'PM',   // Saint Pierre and Miquelon
+            '+509' => 'HT',   // Haiti
+            '+590' => 'GP',   // Guadeloupe
+            '+591' => 'BO',   // Bolivia
+            '+592' => 'GY',   // Guyana
+            '+593' => 'EC',   // Ecuador
+            '+594' => 'GF',   // French Guiana
+            '+595' => 'PY',   // Paraguay
+            '+596' => 'MQ',   // Martinique
+            '+597' => 'SR',   // Suriname
+            '+598' => 'UY',   // Uruguay
+            '+599' => 'CW',   // Curaçao
+            '+670' => 'TL',   // Timor-Leste
+            '+672' => 'AQ',   // Australian Antarctic Territory
+            '+673' => 'BN',   // Brunei
+            '+674' => 'NR',   // Nauru
+            '+675' => 'PG',   // Papua New Guinea
+            '+676' => 'TO',   // Tonga
+            '+677' => 'SB',   // Solomon Islands
+            '+678' => 'VU',   // Vanuatu
+            '+679' => 'FJ',   // Fiji
+            '+680' => 'PW',   // Palau
+            '+681' => 'WF',   // Wallis and Futuna
+            '+682' => 'CK',   // Cook Islands
+            '+683' => 'NU',   // Niue
+            '+684' => 'AS',   // American Samoa
+            '+685' => 'WS',   // Samoa
+            '+686' => 'KI',   // Kiribati
+            '+687' => 'NC',   // New Caledonia
+            '+688' => 'TV',   // Tuvalu
+            '+689' => 'PF',   // French Polynesia
+            '+690' => 'TK',   // Tokelau
+            '+691' => 'FM',   // Micronesia
+            '+692' => 'MH',   // Marshall Islands
+            '+850' => 'KP',   // North Korea
+            '+852' => 'HK',   // Hong Kong
+            '+853' => 'MO',   // Macau
+            '+855' => 'KH',   // Cambodia
+            '+856' => 'LA',   // Laos
+            '+880' => 'BD',   // Bangladesh
+            '+886' => 'TW',   // Taiwan
+            '+960' => 'MV',   // Maldives
+            '+961' => 'LB',   // Lebanon
+            '+962' => 'JO',   // Jordan
+            '+963' => 'SY',   // Syria
+            '+964' => 'IQ',   // Iraq
+            '+965' => 'KW',   // Kuwait
+            '+966' => 'SA',   // Saudi Arabia
+            '+967' => 'YE',   // Yemen
+            '+968' => 'OM',   // Oman
+            '+970' => 'PS',   // Palestine
+            '+971' => 'AE',   // United Arab Emirates
+            '+972' => 'IL',   // Israel
+            '+973' => 'BH',   // Bahrain
+            '+974' => 'QA',   // Qatar
+            '+975' => 'BT',   // Bhutan
+            '+976' => 'MN',   // Mongolia
+            '+977' => 'NP',   // Nepal
+            '+992' => 'TJ',   // Tajikistan
+            '+993' => 'TM',   // Turkmenistan
+            '+994' => 'AZ',   // Azerbaijan
+            '+995' => 'GE',   // Georgia
+            '+996' => 'KG',   // Kyrgyzstan
+            '+998' => 'UZ',   // Uzbekistan
+        ];
+
+        return $callingCodeMap[$callingCode] ?? null;
+    }
+
+    /**
+     * Check if a calling code is valid.
+     * Basic validation - could be enhanced with a proper phone library.
+     *
+     * @param string $callingCode
+     * @return bool
+     */
+    private function isValidCallingCode(string $callingCode): bool
+    {
+        // Remove + and check if remaining is numeric and reasonable length
+        $code = ltrim($callingCode, '+');
+        return is_numeric($code) && strlen($code) >= 1 && strlen($code) <= 4;
     }
 
     public function handleIvrInput(Request $request): Response

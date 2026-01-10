@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ExtensionController;
 use App\Http\Controllers\Api\IvrMenuController;
+use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
@@ -161,6 +162,9 @@ Route::prefix('v1')->group(function (): void {
         // Phone Numbers (DIDs)
         Route::apiResource('phone-numbers', PhoneNumberController::class);
 
+        // Outbound Whitelist
+        Route::apiResource('outbound-whitelist', OutboundWhitelistController::class);
+
         // Call Logs (read-only)
         Route::prefix('call-logs')->group(function (): void {
             Route::get('/', [CallLogController::class, 'index'])->name('call-logs.index');
@@ -187,6 +191,7 @@ Route::prefix('v1')->group(function (): void {
             Route::put('cloudonix', [SettingsController::class, 'updateCloudonixSettings'])->name('settings.cloudonix.update');
             Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
+            Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
         });
 
 

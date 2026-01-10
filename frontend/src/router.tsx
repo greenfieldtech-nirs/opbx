@@ -26,6 +26,7 @@ const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
 const Recordings = lazy(() => import('@/pages/Recordings'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 
 
 export const router = createBrowserRouter([
@@ -85,22 +86,30 @@ export const router = createBrowserRouter([
         path: 'recordings',
         element: <Recordings />,
       },
-      {
-        path: 'live-calls',
-        element: <LiveCalls />,
-      },
-      {
-        path: 'profile',
-        element: <Profile />,
-      },
-      {
-        path: 'settings',
-        element: (
-          <OwnerRoute>
-            <Settings />
-          </OwnerRoute>
-        ),
-      },
+       {
+         path: 'live-calls',
+         element: <LiveCalls />,
+       },
+       {
+         path: 'outbound-whitelist',
+         element: (
+           <OwnerRoute>
+             <OutboundWhitelistPage />
+           </OwnerRoute>
+         ),
+       },
+       {
+         path: 'profile',
+         element: <Profile />,
+       },
+       {
+         path: 'settings',
+         element: (
+           <OwnerRoute>
+             <Settings />
+           </OwnerRoute>
+         ),
+       },
 
     ],
   },

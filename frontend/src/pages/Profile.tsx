@@ -7,7 +7,7 @@
  * 3. Change Password (with password generator)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -55,7 +55,7 @@ import type {
 } from '@/types';
 import { generateStrongPassword } from '@/utils/passwordGenerator';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
-import { COUNTRIES } from '@/utils/countries';
+import { getCountryOptions } from '@/utils/countries';
 import { getRoleLabel, getRoleColor } from '@/utils/roleHelpers';
 import type { UserRole } from '@/types';
 
@@ -110,6 +110,14 @@ export default function Profile() {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
 
   const isOwner = user?.role === 'owner';
+
+  // Memoize country options to ensure stable references
+  const countryOptions = useMemo(() =>
+    getCountryOptions().map(c => ({
+      value: c.code,
+      label: `${c.flag} ${c.name}`
+    })), []
+  );
 
   // Organization form
   const {
@@ -538,19 +546,19 @@ export default function Profile() {
                   <Controller
                     name="country"
                     control={controlProfile}
-                    render={({ field }) => (
-                      <Combobox
-                        options={COUNTRIES.map(c => ({ value: c.name, label: c.name }))}
-                        value={field.value || ''}
-                        onValueChange={field.onChange}
-                        placeholder="Select a country..."
-                        searchPlaceholder="Search countries..."
-                        emptyText="No country found."
-                        disabled={isUpdatingProfile}
-                        buttonClassName="w-full"
-                        contentClassName="w-[--radix-popover-trigger-width]"
-                      />
-                    )}
+                      render={({ field }) => (
+                        <Combobox
+                          options={countryOptions}
+                         value={field.value || ''}
+                         onValueChange={field.onChange}
+                         placeholder="Select a country..."
+                         searchPlaceholder="Search countries..."
+                         emptyText="No country found."
+                         disabled={isUpdatingProfile}
+                         buttonClassName="w-full"
+                         contentClassName="w-[--radix-popover-trigger-width]"
+                       />
+                     )}
                   />
                 </div>
               </div>
