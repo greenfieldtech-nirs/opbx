@@ -273,8 +273,184 @@ class VoiceRoutingManager
     }
 
     /**
-     * Validate extension configuration and suggest fixes
+     * Resolve extension destination based on extension type and configuration.
+     *
+     * @param Extension $extension
+     * @param int $organizationId
+     * @return array Destination array for routing strategy
      */
+    private function resolveExtensionDestination(Extension $extension, int $organizationId): array
+    {
+        $extensionType = $extension->type;
+
+        Log::info('VoiceRoutingManager: Resolving extension destination', [
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'extension_type_raw' => $extensionType,
+            'organization_id' => $organizationId,
+        ]);
+
+        // Handle both enum and string types for backward compatibility
+        if ($extensionType instanceof ExtensionType) {
+            $typeValue = $extensionType->value;
+        } else {
+            $typeValue = (string) $extensionType;
+        }
+
+        Log::info('VoiceRoutingManager: Extension type resolved', [
+            'type_value' => $typeValue,
+        ]);
+
+        // Route based on extension type
+        switch ($typeValue) {
+            case 'user':
+                Log::debug('VoiceRoutingManager: User extension destination', [
+                    'extension' => $extension->extension_number
+                ]);
+                return ['extension' => $extension];
+
+            case 'ring_group':
+                return $this->resolveRingGroupDestination($extension, $organizationId);
+
+            case 'conference':
+                return $this->resolveConferenceDestination($extension, $organizationId);
+
+            case 'ivr':
+                return $this->resolveIvrDestination($extension, $organizationId);
+
+            case 'ai_assistant':
+                return $this->resolveAiAssistantDestination($extension, $organizationId);
+
+            case 'forward':
+                // For forward extensions, we still need to determine the forwarding target
+                return ['extension' => $extension]; // Let the strategy handle forwarding
+
+            case 'custom_logic':
+                return ['extension' => $extension]; // Custom logic not yet implemented
+
+            case 'queue':
+                return ['extension' => $extension]; // Queue routing not yet implemented
+
+            default:
+                Log::warning('VoiceRoutingManager: Unknown extension type, falling back to extension', [
+                    'extension_number' => $extension->extension_number,
+                    'type_raw' => $extensionType,
+                    'type_value' => $typeValue
+                ]);
+                return ['extension' => $extension]; // Fallback for unknown types
+        }
+    }
+
+    /**
+     * Resolve ring group destination for ring group type extensions.
+     */
+    private function resolveRingGroupDestination(Extension $extension, int $organizationId): array
+    {
+        $ringGroupId = $extension->configuration['ring_group_id'] ?? null;
+        if (!$ringGroupId) {
+            Log::warning('VoiceRoutingManager: Ring group extension missing ring_group_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId
+            ]);
+
+            // Try fallback ring group lookup
+            return $this->findRingGroupByExtensionNumber($extension, $organizationId);
+        }
+
+        $ringGroup = RingGroup::where('id', $ringGroupId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$ringGroup) {
+            Log::warning('VoiceRoutingManager: Ring group not found', [
+                'extension_id' => $extension->id,
+                'ring_group_id' => $ringGroupId,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        return ['ring_group' => $ringGroup];
+    }
+
+    /**
+     * Resolve conference destination for conference type extensions.
+     */
+    private function resolveConferenceDestination(Extension $extension, int $organizationId): array
+    {
+        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
+        if (!$conferenceRoomId) {
+            Log::warning('VoiceRoutingManager: Conference extension missing conference_room_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        $room = ConferenceRoom::where('id', $conferenceRoomId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$room) {
+            Log::warning('VoiceRoutingManager: Conference room not found', [
+                'extension_id' => $extension->id,
+                'conference_room_id' => $conferenceRoomId,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        return ['conference_room' => $room];
+    }
+
+    /**
+     * Resolve IVR destination for IVR type extensions.
+     */
+    private function resolveIvrDestination(Extension $extension, int $organizationId): array
+    {
+        $ivrMenuId = $extension->configuration['ivr_id'] ?? null;
+        if (!$ivrMenuId) {
+            Log::warning('VoiceRoutingManager: IVR extension missing ivr_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        $ivrMenu = IvrMenu::where('id', $ivrMenuId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (!$ivrMenu) {
+            Log::warning('VoiceRoutingManager: IVR menu not found', [
+                'extension_id' => $extension->id,
+                'ivr_menu_id' => $ivrMenuId,
+                'organization_id' => $organizationId
+            ]);
+            return [];
+        }
+
+        return ['ivr_menu' => $ivrMenu];
+    }
+
+    /**
+     * Resolve AI assistant destination for AI assistant type extensions.
+     */
+    private function resolveAiAssistantDestination(Extension $extension, int $organizationId): array
+    {
+        // For now, just return the extension - AI assistant logic is handled in the strategy
+        Log::info('VoiceRoutingManager: AI assistant extension destination', [
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'configuration' => $extension->configuration
+        ]);
+
+        return ['extension' => $extension];
+    }
+
     public function validateExtensionConfiguration(Extension $extension): array
     {
         $issues = [];
