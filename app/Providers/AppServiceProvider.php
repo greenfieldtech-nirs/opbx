@@ -68,6 +68,7 @@ class AppServiceProvider extends ServiceProvider
                 return new \App\Services\VoiceRouting\VoiceRoutingManager(
                     $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class),
                     $app->make(\App\Services\IvrStateService::class),
+                    $app->make(\App\Services\PhoneNumberService::class),
                     $app->tagged('voice_routing.strategies')
                 );
             }

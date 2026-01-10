@@ -14,6 +14,7 @@ use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\IvrStateService;
+use App\Services\PhoneNumberService;
 
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
 use Illuminate\Http\Request;
@@ -29,6 +30,7 @@ class VoiceRoutingManager
     public function __construct(
         private readonly VoiceRoutingCacheService $cache,
         private readonly IvrStateService $ivrStateService,
+        private readonly PhoneNumberService $phoneNumberService,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
@@ -49,20 +51,43 @@ class VoiceRoutingManager
             'org_id' => $orgId
         ]);
 
-        Log::info('VoiceRoutingManager: Starting routing logic', [
-            'to' => $to,
-            'from' => $from,
-            'org_id' => $orgId
-        ]);
-
         // 0. Check Business Hours
         $businessHoursResponse = $this->checkBusinessHours($orgId, $request->input('CallSid', ''));
         if ($businessHoursResponse) {
             return $businessHoursResponse;
         }
 
-        // 1. Resolve Target (DID or Extension)
-        // First check if it's a DID (scoped to authenticated organization)
+        // 1. Try DID routing
+        $didResponse = $this->handleDidRouting($request, $to, $orgId);
+        if ($didResponse) {
+            return $didResponse;
+        }
+
+        // 2. Try extension routing
+        $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
+        if ($extensionResponse) {
+            return $extensionResponse;
+        }
+
+        // 3. Try outbound routing
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
+        }
+
+        Log::info('VoiceRoutingManager: No destination found, returning unavailable', [
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
+
+        return $this->createCxmlErrorResponse('Destination not found');
+    }
+
+    /**
+     * Handle DID-based routing if a DID is found for the destination number.
+     */
+    private function handleDidRouting(Request $request, string $to, int $orgId): ?Response
+    {
         Log::info('VoiceRoutingManager: Checking for DID', [
             'to' => $to,
             'org_id' => $orgId,
@@ -89,10 +114,14 @@ class VoiceRoutingManager
             return $this->routeDidCall($request, $did);
         }
 
-        // If not a DID, it might be an internal extension
-        // Using cache service to look up extension by number
-        // Normalize number logic might be needed here, or assumed normalized by middleware/controller
+        return null;
+    }
 
+    /**
+     * Handle extension-based routing if an extension is found for the destination number.
+     */
+    private function handleExtensionRouting(Request $request, string $to, int $orgId): ?Response
+    {
         Log::info('VoiceRoutingManager: Checking for extension', [
             'to' => $to,
             'org_id' => $orgId,
@@ -108,8 +137,8 @@ class VoiceRoutingManager
             'extension_status' => $extension?->status,
             'extension_active' => $extension?->isActive(),
         ]);
+
         if ($extension && $extension->isActive()) {
-            // Internal call routing to an Extension
             Log::info('VoiceRoutingManager: Internal extension destination', [
                 'extension' => $extension->extension_number,
                 'type' => $extension->type->value
@@ -129,29 +158,22 @@ class VoiceRoutingManager
                 Log::warning('VoiceRoutingManager: Could not resolve destination for extension', [
                     'extension' => $extension->extension_number,
                     'type' => $extension->type->value,
-                    'org_id' => $orgId,
-                    'configuration' => $extension->configuration,
+                    'org_id' => $orgId
                 ]);
-
-                // For ring group extensions with missing configuration, try to find a ring group by name
-                if ($extension->type->value === 'ring_group') {
-                    $fallbackDestination = $this->findRingGroupByExtensionNumber($extension, $orgId);
-                    if (!empty($fallbackDestination)) {
-                        Log::info('VoiceRoutingManager: Found fallback ring group destination', [
-                            'extension' => $extension->extension_number,
-                            'fallback_ring_group_id' => $fallbackDestination['ring_group']->id,
-                        ]);
-                        return $this->executeStrategy($extension->type, $request, new DidNumber(), $fallbackDestination);
-                    }
-                }
-
-                return response(CxmlBuilder::unavailable('Extension configuration error'), 200, ['Content-Type' => 'text/xml']);
+                return $this->createCxmlErrorResponse('Extension configuration error');
             }
 
             return $this->executeStrategy($extension->type, $request, new DidNumber(), $destination);
         }
 
-        // Check for outbound whitelist routing if call is from internal extension
+        return null;
+    }
+
+    /**
+     * Handle outbound routing via whitelist for calls from internal extensions.
+     */
+    private function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
+    {
         Log::info('VoiceRoutingManager: Checking for outbound whitelist routing', [
             'to' => $to,
             'from' => $from,
@@ -191,12 +213,15 @@ class VoiceRoutingManager
             }
         }
 
-        Log::info('VoiceRoutingManager: No destination found, returning unavailable', [
-            'to' => $to,
-            'org_id' => $orgId,
-        ]);
+        return null;
+    }
 
-        return response(CxmlBuilder::unavailable('Destination not found'), 200, ['Content-Type' => 'text/xml']);
+    /**
+     * Create a standardized CXML error response.
+     */
+    private function createCxmlErrorResponse(string $message): Response
+    {
+        return response(CxmlBuilder::unavailable($message), 200, ['Content-Type' => 'text/xml']);
     }
 
     private function routeDidCall(Request $request, DidNumber $did): Response
@@ -562,8 +587,8 @@ class VoiceRoutingManager
         ]);
 
         // Extract country calling code from destination number
-        $callingCode = $this->extractCallingCode($destinationNumber);
-        $countryCode = $callingCode ? $this->callingCodeToCountryCode($callingCode) : null;
+        $callingCode = $this->phoneNumberService->extractCallingCode($destinationNumber);
+        $countryCode = $callingCode ? $this->phoneNumberService->callingCodeToCountryCode($callingCode) : null;
 
         Log::info('VoiceRoutingManager: Extracted calling code and country code', [
             'destination_number' => $destinationNumber,
@@ -704,45 +729,6 @@ class VoiceRoutingManager
         ]);
 
         return [];
-    }
-
-    /**
-     * Extract calling code from a phone number.
-     * Supports E.164 format numbers starting with + and calling codes without +.
-     *
-     * @param string $phoneNumber
-     * @return string|null The calling code (e.g., "+1", "+44") or null if not found
-     */
-    private function extractCallingCode(string $phoneNumber): ?string
-    {
-        // Remove any non-digit characters except +
-        $cleanedNumber = preg_replace('/[^\d+]/', '', $phoneNumber);
-
-        // If number starts with +, process as E.164 format
-        if (str_starts_with($cleanedNumber, '+')) {
-            $digits = substr($cleanedNumber, 1);
-
-            // Try different calling code lengths (4-1 digits) - longest first
-            for ($length = 4; $length >= 1; $length--) {
-                $potentialCode = substr($digits, 0, $length);
-                $callingCode = '+' . $potentialCode;
-                if ($this->isValidCallingCode($callingCode) && $this->callingCodeToCountryCode($callingCode) !== null) {
-                    return $callingCode;
-                }
-            }
-        } else {
-            // Number doesn't start with +, try to extract calling code from beginning
-            // Try different calling code lengths (4-1 digits) - longest first
-            for ($length = 4; $length >= 1; $length--) {
-                $potentialCode = substr($cleanedNumber, 0, $length);
-                $callingCode = '+' . $potentialCode;
-                if ($this->isValidCallingCode($callingCode) && $this->callingCodeToCountryCode($callingCode) !== null) {
-                    return $callingCode;
-                }
-            }
-        }
-
-        return null;
     }
 
     /**
