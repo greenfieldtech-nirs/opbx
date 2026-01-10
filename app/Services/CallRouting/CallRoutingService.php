@@ -260,7 +260,7 @@ class CallRoutingService
                     return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
                 }
 
-                // TODO: Implement round-robin and sequential strategies
+                // NOTE: Currently only supports simultaneous ringing. Round-robin and sequential strategies planned for Phase 4.
                 return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
             },
             5,  // Lock duration in seconds
@@ -285,7 +285,7 @@ class CallRoutingService
             'duration_ms' => round($duration * 1000, 2),
         ]);
 
-        // TODO: Send to metrics system (Prometheus, CloudWatch, etc.) in Phase 4
+        // NOTE: Metrics collection planned for Phase 4 (Prometheus, CloudWatch, etc.)
     }
 
     /**

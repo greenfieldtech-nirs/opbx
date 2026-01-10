@@ -1,7 +1,7 @@
 <?php
 
 // Simple test without database
-require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 // Test ExtensionType enum
 use App\Enums\ExtensionType;

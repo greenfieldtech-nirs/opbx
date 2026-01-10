@@ -175,7 +175,7 @@ class RateLimitPerOrganization
             'timestamp' => now()->toIso8601String(),
         ]);
 
-        // TODO: Send to metrics/alerting system (Phase 4)
+        // NOTE: Alerting system integration planned for Phase 4
     }
 
     /**
@@ -199,6 +199,6 @@ class RateLimitPerOrganization
             ]);
         }
 
-        // TODO: Send usage metrics to monitoring system (Phase 4)
+        // NOTE: Usage metrics collection planned for Phase 4 monitoring system
     }
 }
