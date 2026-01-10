@@ -129,8 +129,22 @@ class VoiceRoutingManager
                 Log::warning('VoiceRoutingManager: Could not resolve destination for extension', [
                     'extension' => $extension->extension_number,
                     'type' => $extension->type->value,
-                    'org_id' => $orgId
+                    'org_id' => $orgId,
+                    'configuration' => $extension->configuration,
                 ]);
+
+                // For ring group extensions with missing configuration, try to find a ring group by name
+                if ($extension->type->value === 'ring_group') {
+                    $fallbackDestination = $this->findRingGroupByExtensionNumber($extension, $orgId);
+                    if (!empty($fallbackDestination)) {
+                        Log::info('VoiceRoutingManager: Found fallback ring group destination', [
+                            'extension' => $extension->extension_number,
+                            'fallback_ring_group_id' => $fallbackDestination['ring_group']->id,
+                        ]);
+                        return $this->executeStrategy($extension->type, $request, new DidNumber(), $fallbackDestination);
+                    }
+                }
+
                 return response(CxmlBuilder::unavailable('Extension configuration error'), 200, ['Content-Type' => 'text/xml']);
             }
 
@@ -258,216 +272,65 @@ class VoiceRoutingManager
         return [];
     }
 
-    private function determineExtensionType(DidNumber $did, array $destination): ?ExtensionType
+    /**
+     * Validate extension configuration and suggest fixes
+     */
+    public function validateExtensionConfiguration(Extension $extension): array
     {
-        if (isset($destination['extension'])) {
-            return $destination['extension']->type;
-        }
-        if (isset($destination['ring_group'])) {
-            return ExtensionType::RING_GROUP;
-        }
-        if (isset($destination['conference_room'])) {
-            return ExtensionType::CONFERENCE;
-        }
-        if (isset($destination['ivr_menu'])) {
-            return ExtensionType::IVR;
-        }
+        $issues = [];
+        $suggestions = [];
 
-        return null;
-    }
+        $type = $extension->type;
+        $config = $extension->configuration ?? [];
 
-    private function executeStrategy(ExtensionType $type, Request $request, DidNumber $did, array $destination): Response
-    {
-        foreach ($this->strategies as $strategy) {
-            if ($strategy->canHandle($type)) {
-                return $strategy->route($request, $did, $destination);
+        if ($type->value === 'ring_group') {
+            if (empty($config['ring_group_id'])) {
+                $issues[] = 'Missing ring_group_id in configuration';
+
+                // Suggest finding a ring group by name
+                $potentialRingGroup = RingGroup::where('name', $extension->extension_number)
+                    ->where('organization_id', $extension->organization_id)
+                    ->first();
+
+                if ($potentialRingGroup) {
+                    $suggestions[] = "Set ring_group_id to {$potentialRingGroup->id} (matches extension number '{$extension->extension_number}')";
+                } else {
+                    $activeRingGroups = RingGroup::where('organization_id', $extension->organization_id)
+                        ->where('status', 'active')
+                        ->get();
+
+                    if ($activeRingGroups->isNotEmpty()) {
+                        $suggestions[] = 'Set ring_group_id to one of: ' .
+                            $activeRingGroups->pluck('id', 'name')->map(fn($id, $name) => "{$id} ({$name})")->join(', ');
+                    } else {
+                        $suggestions[] = 'Create a ring group first, then configure this extension';
+                    }
+                }
+            } else {
+                $ringGroup = RingGroup::find($config['ring_group_id']);
+                if (!$ringGroup) {
+                    $issues[] = "Referenced ring_group_id {$config['ring_group_id']} does not exist";
+                    $suggestions[] = 'Update ring_group_id to a valid ring group ID';
+                } elseif ($ringGroup->organization_id !== $extension->organization_id) {
+                    $issues[] = "Ring group belongs to different organization";
+                    $suggestions[] = 'Use a ring group from the same organization';
+                } elseif (!$ringGroup->isActive()) {
+                    $issues[] = 'Referenced ring group is inactive';
+                    $suggestions[] = 'Activate the ring group or choose a different one';
+                }
             }
         }
 
-        Log::error('VoiceRoutingManager: No strategy found for type', ['type' => $type->value]);
-        return response(CxmlBuilder::unavailable('Routing strategy not found'), 200, ['Content-Type' => 'text/xml']);
-    }
+        // Add validation for other extension types as needed
 
-    public function routeRingGroupCallback(Request $request): Response
-    {
-        $rgId = $request->input('ring_group_id') ?? $request->input('SessionData.ring_group_id');
-        $organizationId = (int) $request->input('_organization_id');
-
-        // Extract attempt number from query params or session_data JSON
-        $attempt = (int) $request->input('attempt_number', 0);
-        if ($attempt === 0) {
-            // Try to extract from session_data JSON if not in query params
-            $sessionDataJson = $request->input('session_data');
-            if ($sessionDataJson) {
-                $sessionData = json_decode($sessionDataJson, true);
-                $attempt = (int) ($sessionData['attempt_number'] ?? 0);
-            }
-        }
-
-        if (!$rgId) {
-            return response(CxmlBuilder::unavailable('Ring group context missing'), 200, ['Content-Type' => 'text/xml']);
-        }
-
-        $rg = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $rgId)
-            ->where('organization_id', $organizationId)
-            ->first();
-
-        if (!$rg) {
-            Log::warning('VoiceRoutingManager: Ring group not found in callback', [
-                'ring_group_id' => $rgId,
-                'organization_id' => $organizationId
-            ]);
-            return response(CxmlBuilder::unavailable('Ring group not found'), 200, ['Content-Type' => 'text/xml']);
-        }
-
-        $destination = ['ring_group' => $rg];
-
-        // Execute Ring Group Strategy
-        return $this->executeStrategy(ExtensionType::RING_GROUP, $request, new DidNumber(), $destination);
-    }
-
-    private function resolveExtensionDestination(Extension $extension, int $organizationId): array
-    {
-        $extensionType = $extension->type;
-
-        Log::info('VoiceRoutingManager: Resolving extension destination', [
+        return [
             'extension_id' => $extension->id,
             'extension_number' => $extension->extension_number,
-            'extension_type_raw' => $extensionType,
-            'organization_id' => $organizationId,
-        ]);
-
-        // Handle both enum and string types for backward compatibility
-        if ($extensionType instanceof ExtensionType) {
-            $typeValue = $extensionType->value;
-        } else {
-            $typeValue = (string) $extensionType;
-        }
-
-        Log::info('VoiceRoutingManager: Extension type resolved', [
-            'type_value' => $typeValue,
-        ]);
-
-        // Use if statements instead of match for better debugging and reliability
-        if ($typeValue === 'user') {
-            Log::debug('VoiceRoutingManager: User extension destination', ['extension' => $extension->extension_number]);
-            return ['extension' => $extension];
-        } elseif ($typeValue === 'conference') {
-            return $this->resolveConferenceDestination($extension, $organizationId);
-        } elseif ($typeValue === 'ring_group') {
-            return $this->resolveRingGroupDestination($extension, $organizationId);
-        } elseif ($typeValue === 'ivr') {
-            return $this->resolveIvrDestination($extension, $organizationId);
-        } elseif ($typeValue === 'ai_assistant') {
-            return $this->resolveAiAssistantDestination($extension, $organizationId);
-        } elseif ($typeValue === 'custom_logic') {
-            return ['extension' => $extension]; // Custom logic not yet implemented
-        } elseif ($typeValue === 'forward') {
-            return ['extension' => $extension];
-        } elseif ($typeValue === 'queue') {
-            return ['extension' => $extension]; // Queue routing not yet implemented
-        } else {
-            Log::warning('VoiceRoutingManager: Unknown extension type, falling back to extension', [
-                'extension_number' => $extension->extension_number,
-                'type_raw' => $extensionType,
-                'type_value' => $typeValue
-            ]);
-            return ['extension' => $extension]; // Fallback for unknown types
-        }
-    }
-
-    private function resolveConferenceDestination(Extension $extension, int $organizationId): array
-    {
-        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
-        if (!$conferenceRoomId) {
-            Log::warning('VoiceRoutingManager: Conference extension missing conference_room_id', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
-                'organization_id' => $organizationId
-            ]);
-            return [];
-        }
-
-        $room = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $conferenceRoomId)
-            ->where('organization_id', $organizationId)
-            ->first();
-
-        if (!$room) {
-            Log::warning('VoiceRoutingManager: Conference room not found', [
-                'extension_id' => $extension->id,
-                'conference_room_id' => $conferenceRoomId,
-                'organization_id' => $organizationId
-            ]);
-            return [];
-        }
-
-        return ['conference_room' => $room];
-    }
-
-    private function resolveAiAssistantDestination(Extension $extension, int $organizationId): array
-    {
-        // AI Assistant routing is handled by the AiAgentRoutingStrategy
-        // Configuration is extracted in the strategy itself
-        return ['extension' => $extension];
-    }
-
-    private function resolveRingGroupDestination(Extension $extension, int $organizationId): array
-    {
-        $ringGroupId = $extension->configuration['ring_group_id'] ?? null;
-        if (!$ringGroupId) {
-            Log::warning('VoiceRoutingManager: Ring group extension missing ring_group_id', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
-                'organization_id' => $organizationId
-            ]);
-            return [];
-        }
-
-        $ringGroup = RingGroup::where('id', $ringGroupId)
-            ->where('organization_id', $organizationId)
-            ->first();
-
-        if (!$ringGroup) {
-            Log::warning('VoiceRoutingManager: Ring group not found', [
-                'extension_id' => $extension->id,
-                'ring_group_id' => $ringGroupId,
-                'organization_id' => $organizationId
-            ]);
-            return [];
-        }
-
-        return ['ring_group' => $ringGroup];
-    }
-
-    private function resolveIvrDestination(Extension $extension, int $organizationId): array
-    {
-        $ivrMenuId = $extension->configuration['ivr_id'] ?? null;
-        if (!$ivrMenuId) {
-            Log::warning('VoiceRoutingManager: IVR extension missing ivr_id', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
-                'organization_id' => $organizationId
-            ]);
-            return [];
-        }
-
-        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $ivrMenuId)
-            ->where('organization_id', $organizationId)
-            ->first();
-
-        if (!$ivrMenu) {
-            Log::warning('VoiceRoutingManager: IVR menu not found', [
-                'extension_id' => $extension->id,
-                'ivr_menu_id' => $ivrMenuId,
-                'organization_id' => $organizationId
-            ]);
-            return [];
-        }
-
-        return ['ivr_menu' => $ivrMenu];
+            'type' => $type->value,
+            'has_issues' => !empty($issues),
+            'issues' => $issues,
+            'suggestions' => $suggestions,
+        ];
     }
 
     private function checkBusinessHours(int $organizationId, string $callSid): ?Response
@@ -615,6 +478,53 @@ class VoiceRoutingManager
         ]);
 
         return null;
+    }
+
+    /**
+     * Find a ring group by extension number as fallback when configuration is missing.
+     * This attempts to match ring group names with extension numbers or find any active ring group.
+     *
+     * @param Extension $extension
+     * @param int $organizationId
+     * @return array Empty array if no fallback found, or ['ring_group' => RingGroup] if found
+     */
+    private function findRingGroupByExtensionNumber(Extension $extension, int $organizationId): array
+    {
+        // Try to find a ring group with a name that matches the extension number
+        $ringGroup = RingGroup::where('organization_id', $organizationId)
+            ->where('name', 'like', '%' . $extension->extension_number . '%')
+            ->where('status', 'active')
+            ->first();
+
+        if ($ringGroup) {
+            Log::info('VoiceRoutingManager: Found ring group by name match', [
+                'extension_number' => $extension->extension_number,
+                'ring_group_name' => $ringGroup->name,
+                'ring_group_id' => $ringGroup->id,
+            ]);
+            return ['ring_group' => $ringGroup];
+        }
+
+        // As last resort, find any active ring group in the organization
+        $ringGroup = RingGroup::where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->first();
+
+        if ($ringGroup) {
+            Log::warning('VoiceRoutingManager: Using fallback ring group (first active found)', [
+                'extension_number' => $extension->extension_number,
+                'ring_group_name' => $ringGroup->name,
+                'ring_group_id' => $ringGroup->id,
+            ]);
+            return ['ring_group' => $ringGroup];
+        }
+
+        Log::error('VoiceRoutingManager: No fallback ring group found', [
+            'extension_number' => $extension->extension_number,
+            'organization_id' => $organizationId,
+        ]);
+
+        return [];
     }
 
     /**
@@ -1141,11 +1051,14 @@ class VoiceRoutingManager
                         'extension_number' => $validatedDestination->extension_number,
                         'extension_type' => $validatedDestination->type->value,
                     ]);
-                    $destination = ['extension' => $validatedDestination];
+
+                    // Resolve the extension destination (could be ring group, conference, etc.)
+                    $destination = $this->resolveExtensionDestination($validatedDestination, $ivrMenu->organization_id);
 
                     Log::info('IVR Input: About to execute strategy', [
                         'extension_type' => $validatedDestination->type,
                         'extension_type_value' => $validatedDestination->type->value,
+                        'resolved_destination' => $destination,
                     ]);
 
                     return $this->executeStrategy($validatedDestination->type, $request, new DidNumber(), $destination);
