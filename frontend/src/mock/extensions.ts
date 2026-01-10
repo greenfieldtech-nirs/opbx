@@ -131,7 +131,7 @@ export const mockExtensions: Extension[] = [
     updated_at: '2024-03-15T10:00:00Z',
   },
 
-  // IVR Menus
+  // IVR Extension (references IVR Menu by ID)
   {
     id: 'ext-301',
     organization_id: 'org-001',
@@ -141,14 +141,7 @@ export const mockExtensions: Extension[] = [
     status: 'active',
     voicemail_enabled: false,
     configuration: {
-      menu: {
-        '1': { action: 'extension', target: '1001', label: 'Sales' },
-        '2': { action: 'extension', target: '1002', label: 'Support' },
-        '3': { action: 'extension', target: '3001', label: 'Main Office' },
-        '0': { action: 'operator', target: '1001', label: 'Operator' },
-      },
-      timeout_action: 'repeat',
-      welcome_message: 'Thank you for calling. Press 1 for Sales, 2 for Support...',
+      ivr_menu_id: 1, // References IVR menu with ID 1
     },
     created_at: '2024-03-20T10:00:00Z',
     updated_at: '2024-03-20T10:00:00Z',

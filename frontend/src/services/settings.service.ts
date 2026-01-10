@@ -13,6 +13,20 @@ import type {
   GenerateRequestsApiKeyResponse,
 } from '@/types';
 
+// Define trunk interface based on Cloudonix API
+export interface CloudonixTrunk {
+  id: number;
+  name: string;
+  uuid: string;
+  direction: 'inbound' | 'outbound' | 'public-inbound' | 'public-outbound';
+  active: boolean;
+  ip?: string;
+  port?: string;
+  transport?: 'udp' | 'tcp' | 'tls';
+  createdAt: string;
+  modifiedAt: string;
+}
+
 export const settingsService = {
   /**
    * Get Cloudonix settings
@@ -45,6 +59,20 @@ export const settingsService = {
           callback_url: res.data.callback_url,
           cdr_url: res.data.cdr_url,
         };
+      });
+  },
+
+  /**
+   * Get outbound voice trunks from Cloudonix
+   * GET /settings/cloudonix/outbound-trunks
+   */
+  getOutboundTrunks: (): Promise<CloudonixTrunk[]> => {
+    return api.get<{ trunks: CloudonixTrunk[]; count: number }>('/settings/cloudonix/outbound-trunks')
+      .then(res => res.data.trunks)
+      .catch(error => {
+        // If API fails, return empty array instead of throwing
+        console.warn('Failed to fetch outbound trunks:', error);
+        return [];
       });
   },
 

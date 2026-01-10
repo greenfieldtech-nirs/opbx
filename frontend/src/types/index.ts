@@ -693,3 +693,61 @@ export interface GenerateRequestsApiKeyResponse {
   api_key: string;
   message?: string;
 }
+
+// ============================================================================
+// Outbound Whitelist Types
+// ============================================================================
+
+export interface OutboundWhitelist {
+  id: string;
+  organization_id: string;
+  name: string;
+  destination_country: string;
+  destination_prefix?: string;
+  outbound_trunk_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateOutboundWhitelistRequest {
+  name: string;
+  destination_country: string;
+  destination_prefix?: string;
+  outbound_trunk_name: string;
+}
+
+export interface UpdateOutboundWhitelistRequest {
+  name?: string;
+  destination_country?: string;
+  destination_prefix?: string;
+  outbound_trunk_name?: string;
+}
+
+export interface OutboundWhitelistFilterParams extends PaginationParams {
+  status?: Status;
+  search?: string;
+}
+
+// ============================================================================
+// Voice Trunk Types
+// ============================================================================
+
+export interface VoiceTrunk {
+  id: string;
+  name: string;
+  provider: string;
+  type: 'sip' | 'pstn' | 'ip';
+  status: 'active' | 'inactive';
+  capabilities: string[]; // e.g., ['outbound', 'inbound']
+  region?: string;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VoiceTrunksResponse {
+  data: VoiceTrunk[];
+  meta?: {
+    total: number;
+  };
+}

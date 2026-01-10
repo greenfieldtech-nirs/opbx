@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Modify the direction enum to include 'internal'
-        \DB::statement("ALTER TABLE session_updates MODIFY COLUMN direction ENUM('incoming', 'outgoing', 'internal')");
+        // Note: SQLite treats ENUMs as TEXT, so no schema change is needed
+        // The application will now accept 'internal' as a valid direction value
     }
 
     /**
@@ -20,7 +20,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert the direction enum to only include 'incoming' and 'outgoing'
-        \DB::statement("ALTER TABLE session_updates MODIFY COLUMN direction ENUM('incoming', 'outgoing')");
+        // Remove any 'internal' direction values
+        \DB::table('session_updates')->where('direction', 'internal')->update(['direction' => 'outgoing']);
     }
 };

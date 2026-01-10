@@ -118,8 +118,5 @@ class Organization extends Model
         return $this->status === 'active';
     }
 
-    public function sentryBlacklists(): HasMany
-    {
-        return $this->hasMany(SentryBlacklist::class);
-    }
+
 }

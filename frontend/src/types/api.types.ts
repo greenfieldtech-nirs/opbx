@@ -354,6 +354,8 @@ export interface IvrMenu {
   audio_file_path?: string;
   tts_text?: string;
   tts_voice?: string;
+  max_timeout: number;
+  inter_digit_timeout: number;
   max_turns: number;
   failover_destination_type: IvrDestinationType;
   failover_destination_id?: string;
@@ -371,6 +373,8 @@ export interface CreateIvrMenuRequest {
   recording_id?: number;
   tts_text?: string;
   tts_voice?: string;
+  max_timeout: number;
+  inter_digit_timeout: number;
   max_turns: number;
   failover_destination_type: IvrDestinationType;
   failover_destination_id?: string;
@@ -391,6 +395,8 @@ export interface UpdateIvrMenuRequest {
   recording_id?: number;
   tts_text?: string;
   tts_voice?: string;
+  max_timeout?: number;
+  inter_digit_timeout?: number;
   max_turns?: number;
   failover_destination_type?: IvrDestinationType;
   failover_destination_id?: string;

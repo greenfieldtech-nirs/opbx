@@ -6,6 +6,7 @@ namespace App\Services\VoiceRouting;
 
 use App\Models\BusinessHoursSchedule;
 use App\Models\Extension;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -62,21 +63,56 @@ class VoiceRoutingCacheService
                 $cacheKey,
                 self::EXTENSION_CACHE_TTL,
                 function () use ($organizationId, $extensionNumber) {
-                    Log::debug('Voice routing cache: Extension cache miss, loading from database', [
+                    Log::info('Voice routing cache: Extension cache miss, loading from database', [
                         'organization_id' => $organizationId,
                         'extension_number' => $extensionNumber,
                     ]);
 
-                    return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    $query = Extension::withoutGlobalScope(OrganizationScope::class)
                         ->with('user')
                         ->where('organization_id', $organizationId)
-                        ->where('extension_number', $extensionNumber)
-                        ->first();
+                        ->where('extension_number', $extensionNumber);
+
+                    Log::info('Voice routing cache: Executing extension query', [
+                        'sql' => $query->toSql(),
+                        'bindings' => $query->getBindings(),
+                    ]);
+
+                    $extension = $query->first();
+
+                    Log::info('Voice routing cache: Extension database query result', [
+                        'organization_id' => $organizationId,
+                        'extension_number' => $extensionNumber,
+                        'extension_found' => $extension !== null,
+                        'extension_id' => $extension?->id,
+                        'extension_type' => $extension?->type,
+                        'extension_status' => $extension?->status,
+                    ]);
+
+                    // Debug: Show all extensions in the database
+                    $allExtensions = Extension::withoutGlobalScope(OrganizationScope::class)
+                        ->select('id', 'organization_id', 'extension_number', 'type', 'status')
+                        ->get();
+
+                    Log::info('Voice routing cache: All extensions in database', [
+                        'total_count' => $allExtensions->count(),
+                        'extensions' => $allExtensions->map(function($ext) {
+                            return [
+                                'id' => $ext->id,
+                                'org_id' => $ext->organization_id,
+                                'number' => $ext->extension_number,
+                                'type' => $ext->type,
+                                'status' => $ext->status,
+                            ];
+                        })->toArray(),
+                    ]);
+
+                    return $extension;
                 }
             );
 
             if ($extension) {
-                Log::debug('Voice routing cache: Extension retrieved', [
+                Log::info('Voice routing cache: Extension retrieved', [
                     'organization_id' => $organizationId,
                     'extension_number' => $extensionNumber,
                     'extension_id' => $extension->id,
@@ -93,8 +129,7 @@ class VoiceRoutingCacheService
                 'error' => $e->getMessage(),
             ]);
 
-            return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->with('user')
+            return Extension::with('user')
                 ->where('organization_id', $organizationId)
                 ->where('extension_number', $extensionNumber)
                 ->first();
@@ -123,8 +158,7 @@ class VoiceRoutingCacheService
                         'organization_id' => $organizationId,
                     ]);
 
-                    return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                        ->where('organization_id', $organizationId)
+                    return BusinessHoursSchedule::where('organization_id', $organizationId)
                         ->active()
                         ->with(['scheduleDays.timeRanges', 'exceptions.timeRanges'])
                         ->first();
@@ -147,8 +181,7 @@ class VoiceRoutingCacheService
                 'error' => $e->getMessage(),
             ]);
 
-            return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('organization_id', $organizationId)
+            return BusinessHoursSchedule::where('organization_id', $organizationId)
                 ->active()
                 ->with(['scheduleDays.timeRanges', 'exceptions.timeRanges'])
                 ->first();

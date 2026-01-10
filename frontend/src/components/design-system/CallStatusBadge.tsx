@@ -11,7 +11,6 @@
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { colors } from '@/styles/tokens';
 
 export type CallStatus =
   | 'initiated'

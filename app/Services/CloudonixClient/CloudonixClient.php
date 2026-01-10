@@ -977,4 +977,83 @@ class CloudonixClient
             return $response->json();
         });
     }
+
+    /**
+     * List outbound trunks for the domain.
+     *
+     * Fetches trunks from /customers/{customer-id}/domains/{domain-id}/trunks
+     * and filters for trunks with direction "public-outbound" and "outbound" only.
+     *
+     * @return array<array<string, mixed>>|null Array of outbound trunk objects or null on failure
+     */
+    public function listOutboundTrunks(): ?array
+    {
+        if (empty($this->domainUuid)) {
+            throw new \RuntimeException(
+                'Domain UUID is required for trunk operations. ' .
+                'Please instantiate CloudonixClient with CloudonixSettings.'
+            );
+        }
+
+        $cacheKey = "cloudonix:outbound_trunks:{$this->domainUuid}";
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($cacheKey) {
+                try {
+                    $url = "/customers/{$this->customerId}/domains/{$this->domainUuid}/trunks";
+
+                    Log::debug('Cloudonix API request: List Outbound Trunks', [
+                        'url' => $this->baseUrl . $url,
+                        'domain_uuid' => $this->domainUuid,
+                    ]);
+
+                    $response = $this->client()
+                        ->get($url);
+
+                    if ($response->successful()) {
+                        $trunks = $response->json();
+
+                        // Filter for outbound trunks only
+                        $outboundTrunks = array_filter($trunks, function ($trunk) {
+                            return isset($trunk['direction']) &&
+                                   in_array($trunk['direction'], ['public-outbound', 'outbound'], true);
+                        });
+
+                        // Re-index array after filtering
+                        $outboundTrunks = array_values($outboundTrunks);
+
+                        Log::info('Successfully fetched outbound trunks from Cloudonix', [
+                            'domain_uuid' => $this->domainUuid,
+                            'total_trunks' => is_array($trunks) ? count($trunks) : 0,
+                            'outbound_trunks' => count($outboundTrunks),
+                            'status' => $response->status(),
+                        ]);
+
+                        // Cache filtered results for 5 minutes (trunk configurations change infrequently)
+                        Cache::put($cacheKey, $outboundTrunks, now()->addMinutes(5));
+
+                        return $outboundTrunks;
+                    }
+
+                    Log::warning('Failed to fetch outbound trunks from Cloudonix', [
+                        'domain_uuid' => $this->domainUuid,
+                        'url' => $this->baseUrl . $url,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while fetching outbound trunks from Cloudonix', [
+                        'domain_uuid' => $this->domainUuid,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: $cacheKey,
+            fallbackValue: []
+        );
+    }
 }

@@ -230,7 +230,7 @@ const VoiceSelector: React.FC<{
       {/* Voice selection */}
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Voice</Label>
-        <Select value={value || 'Cloudonix-Neural:Zoe'} onValueChange={onChange}>
+        <Select value={value} onValueChange={onChange}>
           <SelectTrigger>
             <SelectValue placeholder="Choose a voice" />
           </SelectTrigger>
@@ -341,13 +341,13 @@ export default function IVRMenus() {
     audio_file_path: '',
     recording_id: undefined,
     tts_text: '',
-    tts_voice: 'en-US-Neural2-A',
+    tts_voice: undefined,
     useTTS: false,
-    max_timeout: 3,
-    inter_digit_timeout: 2,
-    max_turns: 3,
-    failover_destination_type: 'hangup',
-    status: 'active',
+    max_timeout: 1,
+    inter_digit_timeout: 1,
+    max_turns: 1,
+    failover_destination_type: 'hangup' as IvrDestinationType,
+    status: 'active' as IvrMenuStatus,
     options: [],
   });
 
@@ -520,12 +520,15 @@ export default function IVRMenus() {
       name: '',
       description: '',
       audio_file_path: '',
+      recording_id: undefined,
       tts_text: '',
-    tts_voice: 'Cloudonix-Neural:Zoe',
+      tts_voice: undefined,
       useTTS: false,
-      max_turns: 3,
-      failover_destination_type: 'hangup',
-      status: 'active',
+      max_timeout: 1,
+      inter_digit_timeout: 1,
+      max_turns: 1,
+      failover_destination_type: 'hangup' as IvrDestinationType,
+      status: 'active' as IvrMenuStatus,
       options: [],
     });
   };
@@ -552,19 +555,19 @@ export default function IVRMenus() {
       return;
     }
 
-    const requestData: CreateIvrMenuRequest = {
-      name: formData.name,
-      description: formData.description,
-      audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
-      recording_id: formData.useTTS ? undefined : formData.recording_id,
-      tts_text: formData.useTTS ? formData.tts_text : undefined,
-      tts_voice: formData.useTTS ? formData.tts_voice : undefined,
-      max_timeout: formData.max_timeout || 3,
-      inter_digit_timeout: formData.inter_digit_timeout || 2,
-      max_turns: formData.max_turns || 3,
-      failover_destination_type: formData.failover_destination_type as any,
-      failover_destination_id: formData.failover_destination_id,
-      status: formData.status as IvrMenuStatus,
+     const requestData: CreateIvrMenuRequest = {
+       name: formData.name,
+       description: formData.description,
+       audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
+       recording_id: formData.useTTS ? undefined : formData.recording_id,
+       tts_text: formData.useTTS ? formData.tts_text : undefined,
+       tts_voice: formData.useTTS ? formData.tts_voice : undefined,
+       max_timeout: formData.max_timeout,
+       inter_digit_timeout: formData.inter_digit_timeout,
+       max_turns: formData.max_turns,
+       failover_destination_type: formData.failover_destination_type as any,
+       failover_destination_id: formData.failover_destination_id,
+       status: formData.status as IvrMenuStatus,
       options: formData.options.map((option, index) => ({
         input_digits: option.input_digits,
         description: option.description,
@@ -601,19 +604,19 @@ export default function IVRMenus() {
       return;
     }
 
-    const requestData: UpdateIvrMenuRequest = {
-      name: formData.name,
-      description: formData.description,
-      audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
-      recording_id: formData.useTTS ? undefined : formData.recording_id,
-      tts_text: formData.useTTS ? formData.tts_text : undefined,
-      tts_voice: formData.useTTS ? formData.tts_voice : undefined,
-      max_timeout: formData.max_timeout || 3,
-      inter_digit_timeout: formData.inter_digit_timeout || 2,
-      max_turns: formData.max_turns || 3,
-      failover_destination_type: formData.failover_destination_type as any,
-      failover_destination_id: formData.failover_destination_id,
-      status: formData.status as IvrMenuStatus,
+     const requestData: UpdateIvrMenuRequest = {
+       name: formData.name,
+       description: formData.description,
+       audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
+       recording_id: formData.useTTS ? undefined : formData.recording_id,
+       tts_text: formData.useTTS ? formData.tts_text : undefined,
+       tts_voice: formData.useTTS ? formData.tts_voice : undefined,
+       max_timeout: formData.max_timeout,
+       inter_digit_timeout: formData.inter_digit_timeout,
+       max_turns: formData.max_turns,
+       failover_destination_type: formData.failover_destination_type as any,
+       failover_destination_id: formData.failover_destination_id,
+       status: formData.status as IvrMenuStatus,
       options: formData.options.map((option, index) => ({
         input_digits: option.input_digits,
         description: option.description,
@@ -674,11 +677,12 @@ export default function IVRMenus() {
       name: menu.name,
       description: menu.description,
       audio_file_path: menu.audio_file_path,
+      recording_id: undefined,
       tts_text: menu.tts_text,
-      tts_voice: menu.tts_voice || 'Cloudonix-Neural:Zoe', // Load from menu or default
+      tts_voice: menu.tts_voice,
       useTTS: !!menu.tts_text,
-      max_timeout: menu.max_timeout || 3,
-      inter_digit_timeout: menu.inter_digit_timeout || 2,
+      max_timeout: menu.max_timeout,
+      inter_digit_timeout: menu.inter_digit_timeout,
       max_turns: menu.max_turns,
       failover_destination_type: menu.failover_destination_type,
       failover_destination_id: menu.failover_destination_id,
@@ -1054,21 +1058,21 @@ export default function IVRMenus() {
                           Select from uploaded recordings or upload new ones in the Recordings page
                         </p>
                       </div>
-                    )}
-                  </div>
-                 ) : (
-                   <div className="space-y-4">
-                      <VoiceSelector
-                        value={formData.tts_voice || 'en-US-Neural2-A'}
-                        onChange={(value) => setFormData({ ...formData, tts_voice: value })}
-                        voices={voices}
-                        filters={filters}
-                        onRefresh={refreshVoices}
-                        cloudonixSettings={cloudonixSettings}
-                      />
+                     )}
+                   </div>
+                  ) : (
+                    <div className="space-y-4">
+                       <VoiceSelector
+                         value={formData.tts_voice}
+                         onChange={(value) => setFormData({ ...formData, tts_voice: value })}
+                         voices={voices}
+                         filters={filters}
+                         onRefresh={refreshVoices}
+                         cloudonixSettings={cloudonixSettings}
+                       />
 
-                     <div className="space-y-2">
-                       <Label htmlFor="tts-text">Text to Speak</Label>
+                      <div className="space-y-2">
+                        <Label htmlFor="tts-text">Text to Speak</Label>
                       <Textarea
                         id="tts-text"
                         value={formData.tts_text || ''}

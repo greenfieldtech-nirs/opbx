@@ -33,8 +33,9 @@ class CxmlBuilder
      * @param string|array<string> $targets Phone number(s) or SIP URI(s)
      * @param int|null $timeout Timeout in seconds
      * @param string|null $action Callback URL after dial completes
+     * @param string|null $trunks Trunk identifier(s) to use for dialing
      */
-    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null): self
+    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null): self
     {
         $dial = $this->document->createElement('Dial');
 
@@ -44,6 +45,10 @@ class CxmlBuilder
 
         if ($action !== null) {
             $dial->setAttribute('action', $action);
+        }
+
+        if ($trunks !== null) {
+            $dial->setAttribute('trunks', $trunks);
         }
 
         // Handle multiple targets
@@ -324,11 +329,12 @@ class CxmlBuilder
      * @param string $destination The destination to dial
      * @param string|null $callerId Optional caller ID
      * @param int|null $timeout Optional timeout in seconds
+     * @param string|null $trunks Trunk identifier(s) to use for dialing
      */
-    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null): string
+    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null): string
     {
         $builder = new self();
-        $builder->dial($destination, $timeout, null);
+        $builder->dial($destination, $timeout, null, $trunks);
 
         return $builder->build();
     }

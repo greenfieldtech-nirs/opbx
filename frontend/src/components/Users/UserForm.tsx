@@ -4,7 +4,6 @@
  * Form for creating and editing users with validation
  */
 
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import type { User, CreateUserRequest, UpdateUserRequest, UserRole, UserStatus } from '@/types/api.types';
 
 // Validation schema

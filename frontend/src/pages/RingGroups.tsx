@@ -227,8 +227,6 @@ export default function RingGroups() {
   });
 
   const ringGroups = ringGroupsData?.data || [];
-  const totalRingGroups = ringGroupsData?.meta?.total || 0;
-  const totalPages = ringGroupsData?.meta?.last_page || 1;
 
   // Fetch available extensions (type: user, status: active)
   const { data: extensionsData } = useQuery({
