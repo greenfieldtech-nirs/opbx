@@ -79,4 +79,25 @@ class CxmlBuilderTest extends TestCase
         $this->assertStringContainsString('<Number>+1234567890</Number>', $cxml);
         $this->assertStringNotContainsString('<Sip>', $cxml);
     }
+
+    public function test_dial_with_trunks_attribute(): void
+    {
+        $builder = new CxmlBuilder();
+        $cxml = $builder
+            ->dial('sip:1001@example.com', 30, null, 'trunk1,trunk2')
+            ->build();
+
+        $this->assertStringContainsString('<Dial', $cxml);
+        $this->assertStringContainsString('trunks="trunk1,trunk2"', $cxml);
+        $this->assertStringContainsString('<Sip>sip:1001@example.com</Sip>', $cxml);
+    }
+
+    public function test_simple_dial_with_trunks(): void
+    {
+        $cxml = CxmlBuilder::simpleDial('+1234567890', null, 30, 'trunk1');
+
+        $this->assertStringContainsString('<Dial', $cxml);
+        $this->assertStringContainsString('trunks="trunk1"', $cxml);
+        $this->assertStringContainsString('<Number>+1234567890</Number>', $cxml);
+    }
 }

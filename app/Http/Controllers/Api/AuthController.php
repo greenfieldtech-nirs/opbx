@@ -77,7 +77,7 @@ class AuthController extends Controller
                 'user_exists' => $user !== null,
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['email' => $request->input('email')],
                 'Invalid credentials.',
                 401,
@@ -96,7 +96,7 @@ class AuthController extends Controller
                 'ip_address' => $ipAddress,
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['account_inactive' => true],
                 'Your account is not active. Please contact support.',
                 403,
@@ -116,7 +116,7 @@ class AuthController extends Controller
                 'ip_address' => $ipAddress,
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['organization_id' => $user->organization_id],
                 'Your organization is not active. Please contact support.',
                 403,

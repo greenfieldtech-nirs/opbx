@@ -12,7 +12,6 @@ export function JsonViewer({ data, collapsed = false, className = '' }: JsonView
     <div className={`bg-slate-900 p-3 rounded border ${className}`}>
       <JsonView
         src={data}
-        theme="dark"
         collapseStringsAfterLength={100}
         collapsed={collapsed}
         style={{

@@ -4,13 +4,11 @@
  * Real-time active calls monitoring using session-updates API
  */
 
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, PhoneCall, Clock, ArrowRightLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ActiveCall, ActiveCallsResponse } from '@/types/api.types';
 
 /**
  * Get status color for call status badges

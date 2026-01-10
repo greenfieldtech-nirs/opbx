@@ -376,6 +376,86 @@ class SettingsController extends Controller
     }
 
     /**
+     * Get outbound voice trunks from Cloudonix API.
+     *
+     * @return JsonResponse
+     */
+    public function getOutboundTrunks(): JsonResponse
+    {
+        $requestId = $this->getRequestId();
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        // Check authorization using policy
+        $this->authorize('viewAny', CloudonixSettings::class);
+
+        $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
+
+        if (!$settings || !$settings->isConfigured()) {
+            return response()->json([
+                'error' => 'Cloudonix settings not configured',
+                'message' => 'Please configure Cloudonix settings before fetching outbound trunks.',
+            ], 422);
+        }
+
+        Log::info('Fetching outbound voice trunks from Cloudonix', [
+            'request_id' => $requestId,
+            'user_id' => $user->id,
+            'organization_id' => $user->organization_id,
+            'domain_uuid' => $settings->domain_uuid,
+        ]);
+
+        try {
+            $client = new CloudonixClient($settings);
+            $trunks = $client->listOutboundTrunks();
+
+            if ($trunks === null) {
+                Log::warning('Failed to fetch outbound trunks from Cloudonix API', [
+                    'request_id' => $requestId,
+                    'user_id' => $user->id,
+                    'organization_id' => $user->organization_id,
+                    'domain_uuid' => $settings->domain_uuid,
+                ]);
+
+                return response()->json([
+                    'error' => 'Failed to fetch outbound trunks',
+                    'message' => 'Unable to retrieve outbound trunks from Cloudonix API.',
+                ], 500);
+            }
+
+            Log::info('Successfully fetched outbound trunks from Cloudonix', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'domain_uuid' => $settings->domain_uuid,
+                'trunk_count' => count($trunks),
+            ]);
+
+            return response()->json([
+                'trunks' => $trunks,
+                'count' => count($trunks),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Exception while fetching outbound trunks from Cloudonix', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'domain_uuid' => $settings->domain_uuid,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to fetch outbound trunks',
+                'message' => 'An error occurred while retrieving outbound trunks.',
+            ], 500);
+        }
+    }
+
+    /**
      * Generate a cryptographically secure random API key.
      *
      * @param int $length The length of the API key

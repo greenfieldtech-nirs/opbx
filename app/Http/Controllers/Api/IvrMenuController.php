@@ -894,11 +894,11 @@ class IvrMenuController extends Controller
 
         // Check if recording_id is provided
         if ($recordingId) {
-            $recording = \App\Models\Recording::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find($recordingId);
+            $recording = \App\Models\Recording::find($recordingId);
         }
         // Check if audio_file_path is a recording ID (integer or numeric string)
         elseif ($audioFilePath && (is_int($audioFilePath) || (is_string($audioFilePath) && ctype_digit($audioFilePath)))) {
-            $recording = \App\Models\Recording::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->find((int) $audioFilePath);
+            $recording = \App\Models\Recording::find((int) $audioFilePath);
         }
 
         if (isset($recording) && $recording && $recording->isActive()) {

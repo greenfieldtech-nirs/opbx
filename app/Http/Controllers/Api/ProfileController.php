@@ -26,13 +26,15 @@ use Illuminate\Support\Str;
 class ProfileController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Get current user's profile.
      *
      * Returns detailed profile information for the authenticated user
      * including organization details.
      *
-     * @param  Request  $request  Authenticated request
+     * @param Request $request Authenticated request
+     *
      * @return JsonResponse User profile data
      */
     public function show(Request $request): JsonResponse
@@ -73,7 +75,8 @@ class ProfileController extends Controller
      * Email uniqueness is validated across the users table.
      * All changes are logged for audit purposes.
      *
-     * @param  UpdateProfileRequest  $request  Validated profile update data
+     * @param UpdateProfileRequest $request Validated profile update data
+     *
      * @return JsonResponse Updated user profile
      */
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -96,7 +99,7 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user) {
+            DB::transaction(function () use ($user, $request) {
                 // Update user profile - only update fields that are present
                 $fieldsToUpdate = [
                     'name',
@@ -169,7 +172,6 @@ class ProfileController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-
             Log::error('Profile update failed', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -177,13 +179,14 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['error' => $e->getMessage()],
                 'Failed to update profile. Please try again.',
                 500,
                 'PROFILE_UPDATE_FAILED',
                 $requestId
             );
+        }
     }
 
     /**
@@ -193,7 +196,8 @@ class ProfileController extends Controller
      * Only users with the OWNER role can perform this operation.
      * All changes are logged for audit purposes.
      *
-     * @param  UpdateOrganizationRequest  $request  Validated organization update data
+     * @param UpdateOrganizationRequest $request Validated organization update data
+     *
      * @return JsonResponse Updated organization data
      */
     public function updateOrganization(UpdateOrganizationRequest $request): JsonResponse
@@ -215,7 +219,7 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user, $organization) {
+            DB::transaction(function () use ($user, $organization, $request) {
                 // Update organization - only update fields that are present
                 if ($request->has('name')) {
                     $organization->name = $request->input('name');
@@ -225,7 +229,6 @@ class ProfileController extends Controller
                 }
 
                 $organization->save();
-                $user->save();
             });
 
             Log::info('Organization updated successfully', [
@@ -251,7 +254,6 @@ class ProfileController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-
             Log::error('Organization update failed', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -260,7 +262,7 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['error' => $e->getMessage()],
                 'Failed to update organization. Please try again.',
                 500,
@@ -279,7 +281,8 @@ class ProfileController extends Controller
      * Password is hashed using bcrypt before storage.
      * All authentication tokens are revoked after password change for security.
      *
-     * @param  UpdatePasswordRequest  $request  Validated password change data
+     * @param UpdatePasswordRequest $request Validated password change data
+     *
      * @return JsonResponse Success message
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
@@ -295,15 +298,13 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user) {
+            DB::transaction(function () use ($user, $request) {
                 // Update password with bcrypt hashing
                 $user->password = Hash::make($request->input('new_password'));
                 $user->save();
 
                 // Revoke all existing tokens for security
                 $user->tokens()->delete();
-
-                DB::commit();
 
                 Log::info('Password changed successfully', [
                     'request_id' => $requestId,
@@ -325,11 +326,27 @@ class ProfileController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->logAndRespond(
+            return $this->logAndRespondError(
                 ['error' => $e->getMessage()],
                 'Failed to update password. Please try again.',
                 500,
                 'PASSWORD_UPDATE_FAILED',
+                $requestId
+            );
+        } catch (\Exception $e) {
+            Log::error('Organization update failed', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $organization->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->logAndRespondError(
+                ['error' => $e->getMessage()],
+                'Failed to update organization. Please try again.',
+                500,
+                'ORGANIZATION_UPDATE_FAILED',
                 $requestId
             );
         }

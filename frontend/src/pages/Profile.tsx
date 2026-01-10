@@ -7,7 +7,7 @@
  * 3. Change Password (with password generator)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { profileService } from '@/services/profile.service';
 import { getApiErrorMessage } from '@/services/api';
+import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +30,7 @@ import {
   SelectGroup,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
 import {
   User,
   Mail,
@@ -53,9 +54,9 @@ import type {
   ProfileData,
 } from '@/types';
 import { generateStrongPassword } from '@/utils/passwordGenerator';
-import { TIMEZONES, getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
-import { COUNTRIES, searchCountries } from '@/utils/countries';
-import { getRoleLabel, getRoleColor, canEditRoles } from '@/utils/roleHelpers';
+import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
+import { getCountryOptions } from '@/utils/countries';
+import { getRoleLabel, getRoleColor } from '@/utils/roleHelpers';
 import type { UserRole } from '@/types';
 
 // Organization form validation schema
@@ -110,6 +111,14 @@ export default function Profile() {
 
   const isOwner = user?.role === 'owner';
 
+  // Memoize country options to ensure stable references
+  const countryOptions = useMemo(() =>
+    getCountryOptions().map(c => ({
+      value: c.code,
+      label: `${c.flag} ${c.name}`
+    })), []
+  );
+
   // Organization form
   const {
     register: registerOrg,
@@ -149,7 +158,7 @@ export default function Profile() {
     resolver: zodResolver(passwordSchema),
   });
 
-  const newPassword = watchPassword('new_password');
+
 
   // Load profile data on mount
   useEffect(() => {
@@ -537,19 +546,19 @@ export default function Profile() {
                   <Controller
                     name="country"
                     control={controlProfile}
-                    render={({ field }) => (
-                      <Combobox
-                        options={COUNTRIES.map(c => ({ value: c.name, label: c.name }))}
-                        value={field.value || ''}
-                        onValueChange={field.onChange}
-                        placeholder="Select a country..."
-                        searchPlaceholder="Search countries..."
-                        emptyText="No country found."
-                        disabled={isUpdatingProfile}
-                        buttonClassName="w-full"
-                        contentClassName="w-[--radix-popover-trigger-width]"
-                      />
-                    )}
+                      render={({ field }) => (
+                        <Combobox
+                          options={countryOptions}
+                         value={field.value || ''}
+                         onValueChange={field.onChange}
+                         placeholder="Select a country..."
+                         searchPlaceholder="Search countries..."
+                         emptyText="No country found."
+                         disabled={isUpdatingProfile}
+                         buttonClassName="w-full"
+                         contentClassName="w-[--radix-popover-trigger-width]"
+                       />
+                     )}
                   />
                 </div>
               </div>

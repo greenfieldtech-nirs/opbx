@@ -25,7 +25,7 @@ class IvrRoutingStrategy implements RoutingStrategy
         return $type === ExtensionType::IVR;
     }
 
-    public function route(Request $request, DidNumber $did, array $destination): Response
+    public function route(Request $request, DidNumber $did, array $destination, ?string $errorMessage = null): Response
     {
         $callSid = $request->input('CallSid');
         $orgId = (int) $request->input('_organization_id');
@@ -55,18 +55,18 @@ class IvrRoutingStrategy implements RoutingStrategy
         $callState = $this->ivrStateService->initializeCallState($callSid, $ivrMenu->id);
 
         // Generate CXML for IVR menu presentation
-        return $this->generateIvrMenuResponse($request, $ivrMenu, $callState, $baseUrl);
+        return $this->generateIvrMenuResponse($request, $ivrMenu, $callState, $baseUrl, $errorMessage);
     }
 
     /**
      * Generate CXML response for IVR menu presentation.
      */
-    private function generateIvrMenuResponse(Request $request, IvrMenu $ivrMenu, array $callState, string $baseUrl): Response
+    private function generateIvrMenuResponse(Request $request, IvrMenu $ivrMenu, array $callState, string $baseUrl, ?string $errorMessage = null): Response
     {
         $callSid = $request->input('CallSid');
 
         // Determine what to play/say
-        $audioContent = $this->getAudioContent($request, $ivrMenu, $baseUrl);
+        $audioContent = $this->getAudioContent($request, $ivrMenu, $baseUrl, $errorMessage);
 
         // Create Gather verb for DTMF collection
         $relativeUrl = route('voice.ivr-input', [], false) . '?menu_id=' . $ivrMenu->id;
@@ -100,22 +100,29 @@ class IvrRoutingStrategy implements RoutingStrategy
     /**
      * Get audio content for the IVR menu (file or TTS).
      */
-    private function getAudioContent(Request $request, IvrMenu $ivrMenu, string $baseUrl): string
+    private function getAudioContent(Request $request, IvrMenu $ivrMenu, string $baseUrl, ?string $errorMessage = null): string
     {
+        $audioContent = '';
+
+        // Prepend error message if provided
+        if ($errorMessage) {
+            $audioContent .= CxmlBuilder::sayXml($errorMessage);
+        }
+
         // Priority: audio file > TTS text > default message
         if ($ivrMenu->audio_file_path) {
             $audioUrl = $this->resolveAudioUrl($request, $ivrMenu->audio_file_path, $baseUrl);
-            return CxmlBuilder::playXml($audioUrl);
-        }
-
-        if ($ivrMenu->tts_text) {
+            $audioContent .= CxmlBuilder::playXml($audioUrl);
+        } elseif ($ivrMenu->tts_text) {
             // Use the selected voice, fallback to Cloudonix-Neural:Zoe if not set
             $voice = $ivrMenu->tts_voice ?: 'Cloudonix-Neural:Zoe';
-            return CxmlBuilder::sayXml($ivrMenu->tts_text, $voice);
+            $audioContent .= CxmlBuilder::sayXml($ivrMenu->tts_text, $voice);
+        } else {
+            // Default fallback message
+            $audioContent .= CxmlBuilder::sayXml('Please enter the number for your desired option.', 'Cloudonix-Neural:Zoe');
         }
 
-        // Default fallback message
-        return CxmlBuilder::sayXml('Please enter the number for your desired option.', 'Cloudonix-Neural:Zoe');
+        return $audioContent;
     }
 
     /**
