@@ -358,7 +358,8 @@ class VoiceRoutingManager
             return $this->findRingGroupByExtensionNumber($extension, $organizationId);
         }
 
-        $ringGroup = RingGroup::where('id', $ringGroupId)
+        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -389,7 +390,8 @@ class VoiceRoutingManager
             return [];
         }
 
-        $room = ConferenceRoom::where('id', $conferenceRoomId)
+        $room = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -420,7 +422,8 @@ class VoiceRoutingManager
             return [];
         }
 
-        $ivrMenu = IvrMenu::where('id', $ivrMenuId)
+        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ivrMenuId)
             ->where('organization_id', $organizationId)
             ->first();
 
@@ -1397,5 +1400,57 @@ class VoiceRoutingManager
             200,
             ['Content-Type' => 'text/xml']
         );
+    }
+
+    /**
+     * Execute the appropriate routing strategy for the given extension type.
+     */
+    private function executeStrategy(ExtensionType $type, Request $request, DidNumber $did, array $destination): Response
+    {
+        foreach ($this->strategies as $strategy) {
+            if ($strategy->canHandle($type)) {
+                return $strategy->route($request, $did, $destination);
+            }
+        }
+
+        Log::error('VoiceRoutingManager: No strategy found for extension type', [
+            'type' => $type->value,
+            'available_strategies' => $this->strategies->map(fn($s) => get_class($s))->toArray(),
+        ]);
+
+        return response(CxmlBuilder::unavailable('Unsupported extension type'), 200, ['Content-Type' => 'text/xml']);
+    }
+
+    /**
+     * Determine the extension type from a DID destination.
+     */
+    private function determineExtensionType(DidNumber $did, array $destination): ?ExtensionType
+    {
+        // If destination contains extension, use its type
+        if (isset($destination['extension'])) {
+            return $destination['extension']->type;
+        }
+
+        // If destination contains ring_group, return RING_GROUP
+        if (isset($destination['ring_group'])) {
+            return ExtensionType::RING_GROUP;
+        }
+
+        // If destination contains conference_room, return CONFERENCE
+        if (isset($destination['conference_room'])) {
+            return ExtensionType::CONFERENCE;
+        }
+
+        // If destination contains ivr_menu, return IVR
+        if (isset($destination['ivr_menu'])) {
+            return ExtensionType::IVR;
+        }
+
+        Log::warning('VoiceRoutingManager: Could not determine extension type from destination', [
+            'did_id' => $did->id,
+            'destination_keys' => array_keys($destination),
+        ]);
+
+        return null;
     }
 }
