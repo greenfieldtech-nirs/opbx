@@ -124,7 +124,7 @@ class AppServiceProvider extends ServiceProvider
         // API routes - 60 requests per minute for authenticated users
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(config('rate_limiting.api', 60))
-                ->by($request->user()?->id ?: $request->ip())
+                ->by($request->user() ? $request->user()->id : $request->ip())
                 ->response(function (Request $request, array $headers) {
                     return response()->json([
                         'error' => 'Too Many Requests',
@@ -168,7 +168,7 @@ class AppServiceProvider extends ServiceProvider
         // Sensitive operations - 10 requests per minute per user
         RateLimiter::for('sensitive', function (Request $request) {
             return Limit::perMinute(config('rate_limiting.sensitive', 10))
-                ->by($request->user()?->id ?: $request->ip())
+                ->by($request->user() ? $request->user()->id : $request->ip())
                 ->response(function (Request $request, array $headers) {
                     return response()->json([
                         'error' => 'Too Many Requests',

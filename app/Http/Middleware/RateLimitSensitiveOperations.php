@@ -42,7 +42,7 @@ class RateLimitSensitiveOperations
 
         if ($isSensitiveRoute) {
             // Rate limit to 5 requests per minute
-            $key = 'sensitive-operation:' . ($request->user()?->id : 'anonymous') . ':' . $request->ip();
+            $key = 'sensitive-operation:' . ($request->user() ? $request->user()->id : 'anonymous') . ':' . $request->ip();
 
             if (RateLimiter::tooManyAttempts($key, $maxAttempts = 5, $decayMinutes = 1)) {
                 Log::warning('Rate limit exceeded for sensitive operation', [
