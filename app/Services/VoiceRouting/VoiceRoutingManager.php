@@ -268,10 +268,19 @@ class VoiceRoutingManager
 
     /**
      * Create a standardized CXML error response.
+     *
+     * @param string $message Error message to include in the response
+     * @param int $statusCode HTTP status code (default: 200 for CXML)
+     * @return Response CXML-formatted error response
      */
-    private function createCxmlErrorResponse(string $message): Response
+    private function createCxmlErrorResponse(string $message, int $statusCode = 200): Response
     {
-        return response(CxmlBuilder::unavailable($message), 200, ['Content-Type' => 'text/xml']);
+        Log::warning('VoiceRoutingManager: Returning error response', [
+            'message' => $message,
+            'status_code' => $statusCode,
+        ]);
+
+        return response(CxmlBuilder::unavailable($message), $statusCode, ['Content-Type' => 'text/xml']);
     }
 
     private function routeDidCall(Request $request, DidNumber $did): Response
@@ -281,14 +290,14 @@ class VoiceRoutingManager
 
         if (empty($destination)) {
             Log::warning('VoiceRoutingManager: No destination found for DID', ['did' => $did->phone_number]);
-            return response(CxmlBuilder::unavailable('Configuration error'), 200, ['Content-Type' => 'text/xml']);
+            return $this->createCxmlErrorResponse('Configuration error');
         }
 
         // 4. Determine Extension Type for Strategy Selection
         $type = $this->determineExtensionType($did, $destination);
 
         if (!$type) {
-            return response(CxmlBuilder::unavailable('Unknown routing type'), 200, ['Content-Type' => 'text/xml']);
+            return $this->createCxmlErrorResponse('Unknown routing type');
         }
 
         // 5. Execute Strategy
@@ -1467,7 +1476,7 @@ class VoiceRoutingManager
             'available_strategies' => $this->strategies->map(fn($s) => get_class($s))->toArray(),
         ]);
 
-        return response(CxmlBuilder::unavailable('Unsupported extension type'), 200, ['Content-Type' => 'text/xml']);
+        return $this->createCxmlErrorResponse('Unsupported extension type');
     }
 
     /**

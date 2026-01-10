@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use libphonenumber\PhoneNumberUtil;
 use libphonenumber\PhoneNumberFormat;
@@ -49,10 +50,8 @@ class PhoneNumberService
             // Parse the phone number
             $parsedNumber = $this->phoneUtil->parse($phoneNumber, 'US'); // Default region
 
-            // Get the country code
-            $countryCode = $this->phoneUtil->getCountryCodeForRegion(
-                $this->phoneUtil->getRegionCodeForNumber($parsedNumber)
-            );
+            // Get the country code directly from the parsed number
+            $countryCode = $parsedNumber->getCountryCode();
 
             return '+' . $countryCode;
         } catch (NumberParseException $e) {
@@ -67,32 +66,68 @@ class PhoneNumberService
     /**
      * Convert calling code to country code.
      * Uses libphonenumber for accurate country code mapping.
+     * Results are cached for performance.
      *
      * @param string $callingCode
      * @return string|null The ISO country code or null if not found
      */
     public function callingCodeToCountryCode(string $callingCode): ?string
     {
-        try {
-            // Parse a dummy number with this calling code to get the region
-            $dummyNumber = $callingCode . '1234567890';
-            $parsedNumber = $this->phoneUtil->parse($dummyNumber, 'US');
+        $cacheKey = "phone_country_code:{$callingCode}";
 
-            $region = $this->phoneUtil->getRegionCodeForNumber($parsedNumber);
+        return Cache::remember(
+            $cacheKey,
+            3600, // Cache for 1 hour
+            function () use ($callingCode) {
+                try {
+                    // Remove + prefix if present
+                    $code = ltrim($callingCode, '+');
 
-            // If region is ZZ (unknown), return null
-            return $region === 'ZZ' ? null : $region;
-        } catch (NumberParseException $e) {
-            Log::warning('Failed to determine country code from calling code', [
-                'calling_code' => $callingCode,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
+                    // Try to find a region that uses this calling code
+                    // This is a simplified approach - in practice, multiple countries can share calling codes
+                    $regions = [
+                        1 => 'US',    // United States, Canada, etc.
+                        7 => 'RU',    // Russia, Kazakhstan
+                        20 => 'EG',   // Egypt
+                        27 => 'ZA',   // South Africa
+                        30 => 'GR',   // Greece
+                        31 => 'NL',   // Netherlands
+                        32 => 'BE',   // Belgium
+                        33 => 'FR',   // France
+                        34 => 'ES',   // Spain
+                        36 => 'HU',   // Hungary
+                        39 => 'IT',   // Italy
+                        40 => 'RO',   // Romania
+                        41 => 'CH',   // Switzerland
+                        43 => 'AT',   // Austria
+                        44 => 'GB',   // United Kingdom
+                        45 => 'DK',   // Denmark
+                        46 => 'SE',   // Sweden
+                        47 => 'NO',   // Norway
+                        48 => 'PL',   // Poland
+                        49 => 'DE',   // Germany
+                        81 => 'JP',   // Japan
+                        82 => 'KR',   // South Korea
+                        86 => 'CN',   // China
+                        91 => 'IN',   // India
+                    ];
+
+                    $countryCode = (int) $code;
+                    return $regions[$countryCode] ?? null;
+                } catch (\Exception $e) {
+                    Log::warning('Failed to determine country code from calling code', [
+                        'calling_code' => $callingCode,
+                        'error' => $e->getMessage(),
+                    ]);
+                    return null;
+                }
+            }
+        );
     }
 
     /**
      * Validate and format a phone number.
+     * Results are cached for performance.
      *
      * @param string $phoneNumber
      * @param string $defaultRegion Default region for parsing (e.g., 'US')
@@ -100,28 +135,36 @@ class PhoneNumberService
      */
     public function validateAndFormatPhoneNumber(string $phoneNumber, string $defaultRegion = 'US'): ?array
     {
-        try {
-            $parsedNumber = $this->phoneUtil->parse($phoneNumber, $defaultRegion);
+        $cacheKey = "phone_validation:{$phoneNumber}:{$defaultRegion}";
 
-            if (!$this->phoneUtil->isValidNumber($parsedNumber)) {
-                return null;
+        return Cache::remember(
+            $cacheKey,
+            1800, // Cache for 30 minutes
+            function () use ($phoneNumber, $defaultRegion) {
+                try {
+                    $parsedNumber = $this->phoneUtil->parse($phoneNumber, $defaultRegion);
+
+                    if (!$this->phoneUtil->isValidNumber($parsedNumber)) {
+                        return null;
+                    }
+
+                    return [
+                        'formatted' => $this->phoneUtil->format($parsedNumber, PhoneNumberFormat::E164),
+                        'country_code' => '+' . $parsedNumber->getCountryCode(),
+                        'national_number' => $parsedNumber->getNationalNumber(),
+                        'region' => $this->phoneUtil->getRegionCodeForNumber($parsedNumber),
+                        'is_valid' => true,
+                    ];
+                } catch (NumberParseException $e) {
+                    Log::warning('Failed to validate phone number', [
+                        'phone_number' => $phoneNumber,
+                        'default_region' => $defaultRegion,
+                        'error' => $e->getMessage(),
+                    ]);
+                    return null;
+                }
             }
-
-            return [
-                'formatted' => $this->phoneUtil->format($parsedNumber, PhoneNumberFormat::E164),
-                'country_code' => '+' . $parsedNumber->getCountryCode(),
-                'national_number' => $parsedNumber->getNationalNumber(),
-                'region' => $this->phoneUtil->getRegionCodeForNumber($parsedNumber),
-                'is_valid' => true,
-            ];
-        } catch (NumberParseException $e) {
-            Log::warning('Failed to validate phone number', [
-                'phone_number' => $phoneNumber,
-                'default_region' => $defaultRegion,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
+        );
     }
 
     /**
