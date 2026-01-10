@@ -80,6 +80,15 @@ class VoiceRoutingManager
             'did_routing_type' => $did?->routing_type,
         ]);
 
+        // If DID found, route according to DID configuration
+        if ($did) {
+            Log::info('VoiceRoutingManager: Routing to DID destination', [
+                'did_id' => $did->id,
+                'routing_type' => $did->routing_type,
+            ]);
+            return $this->routeDidCall($request, $did);
+        }
+
         // If not a DID, it might be an internal extension
         // Using cache service to look up extension by number
         // Normalize number logic might be needed here, or assumed normalized by middleware/controller
