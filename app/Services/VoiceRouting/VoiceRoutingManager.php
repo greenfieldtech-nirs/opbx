@@ -22,11 +22,31 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Voice Routing Manager
+ *
+ * Central service for handling inbound voice call routing in the PBX system.
+ * Supports multiple routing types including DIDs, extensions, ring groups,
+ * conference rooms, IVR menus, AI assistants, and outbound routing.
+ *
+ * This service coordinates between various routing strategies and provides
+ * unified call routing logic with proper error handling and logging.
+ *
+ * @package App\Services\VoiceRouting
+ */
 class VoiceRoutingManager
 {
     /** @var Collection<int, RoutingStrategy> */
     private Collection $strategies;
 
+    /**
+     * Create a new VoiceRoutingManager instance.
+     *
+     * @param VoiceRoutingCacheService $cache Service for caching extension and routing data
+     * @param IvrStateService $ivrStateService Service for managing IVR call state
+     * @param PhoneNumberService $phoneNumberService Service for phone number parsing and validation
+     * @param iterable<RoutingStrategy> $strategies Collection of routing strategies
+     */
     public function __construct(
         private readonly VoiceRoutingCacheService $cache,
         private readonly IvrStateService $ivrStateService,
@@ -38,6 +58,18 @@ class VoiceRoutingManager
 
     /**
      * Handle inbound call routing.
+     *
+     * Main entry point for processing incoming calls. Determines the routing path
+     * based on the destination number and applies business rules in priority order:
+     * 1. Business hours check
+     * 2. DID routing (if DID exists for the number)
+     * 3. Extension routing (if extension exists for the number)
+     * 4. Outbound routing (via whitelist for internal callers)
+     *
+     * @param Request $request The incoming HTTP request containing call details
+     * @return Response CXML response with routing instructions
+     *
+     * @throws \Exception If routing cannot be determined
      */
     public function handleInbound(Request $request): Response
     {
@@ -85,6 +117,15 @@ class VoiceRoutingManager
 
     /**
      * Handle DID-based routing if a DID is found for the destination number.
+     *
+     * Checks if the destination number is configured as a DID in the system.
+     * If found, routes the call according to the DID's routing configuration
+     * (extension, ring group, conference, IVR, etc.).
+     *
+     * @param Request $request The incoming call request
+     * @param string $to The destination phone number
+     * @param int $orgId The organization ID
+     * @return Response|null CXML response if DID routing applies, null otherwise
      */
     private function handleDidRouting(Request $request, string $to, int $orgId): ?Response
     {
@@ -119,6 +160,15 @@ class VoiceRoutingManager
 
     /**
      * Handle extension-based routing if an extension is found for the destination number.
+     *
+     * Checks if the destination number corresponds to an internal extension.
+     * If found and active, resolves the extension's destination type and routes accordingly.
+     * Supports all extension types: user, ring_group, conference, ivr, ai_assistant, forward.
+     *
+     * @param Request $request The incoming call request
+     * @param string $to The destination extension number
+     * @param int $orgId The organization ID
+     * @return Response|null CXML response if extension routing applies, null otherwise
      */
     private function handleExtensionRouting(Request $request, string $to, int $orgId): ?Response
     {
@@ -316,54 +366,67 @@ class VoiceRoutingManager
         ]);
 
         // Handle both enum and string types for backward compatibility
-        if ($extensionType instanceof ExtensionType) {
-            $typeValue = $extensionType->value;
-        } else {
-            $typeValue = (string) $extensionType;
-        }
+        $typeValue = $extensionType instanceof ExtensionType ? $extensionType->value : (string) $extensionType;
 
         Log::info('VoiceRoutingManager: Extension type resolved', [
             'type_value' => $typeValue,
         ]);
 
-        // Route based on extension type
-        switch ($typeValue) {
-            case 'user':
-                Log::debug('VoiceRoutingManager: User extension destination', [
-                    'extension' => $extension->extension_number
-                ]);
-                return ['extension' => $extension];
+        // Map extension types to their resolver methods
+        $resolverMap = [
+            'user' => fn() => $this->resolveUserDestination($extension),
+            'ring_group' => fn() => $this->resolveRingGroupDestination($extension, $organizationId),
+            'conference' => fn() => $this->resolveConferenceDestination($extension, $organizationId),
+            'ivr' => fn() => $this->resolveIvrDestination($extension, $organizationId),
+            'ai_assistant' => fn() => $this->resolveAiAssistantDestination($extension, $organizationId),
+            'forward' => fn() => $this->resolveForwardDestination($extension),
+        ];
 
-            case 'ring_group':
-                return $this->resolveRingGroupDestination($extension, $organizationId);
-
-            case 'conference':
-                return $this->resolveConferenceDestination($extension, $organizationId);
-
-            case 'ivr':
-                return $this->resolveIvrDestination($extension, $organizationId);
-
-            case 'ai_assistant':
-                return $this->resolveAiAssistantDestination($extension, $organizationId);
-
-            case 'forward':
-                // For forward extensions, we still need to determine the forwarding target
-                return ['extension' => $extension]; // Let the strategy handle forwarding
-
-            case 'custom_logic':
-                return ['extension' => $extension]; // Custom logic not yet implemented
-
-            case 'queue':
-                return ['extension' => $extension]; // Queue routing not yet implemented
-
-            default:
-                Log::warning('VoiceRoutingManager: Unknown extension type, falling back to extension', [
+        // Use resolver if available, otherwise fallback to generic extension
+        if (isset($resolverMap[$typeValue])) {
+            try {
+                $result = $resolverMap[$typeValue]();
+                if (!empty($result)) {
+                    return $result;
+                }
+            } catch (\Exception $e) {
+                Log::error('VoiceRoutingManager: Error resolving extension destination', [
+                    'extension_id' => $extension->id,
                     'extension_number' => $extension->extension_number,
-                    'type_raw' => $extensionType,
-                    'type_value' => $typeValue
+                    'type' => $typeValue,
+                    'error' => $e->getMessage(),
                 ]);
-                return ['extension' => $extension]; // Fallback for unknown types
+            }
         }
+
+        // Fallback for unknown types or failed resolution
+        Log::warning('VoiceRoutingManager: Using fallback resolution for extension', [
+            'extension_number' => $extension->extension_number,
+            'type' => $typeValue,
+            'resolver_found' => isset($resolverMap[$typeValue]),
+        ]);
+
+        return ['extension' => $extension];
+    }
+
+    /**
+     * Resolve user extension destination.
+     */
+    private function resolveUserDestination(Extension $extension): array
+    {
+        Log::debug('VoiceRoutingManager: User extension destination', [
+            'extension' => $extension->extension_number
+        ]);
+        return ['extension' => $extension];
+    }
+
+    /**
+     * Resolve forward extension destination.
+     */
+    private function resolveForwardDestination(Extension $extension): array
+    {
+        // For forward extensions, the strategy will handle the forwarding logic
+        return ['extension' => $extension];
     }
 
     /**
