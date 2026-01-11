@@ -215,7 +215,7 @@ class VoiceRoutingManager
      * Handle application direction calls (API-initiated calls).
      *
      * These are calls initiated programmatically through the API.
-     * Currently not implemented - returns error response.
+     * Uses the same internal PBX user logic as subscriber calls.
      *
      * @param  Request  $request  The incoming call request
      * @return Response CXML response with routing instructions
@@ -232,14 +232,25 @@ class VoiceRoutingManager
             'org_id' => $orgId,
         ]);
 
-        // Application-initiated calls are not yet implemented
-        Log::warning('VoiceRoutingManager: Application direction calls not yet implemented', [
+        // Use the same logic as subscriber direction calls
+        // 1. Try extension routing first (direct extension dial)
+        $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
+        if ($extensionResponse) {
+            return $extensionResponse;
+        }
+
+        // 2. Try DID routing (fallback for API-initiated calls)
+        $didResponse = $this->handleDidRouting($request, $to, $orgId);
+        if ($didResponse) {
+            return $didResponse;
+        }
+
+        Log::info('VoiceRoutingManager: No destination found for application call', [
             'to' => $to,
-            'from' => $from,
             'org_id' => $orgId,
         ]);
 
-        return $this->createCxmlErrorResponse('Application-initiated calls not supported');
+        return $this->createCxmlErrorResponse('Extension not found');
     }
 
     /**
