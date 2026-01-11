@@ -142,7 +142,7 @@ services:
       - MYSQL_USER=${DB_USERNAME:-opbx}
       - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./volumes/mysql:/var/lib/mysql
     networks:
       - opbx
     healthcheck:
@@ -186,7 +186,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
     volumes:
-      - minio_data:/data
+      - ./volumes/minio:/data
     networks:
       - opbx
     command: server /data --console-address ":9001"
@@ -245,9 +245,5 @@ networks:
     driver: bridge
 
 volumes:
-  mysql_data:
-    driver: local
   redis_data:
-    driver: local
-  minio_data:
     driver: local
