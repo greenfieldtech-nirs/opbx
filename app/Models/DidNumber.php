@@ -162,7 +162,10 @@ class DidNumber extends Model
             return $this->attributes['_ring_group'];
         }
 
-        return RingGroup::find($ringGroupId);
+        return RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -183,7 +186,10 @@ class DidNumber extends Model
             return $this->attributes['_business_hours_schedule'];
         }
 
-        return BusinessHoursSchedule::find($scheduleId);
+        return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $scheduleId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -204,7 +210,10 @@ class DidNumber extends Model
             return $this->attributes['_conference_room'];
         }
 
-        return ConferenceRoom::find($conferenceRoomId);
+        return ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -225,7 +234,10 @@ class DidNumber extends Model
             return $this->attributes['_ivr_menu'];
         }
 
-        return IvrMenu::find($ivrMenuId);
+        return IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ivrMenuId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
