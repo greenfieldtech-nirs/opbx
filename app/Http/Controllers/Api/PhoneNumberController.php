@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
+use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
 use App\Models\BusinessHoursSchedule;
