@@ -138,7 +138,8 @@ class DidNumber extends Model
             return $this->attributes['_extension'];
         }
 
-        return Extension::where('id', $extensionId)
+        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $extensionId)
             ->where('organization_id', $this->organization_id)
             ->first();
     }
