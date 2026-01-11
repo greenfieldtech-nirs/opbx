@@ -19,6 +19,8 @@ services:
       - VITE_WEBSOCKET_KEY=${PUSHER_APP_KEY:-pbxappkey}
       - VITE_WEBSOCKET_CLUSTER=mt1
     depends_on:
+      - app
+      - mysql
       - nginx
       - soketi
     networks:

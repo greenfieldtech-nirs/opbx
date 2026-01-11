@@ -4,6 +4,8 @@
  * Test script to simulate HTTP requests to /api/voice/route for extensions 3000-3004
  * and validate the CXML responses for different extension types.
  *
+ * Tests error handling for missing referenced entities (no fallback creation).
+ *
  * Usage: php test-voice-routing.php
  */
 
@@ -68,51 +70,29 @@ try {
     ]);
     echo "Created extension 3000 (Conference Room): {$extensions['3000']->id}\n";
 
-    // 3001: Ring Group
-    $ringGroup = RingGroup::factory()->create([
-        'organization_id' => $organization->id,
-        'name' => 'Test Ring Group',
-        'status' => 'active',
-        'strategy' => 'simultaneous',
-        'timeout' => 20,
-    ]);
-
-    // Add a member to the ring group
-    $ringGroup->members()->create([
-        'extension_id' => $extensions['3000']->id, // Use the conference extension as a member
-        'priority' => 1,
-    ]);
-
+    // 3001: Ring Group (references non-existent ring group to test error handling)
     $extensions['3001'] = Extension::factory()->create([
         'organization_id' => $organization->id,
         'extension_number' => '3001',
         'type' => ExtensionType::RING_GROUP,
         'status' => 'active',
         'configuration' => [
-            'ring_group_id' => $ringGroup->id,
+            'ring_group_id' => 99999, // Non-existent ID
         ],
     ]);
-    echo "Created extension 3001 (Ring Group): {$extensions['3001']->id}\n";
+    echo "Created extension 3001 (Ring Group with invalid reference): {$extensions['3001']->id}\n";
 
-    // 3002: IVR Menu
-    $ivrMenu = IvrMenu::factory()->create([
-        'organization_id' => $organization->id,
-        'name' => 'Test IVR Menu',
-        'status' => 'active',
-        'tts_text' => 'Welcome to our IVR system',
-        'max_turns' => 3,
-    ]);
-
+    // 3002: IVR Menu (references non-existent IVR menu to test error handling)
     $extensions['3002'] = Extension::factory()->create([
         'organization_id' => $organization->id,
         'extension_number' => '3002',
         'type' => ExtensionType::IVR,
         'status' => 'active',
         'configuration' => [
-            'ivr_id' => $ivrMenu->id,
+            'ivr_id' => 99999, // Non-existent ID
         ],
     ]);
-    echo "Created extension 3002 (IVR Menu): {$extensions['3002']->id}\n";
+    echo "Created extension 3002 (IVR Menu with invalid reference): {$extensions['3002']->id}\n";
 
     // 3003: AI Assistant
     $extensions['3003'] = Extension::factory()->create([
@@ -196,16 +176,16 @@ try {
         echo "  Issues: " . implode(', ', $result3000['issues']) . "\n";
     }
 
-    // 3001: Ring Group → Should return ring group dialing CXML
-    $result3001 = validateRingGroupResponse($testResults['3001']);
+    // 3001: Ring Group → Should return error response (no fallback creation)
+    $result3001 = validateErrorResponse($testResults['3001'], 'Ring group not found');
     $validationResults['3001'] = $result3001;
     echo "3001 (Ring Group): " . ($result3001['valid'] ? 'PASS' : 'FAIL') . "\n";
     if (!$result3001['valid']) {
         echo "  Issues: " . implode(', ', $result3001['issues']) . "\n";
     }
 
-    // 3002: IVR Menu → Should return IVR menu CXML
-    $result3002 = validateIvrResponse($testResults['3002']);
+    // 3002: IVR Menu → Should return error response (no fallback creation)
+    $result3002 = validateErrorResponse($testResults['3002'], 'IVR menu not found');
     $validationResults['3002'] = $result3002;
     echo "3002 (IVR Menu): " . ($result3002['valid'] ? 'PASS' : 'FAIL') . "\n";
     if (!$result3002['valid']) {
@@ -248,6 +228,38 @@ try {
 }
 
 // Validation functions
+
+function validateErrorResponse(array $result, string $expectedMessage): array
+{
+    $issues = [];
+
+    if ($result['status'] !== 200) {
+        $issues[] = "Expected status 200, got {$result['status']}";
+    }
+
+    if (!str_contains($result['content_type'], 'text/xml')) {
+        $issues[] = "Expected content-type text/xml, got {$result['content_type']}";
+    }
+
+    $content = $result['content'];
+
+    if (!str_contains($content, '<Say>')) {
+        $issues[] = "Expected <Say> element not found";
+    }
+
+    if (!str_contains($content, $expectedMessage)) {
+        $issues[] = "Expected error message '{$expectedMessage}' not found";
+    }
+
+    if (!str_contains($content, '<Hangup/>')) {
+        $issues[] = "Expected <Hangup/> element not found";
+    }
+
+    return [
+        'valid' => empty($issues),
+        'issues' => $issues,
+    ];
+}
 
 function validateConferenceResponse(array $result): array
 {

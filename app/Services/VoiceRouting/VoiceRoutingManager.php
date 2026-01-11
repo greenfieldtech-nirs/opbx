@@ -15,7 +15,6 @@ use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\IvrStateService;
 use App\Services\PhoneNumberService;
-
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -31,8 +30,6 @@ use Illuminate\Support\Facades\Log;
  *
  * This service coordinates between various routing strategies and provides
  * unified call routing logic with proper error handling and logging.
- *
- * @package App\Services\VoiceRouting
  */
 class VoiceRoutingManager
 {
@@ -42,10 +39,10 @@ class VoiceRoutingManager
     /**
      * Create a new VoiceRoutingManager instance.
      *
-     * @param VoiceRoutingCacheService $cache Service for caching extension and routing data
-     * @param IvrStateService $ivrStateService Service for managing IVR call state
-     * @param PhoneNumberService $phoneNumberService Service for phone number parsing and validation
-     * @param iterable<RoutingStrategy> $strategies Collection of routing strategies
+     * @param  VoiceRoutingCacheService  $cache  Service for caching extension and routing data
+     * @param  IvrStateService  $ivrStateService  Service for managing IVR call state
+     * @param  PhoneNumberService  $phoneNumberService  Service for phone number parsing and validation
+     * @param  iterable<RoutingStrategy>  $strategies  Collection of routing strategies
      */
     public function __construct(
         private readonly VoiceRoutingCacheService $cache,
@@ -66,7 +63,7 @@ class VoiceRoutingManager
      * 3. Extension routing (if extension exists for the number)
      * 4. Outbound routing (via whitelist for internal callers)
      *
-     * @param Request $request The incoming HTTP request containing call details
+     * @param  Request  $request  The incoming HTTP request containing call details
      * @return Response CXML response with routing instructions
      *
      * @throws \Exception If routing cannot be determined
@@ -80,7 +77,7 @@ class VoiceRoutingManager
         Log::info('VoiceRoutingManager: Handling inbound call', [
             'to' => $to,
             'from' => $from,
-            'org_id' => $orgId
+            'org_id' => $orgId,
         ]);
 
         // 0. Check Business Hours
@@ -118,9 +115,9 @@ class VoiceRoutingManager
     /**
      * Handle extension-based routing if an extension is found for the destination number.
      *
-     * @param Request $request The incoming call request
-     * @param string $to The destination extension number
-     * @param int $orgId The organization ID
+     * @param  Request  $request  The incoming call request
+     * @param  string  $to  The destination extension number
+     * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if extension routing applies, null otherwise
      */
     private function handleExtensionRouting(Request $request, string $to, int $orgId): ?Response
@@ -144,7 +141,7 @@ class VoiceRoutingManager
         if ($extension && $extension->isActive()) {
             Log::info('VoiceRoutingManager: Internal extension destination', [
                 'extension' => $extension->extension_number,
-                'type' => $extension->type->value
+                'type' => $extension->type->value,
             ]);
 
             // Create destination array based on extension type
@@ -170,9 +167,9 @@ class VoiceRoutingManager
      * If found, routes the call according to the DID's routing configuration
      * (extension, ring group, conference, IVR, etc.).
      *
-     * @param Request $request The incoming call request
-     * @param string $to The destination phone number
-     * @param int $orgId The organization ID
+     * @param  Request  $request  The incoming call request
+     * @param  string  $to  The destination phone number
+     * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if DID routing applies, null otherwise
      */
     private function handleDidRouting(Request $request, string $to, int $orgId): ?Response
@@ -200,6 +197,7 @@ class VoiceRoutingManager
                 'did_id' => $did->id,
                 'routing_type' => $did->routing_type,
             ]);
+
             return $this->routeDidCall($request, $did);
         }
 
@@ -209,8 +207,8 @@ class VoiceRoutingManager
     /**
      * Route a call based on DID configuration.
      *
-     * @param Request $request The incoming request
-     * @param DidNumber $did The DID number configuration
+     * @param  Request  $request  The incoming request
+     * @param  DidNumber  $did  The DID number configuration
      * @return Response CXML response
      */
     private function routeDidCall(Request $request, DidNumber $did): Response
@@ -253,7 +251,7 @@ class VoiceRoutingManager
                 if ($schedule) {
                     // For business hours, route based on current status
                     $currentAction = $schedule->getCurrentRouting();
-                    if (!empty($currentAction)) {
+                    if (! empty($currentAction)) {
                         return $this->routeToBusinessHoursAction(
                             $currentAction,
                             $did->organization_id,
@@ -270,13 +268,14 @@ class VoiceRoutingManager
                 'did_id' => $did->id,
                 'routing_type' => $did->routing_type,
             ]);
+
             return $this->createCxmlErrorResponse('Destination not configured');
         }
 
         // Determine extension type from destination
         $extensionType = $this->determineExtensionType($did, $destination);
 
-        if (!$extensionType) {
+        if (! $extensionType) {
             return $this->createCxmlErrorResponse('Unsupported routing configuration');
         }
 
@@ -286,11 +285,8 @@ class VoiceRoutingManager
     /**
      * Route to business hours action (extension number/ID).
      *
-     * @param string $action The extension number or ID to route to
-     * @param int $organizationId
-     * @param string $callSid
-     * @param Request $request The incoming request
-     * @return Response
+     * @param  string  $action  The extension number or ID to route to
+     * @param  Request  $request  The incoming request
      */
     private function routeToBusinessHoursAction(string $action, int $organizationId, string $callSid, Request $request): Response
     {
@@ -302,7 +298,7 @@ class VoiceRoutingManager
         Log::info('VoiceRoutingManager: Routing to business hours action', [
             'call_sid' => $callSid,
             'action' => $action,
-            'organization_id' => $organizationId
+            'organization_id' => $organizationId,
         ]);
 
         // Check if action is an extension number
@@ -313,18 +309,19 @@ class VoiceRoutingManager
                 'call_sid' => $callSid,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
-                'extension_type' => $extension->type->value
+                'extension_type' => $extension->type->value,
             ]);
 
             // Use the extension routing logic
             $destination = $this->resolveExtensionDestination($extension, $organizationId);
+
             return $this->routeUsingExtensionStrategies($extension, $destination, $organizationId, $request);
         }
 
         // If not an extension, treat as a direct extension number for dialing
         Log::info('VoiceRoutingManager: Treating action as direct extension number', [
             'call_sid' => $callSid,
-            'action' => $action
+            'action' => $action,
         ]);
 
         return response(
@@ -345,10 +342,6 @@ class VoiceRoutingManager
      *    - The calling code directly (e.g., "+1", "+972", "+44")
      * 4. Within those matches, check destination_prefix for additional matching
      * 5. Return the longest matching prefix
-     *
-     * @param int $organizationId
-     * @param string $destinationNumber
-     * @return OutboundWhitelist|null
      */
     private function findOutboundWhitelistEntry(int $organizationId, string $destinationNumber): ?OutboundWhitelist
     {
@@ -392,7 +385,7 @@ class VoiceRoutingManager
             }
 
             // Check prefix match
-            if (!empty($entry->destination_prefix)) {
+            if (! empty($entry->destination_prefix)) {
                 // Normalize destination_prefix by removing spaces
                 $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
 
@@ -433,8 +426,8 @@ class VoiceRoutingManager
         }
 
         // Sort by score (highest first) and return the best match
-        if (!empty($matches)) {
-            usort($matches, fn($a, $b) => $b['score'] <=> $a['score']);
+        if (! empty($matches)) {
+            usort($matches, fn ($a, $b) => $b['score'] <=> $a['score']);
             $bestMatch = $matches[0];
 
             Log::info('VoiceRoutingManager: Outbound whitelist match found', [
@@ -461,58 +454,12 @@ class VoiceRoutingManager
         return null;
     }
 
-    /**
-     * Find a ring group by extension number as fallback when configuration is missing.
-     * This attempts to match ring group names with extension numbers or find any active ring group.
-     *
-     * @param Extension $extension
-     * @param int $organizationId
-     * @return array Empty array if no fallback found, or ['ring_group' => RingGroup] if found
-     */
-    private function findRingGroupByExtensionNumber(Extension $extension, int $organizationId): array
-    {
-        // Try to find a ring group with a name that matches the extension number
-        $ringGroup = RingGroup::where('organization_id', $organizationId)
-            ->where('name', 'like', '%' . $extension->extension_number . '%')
-            ->where('status', 'active')
-            ->first();
 
-        if ($ringGroup) {
-            Log::info('VoiceRoutingManager: Found ring group by name match', [
-                'extension_number' => $extension->extension_number,
-                'ring_group_name' => $ringGroup->name,
-                'ring_group_id' => $ringGroup->id,
-            ]);
-            return ['ring_group' => $ringGroup];
-        }
-
-        // As last resort, find any active ring group in the organization
-        $ringGroup = RingGroup::where('organization_id', $organizationId)
-            ->where('status', 'active')
-            ->first();
-
-        if ($ringGroup) {
-            Log::warning('VoiceRoutingManager: Using fallback ring group (first active found)', [
-                'extension_number' => $extension->extension_number,
-                'ring_group_name' => $ringGroup->name,
-                'ring_group_id' => $ringGroup->id,
-            ]);
-            return ['ring_group' => $ringGroup];
-        }
-
-        Log::error('VoiceRoutingManager: No fallback ring group found', [
-            'extension_number' => $extension->extension_number,
-            'organization_id' => $organizationId,
-        ]);
-
-        return [];
-    }
 
     /**
      * Convert calling code to country code.
      * Uses a mapping of common calling codes to ISO country codes.
      *
-     * @param string $callingCode
      * @return string|null The ISO country code or null if not found
      */
     private function callingCodeToCountryCode(string $callingCode): ?string
@@ -731,40 +678,38 @@ class VoiceRoutingManager
     /**
      * Check if a calling code is valid.
      * Basic validation - could be enhanced with a proper phone library.
-     *
-     * @param string $callingCode
-     * @return bool
      */
     private function isValidCallingCode(string $callingCode): bool
     {
         // Remove + and check if remaining is numeric and reasonable length
         $code = ltrim($callingCode, '+');
+
         return is_numeric($code) && strlen($code) >= 1 && strlen($code) <= 4;
     }
 
     /**
      * Check business hours and route accordingly.
      *
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID
-     * @param Request $request The incoming request
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID
+     * @param  Request  $request  The incoming request
      * @return Response|null CXML response if business hours routing applies, null otherwise
      */
     private function checkBusinessHours(int $organizationId, string $callSid, Request $request): ?Response
     {
         $schedule = $this->cache->getActiveBusinessHoursSchedule($organizationId);
 
-        if (!$schedule) {
+        if (! $schedule) {
             return null;
         }
 
         $currentAction = $schedule->getCurrentRouting();
 
-        if (!empty($currentAction)) {
+        if (! empty($currentAction)) {
             Log::info('VoiceRoutingManager: Routing via business hours action', [
                 'call_sid' => $callSid,
                 'action' => $currentAction,
-                'is_open' => $schedule->isCurrentlyOpen()
+                'is_open' => $schedule->isCurrentlyOpen(),
             ]);
 
             return $this->routeToBusinessHoursAction($currentAction, $organizationId, $callSid, $request);
@@ -776,10 +721,10 @@ class VoiceRoutingManager
     /**
      * Handle outbound routing via whitelist for calls from internal extensions.
      *
-     * @param Request $request The incoming call request
-     * @param string $to The destination phone number
-     * @param string $from The caller phone number
-     * @param int $orgId The organization ID
+     * @param  Request  $request  The incoming call request
+     * @param  string  $to  The destination phone number
+     * @param  string  $from  The caller phone number
+     * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if outbound routing applies, null otherwise
      */
     private function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
@@ -793,12 +738,13 @@ class VoiceRoutingManager
         // Only allow outbound routing for calls from internal extensions
         $fromExtension = $this->cache->getExtension($orgId, $from);
 
-        if (!$fromExtension || !$fromExtension->isActive()) {
+        if (! $fromExtension || ! $fromExtension->isActive()) {
             Log::info('VoiceRoutingManager: Outbound routing not allowed - caller is not an active internal extension', [
                 'from' => $from,
                 'extension_found' => $fromExtension !== null,
                 'extension_active' => $fromExtension?->isActive(),
             ]);
+
             return null;
         }
 
@@ -813,11 +759,12 @@ class VoiceRoutingManager
             ->where('phone_number', $to)
             ->first();
 
-        if (!$whitelistEntry) {
+        if (! $whitelistEntry) {
             Log::info('VoiceRoutingManager: No outbound whitelist entry found for destination', [
                 'to' => $to,
                 'org_id' => $orgId,
             ]);
+
             return null;
         }
 
@@ -830,8 +777,6 @@ class VoiceRoutingManager
         // Route via trunk (not implemented yet)
         return response(CxmlBuilder::unavailable('Outbound routing not yet implemented'), 200, ['Content-Type' => 'text/xml']);
     }
-
-
 
     public function handleIvrInput(Request $request): Response
     {
@@ -849,8 +794,8 @@ class VoiceRoutingManager
                 'sequence_number' => $request->input('SequenceNumber', 'unknown'),
             ]);
 
-        // Note: Idempotency checking removed for IVR input to allow users to correct their input
-        // Users may press wrong digits and need to make subsequent attempts
+            // Note: Idempotency checking removed for IVR input to allow users to correct their input
+            // Users may press wrong digits and need to make subsequent attempts
 
             // Validate menu exists and belongs to organization
             $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
@@ -859,12 +804,13 @@ class VoiceRoutingManager
                 ->where('status', 'active')
                 ->first();
 
-            if (!$ivrMenu) {
+            if (! $ivrMenu) {
                 Log::warning('IVR Input: Menu not found or inactive', [
                     'call_sid' => $callSid,
                     'menu_id' => $menuId,
                     'org_id' => $orgId,
                 ]);
+
                 return response(
                     CxmlBuilder::sayWithHangup('Menu configuration error.', true),
                     200,
@@ -891,11 +837,12 @@ class VoiceRoutingManager
             // Get current call state
             $callState = $this->ivrStateService->getCallState($callSid);
 
-            if (!$callState) {
+            if (! $callState) {
                 Log::warning('IVR Input: No call state found', [
                     'call_sid' => $callSid,
                     'menu_id' => $menuId,
                 ]);
+
                 return response(
                     CxmlBuilder::sayWithHangup('Call state error. Please try again.', true),
                     200,
@@ -967,7 +914,8 @@ class VoiceRoutingManager
 
         // Replay menu
         $destination = ['ivr_menu' => $ivrMenu];
-        return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber(), $destination);
+
+        return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
     }
 
     /**
@@ -986,8 +934,8 @@ class VoiceRoutingManager
             'destination_id' => $option->destination_id,
         ]);
 
-            // Route to the selected destination
-            return $this->routeToOptionDestination($request, $option, $ivrMenu);
+        // Route to the selected destination
+        return $this->routeToOptionDestination($request, $option, $ivrMenu);
     }
 
     /**
@@ -1017,7 +965,7 @@ class VoiceRoutingManager
         $ivrStrategy = new \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy($this->ivrStateService);
 
         // Pass error message to IVR strategy - it will be included in the Gather operation
-        return $ivrStrategy->route($request, new DidNumber(), $destination, $errorMessage);
+        return $ivrStrategy->route($request, new DidNumber, $destination, $errorMessage);
     }
 
     /**
@@ -1050,7 +998,7 @@ class VoiceRoutingManager
                 'is_null' => $validatedDestination === null,
             ]);
 
-            if (!$validatedDestination) {
+            if (! $validatedDestination) {
                 Log::error('IVR Input: Destination validation failed', [
                     'call_sid' => $request->input('CallSid'),
                     'option_id' => $option->id ?? 'mock',
@@ -1094,7 +1042,7 @@ class VoiceRoutingManager
                         'resolved_destination' => $destination,
                     ]);
 
-                    return $this->executeStrategy($validatedDestination->type, $request, new DidNumber(), $destination);
+                    return $this->executeStrategy($validatedDestination->type, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::RING_GROUP:
                     Log::info('IVR Input: Routing to ring group', [
@@ -1104,7 +1052,8 @@ class VoiceRoutingManager
                         'ring_group_name' => $validatedDestination->name,
                     ]);
                     $destination = ['ring_group' => $validatedDestination];
-                    return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber(), $destination);
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::CONFERENCE_ROOM:
                     Log::info('IVR Input: Routing to conference room', [
@@ -1114,7 +1063,8 @@ class VoiceRoutingManager
                         'conference_room_name' => $validatedDestination->name,
                     ]);
                     $destination = ['conference_room' => $validatedDestination];
-                    return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber(), $destination);
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::IVR_MENU:
                     Log::info('IVR Input: Routing to IVR menu', [
@@ -1124,7 +1074,8 @@ class VoiceRoutingManager
                         'ivr_menu_name' => $validatedDestination->name,
                     ]);
                     $destination = ['ivr_menu' => $validatedDestination];
-                    return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber(), $destination);
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
             }
 
             // Fallback for invalid destination
@@ -1220,7 +1171,7 @@ class VoiceRoutingManager
                 ->first();
         }
 
-        if (!$validatedDestination) {
+        if (! $validatedDestination) {
             Log::error('IVR Input: Destination validation failed for failover', [
                 'call_sid' => $request->input('CallSid'),
                 'destination_type' => is_object($destinationType) ? $destinationType->value : $destinationType,
@@ -1237,16 +1188,20 @@ class VoiceRoutingManager
         // Route based on destination type
         if ($destinationType === \App\Enums\IvrDestinationType::EXTENSION) {
             $destination = ['extension' => $validatedDestination];
-            return $this->executeStrategy($validatedDestination->type, $request, new DidNumber(), $destination);
+
+            return $this->executeStrategy($validatedDestination->type, $request, new DidNumber, $destination);
         } elseif ($destinationType === \App\Enums\IvrDestinationType::RING_GROUP) {
             $destination = ['ring_group' => $validatedDestination];
-            return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber(), $destination);
+
+            return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber, $destination);
         } elseif ($destinationType === \App\Enums\IvrDestinationType::CONFERENCE_ROOM) {
             $destination = ['conference_room' => $validatedDestination];
-            return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber(), $destination);
+
+            return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber, $destination);
         } elseif ($destinationType === \App\Enums\IvrDestinationType::IVR_MENU) {
             $destination = ['ivr_menu' => $validatedDestination];
-            return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber(), $destination);
+
+            return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
         }
 
         return response(
@@ -1269,7 +1224,7 @@ class VoiceRoutingManager
 
         Log::error('VoiceRoutingManager: No strategy found for extension type', [
             'type' => $type->value,
-            'available_strategies' => $this->strategies->map(fn($s) => get_class($s))->toArray(),
+            'available_strategies' => $this->strategies->map(fn ($s) => get_class($s))->toArray(),
         ]);
 
         return $this->createCxmlErrorResponse('Unsupported extension type');
@@ -1281,8 +1236,8 @@ class VoiceRoutingManager
      * Loads the appropriate related models from extension configuration
      * and returns them in a destination array for routing strategies.
      *
-     * @param Extension $extension The extension to resolve destination for
-     * @param int $organizationId The organization ID for scoping queries
+     * @param  Extension  $extension  The extension to resolve destination for
+     * @param  int  $organizationId  The organization ID for scoping queries
      * @return array The destination array with loaded models
      */
     private function resolveExtensionDestination(Extension $extension, int $organizationId): array
@@ -1316,82 +1271,144 @@ class VoiceRoutingManager
 
     /**
      * Load ring group from extension configuration.
+     * Returns null if the configured ring group doesn't exist.
      */
     private function loadRingGroupFromExtension(Extension $extension, int $organizationId): ?RingGroup
     {
         $config = $extension->configuration ?? [];
         $ringGroupId = $config['ring_group_id'] ?? null;
 
-        if (!$ringGroupId) {
-            Log::warning('VoiceRoutingManager: Extension missing ring_group_id in configuration', [
+        if (! $ringGroupId) {
+            Log::error('VoiceRoutingManager: RING_GROUP extension missing ring_group_id in configuration', [
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
+                'extension_type' => $extension->type->value,
+                'configuration' => $extension->configuration,
             ]);
+
             return null;
         }
 
-        return RingGroup::where('id', $ringGroupId)
+        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $ringGroupId)
             ->where('organization_id', $organizationId)
             ->first();
+
+        if (! $ringGroup) {
+            Log::error('VoiceRoutingManager: Configured ring group not found for RING_GROUP extension', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'ring_group_id' => $ringGroupId,
+                'organization_id' => $organizationId,
+            ]);
+
+            return null;
+        }
+
+        return $ringGroup;
     }
 
     /**
      * Load conference room from extension configuration.
+     * Returns null if the configured conference room doesn't exist.
      */
     private function loadConferenceRoomFromExtension(Extension $extension, int $organizationId): ?ConferenceRoom
     {
         $config = $extension->configuration ?? [];
         $conferenceRoomId = $config['conference_room_id'] ?? null;
 
-        if (!$conferenceRoomId) {
-            Log::warning('VoiceRoutingManager: Extension missing conference_room_id in configuration', [
+        if (! $conferenceRoomId) {
+            Log::error('VoiceRoutingManager: Extension missing conference_room_id in configuration', [
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
             ]);
+
             return null;
         }
 
-        return ConferenceRoom::where('id', $conferenceRoomId)
+        $conferenceRoom = ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
             ->where('organization_id', $organizationId)
             ->first();
+
+        if (! $conferenceRoom) {
+            Log::error('VoiceRoutingManager: Configured conference room not found for extension', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'conference_room_id' => $conferenceRoomId,
+            ]);
+
+            return null;
+        }
+
+        return $conferenceRoom;
     }
 
     /**
      * Load IVR menu from extension configuration.
+     * Returns null if the configured IVR menu doesn't exist.
      */
     private function loadIvrMenuFromExtension(Extension $extension, int $organizationId): ?IvrMenu
     {
         $config = $extension->configuration ?? [];
         $ivrMenuId = $config['ivr_menu_id'] ?? $config['ivr_id'] ?? null;
 
-        if (!$ivrMenuId) {
-            Log::warning('VoiceRoutingManager: Extension missing ivr_menu_id in configuration', [
+        if (! $ivrMenuId) {
+            Log::error('VoiceRoutingManager: Extension missing ivr_menu_id in configuration', [
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
             ]);
+
             return null;
         }
 
-        return IvrMenu::where('id', $ivrMenuId)
+        $ivrMenu = IvrMenu::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $ivrMenuId)
             ->where('organization_id', $organizationId)
             ->first();
+
+        if (! $ivrMenu) {
+            Log::error('VoiceRoutingManager: Configured IVR menu not found for extension', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'ivr_menu_id' => $ivrMenuId,
+            ]);
+
+            return null;
+        }
+
+        return $ivrMenu;
     }
 
     /**
      * Route using extension strategies.
      *
      * Delegates to the appropriate routing strategy based on extension type.
+     * Returns error response if referenced entities don't exist.
      *
-     * @param Extension $extension The extension being routed
-     * @param array $destination The resolved destination resources
-     * @param int $organizationId The organization ID
-     * @param Request $request The incoming request (added to match strategy interface)
-     * @return Response CXML response from the routing strategy
+     * @param  Extension  $extension  The extension being routed
+     * @param  array  $destination  The resolved destination resources
+     * @param  int  $organizationId  The organization ID
+     * @param  Request  $request  The incoming request (added to match strategy interface)
+     * @return Response CXML response from the routing strategy or error response
      */
     private function routeUsingExtensionStrategies(Extension $extension, array $destination, int $organizationId, Request $request): Response
     {
+        // Check for null referenced entities and return error responses
+        if ($extension->type === ExtensionType::RING_GROUP && (!isset($destination['ring_group']) || $destination['ring_group'] === null)) {
+            return $this->createCxmlErrorResponse('Ring group not found');
+        }
+
+        if ($extension->type === ExtensionType::CONFERENCE && (!isset($destination['conference_room']) || $destination['conference_room'] === null)) {
+            return $this->createCxmlErrorResponse('Conference room not found');
+        }
+
+        if ($extension->type === ExtensionType::IVR && (!isset($destination['ivr_menu']) || $destination['ivr_menu'] === null)) {
+            return $this->createCxmlErrorResponse('IVR menu not found');
+        }
+
         // Create a dummy DID for strategy compatibility
-        $dummyDid = new DidNumber();
+        $dummyDid = new DidNumber;
 
         return $this->executeStrategy($extension->type, $request, $dummyDid, $destination);
     }
@@ -1429,10 +1446,98 @@ class VoiceRoutingManager
         return null;
     }
 
+
+
+
+
+
+
+    /**
+     * Validate extension configuration for potential issues.
+     *
+     * @param  Extension  $extension  The extension to validate
+     * @return array{has_issues: bool, extension_number: string, type: string, issues: array, suggestions: array}
+     */
+    public function validateExtensionConfiguration(Extension $extension): array
+    {
+        $issues = [];
+        $suggestions = [];
+
+        $config = $extension->configuration ?? [];
+
+        // Check configuration based on extension type
+        switch ($extension->type) {
+            case ExtensionType::RING_GROUP:
+                $ringGroupId = $config['ring_group_id'] ?? null;
+                if (!$ringGroupId) {
+                    $issues[] = 'Missing ring_group_id in configuration';
+                    $suggestions[] = 'Add ring_group_id to extension configuration';
+                } else {
+                    $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
+                        ->where('id', $ringGroupId)
+                        ->where('organization_id', $extension->organization_id)
+                        ->first();
+                    if (!$ringGroup) {
+                        $issues[] = "Ring group with ID {$ringGroupId} not found";
+                        $suggestions[] = 'Create a ring group or update ring_group_id to reference an existing one';
+                    }
+                }
+                break;
+
+            case ExtensionType::CONFERENCE:
+                $conferenceRoomId = $config['conference_room_id'] ?? null;
+                if (!$conferenceRoomId) {
+                    $issues[] = 'Missing conference_room_id in configuration';
+                    $suggestions[] = 'Add conference_room_id to extension configuration';
+                } else {
+                    $conferenceRoom = ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+                        ->where('id', $conferenceRoomId)
+                        ->where('organization_id', $extension->organization_id)
+                        ->first();
+                    if (!$conferenceRoom) {
+                        $issues[] = "Conference room with ID {$conferenceRoomId} not found";
+                        $suggestions[] = 'Create a conference room or update conference_room_id to reference an existing one';
+                    }
+                }
+                break;
+
+            case ExtensionType::IVR:
+                $ivrMenuId = $config['ivr_menu_id'] ?? $config['ivr_id'] ?? null;
+                if (!$ivrMenuId) {
+                    $issues[] = 'Missing ivr_menu_id or ivr_id in configuration';
+                    $suggestions[] = 'Add ivr_menu_id or ivr_id to extension configuration';
+                } else {
+                    $ivrMenu = IvrMenu::withoutGlobalScope(OrganizationScope::class)
+                        ->where('id', $ivrMenuId)
+                        ->where('organization_id', $extension->organization_id)
+                        ->first();
+                    if (!$ivrMenu) {
+                        $issues[] = "IVR menu with ID {$ivrMenuId} not found";
+                        $suggestions[] = 'Create an IVR menu or update ivr_menu_id/ivr_id to reference an existing one';
+                    }
+                }
+                break;
+
+            case ExtensionType::USER:
+            case ExtensionType::AI_ASSISTANT:
+            case ExtensionType::FORWARD:
+                // These types don't require additional configuration validation
+                break;
+        }
+
+        return [
+            'has_issues' => !empty($issues),
+            'extension_number' => $extension->extension_number,
+            'type' => $extension->type->value,
+            'issues' => $issues,
+            'suggestions' => $suggestions,
+        ];
+    }
+
     /**
      * Create a CXML error response for voice routing failures.
      *
-     * @param string $message The error message to speak
+     * @param  string  $message  The error message to speak
      * @return Response CXML response with error message and hangup
      */
     private function createCxmlErrorResponse(string $message): Response

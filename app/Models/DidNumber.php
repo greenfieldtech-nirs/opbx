@@ -138,7 +138,9 @@ class DidNumber extends Model
             return $this->attributes['_extension'];
         }
 
-        return Extension::find($extensionId);
+        return Extension::where('id', $extensionId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**

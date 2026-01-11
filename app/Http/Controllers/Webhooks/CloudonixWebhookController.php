@@ -246,7 +246,8 @@ class CloudonixWebhookController extends Controller
             return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Conference room not configured');
         }
 
-        $conferenceRoom = \App\Models\ConferenceRoom::where('id', $conferenceRoomId)
+        $conferenceRoom = \App\Models\ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
             ->where('organization_id', $organizationId)
             ->where('status', \App\Enums\UserStatus::ACTIVE)
             ->first();
@@ -276,7 +277,8 @@ class CloudonixWebhookController extends Controller
             return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Ring group not configured');
         }
 
-        $ringGroup = \App\Models\RingGroup::where('id', $ringGroupId)
+        $ringGroup = \App\Models\RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
             ->where('organization_id', $organizationId)
             ->where('status', \App\Enums\UserStatus::ACTIVE)
             ->first();
