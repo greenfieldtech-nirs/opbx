@@ -129,10 +129,29 @@ class VoiceRoutingManager
     }
 
     /**
-     * Handle inbound direction calls (external inbound calls).
+     * Check if a phone number is assigned as a DID in the system.
      *
-     * These are calls from external numbers to the PBX. Business hours checking
-     * is applied to determine routing behavior.
+     * @param  string  $phoneNumber  The phone number to check
+     * @param  int  $orgId  The organization ID
+     * @return bool True if the phone number is assigned as an active DID
+     */
+    private function isAssignedPhoneNumber(string $phoneNumber, int $orgId): bool
+    {
+        $did = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('phone_number', $phoneNumber)
+            ->where('organization_id', $orgId)
+            ->where('status', 'active')
+            ->first();
+
+        return $did !== null;
+    }
+
+    /**
+     * Handle inbound direction calls (both internal and external).
+     *
+     * Determines call type based on whether the caller (From) is an assigned DID:
+     * - If From is an assigned DID: internal call from a DID
+     * - If From is not assigned: external inbound call to a DID (To)
      *
      * @param  Request  $request  The incoming call request
      * @return Response CXML response with routing instructions
@@ -149,7 +168,101 @@ class VoiceRoutingManager
             'org_id' => $orgId,
         ]);
 
-        // 0. Check Business Hours (only for inbound external calls)
+        // Validate required parameters
+        if (empty($to) || empty($from)) {
+            Log::warning('VoiceRoutingManager: Missing required call parameters', [
+                'to' => $to,
+                'from' => $from,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->createCxmlErrorResponse('Missing call parameters');
+        }
+
+        // Determine call type: check if From is an assigned phone number
+        if ($this->isAssignedPhoneNumber($from, $orgId)) {
+            Log::info('VoiceRoutingManager: Detected internal call from DID', [
+                'from_did' => $from,
+                'to' => $to,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->handleInternalCallFromDid($request);
+        } else {
+            Log::info('VoiceRoutingManager: Detected external inbound call to DID', [
+                'from_external' => $from,
+                'to_did' => $to,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->handleExternalInboundCall($request);
+        }
+    }
+
+    /**
+     * Handle internal calls originating from a DID.
+     *
+     * These are calls made from an assigned DID number (e.g., an extension calling out
+     * through a DID). No business hours checking is applied to internal calls.
+     *
+     * @param  Request  $request  The incoming call request
+     * @return Response CXML response with routing instructions
+     */
+    private function handleInternalCallFromDid(Request $request): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Processing internal call from DID', [
+            'from_did' => $from,
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
+
+        // 1. Try extension routing first (direct extension dial)
+        $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
+        if ($extensionResponse) {
+            return $extensionResponse;
+        }
+
+        // 2. Try DID routing (fallback for internal calls)
+        $didResponse = $this->handleDidRouting($request, $to, $orgId);
+        if ($didResponse) {
+            return $didResponse;
+        }
+
+        Log::info('VoiceRoutingManager: No destination found for internal DID call', [
+            'from_did' => $from,
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
+
+        return $this->createCxmlErrorResponse('Extension not found');
+    }
+
+    /**
+     * Handle external inbound calls to a DID.
+     *
+     * These are calls from external numbers to an assigned DID. Business hours checking
+     * is applied to determine routing behavior.
+     *
+     * @param  Request  $request  The incoming call request
+     * @return Response CXML response with routing instructions
+     */
+    private function handleExternalInboundCall(Request $request): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Processing external inbound call to DID', [
+            'from_external' => $from,
+            'to_did' => $to,
+            'org_id' => $orgId,
+        ]);
+
+        // 0. Check Business Hours (only for external inbound calls)
         $businessHoursResponse = $this->checkBusinessHours($orgId, $request->input('CallSid', ''), $request);
         if ($businessHoursResponse) {
             return $businessHoursResponse;
@@ -167,8 +280,9 @@ class VoiceRoutingManager
             return $extensionResponse;
         }
 
-        Log::info('VoiceRoutingManager: No destination found for inbound call', [
-            'to' => $to,
+        Log::info('VoiceRoutingManager: No destination found for external inbound call', [
+            'from_external' => $from,
+            'to_did' => $to,
             'org_id' => $orgId,
         ]);
 
@@ -351,6 +465,7 @@ class VoiceRoutingManager
         $did = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('phone_number', $to)
             ->where('organization_id', $orgId)
+            ->where('status', 'active')
             ->first();
 
         Log::info('VoiceRoutingManager: DID lookup result', [
