@@ -22,7 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 
 // Bootstrap Laravel
-$app = require_once __DIR__ . '/bootstrap/app.php';
+$app = require_once __DIR__ . '/../../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 echo "Setting up test data...\n";

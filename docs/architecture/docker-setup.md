@@ -48,7 +48,7 @@ services:
   # Nginx Web Server
   nginx:
     build:
-      context: .
+      context: ..
       dockerfile: docker/nginx/Dockerfile
     ports:
       - "80:80"
@@ -62,7 +62,7 @@ services:
   # Laravel Application
   app:
     build:
-      context: .
+      context: ..
       dockerfile: docker/app/Dockerfile
     volumes:
       - .:/var/www/html
@@ -77,7 +77,7 @@ services:
   # Queue Worker
   queue-worker:
     build:
-      context: .
+      context: ..
       dockerfile: docker/app/Dockerfile
     command: php artisan queue:work --tries=3 --timeout=90
     volumes:
@@ -94,7 +94,7 @@ services:
   # Scheduler (Cron Jobs)
   scheduler:
     build:
-      context: .
+      context: ..
       dockerfile: docker/app/Dockerfile
     command: /bin/bash -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
     volumes:
