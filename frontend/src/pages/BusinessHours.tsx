@@ -84,6 +84,89 @@ export interface BusinessHoursAction {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+// Helper function to get action display name for both structured and legacy formats
+const getActionDisplayName = (action: any, extensions: any[], ringGroups: any[], ivrMenus: any[]): JSX.Element => {
+  if (!action) return <span className="text-muted-foreground">Not set</span>;
+
+  // If it's a structured object (new format)
+  if (typeof action === 'object' && action.type && action.target_id) {
+    const actionObj = action as BusinessHoursAction;
+
+
+    // Get type configuration - matching ActionSelector
+    const getTypeConfig = (type: string) => {
+      const configs = {
+        user: { label: 'PBX User', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
+        conference: { label: 'Conference', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
+        ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+        ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+        ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+        forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
+      };
+      return configs[type as keyof typeof configs] || configs.user;
+    };
+    // Get the target option and display name
+    let targetOption: any = null;
+    let displayName = '';
+    let displayType = '';
+
+    // Extract the numeric ID from prefixed target_id (e.g., "ext-123" -> "123")
+    let numericId = actionObj.target_id;
+    if (actionObj.target_id.startsWith('ext-')) {
+      numericId = actionObj.target_id.substring(4);
+    } else if (actionObj.target_id.startsWith('rg-')) {
+      numericId = actionObj.target_id.substring(3);
+    } else if (actionObj.target_id.startsWith('ivr-')) {
+      numericId = actionObj.target_id.substring(4);
+    }
+
+    switch (actionObj.type) {
+      case 'extension':
+        targetOption = extensions.find(e => e.id.toString() === numericId);
+        displayName = targetOption?.name || `Extension ${actionObj.target_id}`;
+        displayType = targetOption?.type || 'user';
+        break;
+      case 'ring_group':
+        targetOption = ringGroups.find(g => g.id.toString() === numericId);
+        displayName = targetOption?.name || `Ring Group ${actionObj.target_id}`;
+        displayType = 'ring_group';
+        break;
+      case 'ivr_menu':
+        targetOption = ivrMenus.find(m => m.id.toString() === numericId);
+        displayName = targetOption?.name || `IVR Menu ${actionObj.target_id}`;
+        displayType = 'ivr';
+        break;
+      default:
+        displayName = `${actionObj.type}: ${actionObj.target_id}`;
+        displayType = 'user';
+    }
+
+    const typeConfig = getTypeConfig(displayType);
+    const Icon = typeConfig.icon;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="font-mono">{targetOption?.extension_number || numericId}</span>
+        <Badge variant="outline" className={cn('flex items-center gap-1 text-xs', typeConfig.color)}>
+          <Icon className="h-3 w-3" />
+          {typeConfig.label} - {displayName}
+        </Badge>
+      </div>
+    );
+  }
+
+  // If it's a string (legacy format), assume it's an extension ID
+  if (typeof action === 'string') {
+    const ext = extensions.find(e => e.id === action);
+    return <span>{ext?.name || action}</span>;
+  }
+
+  return <span className="text-muted-foreground">Unknown</span>;
+};
+
+// ============================================================================
 // Action Selector Component
 // ============================================================================
 
@@ -119,9 +202,25 @@ const ActionSelector: React.FC<ActionSelectorProps> = ({
   };
 
   const handleTargetChange = (targetId: string) => {
-    onChange({ ...value!, target_id: targetId });
-  };
+    if (value) {
+      let prefixedTargetId = targetId;
 
+      // Add appropriate prefix based on action type
+      switch (value.type) {
+        case 'extension':
+          prefixedTargetId = `ext-${targetId}`;
+          break;
+        case 'ring_group':
+          prefixedTargetId = `rg-${targetId}`;
+          break;
+        case 'ivr_menu':
+          prefixedTargetId = `ivr-${targetId}`;
+          break;
+      }
+
+      onChange({ ...value, target_id: prefixedTargetId });
+    }
+  };
 
 
   const getTargetOptions = () => {
@@ -153,8 +252,33 @@ const ActionSelector: React.FC<ActionSelectorProps> = ({
   const getCurrentTargetLabel = () => {
     if (!value?.target_id) return null;
     const options = getTargetOptions();
-    const target = options.find(opt => opt.id.toString() === value.target_id);
+
+    // Extract the numeric ID from prefixed target_id (e.g., "ext-123" -> "123")
+    let numericId = value.target_id;
+    if (value.target_id.startsWith('ext-')) {
+      numericId = value.target_id.substring(4);
+    } else if (value.target_id.startsWith('rg-')) {
+      numericId = value.target_id.substring(3);
+    } else if (value.target_id.startsWith('ivr-')) {
+      numericId = value.target_id.substring(4);
+    }
+
+    const target = options.find(opt => opt.id.toString() === numericId);
     return target?.name || target?.extension_number || 'Unknown';
+  };
+
+  const getCurrentTargetValue = () => {
+    if (!value?.target_id) return '';
+    // Extract the numeric ID from prefixed target_id (e.g., "ext-123" -> "123")
+    let numericId = value.target_id;
+    if (value.target_id.startsWith('ext-')) {
+      numericId = value.target_id.substring(4);
+    } else if (value.target_id.startsWith('rg-')) {
+      numericId = value.target_id.substring(3);
+    } else if (value.target_id.startsWith('ivr-')) {
+      numericId = value.target_id.substring(4);
+    }
+    return numericId;
   };
 
   return (
@@ -189,7 +313,7 @@ const ActionSelector: React.FC<ActionSelectorProps> = ({
       {/* Target Selector */}
       {value?.type && (
         <Select
-          value={value.target_id || ''}
+          value={getCurrentTargetValue()}
           onValueChange={handleTargetChange}
         >
           <SelectTrigger>
@@ -698,8 +822,8 @@ const BusinessHours: React.FC = () => {
       status: 'active',
       schedule: createEmptyWeeklySchedule(),
       exceptions: [],
-      open_hours_action: '',
-      closed_hours_action: '',
+      open_hours_action: null,
+      closed_hours_action: null,
     };
     setFormData(initialSchedule);
     setOpenHoursAction(null);
@@ -713,11 +837,21 @@ const BusinessHours: React.FC = () => {
   const handleEdit = (schedule: BusinessHoursSchedule) => {
     setFormData({ ...schedule });
 
-    // Parse actions from string format (for backward compatibility)
-    const parseAction = (actionStr: string): BusinessHoursAction | null => {
-      if (!actionStr) return null;
-      // For now, assume it's an extension ID, but in future could be JSON
-      return { type: 'extension', target_id: actionStr };
+    // Parse actions - handle both structured objects (new format) and strings (legacy format)
+    const parseAction = (action: any): BusinessHoursAction | null => {
+      if (!action) return null;
+
+      // If it's already a structured object (new API format)
+      if (typeof action === 'object' && action.type && action.target_id) {
+        return action as BusinessHoursAction;
+      }
+
+      // If it's a string (legacy format), assume it's an extension ID
+      if (typeof action === 'string') {
+        return { type: 'extension', target_id: action };
+      }
+
+      return null;
     };
 
     setOpenHoursAction(parseAction(schedule.open_hours_action));
@@ -968,17 +1102,12 @@ const BusinessHours: React.FC = () => {
       return;
     }
 
-    // Convert actions to string format for API
-    const actionToString = (action: BusinessHoursAction): string => {
-      return action.target_id || '';
-    };
-
     // Prepare data for API
     const apiData = {
       name: formData.name!,
       status: formData.status!,
-      open_hours_action: actionToString(openHoursAction!),
-      closed_hours_action: actionToString(closedHoursAction!),
+      open_hours_action: openHoursAction!,
+      closed_hours_action: closedHoursAction!,
       schedule: formData.schedule!,
       exceptions: formData.exceptions || [],
     };
@@ -1291,7 +1420,9 @@ const BusinessHours: React.FC = () => {
         open={isDetailSheetOpen}
         onOpenChange={setIsDetailSheetOpen}
         schedule={selectedSchedule}
-        onEdit={canManage ? handleEdit : undefined}
+        extensions={extensions}
+        ringGroups={ringGroups}
+        ivrMenus={ivrMenus}
       />
     </div>
   );
@@ -2271,14 +2402,18 @@ interface ScheduleDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schedule: BusinessHoursSchedule | null;
-  onEdit?: (schedule: BusinessHoursSchedule) => void;
+  extensions: any[];
+  ringGroups: any[];
+  ivrMenus: any[];
 }
 
 const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
   open,
   onOpenChange,
   schedule,
-  onEdit,
+  extensions,
+  ringGroups,
+  ivrMenus,
 }) => {
   if (!schedule) return null;
 
@@ -2293,12 +2428,6 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
         <SheetHeader>
           <div className="flex items-center justify-between">
             <SheetTitle className="text-2xl">{schedule.name}</SheetTitle>
-            {onEdit && (
-              <Button variant="outline" size="sm" onClick={() => onEdit(schedule)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            )}
           </div>
           <SheetDescription>Business hours schedule details</SheetDescription>
         </SheetHeader>
@@ -2326,11 +2455,11 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
               </div>
               <div>
                 <span className="text-muted-foreground">Open Hours Action:</span>{' '}
-                {mockExtensions.find(e => e.id === schedule.open_hours_action)?.name || schedule.open_hours_action}
+                {getActionDisplayName(schedule.open_hours_action, extensions, ringGroups, ivrMenus)}
               </div>
               <div>
                 <span className="text-muted-foreground">Closed Hours Action:</span>{' '}
-                {mockExtensions.find(e => e.id === schedule.closed_hours_action)?.name || schedule.closed_hours_action}
+                {getActionDisplayName(schedule.closed_hours_action, extensions, ringGroups, ivrMenus)}
               </div>
               <div className="text-xs text-muted-foreground">
                 Created: {new Date(schedule.created_at).toLocaleDateString()} by{' '}

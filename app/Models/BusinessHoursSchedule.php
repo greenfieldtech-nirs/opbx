@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\DayOfWeek;
 use App\Scopes\OrganizationScope;
@@ -38,7 +39,9 @@ class BusinessHoursSchedule extends Model
         'name',
         'status',
         'open_hours_action',
+        'open_hours_action_type',
         'closed_hours_action',
+        'closed_hours_action_type',
     ];
 
     /**
@@ -50,6 +53,10 @@ class BusinessHoursSchedule extends Model
     {
         return [
             'status' => BusinessHoursStatus::class,
+            'open_hours_action' => 'json',
+            'open_hours_action_type' => BusinessHoursActionType::class,
+            'closed_hours_action' => 'json',
+            'closed_hours_action_type' => BusinessHoursActionType::class,
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -180,13 +187,20 @@ class BusinessHoursSchedule extends Model
      * Get the routing action based on current time.
      *
      * @param Carbon|null $dateTime
-     * @return string
+     * @return array|string
      */
-    public function getCurrentRouting(?Carbon $dateTime = null): string
+    public function getCurrentRouting(?Carbon $dateTime = null)
     {
-        return $this->isCurrentlyOpen($dateTime)
-            ? $this->open_hours_action
-            : $this->closed_hours_action;
+        $isOpen = $this->isCurrentlyOpen($dateTime);
+        $action = $isOpen ? $this->open_hours_action : $this->closed_hours_action;
+
+        // Handle both old string format and new JSON format during transition
+        if (is_array($action)) {
+            return $action;
+        }
+
+        // For backward compatibility, return as string if still in old format
+        return $action;
     }
 
     /**
@@ -234,5 +248,73 @@ class BusinessHoursSchedule extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', BusinessHoursStatus::ACTIVE->value);
+    }
+
+    /**
+     * Get the open hours action type.
+     *
+     * @return BusinessHoursActionType
+     */
+    public function getOpenHoursActionType(): BusinessHoursActionType
+    {
+        return $this->open_hours_action_type ?? BusinessHoursActionType::EXTENSION;
+    }
+
+    /**
+     * Get the closed hours action type.
+     *
+     * @return BusinessHoursActionType
+     */
+    public function getClosedHoursActionType(): BusinessHoursActionType
+    {
+        return $this->closed_hours_action_type ?? BusinessHoursActionType::EXTENSION;
+    }
+
+    /**
+     * Get the open hours target ID.
+     *
+     * @return string|null
+     */
+    public function getOpenHoursTargetId(): ?string
+    {
+        $action = $this->open_hours_action;
+        return is_array($action) ? ($action['target_id'] ?? null) : $action;
+    }
+
+    /**
+     * Get the closed hours target ID.
+     *
+     * @return string|null
+     */
+    public function getClosedHoursTargetId(): ?string
+    {
+        $action = $this->closed_hours_action;
+        return is_array($action) ? ($action['target_id'] ?? null) : $action;
+    }
+
+    /**
+     * Get the current routing action type.
+     *
+     * @param Carbon|null $dateTime
+     * @return BusinessHoursActionType
+     */
+    public function getCurrentRoutingType(?Carbon $dateTime = null): BusinessHoursActionType
+    {
+        return $this->isCurrentlyOpen($dateTime)
+            ? $this->getOpenHoursActionType()
+            : $this->getClosedHoursActionType();
+    }
+
+    /**
+     * Get the current routing target ID.
+     *
+     * @param Carbon|null $dateTime
+     * @return string|null
+     */
+    public function getCurrentRoutingTargetId(?Carbon $dateTime = null): ?string
+    {
+        return $this->isCurrentlyOpen($dateTime)
+            ? $this->getOpenHoursTargetId()
+            : $this->getClosedHoursTargetId();
     }
 }

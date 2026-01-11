@@ -133,6 +133,7 @@ docker-compose.override.yml
 /coverage
 /.nyc_output
 /tests/coverage
+/tests
 phpunit.xml
 .phpunit.cache
 

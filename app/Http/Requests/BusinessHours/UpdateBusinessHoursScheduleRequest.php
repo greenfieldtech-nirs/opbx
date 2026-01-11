@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\BusinessHours;
 
+use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\DayOfWeek;
@@ -65,10 +66,28 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             ],
             'open_hours_action' => [
                 'required',
+                'array',
+            ],
+            'open_hours_action.type' => [
+                'required',
+                'string',
+                new Enum(BusinessHoursActionType::class),
+            ],
+            'open_hours_action.target_id' => [
+                'required',
                 'string',
                 'max:255',
             ],
             'closed_hours_action' => [
+                'required',
+                'array',
+            ],
+            'closed_hours_action.type' => [
+                'required',
+                'string',
+                new Enum(BusinessHoursActionType::class),
+            ],
+            'closed_hours_action.target_id' => [
                 'required',
                 'string',
                 'max:255',
@@ -157,7 +176,16 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             'name.unique' => 'A schedule with this name already exists in your organization.',
             'status.required' => 'Status is required.',
             'open_hours_action.required' => 'Open hours action is required.',
+            'open_hours_action.required' => 'Open hours action is required.',
+            'open_hours_action.array' => 'Open hours action must be a structured object.',
+            'open_hours_action.type.required' => 'Open hours action type is required.',
+            'open_hours_action.target_id.required' => 'Open hours action target ID is required.',
+            'open_hours_action.target_id.max' => 'Open hours action target ID must not exceed 255 characters.',
             'closed_hours_action.required' => 'Closed hours action is required.',
+            'closed_hours_action.array' => 'Closed hours action must be a structured object.',
+            'closed_hours_action.type.required' => 'Closed hours action type is required.',
+            'closed_hours_action.target_id.required' => 'Closed hours action target ID is required.',
+            'closed_hours_action.target_id.max' => 'Closed hours action target ID must not exceed 255 characters.',
             'schedule.required' => 'Weekly schedule is required.',
             'schedule.*.enabled.required' => 'Enabled status is required for each day.',
             'schedule.*.enabled.boolean' => 'Enabled must be true or false.',
@@ -203,6 +231,8 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             $this->merge(['schedule' => $schedule]);
         }
 
+
+
         // Deduplicate exception dates (silently use first occurrence)
         $exceptions = $this->input('exceptions', []);
         if (!empty($exceptions)) {
@@ -221,6 +251,8 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         }
     }
 
+
+
     /**
      * Configure the validator instance.
      *
@@ -232,6 +264,8 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         $validator->after(function ($validator) {
             $schedule = $this->input('schedule', []);
             $exceptions = $this->input('exceptions', []);
+            $openHoursAction = $this->input('open_hours_action', []);
+            $closedHoursAction = $this->input('closed_hours_action', []);
 
             // Validate that enabled days have at least one time range
             foreach ($schedule as $dayName => $daySchedule) {
@@ -266,6 +300,56 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                     );
                 }
             }
+
+            // Validate action structure consistency
+            $this->validateActionStructure($validator, 'open_hours_action', $openHoursAction);
+            $this->validateActionStructure($validator, 'closed_hours_action', $closedHoursAction);
         });
+    }
+
+    /**
+     * Validate that the action structure is consistent.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @param string $field
+     * @param array $action
+     * @return void
+     */
+    private function validateActionStructure($validator, string $field, array $action): void
+    {
+        $type = $action['type'] ?? null;
+        $targetId = $action['target_id'] ?? null;
+
+        if ($type && $targetId) {
+            // For extension actions, target_id should be a valid extension identifier
+            if ($type === BusinessHoursActionType::EXTENSION->value) {
+                if (!preg_match('/^ext-[a-zA-Z0-9_-]+$/', $targetId)) {
+                    $validator->errors()->add(
+                        $field . '.target_id',
+                        'Extension target ID must be in format: ext-{identifier}'
+                    );
+                }
+            }
+
+            // For ring group actions, target_id should be a valid ring group identifier
+            if ($type === BusinessHoursActionType::RING_GROUP->value) {
+                if (!preg_match('/^rg-[a-zA-Z0-9_-]+$/', $targetId)) {
+                    $validator->errors()->add(
+                        $field . '.target_id',
+                        'Ring group target ID must be in format: rg-{identifier}'
+                    );
+                }
+            }
+
+            // For IVR menu actions, target_id should be a valid IVR menu identifier
+            if ($type === BusinessHoursActionType::IVR_MENU->value) {
+                if (!preg_match('/^ivr-[a-zA-Z0-9_-]+$/', $targetId)) {
+                    $validator->errors()->add(
+                        $field . '.target_id',
+                        'IVR menu target ID must be in format: ivr-{identifier}'
+                    );
+                }
+            }
+        }
     }
 }

@@ -226,8 +226,6 @@ class BusinessHoursScheduleCacheObserverTest extends TestCase
         // Arrange
         $schedule = BusinessHoursSchedule::factory()->create([
             'organization_id' => $this->organization->id,
-            'open_hours_action' => 'ext-100',
-            'closed_hours_action' => 'ext-voicemail',
         ]);
 
         // Warm up cache
@@ -236,8 +234,8 @@ class BusinessHoursScheduleCacheObserverTest extends TestCase
         $this->assertTrue(Cache::has($cacheKey));
 
         // Act - change actions
-        $schedule->open_hours_action = 'ext-200';
-        $schedule->closed_hours_action = 'ext-announce';
+        $schedule->open_hours_action = ['target_id' => 'ext-200'];
+        $schedule->closed_hours_action = ['target_id' => 'ext-announce'];
         $schedule->save();
 
         // Assert - cache should be invalidated

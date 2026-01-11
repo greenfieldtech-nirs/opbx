@@ -14,11 +14,16 @@ export interface BusinessHoursSchedule {
     sunday: DaySchedule;
   };
   exceptions: BusinessHoursException[];
-  open_hours_action: string;
-  closed_hours_action: string;
+  open_hours_action: BusinessHoursAction;
+  closed_hours_action: BusinessHoursAction;
   current_status: 'open' | 'closed' | 'exception';
   created_at: string;
   updated_at: string;
+}
+
+export interface BusinessHoursAction {
+  type: 'extension' | 'ring_group' | 'ivr_menu';
+  target_id: string;
 }
 
 export interface DaySchedule {
@@ -54,8 +59,8 @@ export interface BusinessHoursScheduleCollection {
 export interface CreateBusinessHoursScheduleRequest {
   name: string;
   status: 'active' | 'inactive';
-  open_hours_action: string;
-  closed_hours_action: string;
+  open_hours_action: BusinessHoursAction;
+  closed_hours_action: BusinessHoursAction;
   schedule: {
     monday: DayScheduleRequest;
     tuesday: DayScheduleRequest;
