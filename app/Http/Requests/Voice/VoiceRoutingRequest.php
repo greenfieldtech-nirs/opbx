@@ -49,7 +49,7 @@ class VoiceRoutingRequest extends FormRequest
             'CallStatus' => ['nullable', 'string', 'in:ringing,answered,completed,failed,busy,no-answer', 'max:20'],
 
             // Direction - optional
-            'Direction' => ['nullable', 'string', 'in:inbound,outbound'],
+            'Direction' => ['nullable', 'string', 'in:subscriber,inbound,outbound,application'],
 
             // Organization ID - set by middleware
             '_organization_id' => ['nullable', 'integer', 'min:1'],
@@ -72,7 +72,7 @@ class VoiceRoutingRequest extends FormRequest
             'To.regex' => 'Called number must be in E.164 format or valid extension.',
             'Domain.regex' => 'Domain must be a valid hostname.',
             'CallStatus.in' => 'Call status must be a valid status value.',
-            'Direction.in' => 'Direction must be either inbound or outbound.',
+            'Direction.in' => 'Direction must be one of: subscriber, inbound, outbound, application.',
         ];
     }
 }

@@ -57,11 +57,7 @@ class VoiceRoutingManager
      * Handle inbound call routing.
      *
      * Main entry point for processing incoming calls. Determines the routing path
-     * based on the destination number and applies business rules in priority order:
-     * 1. Business hours check
-     * 2. DID routing (if DID exists for the number)
-     * 3. Extension routing (if extension exists for the number)
-     * 4. Outbound routing (via whitelist for internal callers)
+     * based on the call direction and destination number.
      *
      * @param  Request  $request  The incoming HTTP request containing call details
      * @return Response CXML response with routing instructions
@@ -70,17 +66,90 @@ class VoiceRoutingManager
      */
     public function handleInbound(Request $request): Response
     {
+        $direction = $request->input('Direction', 'unknown');
         $to = $request->input('To');
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Handling inbound call', [
+        Log::info('VoiceRoutingManager: Handling call routing by direction', [
+            'direction' => $direction,
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
         ]);
 
-        // 0. Check Business Hours
+        return match ($direction) {
+            'subscriber' => $this->handleSubscriberDirection($request),
+            'inbound' => $this->handleInboundDirection($request),
+            'outbound' => $this->handleOutgoingDirection($request),
+            'application' => $this->handleApplicationDirection($request),
+            default => $this->handleUnknownDirection($request, $direction),
+        };
+    }
+
+    /**
+     * Handle subscriber direction calls (internal PBX user calls).
+     *
+     * These are calls from internal PBX users to other internal destinations.
+     * No business hours checking is applied to internal calls.
+     *
+     * @param  Request  $request  The incoming call request
+     * @return Response CXML response with routing instructions
+     */
+    private function handleSubscriberDirection(Request $request): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Handling subscriber direction call', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        // 1. Try extension routing first (direct extension dial)
+        $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
+        if ($extensionResponse) {
+            return $extensionResponse;
+        }
+
+        // 2. Try DID routing (fallback for internal calls)
+        $didResponse = $this->handleDidRouting($request, $to, $orgId);
+        if ($didResponse) {
+            return $didResponse;
+        }
+
+        Log::info('VoiceRoutingManager: No destination found for subscriber call', [
+            'to' => $to,
+            'org_id' => $orgId,
+        ]);
+
+        return $this->createCxmlErrorResponse('Extension not found');
+    }
+
+    /**
+     * Handle inbound direction calls (external inbound calls).
+     *
+     * These are calls from external numbers to the PBX. Business hours checking
+     * is applied to determine routing behavior.
+     *
+     * @param  Request  $request  The incoming call request
+     * @return Response CXML response with routing instructions
+     */
+    private function handleInboundDirection(Request $request): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Handling inbound direction call', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        // 0. Check Business Hours (only for inbound external calls)
         $businessHoursResponse = $this->checkBusinessHours($orgId, $request->input('CallSid', ''), $request);
         if ($businessHoursResponse) {
             return $businessHoursResponse;
@@ -92,24 +161,111 @@ class VoiceRoutingManager
             return $didResponse;
         }
 
-        // 2. Try extension routing
+        // 2. Try extension routing (fallback)
         $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
         if ($extensionResponse) {
             return $extensionResponse;
         }
 
-        // 3. Try outbound routing
-        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
-        if ($outboundResponse) {
-            return $outboundResponse;
-        }
-
-        Log::info('VoiceRoutingManager: No destination found, returning unavailable', [
+        Log::info('VoiceRoutingManager: No destination found for inbound call', [
             'to' => $to,
             'org_id' => $orgId,
         ]);
 
         return $this->createCxmlErrorResponse('Destination not found');
+    }
+
+    /**
+     * Handle outbound direction calls (internal to external calls).
+     *
+     * These are calls from internal extensions to external numbers.
+     * Uses outbound whitelist routing.
+     *
+     * @param  Request  $request  The incoming call request
+     * @return Response CXML response with routing instructions
+     */
+    private function handleOutgoingDirection(Request $request): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Handling outbound direction call', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        // Try outbound routing via whitelist
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
+        }
+
+        Log::info('VoiceRoutingManager: Outbound call not allowed or no whitelist match', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        return $this->createCxmlErrorResponse('Outbound call not permitted');
+    }
+
+    /**
+     * Handle application direction calls (API-initiated calls).
+     *
+     * These are calls initiated programmatically through the API.
+     * Currently not implemented - returns error response.
+     *
+     * @param  Request  $request  The incoming call request
+     * @return Response CXML response with routing instructions
+     */
+    private function handleApplicationDirection(Request $request): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Handling application direction call', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        // Application-initiated calls are not yet implemented
+        Log::warning('VoiceRoutingManager: Application direction calls not yet implemented', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        return $this->createCxmlErrorResponse('Application-initiated calls not supported');
+    }
+
+    /**
+     * Handle calls with unknown direction.
+     *
+     * Falls back to default routing behavior for unrecognized directions.
+     *
+     * @param  Request  $request  The incoming call request
+     * @param  string  $direction  The unrecognized direction value
+     * @return Response CXML response with routing instructions
+     */
+    private function handleUnknownDirection(Request $request, string $direction): Response
+    {
+        $to = $request->input('To');
+        $from = $request->input('From');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::warning('VoiceRoutingManager: Unknown call direction, falling back to default routing', [
+            'direction' => $direction,
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
+
+        // Fall back to inbound behavior for unknown directions
+        return $this->handleInboundDirection($request);
     }
 
     /**
@@ -123,6 +279,7 @@ class VoiceRoutingManager
     private function handleExtensionRouting(Request $request, string $to, int $orgId): ?Response
     {
         Log::info('VoiceRoutingManager: Checking for extension', [
+            'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
             'org_id' => $orgId,
         ]);
@@ -175,6 +332,7 @@ class VoiceRoutingManager
     private function handleDidRouting(Request $request, string $to, int $orgId): ?Response
     {
         Log::info('VoiceRoutingManager: Checking for DID', [
+            'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
             'org_id' => $orgId,
         ]);
@@ -730,6 +888,7 @@ class VoiceRoutingManager
     private function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
     {
         Log::info('VoiceRoutingManager: Checking for outbound whitelist routing', [
+            'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
