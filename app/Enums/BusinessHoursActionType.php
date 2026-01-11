@@ -13,6 +13,7 @@ enum BusinessHoursActionType: string
 {
     case EXTENSION = 'extension';
     case RING_GROUP = 'ring_group';
+    case CONFERENCE_ROOM = 'conference_room';
     case IVR_MENU = 'ivr_menu';
 
     /**
@@ -25,6 +26,7 @@ enum BusinessHoursActionType: string
         return match ($this) {
             self::EXTENSION => 'Extension',
             self::RING_GROUP => 'Ring Group',
+            self::CONFERENCE_ROOM => 'Conference Room',
             self::IVR_MENU => 'IVR Menu',
         };
     }
@@ -39,6 +41,7 @@ enum BusinessHoursActionType: string
         return match ($this) {
             self::EXTENSION => 'Route calls directly to a specific extension',
             self::RING_GROUP => 'Route calls to a ring group for simultaneous or sequential ringing',
+            self::CONFERENCE_ROOM => 'Route calls to a conference room',
             self::IVR_MENU => 'Route calls to an interactive voice response menu',
         };
     }

@@ -538,51 +538,70 @@ class VoiceRoutingManager
                     switch ($actionType) {
                         case \App\Enums\BusinessHoursActionType::EXTENSION:
                             if ($targetId) {
-                                $extension = $this->cache->getExtension($did->organization_id, $targetId);
-                                if ($extension && $extension->isActive()) {
-                                    $destination['extension'] = $extension;
+                                // Parse "ext-13" format to get extension ID
+                                if (preg_match('/^ext-(\d+)$/', $targetId, $matches)) {
+                                    $extensionId = (int) $matches[1];
+                                    $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $extensionId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($extension) {
+                                        $destination['extension'] = $extension;
+                                    }
                                 }
                             }
                             break;
 
                         case \App\Enums\BusinessHoursActionType::RING_GROUP:
                             if ($targetId) {
-                                $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                                    ->where('id', $targetId)
-                                    ->where('organization_id', $did->organization_id)
-                                    ->first();
-                                if ($ringGroup) {
-                                    $destination['ring_group'] = $ringGroup;
+                                // Parse "rg-5" format to get ring group ID
+                                if (preg_match('/^rg-(\d+)$/', $targetId, $matches)) {
+                                    $ringGroupId = (int) $matches[1];
+                                    $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $ringGroupId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($ringGroup) {
+                                        $destination['ring_group'] = $ringGroup;
+                                    }
                                 }
                             }
                             break;
 
                         case \App\Enums\BusinessHoursActionType::CONFERENCE_ROOM:
                             if ($targetId) {
-                                $conferenceRoom = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                                    ->where('id', $targetId)
-                                    ->where('organization_id', $did->organization_id)
-                                    ->first();
-                                if ($conferenceRoom) {
-                                    $destination['conference_room'] = $conferenceRoom;
+                                // Parse "conf-1" format to get conference room ID
+                                if (preg_match('/^conf-(\d+)$/', $targetId, $matches)) {
+                                    $conferenceRoomId = (int) $matches[1];
+                                    $conferenceRoom = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $conferenceRoomId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->first();
+                                    if ($conferenceRoom) {
+                                        $destination['conference_room'] = $conferenceRoom;
+                                    }
                                 }
                             }
                             break;
 
                         case \App\Enums\BusinessHoursActionType::IVR_MENU:
                             if ($targetId) {
-                                $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                                    ->where('id', $targetId)
-                                    ->where('organization_id', $did->organization_id)
-                                    ->first();
-                                if ($ivrMenu) {
-                                    $destination['ivr_menu'] = $ivrMenu;
+                                // Parse "ivr-1" format to get IVR menu ID
+                                if (preg_match('/^ivr-(\d+)$/', $targetId, $matches)) {
+                                    $ivrMenuId = (int) $matches[1];
+                                    $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $ivrMenuId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($ivrMenu) {
+                                        $destination['ivr_menu'] = $ivrMenu;
+                                    }
                                 }
                             }
                             break;
-
-                        case \App\Enums\BusinessHoursActionType::HANGUP:
-                            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
 
                         default:
                             // For legacy string actions, use the old method

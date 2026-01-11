@@ -15,10 +15,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('business_hours_schedules', function (Blueprint $table) {
-            $table->enum('open_hours_action_type', ['extension', 'ring_group', 'ivr_menu'])
+            $table->enum('open_hours_action_type', ['extension', 'ring_group', 'conference_room', 'ivr_menu'])
                 ->after('open_hours_action')
                 ->default('extension');
-            $table->enum('closed_hours_action_type', ['extension', 'ring_group', 'ivr_menu'])
+            $table->enum('closed_hours_action_type', ['extension', 'ring_group', 'conference_room', 'ivr_menu'])
                 ->after('closed_hours_action')
                 ->default('extension');
         });
