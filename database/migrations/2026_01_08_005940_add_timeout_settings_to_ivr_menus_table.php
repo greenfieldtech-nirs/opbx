@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('ivr_menus', function (Blueprint $table) {
-            $table->tinyInteger('max_timeout')->unsigned()->default(3)->after('tts_voice');
-            $table->tinyInteger('inter_digit_timeout')->unsigned()->default(2)->after('max_timeout');
+            if (!Schema::hasColumn('ivr_menus', 'max_timeout')) {
+                $table->tinyInteger('max_timeout')->unsigned()->default(3)->after('tts_voice');
+            }
+            if (!Schema::hasColumn('ivr_menus', 'inter_digit_timeout')) {
+                $table->tinyInteger('inter_digit_timeout')->unsigned()->default(2)->after('max_timeout');
+            }
         });
     }
 
