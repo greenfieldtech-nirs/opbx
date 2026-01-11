@@ -244,8 +244,9 @@ class VoiceRoutingManager
     /**
      * Handle external inbound calls to a DID.
      *
-     * These are calls from external numbers to an assigned DID. Business hours checking
-     * is applied to determine routing behavior.
+     * These are calls from external numbers to an assigned DID. Routes ONLY to the
+     * configured destination for that specific DID (extension, IVR, ring group,
+     * conference, or business hours as configured in the DID settings).
      *
      * @param  Request  $request  The incoming call request
      * @return Response CXML response with routing instructions
@@ -262,31 +263,19 @@ class VoiceRoutingManager
             'org_id' => $orgId,
         ]);
 
-        // 0. Check Business Hours (only for external inbound calls)
-        $businessHoursResponse = $this->checkBusinessHours($orgId, $request->input('CallSid', ''), $request);
-        if ($businessHoursResponse) {
-            return $businessHoursResponse;
-        }
-
-        // 1. Try DID routing
+        // Route ONLY to the configured destination for this specific DID
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
             return $didResponse;
         }
 
-        // 2. Try extension routing (fallback)
-        $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
-        if ($extensionResponse) {
-            return $extensionResponse;
-        }
-
-        Log::info('VoiceRoutingManager: No destination found for external inbound call', [
+        Log::info('VoiceRoutingManager: No destination configured for DID', [
             'from_external' => $from,
             'to_did' => $to,
             'org_id' => $orgId,
         ]);
 
-        return $this->createCxmlErrorResponse('Destination not found');
+        return $this->createCxmlErrorResponse('DID destination not configured');
     }
 
     /**
