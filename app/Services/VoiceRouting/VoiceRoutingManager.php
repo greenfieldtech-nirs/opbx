@@ -523,14 +523,79 @@ class VoiceRoutingManager
                 $schedule = $did->getBusinessHoursScheduleAttribute();
                 if ($schedule) {
                     // For business hours, route based on current status
-                    $currentAction = $schedule->getCurrentRouting();
-                    if (! empty($currentAction)) {
-                        return $this->routeToBusinessHoursAction(
-                            $currentAction,
-                            $did->organization_id,
-                            $request->input('CallSid', ''),
-                            $request
-                        );
+                    $actionType = $schedule->getCurrentRoutingType();
+                    $targetId = $schedule->getCurrentRoutingTargetId();
+
+                    Log::info('VoiceRoutingManager: Business hours routing', [
+                        'did_id' => $did->id,
+                        'schedule_id' => $schedule->id,
+                        'action_type' => $actionType->value,
+                        'target_id' => $targetId,
+                        'is_open' => $schedule->isCurrentlyOpen(),
+                    ]);
+
+                    // Route based on action type
+                    switch ($actionType) {
+                        case \App\Enums\BusinessHoursActionType::EXTENSION:
+                            if ($targetId) {
+                                $extension = $this->cache->getExtension($did->organization_id, $targetId);
+                                if ($extension && $extension->isActive()) {
+                                    $destination['extension'] = $extension;
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::RING_GROUP:
+                            if ($targetId) {
+                                $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                    ->where('id', $targetId)
+                                    ->where('organization_id', $did->organization_id)
+                                    ->first();
+                                if ($ringGroup) {
+                                    $destination['ring_group'] = $ringGroup;
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::CONFERENCE_ROOM:
+                            if ($targetId) {
+                                $conferenceRoom = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                    ->where('id', $targetId)
+                                    ->where('organization_id', $did->organization_id)
+                                    ->first();
+                                if ($conferenceRoom) {
+                                    $destination['conference_room'] = $conferenceRoom;
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::IVR_MENU:
+                            if ($targetId) {
+                                $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                    ->where('id', $targetId)
+                                    ->where('organization_id', $did->organization_id)
+                                    ->first();
+                                if ($ivrMenu) {
+                                    $destination['ivr_menu'] = $ivrMenu;
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::HANGUP:
+                            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
+
+                        default:
+                            // For legacy string actions, use the old method
+                            $currentAction = $schedule->getCurrentRouting();
+                            if (is_string($currentAction) && !empty($currentAction)) {
+                                return $this->routeToBusinessHoursAction(
+                                    $currentAction,
+                                    $did->organization_id,
+                                    $request->input('CallSid', ''),
+                                    $request
+                                );
+                            }
+                            break;
                     }
                 }
                 break;
