@@ -249,6 +249,14 @@ export default function RingGroups() {
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
+  // Fetch all ring groups for fallback destinations (unfiltered, all active)
+  const { data: allRingGroupsData } = useQuery({
+    queryKey: ['ring-groups-all'],
+    queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
+  });
+
+  const allRingGroups = allRingGroupsData?.data || [];
+
   const availableExtensions = extensionsData?.data || [];
 
   // Fetch available IVR menus (status: active)
@@ -545,22 +553,21 @@ export default function RingGroups() {
 
   // Open edit dialog
   const openEditDialog = (group: RingGroup) => {
-    const extendedGroup = group as ExtendedRingGroup;
-    setSelectedGroup(extendedGroup);
+    setSelectedGroup(group);
     setFormData({
-      name: extendedGroup.name,
-      description: extendedGroup.description,
-      strategy: extendedGroup.strategy,
-      timeout: extendedGroup.timeout,
-      ring_turns: extendedGroup.ring_turns,
-      fallback_action: extendedGroup.fallback_action,
-      fallback_extension_id: extendedGroup.fallback_extension_id,
-      fallback_extension_number: extendedGroup.fallback_extension_number,
-      fallback_ring_group_id: extendedGroup.fallback_ring_group_id,
-      fallback_ivr_menu_id: extendedGroup.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: extendedGroup.fallback_ai_assistant_id,
-      status: extendedGroup.status,
-      members: [...extendedGroup.members],
+      name: group.name,
+      description: group.description,
+      strategy: group.strategy,
+      timeout: group.timeout,
+      ring_turns: group.ring_turns,
+      fallback_action: group.fallback_action,
+      fallback_extension_id: group.fallback_extension_id,
+      fallback_extension_number: group.fallback_extension_number,
+      fallback_ring_group_id: (group as any).fallback_ring_group_id,
+      fallback_ivr_menu_id: (group as any).fallback_ivr_menu_id,
+      fallback_ai_assistant_id: (group as any).fallback_ai_assistant_id,
+      status: group.status,
+      members: [...group.members],
     });
     setIsEditDialogOpen(true);
   };
@@ -1062,7 +1069,7 @@ export default function RingGroups() {
                         <SelectValue placeholder="Select ring group" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ringGroups.map((group) => (
+                        {allRingGroups.map((group) => (
                           <SelectItem key={group.id} value={group.id.toString()}>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
