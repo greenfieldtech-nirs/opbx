@@ -17,8 +17,8 @@ import type {
   RingGroupFallbackAction,
   CreateRingGroupRequest,
   UpdateRingGroupRequest,
-  Extension,
 } from '@/types/api.types';
+import type { Extension } from '@/types';
 import {
   getStrategyDisplayName,
   getStrategyDescription,
@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
 import {
   Plus,
   Search,
@@ -482,7 +483,7 @@ export default function RingGroups() {
     const newMember: RingGroupMember = {
       extension_id: firstAvailable.id,
       extension_number: firstAvailable.extension_number,
-      user_name: firstAvailable.name || null,
+      user_name: firstAvailable.user?.name || null,
       priority: currentMembers.length + 1,
     };
 
@@ -518,7 +519,7 @@ export default function RingGroups() {
       ...newMembers[index],
       extension_id: extension.id,
       extension_number: extension.extension_number,
-      user_name: extension.name || null,
+      user_name: extension.user?.name || null,
     };
 
     setFormData({
@@ -535,6 +536,44 @@ export default function RingGroups() {
       .map((m) => m.extension_id)
       .filter((id) => id !== currentMemberExtensionId);
     return availableExtensions.filter((ext) => !usedExtensionIds.includes(ext.id));
+  };
+
+  const moveMemberUp = (index: number) => {
+    const currentMembers = formData.members || [];
+    if (index === 0 || currentMembers.length < 2) return;
+
+    const newMembers = [...currentMembers];
+    [newMembers[index - 1], newMembers[index]] = [newMembers[index], newMembers[index - 1]];
+
+    // Recalculate priorities
+    const reorderedMembers = newMembers.map((member, i) => ({
+      ...member,
+      priority: i + 1,
+    }));
+
+    setFormData({
+      ...formData,
+      members: reorderedMembers,
+    });
+  };
+
+  const moveMemberDown = (index: number) => {
+    const currentMembers = formData.members || [];
+    if (index === currentMembers.length - 1 || currentMembers.length < 2) return;
+
+    const newMembers = [...currentMembers];
+    [newMembers[index], newMembers[index + 1]] = [newMembers[index + 1], newMembers[index]];
+
+    // Recalculate priorities
+    const reorderedMembers = newMembers.map((member, i) => ({
+      ...member,
+      priority: i + 1,
+    }));
+
+    setFormData({
+      ...formData,
+      members: reorderedMembers,
+    });
   };
 
   // Render form dialog content
@@ -560,11 +599,11 @@ export default function RingGroups() {
 
         <div className="space-y-4 py-4">
           {/* Name and Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
-              </Label>
+          <div className="space-y-2">
+            <Label htmlFor="name">
+              Name <span className="text-red-500">*</span>
+            </Label>
+            <div className="flex items-center gap-3">
               <Input
                 id="name"
                 value={formData.name || ''}
@@ -572,26 +611,20 @@ export default function RingGroups() {
                 placeholder="e.g., Sales Team"
                 className={formErrors.name ? 'border-red-500' : ''}
               />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="status"
+                  checked={formData.status === 'active'}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
+                  }
+                />
+                <Label htmlFor="status" className="text-sm">
+                  {formData.status === 'active' ? 'Active' : 'Inactive'}
+                </Label>
+              </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, status: value as RingGroupStatus })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
           </div>
 
           {/* Members */}
@@ -654,11 +687,11 @@ export default function RingGroups() {
                                      <SelectValue />
                                    </SelectTrigger>
                                    <SelectContent>
-                                     {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                                       <SelectItem key={ext.id} value={ext.id}>
-                                         {ext.extension_number} - {ext.name || 'Unassigned'}
-                                       </SelectItem>
-                                     ))}
+                                      {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                        <SelectItem key={ext.id} value={ext.id}>
+                                          {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                        </SelectItem>
+                                      ))}
                                    </SelectContent>
                                  </Select>
                                </div>
@@ -713,11 +746,11 @@ export default function RingGroups() {
                                <SelectValue />
                              </SelectTrigger>
                              <SelectContent>
-                               {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                                 <SelectItem key={ext.id} value={ext.id}>
-                                   {ext.extension_number} - {ext.name || 'Unassigned'}
-                                 </SelectItem>
-                               ))}
+                                {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                  <SelectItem key={ext.id} value={ext.id}>
+                                    {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                  </SelectItem>
+                                ))}
                              </SelectContent>
                            </Select>
                          </div>
@@ -821,73 +854,136 @@ export default function RingGroups() {
 
           {/* Fallback Action */}
           <div className="space-y-2">
-            <Label htmlFor="fallback_action">
+            <Label>
               Fallback Action <span className="text-red-500">*</span>
             </Label>
-            <Select
-              value={formData.fallback_action}
-              onValueChange={(value) => {
-                setFormData({
-                  ...formData,
-                  fallback_action: value as RingGroupFallbackAction,
-                  fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
-                  fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="extension">
-                  <div className="flex items-center gap-2">
-                    <PhoneForwarded className="h-4 w-4" />
-                    <span>Forward to Extension</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fallback_action" className="text-sm text-muted-foreground">Action</Label>
+                <Select
+                  value={formData.fallback_action}
+                  onValueChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      fallback_action: value as RingGroupFallbackAction,
+                      fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
+                      fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="extension">
+                      <div className="flex items-center gap-2">
+                        <PhoneForwarded className="h-4 w-4" />
+                        <span>Extension</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ring_group">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span>Ring Group</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ivr_menu">
+                      <div className="flex items-center gap-2">
+                        <Menu className="h-4 w-4" />
+                        <span>IVR Menu</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ai_assistant">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        <span>AI Assistant</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hangup">
+                      <div className="flex items-center gap-2">
+                        <PhoneOff className="h-4 w-4" />
+                        <span>Hangup</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Destination</Label>
+                {formData.fallback_action === 'extension' && (
+                  <Select
+                    value={formData.fallback_extension_id || ''}
+                    onValueChange={(value) => {
+                      const ext = availableExtensions.find((e) => e.id === value);
+                      setFormData({
+                        ...formData,
+                        fallback_extension_id: value,
+                        fallback_extension_number: ext?.extension_number,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select extension" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableExtensions.map((ext) => (
+                        <SelectItem key={ext.id} value={ext.id}>
+                          {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ring_group' && (
+                  <Select value="">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select ring group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rg-001">Sales Team</SelectItem>
+                      <SelectItem value="rg-002">Support Team</SelectItem>
+                      <SelectItem value="rg-003">Management</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ivr_menu' && (
+                  <Select value="">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select IVR menu" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ivr-001">Main Menu</SelectItem>
+                      <SelectItem value="ivr-002">Support Menu</SelectItem>
+                      <SelectItem value="ivr-003">Sales Menu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ai_assistant' && (
+                  <Select value="">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select AI assistant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ai-001">General Assistant</SelectItem>
+                      <SelectItem value="ai-002">Sales Assistant</SelectItem>
+                      <SelectItem value="ai-003">Support Assistant</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'hangup' && (
+                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+                    No destination needed
                   </div>
-                </SelectItem>
-                <SelectItem value="hangup">
-                  <div className="flex items-center gap-2">
-                    <PhoneOff className="h-4 w-4" />
-                    <span>Hangup</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                )}
+                {formErrors.fallback_extension && formData.fallback_action === 'extension' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Fallback Extension (conditional) */}
-          {formData.fallback_action === 'extension' && (
-            <div className="space-y-2">
-              <Label htmlFor="fallback_extension">
-                Fallback Extension <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.fallback_extension_id || ''}
-                onValueChange={(value) => {
-                  const ext = availableExtensions.find((e) => e.id === value);
-                  setFormData({
-                    ...formData,
-                    fallback_extension_id: value,
-                    fallback_extension_number: ext?.extension_number,
-                  });
-                }}
-              >
-                <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select extension" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableExtensions.map((ext) => (
-                    <SelectItem key={ext.id} value={ext.id}>
-                      {ext.extension_number} - {ext.name || 'Unassigned'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formErrors.fallback_extension && (
-                <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
-              )}
-            </div>
-          )}
+
         </div>
 
         <DialogFooter>
