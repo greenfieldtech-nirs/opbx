@@ -385,20 +385,20 @@ export default function RingGroups() {
     switch (group.fallback_action) {
       case 'extension':
         return group.fallback_extension_number
-          ? `→ Ext ${group.fallback_extension_number}`
+          ? `→ Extension: ${group.fallback_extension_number}`
           : '→ Extension';
 
       case 'ring_group':
         if (group.fallback_ring_group_id) {
           const targetRingGroup = ringGroups.find(rg => rg.id.toString() === group.fallback_ring_group_id);
-          return targetRingGroup ? `→ ${targetRingGroup.name}` : '→ Ring Group';
+          return targetRingGroup ? `→ Ring Group: ${targetRingGroup.name}` : '→ Ring Group';
         }
         return '→ Ring Group';
 
       case 'ivr_menu':
         if (group.fallback_ivr_menu_id) {
           const targetIvrMenu = ivrMenus.find(ivr => ivr.id.toString() === group.fallback_ivr_menu_id);
-          return targetIvrMenu ? `→ ${targetIvrMenu.name}` : '→ IVR Menu';
+          return targetIvrMenu ? `→ IVR Menu: ${targetIvrMenu.name}` : '→ IVR Menu';
         }
         return '→ IVR Menu';
 
@@ -407,7 +407,7 @@ export default function RingGroups() {
           const targetAiAssistant = availableExtensions.find(ext =>
             ext.id === group.fallback_ai_assistant_id && ext.type === 'ai_assistant'
           );
-          return targetAiAssistant ? `→ ${targetAiAssistant.user?.name || 'AI Assistant'}` : '→ AI Assistant';
+          return targetAiAssistant ? `→ AI Assistant: ${targetAiAssistant.user?.name || 'AI Assistant'}` : '→ AI Assistant';
         }
         return '→ AI Assistant';
 
