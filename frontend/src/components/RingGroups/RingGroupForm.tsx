@@ -1,7 +1,7 @@
 /**
  * Ring Group Form Component
  *
- * Form for creating and editing ring groups with member selection
+ * Modern form for creating and editing ring groups with enhanced UI features
  */
 
 import { useState } from 'react';
@@ -22,7 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { X } from 'lucide-react';
+import { X, Users, PhoneForwarded, RotateCw, List, PhoneOff, Menu, Bot } from 'lucide-react';
 import { extensionsService } from '@/services/extensions.service';
 import { mockExtensions } from '@/mock/extensions';
 import type { RingGroup, CreateRingGroupRequest, UpdateRingGroupRequest, RingGroupStrategy, RingGroupStatus, RingGroupFallbackAction } from '@/types/api.types';
@@ -171,6 +171,32 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
     return ext ? `${ext.extension_number} - ${ext.user?.name || 'No User'}` : extensionId;
   };
 
+  const getFallbackIcon = (action: RingGroupFallbackAction) => {
+    switch (action) {
+      case 'extension':
+        return <PhoneForwarded className="h-4 w-4" />;
+      case 'ring_group':
+        return <Users className="h-4 w-4" />;
+      case 'ivr_menu':
+        return <Menu className="h-4 w-4" />;
+      case 'ai_assistant':
+        return <Bot className="h-4 w-4" />;
+      case 'hangup':
+        return <PhoneOff className="h-4 w-4" />;
+    }
+  };
+
+  const getStrategyIcon = (strategy: RingGroupStrategy) => {
+    switch (strategy) {
+      case 'simultaneous':
+        return <Users className="h-4 w-4" />;
+      case 'round_robin':
+        return <RotateCw className="h-4 w-4" />;
+      case 'sequential':
+        return <List className="h-4 w-4" />;
+    }
+  };
+
   const handleFormSubmit = (data: RingGroupFormData) => {
     // Map the appropriate destination ID based on fallback action
     let fallback_destination_id = '';
@@ -209,7 +235,7 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      {/* Name and Status */}
+      {/* Name and Status Toggle */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="name">
@@ -265,21 +291,30 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="simultaneous">
-              <div>
-                <div className="font-medium">Simultaneous</div>
-                <div className="text-xs text-muted-foreground">Ring all members at once</div>
+              <div className="flex items-center gap-2">
+                {getStrategyIcon('simultaneous')}
+                <div>
+                  <div className="font-medium">Simultaneous</div>
+                  <div className="text-xs text-muted-foreground">Ring all members at once</div>
+                </div>
               </div>
             </SelectItem>
             <SelectItem value="round_robin">
-              <div>
-                <div className="font-medium">Round Robin</div>
-                <div className="text-xs text-muted-foreground">Distribute calls evenly</div>
+              <div className="flex items-center gap-2">
+                {getStrategyIcon('round_robin')}
+                <div>
+                  <div className="font-medium">Round Robin</div>
+                  <div className="text-xs text-muted-foreground">Distribute calls evenly</div>
+                </div>
               </div>
             </SelectItem>
             <SelectItem value="sequential">
-              <div>
-                <div className="font-medium">Sequential</div>
-                <div className="text-xs text-muted-foreground">Ring members one by one</div>
+              <div className="flex items-center gap-2">
+                {getStrategyIcon('sequential')}
+                <div>
+                  <div className="font-medium">Sequential</div>
+                  <div className="text-xs text-muted-foreground">Ring members one by one</div>
+                </div>
               </div>
             </SelectItem>
           </SelectContent>
@@ -376,10 +411,12 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
             {members.map((member, index) => (
               <div
                 key={member.extension_id}
-                className="flex items-center justify-between rounded-lg border p-3"
+                className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <Badge variant="secondary">{member.priority}</Badge>
+                  <Badge variant="secondary" className="min-w-fit">
+                    {member.priority}
+                  </Badge>
                   <span className="font-medium">{getExtensionName(member.extension_id)}</span>
                 </div>
                 <Button
@@ -388,6 +425,7 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
                   size="sm"
                   onClick={() => handleRemoveMember(member.extension_id)}
                   disabled={isLoading}
+                  className="text-muted-foreground hover:text-destructive"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -395,9 +433,10 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No members added yet
-          </p>
+          <div className="text-center py-8">
+            <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-sm text-muted-foreground">No members added yet</p>
+          </div>
         )}
 
         {errors.members && (
@@ -405,19 +444,21 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
         )}
       </div>
 
-      {/* Fallback Action */}
+      {/* Fallback Actions - Side by Side Controls */}
       <div className="space-y-4 rounded-lg border p-4">
         <div>
           <Label>
-            Fallback Action <span className="text-destructive">*</span>
+            Fallback Actions <span className="text-destructive">*</span>
           </Label>
           <p className="text-sm text-muted-foreground mb-3">
             What happens when no one answers after all ring turns
           </p>
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Fallback Action Select */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Action</Label>
             <Select
               value={fallbackAction}
               onValueChange={(value) => setValue('fallback_action', value as RingGroupFallbackAction)}
@@ -426,143 +467,160 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
               <SelectTrigger>
                 <SelectValue placeholder="Select fallback action" />
               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="extension">
-                   <div>
-                     <div className="font-medium">PBX User Extension</div>
-                     <div className="text-xs text-muted-foreground">Forward to a specific user extension</div>
-                   </div>
-                 </SelectItem>
-                 <SelectItem value="ring_group">
-                   <div>
-                     <div className="font-medium">Ring Group</div>
-                     <div className="text-xs text-muted-foreground">Forward to another ring group</div>
-                   </div>
-                 </SelectItem>
-                 <SelectItem value="ivr_menu">
-                   <div>
-                     <div className="font-medium">IVR Menu</div>
-                     <div className="text-xs text-muted-foreground">Play an interactive voice response menu</div>
-                   </div>
-                 </SelectItem>
-                 <SelectItem value="ai_assistant">
-                   <div>
-                     <div className="font-medium">AI Assistant Extension</div>
-                     <div className="text-xs text-muted-foreground">Connect to an AI-powered assistant</div>
-                   </div>
-                 </SelectItem>
-                 <SelectItem value="hangup">
-                   <div>
-                     <div className="font-medium">Hang Up</div>
-                     <div className="text-xs text-muted-foreground">End the call</div>
-                   </div>
-                 </SelectItem>
-               </SelectContent>
+              <SelectContent>
+                <SelectItem value="extension">
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon('extension')}
+                    <div>
+                      <div className="font-medium">PBX User Extension</div>
+                      <div className="text-xs text-muted-foreground">Forward to a specific user extension</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="ring_group">
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon('ring_group')}
+                    <div>
+                      <div className="font-medium">Ring Group</div>
+                      <div className="text-xs text-muted-foreground">Forward to another ring group</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="ivr_menu">
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon('ivr_menu')}
+                    <div>
+                      <div className="font-medium">IVR Menu</div>
+                      <div className="text-xs text-muted-foreground">Play an interactive voice response menu</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="ai_assistant">
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon('ai_assistant')}
+                    <div>
+                      <div className="font-medium">AI Assistant Extension</div>
+                      <div className="text-xs text-muted-foreground">Connect to an AI-powered assistant</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="hangup">
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon('hangup')}
+                    <div>
+                      <div className="font-medium">Hang Up</div>
+                      <div className="text-xs text-muted-foreground">End the call</div>
+                    </div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
             </Select>
           </div>
 
-           {fallbackAction === 'extension' && (
-             <div className="flex-1">
-               <Select
-                 value={watch('fallback_extension_id') || ''}
-                 onValueChange={(value) => setValue('fallback_extension_id', value)}
-                 disabled={isLoading}
-               >
-                 <SelectTrigger>
-                   <SelectValue placeholder="Select user extension" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {extensionsData?.data
-                     ?.filter((ext) => ext.type === 'user')
-                     .map((ext) => (
-                       <SelectItem key={ext.id} value={ext.id}>
-                         {ext.extension_number} - {ext.user?.name || 'No User'}
-                       </SelectItem>
-                     ))}
-                 </SelectContent>
-               </Select>
-             </div>
-           )}
+          {/* Fallback Destination Select */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Destination</Label>
+            {fallbackAction === 'extension' && (
+              <Select
+                value={watch('fallback_extension_id') || ''}
+                onValueChange={(value) => setValue('fallback_extension_id', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select user extension" />
+                </SelectTrigger>
+                <SelectContent>
+                  {extensionsData?.data
+                    ?.filter((ext) => ext.type === 'user')
+                    .map((ext) => (
+                      <SelectItem key={ext.id} value={ext.id}>
+                        {ext.extension_number} - {ext.user?.name || 'No User'}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
 
-           {fallbackAction === 'ring_group' && (
-             <div className="flex-1">
-               <Select
-                 value={watch('fallback_ring_group_id') || ''}
-                 onValueChange={(value) => setValue('fallback_ring_group_id', value)}
-                 disabled={isLoading}
-               >
-                 <SelectTrigger>
-                   <SelectValue placeholder="Select ring group" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {mockRingGroups.map((rg) => (
-                     <SelectItem key={rg.id} value={rg.id}>
-                       {rg.name} - {rg.description}
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
-           )}
+            {fallbackAction === 'ring_group' && (
+              <Select
+                value={watch('fallback_ring_group_id') || ''}
+                onValueChange={(value) => setValue('fallback_ring_group_id', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select ring group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mockRingGroups.map((rg) => (
+                    <SelectItem key={rg.id} value={rg.id}>
+                      {rg.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-           {fallbackAction === 'ivr_menu' && (
-             <div className="flex-1">
-               <Select
-                 value={watch('fallback_ivr_menu_id') || ''}
-                 onValueChange={(value) => setValue('fallback_ivr_menu_id', value)}
-                 disabled={isLoading}
-               >
-                 <SelectTrigger>
-                   <SelectValue placeholder="Select IVR menu" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {mockIvrMenus.map((ivr) => (
-                     <SelectItem key={ivr.id} value={ivr.id}>
-                       {ivr.name} - {ivr.description}
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
-           )}
+            {fallbackAction === 'ivr_menu' && (
+              <Select
+                value={watch('fallback_ivr_menu_id') || ''}
+                onValueChange={(value) => setValue('fallback_ivr_menu_id', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select IVR menu" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mockIvrMenus.map((ivr) => (
+                    <SelectItem key={ivr.id} value={ivr.id}>
+                      {ivr.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-           {fallbackAction === 'ai_assistant' && (
-             <div className="flex-1">
-               <Select
-                 value={watch('fallback_ai_assistant_id') || ''}
-                 onValueChange={(value) => setValue('fallback_ai_assistant_id', value)}
-                 disabled={isLoading}
-               >
-                 <SelectTrigger>
-                   <SelectValue placeholder="Select AI assistant" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {mockAiAssistants.map((ai) => (
-                     <SelectItem key={ai.id} value={ai.id}>
-                       {ai.name} - {ai.description}
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
-           )}
+            {fallbackAction === 'ai_assistant' && (
+              <Select
+                value={watch('fallback_ai_assistant_id') || ''}
+                onValueChange={(value) => setValue('fallback_ai_assistant_id', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select AI assistant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mockAiAssistants.map((ai) => (
+                    <SelectItem key={ai.id} value={ai.id}>
+                      {ai.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {fallbackAction === 'hangup' && (
+              <div className="flex items-center justify-center h-10 px-3 py-2 bg-muted rounded-md">
+                <span className="text-sm text-muted-foreground">No destination needed</span>
+              </div>
+            )}
+          </div>
         </div>
 
-         {errors.fallback_action && (
-           <p className="text-sm text-destructive">{errors.fallback_action.message}</p>
-         )}
-         {fallbackAction === 'extension' && errors.fallback_extension_id && (
-           <p className="text-sm text-destructive">{errors.fallback_extension_id.message}</p>
-         )}
-         {fallbackAction === 'ring_group' && errors.fallback_ring_group_id && (
-           <p className="text-sm text-destructive">{errors.fallback_ring_group_id.message}</p>
-         )}
-         {fallbackAction === 'ivr_menu' && errors.fallback_ivr_menu_id && (
-           <p className="text-sm text-destructive">{errors.fallback_ivr_menu_id.message}</p>
-         )}
-         {fallbackAction === 'ai_assistant' && errors.fallback_ai_assistant_id && (
-           <p className="text-sm text-destructive">{errors.fallback_ai_assistant_id.message}</p>
-         )}
+        {errors.fallback_action && (
+          <p className="text-sm text-destructive">{errors.fallback_action.message}</p>
+        )}
+        {fallbackAction === 'extension' && errors.fallback_extension_id && (
+          <p className="text-sm text-destructive">{errors.fallback_extension_id.message}</p>
+        )}
+        {fallbackAction === 'ring_group' && errors.fallback_ring_group_id && (
+          <p className="text-sm text-destructive">{errors.fallback_ring_group_id.message}</p>
+        )}
+        {fallbackAction === 'ivr_menu' && errors.fallback_ivr_menu_id && (
+          <p className="text-sm text-destructive">{errors.fallback_ivr_menu_id.message}</p>
+        )}
+        {fallbackAction === 'ai_assistant' && errors.fallback_ai_assistant_id && (
+          <p className="text-sm text-destructive">{errors.fallback_ai_assistant_id.message}</p>
+        )}
       </div>
 
       {/* Form Actions */}
