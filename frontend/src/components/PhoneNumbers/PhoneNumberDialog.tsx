@@ -448,28 +448,17 @@ export function PhoneNumberDialog({
                     <SelectValue placeholder="Select a ring group" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Mock ring groups */}
-                    <SelectItem value="rg-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                        <span>Sales Team</span>
-                        <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">3 members</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="rg-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                        <span>Support Team</span>
-                        <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">5 members</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="rg-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <span>Emergency Line</span>
-                        <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">2 members</span>
-                      </div>
-                    </SelectItem>
+                    {availableRingGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${group.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                          <span>{group.name}</span>
+                          <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">
+                            {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
