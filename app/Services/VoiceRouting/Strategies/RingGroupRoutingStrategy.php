@@ -10,6 +10,7 @@ use App\Enums\RingGroupStrategy as StrategyEnum;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
@@ -154,27 +155,127 @@ class RingGroupRoutingStrategy implements RoutingStrategy
     {
         $fallbackAction = $ringGroup->fallback_action;
 
-        if ($fallbackAction === RingGroupFallbackAction::EXTENSION) {
-            $fallbackExtensionId = $ringGroup->fallback_extension_id;
+        return match ($fallbackAction) {
+            RingGroupFallbackAction::EXTENSION => $this->handleFallbackExtension($ringGroup),
+            RingGroupFallbackAction::RING_GROUP => $this->handleFallbackRingGroup($ringGroup),
+            RingGroupFallbackAction::IVR_MENU => $this->handleFallbackIvrMenu($ringGroup),
+            RingGroupFallbackAction::AI_ASSISTANT => $this->handleFallbackAiAssistant($ringGroup),
+            RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($ringGroup),
+            default => $this->handleFallbackHangup($ringGroup), // Default to hangup for unknown actions
+        };
+    }
 
-            if ($fallbackExtensionId) {
-                $fallbackExtension = Extension::where('id', $fallbackExtensionId)
-                    ->where('organization_id', $ringGroup->organization_id)
-                    ->first();
+    private function handleFallbackExtension(RingGroup $ringGroup): Response
+    {
+        $fallbackExtensionId = $ringGroup->fallback_extension_id;
 
-                if ($fallbackExtension && $fallbackExtension->isActive()) {
-                    // Route to the fallback extension
-                    return response(
-                        CxmlBuilder::dialExtension($fallbackExtension->extension_number, $ringGroup->timeout ?? 30),
-                        200,
-                        ['Content-Type' => 'text/xml']
-                    );
-                }
-            }
-
-            // If fallback extension not found or invalid, fall back to hangup
+        if (!$fallbackExtensionId) {
+            return $this->handleFallbackHangup($ringGroup);
         }
 
+        $fallbackExtension = Extension::where('id', $fallbackExtensionId)
+            ->where('organization_id', $ringGroup->organization_id)
+            ->first();
+
+        if (!$fallbackExtension || !$fallbackExtension->isActive()) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        // Route to the fallback extension
+        return response(
+            CxmlBuilder::dialExtension($fallbackExtension->extension_number, $ringGroup->timeout ?? 30),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
+    }
+
+    private function handleFallbackRingGroup(RingGroup $ringGroup): Response
+    {
+        $fallbackRingGroupId = $ringGroup->fallback_ring_group_id;
+
+        if (!$fallbackRingGroupId) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        $fallbackRingGroup = RingGroup::where('id', $fallbackRingGroupId)
+            ->where('organization_id', $ringGroup->organization_id)
+            ->first();
+
+        if (!$fallbackRingGroup || !$fallbackRingGroup->isActive()) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        // For ring group fallback, delegate to the voice routing system
+        // Use a redirect to the voice routing endpoint for the fallback ring group
+        $organizationId = $ringGroup->organization_id;
+        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
+
+        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
+            ? rtrim($cloudonixSettings->webhook_base_url, '/')
+            : request()->getSchemeAndHttpHost();
+
+        $redirectUrl = $baseUrl . route('voice.route', [
+            'extension_number' => $fallbackRingGroup->extension_number,
+        ], false);
+
+        return response(
+            CxmlBuilder::redirect($redirectUrl),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
+    }
+
+    private function handleFallbackIvrMenu(RingGroup $ringGroup): Response
+    {
+        $fallbackIvrMenuId = $ringGroup->fallback_ivr_menu_id;
+
+        if (!$fallbackIvrMenuId) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        $fallbackIvrMenu = IvrMenu::where('id', $fallbackIvrMenuId)
+            ->where('organization_id', $ringGroup->organization_id)
+            ->first();
+
+        if (!$fallbackIvrMenu || !$fallbackIvrMenu->isActive()) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        // Route to the fallback IVR menu extension
+        return response(
+            CxmlBuilder::dialExtension($fallbackIvrMenu->extension_number, $ringGroup->timeout ?? 30),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
+    }
+
+    private function handleFallbackAiAssistant(RingGroup $ringGroup): Response
+    {
+        $fallbackAiAssistantId = $ringGroup->fallback_ai_assistant_id;
+
+        if (!$fallbackAiAssistantId) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        $fallbackAiAssistant = Extension::where('id', $fallbackAiAssistantId)
+            ->where('organization_id', $ringGroup->organization_id)
+            ->where('type', ExtensionType::AI_ASSISTANT)
+            ->first();
+
+        if (!$fallbackAiAssistant || !$fallbackAiAssistant->isActive()) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        // Route to the fallback AI assistant
+        return response(
+            CxmlBuilder::dialExtension($fallbackAiAssistant->extension_number, $ringGroup->timeout ?? 30),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
+    }
+
+    private function handleFallbackHangup(RingGroup $ringGroup): Response
+    {
         // Default fallback: hangup with message
         return response(
             CxmlBuilder::unavailable('No agents available. Goodbye.'),

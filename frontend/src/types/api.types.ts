@@ -70,7 +70,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
 
 // Ring Group Status
 export type RingGroupStatus = 'active' | 'inactive';

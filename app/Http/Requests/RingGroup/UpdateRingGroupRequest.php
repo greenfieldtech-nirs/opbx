@@ -10,6 +10,8 @@ use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
 use App\Models\Extension;
+use App\Models\IvrMenu;
+use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -89,6 +91,21 @@ class UpdateRingGroupRequest extends FormRequest
                 'nullable',
                 'exists:extensions,id',
             ],
+            'fallback_ring_group_id' => [
+                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
+                'nullable',
+                'exists:ring_groups,id',
+            ],
+            'fallback_ivr_menu_id' => [
+                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
+                'nullable',
+                'exists:ivr_menus,id',
+            ],
+            'fallback_ai_assistant_id' => [
+                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
+                'nullable',
+                'exists:extensions,id',
+            ],
             'status' => [
                 'required',
                 new Enum(RingGroupStatus::class),
@@ -136,6 +153,12 @@ class UpdateRingGroupRequest extends FormRequest
             'fallback_action.required' => 'Fallback action is required.',
             'fallback_extension_id.required_if' => 'Fallback extension is required when fallback action is "extension".',
             'fallback_extension_id.exists' => 'The selected fallback extension does not exist.',
+            'fallback_ring_group_id.required_if' => 'Fallback ring group is required when fallback action is "ring_group".',
+            'fallback_ring_group_id.exists' => 'The selected fallback ring group does not exist.',
+            'fallback_ivr_menu_id.required_if' => 'Fallback IVR menu is required when fallback action is "ivr_menu".',
+            'fallback_ivr_menu_id.exists' => 'The selected fallback IVR menu does not exist.',
+            'fallback_ai_assistant_id.required_if' => 'Fallback AI assistant is required when fallback action is "ai_assistant".',
+            'fallback_ai_assistant_id.exists' => 'The selected fallback AI assistant does not exist.',
             'status.required' => 'Status is required.',
             'members.required' => 'At least one member is required.',
             'members.min' => 'At least one member is required.',
@@ -162,6 +185,9 @@ class UpdateRingGroupRequest extends FormRequest
             $members = $this->input('members', []);
             $fallbackAction = $this->input('fallback_action');
             $fallbackExtensionId = $this->input('fallback_extension_id');
+            $fallbackRingGroupId = $this->input('fallback_ring_group_id');
+            $fallbackIvrMenuId = $this->input('fallback_ivr_menu_id');
+            $fallbackAiAssistantId = $this->input('fallback_ai_assistant_id');
 
             // Validate that all extensions belong to the same organization
             if (!empty($members)) {
@@ -215,6 +241,73 @@ class UpdateRingGroupRequest extends FormRequest
                         $validator->errors()->add(
                             'fallback_extension_id',
                             'Fallback extension must be active.'
+                        );
+                    }
+                }
+            }
+
+            // Validate fallback ring group belongs to organization and is active
+            if ($fallbackAction === RingGroupFallbackAction::RING_GROUP->value && $fallbackRingGroupId) {
+                $fallbackRingGroup = RingGroup::find($fallbackRingGroupId);
+                if ($fallbackRingGroup) {
+                    if ($fallbackRingGroup->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'fallback_ring_group_id',
+                            'Fallback ring group must belong to your organization.'
+                        );
+                    }
+
+                    if (!$fallbackRingGroup->isActive()) {
+                        $validator->errors()->add(
+                            'fallback_ring_group_id',
+                            'Fallback ring group must be active.'
+                        );
+                    }
+                }
+            }
+
+            // Validate fallback IVR menu belongs to organization and is active
+            if ($fallbackAction === RingGroupFallbackAction::IVR_MENU->value && $fallbackIvrMenuId) {
+                $fallbackIvrMenu = IvrMenu::find($fallbackIvrMenuId);
+                if ($fallbackIvrMenu) {
+                    if ($fallbackIvrMenu->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'fallback_ivr_menu_id',
+                            'Fallback IVR menu must belong to your organization.'
+                        );
+                    }
+
+                    if (!$fallbackIvrMenu->isActive()) {
+                        $validator->errors()->add(
+                            'fallback_ivr_menu_id',
+                            'Fallback IVR menu must be active.'
+                        );
+                    }
+                }
+            }
+
+            // Validate fallback AI assistant belongs to organization, is active, and is AI assistant type
+            if ($fallbackAction === RingGroupFallbackAction::AI_ASSISTANT->value && $fallbackAiAssistantId) {
+                $fallbackAiAssistant = Extension::find($fallbackAiAssistantId);
+                if ($fallbackAiAssistant) {
+                    if ($fallbackAiAssistant->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'fallback_ai_assistant_id',
+                            'Fallback AI assistant must belong to your organization.'
+                        );
+                    }
+
+                    if ($fallbackAiAssistant->status !== UserStatus::ACTIVE) {
+                        $validator->errors()->add(
+                            'fallback_ai_assistant_id',
+                            'Fallback AI assistant must be active.'
+                        );
+                    }
+
+                    if ($fallbackAiAssistant->type !== ExtensionType::AI_ASSISTANT) {
+                        $validator->errors()->add(
+                            'fallback_ai_assistant_id',
+                            'The selected extension is not an AI assistant.'
                         );
                     }
                 }

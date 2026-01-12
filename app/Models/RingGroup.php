@@ -36,6 +36,9 @@ class RingGroup extends Model
         'ring_turns',
         'fallback_action',
         'fallback_extension_id',
+        'fallback_ring_group_id',
+        'fallback_ivr_menu_id',
+        'fallback_ai_assistant_id',
         'status',
     ];
 
@@ -77,6 +80,30 @@ class RingGroup extends Model
     public function fallbackExtension(): BelongsTo
     {
         return $this->belongsTo(Extension::class, 'fallback_extension_id');
+    }
+
+    /**
+     * Get the fallback ring group for this ring group.
+     */
+    public function fallbackRingGroup(): BelongsTo
+    {
+        return $this->belongsTo(RingGroup::class, 'fallback_ring_group_id');
+    }
+
+    /**
+     * Get the fallback IVR menu for this ring group.
+     */
+    public function fallbackIvrMenu(): BelongsTo
+    {
+        return $this->belongsTo(IvrMenu::class, 'fallback_ivr_menu_id');
+    }
+
+    /**
+     * Get the fallback AI assistant for this ring group.
+     */
+    public function fallbackAiAssistant(): BelongsTo
+    {
+        return $this->belongsTo(Extension::class, 'fallback_ai_assistant_id');
     }
 
     /**
