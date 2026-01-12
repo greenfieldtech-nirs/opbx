@@ -198,7 +198,11 @@ export default function RingGroups() {
   const [selectedGroup, setSelectedGroup] = useState<RingGroup | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState<Partial<RingGroup>>({
+  const [formData, setFormData] = useState<Partial<RingGroup & {
+    fallback_ring_group_id?: string;
+    fallback_ivr_menu_id?: string;
+    fallback_ai_assistant_id?: string;
+  }>>({
     name: '',
     description: '',
     strategy: 'simultaneous',
@@ -417,6 +421,9 @@ export default function RingGroups() {
       fallback_action: 'extension',
       status: 'active',
       members: [],
+      fallback_ring_group_id: undefined,
+      fallback_ivr_menu_id: undefined,
+      fallback_ai_assistant_id: undefined,
     });
     setFormErrors({});
   };
@@ -431,7 +438,7 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData: CreateRingGroupRequest = {
+    const requestData = {
       name: formData.name!,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
@@ -439,6 +446,9 @@ export default function RingGroups() {
       ring_turns: formData.ring_turns!,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
       fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
@@ -456,7 +466,7 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData: UpdateRingGroupRequest = {
+    const requestData = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
@@ -464,6 +474,9 @@ export default function RingGroups() {
       ring_turns: formData.ring_turns,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
       fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
@@ -904,17 +917,20 @@ export default function RingGroups() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fallback_action" className="text-sm text-muted-foreground">Action</Label>
-                <Select
-                  value={formData.fallback_action}
-                  onValueChange={(value) => {
-                    setFormData({
-                      ...formData,
-                      fallback_action: value as RingGroupFallbackAction,
-                      fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
-                      fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
-                    });
-                  }}
-                >
+                 <Select
+                   value={formData.fallback_action}
+                   onValueChange={(value) => {
+                     setFormData({
+                       ...formData,
+                       fallback_action: value as RingGroupFallbackAction,
+                       fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
+                       fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
+                       fallback_ring_group_id: value === 'ring_group' ? formData.fallback_ring_group_id : undefined,
+                       fallback_ivr_menu_id: value === 'ivr_menu' ? formData.fallback_ivr_menu_id : undefined,
+                       fallback_ai_assistant_id: value === 'ai_assistant' ? formData.fallback_ai_assistant_id : undefined,
+                     });
+                   }}
+                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -984,78 +1000,93 @@ export default function RingGroups() {
                      </SelectContent>
                   </Select>
                 )}
-                 {formData.fallback_action === 'ring_group' && (
-                   <Select value="">
-                     <SelectTrigger>
-                       <SelectValue placeholder="Select ring group" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {ringGroups.map((group) => (
-                         <SelectItem key={group.id} value={group.id.toString()}>
-                           <div className="flex items-center gap-2">
-                             <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
-                               <Users className="h-3.5 w-3.5" />
-                               {group.name}
-                             </Badge>
-                           </div>
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 )}
-                 {formData.fallback_action === 'ivr_menu' && (
-                   <Select value="">
-                     <SelectTrigger>
-                       <SelectValue placeholder="Select IVR menu" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {availableIvrMenus.map((ivr) => (
-                         <SelectItem key={ivr.id} value={ivr.id.toString()}>
-                           <div className="flex items-center gap-2">
-                             <Badge variant="outline" className="flex items-center gap-1.5 bg-green-100 text-green-800 border-green-200">
-                               <Menu className="h-3.5 w-3.5" />
-                               {ivr.name}
-                             </Badge>
-                           </div>
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 )}
-                 {formData.fallback_action === 'ai_assistant' && (
-                   <Select value="">
-                     <SelectTrigger>
-                       <SelectValue placeholder="Select AI assistant" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {/* For now, keep hardcoded AI assistants until proper service is available */}
-                       <SelectItem value="ai-001">
-                         <div className="flex items-center gap-2">
-                           <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
-                             <Bot className="h-3.5 w-3.5" />
-                             General Assistant
-                           </Badge>
-                         </div>
-                       </SelectItem>
-                       <SelectItem value="ai-002">
-                         <div className="flex items-center gap-2">
-                           <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
-                             <Bot className="h-3.5 w-3.5" />
-                             Sales Assistant
-                           </Badge>
-                         </div>
-                       </SelectItem>
-                       <SelectItem value="ai-003">
-                         <div className="flex items-center gap-2">
-                           <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
-                             <Bot className="h-3.5 w-3.5" />
-                             Support Assistant
-                           </Badge>
-                         </div>
-                       </SelectItem>
-                     </SelectContent>
-                   </Select>
-                 )}
+                  {formData.fallback_action === 'ring_group' && (
+                    <Select
+                      value={formData.fallback_ring_group_id || ''}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ring_group_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select ring group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ringGroups.map((group) => (
+                          <SelectItem key={group.id} value={group.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
+                                <Users className="h-3.5 w-3.5" />
+                                {group.name}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {formData.fallback_action === 'ivr_menu' && (
+                    <Select
+                      value={formData.fallback_ivr_menu_id || ''}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ivr_menu_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select IVR menu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableIvrMenus.map((ivr) => (
+                          <SelectItem key={ivr.id} value={ivr.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="flex items-center gap-1.5 bg-green-100 text-green-800 border-green-200">
+                                <Menu className="h-3.5 w-3.5" />
+                                {ivr.name}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {formData.fallback_action === 'ai_assistant' && (
+                    <Select
+                      value={formData.fallback_ai_assistant_id || ''}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ai_assistant_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select AI assistant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {/* For now, keep hardcoded AI assistants until proper service is available */}
+                        <SelectItem value="ai-001">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
+                              <Bot className="h-3.5 w-3.5" />
+                              General Assistant
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="ai-002">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
+                              <Bot className="h-3.5 w-3.5" />
+                              Sales Assistant
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="ai-003">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
+                              <Bot className="h-3.5 w-3.5" />
+                              Support Assistant
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 {formData.fallback_action === 'hangup' && (
                   <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
                     No destination needed
