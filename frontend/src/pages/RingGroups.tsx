@@ -81,6 +81,8 @@ import {
   ArrowUpDown,
   RefreshCw,
   GripVertical,
+  Menu,
+  Bot,
 } from 'lucide-react';
 import {
   DndContext,
@@ -300,6 +302,12 @@ export default function RingGroups() {
     switch (action) {
       case 'extension':
         return <PhoneForwarded className="h-4 w-4" />;
+      case 'ring_group':
+        return <Users className="h-4 w-4" />;
+      case 'ivr_menu':
+        return <Menu className="h-4 w-4" />;
+      case 'ai_assistant':
+        return <Bot className="h-4 w-4" />;
       case 'hangup':
         return <PhoneOff className="h-4 w-4" />;
     }

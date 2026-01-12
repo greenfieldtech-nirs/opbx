@@ -27,6 +27,28 @@ import { extensionsService } from '@/services/extensions.service';
 import { mockExtensions } from '@/mock/extensions';
 import type { RingGroup, CreateRingGroupRequest, UpdateRingGroupRequest, RingGroupStrategy, RingGroupStatus, RingGroupFallbackAction } from '@/types/api.types';
 
+// Mock data for destination selects
+const mockRingGroups = [
+  { id: 'rg-001', name: 'Sales Team', description: 'Main sales team' },
+  { id: 'rg-002', name: 'Support Department', description: 'Customer support team' },
+  { id: 'rg-003', name: 'Management Escalation', description: 'Urgent matters escalation' },
+  { id: 'rg-004', name: 'After Hours Team', description: 'Available outside business hours' },
+];
+
+const mockIvrMenus = [
+  { id: 'ivr-001', name: 'Main Menu', description: 'Primary IVR greeting' },
+  { id: 'ivr-002', name: 'Support Menu', description: 'Technical support options' },
+  { id: 'ivr-003', name: 'Sales Menu', description: 'Sales department routing' },
+  { id: 'ivr-004', name: 'Billing Menu', description: 'Payment and billing options' },
+];
+
+const mockAiAssistants = [
+  { id: 'ai-001', name: 'General Assistant', description: 'Handles general inquiries' },
+  { id: 'ai-002', name: 'Sales Assistant', description: 'Qualified sales leads' },
+  { id: 'ai-003', name: 'Support Bot', description: 'Basic troubleshooting' },
+  { id: 'ai-004', name: 'Receptionist', description: 'Call routing and scheduling' },
+];
+
 // Validation schema
 const ringGroupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -39,17 +61,30 @@ const ringGroupSchema = z.object({
     extension_id: z.string().min(1, 'Extension ID is required'),
     priority: z.number().min(1, 'Priority must be at least 1'),
   })).min(1, 'At least one member is required'),
-  fallback_action: z.enum(['extension', 'hangup'] as const),
+  fallback_action: z.enum(['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'hangup'] as const),
   fallback_extension_id: z.string().optional(),
+  fallback_ring_group_id: z.string().optional(),
+  fallback_ivr_menu_id: z.string().optional(),
+  fallback_ai_assistant_id: z.string().optional(),
 }).refine((data) => {
-  // If fallback_action is 'extension', fallback_extension_id must be provided
-  if (data.fallback_action === 'extension') {
-    return data.fallback_extension_id && data.fallback_extension_id.length > 0;
+  // Validate based on fallback action
+  switch (data.fallback_action) {
+    case 'extension':
+      return data.fallback_extension_id && data.fallback_extension_id.length > 0;
+    case 'ring_group':
+      return data.fallback_ring_group_id && data.fallback_ring_group_id.length > 0;
+    case 'ivr_menu':
+      return data.fallback_ivr_menu_id && data.fallback_ivr_menu_id.length > 0;
+    case 'ai_assistant':
+      return data.fallback_ai_assistant_id && data.fallback_ai_assistant_id.length > 0;
+    case 'hangup':
+      return true;
+    default:
+      return false;
   }
-  return true;
 }, {
-  message: 'Fallback extension is required when action is "extension"',
-  path: ['fallback_extension_id'],
+  message: 'Fallback destination is required for the selected action',
+  path: ['fallback_action'],
 });
 
 type RingGroupFormData = {
@@ -63,8 +98,11 @@ type RingGroupFormData = {
     extension_id: string;
     priority: number;
   }>;
-  fallback_action: 'extension' | 'hangup';
+  fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
 };
 
 interface RingGroupFormProps {
@@ -101,6 +139,9 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
       })) || [],
       fallback_action: ringGroup?.fallback_action || 'hangup',
       fallback_extension_id: ringGroup?.fallback_extension_id || '',
+      fallback_ring_group_id: '',
+      fallback_ivr_menu_id: '',
+      fallback_ai_assistant_id: '',
     },
   });
 
@@ -131,6 +172,26 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
   };
 
   const handleFormSubmit = (data: RingGroupFormData) => {
+    // Map the appropriate destination ID based on fallback action
+    let fallback_destination_id = '';
+    switch (data.fallback_action) {
+      case 'extension':
+        fallback_destination_id = data.fallback_extension_id || '';
+        break;
+      case 'ring_group':
+        fallback_destination_id = data.fallback_ring_group_id || '';
+        break;
+      case 'ivr_menu':
+        fallback_destination_id = data.fallback_ivr_menu_id || '';
+        break;
+      case 'ai_assistant':
+        fallback_destination_id = data.fallback_ai_assistant_id || '';
+        break;
+      case 'hangup':
+        fallback_destination_id = '';
+        break;
+    }
+
     const submitData: CreateRingGroupRequest | UpdateRingGroupRequest = {
       name: data.name,
       description: data.description,
@@ -140,7 +201,7 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
       ring_turns: data.ring_turns,
       members: data.members,
       fallback_action: data.fallback_action,
-      fallback_extension_id: data.fallback_extension_id,
+      fallback_extension_id: fallback_destination_id, // For now, map all to extension_id until API is updated
     };
 
     onSubmit(submitData);
@@ -365,43 +426,143 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
               <SelectTrigger>
                 <SelectValue placeholder="Select fallback action" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hangup">Hang Up</SelectItem>
-                <SelectItem value="extension">Forward to Extension</SelectItem>
-              </SelectContent>
+               <SelectContent>
+                 <SelectItem value="extension">
+                   <div>
+                     <div className="font-medium">PBX User Extension</div>
+                     <div className="text-xs text-muted-foreground">Forward to a specific user extension</div>
+                   </div>
+                 </SelectItem>
+                 <SelectItem value="ring_group">
+                   <div>
+                     <div className="font-medium">Ring Group</div>
+                     <div className="text-xs text-muted-foreground">Forward to another ring group</div>
+                   </div>
+                 </SelectItem>
+                 <SelectItem value="ivr_menu">
+                   <div>
+                     <div className="font-medium">IVR Menu</div>
+                     <div className="text-xs text-muted-foreground">Play an interactive voice response menu</div>
+                   </div>
+                 </SelectItem>
+                 <SelectItem value="ai_assistant">
+                   <div>
+                     <div className="font-medium">AI Assistant Extension</div>
+                     <div className="text-xs text-muted-foreground">Connect to an AI-powered assistant</div>
+                   </div>
+                 </SelectItem>
+                 <SelectItem value="hangup">
+                   <div>
+                     <div className="font-medium">Hang Up</div>
+                     <div className="text-xs text-muted-foreground">End the call</div>
+                   </div>
+                 </SelectItem>
+               </SelectContent>
             </Select>
           </div>
 
-          {fallbackAction === 'extension' && (
-            <div className="flex-1">
-              <Select
-                value={watch('fallback_extension_id') || ''}
-                onValueChange={(value) => setValue('fallback_extension_id', value)}
-                disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select extension" />
-                </SelectTrigger>
-                <SelectContent>
-                  {extensionsData?.data
-                    ?.filter((ext) => ext.type === 'user') // Only show user extensions for fallback
-                    .map((ext) => (
-                      <SelectItem key={ext.id} value={ext.id}>
-                        {ext.extension_number} - {ext.user?.name || 'No User'}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+           {fallbackAction === 'extension' && (
+             <div className="flex-1">
+               <Select
+                 value={watch('fallback_extension_id') || ''}
+                 onValueChange={(value) => setValue('fallback_extension_id', value)}
+                 disabled={isLoading}
+               >
+                 <SelectTrigger>
+                   <SelectValue placeholder="Select user extension" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   {extensionsData?.data
+                     ?.filter((ext) => ext.type === 'user')
+                     .map((ext) => (
+                       <SelectItem key={ext.id} value={ext.id}>
+                         {ext.extension_number} - {ext.user?.name || 'No User'}
+                       </SelectItem>
+                     ))}
+                 </SelectContent>
+               </Select>
+             </div>
+           )}
+
+           {fallbackAction === 'ring_group' && (
+             <div className="flex-1">
+               <Select
+                 value={watch('fallback_ring_group_id') || ''}
+                 onValueChange={(value) => setValue('fallback_ring_group_id', value)}
+                 disabled={isLoading}
+               >
+                 <SelectTrigger>
+                   <SelectValue placeholder="Select ring group" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   {mockRingGroups.map((rg) => (
+                     <SelectItem key={rg.id} value={rg.id}>
+                       {rg.name} - {rg.description}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+             </div>
+           )}
+
+           {fallbackAction === 'ivr_menu' && (
+             <div className="flex-1">
+               <Select
+                 value={watch('fallback_ivr_menu_id') || ''}
+                 onValueChange={(value) => setValue('fallback_ivr_menu_id', value)}
+                 disabled={isLoading}
+               >
+                 <SelectTrigger>
+                   <SelectValue placeholder="Select IVR menu" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   {mockIvrMenus.map((ivr) => (
+                     <SelectItem key={ivr.id} value={ivr.id}>
+                       {ivr.name} - {ivr.description}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+             </div>
+           )}
+
+           {fallbackAction === 'ai_assistant' && (
+             <div className="flex-1">
+               <Select
+                 value={watch('fallback_ai_assistant_id') || ''}
+                 onValueChange={(value) => setValue('fallback_ai_assistant_id', value)}
+                 disabled={isLoading}
+               >
+                 <SelectTrigger>
+                   <SelectValue placeholder="Select AI assistant" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   {mockAiAssistants.map((ai) => (
+                     <SelectItem key={ai.id} value={ai.id}>
+                       {ai.name} - {ai.description}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+             </div>
+           )}
         </div>
 
-        {errors.fallback_action && (
-          <p className="text-sm text-destructive">{errors.fallback_action.message}</p>
-        )}
-        {fallbackAction === 'extension' && errors.fallback_extension_id && (
-          <p className="text-sm text-destructive">{errors.fallback_extension_id.message}</p>
-        )}
+         {errors.fallback_action && (
+           <p className="text-sm text-destructive">{errors.fallback_action.message}</p>
+         )}
+         {fallbackAction === 'extension' && errors.fallback_extension_id && (
+           <p className="text-sm text-destructive">{errors.fallback_extension_id.message}</p>
+         )}
+         {fallbackAction === 'ring_group' && errors.fallback_ring_group_id && (
+           <p className="text-sm text-destructive">{errors.fallback_ring_group_id.message}</p>
+         )}
+         {fallbackAction === 'ivr_menu' && errors.fallback_ivr_menu_id && (
+           <p className="text-sm text-destructive">{errors.fallback_ivr_menu_id.message}</p>
+         )}
+         {fallbackAction === 'ai_assistant' && errors.fallback_ai_assistant_id && (
+           <p className="text-sm text-destructive">{errors.fallback_ai_assistant_id.message}</p>
+         )}
       </div>
 
       {/* Form Actions */}
