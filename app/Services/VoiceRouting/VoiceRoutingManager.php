@@ -511,11 +511,18 @@ class VoiceRoutingManager
                 }
                 break;
 
-            case 'ivr_menu':
+             case 'ivr_menu':
             case 'ivr':
                 $ivrMenu = $did->getIvrMenuAttribute();
                 if ($ivrMenu) {
                     $destination['ivr_menu'] = $ivrMenu;
+                }
+                break;
+
+            case 'ai_assistant':
+                $aiAssistant = $did->getAiAssistantAttribute();
+                if ($aiAssistant) {
+                    $destination['extension'] = $aiAssistant;
                 }
                 break;
 
