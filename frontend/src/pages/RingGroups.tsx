@@ -552,7 +552,7 @@ export default function RingGroups() {
   };
 
   // Open edit dialog
-  const openEditDialog = (group: RingGroup) => {
+  const openEditDialog = (group: ExtendedRingGroup) => {
     setSelectedGroup(group);
     setFormData({
       name: group.name,
@@ -563,9 +563,9 @@ export default function RingGroups() {
       fallback_action: group.fallback_action,
       fallback_extension_id: group.fallback_extension_id,
       fallback_extension_number: group.fallback_extension_number,
-      fallback_ring_group_id: (group as any).fallback_ring_group_id,
-      fallback_ivr_menu_id: (group as any).fallback_ivr_menu_id,
-      fallback_ai_assistant_id: (group as any).fallback_ai_assistant_id,
+      fallback_ring_group_id: group.fallback_ring_group_id,
+      fallback_ivr_menu_id: group.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: group.fallback_ai_assistant_id,
       status: group.status,
       members: [...group.members],
     });
@@ -1406,7 +1406,7 @@ export default function RingGroups() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openEditDialog(group)}
+                              onClick={() => openEditDialog(group as ExtendedRingGroup)}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
