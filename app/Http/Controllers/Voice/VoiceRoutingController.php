@@ -10,12 +10,21 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class VoiceRoutingController extends Controller
 {
     public function __construct(
         private readonly VoiceRoutingManager $manager
     ) {
+    }
+
+    /**
+     * Get or generate a unique request ID for logging.
+     */
+    protected function getRequestId(): string
+    {
+        return (string) Str::uuid();
     }
 
     /**
