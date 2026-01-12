@@ -95,6 +95,15 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         // If we've exhausted all ring turns, fallback
         if ($attempt >= $totalAttemptsAllowed) {
+            Log::info('RingGroupRoutingStrategy: All ring attempts exhausted, triggering fallback', [
+                'ring_group_id' => $ringGroup->id,
+                'ring_group_name' => $ringGroup->name,
+                'total_members' => $memberCount,
+                'ring_turns' => $ringTurns,
+                'total_attempts_allowed' => $totalAttemptsAllowed,
+                'final_attempt' => $attempt,
+                'fallback_action' => $ringGroup->fallback_action->value,
+            ]);
             return $this->handleFallback($ringGroup);
         }
 
@@ -155,6 +164,12 @@ class RingGroupRoutingStrategy implements RoutingStrategy
     {
         $fallbackAction = $ringGroup->fallback_action;
 
+        Log::info('RingGroupRoutingStrategy: Executing fallback action', [
+            'ring_group_id' => $ringGroup->id,
+            'ring_group_name' => $ringGroup->name,
+            'fallback_action' => $fallbackAction->value,
+        ]);
+
         return match ($fallbackAction) {
             RingGroupFallbackAction::EXTENSION => $this->handleFallbackExtension($ringGroup),
             RingGroupFallbackAction::RING_GROUP => $this->handleFallbackRingGroup($ringGroup),
@@ -169,7 +184,17 @@ class RingGroupRoutingStrategy implements RoutingStrategy
     {
         $fallbackExtensionId = $ringGroup->fallback_extension_id;
 
+        Log::info('RingGroupRoutingStrategy: Attempting fallback to extension', [
+            'ring_group_id' => $ringGroup->id,
+            'ring_group_name' => $ringGroup->name,
+            'fallback_extension_id' => $fallbackExtensionId,
+        ]);
+
         if (!$fallbackExtensionId) {
+            Log::warning('RingGroupRoutingStrategy: No fallback extension configured, using hangup', [
+                'ring_group_id' => $ringGroup->id,
+                'ring_group_name' => $ringGroup->name,
+            ]);
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -177,9 +202,32 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             ->where('organization_id', $ringGroup->organization_id)
             ->first();
 
-        if (!$fallbackExtension || !$fallbackExtension->isActive()) {
+        if (!$fallbackExtension) {
+            Log::warning('RingGroupRoutingStrategy: Fallback extension not found', [
+                'ring_group_id' => $ringGroup->id,
+                'ring_group_name' => $ringGroup->name,
+                'fallback_extension_id' => $fallbackExtensionId,
+            ]);
             return $this->handleFallbackHangup($ringGroup);
         }
+
+        if (!$fallbackExtension->isActive()) {
+            Log::warning('RingGroupRoutingStrategy: Fallback extension is not active', [
+                'ring_group_id' => $ringGroup->id,
+                'ring_group_name' => $ringGroup->name,
+                'fallback_extension_id' => $fallbackExtensionId,
+                'extension_number' => $fallbackExtension->extension_number,
+                'extension_status' => $fallbackExtension->status->value,
+            ]);
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        Log::info('RingGroupRoutingStrategy: Routing to fallback extension', [
+            'ring_group_id' => $ringGroup->id,
+            'ring_group_name' => $ringGroup->name,
+            'fallback_extension_number' => $fallbackExtension->extension_number,
+            'extension_type' => $fallbackExtension->type->value,
+        ]);
 
         // Route to the fallback extension
         return response(

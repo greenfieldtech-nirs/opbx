@@ -43,7 +43,24 @@ class VoiceRoutingController extends Controller
      */
     public function handleRingGroupCallback(Request $request): Response
     {
-        return $this->manager->routeRingGroupCallback($request);
+        $requestId = $this->getRequestId();
+
+        Log::info('VoiceRoutingController: Ring group callback received', [
+            'request_id' => $requestId,
+            'ring_group_id' => $request->input('ring_group_id'),
+            'attempt_number' => $request->input('attempt_number'),
+            'call_sid' => $request->input('CallSid'),
+            'organization_id' => $request->input('_organization_id'),
+        ]);
+
+        $response = $this->manager->routeRingGroupCallback($request);
+
+        Log::info('VoiceRoutingController: Ring group callback response generated', [
+            'request_id' => $requestId,
+            'response_content_length' => strlen($response->getContent()),
+        ]);
+
+        return $response;
     }
 
     /**
