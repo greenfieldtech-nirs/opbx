@@ -1258,6 +1258,70 @@ class VoiceRoutingManager
     }
 
     /**
+     * Handle ring group sequential callback routing.
+     *
+     * Processes callbacks from sequential ring group routing to determine
+     * the next member to try or fallback action.
+     *
+     * @param  Request  $request  The incoming callback request
+     * @return Response CXML response with next routing instruction
+     */
+    public function routeRingGroupCallback(Request $request): Response
+    {
+        $ringGroupId = (int) $request->input('ring_group_id');
+        $callSid = $request->input('CallSid');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Handling ring group callback', [
+            'call_sid' => $callSid,
+            'ring_group_id' => $ringGroupId,
+            'org_id' => $orgId,
+        ]);
+
+        // Validate required parameters
+        if (!$ringGroupId || !$callSid) {
+            Log::warning('VoiceRoutingManager: Missing required parameters for ring group callback', [
+                'call_sid' => $callSid,
+                'ring_group_id' => $ringGroupId,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->createCxmlErrorResponse('Missing required parameters');
+        }
+
+        // Get the ring group
+        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
+            ->where('organization_id', $orgId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$ringGroup) {
+            Log::warning('VoiceRoutingManager: Ring group not found or inactive', [
+                'call_sid' => $callSid,
+                'ring_group_id' => $ringGroupId,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->createCxmlErrorResponse('Ring group not found');
+        }
+
+        Log::info('VoiceRoutingManager: Found active ring group for callback', [
+            'call_sid' => $callSid,
+            'ring_group_id' => $ringGroup->id,
+            'ring_group_name' => $ringGroup->name,
+            'strategy' => $ringGroup->strategy->value,
+        ]);
+
+        // Create destination array for the strategy
+        $destination = ['ring_group' => $ringGroup];
+
+        // Delegate to the RingGroupRoutingStrategy
+        // Pass empty DidNumber since callbacks don't need DID context
+        return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber, $destination);
+    }
+
+    /**
      * Handle case where caller provides no input (timeout).
      */
     private function handleNoInput(Request $request, IvrMenu $ivrMenu, array $callState): Response
