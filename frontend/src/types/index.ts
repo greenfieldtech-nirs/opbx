@@ -69,6 +69,9 @@ export type CallDirection = 'inbound' | 'outbound';
 // Ring Group Strategy
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
+// Ring Group Fallback Action
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
+
 // Routing Type
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room';
 
@@ -170,10 +173,12 @@ export interface RingGroup {
     extension_id: string;
     priority: number;
   }>;
-  fallback_action?: {
-    type: 'voicemail' | 'extension' | 'hangup';
-    extension_id?: string;
-  };
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_extension_number?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
   status: Status;
   created_at: string;
   updated_at: string;

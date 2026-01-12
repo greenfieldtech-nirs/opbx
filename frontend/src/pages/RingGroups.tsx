@@ -508,6 +508,9 @@ export default function RingGroups() {
       fallback_action: group.fallback_action,
       fallback_extension_id: group.fallback_extension_id,
       fallback_extension_number: group.fallback_extension_number,
+      fallback_ring_group_id: group.fallback_ring_group_id,
+      fallback_ivr_menu_id: group.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: group.fallback_ai_assistant_id,
       status: group.status,
       members: [...group.members],
     });
