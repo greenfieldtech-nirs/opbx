@@ -20,6 +20,13 @@ import type {
   UpdateRingGroupRequest,
 } from '@/types/api.types';
 import type { Extension } from '@/types';
+
+// Extended RingGroup type with additional fallback fields
+interface ExtendedRingGroup extends RingGroup {
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+}
 import {
   getStrategyDisplayName,
   getStrategyDescription,
@@ -64,6 +71,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import {
+  AlertCircle,
   Plus,
   Search,
   Filter,
@@ -198,11 +206,7 @@ export default function RingGroups() {
   const [selectedGroup, setSelectedGroup] = useState<RingGroup | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState<Partial<RingGroup & {
-    fallback_ring_group_id?: string;
-    fallback_ivr_menu_id?: string;
-    fallback_ai_assistant_id?: string;
-  }>>({
+  const [formData, setFormData] = useState<Partial<ExtendedRingGroup>>({
     name: '',
     description: '',
     strategy: 'simultaneous',
@@ -352,13 +356,58 @@ export default function RingGroups() {
       case 'extension':
         return <PhoneForwarded className="h-4 w-4" />;
       case 'ring_group':
-        return <Users className="h-4 w-4" />;
+        return <ArrowRight className="h-4 w-4" />;
       case 'ivr_menu':
         return <Menu className="h-4 w-4" />;
       case 'ai_assistant':
         return <Bot className="h-4 w-4" />;
       case 'hangup':
         return <PhoneOff className="h-4 w-4" />;
+      default:
+        return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  // Enhanced fallback display text with actual destination names
+  const getFallbackDisplayText = (
+    group: ExtendedRingGroup,
+    ringGroups: any[],
+    ivrMenus: any[]
+  ): string => {
+    switch (group.fallback_action) {
+      case 'extension':
+        return group.fallback_extension_number
+          ? `→ Ext ${group.fallback_extension_number}`
+          : '→ Extension';
+
+      case 'ring_group':
+        if (group.fallback_ring_group_id) {
+          const targetRingGroup = ringGroups.find(rg => rg.id.toString() === group.fallback_ring_group_id);
+          return targetRingGroup ? `→ ${targetRingGroup.name}` : '→ Ring Group';
+        }
+        return '→ Ring Group';
+
+      case 'ivr_menu':
+        if (group.fallback_ivr_menu_id) {
+          const targetIvrMenu = ivrMenus.find(ivr => ivr.id.toString() === group.fallback_ivr_menu_id);
+          return targetIvrMenu ? `→ ${targetIvrMenu.name}` : '→ IVR Menu';
+        }
+        return '→ IVR Menu';
+
+      case 'ai_assistant':
+        if (group.fallback_ai_assistant_id) {
+          const targetAiAssistant = availableExtensions.find(ext =>
+            ext.id === group.fallback_ai_assistant_id && ext.type === 'ai_assistant'
+          );
+          return targetAiAssistant ? `→ ${targetAiAssistant.user?.name || 'AI Assistant'}` : '→ AI Assistant';
+        }
+        return '→ AI Assistant';
+
+      case 'hangup':
+        return 'Hangup';
+
+      default:
+        return 'Unknown';
     }
   };
 
@@ -421,9 +470,7 @@ export default function RingGroups() {
       fallback_action: 'extension',
       status: 'active',
       members: [],
-      fallback_ring_group_id: undefined,
-      fallback_ivr_menu_id: undefined,
-      fallback_ai_assistant_id: undefined,
+
     });
     setFormErrors({});
   };
@@ -498,21 +545,22 @@ export default function RingGroups() {
 
   // Open edit dialog
   const openEditDialog = (group: RingGroup) => {
-    setSelectedGroup(group);
+    const extendedGroup = group as ExtendedRingGroup;
+    setSelectedGroup(extendedGroup);
     setFormData({
-      name: group.name,
-      description: group.description,
-      strategy: group.strategy,
-      timeout: group.timeout,
-      ring_turns: group.ring_turns,
-      fallback_action: group.fallback_action,
-      fallback_extension_id: group.fallback_extension_id,
-      fallback_extension_number: group.fallback_extension_number,
-      fallback_ring_group_id: group.fallback_ring_group_id,
-      fallback_ivr_menu_id: group.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: group.fallback_ai_assistant_id,
-      status: group.status,
-      members: [...group.members],
+      name: extendedGroup.name,
+      description: extendedGroup.description,
+      strategy: extendedGroup.strategy,
+      timeout: extendedGroup.timeout,
+      ring_turns: extendedGroup.ring_turns,
+      fallback_action: extendedGroup.fallback_action,
+      fallback_extension_id: extendedGroup.fallback_extension_id,
+      fallback_extension_number: extendedGroup.fallback_extension_number,
+      fallback_ring_group_id: extendedGroup.fallback_ring_group_id,
+      fallback_ivr_menu_id: extendedGroup.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: extendedGroup.fallback_ai_assistant_id,
+      status: extendedGroup.status,
+      members: [...extendedGroup.members],
     });
     setIsEditDialogOpen(true);
   };
@@ -1325,8 +1373,9 @@ export default function RingGroups() {
                         {getFallbackIcon(group.fallback_action)}
                         <span className="text-sm">
                           {getFallbackDisplayText(
-                            group.fallback_action,
-                            group.fallback_extension_number
+                            group as ExtendedRingGroup,
+                            ringGroups || [],
+                            availableIvrMenus || []
                           )}
                         </span>
                       </div>
@@ -1452,8 +1501,9 @@ export default function RingGroups() {
                     {getFallbackIcon(selectedGroup.fallback_action)}
                     <span className="text-sm">
                       {getFallbackDisplayText(
-                        selectedGroup.fallback_action,
-                        selectedGroup.fallback_extension_number
+                        selectedGroup as ExtendedRingGroup,
+                        ringGroups || [],
+                        availableIvrMenus || []
                       )}
                     </span>
                   </div>
