@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -54,12 +55,12 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'string',
                 'max:255',
             ],
-            'routing_type' => [
-                'sometimes',
-                'required',
-                'string',
-                Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room']),
-            ],
+             'routing_type' => [
+                 'sometimes',
+                 'required',
+                 'string',
+                 Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ivr_menu']),
+             ],
             'routing_config' => [
                 'sometimes',
                 'required',
@@ -85,7 +86,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             'phone_number.prohibited' => 'Phone number cannot be changed after creation.',
             'friendly_name.max' => 'Friendly name must not exceed 255 characters.',
             'routing_type.required' => 'Routing type is required.',
-            'routing_type.in' => 'Invalid routing type. Must be one of: extension, ring_group, business_hours, conference_room.',
+             'routing_type.in' => 'Invalid routing type. Must be one of: extension, ring_group, business_hours, conference_room, ai_assistant, ivr_menu.',
             'routing_config.required' => 'Routing configuration is required when changing routing type.',
             'routing_config.array' => 'Routing configuration must be an object.',
             'status.required' => 'Status is required.',
@@ -130,6 +131,8 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'ring_group' => $this->validateRingGroupRouting($validator, $user, $routingConfig),
                 'business_hours' => $this->validateBusinessHoursRouting($validator, $user, $routingConfig),
                 'conference_room' => $this->validateConferenceRoomRouting($validator, $user, $routingConfig),
+                'ai_assistant' => $this->validateAiAssistantRouting($validator, $user, $routingConfig),
+                'ivr_menu' => $this->validateIvrMenuRouting($validator, $user, $routingConfig),
                 default => null,
             };
         });
@@ -317,6 +320,102 @@ class UpdatePhoneNumberRequest extends FormRequest
             $validator->errors()->add(
                 'routing_config.conference_room_id',
                 'The selected conference room must be active. Conference room "' . $conferenceRoom->name . '" is currently ' . $conferenceRoom->status->value . '.'
+            );
+        }
+    }
+
+    /**
+     * Validate AI assistant routing configuration.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @param \App\Models\User $user
+     * @param array<string, mixed> $routingConfig
+     * @return void
+     */
+    private function validateAiAssistantRouting($validator, $user, array $routingConfig): void
+    {
+        if (!isset($routingConfig['extension_id'])) {
+            $validator->errors()->add(
+                'routing_config.extension_id',
+                'Extension ID is required when routing type is ai_assistant.'
+            );
+            return;
+        }
+
+        $extension = Extension::find($routingConfig['extension_id']);
+
+        if (!$extension) {
+            $validator->errors()->add(
+                'routing_config.extension_id',
+                'The selected extension does not exist.'
+            );
+            return;
+        }
+
+        if ($extension->organization_id !== $user->organization_id) {
+            $validator->errors()->add(
+                'routing_config.extension_id',
+                'The selected extension does not belong to your organization.'
+            );
+            return;
+        }
+
+        if ($extension->type !== \App\Enums\ExtensionType::AI_ASSISTANT) {
+            $validator->errors()->add(
+                'routing_config.extension_id',
+                'The selected extension must be an AI assistant. Extension ' . $extension->extension_number . ' is of type ' . $extension->type->label() . '.'
+            );
+            return;
+        }
+
+        if ($extension->status !== UserStatus::ACTIVE) {
+            $validator->errors()->add(
+                'routing_config.extension_id',
+                'The selected extension must be active. Extension ' . $extension->extension_number . ' is currently ' . $extension->status->value . '.'
+            );
+        }
+    }
+
+    /**
+     * Validate IVR menu routing configuration.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @param \App\Models\User $user
+     * @param array<string, mixed> $routingConfig
+     * @return void
+     */
+    private function validateIvrMenuRouting($validator, $user, array $routingConfig): void
+    {
+        if (!isset($routingConfig['ivr_menu_id'])) {
+            $validator->errors()->add(
+                'routing_config.ivr_menu_id',
+                'IVR menu ID is required when routing type is ivr_menu.'
+            );
+            return;
+        }
+
+        $ivrMenu = IvrMenu::find($routingConfig['ivr_menu_id']);
+
+        if (!$ivrMenu) {
+            $validator->errors()->add(
+                'routing_config.ivr_menu_id',
+                'The selected IVR menu does not exist.'
+            );
+            return;
+        }
+
+        if ($ivrMenu->organization_id !== $user->organization_id) {
+            $validator->errors()->add(
+                'routing_config.ivr_menu_id',
+                'The selected IVR menu does not belong to your organization.'
+            );
+            return;
+        }
+
+        if (!$ivrMenu->isActive()) {
+            $validator->errors()->add(
+                'routing_config.ivr_menu_id',
+                'The selected IVR menu must be active. IVR menu "' . $ivrMenu->name . '" is currently inactive.'
             );
         }
     }

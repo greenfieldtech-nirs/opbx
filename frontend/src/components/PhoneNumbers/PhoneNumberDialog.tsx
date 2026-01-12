@@ -31,6 +31,8 @@ import {
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 interface PhoneNumberDialogProps {
@@ -59,6 +61,7 @@ export function PhoneNumberDialog({
     status: 'active' as 'active' | 'inactive',
     routing_type: 'extension' as RoutingType,
     target_id: '',
+    enable_non_e164: false,
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -70,6 +73,7 @@ export function PhoneNumberDialog({
         // Edit mode - populate with existing data
         const targetId =
           phoneNumber.routing_config.extension_id ||
+          phoneNumber.routing_config.ai_assistant_id ||
           phoneNumber.routing_config.ring_group_id ||
           phoneNumber.routing_config.business_hours_schedule_id ||
           phoneNumber.routing_config.conference_room_id ||
@@ -81,6 +85,7 @@ export function PhoneNumberDialog({
           status: phoneNumber.status,
           routing_type: phoneNumber.routing_type,
           target_id: targetId,
+          enable_non_e164: false,
         });
       } else {
         // Create mode - reset to defaults
@@ -90,17 +95,25 @@ export function PhoneNumberDialog({
           status: 'active',
           routing_type: 'extension',
           target_id: '',
+          enable_non_e164: false,
         });
       }
       setFormErrors({});
     }
   }, [open, phoneNumber]);
 
-  // Fetch available extensions (active only, with user relationship)
-  const { data: extensionsData } = useQuery({
-    queryKey: ['extensions', { status: 'active', per_page: 100, with: 'user' }],
-    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100, with: 'user' }),
+  // Fetch available PBX user extensions (active only, with user relationship)
+  const { data: pbxUserExtensionsData } = useQuery({
+    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100, with: 'user' }],
+    queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100, with: 'user' }),
     enabled: open && formData.routing_type === 'extension',
+  });
+
+  // Fetch available AI assistant extensions (active only)
+  const { data: aiAssistantExtensionsData } = useQuery({
+    queryKey: ['extensions', { type: 'ai_assistant', status: 'active', per_page: 100 }],
+    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
+    enabled: open && formData.routing_type === 'ai_assistant',
   });
 
   // Fetch available ring groups (active only)
@@ -124,13 +137,14 @@ export function PhoneNumberDialog({
     enabled: open && formData.routing_type === 'conference_room',
   });
 
-  const availableExtensions = extensionsData?.data || [];
+  const availablePbxUserExtensions = pbxUserExtensionsData?.data || [];
+  const availableAiAssistantExtensions = aiAssistantExtensionsData?.data || [];
   const availableRingGroups = ringGroupsData?.data || [];
   const availableBusinessHours = businessHoursData?.data || [];
   const availableConferenceRooms = conferenceRoomsData?.data || [];
 
   // Handle form field changes
-  const handleFieldChange = (field: string, value: string) => {
+  const handleFieldChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field
     if (formErrors[field]) {
@@ -158,8 +172,10 @@ export function PhoneNumberDialog({
     // Phone number validation (only in create mode)
     if (!isEditMode && !formData.phone_number) {
       errors.phone_number = 'Phone number is required';
-    } else if (!isEditMode && !/^\+[1-9]\d{1,14}$/.test(formData.phone_number)) {
+    } else if (!isEditMode && !formData.enable_non_e164 && !/^\+[1-9]\d{1,14}$/.test(formData.phone_number)) {
       errors.phone_number = 'Phone number must be in E.164 format (+12125551234)';
+    } else if (!isEditMode && formData.enable_non_e164 && !/^[\d+#]+$/.test(formData.phone_number.replace(/^\+/, ''))) {
+      errors.phone_number = 'Phone number can only contain digits, +, and # characters';
     }
 
     // Target validation
@@ -180,6 +196,9 @@ export function PhoneNumberDialog({
     switch (formData.routing_type) {
       case 'extension':
         routing_config.extension_id = formData.target_id;
+        break;
+      case 'ai_assistant':
+        routing_config.ai_assistant_id = formData.target_id;
         break;
       case 'ring_group':
         routing_config.ring_group_id = formData.target_id;
@@ -237,9 +256,8 @@ export function PhoneNumberDialog({
             </Alert>
           )}
 
-          {/* Section 1: Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Basic Information</h3>
+           {/* Section 1: Basic Information */}
+           <div className="space-y-4">
 
             {/* Phone Number - only shown on create, disabled on edit */}
             {!isEditMode && (
@@ -247,15 +265,48 @@ export function PhoneNumberDialog({
                 <Label htmlFor="phone_number">
                   Phone Number <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="phone_number"
-                  value={formData.phone_number}
-                  onChange={(e) => handleFieldChange('phone_number', e.target.value)}
-                  placeholder="+12125551234"
-                  className={formErrors.phone_number ? 'border-red-500' : ''}
-                />
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Input
+                      id="phone_number"
+                      value={formData.phone_number}
+                      onChange={(e) => handleFieldChange('phone_number', e.target.value)}
+                      placeholder="+12125551234"
+                      className={formErrors.phone_number ? 'border-red-500' : ''}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={formData.status === 'active'}
+                      onCheckedChange={(checked) =>
+                        handleFieldChange('status', checked ? 'active' : 'inactive')
+                      }
+                    />
+                    <span className="text-sm font-medium">
+                      {formData.status === 'active' ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Enable non-E.164 checkbox */}
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="enable_non_e164"
+                    checked={formData.enable_non_e164}
+                    onCheckedChange={(checked) =>
+                      handleFieldChange('enable_non_e164', checked === true)
+                    }
+                  />
+                  <Label htmlFor="enable_non_e164" className="text-sm font-normal cursor-pointer">
+                    Enable non-E.164 Phone Numbers
+                  </Label>
+                </div>
+
                 <p className="text-xs text-muted-foreground">
-                  Enter in E.164 format: +[country][number]
+                  {formData.enable_non_e164
+                    ? 'Enter any phone number using digits, +, and # characters'
+                    : 'Enter in E.164 format: +[country][number]'
+                  }
                 </p>
                 {formErrors.phone_number && (
                   <p className="text-xs text-red-500">{formErrors.phone_number}</p>
@@ -267,56 +318,31 @@ export function PhoneNumberDialog({
             {isEditMode && (
               <div className="space-y-2">
                 <Label>Phone Number</Label>
-                <Input value={formData.phone_number} disabled className="bg-muted" />
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Input value={formData.phone_number} disabled className="bg-muted" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={formData.status === 'active'}
+                      onCheckedChange={(checked) =>
+                        handleFieldChange('status', checked ? 'active' : 'inactive')
+                      }
+                    />
+                    <span className="text-sm font-medium">
+                      {formData.status === 'active' ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Phone number cannot be changed after creation
                 </p>
               </div>
             )}
 
-            {/* Friendly Name */}
-            <div className="space-y-2">
-              <Label htmlFor="friendly_name">Friendly Name</Label>
-              <Input
-                id="friendly_name"
-                value={formData.friendly_name}
-                onChange={(e) => handleFieldChange('friendly_name', e.target.value)}
-                placeholder="e.g., Main Office, Support Hotline"
-                maxLength={255}
-              />
-              <p className="text-xs text-muted-foreground">
-                Optional: Give this number a memorable name
-              </p>
-            </div>
 
-            {/* Status */}
-            <div className="space-y-2">
-              <Label>
-                Status <span className="text-red-500">*</span>
-              </Label>
-              <RadioGroup
-                value={formData.status}
-                onValueChange={(value: 'active' | 'inactive') =>
-                  handleFieldChange('status', value)
-                }
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="active" id="status-active" />
-                  <Label htmlFor="status-active" className="font-normal cursor-pointer">
-                    Active
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="inactive" id="status-inactive" />
-                  <Label htmlFor="status-inactive" className="font-normal cursor-pointer">
-                    Inactive
-                  </Label>
-                </div>
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                Inactive numbers will reject incoming calls
-              </p>
-            </div>
+
+
           </div>
 
           {/* Section 2: Routing Configuration */}
@@ -328,94 +354,126 @@ export function PhoneNumberDialog({
               <Label htmlFor="routing_type">
                 Route calls to <span className="text-red-500">*</span>
               </Label>
-              <Select value={formData.routing_type} onValueChange={handleRoutingTypeChange}>
-                <SelectTrigger id="routing_type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="extension">Extension</SelectItem>
-                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                  <SelectItem value="business_hours">Business Hours</SelectItem>
-                  <SelectItem value="conference_room">Conference Room</SelectItem>
-                </SelectContent>
-              </Select>
+               <Select value={formData.routing_type} onValueChange={handleRoutingTypeChange}>
+                 <SelectTrigger id="routing_type">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="extension">PBX User Extension</SelectItem>
+                   <SelectItem value="ai_assistant">AI Assistant Extension</SelectItem>
+                   <SelectItem value="ring_group">Ring Group</SelectItem>
+                   <SelectItem value="conference_room">Conference Room</SelectItem>
+                   <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                   <SelectItem value="business_hours">Business Hours</SelectItem>
+                 </SelectContent>
+               </Select>
               <p className="text-xs text-muted-foreground">
                 Choose where calls should be routed
               </p>
             </div>
 
-            {/* Conditional Target Fields */}
-            {formData.routing_type === 'extension' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_extension">
-                  Target Extension <span className="text-red-500">*</span>
-                </Label>
-                <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
-                  <SelectTrigger id="target_extension" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Select an extension" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableExtensions.map((ext) => (
-                      <SelectItem key={ext.id} value={ext.id}>
-                        {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will ring this extension directly
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
+             {/* Conditional Target Fields */}
+             {formData.routing_type === 'extension' && (
+               <div className="space-y-2">
+                 <Label htmlFor="target_extension">
+                   PBX User Extension <span className="text-red-500">*</span>
+                 </Label>
+                 <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
+                   <SelectTrigger id="target_extension" className={formErrors.target_id ? 'border-red-500' : ''}>
+                     <SelectValue placeholder="Select a PBX user extension" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     {availablePbxUserExtensions.map((extension) => (
+                       <SelectItem key={extension.id} value={extension.id}>
+                         <div className="flex items-center gap-2">
+                           <div className={`w-2 h-2 rounded-full ${extension.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                           <span className="font-mono">{extension.extension_number}</span>
+                           <span className="text-muted-foreground">
+                             {extension.user ? extension.user.name : 'Unassigned'}
+                           </span>
+                         </div>
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+                 <p className="text-xs text-muted-foreground">
+                   Calls will ring the selected PBX user directly
+                 </p>
+                 {formErrors.target_id && (
+                   <p className="text-xs text-red-500">{formErrors.target_id}</p>
+                 )}
+               </div>
+             )}
+
+             {formData.routing_type === 'ai_assistant' && (
+               <div className="space-y-2">
+                 <Label htmlFor="target_ai_assistant">
+                   AI Assistant Extension <span className="text-red-500">*</span>
+                 </Label>
+                 <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
+                   <SelectTrigger id="target_ai_assistant" className={formErrors.target_id ? 'border-red-500' : ''}>
+                     <SelectValue placeholder="Select an AI assistant extension" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     {availableAiAssistantExtensions.map((extension) => (
+                       <SelectItem key={extension.id} value={extension.id}>
+                         <div className="flex items-center gap-2">
+                           <div className={`w-2 h-2 rounded-full ${extension.status === 'active' ? 'bg-blue-500' : 'bg-yellow-500'}`}></div>
+                           <span className="font-mono">{extension.extension_number}</span>
+                           <span className="text-muted-foreground">
+                             {extension.configuration?.provider ? `${extension.configuration.provider} Assistant` : 'AI Assistant'}
+                           </span>
+                           <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">AI</span>
+                         </div>
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+                 <p className="text-xs text-muted-foreground">
+                   Calls will be handled by the selected AI assistant
+                 </p>
+                 {formErrors.target_id && (
+                   <p className="text-xs text-red-500">{formErrors.target_id}</p>
+                 )}
+               </div>
+             )}
 
             {formData.routing_type === 'ring_group' && (
               <div className="space-y-2">
                 <Label htmlFor="target_ring_group">
-                  Target Ring Group <span className="text-red-500">*</span>
+                  Ring Group <span className="text-red-500">*</span>
                 </Label>
                 <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
                   <SelectTrigger id="target_ring_group" className={formErrors.target_id ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select a ring group" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableRingGroups.map((rg) => (
-                      <SelectItem key={rg.id} value={rg.id}>
-                        {rg.name} ({rg.members?.length || 0} members)
-                      </SelectItem>
-                    ))}
+                    {/* Mock ring groups */}
+                    <SelectItem value="rg-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                        <span>Sales Team</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">3 members</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="rg-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                        <span>Support Team</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">5 members</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="rg-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span>Emergency Line</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">2 members</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Calls will use this ring group's strategy
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
-
-            {formData.routing_type === 'business_hours' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_business_hours">
-                  Business Hours Schedule <span className="text-red-500">*</span>
-                </Label>
-                <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
-                  <SelectTrigger id="target_business_hours" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Select a schedule" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBusinessHours.map((bh) => (
-                      <SelectItem key={bh.id} value={bh.id}>
-                        {bh.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will route based on time of day
+                  Calls will ring all members according to the group's strategy
                 </p>
                 {formErrors.target_id && (
                   <p className="text-xs text-red-500">{formErrors.target_id}</p>
@@ -426,36 +484,132 @@ export function PhoneNumberDialog({
             {formData.routing_type === 'conference_room' && (
               <div className="space-y-2">
                 <Label htmlFor="target_conference_room">
-                  Target Conference Room <span className="text-red-500">*</span>
+                  Conference Room <span className="text-red-500">*</span>
                 </Label>
                 <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
                   <SelectTrigger id="target_conference_room" className={formErrors.target_id ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select a conference room" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableConferenceRooms.map((cr) => (
-                      <SelectItem key={cr.id} value={cr.id}>
-                        {cr.name} ({cr.max_participants} max)
-                      </SelectItem>
-                    ))}
+                    {/* Mock conference rooms */}
+                    <SelectItem value="conf-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                        <span>Sales Meeting Room</span>
+                        <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">25 max</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="conf-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                        <span>Executive Boardroom</span>
+                        <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">10 max</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="conf-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span>Training Room</span>
+                        <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">50 max</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Calls will join this conference room
+                  Calls will join the selected conference room
                 </p>
                 {formErrors.target_id && (
                   <p className="text-xs text-red-500">{formErrors.target_id}</p>
                 )}
               </div>
             )}
-            {/* Sentry Protection Info */}
-            <Alert className="bg-blue-50 border-blue-200">
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-700 text-xs">
-                This number is automatically protected by <strong>Routing Sentry</strong>.
-                Inbound call velocity and volume are monitored based on global settings.
-              </AlertDescription>
-            </Alert>
+
+            {formData.routing_type === 'ivr_menu' && (
+              <div className="space-y-2">
+                <Label htmlFor="target_ivr_menu">
+                  IVR Menu <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
+                  <SelectTrigger id="target_ivr_menu" className={formErrors.target_id ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select an IVR menu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Mock IVR menus */}
+                    <SelectItem value="ivr-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                        <span>Main Menu</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-1 rounded">IVR</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ivr-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                        <span>Support Menu</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-1 rounded">IVR</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ivr-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span>Emergency Menu</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-1 rounded">IVR</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Calls will be handled by the selected IVR menu
+                </p>
+                {formErrors.target_id && (
+                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
+                )}
+              </div>
+            )}
+
+            {formData.routing_type === 'business_hours' && (
+              <div className="space-y-2">
+                <Label htmlFor="target_business_hours">
+                  Business Hours <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.target_id} onValueChange={(val) => handleFieldChange('target_id', val)}>
+                  <SelectTrigger id="target_business_hours" className={formErrors.target_id ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select business hours" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Mock business hours schedules */}
+                    <SelectItem value="bh-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                        <span>Office Hours</span>
+                        <span className="text-xs bg-teal-100 text-teal-800 px-1 rounded">Mon-Fri 9AM-5PM</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="bh-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                        <span>Extended Hours</span>
+                        <span className="text-xs bg-teal-100 text-teal-800 px-1 rounded">Mon-Sat 8AM-8PM</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="bh-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span>24/7 Support</span>
+                        <span className="text-xs bg-teal-100 text-teal-800 px-1 rounded">Always Open</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Calls will route based on the selected business hours schedule
+                </p>
+                {formErrors.target_id && (
+                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
+                )}
+              </div>
+            )}
+
           </div>
         </div>
 
