@@ -1643,7 +1643,7 @@ class VoiceRoutingManager
     /**
      * Execute the appropriate routing strategy for the given extension type.
      */
-    private function executeStrategy(ExtensionType $type, Request $request, DidNumber $did, array $destination): Response
+    public function executeStrategy(ExtensionType $type, Request $request, DidNumber $did, array $destination): Response
     {
         foreach ($this->strategies as $strategy) {
             if ($strategy->canHandle($type)) {
