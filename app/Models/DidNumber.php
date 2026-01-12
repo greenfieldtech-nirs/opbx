@@ -113,8 +113,8 @@ class DidNumber extends Model
      */
     public function getTargetAiAssistantId(): ?int
     {
-        if ($this->routing_type === 'ai_assistant' && isset($this->routing_config['extension_id'])) {
-            return (int) $this->routing_config['extension_id'];
+        if ($this->routing_type === 'ai_assistant' && isset($this->routing_config['ai_assistant_id'])) {
+            return (int) $this->routing_config['ai_assistant_id'];
         }
 
         return null;

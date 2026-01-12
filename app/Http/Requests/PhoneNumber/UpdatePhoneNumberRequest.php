@@ -334,35 +334,35 @@ class UpdatePhoneNumberRequest extends FormRequest
      */
     private function validateAiAssistantRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['extension_id'])) {
+        if (!isset($routingConfig['ai_assistant_id'])) {
             $validator->errors()->add(
-                'routing_config.extension_id',
-                'Extension ID is required when routing type is ai_assistant.'
+                'routing_config.ai_assistant_id',
+                'AI assistant ID is required when routing type is ai_assistant.'
             );
             return;
         }
 
-        $extension = Extension::find($routingConfig['extension_id']);
+        $extension = Extension::find($routingConfig['ai_assistant_id']);
 
         if (!$extension) {
             $validator->errors()->add(
-                'routing_config.extension_id',
-                'The selected extension does not exist.'
+                'routing_config.ai_assistant_id',
+                'The selected AI assistant does not exist.'
             );
             return;
         }
 
         if ($extension->organization_id !== $user->organization_id) {
             $validator->errors()->add(
-                'routing_config.extension_id',
-                'The selected extension does not belong to your organization.'
+                'routing_config.ai_assistant_id',
+                'The selected AI assistant does not belong to your organization.'
             );
             return;
         }
 
         if ($extension->type !== \App\Enums\ExtensionType::AI_ASSISTANT) {
             $validator->errors()->add(
-                'routing_config.extension_id',
+                'routing_config.ai_assistant_id',
                 'The selected extension must be an AI assistant. Extension ' . $extension->extension_number . ' is of type ' . $extension->type->label() . '.'
             );
             return;
@@ -370,8 +370,8 @@ class UpdatePhoneNumberRequest extends FormRequest
 
         if ($extension->status !== UserStatus::ACTIVE) {
             $validator->errors()->add(
-                'routing_config.extension_id',
-                'The selected extension must be active. Extension ' . $extension->extension_number . ' is currently ' . $extension->status->value . '.'
+                'routing_config.ai_assistant_id',
+                'The selected AI assistant must be active. AI assistant ' . $extension->extension_number . ' is currently ' . $extension->status->value . '.'
             );
         }
     }
