@@ -412,7 +412,15 @@ We welcome contributions from the community! Here's how to get started:
 
 ### Created By
 
-- **Nir Simionovich** ([@greenfieldtech-nirs](https://github.com/greenfieldtech-nirs)) - Lead Developer
+- **Nir Simionovich** ([@greenfieldtech-nirs](https://github.com/greenfieldtech-nirs)) - Lead Architect
+
+### Created Using
+
+- **Claude Code** ([@claudecode](https://claude.com/product/claude-code)) - Backend Developer
+- **Grok Code Fast 1** ([@grokcode](https://x.ai/news/grok-code-fast-1)) - Frontend Developer
+- **Google Gemini** ([@gemini](https://gemini.google.com/app)) - Code Reviewer and Expert Debugger
+- **Google Antigravity** ([@antigravity](https://antigravity.google.com/app))
+- **OpenCode** ([@opencode](https://opencode.ai/))
 
 ### Built With Support From
 
