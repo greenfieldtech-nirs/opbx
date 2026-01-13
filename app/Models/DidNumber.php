@@ -109,6 +109,18 @@ class DidNumber extends Model
     }
 
     /**
+     * Get the routing target AI assistant ID.
+     */
+    public function getTargetAiAssistantId(): ?int
+    {
+        if ($this->routing_type === 'ai_assistant' && isset($this->routing_config['ai_assistant_id'])) {
+            return (int) $this->routing_config['ai_assistant_id'];
+        }
+
+        return null;
+    }
+
+    /**
      * Get the routing target IVR menu ID.
      */
     public function getTargetIvrMenuId(): ?int
@@ -138,7 +150,10 @@ class DidNumber extends Model
             return $this->attributes['_extension'];
         }
 
-        return Extension::find($extensionId);
+        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $extensionId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -159,7 +174,10 @@ class DidNumber extends Model
             return $this->attributes['_ring_group'];
         }
 
-        return RingGroup::find($ringGroupId);
+        return RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -180,7 +198,10 @@ class DidNumber extends Model
             return $this->attributes['_business_hours_schedule'];
         }
 
-        return BusinessHoursSchedule::find($scheduleId);
+        return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $scheduleId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -201,7 +222,35 @@ class DidNumber extends Model
             return $this->attributes['_conference_room'];
         }
 
-        return ConferenceRoom::find($conferenceRoomId);
+        return ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $conferenceRoomId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
+    }
+
+    /**
+     * Get the AI assistant for AI assistant routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getAiAssistantAttribute(): ?Extension
+    {
+        $aiAssistantId = $this->getTargetAiAssistantId();
+        if ($aiAssistantId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_ai_assistant', $this->attributes)) {
+            return $this->attributes['_ai_assistant'];
+        }
+
+        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $aiAssistantId)
+            ->where('organization_id', $this->organization_id)
+            ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+            ->first();
     }
 
     /**
@@ -222,7 +271,10 @@ class DidNumber extends Model
             return $this->attributes['_ivr_menu'];
         }
 
-        return IvrMenu::find($ivrMenuId);
+        return IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ivrMenuId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
     }
 
     /**
@@ -255,6 +307,14 @@ class DidNumber extends Model
     public function setConferenceRoom(?ConferenceRoom $conferenceRoom): void
     {
         $this->attributes['_conference_room'] = $conferenceRoom;
+    }
+
+    /**
+     * Manually set the AI assistant relationship.
+     */
+    public function setAiAssistant(?Extension $aiAssistant): void
+    {
+        $this->attributes['_ai_assistant'] = $aiAssistant;
     }
 
     /**

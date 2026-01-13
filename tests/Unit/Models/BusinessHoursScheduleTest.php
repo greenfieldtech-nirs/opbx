@@ -195,8 +195,14 @@ class BusinessHoursScheduleTest extends TestCase
             'organization_id' => $this->organization->id,
             'name' => 'Split Shift Schedule',
             'status' => BusinessHoursStatus::ACTIVE,
-            'open_hours_action' => 'ext-101',
-            'closed_hours_action' => 'ext-voicemail',
+            'open_hours_action' => [
+                'target_id' => 'ext-101',
+            ],
+            'open_hours_action_type' => 'extension',
+            'closed_hours_action' => [
+                'target_id' => 'ext-voicemail',
+            ],
+            'closed_hours_action_type' => 'extension',
         ]);
 
         // Monday: 9-12 and 14-17 (lunch break)
@@ -241,8 +247,14 @@ class BusinessHoursScheduleTest extends TestCase
             'organization_id' => $this->organization->id,
             'name' => 'Test Schedule',
             'status' => BusinessHoursStatus::ACTIVE,
-            'open_hours_action' => 'ext-101',
-            'closed_hours_action' => 'ext-voicemail',
+            'open_hours_action' => [
+                'target_id' => 'ext-101',
+            ],
+            'open_hours_action_type' => 'extension',
+            'closed_hours_action' => [
+                'target_id' => 'ext-voicemail',
+            ],
+            'closed_hours_action_type' => 'extension',
         ]);
 
         // Create weekday schedule (Mon-Fri 9-17)

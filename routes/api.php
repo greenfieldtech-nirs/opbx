@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\SessionUpdateController;
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,6 +31,9 @@ use Illuminate\Support\Facades\Route;
 |
 
 */
+
+// Broadcasting authentication routes (must be before auth middleware)
+Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
 
 
 

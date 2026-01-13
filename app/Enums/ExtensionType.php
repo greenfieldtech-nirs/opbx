@@ -93,7 +93,7 @@ enum ExtensionType: string
     public function requiredConfigFields(): array
     {
         return match ($this) {
-            self::USER => [],
+            self::USER => [], // Can optionally have 'forward_to'
             self::CONFERENCE => ['conference_room_id'],
             self::RING_GROUP => ['ring_group_id'],
             self::IVR => ['ivr_id'],

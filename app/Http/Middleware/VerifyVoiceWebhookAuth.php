@@ -35,6 +35,13 @@ class VerifyVoiceWebhookAuth
      */
     public function handle(Request $request, Closure $next): Response
     {
+        Log::info('Voice webhook auth middleware triggered', [
+            'ip' => $request->ip(),
+            'path' => $request->path(),
+            'method' => $request->method(),
+            'headers' => $request->headers->all(),
+        ]);
+
         // Get Authorization header
         $authHeader = $request->header('Authorization');
 

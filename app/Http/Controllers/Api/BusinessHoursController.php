@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
+use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
 use App\Http\Requests\BusinessHours\UpdateBusinessHoursScheduleRequest;
 use App\Http\Resources\BusinessHoursScheduleCollection;
 use App\Http\Resources\BusinessHoursScheduleResource;
@@ -21,9 +21,7 @@ use App\Models\BusinessHoursTimeRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Business Hours management API controller.
@@ -137,13 +135,19 @@ class BusinessHoursController extends Controller
 
         try {
             $schedule = DB::transaction(function () use ($user, $validated): BusinessHoursSchedule {
+                // Transform action data for storage
+                $openHoursActionData = $this->transformActionDataForStorage($validated['open_hours_action']);
+                $closedHoursActionData = $this->transformActionDataForStorage($validated['closed_hours_action']);
+
                 // Create the main schedule
                 $schedule = BusinessHoursSchedule::create([
                     'organization_id' => $user->organization_id,
                     'name' => $validated['name'],
                     'status' => $validated['status'],
-                    'open_hours_action' => $validated['open_hours_action'],
-                    'closed_hours_action' => $validated['closed_hours_action'],
+                    'open_hours_action' => $openHoursActionData['action'],
+                    'open_hours_action_type' => $openHoursActionData['action_type'],
+                    'closed_hours_action' => $closedHoursActionData['action'],
+                    'closed_hours_action_type' => $closedHoursActionData['action_type'],
                 ]);
 
                 // Create schedule days and time ranges
@@ -281,12 +285,18 @@ class BusinessHoursController extends Controller
 
         try {
             DB::transaction(function () use ($businessHour, $validated): void {
+                // Transform action data for storage
+                $openHoursActionData = $this->transformActionDataForStorage($validated['open_hours_action']);
+                $closedHoursActionData = $this->transformActionDataForStorage($validated['closed_hours_action']);
+
                 // Update main schedule
                 $businessHour->update([
                     'name' => $validated['name'],
                     'status' => $validated['status'],
-                    'open_hours_action' => $validated['open_hours_action'],
-                    'closed_hours_action' => $validated['closed_hours_action'],
+                    'open_hours_action' => $openHoursActionData['action'],
+                    'open_hours_action_type' => $openHoursActionData['action_type'],
+                    'closed_hours_action' => $closedHoursActionData['action'],
+                    'closed_hours_action_type' => $closedHoursActionData['action_type'],
                 ]);
 
                 // Delete existing schedule days and recreate
@@ -459,7 +469,9 @@ class BusinessHoursController extends Controller
                     'name' => $businessHour->name . ' (Copy)',
                     'status' => $businessHour->status,
                     'open_hours_action' => $businessHour->open_hours_action,
+                    'open_hours_action_type' => $businessHour->open_hours_action_type,
                     'closed_hours_action' => $businessHour->closed_hours_action,
+                    'closed_hours_action_type' => $businessHour->closed_hours_action_type,
                 ]);
 
                 // Duplicate schedule days and time ranges
@@ -532,6 +544,59 @@ class BusinessHoursController extends Controller
                 'message' => 'An error occurred while duplicating the business hours schedule.',
             ], 500);
         }
+    }
+
+    /**
+     * Transform action data for storage in database.
+     * Handles both structured format {type: string, target_id: string} and legacy string format.
+     *
+     * @param array{type: string, target_id: string}|string $actionData
+     * @return array{action: array{target_id: string}, action_type: string}
+     */
+    private function transformActionDataForStorage(array|string $actionData): array
+    {
+        // Handle legacy string format (backward compatibility)
+        if (is_string($actionData)) {
+            // For now, assume string format represents extension IDs
+            // TODO: Remove this backward compatibility once frontend is fully migrated
+            return [
+                'action' => [
+                    'target_id' => 'ext-' . $actionData,
+                ],
+                'action_type' => 'extension',
+            ];
+        }
+
+        // Handle structured format
+        return [
+            'action' => [
+                'target_id' => $actionData['target_id'],
+            ],
+            'action_type' => $actionData['type'],
+        ];
+    }
+
+    /**
+     * Transform stored action data into structured format for API response.
+     *
+     * @param BusinessHoursSchedule $schedule
+     * @param string $actionField 'open_hours' or 'closed_hours'
+     * @return array{type: string, target_id: string}
+     */
+    private function transformActionForResponse(BusinessHoursSchedule $schedule, string $actionField): array
+    {
+        $actionType = $actionField === 'open_hours'
+            ? $schedule->getOpenHoursActionType()
+            : $schedule->getClosedHoursActionType();
+
+        $targetId = $actionField === 'open_hours'
+            ? $schedule->getOpenHoursTargetId()
+            : $schedule->getClosedHoursTargetId();
+
+        return [
+            'type' => $actionType->value,
+            'target_id' => $targetId ?? '',
+        ];
     }
 
     /**

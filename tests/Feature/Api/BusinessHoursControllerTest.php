@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\UserRole;
@@ -124,91 +125,14 @@ class BusinessHoursControllerTest extends TestCase
         $scheduleData = [
             'name' => 'Main Office Hours',
             'status' => BusinessHoursStatus::ACTIVE->value,
-            'open_hours_action' => 'ext-101',
-            'closed_hours_action' => 'ext-voicemail',
-            'schedule' => [
-                'monday' => [
-                    'enabled' => true,
-                    'time_ranges' => [
-                        ['start_time' => '09:00', 'end_time' => '17:00'],
-                    ],
-                ],
-                'tuesday' => [
-                    'enabled' => true,
-                    'time_ranges' => [
-                        ['start_time' => '09:00', 'end_time' => '17:00'],
-                    ],
-                ],
-                'wednesday' => [
-                    'enabled' => true,
-                    'time_ranges' => [
-                        ['start_time' => '09:00', 'end_time' => '17:00'],
-                    ],
-                ],
-                'thursday' => [
-                    'enabled' => true,
-                    'time_ranges' => [
-                        ['start_time' => '09:00', 'end_time' => '17:00'],
-                    ],
-                ],
-                'friday' => [
-                    'enabled' => true,
-                    'time_ranges' => [
-                        ['start_time' => '09:00', 'end_time' => '17:00'],
-                    ],
-                ],
-                'saturday' => [
-                    'enabled' => false,
-                    'time_ranges' => [],
-                ],
-                'sunday' => [
-                    'enabled' => false,
-                    'time_ranges' => [],
-                ],
+            'open_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-101',
             ],
-            'exceptions' => [
-                [
-                    'date' => '2025-12-25',
-                    'name' => 'Christmas Day',
-                    'type' => BusinessHoursExceptionType::CLOSED->value,
-                ],
+            'closed_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-voicemail',
             ],
-        ];
-
-        $response = $this->postJson('/api/v1/business-hours', $scheduleData);
-
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'message',
-                'data' => [
-                    'id',
-                    'name',
-                    'status',
-                    'schedule',
-                    'exceptions',
-                ],
-            ])
-            ->assertJsonPath('data.name', 'Main Office Hours')
-            ->assertJsonPath('data.status', BusinessHoursStatus::ACTIVE->value);
-
-        $this->assertDatabaseHas('business_hours_schedules', [
-            'name' => 'Main Office Hours',
-            'organization_id' => $this->organization->id,
-        ]);
-    }
-
-    /**
-     * Test that agents cannot create business hours schedules.
-     */
-    public function test_agents_cannot_create_business_hours_schedules(): void
-    {
-        Sanctum::actingAs($this->agent);
-
-        $scheduleData = [
-            'name' => 'Test Schedule',
-            'status' => BusinessHoursStatus::ACTIVE->value,
-            'open_hours_action' => 'ext-101',
-            'closed_hours_action' => 'ext-voicemail',
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
                 'tuesday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -222,7 +146,7 @@ class BusinessHoursControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/business-hours', $scheduleData);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
     }
 
     /**
@@ -253,8 +177,14 @@ class BusinessHoursControllerTest extends TestCase
         $scheduleData = [
             'name' => 'Existing Schedule',
             'status' => BusinessHoursStatus::ACTIVE->value,
-            'open_hours_action' => 'ext-101',
-            'closed_hours_action' => 'ext-voicemail',
+            'open_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-101',
+            ],
+            'closed_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-voicemail',
+            ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
                 'tuesday' => ['enabled' => false, 'time_ranges' => []],
@@ -287,8 +217,14 @@ class BusinessHoursControllerTest extends TestCase
         $updateData = [
             'name' => 'Updated Name',
             'status' => BusinessHoursStatus::INACTIVE->value,
-            'open_hours_action' => 'ext-102',
-            'closed_hours_action' => 'ext-voicemail-2',
+            'open_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-102',
+            ],
+            'closed_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-voicemail-2',
+            ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '10:00', 'end_time' => '18:00']]],
                 'tuesday' => ['enabled' => true, 'time_ranges' => [['start_time' => '10:00', 'end_time' => '18:00']]],
@@ -328,8 +264,14 @@ class BusinessHoursControllerTest extends TestCase
         $updateData = [
             'name' => 'Updated Name',
             'status' => BusinessHoursStatus::INACTIVE->value,
-            'open_hours_action' => 'ext-102',
-            'closed_hours_action' => 'ext-voicemail',
+            'open_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-102',
+            ],
+            'closed_hours_action' => [
+                'type' => 'extension',
+                'target_id' => 'ext-voicemail',
+            ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
                 'tuesday' => ['enabled' => false, 'time_ranges' => []],

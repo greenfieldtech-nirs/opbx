@@ -37,8 +37,14 @@ class BusinessHoursScheduleFactory extends Factory
             'organization_id' => Organization::factory(),
             'name' => fake()->words(2, true) . ' Hours',
             'status' => BusinessHoursStatus::ACTIVE,
-            'open_hours_action' => 'ext-' . fake()->numberBetween(100, 999),
-            'closed_hours_action' => 'ext-voicemail',
+            'open_hours_action' => [
+                'target_id' => 'ext-' . fake()->numberBetween(100, 999),
+            ],
+            'open_hours_action_type' => 'extension',
+            'closed_hours_action' => [
+                'target_id' => 'ext-voicemail',
+            ],
+            'closed_hours_action_type' => 'extension',
         ];
     }
 

@@ -73,6 +73,17 @@ class BusinessHoursScheduleResource extends JsonResource
             return $exceptionData;
         })->sortBy('date')->values()->toArray();
 
+        // Transform actions into structured format
+        $openHoursAction = [
+            'type' => $this->getOpenHoursActionType()->value,
+            'target_id' => $this->getOpenHoursTargetId() ?? '',
+        ];
+
+        $closedHoursAction = [
+            'type' => $this->getClosedHoursActionType()->value,
+            'target_id' => $this->getClosedHoursTargetId() ?? '',
+        ];
+
         return [
             'id' => (string) $this->id,
             'organization_id' => (string) $this->organization_id,
@@ -80,8 +91,8 @@ class BusinessHoursScheduleResource extends JsonResource
             'status' => $this->status->value,
             'schedule' => $schedule,
             'exceptions' => $exceptions,
-            'open_hours_action' => $this->open_hours_action,
-            'closed_hours_action' => $this->closed_hours_action,
+            'open_hours_action' => $openHoursAction,
+            'closed_hours_action' => $closedHoursAction,
             'current_status' => $this->current_status,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

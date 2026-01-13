@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter, RefreshCw } from 'lucide-react';
+import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter, RefreshCw, Phone, Menu, Users, Bot, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/AuthContext';
@@ -46,6 +47,9 @@ import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
 import logger from '@/utils/logger';
 import { extensionsService } from '@/services/extensions.service';
+import { ringGroupsService } from '@/services/ringGroups.service';
+import { ivrMenusService } from '@/services/ivrMenus.service';
+import { conferenceRoomsService } from '@/services/conferenceRooms.service';
 import { cn } from '@/lib/utils';
 import {
   type BusinessHoursSchedule,
@@ -57,16 +61,610 @@ import {
   type ScheduleStatus,
   type ExceptionType,
    type Country,
-   mockDidBusinessHours,
-   mockExtensions,
-   getScheduleSummary,
-   getDetailedHours,
-   isValidTimeFormat,
-   isEndTimeAfterStart,
-   formatExceptionDate,
-   getNextExceptionId,
+    mockDidBusinessHours,
+    mockExtensions,
+    getScheduleSummary,
+    getDetailedHours,
+    isValidTimeFormat,
+    isEndTimeAfterStart,
+    formatExceptionDate,
+    getNextExceptionId,
   getNextTimeRangeId,
 } from '@/mock/businessHours';
+
+// Action types for business hours routing
+export type BusinessHoursActionType =
+  | 'extension'
+  | 'ivr_menu'
+  | 'ring_group';
+
+export interface BusinessHoursAction {
+  type: BusinessHoursActionType;
+  target_id?: string;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// Helper function to get action display name for both structured and legacy formats
+const getActionDisplayName = (action: any, extensions: any[], ringGroups: any[], ivrMenus: any[]): JSX.Element => {
+  if (!action) return <span className="text-muted-foreground">Not set</span>;
+
+  // If it's a structured object (new format)
+  if (typeof action === 'object' && action.type && action.target_id) {
+    const actionObj = action as BusinessHoursAction;
+
+
+    // Get type configuration - matching ActionSelector
+    const getTypeConfig = (type: string) => {
+      const configs = {
+        user: { label: 'PBX User', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
+        conference: { label: 'Conference', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
+        ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+        ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+        ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+        forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
+      };
+      return configs[type as keyof typeof configs] || configs.user;
+    };
+    // Get the target option and display name
+    let targetOption: any = null;
+    let displayName = '';
+    let displayType = '';
+
+    // Extract the numeric ID from prefixed target_id (e.g., "ext-123" -> "123")
+    let numericId = actionObj.target_id;
+    if (actionObj.target_id.startsWith('ext-')) {
+      numericId = actionObj.target_id.substring(4);
+    } else if (actionObj.target_id.startsWith('rg-')) {
+      numericId = actionObj.target_id.substring(3);
+    } else if (actionObj.target_id.startsWith('ivr-')) {
+      numericId = actionObj.target_id.substring(4);
+    }
+
+    switch (actionObj.type) {
+      case 'extension':
+        targetOption = extensions.find(e => e.id.toString() === numericId);
+        displayName = targetOption?.name || `Extension ${actionObj.target_id}`;
+        displayType = targetOption?.type || 'user';
+        break;
+      case 'ring_group':
+        targetOption = ringGroups.find(g => g.id.toString() === numericId);
+        displayName = targetOption?.name || `Ring Group ${actionObj.target_id}`;
+        displayType = 'ring_group';
+        break;
+      case 'ivr_menu':
+        targetOption = ivrMenus.find(m => m.id.toString() === numericId);
+        displayName = targetOption?.name || `IVR Menu ${actionObj.target_id}`;
+        displayType = 'ivr';
+        break;
+      default:
+        displayName = `${actionObj.type}: ${actionObj.target_id}`;
+        displayType = 'user';
+    }
+
+    const typeConfig = getTypeConfig(displayType);
+    const Icon = typeConfig.icon;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="font-mono">{targetOption?.extension_number || numericId}</span>
+        <Badge variant="outline" className={cn('flex items-center gap-1 text-xs', typeConfig.color)}>
+          <Icon className="h-3 w-3" />
+          {typeConfig.label} - {displayName}
+        </Badge>
+      </div>
+    );
+  }
+
+  // If it's a string (legacy format), assume it's an extension ID
+  if (typeof action === 'string') {
+    const ext = extensions.find(e => e.id === action);
+    return <span>{ext?.name || action}</span>;
+  }
+
+  return <span className="text-muted-foreground">Unknown</span>;
+};
+
+// ============================================================================
+// Action Selector Component
+// ============================================================================
+
+interface ActionSelectorProps {
+  label: string;
+  value: BusinessHoursAction | null;
+  onChange: (action: BusinessHoursAction) => void;
+  error?: string;
+  extensions: any[];
+  ringGroups: any[];
+  ivrMenus: any[];
+  conferenceRooms: any[];
+}
+
+const ActionSelector: React.FC<ActionSelectorProps> = ({
+  label,
+  value,
+  onChange,
+  error,
+  extensions,
+  ringGroups,
+  ivrMenus,
+  conferenceRooms,
+}) => {
+  const actionTypes = [
+    { value: 'extension', label: 'Extension', icon: Phone },
+    { value: 'ivr_menu', label: 'IVR Menu', icon: Menu },
+    { value: 'ring_group', label: 'Ring Group', icon: Users },
+  ];
+
+  const handleTypeChange = (type: BusinessHoursActionType) => {
+    onChange({ type, target_id: '' });
+  };
+
+  const handleTargetChange = (targetId: string) => {
+    if (value) {
+      let prefixedTargetId = targetId;
+
+      // Add appropriate prefix based on action type
+      switch (value.type) {
+        case 'extension':
+          prefixedTargetId = `ext-${targetId}`;
+          break;
+        case 'ring_group':
+          prefixedTargetId = `rg-${targetId}`;
+          break;
+        case 'ivr_menu':
+          prefixedTargetId = `ivr-${targetId}`;
+          break;
+      }
+
+      onChange({ ...value, target_id: prefixedTargetId });
+    }
+  };
+
+
+  const getTargetOptions = () => {
+    switch (value?.type) {
+      case 'extension':
+        return extensions;
+      case 'ring_group':
+        return ringGroups;
+      case 'ivr_menu':
+        return ivrMenus;
+      default:
+        return [];
+    }
+  };
+
+  const getTargetPlaceholder = () => {
+    switch (value?.type) {
+      case 'extension':
+        return 'Select extension';
+      case 'ring_group':
+        return 'Select ring group';
+      case 'ivr_menu':
+        return 'Select IVR menu';
+      default:
+        return 'Select target';
+    }
+  };
+
+  const getCurrentTargetLabel = () => {
+    if (!value?.target_id) return null;
+    const options = getTargetOptions();
+
+    // Extract the numeric ID from prefixed target_id (e.g., "ext-123" -> "123")
+    let numericId = value.target_id;
+    if (value.target_id.startsWith('ext-')) {
+      numericId = value.target_id.substring(4);
+    } else if (value.target_id.startsWith('rg-')) {
+      numericId = value.target_id.substring(3);
+    } else if (value.target_id.startsWith('ivr-')) {
+      numericId = value.target_id.substring(4);
+    }
+
+    const target = options.find(opt => opt.id.toString() === numericId);
+    return target?.name || target?.extension_number || 'Unknown';
+  };
+
+  const getCurrentTargetValue = () => {
+    if (!value?.target_id) return '';
+    // Extract the numeric ID from prefixed target_id (e.g., "ext-123" -> "123")
+    let numericId = value.target_id;
+    if (value.target_id.startsWith('ext-')) {
+      numericId = value.target_id.substring(4);
+    } else if (value.target_id.startsWith('rg-')) {
+      numericId = value.target_id.substring(3);
+    } else if (value.target_id.startsWith('ivr-')) {
+      numericId = value.target_id.substring(4);
+    }
+    return numericId;
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label>
+        {label} <span className="text-destructive">*</span>
+      </Label>
+
+      {/* Action Type Selector */}
+      <Select
+        value={value?.type || ''}
+        onValueChange={handleTypeChange}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select action type" />
+        </SelectTrigger>
+        <SelectContent>
+          {actionTypes.map((type) => {
+            const Icon = type.icon;
+            return (
+              <SelectItem key={type.value} value={type.value}>
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4" />
+                  {type.label}
+                </div>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+
+      {/* Target Selector */}
+      {value?.type && (
+        <Select
+          value={getCurrentTargetValue()}
+          onValueChange={handleTargetChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={getTargetPlaceholder()} />
+          </SelectTrigger>
+          <SelectContent>
+            {getTargetOptions().map((option) => {
+              // Get type badge configuration
+              const getTypeConfig = (type: string) => {
+                const configs = {
+                  user: { label: 'PBX User', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
+                  conference: { label: 'Conference', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
+                  ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+                  ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+                  ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+                  forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
+                };
+                return configs[type as keyof typeof configs] || configs.user;
+              };
+
+              const typeConfig = getTypeConfig(option.type);
+              const Icon = typeConfig.icon;
+
+              // Get display name based on extension type - matching Extensions page implementation
+              const getDisplayName = (ext: any) => {
+                switch (ext.type) {
+                  case 'user':
+                    return ext.user?.name || 'Unassigned';
+                  case 'conference': {
+                    const conferenceRoomId = ext.configuration?.conference_room_id;
+                    if (conferenceRoomId) {
+                      const conferenceRoom = conferenceRooms.find(room => room.id == conferenceRoomId);
+                      return conferenceRoom ? conferenceRoom.name : `ID ${conferenceRoomId}`;
+                    }
+                    return 'Not configured';
+                  }
+                  case 'ring_group': {
+                    const ringGroupId = ext.configuration?.ring_group_id;
+                    if (ringGroupId) {
+                      const ringGroup = ringGroups.find(group => group.id == ringGroupId);
+                      return ringGroup ? ringGroup.name : `ID ${ringGroupId}`;
+                    }
+                    return 'Not configured';
+                  }
+                  case 'ivr': {
+                    // Handle configuration as object or direct value - matching Extensions page logic
+                    let ivrId: any = null;
+                    if (typeof ext.configuration === 'object' && ext.configuration) {
+                      ivrId = ext.configuration.ivr_id || ext.configuration.ivr_menu_id;
+                    } else {
+                      // Configuration might be just the IVR menu ID
+                      ivrId = ext.configuration;
+                    }
+                    if (ivrId) {
+                      const ivrMenu = ivrMenus.find(menu => menu.id == ivrId);
+                      return ivrMenu ? ivrMenu.name : `ID ${ivrId}`;
+                    }
+                    return 'Not configured';
+                  }
+                  case 'ai_assistant': {
+                    const provider = ext.configuration?.provider || 'Unknown';
+                    const phoneNumber = ext.configuration?.phone_number || 'Not set';
+                    return `${phoneNumber} @ ${provider}`;
+                  }
+                  case 'forward': {
+                    return ext.configuration?.forward_to || 'Not configured';
+                  }
+                  default:
+                    return ext.name || 'Unnamed';
+                }
+              };
+
+              return (
+                <SelectItem key={option.id} value={option.id.toString()}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono">{option.extension_number}</span>
+                    <Badge variant="outline" className={cn('flex items-center gap-1 text-xs', typeConfig.color)}>
+                      <Icon className="h-3 w-3" />
+                      {typeConfig.label} - {getDisplayName(option)}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      )}
+
+
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <p className="text-sm text-muted-foreground">
+        Where to forward calls during {label.toLowerCase().includes('open') ? 'open' : 'closed'} hours
+      </p>
+    </div>
+  );
+};
+
+// ============================================================================
+// Weekly Calendar View Component
+// ============================================================================
+
+interface WeeklyCalendarViewProps {
+  schedule: WeeklySchedule;
+  onScheduleChange: (newSchedule: WeeklySchedule) => void;
+  onDayScheduleChange: (day: DayOfWeek, enabled: boolean) => void;
+  onTimeRangeChange: (day: DayOfWeek, rangeId: string, field: 'start_time' | 'end_time', value: string) => void;
+  onAddTimeRange: (day: DayOfWeek) => void;
+  onRemoveTimeRange: (day: DayOfWeek, rangeId: string) => void;
+  onOpenCopyHours: (day: DayOfWeek) => void;
+  errors: Record<string, string>;
+}
+
+const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
+  schedule,
+  onScheduleChange,
+  onDayScheduleChange,
+  onTimeRangeChange,
+  onAddTimeRange,
+  onRemoveTimeRange,
+  onOpenCopyHours,
+  errors,
+}) => {
+  const days: { key: DayOfWeek; label: string; shortLabel: string }[] = [
+    { key: 'monday', label: 'Monday', shortLabel: 'Mon' },
+    { key: 'tuesday', label: 'Tuesday', shortLabel: 'Tue' },
+    { key: 'wednesday', label: 'Wednesday', shortLabel: 'Wed' },
+    { key: 'thursday', label: 'Thursday', shortLabel: 'Thu' },
+    { key: 'friday', label: 'Friday', shortLabel: 'Fri' },
+    { key: 'saturday', label: 'Saturday', shortLabel: 'Sat' },
+    { key: 'sunday', label: 'Sunday', shortLabel: 'Sun' },
+  ];
+
+  const timeSlots = Array.from({ length: 24 }, (_, i) => {
+    const hour = i;
+    return {
+      hour,
+      label: `${hour.toString().padStart(2, '0')}:00`,
+      display: hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`,
+    };
+  });
+
+  const getTimeSlotStatus = (day: DayOfWeek, hour: number): 'open' | 'closed' | 'partial' => {
+    const daySchedule = schedule[day];
+    if (!daySchedule.enabled) return 'closed';
+
+    // Check if this hour falls within any time range
+    for (const range of daySchedule.time_ranges) {
+      const startHour = parseInt(range.start_time.split(':')[0]);
+      const endHour = parseInt(range.end_time.split(':')[0]);
+
+      // Handle normal ranges
+      if (startHour <= endHour) {
+        if (hour >= startHour && hour < endHour) {
+          return 'open';
+        }
+      } else {
+        // Handle ranges that span midnight
+        if (hour >= startHour || hour < endHour) {
+          return 'open';
+        }
+      }
+    }
+
+    return 'closed';
+  };
+
+  const getDaySummary = (day: DayOfWeek) => {
+    const daySchedule = schedule[day];
+    if (!daySchedule.enabled) return 'Closed all day';
+
+    if (daySchedule.time_ranges.length === 0) return 'Closed all day';
+
+    const ranges = daySchedule.time_ranges.map(r => `${r.start_time}-${r.end_time}`).join(', ');
+    return ranges;
+  };
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      {/* Scrollable container for entire calendar */}
+      <div className="max-h-96 overflow-y-auto">
+        {/* Header with day labels */}
+        <div className="grid grid-cols-8 bg-muted/50 border-b">
+          <div className="p-3 font-medium text-sm border-r">Time</div>
+          {days.map(({ key, shortLabel }) => (
+            <div key={key} className="p-3 font-medium text-sm text-center border-r last:border-r-0">
+              {shortLabel}
+            </div>
+          ))}
+        </div>
+
+        {/* Time slots */}
+        {timeSlots.map(({ hour, label, display }) => (
+          <div key={hour} className="grid grid-cols-8 border-b last:border-b-0 hover:bg-muted/20">
+            <div className="p-2 text-xs text-muted-foreground border-r flex items-center">
+              {`${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`}
+            </div>
+            {days.map(({ key: dayKey }) => {
+              const status = getTimeSlotStatus(dayKey, hour);
+              const daySchedule = schedule[dayKey];
+
+              return (
+                <div
+                  key={`${dayKey}-${hour}`}
+                  className={cn(
+                    'p-2 border-r last:border-r-0 cursor-pointer transition-colors',
+                    status === 'open' && 'bg-green-100 hover:bg-green-200',
+                    status === 'closed' && 'bg-transparent hover:bg-gray-100'
+                  )}
+                  onClick={() => {
+                    // Toggle the specific hour slot
+                    const newSchedule = { ...schedule };
+                    const daySchedule = newSchedule[dayKey];
+                    const hourStart = `${hour.toString().padStart(2, '0')}:00`;
+                    const hourEnd = `${(hour + 1).toString().padStart(2, '0')}:00`;
+
+                    if (!daySchedule.enabled) {
+                      // If day is closed, enable it and set this hour as open
+                      daySchedule.enabled = true;
+                      daySchedule.time_ranges = [{ id: getNextTimeRangeId(), start_time: hourStart, end_time: hourEnd }];
+                    } else {
+                      // Check if this hour is already covered by any existing range
+                      let isCovered = false;
+                      const rangesToModify: { index: number; action: 'remove' | 'split' | 'shorten_start' | 'shorten_end' }[] = [];
+
+                      daySchedule.time_ranges.forEach((range, index) => {
+                        const rangeStart = parseInt(range.start_time.split(':')[0]);
+                        const rangeEnd = parseInt(range.end_time.split(':')[0]);
+                        const clickStart = parseInt(hourStart.split(':')[0]);
+                        const clickEnd = parseInt(hourEnd.split(':')[0]);
+
+                        // Check if this range covers the clicked hour
+                        if (rangeStart <= rangeEnd) {
+                          // Normal range (doesn't span midnight)
+                          if (clickStart >= rangeStart && clickEnd <= rangeEnd) {
+                            isCovered = true;
+                            if (clickStart === rangeStart && clickEnd === rangeEnd) {
+                              // Exact match - remove the entire range
+                              rangesToModify.push({ index, action: 'remove' });
+                            } else if (clickStart === rangeStart) {
+                              // Clicked hour is at the start - shorten from start
+                              rangesToModify.push({ index, action: 'shorten_start' });
+                            } else if (clickEnd === rangeEnd) {
+                              // Clicked hour is at the end - shorten from end
+                              rangesToModify.push({ index, action: 'shorten_end' });
+                            } else {
+                              // Clicked hour is in the middle - split the range
+                              rangesToModify.push({ index, action: 'split' });
+                            }
+                          }
+                        } else {
+                          // Range spans midnight
+                          if (clickStart >= rangeStart || clickEnd <= rangeEnd) {
+                            isCovered = true;
+                            // For simplicity, treat midnight-spanning ranges as exact matches for now
+                            rangesToModify.push({ index, action: 'remove' });
+                          }
+                        }
+                      });
+
+                      if (isCovered) {
+                        // Remove/modify the covering ranges
+                        rangesToModify.sort((a, b) => b.index - a.index); // Process in reverse order
+                        rangesToModify.forEach(({ index, action }) => {
+                          const range = daySchedule.time_ranges[index];
+                          const clickStart = parseInt(hourStart.split(':')[0]);
+                          const clickEnd = parseInt(hourEnd.split(':')[0]);
+
+                          switch (action) {
+                            case 'remove':
+                              daySchedule.time_ranges.splice(index, 1);
+                              break;
+                            case 'shorten_start':
+                              range.start_time = hourEnd;
+                              break;
+                            case 'shorten_end':
+                              range.end_time = hourStart;
+                              break;
+                            case 'split':
+                              // Split into two ranges: before and after the clicked hour
+                              const originalEnd = range.end_time;
+                              range.end_time = hourStart; // Shorten first range
+                              daySchedule.time_ranges.splice(index + 1, 0, {
+                                id: getNextTimeRangeId(),
+                                start_time: hourEnd,
+                                end_time: originalEnd
+                              }); // Add second range
+                              break;
+                          }
+                        });
+                      } else {
+                        // Add this hour as a new range
+                        daySchedule.time_ranges.push({
+                          id: getNextTimeRangeId(),
+                          start_time: hourStart,
+                          end_time: hourEnd
+                        });
+                      }
+
+                      // Sort time ranges by start time
+                      daySchedule.time_ranges.sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+                      // Remove any invalid ranges (where start >= end)
+                      daySchedule.time_ranges = daySchedule.time_ranges.filter(range => {
+                        const start = parseInt(range.start_time.split(':')[0]);
+                        const end = parseInt(range.end_time.split(':')[0]);
+                        return start < end;
+                      });
+                    }
+
+                    // Update the schedule via the form change callback
+                    onScheduleChange(newSchedule);
+                  }}
+                  title={`${days.find(d => d.key === dayKey)?.label}: ${status === 'open' ? 'Open' : 'Closed'}`}
+                >
+                  <div className="text-xs text-center">
+                    {status === 'open' ? '✓' : status === 'closed' ? '✗' : '~'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// Time Range Editor Component (for detailed editing)
+// ============================================================================
+
+interface TimeRangeEditorProps {
+  schedule: WeeklySchedule;
+  onTimeRangeChange: (day: DayOfWeek, rangeId: string, field: 'start_time' | 'end_time', value: string) => void;
+  onAddTimeRange: (day: DayOfWeek) => void;
+  onRemoveTimeRange: (day: DayOfWeek, rangeId: string) => void;
+  errors: Record<string, string>;
+}
+
+const TimeRangeEditor: React.FC<TimeRangeEditorProps> = ({
+  schedule,
+  onTimeRangeChange,
+  onAddTimeRange,
+  onRemoveTimeRange,
+  errors,
+}) => {
+  // This component can be expanded later for more detailed time editing
+  // For now, the calendar view handles inline editing
+  return null;
+};
 
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();
@@ -87,6 +685,10 @@ const BusinessHours: React.FC = () => {
   // Form state for create/edit
   const [formData, setFormData] = useState<Partial<BusinessHoursSchedule>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Action state (converted to/from string format for API)
+  const [openHoursAction, setOpenHoursAction] = useState<BusinessHoursAction | null>(null);
+  const [closedHoursAction, setClosedHoursAction] = useState<BusinessHoursAction | null>(null);
 
   // Exception dialog state
   const [isExceptionDialogOpen, setIsExceptionDialogOpen] = useState(false);
@@ -115,6 +717,30 @@ const BusinessHours: React.FC = () => {
   });
 
   const extensions = extensionsData?.data || mockExtensions;
+
+  // Fetch ring groups for action selectors
+  const { data: ringGroupsData } = useQuery({
+    queryKey: ['ring-groups'],
+    queryFn: () => ringGroupsService.getAll({ per_page: 1000 }),
+  });
+
+  const ringGroups = ringGroupsData?.data || [];
+
+  // Fetch IVR menus for action selectors
+  const { data: ivrMenusData } = useQuery({
+    queryKey: ['ivr-menus'],
+    queryFn: () => ivrMenusService.getAll({ per_page: 1000 }),
+  });
+
+  const ivrMenus = ivrMenusData?.data || [];
+
+  // Fetch conference rooms for action selectors
+  const { data: conferenceRoomsData } = useQuery({
+    queryKey: ['conference-rooms'],
+    queryFn: () => conferenceRoomsService.getAll({ per_page: 1000 }),
+  });
+
+  const conferenceRooms = conferenceRoomsData?.data || [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -187,6 +813,8 @@ const BusinessHours: React.FC = () => {
     return filtered;
   }, [schedules, searchQuery, statusFilter, sortBy]);
 
+  // Handle schedule template application (moved to dialog component)
+
   // Initialize form for create
   const handleCreateNew = () => {
     const initialSchedule: Partial<BusinessHoursSchedule> = {
@@ -194,10 +822,12 @@ const BusinessHours: React.FC = () => {
       status: 'active',
       schedule: createEmptyWeeklySchedule(),
       exceptions: [],
-      open_hours_action: '',
-      closed_hours_action: '',
+      open_hours_action: null,
+      closed_hours_action: null,
     };
     setFormData(initialSchedule);
+    setOpenHoursAction(null);
+    setClosedHoursAction(null);
     setEditingSchedule(null);
     setFormErrors({});
     setIsCreateEditDialogOpen(true);
@@ -206,6 +836,27 @@ const BusinessHours: React.FC = () => {
   // Initialize form for edit
   const handleEdit = (schedule: BusinessHoursSchedule) => {
     setFormData({ ...schedule });
+
+    // Parse actions - handle both structured objects (new format) and strings (legacy format)
+    const parseAction = (action: any): BusinessHoursAction | null => {
+      if (!action) return null;
+
+      // If it's already a structured object (new API format)
+      if (typeof action === 'object' && action.type && action.target_id) {
+        return action as BusinessHoursAction;
+      }
+
+      // If it's a string (legacy format), assume it's an extension ID
+      if (typeof action === 'string') {
+        return { type: 'extension', target_id: action };
+      }
+
+      return null;
+    };
+
+    setOpenHoursAction(parseAction(schedule.open_hours_action));
+    setClosedHoursAction(parseAction(schedule.closed_hours_action));
+
     setEditingSchedule(schedule);
     setFormErrors({});
     setIsCreateEditDialogOpen(true);
@@ -418,11 +1069,11 @@ const BusinessHours: React.FC = () => {
       errors.name = 'Name must be at least 2 characters';
     }
 
-    if (!formData.open_hours_action) {
+    if (!openHoursAction) {
       errors.open_hours_action = 'Open hours action is required';
     }
 
-    if (!formData.closed_hours_action) {
+    if (!closedHoursAction) {
       errors.closed_hours_action = 'Closed hours action is required';
     }
 
@@ -455,8 +1106,8 @@ const BusinessHours: React.FC = () => {
     const apiData = {
       name: formData.name!,
       status: formData.status!,
-      open_hours_action: formData.open_hours_action!,
-      closed_hours_action: formData.closed_hours_action!,
+      open_hours_action: openHoursAction!,
+      closed_hours_action: closedHoursAction!,
       schedule: formData.schedule!,
       exceptions: formData.exceptions || [],
     };
@@ -712,6 +1363,17 @@ const BusinessHours: React.FC = () => {
         onEditException={handleEditException}
         onDeleteException={handleDeleteException}
         onSave={handleSaveSchedule}
+        openHoursAction={openHoursAction}
+        closedHoursAction={closedHoursAction}
+        onOpenHoursActionChange={setOpenHoursAction}
+        onClosedHoursActionChange={setClosedHoursAction}
+        extensions={extensions}
+        ringGroups={ringGroups}
+        ivrMenus={ivrMenus}
+        conferenceRooms={conferenceRooms}
+        onApplyTemplate={(template) => {
+          // This will be handled by the dialog component
+        }}
       />
 
       {/* Exception Dialog */}
@@ -758,7 +1420,9 @@ const BusinessHours: React.FC = () => {
         open={isDetailSheetOpen}
         onOpenChange={setIsDetailSheetOpen}
         schedule={selectedSchedule}
-        onEdit={canManage ? handleEdit : undefined}
+        extensions={extensions}
+        ringGroups={ringGroups}
+        ivrMenus={ivrMenus}
       />
     </div>
   );
@@ -805,6 +1469,15 @@ interface CreateEditScheduleDialogProps {
   onEditException: (exception: ExceptionDate) => void;
   onDeleteException: (exceptionId: string) => void;
   onSave: () => void;
+  openHoursAction: BusinessHoursAction | null;
+  closedHoursAction: BusinessHoursAction | null;
+  onOpenHoursActionChange: (action: BusinessHoursAction) => void;
+  onClosedHoursActionChange: (action: BusinessHoursAction) => void;
+  extensions: any[];
+  ringGroups: any[];
+  ivrMenus: any[];
+  conferenceRooms: any[];
+  onApplyTemplate: (template: string) => void;
 }
 
 const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
@@ -823,7 +1496,123 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
   onEditException,
   onDeleteException,
   onSave,
+  openHoursAction,
+  closedHoursAction,
+  onOpenHoursActionChange,
+  onClosedHoursActionChange,
+  extensions,
+  ringGroups,
+  ivrMenus,
+  conferenceRooms,
+  onApplyTemplate,
 }) => {
+  // Handle schedule template application
+  const handleApplyTemplate = (template: string) => {
+    const newSchedule = createEmptyWeeklySchedule();
+
+    switch (template) {
+      case 'mon-fri-business':
+        // Monday-Friday, 9:00 - 17:00
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: true,
+            time_ranges: [{
+              id: getNextTimeRangeId(),
+              start_time: '09:00',
+              end_time: '17:00'
+            }]
+          };
+        });
+        // Saturday-Sunday closed
+        ['saturday', 'sunday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: false,
+            time_ranges: []
+          };
+        });
+        break;
+
+      case 'mon-fri-all-day':
+        // Monday-Friday, All Day (00:00 - 23:59)
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: true,
+            time_ranges: [{
+              id: getNextTimeRangeId(),
+              start_time: '00:00',
+              end_time: '23:59'
+            }]
+          };
+        });
+        // Saturday-Sunday closed
+        ['saturday', 'sunday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: false,
+            time_ranges: []
+          };
+        });
+        break;
+
+      case 'sun-thu-business':
+        // Sunday-Thursday, 9:00 - 17:00
+        ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: true,
+            time_ranges: [{
+              id: getNextTimeRangeId(),
+              start_time: '09:00',
+              end_time: '17:00'
+            }]
+          };
+        });
+        // Friday-Saturday closed
+        ['friday', 'saturday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: false,
+            time_ranges: []
+          };
+        });
+        break;
+
+      case 'sun-thu-all-day':
+        // Sunday-Thursday, All Day (00:00 - 23:59)
+        ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: true,
+            time_ranges: [{
+              id: getNextTimeRangeId(),
+              start_time: '00:00',
+              end_time: '23:59'
+            }]
+          };
+        });
+        // Friday-Saturday closed
+        ['friday', 'saturday'].forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: false,
+            time_ranges: []
+          };
+        });
+        break;
+
+      case '24-7':
+        // All days, all hours
+        Object.keys(newSchedule).forEach(day => {
+          newSchedule[day as DayOfWeek] = {
+            enabled: true,
+            time_ranges: [{
+              id: getNextTimeRangeId(),
+              start_time: '00:00',
+              end_time: '23:59'
+            }]
+          };
+        });
+        break;
+    }
+
+    // Update form data with the new schedule
+    onFormChange('schedule', newSchedule);
+  };
   const days: { key: DayOfWeek; label: string }[] = [
     { key: 'monday', label: 'Monday' },
     { key: 'tuesday', label: 'Tuesday' },
@@ -836,7 +1625,7 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? 'Edit Schedule' : 'Create Schedule'}</DialogTitle>
           <DialogDescription>
@@ -851,92 +1640,61 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
           <div className="space-y-4">
             <h3 className="font-semibold">Basic Information</h3>
 
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name || ''}
-                onChange={(e) => onFormChange('name', e.target.value)}
-                placeholder="Main Office Hours"
-              />
-              {formErrors.name && (
-                <p className="text-sm text-destructive">{formErrors.name}</p>
-              )}
+            <div className="flex items-center justify-between">
+              <div className="flex-1 mr-4">
+                <Label htmlFor="name">
+                  Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  value={formData.name || ''}
+                  onChange={(e) => onFormChange('name', e.target.value)}
+                  placeholder="Main Office Hours"
+                />
+                {formErrors.name && (
+                  <p className="text-sm text-destructive">{formErrors.name}</p>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={formData.status === 'active'}
+                  onCheckedChange={(checked) => onFormChange('status', checked ? 'active' : 'inactive')}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {formData.status === 'active' ? 'Active' : 'Disabled'}
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="open_hours_action">
-                Open Hours Action <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.open_hours_action}
-                onValueChange={(value) => onFormChange('open_hours_action', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select extension" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockExtensions.map((ext) => (
-                    <SelectItem key={ext.id} value={ext.id}>
-                      {ext.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formErrors.open_hours_action && (
-                <p className="text-sm text-destructive">{formErrors.open_hours_action}</p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                Where to forward calls during open hours
-              </p>
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="p-4">
+                <ActionSelector
+                  label="Open Hours Action"
+                  value={openHoursAction}
+                  onChange={onOpenHoursActionChange}
+                  error={formErrors.open_hours_action}
+                  extensions={extensions}
+                  ringGroups={ringGroups}
+                  ivrMenus={ivrMenus}
+                  conferenceRooms={conferenceRooms}
+                />
+              </Card>
+
+              <Card className="p-4">
+                <ActionSelector
+                  label="Closed Hours Action"
+                  value={closedHoursAction}
+                  onChange={onClosedHoursActionChange}
+                  error={formErrors.closed_hours_action}
+                  extensions={extensions}
+                  ringGroups={ringGroups}
+                  ivrMenus={ivrMenus}
+                  conferenceRooms={conferenceRooms}
+                />
+              </Card>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="closed_hours_action">
-                Closed Hours Action <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.closed_hours_action}
-                onValueChange={(value) => onFormChange('closed_hours_action', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select extension" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockExtensions.map((ext) => (
-                    <SelectItem key={ext.id} value={ext.id}>
-                      {ext.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formErrors.closed_hours_action && (
-                <p className="text-sm text-destructive">{formErrors.closed_hours_action}</p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                Where to forward calls during closed hours
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <RadioGroup
-                value={formData.status}
-                onValueChange={(value: ScheduleStatus) => onFormChange('status', value)}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="active" id="active" />
-                  <Label htmlFor="active">Active</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="inactive" id="inactive" />
-                  <Label htmlFor="inactive">Inactive</Label>
-                </div>
-              </RadioGroup>
-            </div>
           </div>
 
           <Separator />
@@ -945,29 +1703,52 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Weekly Schedule</h3>
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onFormChange('schedule', createEmptyWeeklySchedule())}
+                >
+                  Clear All
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="schedule-template" className="text-sm">Template:</Label>
+                  <Select onValueChange={(value) => handleApplyTemplate(value)}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Select template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mon-fri-business">Monday-Friday, 9:00 - 17:00</SelectItem>
+                      <SelectItem value="mon-fri-all-day">Monday-Friday, All Day</SelectItem>
+                      <SelectItem value="sun-thu-business">Sunday-Thursday, 9:00 - 17:00</SelectItem>
+                      <SelectItem value="sun-thu-all-day">Sunday-Thursday, All Day</SelectItem>
+                      <SelectItem value="24-7">24 x 7</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            {days.map(({ key, label }) => {
-              const daySchedule = formData.schedule?.[key];
-              if (!daySchedule) return null;
+            {/* Calendar-style Weekly View */}
+            <WeeklyCalendarView
+              schedule={formData.schedule || createEmptyWeeklySchedule()}
+              onScheduleChange={(newSchedule) => onFormChange('schedule', newSchedule)}
+              onDayScheduleChange={onDayScheduleChange}
+              onTimeRangeChange={onTimeRangeChange}
+              onAddTimeRange={onAddTimeRange}
+              onRemoveTimeRange={onRemoveTimeRange}
+              onOpenCopyHours={onOpenCopyHours}
+              errors={formErrors}
+            />
 
-              return (
-                <DayScheduleSection
-                  key={key}
-                  day={key}
-                  label={label}
-                  schedule={daySchedule}
-                  onEnabledChange={(enabled) => onDayScheduleChange(key, enabled)}
-                  onTimeRangeChange={(rangeId, field, value) =>
-                    onTimeRangeChange(key, rangeId, field, value)
-                  }
-                  onAddTimeRange={() => onAddTimeRange(key)}
-                  onRemoveTimeRange={(rangeId) => onRemoveTimeRange(key, rangeId)}
-                  onCopyHours={() => onOpenCopyHours(key)}
-                  errors={formErrors}
-                />
-              );
-            })}
+            {/* Time Range Editor - appears when editing a specific day */}
+            <TimeRangeEditor
+              schedule={formData.schedule || createEmptyWeeklySchedule()}
+              onTimeRangeChange={onTimeRangeChange}
+              onAddTimeRange={onAddTimeRange}
+              onRemoveTimeRange={onRemoveTimeRange}
+              errors={formErrors}
+            />
           </div>
 
           <Separator />
@@ -977,6 +1758,13 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Exception Dates</h3>
               <div className="flex gap-2">
+                <Button
+                  onClick={onAddException}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Exception
+                </Button>
                 <HolidayImportButton
                   onImportHolidays={(holidays) => {
                     // Add all holidays as closed exceptions
@@ -996,10 +1784,6 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
                     onFormChange('exceptions', [...currentExceptions, ...uniqueNew].sort((a, b) => a.date.localeCompare(b.date)));
                   }}
                 />
-                <Button variant="outline" size="sm" onClick={onAddException}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Exception
-                </Button>
               </div>
             </div>
 
@@ -1075,99 +1859,7 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
   );
 };
 
-interface DayScheduleSectionProps {
-  day: DayOfWeek;
-  label: string;
-  schedule: DaySchedule;
-  onEnabledChange: (enabled: boolean) => void;
-  onTimeRangeChange: (rangeId: string, field: 'start_time' | 'end_time', value: string) => void;
-  onAddTimeRange: () => void;
-  onRemoveTimeRange: (rangeId: string) => void;
-  onCopyHours: () => void;
-  errors: Record<string, string>;
-}
 
-const DayScheduleSection: React.FC<DayScheduleSectionProps> = ({
-  day,
-  label,
-  schedule,
-  onEnabledChange,
-  onTimeRangeChange,
-  onAddTimeRange,
-  onRemoveTimeRange,
-  onCopyHours,
-  errors,
-}) => {
-  return (
-    <div className="border rounded-lg p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium">{label}</h4>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onCopyHours}>
-            <Copy className="h-3 w-3 mr-1" />
-            Copy
-          </Button>
-          <RadioGroup
-            value={schedule.enabled ? 'open' : 'closed'}
-            onValueChange={(value) => onEnabledChange(value === 'open')}
-            className="flex gap-2"
-          >
-            <div className="flex items-center space-x-1">
-              <RadioGroupItem value="open" id={`${day}-open`} />
-              <Label htmlFor={`${day}-open`} className="text-sm">
-                Open
-              </Label>
-            </div>
-            <div className="flex items-center space-x-1">
-              <RadioGroupItem value="closed" id={`${day}-closed`} />
-              <Label htmlFor={`${day}-closed`} className="text-sm">
-                Closed
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-      </div>
-
-      {schedule.enabled && (
-        <div className="space-y-2">
-          <Label className="text-sm">Time Ranges:</Label>
-          {schedule.time_ranges.map((range, index) => (
-            <div key={range.id} className="flex items-center gap-2">
-              <Input
-                type="time"
-                value={range.start_time}
-                onChange={(e) => onTimeRangeChange(range.id, 'start_time', e.target.value)}
-                className="w-32"
-              />
-              <span className="text-sm text-muted-foreground">to</span>
-              <Input
-                type="time"
-                value={range.end_time}
-                onChange={(e) => onTimeRangeChange(range.id, 'end_time', e.target.value)}
-                className="w-32"
-              />
-              {schedule.time_ranges.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onRemoveTimeRange(range.id)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ))}
-          {schedule.time_ranges.length < 10 && (
-            <Button variant="outline" size="sm" onClick={onAddTimeRange}>
-              <Plus className="mr-2 h-3 w-3" />
-              Add Time Range
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 interface ExceptionDialogProps {
   open: boolean;
@@ -1710,14 +2402,18 @@ interface ScheduleDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schedule: BusinessHoursSchedule | null;
-  onEdit?: (schedule: BusinessHoursSchedule) => void;
+  extensions: any[];
+  ringGroups: any[];
+  ivrMenus: any[];
 }
 
 const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
   open,
   onOpenChange,
   schedule,
-  onEdit,
+  extensions,
+  ringGroups,
+  ivrMenus,
 }) => {
   if (!schedule) return null;
 
@@ -1732,12 +2428,6 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
         <SheetHeader>
           <div className="flex items-center justify-between">
             <SheetTitle className="text-2xl">{schedule.name}</SheetTitle>
-            {onEdit && (
-              <Button variant="outline" size="sm" onClick={() => onEdit(schedule)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            )}
           </div>
           <SheetDescription>Business hours schedule details</SheetDescription>
         </SheetHeader>
@@ -1765,11 +2455,11 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
               </div>
               <div>
                 <span className="text-muted-foreground">Open Hours Action:</span>{' '}
-                {mockExtensions.find(e => e.id === schedule.open_hours_action)?.name || schedule.open_hours_action}
+                {getActionDisplayName(schedule.open_hours_action, extensions, ringGroups, ivrMenus)}
               </div>
               <div>
                 <span className="text-muted-foreground">Closed Hours Action:</span>{' '}
-                {mockExtensions.find(e => e.id === schedule.closed_hours_action)?.name || schedule.closed_hours_action}
+                {getActionDisplayName(schedule.closed_hours_action, extensions, ringGroups, ivrMenus)}
               </div>
               <div className="text-xs text-muted-foreground">
                 Created: {new Date(schedule.created_at).toLocaleDateString()} by{' '}

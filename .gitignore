@@ -133,6 +133,7 @@ docker-compose.override.yml
 /coverage
 /.nyc_output
 /tests/coverage
+/tests
 phpunit.xml
 .phpunit.cache
 
@@ -152,3 +153,9 @@ temp/
 *.session
 .token
 reports/
+
+# ============================================================================
+# Local Storage Volumes
+# ============================================================================
+/volumes/minio/
+/volumes/mysql/

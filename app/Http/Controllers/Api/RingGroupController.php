@@ -168,6 +168,13 @@ class RingGroupController extends Controller
                 // Assign to current user's organization
                 $validated['organization_id'] = $user->organization_id;
 
+                // Ensure only the relevant fallback ID is set based on the action
+                $action = $validated['fallback_action'] ?? null;
+                $validated['fallback_extension_id'] = ($action === 'extension') ? ($validated['fallback_extension_id'] ?? null) : null;
+                $validated['fallback_ring_group_id'] = ($action === 'ring_group') ? ($validated['fallback_ring_group_id'] ?? null) : null;
+                $validated['fallback_ivr_menu_id'] = ($action === 'ivr_menu') ? ($validated['fallback_ivr_menu_id'] ?? null) : null;
+                $validated['fallback_ai_assistant_id'] = ($action === 'ai_assistant') ? ($validated['fallback_ai_assistant_id'] ?? null) : null;
+
                 // Create ring group
                 $ringGroup = RingGroup::create($validated);
 
@@ -309,7 +316,7 @@ class RingGroupController extends Controller
 
         try {
             // Try to acquire lock with 5 second timeout
-            if (! $lock->block(5)) {
+            if (!$lock->block(5)) {
                 Log::warning('Failed to acquire ring group lock', [
                     'request_id' => $requestId,
                     'user_id' => $user->id,
@@ -333,6 +340,25 @@ class RingGroupController extends Controller
                 // Extract members data
                 $membersData = $validated['members'] ?? [];
                 unset($validated['members']);
+
+                // Ensure only the relevant fallback ID is set based on the action
+                $action = $validated['fallback_action'] ?? ($ringGroup->fallback_action->value ?? null);
+                if (isset($validated['fallback_action']) || isset($validated['fallback_action'])) {
+                    $actionToCheck = $validated['fallback_action'] ?? $ringGroup->fallback_action->value;
+                    // Only clear if we are actually updating fallback stuff. 
+                    // Actually, we should check which action is becoming active.
+
+                    // Helper logic:
+                    $action = $validated['fallback_action'] ?? $ringGroup->fallback_action->value;
+
+                    // We need to clear fields ONLY if they are NOT the one being set? 
+                    // No, simply set them to null if they don't match action.
+
+                    $validated['fallback_extension_id'] = ($action === 'extension') ? ($validated['fallback_extension_id'] ?? $ringGroup->fallback_extension_id) : null;
+                    $validated['fallback_ring_group_id'] = ($action === 'ring_group') ? ($validated['fallback_ring_group_id'] ?? $ringGroup->fallback_ring_group_id) : null;
+                    $validated['fallback_ivr_menu_id'] = ($action === 'ivr_menu') ? ($validated['fallback_ivr_menu_id'] ?? $ringGroup->fallback_ivr_menu_id) : null;
+                    $validated['fallback_ai_assistant_id'] = ($action === 'ai_assistant') ? ($validated['fallback_ai_assistant_id'] ?? $ringGroup->fallback_ai_assistant_id) : null;
+                }
 
                 // Update ring group
                 $ringGroup->update($validated);

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\CallRouting;
 
 use App\Enums\RingGroupStrategy;
-use App\Models\BusinessHours;
+use App\Models\BusinessHoursSchedule;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\RingGroup;
@@ -44,7 +44,8 @@ class CallRoutingService
         ]);
 
         // Find DID number
-        $didNumber = DidNumber::where('organization_id', $organizationId)
+        $didNumber = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $organizationId)
             ->where('phone_number', $toNumber)
             ->where('status', 'active')
             ->first();
@@ -84,7 +85,8 @@ class CallRoutingService
             return CxmlBuilder::busy();
         }
 
-        $extension = Extension::where('organization_id', $didNumber->organization_id)
+        $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $didNumber->organization_id)
             ->where('id', $extensionId)
             ->where('status', 'active')
             ->first();
@@ -134,7 +136,8 @@ class CallRoutingService
             return CxmlBuilder::busy();
         }
 
-        $ringGroup = RingGroup::where('organization_id', $didNumber->organization_id)
+        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $didNumber->organization_id)
             ->where('id', $ringGroupId)
             ->where('status', 'active')
             ->first();
@@ -260,7 +263,7 @@ class CallRoutingService
                     return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
                 }
 
-                // TODO: Implement round-robin and sequential strategies
+                // NOTE: Currently only supports simultaneous ringing. Round-robin and sequential strategies planned for Phase 4.
                 return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
             },
             5,  // Lock duration in seconds
@@ -285,7 +288,7 @@ class CallRoutingService
             'duration_ms' => round($duration * 1000, 2),
         ]);
 
-        // TODO: Send to metrics system (Prometheus, CloudWatch, etc.) in Phase 4
+        // NOTE: Metrics collection planned for Phase 4 (Prometheus, CloudWatch, etc.)
     }
 
     /**
@@ -304,21 +307,31 @@ class CallRoutingService
             return CxmlBuilder::busy();
         }
 
-        $businessHours = BusinessHours::where('organization_id', $didNumber->organization_id)
+        $businessHours = BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $didNumber->organization_id)
             ->where('id', $businessHoursId)
-            ->where('status', 'active')
             ->first();
 
         if (! $businessHours) {
-            Log::error('Business hours not found or inactive', [
+            Log::error('Business hours schedule not found', [
                 'did_id' => $didNumber->id,
-                'business_hours_id' => $businessHoursId,
+                'business_hours_schedule_id' => $businessHoursId,
             ]);
 
             return CxmlBuilder::busy();
         }
 
-        $isOpen = $businessHours->isOpen();
+        if ($businessHours->status !== \App\Enums\BusinessHoursStatus::ACTIVE) {
+            Log::error('Business hours schedule not active', [
+                'did_id' => $didNumber->id,
+                'business_hours_schedule_id' => $businessHoursId,
+                'status' => $businessHours->status->value,
+            ]);
+
+            return CxmlBuilder::busy();
+        }
+
+        $isOpen = $businessHours->isCurrentlyOpen();
         $routing = $businessHours->getCurrentRouting();
 
         Log::info('Routing call by business hours', [
@@ -337,6 +350,7 @@ class CallRoutingService
         return match ($tempDid->routing_type) {
             'extension' => $this->routeToExtension($tempDid),
             'ring_group' => $this->routeToRingGroup($tempDid),
+            'conference_room' => $this->routeToConferenceRoom($tempDid),
             'voicemail' => $this->routeToVoicemail($tempDid),
             default => CxmlBuilder::busy(),
         };
@@ -352,6 +366,53 @@ class CallRoutingService
         ]);
 
         return CxmlBuilder::sendToVoicemail();
+    }
+
+    /**
+     * Route call to a conference room.
+     */
+    private function routeToConferenceRoom(DidNumber $didNumber): string
+    {
+        $conferenceRoomId = $didNumber->getTargetConferenceRoomId();
+
+        if (! $conferenceRoomId) {
+            Log::error('Conference room ID not found in routing config', [
+                'did_id' => $didNumber->id,
+                'routing_config' => $didNumber->routing_config,
+            ]);
+
+            return CxmlBuilder::busy();
+        }
+
+        $conferenceRoom = \App\Models\ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $didNumber->organization_id)
+            ->where('id', $conferenceRoomId)
+            ->first();
+
+        if (! $conferenceRoom) {
+            Log::error('Conference room not found', [
+                'did_id' => $didNumber->id,
+                'conference_room_id' => $conferenceRoomId,
+            ]);
+
+            return CxmlBuilder::busy();
+        }
+
+        // Generate a unique conference identifier
+        $conferenceIdentifier = 'conf_'.$conferenceRoom->id.'_'.$didNumber->organization_id;
+
+        Log::info('Routing call to conference room', [
+            'did_id' => $didNumber->id,
+            'conference_room_id' => $conferenceRoom->id,
+            'conference_identifier' => $conferenceIdentifier,
+        ]);
+
+        return CxmlBuilder::joinConference(
+            $conferenceIdentifier,
+            $conferenceRoom->max_participants,
+            $conferenceRoom->mute_on_entry,
+            $conferenceRoom->announce_join_leave
+        );
     }
 
     /**

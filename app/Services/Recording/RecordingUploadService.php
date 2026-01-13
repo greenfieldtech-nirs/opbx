@@ -56,26 +56,46 @@ class RecordingUploadService
         ]);
 
         try {
-            $path = $file->storeAs(
-                "{$user->organization_id}",
-                $filename,
-                'recordings'
-            );
+            // Use Storage::put() instead of UploadedFile::storeAs() to avoid issues
+            $filePath = "{$user->organization_id}/{$filename}";
+            $realPath = $file->getRealPath();
+
+            if (!$realPath || !file_exists($realPath)) {
+                throw new \Exception('Uploaded file is not accessible.');
+            }
+
+            $fileContent = file_get_contents($realPath);
+
+            if ($fileContent === false) {
+                throw new \Exception('Failed to read uploaded file content.');
+            }
+
+            // Verify file size matches
+            if (strlen($fileContent) !== $file->getSize()) {
+                throw new \Exception('File size mismatch during storage.');
+            }
+
+            $stored = Storage::disk('recordings')->put($filePath, $fileContent);
+
+            if (!$stored) {
+                throw new \Exception('Failed to store the uploaded file.');
+            }
+
+            $path = $filePath; // For consistency with the original code
 
             Log::info('RecordingUploadService: File stored successfully', [
                 'path' => $path,
                 'organization_id' => $user->organization_id,
-                'filename' => $filename
+                'filename' => $filename,
+                'file_size' => strlen($fileContent)
             ]);
 
-            if (!$path) {
-                throw new \Exception('Failed to store the uploaded file.');
-            }
         } catch (\Exception $e) {
             Log::error('RecordingUploadService: File storage failed', [
                 'error' => $e->getMessage(),
                 'organization_id' => $user->organization_id,
                 'filename' => $filename,
+                'real_path' => $file->getRealPath() ?? 'unknown',
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;

@@ -3,6 +3,12 @@
  */
 
 // ============================================================================
+// Imports
+// ============================================================================
+
+import type { BusinessHoursAction } from '../pages/BusinessHours';
+
+// ============================================================================
 // Type Definitions
 // ============================================================================
 
@@ -48,8 +54,8 @@ export interface BusinessHoursSchedule {
   status: ScheduleStatus;
   schedule: WeeklySchedule;
   exceptions: ExceptionDate[];
-  open_hours_action: string; // Extension ID to forward to during open hours
-  closed_hours_action: string; // Extension ID to forward to during closed hours
+  open_hours_action: BusinessHoursAction;
+  closed_hours_action: BusinessHoursAction;
   current_status?: 'open' | 'closed' | 'exception';
   created_at: string;
   updated_at: string;
@@ -167,8 +173,8 @@ export const mockBusinessHoursSchedules: BusinessHoursSchedule[] = [
         type: 'closed'
       }
     ],
-    open_hours_action: 'ext-101',
-    closed_hours_action: 'ext-voicemail',
+    open_hours_action: { type: 'extension', target_id: 'ext-101' },
+    closed_hours_action: { type: 'extension', target_id: 'ext-voicemail' },
     current_status: 'open',
     created_at: '2025-12-01T10:00:00Z',
     updated_at: '2025-12-01T10:00:00Z',
@@ -181,8 +187,8 @@ export const mockBusinessHoursSchedules: BusinessHoursSchedule[] = [
     status: 'active',
     schedule: create24x7Schedule(),
     exceptions: [],
-    open_hours_action: 'ext-200',
-    closed_hours_action: 'ext-voicemail',
+    open_hours_action: { type: 'extension', target_id: 'ext-200' },
+    closed_hours_action: { type: 'extension', target_id: 'ext-voicemail' },
     current_status: 'open',
     created_at: '2025-12-05T14:30:00Z',
     updated_at: '2025-12-05T14:30:00Z',
@@ -224,8 +230,8 @@ export const mockBusinessHoursSchedules: BusinessHoursSchedule[] = [
       }
     },
     exceptions: [],
-    open_hours_action: 'ext-150',
-    closed_hours_action: 'ext-voicemail',
+    open_hours_action: { type: 'extension', target_id: 'ext-150' },
+    closed_hours_action: { type: 'extension', target_id: 'ext-voicemail' },
     current_status: 'closed',
     created_at: '2025-06-01T08:00:00Z',
     updated_at: '2025-09-15T16:00:00Z',
