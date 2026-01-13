@@ -22,7 +22,7 @@ export interface BusinessHoursSchedule {
 }
 
 export interface BusinessHoursAction {
-  type: 'extension' | 'ring_group' | 'ivr_menu';
+  type: 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu';
   target_id: string;
 }
 

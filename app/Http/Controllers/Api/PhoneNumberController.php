@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
+use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
 use App\Models\BusinessHoursSchedule;
@@ -357,6 +358,8 @@ class PhoneNumberController extends Controller
             'ring_group' => $this->loadRingGroup($phoneNumber),
             'business_hours' => $this->loadBusinessHoursSchedule($phoneNumber),
             'conference_room' => $this->loadConferenceRoom($phoneNumber),
+            'ai_assistant' => $this->loadAiAssistant($phoneNumber),
+            'ivr_menu' => $this->loadIvrMenu($phoneNumber),
             default => null,
         };
     }
@@ -376,11 +379,15 @@ class PhoneNumberController extends Controller
         $ringGroupIds = [];
         $scheduleIds = [];
         $conferenceRoomIds = [];
+        $aiAssistantIds = [];
+        $ivrMenuIds = [];
         $phoneNumbersByType = [
             'extension' => [],
             'ring_group' => [],
             'business_hours' => [],
             'conference_room' => [],
+            'ai_assistant' => [],
+            'ivr_menu' => [],
         ];
 
         foreach ($phoneNumbers as $phoneNumber) {
@@ -395,6 +402,8 @@ class PhoneNumberController extends Controller
                 'ring_group' => $ringGroupIds[] = $phoneNumber->getTargetRingGroupId(),
                 'business_hours' => $scheduleIds[] = $phoneNumber->getTargetBusinessHoursId(),
                 'conference_room' => $conferenceRoomIds[] = $phoneNumber->getTargetConferenceRoomId(),
+                'ai_assistant' => $aiAssistantIds[] = $phoneNumber->getTargetAiAssistantId(),
+                'ivr_menu' => $ivrMenuIds[] = $phoneNumber->getTargetIvrMenuId(),
                 default => null,
             };
         }
@@ -439,6 +448,31 @@ class PhoneNumberController extends Controller
                 $conferenceRoomId = $phoneNumber->getTargetConferenceRoomId();
                 if ($conferenceRoomId && isset($conferenceRooms[$conferenceRoomId])) {
                     $phoneNumber->setConferenceRoom($conferenceRooms[$conferenceRoomId]);
+                }
+            }
+        }
+
+        // Batch load AI assistants
+        if (!empty($aiAssistantIds)) {
+            $aiAssistants = Extension::whereIn('id', array_filter($aiAssistantIds))
+                ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+                ->get()
+                ->keyBy('id');
+            foreach ($phoneNumbersByType['ai_assistant'] as $phoneNumber) {
+                $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
+                if ($aiAssistantId && isset($aiAssistants[$aiAssistantId])) {
+                    $phoneNumber->setAiAssistant($aiAssistants[$aiAssistantId]);
+                }
+            }
+        }
+
+        // Batch load IVR menus
+        if (!empty($ivrMenuIds)) {
+            $ivrMenus = IvrMenu::whereIn('id', array_filter($ivrMenuIds))->get()->keyBy('id');
+            foreach ($phoneNumbersByType['ivr_menu'] as $phoneNumber) {
+                $ivrMenuId = $phoneNumber->getTargetIvrMenuId();
+                if ($ivrMenuId && isset($ivrMenus[$ivrMenuId])) {
+                    $phoneNumber->setIvrMenu($ivrMenus[$ivrMenuId]);
                 }
             }
         }
@@ -508,6 +542,42 @@ class PhoneNumberController extends Controller
             $conferenceRoom = ConferenceRoom::find($conferenceRoomId);
             if ($conferenceRoom) {
                 $phoneNumber->setConferenceRoom($conferenceRoom);
+            }
+        }
+    }
+
+    /**
+     * Load AI assistant for a phone number.
+     *
+     * @param DidNumber $phoneNumber
+     * @return void
+     */
+    private function loadAiAssistant(DidNumber $phoneNumber): void
+    {
+        $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
+        if ($aiAssistantId) {
+            $aiAssistant = Extension::where('id', $aiAssistantId)
+                ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+                ->first();
+            if ($aiAssistant) {
+                $phoneNumber->setAiAssistant($aiAssistant);
+            }
+        }
+    }
+
+    /**
+     * Load IVR menu for a phone number.
+     *
+     * @param DidNumber $phoneNumber
+     * @return void
+     */
+    private function loadIvrMenu(DidNumber $phoneNumber): void
+    {
+        $ivrMenuId = $phoneNumber->getTargetIvrMenuId();
+        if ($ivrMenuId) {
+            $ivrMenu = IvrMenu::find($ivrMenuId);
+            if ($ivrMenu) {
+                $phoneNumber->setIvrMenu($ivrMenu);
             }
         }
     }

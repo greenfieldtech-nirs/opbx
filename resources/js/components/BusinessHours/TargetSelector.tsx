@@ -1,30 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { BusinessHoursActionType } from '@/types/business-hours';
-
 interface TargetSelectorProps {
-  actionType: BusinessHoursActionType;
+  actionType: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  extensions?: Array<{ id: string; name: string; number?: string }>;
+  ringGroups?: Array<{ id: string; name: string }>;
+  ivrMenus?: Array<{ id: string; name: string }>;
 }
-
-// Mock data - in real implementation, this would come from API
-const mockExtensions = [
-  { id: 'ext-101', name: 'John Doe', number: '101' },
-  { id: 'ext-102', name: 'Jane Smith', number: '102' },
-  { id: 'ext-voicemail', name: 'Voicemail', number: '999' },
-];
-
-const mockRingGroups = [
-  { id: 'rg-sales', name: 'Sales Team' },
-  { id: 'rg-support', name: 'Support Team' },
-];
-
-const mockIvrMenus = [
-  { id: 'ivr-main', name: 'Main Menu' },
-  { id: 'ivr-support', name: 'Support Menu' },
-];
 
 export function TargetSelector({
   actionType,
@@ -32,33 +15,24 @@ export function TargetSelector({
   onChange,
   disabled = false,
   className = '',
+  extensions = [],
+  ringGroups = [],
+  ivrMenus = [],
 }: TargetSelectorProps) {
-  const [options, setOptions] = useState<Array<{ id: string; name: string; number?: string }>>([]);
-  const [loading, setLoading] = useState(false);
+  const getOptions = () => {
+    switch (actionType) {
+      case 'extension':
+        return extensions;
+      case 'ring_group':
+        return ringGroups;
+      case 'ivr_menu':
+        return ivrMenus;
+      default:
+        return [];
+    }
+  };
 
-  useEffect(() => {
-    setLoading(true);
-    
-    // Simulate API call delay
-    const timer = setTimeout(() => {
-      switch (actionType) {
-        case 'extension':
-          setOptions(mockExtensions);
-          break;
-        case 'ring_group':
-          setOptions(mockRingGroups);
-          break;
-        case 'ivr_menu':
-          setOptions(mockIvrMenus);
-          break;
-        default:
-          setOptions([]);
-      }
-      setLoading(false);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [actionType]);
+  const options = getOptions();
 
   const getPlaceholder = () => {
     switch (actionType) {
@@ -94,15 +68,15 @@ export function TargetSelector({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || loading}
+        disabled={disabled}
         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
       >
         <option value="">
-          {loading ? 'Loading...' : getPlaceholder()}
+          {getPlaceholder()}
         </option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
-            {option.name} {option.number ? `(${option.number})` : ''}
+            {option.name} {(option as any).number ? `(${(option as any).number})` : ''}
           </option>
         ))}
       </select>

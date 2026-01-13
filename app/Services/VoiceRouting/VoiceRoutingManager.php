@@ -511,7 +511,7 @@ class VoiceRoutingManager
                 }
                 break;
 
-            case 'ivr_menu':
+             case 'ivr_menu':
             case 'ivr':
                 $ivrMenu = $did->getIvrMenuAttribute();
                 if ($ivrMenu) {
@@ -519,18 +519,109 @@ class VoiceRoutingManager
                 }
                 break;
 
+            case 'ai_assistant':
+                $aiAssistant = $did->getAiAssistantAttribute();
+                if ($aiAssistant) {
+                    $destination['extension'] = $aiAssistant;
+                }
+                break;
+
             case 'business_hours':
                 $schedule = $did->getBusinessHoursScheduleAttribute();
                 if ($schedule) {
                     // For business hours, route based on current status
-                    $currentAction = $schedule->getCurrentRouting();
-                    if (! empty($currentAction)) {
-                        return $this->routeToBusinessHoursAction(
-                            $currentAction,
-                            $did->organization_id,
-                            $request->input('CallSid', ''),
-                            $request
-                        );
+                    $actionType = $schedule->getCurrentRoutingType();
+                    $targetId = $schedule->getCurrentRoutingTargetId();
+
+                    Log::info('VoiceRoutingManager: Business hours routing', [
+                        'did_id' => $did->id,
+                        'schedule_id' => $schedule->id,
+                        'action_type' => $actionType->value,
+                        'target_id' => $targetId,
+                        'is_open' => $schedule->isCurrentlyOpen(),
+                    ]);
+
+                    // Route based on action type
+                    switch ($actionType) {
+                        case \App\Enums\BusinessHoursActionType::EXTENSION:
+                            if ($targetId) {
+                                // Parse "ext-13" format to get extension ID
+                                if (preg_match('/^ext-(\d+)$/', $targetId, $matches)) {
+                                    $extensionId = (int) $matches[1];
+                                    $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $extensionId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($extension) {
+                                        $destination['extension'] = $extension;
+                                    }
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::RING_GROUP:
+                            if ($targetId) {
+                                // Parse "rg-5" format to get ring group ID
+                                if (preg_match('/^rg-(\d+)$/', $targetId, $matches)) {
+                                    $ringGroupId = (int) $matches[1];
+                                    $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $ringGroupId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($ringGroup) {
+                                        $destination['ring_group'] = $ringGroup;
+                                    }
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::CONFERENCE_ROOM:
+                            if ($targetId) {
+                                // Parse "conf-1" format to get conference room ID
+                                if (preg_match('/^conf-(\d+)$/', $targetId, $matches)) {
+                                    $conferenceRoomId = (int) $matches[1];
+                                    $conferenceRoom = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $conferenceRoomId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->first();
+                                    if ($conferenceRoom) {
+                                        $destination['conference_room'] = $conferenceRoom;
+                                    }
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::IVR_MENU:
+                            if ($targetId) {
+                                // Parse "ivr-1" format to get IVR menu ID
+                                if (preg_match('/^ivr-(\d+)$/', $targetId, $matches)) {
+                                    $ivrMenuId = (int) $matches[1];
+                                    $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $ivrMenuId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($ivrMenu) {
+                                        $destination['ivr_menu'] = $ivrMenu;
+                                    }
+                                }
+                            }
+                            break;
+
+                        default:
+                            // For legacy string actions, use the old method
+                            $currentAction = $schedule->getCurrentRouting();
+                            if (is_string($currentAction) && !empty($currentAction)) {
+                                return $this->routeToBusinessHoursAction(
+                                    $currentAction,
+                                    $did->organization_id,
+                                    $request->input('CallSid', ''),
+                                    $request
+                                );
+                            }
+                            break;
                     }
                 }
                 break;
@@ -1167,6 +1258,70 @@ class VoiceRoutingManager
     }
 
     /**
+     * Handle ring group sequential callback routing.
+     *
+     * Processes callbacks from sequential ring group routing to determine
+     * the next member to try or fallback action.
+     *
+     * @param  Request  $request  The incoming callback request
+     * @return Response CXML response with next routing instruction
+     */
+    public function routeRingGroupCallback(Request $request): Response
+    {
+        $ringGroupId = (int) $request->input('ring_group_id');
+        $callSid = $request->input('CallSid');
+        $orgId = (int) $request->input('_organization_id');
+
+        Log::info('VoiceRoutingManager: Handling ring group callback', [
+            'call_sid' => $callSid,
+            'ring_group_id' => $ringGroupId,
+            'org_id' => $orgId,
+        ]);
+
+        // Validate required parameters
+        if (!$ringGroupId || !$callSid) {
+            Log::warning('VoiceRoutingManager: Missing required parameters for ring group callback', [
+                'call_sid' => $callSid,
+                'ring_group_id' => $ringGroupId,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->createCxmlErrorResponse('Missing required parameters');
+        }
+
+        // Get the ring group
+        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
+            ->where('organization_id', $orgId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$ringGroup) {
+            Log::warning('VoiceRoutingManager: Ring group not found or inactive', [
+                'call_sid' => $callSid,
+                'ring_group_id' => $ringGroupId,
+                'org_id' => $orgId,
+            ]);
+
+            return $this->createCxmlErrorResponse('Ring group not found');
+        }
+
+        Log::info('VoiceRoutingManager: Found active ring group for callback', [
+            'call_sid' => $callSid,
+            'ring_group_id' => $ringGroup->id,
+            'ring_group_name' => $ringGroup->name,
+            'strategy' => $ringGroup->strategy->value,
+        ]);
+
+        // Create destination array for the strategy
+        $destination = ['ring_group' => $ringGroup];
+
+        // Delegate to the RingGroupRoutingStrategy
+        // Pass empty DidNumber since callbacks don't need DID context
+        return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber, $destination);
+    }
+
+    /**
      * Handle case where caller provides no input (timeout).
      */
     private function handleNoInput(Request $request, IvrMenu $ivrMenu, array $callState): Response
@@ -1488,7 +1643,7 @@ class VoiceRoutingManager
     /**
      * Execute the appropriate routing strategy for the given extension type.
      */
-    private function executeStrategy(ExtensionType $type, Request $request, DidNumber $did, array $destination): Response
+    public function executeStrategy(ExtensionType $type, Request $request, DidNumber $did, array $destination): Response
     {
         foreach ($this->strategies as $strategy) {
             if ($strategy->canHandle($type)) {

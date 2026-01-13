@@ -51,7 +51,7 @@ export type Status = 'active' | 'inactive';
 export type UserRole = 'owner' | 'admin' | 'agent';
 
 // Extension Types
-export type ExtensionType = 'user' | 'virtual' | 'queue';
+export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward';
 
 // Call Status
 export type CallStatus =
@@ -70,13 +70,13 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
 
 // Ring Group Status
 export type RingGroupStatus = 'active' | 'inactive';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
 
 // IVR Destination Type
 export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'hangup';
@@ -203,14 +203,15 @@ export interface DIDNumber {
   organization_id: string;
   phone_number: string;
   friendly_name?: string;
-  routing_type: RoutingType;
-  routing_config: {
-    extension_id?: string;
-    ring_group_id?: string;
-    business_hours_schedule_id?: string;
-    conference_room_id?: string;
-  };
-  cloudonix_config?: {
+   routing_type: RoutingType;
+   routing_config: {
+     extension_id?: string;
+     ai_assistant_id?: string;
+     ring_group_id?: string;
+     business_hours_schedule_id?: string;
+     conference_room_id?: string;
+   };
+   cloudonix_config?: {
     number_id?: string;
     purchased_at?: string;
     monthly_cost?: number;
@@ -253,6 +254,7 @@ export interface CreateDIDRequest {
   routing_type: RoutingType;
   routing_config: {
     extension_id?: string;
+    ai_assistant_id?: string;
     ring_group_id?: string;
     business_hours_schedule_id?: string;
     conference_room_id?: string;

@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ringGroupsService } from '@/services/ringGroups.service';
 import { extensionsService } from '@/services/extensions.service';
+import { ivrMenusService } from '@/services/ivrMenus.service';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   RingGroup,
@@ -17,8 +18,15 @@ import type {
   RingGroupFallbackAction,
   CreateRingGroupRequest,
   UpdateRingGroupRequest,
-  Extension,
 } from '@/types/api.types';
+import type { Extension } from '@/types';
+
+// Extended RingGroup type with additional fallback fields
+interface ExtendedRingGroup extends RingGroup {
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+}
 import {
   getStrategyDisplayName,
   getStrategyDescription,
@@ -61,7 +69,9 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
 import {
+  AlertCircle,
   Plus,
   Search,
   Filter,
@@ -81,6 +91,11 @@ import {
   ArrowUpDown,
   RefreshCw,
   GripVertical,
+  Menu,
+  Bot,
+  UserCheck,
+  Phone,
+  ArrowRight,
 } from 'lucide-react';
 import {
   DndContext,
@@ -188,10 +203,9 @@ export default function RingGroups() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<RingGroup | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState<Partial<RingGroup>>({
+  const [formData, setFormData] = useState<Partial<ExtendedRingGroup>>({
     name: '',
     description: '',
     strategy: 'simultaneous',
@@ -201,6 +215,13 @@ export default function RingGroups() {
     status: 'active',
     members: [],
   });
+
+  // Debug formData changes
+  // useEffect(() => {
+  //   console.log('formData updated:', formData);
+  // }, [formData]);
+
+  const [selectedGroup, setSelectedGroup] = useState<RingGroup | null>(null);
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -234,7 +255,31 @@ export default function RingGroups() {
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
+  // Fetch available AI Assistants (type: ai_assistant, status: active)
+  const { data: aiAssistantsData } = useQuery({
+    queryKey: ['extensions', { type: 'ai_assistant', status: 'active', per_page: 100 }],
+    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
+  });
+
+  const availableAiAssistants = aiAssistantsData?.data || [];
+
+  // Fetch all ring groups for fallback destinations (unfiltered, all active)
+  const { data: allRingGroupsData } = useQuery({
+    queryKey: ['ring-groups-all'],
+    queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
+  });
+
+  const allRingGroups = allRingGroupsData?.data || [];
+
   const availableExtensions = extensionsData?.data || [];
+
+  // Fetch available IVR menus (status: active)
+  const { data: ivrMenusData } = useQuery({
+    queryKey: ['ivr-menus', { status: 'active', per_page: 100 }],
+    queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  const availableIvrMenus = ivrMenusData?.data || [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -283,6 +328,38 @@ export default function RingGroups() {
     },
   });
 
+  // Badge configuration for destination types
+  const getDestinationBadgeConfig = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension') => {
+    const configs = {
+      ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Users },
+      ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+      ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+      extension: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
+    };
+    return configs[type] || configs.extension;
+  };
+
+  // Get destination display name
+  const getDestinationDisplayName = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant', id: string, name?: string) => {
+    if (name) return name;
+    return `ID ${id}`;
+  };
+
+  // Create formatted destination badge
+  const getDestinationBadge = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension', content: string) => {
+    const config = getDestinationBadgeConfig(type);
+    const Icon = config.icon;
+
+    return (
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
+          <Icon className="h-3.5 w-3.5" />
+          {content}
+        </Badge>
+      </div>
+    );
+  };
+
   // Strategy icon mapping
   const getStrategyIcon = (strategy: RingGroupStrategy) => {
     switch (strategy) {
@@ -300,8 +377,59 @@ export default function RingGroups() {
     switch (action) {
       case 'extension':
         return <PhoneForwarded className="h-4 w-4" />;
+      case 'ring_group':
+        return <ArrowRight className="h-4 w-4" />;
+      case 'ivr_menu':
+        return <Menu className="h-4 w-4" />;
+      case 'ai_assistant':
+        return <Bot className="h-4 w-4" />;
       case 'hangup':
         return <PhoneOff className="h-4 w-4" />;
+      default:
+        return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  // Enhanced fallback display text with actual destination names
+  const getFallbackDisplayText = (
+    group: ExtendedRingGroup,
+    ringGroups: any[],
+    ivrMenus: any[]
+  ): string => {
+    switch (group.fallback_action) {
+      case 'extension':
+        return group.fallback_extension_number
+          ? `→ Extension: ${group.fallback_extension_number}`
+          : '→ Extension';
+
+      case 'ring_group':
+        if (group.fallback_ring_group_id) {
+          const targetRingGroup = ringGroups.find(rg => rg.id.toString() === group.fallback_ring_group_id);
+          return targetRingGroup ? `→ Ring Group: ${targetRingGroup.name}` : '→ Ring Group';
+        }
+        return '→ Ring Group';
+
+      case 'ivr_menu':
+        if (group.fallback_ivr_menu_id) {
+          const targetIvrMenu = ivrMenus.find(ivr => ivr.id.toString() === group.fallback_ivr_menu_id);
+          return targetIvrMenu ? `→ IVR Menu: ${targetIvrMenu.name}` : '→ IVR Menu';
+        }
+        return '→ IVR Menu';
+
+      case 'ai_assistant':
+        if (group.fallback_ai_assistant_id) {
+          const targetAiAssistant = availableExtensions.find(ext =>
+            ext.id === group.fallback_ai_assistant_id && ext.type === 'ai_assistant'
+          );
+          return targetAiAssistant ? `→ AI Assistant: ${targetAiAssistant.user?.name || 'AI Assistant'}` : '→ AI Assistant';
+        }
+        return '→ AI Assistant';
+
+      case 'hangup':
+        return 'Hangup';
+
+      default:
+        return 'Unknown';
     }
   };
 
@@ -364,6 +492,7 @@ export default function RingGroups() {
       fallback_action: 'extension',
       status: 'active',
       members: [],
+
     });
     setFormErrors({});
   };
@@ -378,7 +507,7 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData: CreateRingGroupRequest = {
+    const requestData = {
       name: formData.name!,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
@@ -386,6 +515,9 @@ export default function RingGroups() {
       ring_turns: formData.ring_turns!,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
       fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
@@ -403,7 +535,7 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData: UpdateRingGroupRequest = {
+    const requestData = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
@@ -411,6 +543,9 @@ export default function RingGroups() {
       ring_turns: formData.ring_turns,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
       fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
@@ -431,20 +566,25 @@ export default function RingGroups() {
   };
 
   // Open edit dialog
-  const openEditDialog = (group: RingGroup) => {
+  const openEditDialog = (group: ExtendedRingGroup) => {
     setSelectedGroup(group);
-    setFormData({
+
+    const newFormData = {
       name: group.name,
       description: group.description,
       strategy: group.strategy,
       timeout: group.timeout,
       ring_turns: group.ring_turns,
       fallback_action: group.fallback_action,
-      fallback_extension_id: group.fallback_extension_id,
+      fallback_extension_id: group.fallback_extension_id?.toString(),
       fallback_extension_number: group.fallback_extension_number,
+      fallback_ring_group_id: group.fallback_ring_group_id?.toString(),
+      fallback_ivr_menu_id: group.fallback_ivr_menu_id?.toString(),
+      fallback_ai_assistant_id: group.fallback_ai_assistant_id?.toString(),
       status: group.status,
       members: [...group.members],
-    });
+    };
+    setFormData(newFormData);
     setIsEditDialogOpen(true);
   };
 
@@ -474,7 +614,7 @@ export default function RingGroups() {
     const newMember: RingGroupMember = {
       extension_id: firstAvailable.id,
       extension_number: firstAvailable.extension_number,
-      user_name: firstAvailable.name || null,
+      user_name: firstAvailable.user?.name || null,
       priority: currentMembers.length + 1,
     };
 
@@ -510,7 +650,7 @@ export default function RingGroups() {
       ...newMembers[index],
       extension_id: extension.id,
       extension_number: extension.extension_number,
-      user_name: extension.name || null,
+      user_name: extension.user?.name || null,
     };
 
     setFormData({
@@ -529,9 +669,47 @@ export default function RingGroups() {
     return availableExtensions.filter((ext) => !usedExtensionIds.includes(ext.id));
   };
 
+  const moveMemberUp = (index: number) => {
+    const currentMembers = formData.members || [];
+    if (index === 0 || currentMembers.length < 2) return;
+
+    const newMembers = [...currentMembers];
+    [newMembers[index - 1], newMembers[index]] = [newMembers[index], newMembers[index - 1]];
+
+    // Recalculate priorities
+    const reorderedMembers = newMembers.map((member, i) => ({
+      ...member,
+      priority: i + 1,
+    }));
+
+    setFormData({
+      ...formData,
+      members: reorderedMembers,
+    });
+  };
+
+  const moveMemberDown = (index: number) => {
+    const currentMembers = formData.members || [];
+    if (index === currentMembers.length - 1 || currentMembers.length < 2) return;
+
+    const newMembers = [...currentMembers];
+    [newMembers[index], newMembers[index + 1]] = [newMembers[index + 1], newMembers[index]];
+
+    // Recalculate priorities
+    const reorderedMembers = newMembers.map((member, i) => ({
+      ...member,
+      priority: i + 1,
+    }));
+
+    setFormData({
+      ...formData,
+      members: reorderedMembers,
+    });
+  };
+
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
-    const title = isEdit ? 'Edit Ring Group' : 'Create Ring Group';
+    const title = isEdit ? 'Edit Ring Group DEBUG' : 'Create Ring Group';
     const description = isEdit
       ? 'Update ring group settings and members'
       : 'Configure a new ring group with extension members';
@@ -552,11 +730,11 @@ export default function RingGroups() {
 
         <div className="space-y-4 py-4">
           {/* Name and Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
-              </Label>
+          <div className="space-y-2">
+            <Label htmlFor="name">
+              Name <span className="text-red-500">*</span>
+            </Label>
+            <div className="flex items-center gap-3">
               <Input
                 id="name"
                 value={formData.name || ''}
@@ -564,26 +742,20 @@ export default function RingGroups() {
                 placeholder="e.g., Sales Team"
                 className={formErrors.name ? 'border-red-500' : ''}
               />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="status"
+                  checked={formData.status === 'active'}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
+                  }
+                />
+                <Label htmlFor="status" className="text-sm">
+                  {formData.status === 'active' ? 'Active' : 'Inactive'}
+                </Label>
+              </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, status: value as RingGroupStatus })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
           </div>
 
           {/* Members */}
@@ -617,123 +789,123 @@ export default function RingGroups() {
               </div>
             )}
 
-             {formData.members && formData.members.length > 0 && (
-               <>
-                 {formData.strategy === 'sequential' ? (
-                   <DndContext
-                     sensors={sensors}
-                     collisionDetection={closestCenter}
-                     onDragEnd={handleDragEnd}
-                   >
-                     <SortableContext
-                       items={formData.members.map(m => m.extension_id)}
-                       strategy={verticalListSortingStrategy}
-                     >
-                       <div className="border rounded-lg divide-y">
-                         {formData.members.map((member, index) => (
-                           <SortableItem key={member.extension_id} id={member.extension_id}>
-                             <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
-                               <div className="cursor-grab">
-                                 <GripVertical className="h-4 w-4 text-gray-400" />
-                               </div>
+            {formData.members && formData.members.length > 0 && (
+              <>
+                {formData.strategy === 'sequential' ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={formData.members.map(m => m.extension_id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="border rounded-lg divide-y">
+                        {formData.members.map((member, index) => (
+                          <SortableItem key={member.extension_id} id={member.extension_id}>
+                            <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
+                              <div className="cursor-grab">
+                                <GripVertical className="h-4 w-4 text-gray-400" />
+                              </div>
 
-                               <div className="flex-1">
-                                 <Select
-                                   value={member.extension_id}
-                                   onValueChange={(value) => updateMemberExtension(index, value)}
-                                 >
-                                   <SelectTrigger>
-                                     <SelectValue />
-                                   </SelectTrigger>
-                                   <SelectContent>
-                                     {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                                       <SelectItem key={ext.id} value={ext.id}>
-                                         {ext.extension_number} - {ext.name || 'Unassigned'}
-                                       </SelectItem>
-                                     ))}
-                                   </SelectContent>
-                                 </Select>
-                               </div>
+                              <div className="flex-1">
+                                <Select
+                                  value={member.extension_id}
+                                  onValueChange={(value) => updateMemberExtension(index, value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                      <SelectItem key={ext.id} value={ext.id}>
+                                        {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
-                               <Button
-                                 type="button"
-                                 variant="ghost"
-                                 size="sm"
-                                 onClick={() => removeMember(index)}
-                               >
-                                 <X className="h-4 w-4" />
-                               </Button>
-                             </div>
-                           </SortableItem>
-                         ))}
-                       </div>
-                     </SortableContext>
-                   </DndContext>
-                 ) : (
-                   <div className="border rounded-lg divide-y">
-                     {formData.members.map((member, index) => (
-                       <div key={index} className="p-3 flex items-center gap-3">
-                         <div className="flex flex-col gap-1">
-                           <Button
-                             type="button"
-                             variant="ghost"
-                             size="sm"
-                             className="h-6 w-6 p-0"
-                             onClick={() => moveMemberUp(index)}
-                             disabled={index === 0}
-                           >
-                             <ChevronUp className="h-4 w-4" />
-                           </Button>
-                           <Button
-                             type="button"
-                             variant="ghost"
-                             size="sm"
-                             className="h-6 w-6 p-0"
-                             onClick={() => moveMemberDown(index)}
-                             disabled={index === (formData.members?.length || 0) - 1}
-                           >
-                             <ChevronDown className="h-4 w-4" />
-                           </Button>
-                         </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeMember(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </SortableItem>
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  <div className="border rounded-lg divide-y">
+                    {formData.members.map((member, index) => (
+                      <div key={index} className="p-3 flex items-center gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => moveMemberUp(index)}
+                            disabled={index === 0}
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => moveMemberDown(index)}
+                            disabled={index === (formData.members?.length || 0) - 1}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </div>
 
-                         <div className="flex-1">
-                           <Select
-                             value={member.extension_id}
-                             onValueChange={(value) => updateMemberExtension(index, value)}
-                           >
-                             <SelectTrigger>
-                               <SelectValue />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                                 <SelectItem key={ext.id} value={ext.id}>
-                                   {ext.extension_number} - {ext.name || 'Unassigned'}
-                                 </SelectItem>
-                               ))}
-                             </SelectContent>
-                           </Select>
-                         </div>
+                        <div className="flex-1">
+                          <Select
+                            value={member.extension_id}
+                            onValueChange={(value) => updateMemberExtension(index, value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                <SelectItem key={ext.id} value={ext.id}>
+                                  {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                         <Button
-                           type="button"
-                           variant="ghost"
-                           size="sm"
-                           onClick={() => removeMember(index)}
-                         >
-                           <X className="h-4 w-4" />
-                         </Button>
-                       </div>
-                     ))}
-                   </div>
-                 )}
-               </>
-             )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeMember(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
-             {formData.strategy === 'sequential' && (
-               <p className="text-xs text-muted-foreground">
-                 Drag and drop to reorder the ringing sequence. Extensions will ring in the order shown from top to bottom.
-               </p>
-             )}
+            {formData.strategy === 'sequential' && (
+              <p className="text-xs text-muted-foreground">
+                Drag and drop to reorder the ringing sequence. Extensions will ring in the order shown from top to bottom.
+              </p>
+            )}
           </div>
 
           {/* Strategy */}
@@ -813,73 +985,157 @@ export default function RingGroups() {
 
           {/* Fallback Action */}
           <div className="space-y-2">
-            <Label htmlFor="fallback_action">
+            <Label>
               Fallback Action <span className="text-red-500">*</span>
             </Label>
-            <Select
-              value={formData.fallback_action}
-              onValueChange={(value) => {
-                setFormData({
-                  ...formData,
-                  fallback_action: value as RingGroupFallbackAction,
-                  fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
-                  fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="extension">
-                  <div className="flex items-center gap-2">
-                    <PhoneForwarded className="h-4 w-4" />
-                    <span>Forward to Extension</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fallback_action" className="text-sm text-muted-foreground">Action</Label>
+                <Select
+                  value={formData.fallback_action}
+                  onValueChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      fallback_action: value as RingGroupFallbackAction,
+                      fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
+                      fallback_extension_number: value === 'extension' ? formData.fallback_extension_number : undefined,
+                      fallback_ring_group_id: value === 'ring_group' ? formData.fallback_ring_group_id : undefined,
+                      fallback_ivr_menu_id: value === 'ivr_menu' ? formData.fallback_ivr_menu_id : undefined,
+                      fallback_ai_assistant_id: value === 'ai_assistant' ? formData.fallback_ai_assistant_id : undefined,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="extension">
+                      <div className="flex items-center gap-2">
+                        <PhoneForwarded className="h-4 w-4" />
+                        <span>Extension</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ring_group">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span>Ring Group</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ivr_menu">
+                      <div className="flex items-center gap-2">
+                        <Menu className="h-4 w-4" />
+                        <span>IVR Menu</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ai_assistant">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        <span>AI Assistant</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hangup">
+                      <div className="flex items-center gap-2">
+                        <PhoneOff className="h-4 w-4" />
+                        <span>Hangup</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Destination</Label>
+                {formData.fallback_action === 'extension' && (
+                  <Select
+                    value={formData.fallback_extension_id || ''}
+                    onValueChange={(value) => {
+                      const ext = availableExtensions.find((e) => e.id.toString() === value);
+                      setFormData({
+                        ...formData,
+                        fallback_extension_id: value,
+                        fallback_extension_number: ext?.extension_number,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select extension" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableExtensions.map((ext) => (
+                        <SelectItem key={ext.id} value={ext.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-blue-100 text-blue-800 border-blue-200">
+                              <Phone className="h-3.5 w-3.5" />
+                              {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ring_group' && (
+                  <Select
+                    value={formData.fallback_ring_group_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ring_group_id: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select ring group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allRingGroups.map((group) => (
+                        <SelectItem key={group.id} value={group.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
+                              <Users className="h-3.5 w-3.5" />
+                              {group.name}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ai_assistant' && (
+                  <Select
+                    value={formData.fallback_ai_assistant_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ai_assistant_id: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select AI assistant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAiAssistants.map((assistant) => (
+                        <SelectItem key={assistant.id} value={assistant.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
+                              <Bot className="h-3.5 w-3.5" />
+                              {assistant.configuration?.phone_number || 'No Number'} @ {assistant.configuration?.provider || 'Unknown'}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {formData.fallback_action === 'hangup' && (
+                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+                    No destination needed
                   </div>
-                </SelectItem>
-                <SelectItem value="hangup">
-                  <div className="flex items-center gap-2">
-                    <PhoneOff className="h-4 w-4" />
-                    <span>Hangup</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                )}
+                {formErrors.fallback_extension && formData.fallback_action === 'extension' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Fallback Extension (conditional) */}
-          {formData.fallback_action === 'extension' && (
-            <div className="space-y-2">
-              <Label htmlFor="fallback_extension">
-                Fallback Extension <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.fallback_extension_id || ''}
-                onValueChange={(value) => {
-                  const ext = availableExtensions.find((e) => e.id === value);
-                  setFormData({
-                    ...formData,
-                    fallback_extension_id: value,
-                    fallback_extension_number: ext?.extension_number,
-                  });
-                }}
-              >
-                <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select extension" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableExtensions.map((ext) => (
-                    <SelectItem key={ext.id} value={ext.id}>
-                      {ext.extension_number} - {ext.name || 'Unassigned'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formErrors.fallback_extension && (
-                <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
-              )}
-            </div>
-          )}
+
         </div>
 
         <DialogFooter>
@@ -901,7 +1157,7 @@ export default function RingGroups() {
             {isEdit ? 'Save Changes' : 'Create Ring Group'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogContent >
     );
   };
 
@@ -1102,8 +1358,9 @@ export default function RingGroups() {
                         {getFallbackIcon(group.fallback_action)}
                         <span className="text-sm">
                           {getFallbackDisplayText(
-                            group.fallback_action,
-                            group.fallback_extension_number
+                            group as ExtendedRingGroup,
+                            ringGroups || [],
+                            availableIvrMenus || []
                           )}
                         </span>
                       </div>
@@ -1127,7 +1384,7 @@ export default function RingGroups() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => openEditDialog(group)}
+                              onClick={() => openEditDialog(group as ExtendedRingGroup)}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -1229,8 +1486,9 @@ export default function RingGroups() {
                     {getFallbackIcon(selectedGroup.fallback_action)}
                     <span className="text-sm">
                       {getFallbackDisplayText(
-                        selectedGroup.fallback_action,
-                        selectedGroup.fallback_extension_number
+                        selectedGroup as ExtendedRingGroup,
+                        ringGroups || [],
+                        availableIvrMenus || []
                       )}
                     </span>
                   </div>

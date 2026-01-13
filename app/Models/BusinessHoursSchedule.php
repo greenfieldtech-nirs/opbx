@@ -193,14 +193,68 @@ class BusinessHoursSchedule extends Model
     {
         $isOpen = $this->isCurrentlyOpen($dateTime);
         $action = $isOpen ? $this->open_hours_action : $this->closed_hours_action;
+        $actionType = $isOpen ? $this->open_hours_action_type : $this->closed_hours_action_type;
 
         // Handle both old string format and new JSON format during transition
         if (is_array($action)) {
-            return $action;
+            return $this->convertActionToRoutingFormat($action, $actionType);
         }
 
         // For backward compatibility, return as string if still in old format
         return $action;
+    }
+
+    /**
+     * Convert business hours action to routing format expected by CallRoutingService.
+     *
+     * @param array $action
+     * @param BusinessHoursActionType $actionType
+     * @return array
+     */
+    private function convertActionToRoutingFormat(array $action, BusinessHoursActionType $actionType): array
+    {
+        $targetId = $action['target_id'] ?? null;
+
+        if (!$targetId) {
+            return ['type' => 'voicemail', 'config' => []];
+        }
+
+        $config = [];
+
+        switch ($actionType) {
+            case BusinessHoursActionType::EXTENSION:
+                // Parse "ext-13" to get extension ID 13
+                if (preg_match('/^ext-(\d+)$/', $targetId, $matches)) {
+                    $config['extension_id'] = (int) $matches[1];
+                }
+                break;
+
+            case BusinessHoursActionType::RING_GROUP:
+                // Parse "rg-5" to get ring group ID 5
+                if (preg_match('/^rg-(\d+)$/', $targetId, $matches)) {
+                    $config['ring_group_id'] = (int) $matches[1];
+                }
+                break;
+
+            case BusinessHoursActionType::CONFERENCE_ROOM:
+                // Parse "conf-1" to get conference room ID 1
+                if (preg_match('/^conf-(\d+)$/', $targetId, $matches)) {
+                    $config['conference_room_id'] = (int) $matches[1];
+                }
+                break;
+
+            case BusinessHoursActionType::IVR_MENU:
+                // Parse "ivr-1" to get IVR menu ID 1
+                if (preg_match('/^ivr-(\d+)$/', $targetId, $matches)) {
+                    $config['ivr_menu_id'] = (int) $matches[1];
+                }
+                break;
+        }
+
+        return [
+            'type' => $actionType->value,
+            'config' => $config,
+        ];
     }
 
     /**

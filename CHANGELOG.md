@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-01-13
+
+#### AI Assistant Fallback & UI Enhancements
+- Implemented AI Assistant as a fallback option for Ring Groups
+- Added script organization (tests/Scripts/)
+- Enhanced fallback display to show full action types and destination names
+- Added colored badges and icons for fallback destinations in Ring Groups UI
+
+### Fixed - 2026-01-13
+- Fixed duplicate "Destination" selector in Ring Groups UI
+- Fixed pagination issues in Ring Group fallback selectors
+- Fixed Edit Dialog population for Ring Group fallback fields
+- Fixed class not found error (IvrMenu import) issues
+
+### Added - 2026-01-12
+
+#### Ring Group Fallback Logic & Logging
+- Implemented standard routing logic for Ring Group fallback actions
+- Added comprehensive logging for fallback debugging
+- Added `routeRingGroupCallback` method for sequential routing
+
+#### DID & Business Hours Routing
+- Added AI Assistant and IVR Menu routing types to DID numbers
+- Implemented Business Hours routing (Conference Room support)
+
+### Fixed - 2026-01-12
+- Fixed undefined methods in RingGroupRoutingStrategy and VoiceRoutingController
+- Fixed AI Assistant routing validation (field name mismatch)
+- Fixed migration dependency order for IVR menus
+
+### Added - 2026-01-11
+
+#### Voice Routing Overhaul
+- Implemented inbound call direction logic based on From/To DID checking
+- Refactored VoiceRoutingManager to handle calls by direction
+- Completed Business Hours CRUD implementation with structured actions
+
+#### Maintenance Tools
+- Added script to create missing Ring Groups and IVR menus
+- Added command to remove session IDs from `session_updates` table
+
+### Fixed - 2026-01-11
+- Fixed `OrganizationScope` issues in DidNumber attributes
+- Fixed `ivr_menus` table missing issues
+- Fixed critical code quality issues
+- Fixed session_updates direction enum validation
+
+### Added - 2026-01-10
+- Added CXML generation verification test
+- Implemented OutboundWhitelist feature for outbound call routing
+
+### Fixed - 2026-01-10
+- Fixed Extension destination resolution
+- Fixed fallback ring group routing for misconfigured extensions
+- Fixed missing DID routing logic
+
+### Fixed - 2026-01-09
+- Fixed ProfileController syntax errors
+- Fixed TypeScript compilation errors
+- Removed Routing Sentry feature
+
+### Added - 2026-01-08
+
+#### IVR Enhancements
+- Added maxTimeout and timeout settings to IVR menus
+- Added detailed logging for IVR menu routing
+- Implemented Cloudonix package-based voice restrictions
+
+### Fixed - 2026-01-08
+- Fixed tenant isolation failures
+- Fixed IVR destination lookup organization scoping
+- Fixed internal extension dialing to use Number element
+- Fixed authentication tests
+
+### Added - 2026-01-07
+- Integrated MinIO object storage for recordings
+
+### Fixed - 2026-01-07
+- Fixed IVR audio file serving for external access
+- Fixed recordings playback and download functionality
+
+### Added - 2026-01-06
+- Added comprehensive source code documentation
+- Implemented IVR menu functionality
+
+### Fixed - 2026-01-06
+- Fixed extension user name handling in dropdowns
+- Fixed form data reset in IVR menu dialog
+
 ### Added - 2025-12-28
 
 #### Phase 1 Step 8: Redis Caching Layer (Complete)

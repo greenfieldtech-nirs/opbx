@@ -5,7 +5,7 @@
 
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 export type RingGroupStatus = 'active' | 'inactive';
-export type FallbackAction = 'voicemail' | 'extension' | 'hangup' | 'repeat';
+export type FallbackAction = 'voicemail' | 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup' | 'repeat';
 
 export interface RingGroupMember {
   extension_id: string;
@@ -244,6 +244,12 @@ export function getFallbackDisplayText(
       return 'Voicemail';
     case 'extension':
       return fallbackExtensionNumber ? `→ Ext ${fallbackExtensionNumber}` : '→ Extension';
+    case 'ring_group':
+      return '→ Ring Group';
+    case 'ivr_menu':
+      return '→ IVR Menu';
+    case 'ai_assistant':
+      return '→ AI Assistant';
     case 'hangup':
       return 'Hangup';
     case 'repeat':
