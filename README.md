@@ -1,502 +1,352 @@
 # OPBX - Open Source Business PBX
 
-A modern, containerized business PBX application built on top of the Cloudonix CPaaS platform. OPBX provides enterprise-grade call routing, ring groups, business hours management, and real-time call monitoring - all without the complexity of managing SIP infrastructure.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)](https://laravel.com)
+[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
 
-## Project Status
+A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, IVR menus, business hours management, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
 
-**Phase 1: Complete** ✅
+---
 
-The core inbound call routing system is fully implemented with:
-- Multi-tenant architecture with RBAC
-- Extension-to-extension calling
-- Outbound E.164 calling with permissions
-- Ring groups (simultaneous, round-robin, sequential)
-- Business hours-based routing
-- Call Detail Records (CDR) with viewer UI
-- CXML response builder
-- **Redis caching layer for high-performance routing** (Step 8)
+## Table of Contents
 
-All features are production-ready with comprehensive test coverage (100+ tests).
+- [Features](#features)
+- [Architecture](#architecture)
+- [Built With](#built-with)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Security & Monitoring](#security--monitoring)
+- [API Reference](#api-reference)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [Credits](#credits)
+- [License](#license)
+
+---
 
 ## Features
 
-### Call Routing
+### Call Routing & Management
 - **Direct Extension Calling**: Extension-to-extension dialing with SIP URI generation
 - **Outbound Calling**: E.164 international dialing with extension-type based permissions
-- **Ring Groups**: Distribute calls across multiple extensions
-  - Simultaneous ringing (all at once)
-  - Round-robin (rotate through extensions)
-  - Sequential (one at a time)
+- **Ring Groups**: Distribute calls with simultaneous, round-robin, or sequential strategies
+- **IVR Menus**: Interactive voice menus with DTMF input and configurable destinations
 - **Business Hours**: Time-based routing with weekly schedules and holiday exceptions
-- **Voicemail**: Automatic voicemail for unanswered calls
+- **AI Assistant Integration**: Route calls to AI-powered voice assistants
 
-### Call Management
-- **Real-time Call Logs**: View active and historical calls with search/filtering
-- **Call Statistics**: Dashboard with call volume, duration, and disposition metrics
-- **CDR Storage**: Complete call detail records with Cloudonix integration
-- **CSV Export**: Download call logs for analysis
+### Real-Time Monitoring
+- **Live Call Dashboard**: Real-time call presence via WebSockets
+- **Call Detail Records (CDR)**: Complete call history with search, filtering, and CSV export
+- **Call Statistics**: Volume, duration, and disposition metrics
 
 ### Performance & Reliability
 - **Redis Caching Layer**: 50-90% faster routing lookups with automatic cache invalidation
 - **Idempotent Webhooks**: Redis-based deduplication prevents duplicate processing
-- **Distributed Locking**: Redis locks prevent race conditions on concurrent calls
-- **Queue Workers**: Async job processing for webhook handling
-- **Auto-scaling**: Stateless architecture ready for horizontal scaling
+- **Distributed Locking**: Prevents race conditions on concurrent calls
+- **Queue Workers**: Async job processing for non-blocking operations
 
-### Multi-tenant Architecture
+### Multi-Tenant Architecture
 - **Organization Isolation**: Complete data separation between tenants
 - **Role-Based Access Control (RBAC)**:
-  - Owner: Full organization control
-  - Admin: Manage extensions, ring groups, business hours
-  - Agent: View call logs and statistics
-  - Reporter: Read-only access to reports
-- **Audit Logging**: Structured logs with call correlation IDs
+  - **Owner**: Full organization control
+  - **PBX Admin**: Manage users, extensions, ring groups, business hours
+  - **PBX User**: Access own extension and basic features
+  - **Reporter**: Read-only access to reports and call logs
 
-## Technology Stack
-
-### Backend
-- **Framework**: Laravel 12 (PHP 8.4+)
-- **Database**: MySQL 8.0 with full-text indexes
-- **Cache/Queue**: Redis 7 with automatic cache invalidation
-- **API**: RESTful with Laravel Sanctum authentication
-- **WebSockets**: Laravel Broadcasting for real-time updates
-
-### Infrastructure
-- **Containerization**: Docker Compose with multi-service architecture
-- **Web Server**: nginx with PHP-FPM
-- **Queue Processing**: Laravel queue workers (Redis driver)
-- **Task Scheduling**: Laravel scheduler with cron
-- **Local Development**: ngrok for webhook tunneling
-
-### Frontend (API-Ready)
-- React SPA (API endpoints ready, frontend in progress)
-- Real-time WebSocket integration
-- Responsive design with Tailwind CSS
+---
 
 ## Architecture
 
-OPBX separates concerns into distinct planes:
+OPBX separates concerns into distinct planes for scalability and maintainability.
 
-### Control Plane (Configuration)
-- REST API for managing resources (organizations, users, extensions, DIDs, ring groups, business hours)
-- MySQL as single source of truth
-- RBAC policy enforcement at controller and model levels
-- Tenant isolation via global query scopes
+### High-Level Architecture
 
-### Execution Plane (Runtime)
-- Webhook endpoints for Cloudonix call events
-- Redis-based caching for high-performance lookups
-- Redis distributed locking for call state management
-- Redis idempotency keys for webhook deduplication
-- CXML response generation for call routing
-- Async queue processing for non-blocking operations
+```mermaid
+graph TB
+    subgraph "External Services"
+        CX[Cloudonix CPaaS]
+        NGROK[ngrok Tunnel]
+    end
 
-### Data Flow
+    subgraph "Frontend"
+        REACT[React SPA<br/>Port 3000]
+    end
+
+    subgraph "Load Balancer"
+        NGINX[nginx<br/>Port 80]
+    end
+
+    subgraph "Application Layer"
+        APP[Laravel App<br/>PHP-FPM]
+        QUEUE[Queue Worker]
+        SCHEDULER[Task Scheduler]
+    end
+
+    subgraph "Data Layer"
+        MYSQL[(MySQL 8.0<br/>Port 3306)]
+        REDIS[(Redis 7<br/>Port 6379)]
+        MINIO[(MinIO S3<br/>Ports 9000/9001)]
+    end
+
+    subgraph "Real-Time"
+        SOKETI[Soketi<br/>WebSocket Server<br/>Port 6001]
+    end
+
+    CX -->|Webhooks| NGROK
+    NGROK --> NGINX
+    REACT --> NGINX
+    NGINX --> APP
+    APP --> MYSQL
+    APP --> REDIS
+    APP --> MINIO
+    APP --> SOKETI
+    APP --> CX
+    QUEUE --> REDIS
+    QUEUE --> MYSQL
+    SCHEDULER --> APP
+    SOKETI --> REACT
 ```
-Cloudonix → Webhook → Idempotency Check → Cache Lookup → Routing Decision → CXML Response
-                           ↓                      ↓              ↓
-                        Redis Key          Redis Cache      Call State
-                                                 ↓              ↓
-                                            (fallback)      MySQL CDR
-                                            MySQL DB
+
+### Inbound Call Flow
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Cloudonix
+    participant OPBX
+    participant Redis
+    participant MySQL
+    participant UI
+
+    Caller->>Cloudonix: Inbound Call
+    Cloudonix->>OPBX: Webhook (call-initiated)
+    OPBX->>Redis: Acquire Lock
+    OPBX->>Redis: Check Idempotency
+    OPBX->>Redis: Cache Lookup (routing)
+    alt Cache Miss
+        OPBX->>MySQL: Query Routing Config
+        OPBX->>Redis: Store in Cache
+    end
+    OPBX->>MySQL: Log Call
+    OPBX->>Cloudonix: CXML Response
+    OPBX->>Redis: Broadcast Event
+    Redis->>UI: Real-time Update
 ```
 
-## Prerequisites
+### Control Plane vs Execution Plane
+
+| Aspect | Control Plane | Execution Plane |
+|--------|---------------|-----------------|
+| **Purpose** | Configuration management | Real-time call processing |
+| **Components** | REST API, React SPA | Webhooks, Queue Workers |
+| **Data Store** | MySQL (source of truth) | Redis (cache, locks, state) |
+| **Latency** | Standard web latency | Sub-100ms response required |
+
+---
+
+## Built With
+
+### Backend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| [Laravel](https://laravel.com) | 12 | PHP application framework |
+| [PHP](https://php.net) | 8.4+ | Server-side language |
+| [MySQL](https://mysql.com) | 8.0 | Relational database |
+| [Redis](https://redis.io) | 7 | Cache, queues, sessions |
+| [Laravel Sanctum](https://laravel.com/docs/sanctum) | - | API authentication |
+
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| [React](https://reactjs.org) | 18 | UI framework |
+| [TypeScript](https://typescriptlang.org) | 5 | Type-safe JavaScript |
+| [Vite](https://vitejs.dev) | - | Build tool |
+| [Tailwind CSS](https://tailwindcss.com) | 3 | Utility-first CSS |
+| [Radix UI](https://radix-ui.com) | - | Accessible components |
+| [React Query](https://tanstack.com/query) | - | Server state management |
+
+### Infrastructure
+| Technology | Purpose |
+|------------|---------|
+| [Docker](https://docker.com) | Containerization |
+| [nginx](https://nginx.org) | Web server / reverse proxy |
+| [Soketi](https://soketi.app) | WebSocket server (Laravel Echo compatible) |
+| [MinIO](https://min.io) | S3-compatible object storage for recordings |
+| [ngrok](https://ngrok.com) | Webhook tunneling for local development |
+
+---
+
+## Installation
+
+### Prerequisites
 
 - **Docker** (20.10+) and **Docker Compose** (2.0+)
-- **Cloudonix CPaaS Account**: Sign up at [cloudonix.com](https://cloudonix.com)
-  - API Token (from Cloudonix portal)
-  - Configured voice application
-- **ngrok Account** (for local development): Get authtoken from [ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken)
+- **Cloudonix CPaaS Account**: [Sign up at cloudonix.com](https://cloudonix.com)
+- **ngrok Account** (for local development): [Get authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
 
-## Fresh Installation with Docker
+### Quick Start
 
-### Step 1: Clone Repository
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/greenfieldtech-nirs/opbx.cloudonix.com.git
+   cd opbx.cloudonix.com
+   ```
 
-```bash
-git clone https://github.com/your-org/opbx.cloudonix.com.git
-cd opbx.cloudonix.com
-```
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   ```
 
-### Step 2: Configure Environment
+   Edit `.env` with your settings:
+   ```env
+   # Cloudonix API
+   CLOUDONIX_API_TOKEN=your_api_token_here
+   
+   # ngrok (for local development)
+   NGROK_AUTHTOKEN=your_ngrok_authtoken_here
+   
+   # Redis password (recommended for production)
+   REDIS_PASSWORD=your_redis_password
+   ```
 
-```bash
-# Copy example environment file
-cp .env.example .env
-```
+3. **Start all services**
+   ```bash
+   docker compose up -d
+   ```
 
-Edit `.env` with your configuration:
+4. **Initialize the application**
+   ```bash
+   docker compose exec app php artisan key:generate
+   docker compose exec app php artisan migrate --seed
+   ```
 
-```env
-# Application
-APP_NAME=OPBX
-APP_ENV=local
-APP_DEBUG=true
-APP_URL=http://localhost
+5. **Access the application**
+   - **Frontend**: http://localhost:3000
+   - **API**: http://localhost/api/v1
+   - **ngrok Dashboard**: http://localhost:4040
+   - **MinIO Console**: http://localhost:9001
 
-# Database
-DB_CONNECTION=mysql
-DB_HOST=mysql
-DB_PORT=3306
-DB_DATABASE=opbx
-DB_USERNAME=opbx
-DB_PASSWORD=secret
-
-# Redis
-REDIS_HOST=redis
-REDIS_PASSWORD=null
-REDIS_PORT=6379
-REDIS_DB=0
-REDIS_CACHE_DB=1
-
-# Cache (use Redis for performance)
-CACHE_DRIVER=redis
-CACHE_PREFIX=opbx_cache
-
-# Queue (use Redis for reliability)
-QUEUE_CONNECTION=redis
-
-# Cloudonix API
-CLOUDONIX_API_TOKEN=your_api_token_here
-CLOUDONIX_API_BASE_URL=https://api.cloudonix.io
-
-# ngrok (for local webhook development)
-NGROK_AUTHTOKEN=your_ngrok_authtoken_here
-
-# Webhook Base URL (updated after ngrok starts)
-WEBHOOK_BASE_URL=https://your-domain.com
-```
-
-### Step 3: Start Docker Services
-
-```bash
-# Build and start all containers
-docker compose up -d
-
-# Check container status
-docker compose ps
-```
-
-This starts the following services:
+### Docker Services
 
 | Service | Description | Port |
 |---------|-------------|------|
-| `nginx` | Web server | 80 |
+| `frontend` | React SPA (Vite dev server) | 3000 |
+| `nginx` | Web server / API gateway | 80 |
 | `app` | Laravel PHP-FPM application | - |
-| `queue-worker` | Laravel queue worker for async jobs | - |
-| `scheduler` | Laravel task scheduler (cron) | - |
+| `queue-worker` | Laravel queue processor | - |
+| `scheduler` | Laravel cron scheduler | - |
 | `mysql` | MySQL 8.0 database | 3306 |
-| `redis` | Redis 7 cache/queue/sessions | 6379 |
-| `ngrok` | Webhook tunnel (local dev only) | 4040 (web UI) |
+| `redis` | Redis 7 cache/queue | 6379 |
+| `minio` | S3-compatible storage | 9000, 9001 |
+| `soketi` | WebSocket server | 6001 |
+| `ngrok` | Webhook tunnel | 4040 |
 
-### Step 4: Initialize Application
+### Default Credentials
 
-```bash
-# Generate application key
-docker compose exec app php artisan key:generate
+After running `migrate --seed`, the following admin user is created:
 
-# Run database migrations
-docker compose exec app php artisan migrate
+- **Email**: `admin@example.com`
+- **Password**: `password`
 
-# Verify installation
-docker compose exec app php artisan --version
-```
+> ⚠️ **Change these credentials immediately in production!**
 
-### Step 5: Configure ngrok (Local Development)
-
-**📖 For detailed ngrok setup instructions, see: [`docs/NGROK_SETUP_GUIDE.md`](docs/NGROK_SETUP_GUIDE.md)**
-
-Get your ngrok public URL:
-
-```bash
-# Option 1: Visit ngrok web interface
-open http://localhost:4040
-
-# Option 2: Get URL via API
-curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-```
-
-Update `.env` with the HTTPS URL:
-
-```env
-WEBHOOK_BASE_URL=https://abc123-xyz.ngrok-free.app
-```
-
-Restart the app to apply changes:
-
-```bash
-docker compose restart app queue-worker
-```
-
-### Step 6: Create Your First Organization
-
-```bash
-docker compose exec app php artisan tinker
-```
-
-In the Tinker console:
-
-```php
-// Create organization
-$org = App\Models\Organization::create([
-    'name' => 'Acme Corporation',
-    'slug' => 'acme',
-    'status' => 'active',
-    'timezone' => 'America/New_York',
-]);
-
-// Create owner user
-$user = App\Models\User::create([
-    'organization_id' => $org->id,
-    'name' => 'Admin User',
-    'email' => 'admin@acme.com',
-    'password' => bcrypt('SecurePassword123!'),
-    'role' => 'owner',
-    'status' => 'active',
-]);
-
-// Create a test extension
-$ext = App\Models\Extension::create([
-    'organization_id' => $org->id,
-    'user_id' => $user->id,
-    'extension_number' => '1001',
-    'password' => 'ext1001pass',
-    'type' => 'user',
-    'status' => 'active',
-    'voicemail_enabled' => true,
-    'configuration' => [
-        'sip_uri' => 'sip:1001@your-sip-domain.com'
-    ],
-]);
-
-echo "Organization created: {$org->name}\n";
-echo "User created: {$user->email}\n";
-echo "Extension created: {$ext->extension_number}\n";
-```
-
-Exit Tinker: `exit`
-
-### Step 7: Test the API
-
-```bash
-# Login and get authentication token
-curl -X POST http://localhost/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@acme.com",
-    "password": "SecurePassword123!"
-  }'
-
-# Save the token from the response
-TOKEN="paste-token-here"
-
-# Test authenticated endpoint - list extensions
-curl http://localhost/api/extensions \
-  -H "Authorization: Bearer $TOKEN"
-
-# Get call logs
-curl http://localhost/api/call-logs \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Step 8: Configure Cloudonix Webhooks
-
-In your Cloudonix portal (https://portal.cloudonix.com), configure these webhook URLs:
-
-**Voice Application Webhooks:**
-- **Call Initiated**: `https://your-ngrok-url.ngrok-free.app/api/webhooks/cloudonix/call-initiated`
-- **Call Status**: `https://your-ngrok-url.ngrok-free.app/api/webhooks/cloudonix/call-status`
-
-**CDR Webhook:**
-- **CDR**: `https://your-ngrok-url.ngrok-free.app/api/webhooks/cloudonix/cdr`
-
-Replace `your-ngrok-url.ngrok-free.app` with your actual ngrok URL from Step 5.
-
-### Step 9: Test Call Routing
-
-Make a test call to your Cloudonix DID number. The call should:
-1. Trigger the call-initiated webhook
-2. OPBX looks up routing rules (cached for performance)
-3. Returns CXML to route the call
-4. Call proceeds based on routing (extension, ring group, or business hours)
-5. CDR webhook stores the final call record
-
-Monitor logs:
-```bash
-# Watch application logs
-docker compose logs -f app
-
-# Watch queue worker logs
-docker compose logs -f queue-worker
-
-# Watch all logs
-docker compose logs -f
-```
-
-## Docker Management
-
-### Common Commands
-
-```bash
-# Start services
-docker compose up -d
-
-# Stop services
-docker compose stop
-
-# Restart a service
-docker compose restart app
-
-# View logs
-docker compose logs -f app
-
-# Execute commands in app container
-docker compose exec app php artisan migrate
-docker compose exec app php artisan tinker
-
-# Access MySQL
-docker compose exec mysql mysql -u opbx -psecret opbx
-
-# Access Redis CLI
-docker compose exec redis redis-cli
-
-# Rebuild containers (after Dockerfile changes)
-docker compose up -d --build
-
-# Stop and remove containers
-docker compose down
-
-# Stop and remove containers + volumes (DELETES DATA!)
-docker compose down -v
-```
-
-### Container Shell Access
-
-```bash
-# App container (PHP/Laravel)
-docker compose exec app bash
-
-# MySQL
-docker compose exec mysql bash
-
-# Redis
-docker compose exec redis sh
-```
+---
 
 ## Configuration
 
-### Redis Cache Configuration
+### Environment Variables
 
-The application uses Redis for caching voice routing lookups. Cache configuration is in `config/cache.php`.
+See `.env.example` for all available configuration options. Key variables:
 
-**Cache Keys:**
-- Extensions: `routing:extension:{org_id}:{ext_number}`
-- Business Hours: `routing:business_hours:{org_id}`
+| Variable | Description |
+|----------|-------------|
+| `CLOUDONIX_API_TOKEN` | Cloudonix API authentication token |
+| `WEBHOOK_BASE_URL` | Public URL for webhooks (ngrok URL for local dev) |
+| `REDIS_PASSWORD` | Redis authentication password |
+| `DB_PASSWORD` | MySQL database password |
 
-**Cache TTLs:**
-- Extensions: 30 minutes (1800 seconds)
-- Business Hours: 15 minutes (900 seconds)
+### Cloudonix Webhook Configuration
 
-Cache is automatically invalidated when data changes via Laravel model observers.
+Configure these webhook URLs in your Cloudonix portal:
 
-**Performance Impact:**
-- Cache hits: 0 database queries (100% efficiency)
-- 50-90% faster extension lookups
-- Significant improvement for business hours queries
+| Event | URL |
+|-------|-----|
+| Call Initiated | `{WEBHOOK_BASE_URL}/voice/route` |
+| IVR Input | `{WEBHOOK_BASE_URL}/voice/ivr-input` |
+| CDR | `{WEBHOOK_BASE_URL}/webhooks/cloudonix/cdr` |
+| Session Update | `{WEBHOOK_BASE_URL}/webhooks/cloudonix/session-update` |
 
-See `docs/VOICE_ROUTING_CACHE.md` for detailed cache documentation.
+---
 
-### Queue Configuration
+## Security & Monitoring
 
-Laravel queues use Redis for reliable job processing:
+### Security Features
 
+- **Multi-Tenant Isolation**: Global query scopes enforce organization boundaries
+- **RBAC Authorization**: Policy-based access control at all layers
+- **API Authentication**: Laravel Sanctum with token rotation
+- **Webhook Security**: HMAC signature verification + idempotency
+- **Rate Limiting**: Configurable per-endpoint limits
+- **Security Headers**: CSP, HSTS, X-Frame-Options, and more
+
+### Monitoring
+
+**Health Check Endpoint:**
 ```bash
-# Monitor queue
-docker compose exec app php artisan queue:monitor
-
-# Clear failed jobs
-docker compose exec app php artisan queue:flush
-
-# Retry failed jobs
-docker compose exec app php artisan queue:retry all
+curl http://localhost/health
 ```
 
-## API Documentation
+**Application Logs:**
+```bash
+docker compose logs -f app
+```
+
+**Queue Monitoring:**
+```bash
+docker compose exec app php artisan queue:monitor
+```
+
+**Cache Statistics:**
+```bash
+docker compose exec redis redis-cli -a $REDIS_PASSWORD INFO stats
+```
+
+For detailed security implementation, see [`docs/architecture/security-implementation.md`](docs/architecture/security-implementation.md).
+
+---
+
+## API Reference
 
 ### Authentication
 
-All API endpoints require authentication using Laravel Sanctum bearer tokens.
+```bash
+# Login
+curl -X POST http://localhost/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@example.com", "password": "password"}'
 
-**Login:**
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password"
-}
+# Use token in subsequent requests
+curl http://localhost/api/v1/extensions \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-**Response:**
-```json
-{
-  "token": "1|abc123xyz...",
-  "user": {
-    "id": 1,
-    "name": "Admin User",
-    "email": "admin@example.com",
-    "role": "owner",
-    "organization_id": 1
-  }
-}
-```
+### Key Endpoints
 
-**Authenticated Requests:**
-```http
-Authorization: Bearer 1|abc123xyz...
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/extensions` | List extensions |
+| `POST` | `/api/v1/extensions` | Create extension |
+| `GET` | `/api/v1/ring-groups` | List ring groups |
+| `GET` | `/api/v1/business-hours` | List schedules |
+| `GET` | `/api/v1/call-logs` | List call records |
+| `GET` | `/api/v1/phone-numbers` | List DIDs |
 
-### API Endpoints
+For complete API documentation, see [`docs/architecture/api-webhooks.md`](docs/architecture/api-webhooks.md).
 
-#### Extensions
-- `GET /api/extensions` - List extensions
-- `POST /api/extensions` - Create extension
-- `GET /api/extensions/{id}` - Get extension details
-- `PUT /api/extensions/{id}` - Update extension
-- `DELETE /api/extensions/{id}` - Delete extension
-
-#### Ring Groups
-- `GET /api/ring-groups` - List ring groups
-- `POST /api/ring-groups` - Create ring group
-- `GET /api/ring-groups/{id}` - Get ring group
-- `PUT /api/ring-groups/{id}` - Update ring group
-- `DELETE /api/ring-groups/{id}` - Delete ring group
-
-#### Business Hours
-- `GET /api/business-hours` - List schedules
-- `POST /api/business-hours` - Create schedule
-- `GET /api/business-hours/{id}` - Get schedule
-- `PUT /api/business-hours/{id}` - Update schedule
-- `DELETE /api/business-hours/{id}` - Delete schedule
-
-#### Call Logs
-- `GET /api/call-logs` - List call logs (with filters)
-- `GET /api/call-logs/active` - Get active calls
-- `GET /api/call-logs/statistics` - Get statistics
-- `GET /api/call-logs/{id}` - Get call details
-- `GET /api/call-logs/export` - Export to CSV
-
-#### Webhooks (Public Endpoints)
-- `POST /api/webhooks/cloudonix/call-initiated` - Inbound call webhook
-- `POST /api/webhooks/cloudonix/call-status` - Call status updates
-- `POST /api/webhooks/cloudonix/cdr` - Call detail records
-
-All webhooks implement automatic idempotency using Redis to prevent duplicate processing.
+---
 
 ## Testing
-
-OPBX has comprehensive test coverage with 100+ tests.
 
 ### Run All Tests
 
@@ -504,374 +354,131 @@ OPBX has comprehensive test coverage with 100+ tests.
 docker compose exec app php artisan test
 ```
 
-### Run Specific Test Suites
+### Test Suites
 
 ```bash
-# Unit tests only
+# Unit tests
 docker compose exec app php artisan test --testsuite=Unit
 
-# Feature tests only
+# Feature tests
 docker compose exec app php artisan test --testsuite=Feature
 
-# Integration tests
-docker compose exec app php artisan test tests/Integration/
-
 # Specific test file
-docker compose exec app php artisan test tests/Unit/Services/VoiceRoutingCacheServiceTest.php
-
-# Specific test method
-docker compose exec app php artisan test --filter=test_extension_complete_caching_workflow
+docker compose exec app php artisan test tests/Feature/RingGroupControllerTest.php
 ```
 
-### Test Coverage Areas
-
-**Cache System (47 tests)**
-- Cache service (hit/miss, TTL, isolation)
-- Observer-based invalidation
-- Integration testing with performance benchmarks
-
-**Voice Routing (30+ tests)**
-- Call classification (internal, external, invalid)
-- Extension-to-extension routing
-- Outbound E.164 calling
-- Ring group strategies
-- Business hours logic
-- CXML generation
-
-**Security & Multi-tenancy (25+ tests)**
-- Tenant isolation
-- RBAC policy enforcement
-- Authentication and authorization
-- API endpoint security
-
-**Webhook Processing (20+ tests)**
-- Idempotency verification
-- Distributed locking
-- CDR storage
-- Queue job processing
-
-### Performance Testing
-
-Cache performance tests verify expected improvements:
-
-```bash
-docker compose exec app php artisan test tests/Integration/VoiceRoutingCacheIntegrationTest.php
-```
-
-## Database Schema
-
-### Core Tables
-
-- **organizations** - Tenant organizations with settings
-- **users** - Users with RBAC (owner/admin/agent/reporter)
-- **extensions** - Phone extensions with SIP configuration
-- **did_numbers** - Inbound phone numbers with routing
-- **ring_groups** - Extension groups with routing strategies
-- **ring_group_members** - Extensions in ring groups
-- **business_hours_schedules** - Weekly time-based routing
-- **business_hours_schedule_days** - Daily schedules
-- **business_hours_time_ranges** - Time ranges per day
-- **business_hours_exceptions** - Holiday overrides
-- **call_detail_records** - Call history and active calls
-
-All tables have `organization_id` for tenant isolation (except `organizations` itself).
-
-## Performance & Scalability
-
-### Redis Caching Layer
-
-The voice routing cache system provides significant performance improvements:
-
-- **Extension lookups**: 50-90% faster with cache
-- **Business hours queries**: Dramatic improvement (complex relationships cached)
-- **Cache hit rate**: >95% for active extensions
-- **Database load**: Reduced by 80-90% for routing queries
-
-Cache automatically invalidates when data changes via Laravel model observers.
-
-### Optimization Features
-
-- **OpCache** with JIT compilation enabled
-- **Database indexes** on all foreign keys and query fields
-- **Route/config/view caching** in production
-- **Query result caching** via Redis
-- **Lazy loading prevention** with relationship eager loading
-- **N+1 query prevention** with Laravel Debugbar (development)
-
-### Horizontal Scaling
-
-OPBX is designed for horizontal scaling:
-
-- **Stateless application** - no session state in PHP
-- **Shared Redis** for cache/queue/sessions across instances
-- **Database connection pooling** via PgBouncer (recommended for production)
-- **Load balancer ready** - any instance can handle any request
-- **Queue workers scale independently** - add more workers as needed
-
-## Security
-
-### Application Security
-
-- **Tenant isolation**: Global query scopes enforce organization_id filtering on all queries
-- **RBAC**: Policy-based authorization on all resources (owner > admin > agent > reporter)
-- **API authentication**: Laravel Sanctum token-based auth with token rotation
-- **Input validation**: Laravel form requests with comprehensive rules
-- **SQL injection prevention**: Eloquent ORM with parameter binding
-- **XSS protection**: Blade templating with automatic escaping
-- **CXML escaping**: XML entities properly escaped to prevent injection
-
-### Infrastructure Security
-
-- **Environment variables**: Secrets stored in `.env` (never committed)
-- **Database passwords**: Strong passwords required in production
-- **Redis authentication**: Password-protected in production
-- **SSL/TLS**: HTTPS required for webhooks (enforced by Cloudonix)
-- **Rate limiting**: API rate limits to prevent abuse
-- **CORS**: Configured for specific origins only
-
-### Security Best Practices
-
-For production deployment:
-
-1. Set `APP_ENV=production` and `APP_DEBUG=false`
-2. Generate a strong `APP_KEY` (32 characters)
-3. Use strong database and Redis passwords
-4. Configure SSL/TLS termination at load balancer/proxy
-5. Enable firewall rules to restrict database/Redis access
-6. Regularly update dependencies: `composer update` and `npm update`
-7. Monitor logs for suspicious activity
-8. Implement backup strategy for database
-
-## Production Deployment
-
-### Environment Configuration
-
-```env
-# Production settings
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://your-domain.com
-
-# Strong secrets
-APP_KEY=base64:generate-with-php-artisan-key-generate
-DB_PASSWORD=strong-database-password
-REDIS_PASSWORD=strong-redis-password
-
-# Production cache
-CACHE_DRIVER=redis
-SESSION_DRIVER=redis
-QUEUE_CONNECTION=redis
-
-# Webhook URL (your production domain)
-WEBHOOK_BASE_URL=https://your-domain.com
-```
-
-### Optimize for Production
-
-```bash
-# Cache configuration
-docker compose exec app php artisan config:cache
-
-# Cache routes
-docker compose exec app php artisan route:cache
-
-# Cache views
-docker compose exec app php artisan view:cache
-
-# Optimize autoloader
-docker compose exec app composer install --optimize-autoloader --no-dev
-```
-
-### Monitoring
-
-**Health Check Endpoint:**
-```bash
-curl https://your-domain.com/health
-```
-
-**Application Logs:**
-```bash
-docker compose logs -f app
-tail -f storage/logs/laravel.log
-```
-
-**Queue Monitoring:**
-```bash
-docker compose logs -f queue-worker
-docker compose exec app php artisan queue:monitor
-```
-
-**Cache Statistics:**
-```bash
-docker compose exec redis redis-cli INFO stats
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue: Containers won't start**
-```bash
-# Check for port conflicts
-docker compose ps
-lsof -i :80
-lsof -i :3306
-lsof -i :6379
-
-# View container logs
-docker compose logs
-```
-
-**Issue: Database connection failed**
-```bash
-# Check MySQL is running
-docker compose ps mysql
-
-# Verify credentials in .env
-docker compose exec mysql mysql -u opbx -psecret opbx
-
-# Restart MySQL
-docker compose restart mysql
-```
-
-**Issue: Redis connection failed**
-```bash
-# Check Redis is running
-docker compose ps redis
-
-# Test connection
-docker compose exec redis redis-cli ping
-
-# Restart Redis
-docker compose restart redis
-```
-
-**Issue: Cache not invalidating**
-```bash
-# Clear cache manually
-docker compose exec app php artisan cache:clear
-
-# Check observer registration in AppServiceProvider
-docker compose exec app php artisan tinker
->>> App\Models\Extension::getObservableEvents()
-
-# Verify Redis connection
-docker compose exec app php artisan tinker
->>> Cache::put('test', 'value', 60);
->>> Cache::get('test');
-```
-
-**Issue: Webhooks not received**
-```bash
-# Check ngrok is running (local dev)
-curl http://localhost:4040/api/tunnels
-
-# Verify WEBHOOK_BASE_URL in .env
-docker compose exec app php artisan tinker
->>> config('app.webhook_base_url')
-
-# Test webhook endpoint manually
-curl -X POST http://localhost/api/webhooks/cloudonix/call-initiated \
-  -H "Content-Type: application/json" \
-  -d '{"CallSid":"test123","From":"+1234567890","To":"+1987654321"}'
-```
-
-**Issue: Queue jobs not processing**
-```bash
-# Check queue worker is running
-docker compose ps queue-worker
-docker compose logs queue-worker
-
-# Restart queue worker
-docker compose restart queue-worker
-
-# Check failed jobs
-docker compose exec app php artisan queue:failed
-
-# Retry failed jobs
-docker compose exec app php artisan queue:retry all
-```
-
-## Documentation
-
-- **Webhook Authentication**: `docs/WEBHOOK-AUTHENTICATION.md` - Complete guide to webhook security and authentication methods
-- **Cache System**: `docs/VOICE_ROUTING_CACHE.md` - Comprehensive Redis caching documentation
-- **API Reference**: `docs/API.md` (planned)
-- **Architecture**: `docs/ARCHITECTURE.md` (planned)
-- **Cloudonix Integration**: https://developers.cloudonix.com
-
-## Roadmap
-
-### Phase 2: Frontend Development
-- [ ] React SPA with modern UI
-- [ ] Real-time WebSocket integration
-- [ ] Dashboard with call statistics
-- [ ] Extension management interface
-- [ ] Ring group configuration UI
-- [ ] Business hours scheduler UI
-
-### Phase 3: Advanced Features
-- [ ] Outbound campaign management
-- [ ] IVR (Interactive Voice Response)
-- [ ] Call queues with hold music
-- [ ] Call recording management
-- [ ] WebRTC softphone
-- [ ] Analytics and reporting dashboard
-
-### Phase 4: Enterprise Features
-- [ ] Multi-language support (i18n)
-- [ ] Custom branding per organization
-- [ ] Advanced analytics and BI
-- [ ] API rate limiting per organization
-- [ ] Audit log viewer
-- [ ] Backup and disaster recovery tools
-
-## Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Follow PSR-12 coding standards
-4. Write tests for new features
-5. Ensure all tests pass: `docker compose exec app php artisan test`
-6. Run code style checks: `docker compose exec app ./vendor/bin/pint`
-7. Commit changes: `git commit -m 'Add amazing feature'`
-8. Push to branch: `git push origin feature/amazing-feature`
-9. Submit a pull request
-
-### Development Guidelines
-
-- All new features must have test coverage
-- Follow Laravel best practices
-- Use type hints and return types (PHP 8.4+)
-- Document complex logic with comments
-- Update CHANGELOG.md for notable changes
-- Update documentation for new features
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Support
-
-- **Documentation**: See `docs/` directory
-- **Cloudonix Docs**: https://developers.cloudonix.com
-- **GitHub Issues**: [Report a bug or request a feature]
-- **Email**: support@example.com (replace with actual support email)
-
-## Credits
-
-Built with:
-- [Laravel](https://laravel.com) - PHP Framework
-- [Cloudonix CPaaS](https://cloudonix.com) - Communications Platform
-- [Docker](https://docker.com) - Containerization
-- [Redis](https://redis.io) - Cache, Queue & Sessions
-- [MySQL](https://mysql.com) - Database
-- [ngrok](https://ngrok.com) - Webhook Tunneling
+### Test Coverage
+
+- **100+ tests** covering all major features
+- Cache system, voice routing, security, webhook processing
+- Multi-tenancy and RBAC verification
 
 ---
 
-**Built with ❤️ by the OPBX Team**
+## Contributing
 
-Made possible by [Cloudonix](https://cloudonix.com) - Cloud Communications Platform
+We welcome contributions from the community! Here's how to get started:
+
+### Development Setup
+
+1. Fork the repository
+2. Clone your fork locally
+3. Follow the [Installation](#installation) instructions
+4. Create a feature branch: `git checkout -b feature/your-feature-name`
+
+### Guidelines
+
+- **Code Style**: Follow PSR-12 for PHP and ESLint/Prettier for TypeScript
+- **Testing**: Add tests for new features and bug fixes
+- **Documentation**: Update relevant docs for any changes
+- **Commits**: Use conventional commit messages (`feat:`, `fix:`, `docs:`, etc.)
+
+### Pull Request Process
+
+1. Ensure all tests pass: `docker compose exec app php artisan test`
+2. Update `CHANGELOG.md` with your changes
+3. Open a PR with a clear description of changes
+4. Address any review feedback
+
+### Reporting Issues
+
+- Use GitHub Issues for bug reports and feature requests
+- Include steps to reproduce for bugs
+- Check existing issues before creating new ones
+
+---
+
+## Credits
+
+### Created By
+
+- **Nir Simionovich** ([@greenfieldtech-nirs](https://github.com/greenfieldtech-nirs)) - Lead Architect
+
+### Created Using
+
+- **Claude Code** ([@claudecode](https://claude.com/product/claude-code)) - Backend Developer
+- **Grok Code Fast 1** ([@grokcode](https://x.ai/news/grok-code-fast-1)) - Frontend Developer
+- **Google Gemini** ([@gemini](https://gemini.google.com/app)) - Code Reviewer and Expert Debugger
+- **Google Antigravity** ([@antigravity](https://antigravity.google.com/app))
+- **OpenCode** ([@opencode](https://opencode.ai/))
+
+### Built With Support From
+
+- [Cloudonix](https://cloudonix.com) - CPaaS platform powering all telephony
+- [Laravel](https://laravel.com) - PHP application framework
+- The open source community
+
+### Special Thanks
+
+- All contributors who have helped improve this project
+- The Laravel, React, and Docker communities for their excellent documentation
+
+---
+
+## License
+
+This project is licensed under the **MIT License**.
+
+```
+MIT License
+
+Copyright (c) 2025-2026 Nir Simionovich / Greenfield Technologies Ltd.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+## Documentation
+
+Additional documentation is available in the `docs/` directory:
+
+- [Architecture Overview](docs/architecture/architecture-overview.md)
+- [Security Implementation](docs/architecture/security-implementation.md)
+- [Database Schema](docs/architecture/database-schema.md)
+- [API & Webhooks](docs/architecture/api-webhooks.md)
+- [Docker Setup](docs/architecture/docker-setup.md)
+- [WebSocket Integration](docs/architecture/realtime-websockets.md)
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/greenfieldtech-nirs">Greenfield Technologies</a>&nbsp;&nbsp;Empowered by <a href="https://developers.cloudonix.com">Cloudonix</a>
+
+</p>
