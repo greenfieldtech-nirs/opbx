@@ -479,5 +479,6 @@ Additional documentation is available in the `docs/` directory:
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/greenfieldtech-nirs">Greenfield Technologies</a>
+  Made with ❤️ by <a href="https://github.com/greenfieldtech-nirs">Greenfield Technologies</a>&nbsp;&nbsp;Empowered by <a href="https://developers.cloudonix.com">Cloudonix</a>
+
 </p>
