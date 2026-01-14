@@ -33,7 +33,29 @@ class RingGroupResource extends JsonResource
             'ring_turns' => $this->ring_turns,
             'fallback_action' => $this->fallback_action->value,
             'fallback_extension_id' => $this->fallback_extension_id,
+            'fallback_ring_group_id' => $this->fallback_ring_group_id,
+            'fallback_ivr_menu_id' => $this->fallback_ivr_menu_id,
+            'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
             'status' => $this->status->value,
+            'members' => $this->whenLoaded('members', function () {
+                return $this->members->map(function ($member) {
+                    return [
+                        'id' => $member->id,
+                        'extension_id' => $member->extension_id,
+                        'extension_number' => $member->extension->extension_number ?? null,
+                        'user_name' => $member->extension->user->name ?? null,
+                        'priority' => $member->priority,
+                    ];
+                });
+            }),
+            'members_count' => $this->when(isset($this->members_count), $this->members_count),
+            'active_members_count' => $this->when(isset($this->active_members_count), $this->active_members_count),
+            'fallback_extension' => $this->whenLoaded('fallbackExtension', function () {
+                return [
+                    'id' => $this->fallbackExtension->id,
+                    'extension_number' => $this->fallbackExtension->extension_number,
+                ];
+            }),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

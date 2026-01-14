@@ -425,7 +425,7 @@ abstract class AbstractApiCrudController extends Controller
         $collection = $resourceClass::collection($models);
         
         return response()->json([
-            $this->getPluralResourceKey() => $collection->items(),
+            $this->getPluralResourceKey() => $collection->resolve(),
             'meta' => [
                 'current_page' => $models->currentPage(),
                 'per_page' => $models->perPage(),
