@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: opbx_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+     volumes:
+       - ./frontend:/app
+       - /app/node_modules # Prevent overwriting node_modules
+     environment:
+       - VITE_API_BASE_URL=http://localhost/api/v1
