@@ -408,14 +408,14 @@ abstract class AbstractApiCrudController extends Controller
             }
         }
 
-        Log::info($this->getPluralResourceKey() . ' list retrieved', [
-            'request_id' => $requestId,
+        $context = $this->getLoggingContext();
+        Log::info($this->getPluralResourceKey() . ' list retrieved', array_merge($context, [
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
             'total' => $models->total(),
             'per_page' => $perPage,
             'filters' => $filters,
-        ]);
+        ]));
 
         $resourceClass = $this->getResourceClass();
         $collection = $resourceClass::collection($models);
@@ -448,11 +448,11 @@ abstract class AbstractApiCrudController extends Controller
             ? $request->validated() 
             : $request->all();
 
-        Log::info('Creating new ' . $this->getResourceKey(), [
-            'request_id' => $requestId,
+        $context = $this->getLoggingContext();
+        Log::info('Creating new ' . $this->getResourceKey(), array_merge($context, [
             'creator_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
-        ]);
+        ]));
 
         try {
             $model = DB::transaction(function () use ($currentUser, $validated, $request): Model {
@@ -472,12 +472,12 @@ abstract class AbstractApiCrudController extends Controller
                 return $model;
             });
 
-            Log::info($this->getResourceKey() . ' created successfully', [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::info($this->getResourceKey() . ' created successfully', array_merge($context, [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
-            ]);
+            ]));
 
             $resourceClass = $this->getResourceClass();
             return response()->json([
@@ -485,14 +485,14 @@ abstract class AbstractApiCrudController extends Controller
                 $this->getResourceKey() => new $resourceClass($model),
             ], 201);
         } catch (\Exception $e) {
-            Log::error($this->getCreateErrorMessage(), [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::error($this->getCreateErrorMessage(), array_merge($context, [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]);
+            ]));
 
             return response()->json([
                 'error' => $this->getCreateErrorMessage(),
@@ -514,13 +514,13 @@ abstract class AbstractApiCrudController extends Controller
 
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
-            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' access attempt', [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' access attempt', array_merge($context, [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'target_' . $this->getResourceKey() . '_id' => $model->id,
                 'target_organization_id' => $model->organization_id,
-            ]);
+            ]));
 
             return response()->json([
                 'error' => 'Not Found',
@@ -528,12 +528,12 @@ abstract class AbstractApiCrudController extends Controller
             ], 404);
         }
 
-        Log::info($this->getResourceKey() . ' details retrieved', [
-            'request_id' => $requestId,
+        $context = $this->getLoggingContext();
+        Log::info($this->getResourceKey() . ' details retrieved', array_merge($context, [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
             $this->getResourceKey() . '_id' => $model->id,
-        ]);
+        ]));
 
         // Apply after show hook (for loading additional relationships)
         $this->afterShow($model, $request);
@@ -556,13 +556,13 @@ abstract class AbstractApiCrudController extends Controller
 
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
-            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' update attempt', [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' update attempt', array_merge($context, [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'target_' . $this->getResourceKey() . '_id' => $model->id,
                 'target_organization_id' => $model->organization_id,
-            ]);
+            ]));
 
             return response()->json([
                 'error' => 'Not Found',
@@ -583,13 +583,13 @@ abstract class AbstractApiCrudController extends Controller
             }
         }
 
-        Log::info('Updating ' . $this->getResourceKey(), [
-            'request_id' => $requestId,
+        $context = $this->getLoggingContext();
+        Log::info('Updating ' . $this->getResourceKey(), array_merge($context, [
             'updater_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
             $this->getResourceKey() . '_id' => $model->id,
             'changed_fields' => $changedFields,
-        ]);
+        ]));
 
         // Acquire distributed lock if needed
         $lock = $this->acquireUpdateLock($model, $request);
@@ -609,13 +609,13 @@ abstract class AbstractApiCrudController extends Controller
             // Reload model
             $model->refresh();
 
-            Log::info($this->getResourceKey() . ' updated successfully', [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::info($this->getResourceKey() . ' updated successfully', array_merge($context, [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
                 'changed_fields' => $changedFields,
-            ]);
+            ]));
 
             $resourceClass = $this->getResourceClass();
             return response()->json([
@@ -623,15 +623,15 @@ abstract class AbstractApiCrudController extends Controller
                 $this->getResourceKey() => new $resourceClass($model),
             ]);
         } catch (\Exception $e) {
-            Log::error($this->getUpdateErrorMessage(), [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::error($this->getUpdateErrorMessage(), array_merge($context, [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]);
+            ]));
 
             return response()->json([
                 'error' => $this->getUpdateErrorMessage(),
@@ -656,13 +656,13 @@ abstract class AbstractApiCrudController extends Controller
 
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
-            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' deletion attempt', [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' deletion attempt', array_merge($context, [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'target_' . $this->getResourceKey() . '_id' => $model->id,
                 'target_organization_id' => $model->organization_id,
-            ]);
+            ]));
 
             return response()->json([
                 'error' => 'Not Found',
@@ -670,12 +670,12 @@ abstract class AbstractApiCrudController extends Controller
             ], 404);
         }
 
-        Log::info('Deleting ' . $this->getResourceKey(), [
-            'request_id' => $requestId,
+        $context = $this->getLoggingContext();
+        Log::info('Deleting ' . $this->getResourceKey(), array_merge($context, [
             'deleter_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
             $this->getResourceKey() . '_id' => $model->id,
-        ]);
+        ]));
 
         try {
             DB::transaction(function () use ($model, $request): void {
@@ -689,24 +689,24 @@ abstract class AbstractApiCrudController extends Controller
                 $this->afterDestroy($model, $request);
             });
 
-            Log::info($this->getResourceKey() . ' deleted successfully', [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::info($this->getResourceKey() . ' deleted successfully', array_merge($context, [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
-            ]);
+            ]));
 
             return response()->json(null, 204);
         } catch (\Exception $e) {
-            Log::error($this->getDeleteErrorMessage(), [
-                'request_id' => $requestId,
+            $context = $this->getLoggingContext();
+            Log::error($this->getDeleteErrorMessage(), array_merge($context, [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]);
+            ]));
 
             return response()->json([
                 'error' => $this->getDeleteErrorMessage(),
