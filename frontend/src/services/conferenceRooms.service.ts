@@ -19,9 +19,9 @@ export const conferenceRoomsService = {
    * GET /conference-rooms
    */
   getAll: (params?: ConferenceRoomsFilterParams): Promise<PaginatedResponse<ConferenceRoom>> => {
-    return api.get<{ data: ConferenceRoom[]; meta: any }>('/conference-rooms', { params })
+    return api.get<{ conferencerooms: ConferenceRoom[]; meta: any }>('/conference-rooms', { params })
       .then(res => ({
-        data: res.data.data,
+        data: res.data.conferencerooms,
         meta: res.data.meta,
       }));
   },
@@ -31,8 +31,8 @@ export const conferenceRoomsService = {
    * GET /conference-rooms/:id
    */
   getById: (id: string): Promise<ConferenceRoom> => {
-    return api.get<{ conference_room: ConferenceRoom }>(`/conference-rooms/${id}`)
-      .then(res => res.data.conference_room);
+    return api.get<{ conferenceroom: ConferenceRoom }>(`/conference-rooms/${id}`)
+      .then(res => res.data.conferenceroom);
   },
 
   /**
@@ -40,8 +40,8 @@ export const conferenceRoomsService = {
    * POST /conference-rooms
    */
   create: (data: CreateConferenceRoomRequest): Promise<ConferenceRoom> => {
-    return api.post<{ message: string; conference_room: ConferenceRoom }>('/conference-rooms', data)
-      .then(res => res.data.conference_room);
+    return api.post<{ message: string; conferenceroom: ConferenceRoom }>('/conference-rooms', data)
+      .then(res => res.data.conferenceroom);
   },
 
   /**
@@ -49,8 +49,8 @@ export const conferenceRoomsService = {
    * PUT /conference-rooms/:id
    */
   update: (id: string, data: UpdateConferenceRoomRequest): Promise<ConferenceRoom> => {
-    return api.put<{ message: string; conference_room: ConferenceRoom }>(`/conference-rooms/${id}`, data)
-      .then(res => res.data.conference_room);
+    return api.put<{ message: string; conferenceroom: ConferenceRoom }>(`/conference-rooms/${id}`, data)
+      .then(res => res.data.conferenceroom);
   },
 
   /**
