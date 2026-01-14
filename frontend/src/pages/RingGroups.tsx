@@ -119,7 +119,7 @@ import { CSS } from '@dnd-kit/utilities';
 // Sortable item component for drag-and-drop
 interface SortableItemProps {
   id: string;
-  children: React.ReactNode;
+  children: (dragHandleProps: any) => React.ReactNode;
 }
 
 function SortableItem({ id, children }: SortableItemProps) {
@@ -138,9 +138,15 @@ function SortableItem({ id, children }: SortableItemProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Pass listeners only to the drag handle, not the entire container
+  const dragHandleProps = {
+    ...attributes,
+    ...listeners,
+  };
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
+    <div ref={setNodeRef} style={style}>
+      {children(dragHandleProps)}
     </div>
   );
 }
@@ -272,10 +278,25 @@ export default function RingGroups() {
 
   // Filter out current ring group when editing (can't fallback to self)
   const allRingGroups = useMemo(() => {
+    console.log('[allRingGroups useMemo] Computing...');
+    console.log('  - allRingGroupsData:', allRingGroupsData);
+    console.log('  - allRingGroupsData?.data:', allRingGroupsData?.data);
+    console.log('  - typeof allRingGroupsData?.data:', typeof allRingGroupsData?.data);
+    console.log('  - Array.isArray(allRingGroupsData?.data):', Array.isArray(allRingGroupsData?.data));
+    console.log('  - selectedGroup:', selectedGroup);
+    
     const groups = allRingGroupsData?.data || [];
+    console.log('  - groups (before filter):', groups);
+    console.log('  - groups.length:', groups.length);
+    
     if (selectedGroup) {
-      return groups.filter(g => g.id !== selectedGroup.id);
+      const filtered = groups.filter(g => g.id !== selectedGroup.id);
+      console.log('  - filtered (after removing current):', filtered);
+      console.log('  - filtered.length:', filtered.length);
+      return filtered;
     }
+    
+    console.log('  - returning all groups (no selectedGroup)');
     return groups;
   }, [allRingGroupsData, selectedGroup]);
 
@@ -899,38 +920,40 @@ export default function RingGroups() {
                       <div className="border rounded-lg divide-y">
                         {formData.members.map((member, index) => (
                           <SortableItem key={member.extension_id} id={member.extension_id}>
-                            <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
-                              <div className="cursor-grab">
-                                <GripVertical className="h-4 w-4 text-gray-400" />
-                              </div>
+                            {(dragHandleProps) => (
+                              <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
+                                <div className="cursor-grab" {...dragHandleProps}>
+                                  <GripVertical className="h-4 w-4 text-gray-400" />
+                                </div>
 
-                              <div className="flex-1">
-                                <Select
-                                  value={member.extension_id}
-                                  onValueChange={(value) => updateMemberExtension(index, value)}
+                                <div className="flex-1">
+                                  <Select
+                                    value={member.extension_id}
+                                    onValueChange={(value) => updateMemberExtension(index, value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                        <SelectItem key={ext.id} value={ext.id}>
+                                          {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeMember(index)}
                                 >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                                      <SelectItem key={ext.id} value={ext.id}>
-                                        {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
-
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeMember(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            )}
                           </SortableItem>
                         ))}
                       </div>
@@ -1169,30 +1192,43 @@ export default function RingGroups() {
                     </SelectContent>
                   </Select>
                 )}
-                {formData.fallback_action === 'ring_group' && (
-                  <Select
-                    value={formData.fallback_ring_group_id || ''}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fallback_ring_group_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select ring group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allRingGroups.map((group) => (
-                        <SelectItem key={group.id} value={group.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
-                              <Users className="h-3.5 w-3.5" />
-                              {group.name}
-                            </Badge>
+                {formData.fallback_action === 'ring_group' && (() => {
+                  console.log('[RENDER] Ring Group Select - allRingGroups:', allRingGroups);
+                  console.log('[RENDER] Ring Group Select - allRingGroups.length:', allRingGroups.length);
+                  console.log('[RENDER] Ring Group Select - formData.fallback_ring_group_id:', formData.fallback_ring_group_id);
+                  return (
+                    <Select
+                      value={formData.fallback_ring_group_id || ''}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ring_group_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select ring group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allRingGroups.length === 0 && (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            No ring groups available
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                   </Select>
-                 )}
+                        )}
+                        {allRingGroups.map((group) => {
+                          console.log('[RENDER] Mapping ring group:', group);
+                          return (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
+                                  <Users className="h-3.5 w-3.5" />
+                                  {group.name}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
                  {formData.fallback_action === 'ivr_menu' && (
                    <Select
                      value={formData.fallback_ivr_menu_id || ''}
