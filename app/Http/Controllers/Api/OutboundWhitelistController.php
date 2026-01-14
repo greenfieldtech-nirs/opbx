@@ -77,6 +77,15 @@ class OutboundWhitelistController extends AbstractApiCrudController
     }
 
     /**
+     * Override route parameter name to match Laravel's apiResource convention.
+     * Laravel converts 'outbound-whitelist' route to 'outbound_whitelist' parameter.
+     */
+    protected function getRouteParameterName(): string
+    {
+        return 'outbound_whitelist';
+    }
+
+    /**
      * Display a paginated list of outbound whitelist entries.
      *
      * Overrides parent to maintain custom response format with meta pagination info.

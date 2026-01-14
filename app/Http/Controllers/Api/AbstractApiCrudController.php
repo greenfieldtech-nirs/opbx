@@ -127,9 +127,15 @@ abstract class AbstractApiCrudController extends Controller
     {
         $modelClass = $this->getModelClass();
         $parameterName = $this->getRouteParameterName();
+        $currentUser = $this->getAuthenticatedUser();
 
         if ($key === null) {
             $key = $request->route($parameterName);
+        }
+
+        // Apply organization scope if the model supports it
+        if (method_exists($modelClass, 'scopeForOrganization') && $currentUser) {
+            return $modelClass::forOrganization($currentUser->organization_id)->findOrFail($key);
         }
 
         return $modelClass::findOrFail($key);
