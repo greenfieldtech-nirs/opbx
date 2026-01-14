@@ -13,6 +13,7 @@ use App\Http\Requests\Settings\UpdateCloudonixSettingsRequest;
 use App\Http\Requests\Settings\ValidateCloudonixRequest;
 use App\Models\CloudonixSettings;
 use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\Logging\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -128,6 +129,26 @@ class SettingsController extends Controller
                 'organization_id' => $user->organization_id,
                 'settings_id' => $settings->id,
             ]);
+
+            // Add audit logging for Cloudonix settings update
+            try {
+                $changes = [];
+                // Track which fields were changed (excluding sensitive fields like API keys)
+                if (isset($validated['domain_uuid'])) $changes[] = 'domain_uuid';
+                if (isset($validated['domain_name'])) $changes[] = 'domain_name';
+                if (isset($validated['webhook_base_url'])) $changes[] = 'webhook_base_url';
+                if (isset($validated['no_answer_timeout'])) $changes[] = 'no_answer_timeout';
+                if (isset($validated['recording_format'])) $changes[] = 'recording_format';
+
+                AuditLogger::logCloudonixConfigUpdated($request, $changes);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log Cloudonix settings update audit', [
+                    'user_id' => $user->id,
+                    'organization_id' => $user->organization_id,
+                    'error' => $auditException->getMessage(),
+                ]);
+            }
 
             // Sync settings to Cloudonix if credentials are configured
             $cloudonixSyncWarning = null;

@@ -12,6 +12,7 @@ use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -171,6 +172,17 @@ class UsersController extends AbstractApiCrudController
                 abort(409, 'Cannot delete the last owner in the organization.');
             }
         }
+
+        // Add audit logging for user deletion (before actual deletion)
+        try {
+            AuditLogger::logUserDeleted($request, $model->id, $model->email);
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log user deletion audit', [
+                'user_id' => $model->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -180,6 +192,19 @@ class UsersController extends AbstractApiCrudController
     {
         // Reload extension relationship
         $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+
+        // Add audit logging for user creation
+        try {
+            assert($model instanceof User);
+            $currentUser = $this->getAuthenticatedUser();
+            AuditLogger::logUserCreated($request, $model);
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log user creation audit', [
+                'user_id' => $model->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -189,6 +214,40 @@ class UsersController extends AbstractApiCrudController
     {
         // Reload extension relationship
         $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+
+        // Add audit logging for user updates
+        try {
+            assert($model instanceof User);
+            $currentUser = $this->getAuthenticatedUser();
+
+            // Get validated data to check what changed
+            $validated = method_exists($request, 'validated')
+                ? $request->validated()
+                : $request->all();
+
+            // Check if role changed specifically
+            if (isset($validated['role']) && $validated['role'] !== $model->role->value) {
+                // Role was changed - log this specifically
+                AuditLogger::log('user.role_changed', [
+                    'target_user_id' => $model->id,
+                    'target_user_email' => $model->email,
+                    'old_role' => $model->getOriginal('role'),
+                    'new_role' => $model->role->value,
+                ], AuditLogger::LEVEL_WARNING, $request, $currentUser);
+            }
+
+            // Log general user update
+            $changes = $this->getChangedFields($model, $validated);
+            if (!empty($changes)) {
+                AuditLogger::logUserUpdated($request, $model, $changes);
+            }
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log user update audit', [
+                'user_id' => $model->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
     }
 
     /**

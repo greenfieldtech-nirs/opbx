@@ -15,6 +15,7 @@ use App\Http\Requests\Extension\UpdateExtensionRequest;
 use App\Http\Resources\ExtensionResource;
 use App\Models\Extension;
 use App\Services\CloudonixClient\CloudonixSubscriberService;
+use App\Services\Logging\AuditLogger;
 use App\Services\PasswordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -169,6 +170,17 @@ class ExtensionController extends Controller
                 'extension_number' => $extension->extension_number,
             ]);
 
+            // Add audit logging for extension creation
+            try {
+                AuditLogger::logExtensionCreated($request, $extension);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log extension creation audit', [
+                    'extension_id' => $extension->id,
+                    'error' => $auditException->getMessage(),
+                ]);
+            }
+
             // Sync to Cloudonix if USER type extension
             $cloudonixWarning = $this->syncExtensionToCloudonix($extension, $subscriberService);
 
@@ -308,6 +320,17 @@ class ExtensionController extends Controller
                 'changed_fields' => $changedFields,
             ]);
 
+            // Add audit logging for extension update
+            try {
+                AuditLogger::logExtensionUpdated($request, $extension, $changedFields);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log extension update audit', [
+                    'extension_id' => $extension->id,
+                    'error' => $auditException->getMessage(),
+                ]);
+            }
+
             // Sync to Cloudonix if USER type extension and already synced
             $cloudonixWarning = $this->syncExtensionToCloudonix(
                 $extension,
@@ -380,6 +403,17 @@ class ExtensionController extends Controller
         }
 
         // Log will be handled by success/failure methods below
+
+        // Add audit logging for extension deletion (before actual deletion)
+        try {
+            AuditLogger::logExtensionDeleted($request, $extension->id, $extension->extension_number);
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log extension deletion audit', [
+                'extension_id' => $extension->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
 
         try {
             // Unsync from Cloudonix before deletion if synced
@@ -533,6 +567,22 @@ class ExtensionController extends Controller
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
             ]);
+
+            // Add audit logging for password reset
+            try {
+                AuditLogger::log('extension.password_reset', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'user_id' => $extension->user_id,
+                    'organization_id' => $currentUser->organization_id,
+                ], AuditLogger::LEVEL_INFO, $request, $currentUser);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log extension password reset audit', [
+                    'extension_id' => $extension->id,
+                    'error' => $auditException->getMessage(),
+                ]);
+            }
 
             // Sync to Cloudonix if USER type extension and already synced
             $cloudonixWarning = $this->syncExtensionToCloudonix(
