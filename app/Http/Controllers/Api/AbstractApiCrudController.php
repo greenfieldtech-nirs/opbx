@@ -431,6 +431,7 @@ abstract class AbstractApiCrudController extends Controller
                 'organization_id' => $currentUser->organization_id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
@@ -568,6 +569,7 @@ abstract class AbstractApiCrudController extends Controller
                 $this->getResourceKey() . '_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
@@ -643,6 +645,7 @@ abstract class AbstractApiCrudController extends Controller
                 $this->getResourceKey() . '_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
