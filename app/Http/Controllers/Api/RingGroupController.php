@@ -129,6 +129,12 @@ class RingGroupController extends AbstractApiCrudController
         // Determine the active fallback action
         $action = $validated['fallback_action'] ?? ($ringGroup?->fallback_action->value ?? null);
 
+        // Preserve incoming fallback IDs before clearing
+        $incomingExtensionId = $validated['fallback_extension_id'] ?? null;
+        $incomingRingGroupId = $validated['fallback_ring_group_id'] ?? null;
+        $incomingIvrMenuId = $validated['fallback_ivr_menu_id'] ?? null;
+        $incomingAiAssistantId = $validated['fallback_ai_assistant_id'] ?? null;
+
         // Clear all fallback IDs first
         $validated['fallback_extension_id'] = null;
         $validated['fallback_ring_group_id'] = null;
@@ -138,19 +144,19 @@ class RingGroupController extends AbstractApiCrudController
         // Set only the relevant fallback ID based on action type
         switch ($action) {
             case 'extension':
-                $validated['fallback_extension_id'] = $validated['fallback_extension_id']
+                $validated['fallback_extension_id'] = $incomingExtensionId
                     ?? $ringGroup?->fallback_extension_id;
                 break;
             case 'ring_group':
-                $validated['fallback_ring_group_id'] = $validated['fallback_ring_group_id']
+                $validated['fallback_ring_group_id'] = $incomingRingGroupId
                     ?? $ringGroup?->fallback_ring_group_id;
                 break;
             case 'ivr_menu':
-                $validated['fallback_ivr_menu_id'] = $validated['fallback_ivr_menu_id']
+                $validated['fallback_ivr_menu_id'] = $incomingIvrMenuId
                     ?? $ringGroup?->fallback_ivr_menu_id;
                 break;
             case 'ai_assistant':
-                $validated['fallback_ai_assistant_id'] = $validated['fallback_ai_assistant_id']
+                $validated['fallback_ai_assistant_id'] = $incomingAiAssistantId
                     ?? $ringGroup?->fallback_ai_assistant_id;
                 break;
             // Other actions (voicemail, hangup, etc.) don't need fallback IDs
