@@ -183,7 +183,25 @@ class UsersController extends AbstractApiCrudController
         $model->load('extension:id,user_id,extension_number');
     }
 
-    // Note: store() and update() methods are inherited from AbstractApiCrudController
-    // Type hints for specific FormRequest classes are handled by Laravel's dependency injection
-    // The validation is performed by CreateUserRequest and UpdateUserRequest automatically
+    /**
+     * Store a newly created user.
+     * 
+     * Laravel's DI will inject CreateUserRequest and run validation automatically.
+     */
+    public function store(CreateUserRequest $request): JsonResponse
+    {
+        // Cast to base Request type for parent compatibility
+        return parent::store($request);
+    }
+
+    /**
+     * Update the specified user.
+     * 
+     * Laravel's DI will inject UpdateUserRequest and run validation automatically.
+     */
+    public function update(UpdateUserRequest $request): JsonResponse
+    {
+        // Cast to base Request type for parent compatibility
+        return parent::update($request);
+    }
 }

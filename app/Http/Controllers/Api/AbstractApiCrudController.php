@@ -396,7 +396,10 @@ abstract class AbstractApiCrudController extends Controller
 
         $this->authorize($this->getCreateAbility(), $this->getModelClass());
 
-        $validated = $request->validated();
+        // Get validated data - works with FormRequest objects
+        $validated = method_exists($request, 'validated') 
+            ? $request->validated() 
+            : $request->all();
 
         Log::info('Creating new ' . $this->getResourceKey(), [
             'request_id' => $requestId,
@@ -525,7 +528,10 @@ abstract class AbstractApiCrudController extends Controller
             ], 404);
         }
 
-        $validated = $request->validated();
+        // Get validated data - works with FormRequest objects
+        $validated = method_exists($request, 'validated') 
+            ? $request->validated() 
+            : $request->all();
 
         // Track changed fields for logging
         $changedFields = [];
