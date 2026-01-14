@@ -56,6 +56,11 @@ class RingGroupController extends AbstractApiCrudController
         return 'desc';
     }
 
+    protected function getRouteParameterName(): string
+    {
+        return 'ring_group';
+    }
+
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
         $query->with([
