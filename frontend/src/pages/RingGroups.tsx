@@ -3,7 +3,7 @@
  * Full CRUD operations with backend API integration
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -264,12 +264,20 @@ export default function RingGroups() {
   const availableAiAssistants = aiAssistantsData?.data || [];
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
-  const { data: allRingGroupsData } = useQuery({
+  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
     queryKey: ['ring-groups-all'],
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
+    staleTime: 60000, // 1 minute - keep fresh for form usage
   });
 
-  const allRingGroups = allRingGroupsData?.data || [];
+  // Filter out current ring group when editing (can't fallback to self)
+  const allRingGroups = useMemo(() => {
+    const groups = allRingGroupsData?.data || [];
+    if (selectedGroup) {
+      return groups.filter(g => g.id !== selectedGroup.id);
+    }
+    return groups;
+  }, [allRingGroupsData, selectedGroup]);
 
   const availableExtensions = extensionsData?.data || [];
 
@@ -507,20 +515,53 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-     const requestData = {
-       name: formData.name!,
-       description: formData.description,
-       strategy: formData.strategy as RingGroupStrategy,
-       timeout: formData.timeout!,
-       ring_turns: formData.ring_turns!,
-       fallback_action: formData.fallback_action as RingGroupFallbackAction,
-       fallback_extension_id: formData.fallback_extension_id,
-       fallback_ring_group_id: formData.fallback_ring_group_id,
-       fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-       fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-       status: formData.status as RingGroupStatus,
-       members,
-     };
+    // Build request data - only include the fallback ID that matches the selected action
+    const requestData: any = {
+      name: formData.name!,
+      description: formData.description,
+      strategy: formData.strategy as RingGroupStrategy,
+      timeout: formData.timeout!,
+      ring_turns: formData.ring_turns!,
+      fallback_action: formData.fallback_action as RingGroupFallbackAction,
+      status: formData.status as RingGroupStatus,
+      members,
+    };
+
+    // Only include the relevant fallback ID based on fallback_action
+    // Set others to null to clear them
+    switch (formData.fallback_action) {
+      case 'extension':
+        requestData.fallback_extension_id = formData.fallback_extension_id;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ring_group':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ivr_menu':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ai_assistant':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        break;
+      case 'hangup':
+        // No destination IDs needed for hangup action
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+    }
 
     createMutation.mutate(requestData);
   };
@@ -535,20 +576,53 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData = {
+    // Build request data - only include the fallback ID that matches the selected action
+    const requestData: any = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
       timeout: formData.timeout,
       ring_turns: formData.ring_turns,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
+
+    // Only include the relevant fallback ID based on fallback_action
+    // Set others to null to clear them
+    switch (formData.fallback_action) {
+      case 'extension':
+        requestData.fallback_extension_id = formData.fallback_extension_id;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ring_group':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ivr_menu':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ai_assistant':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        break;
+      case 'hangup':
+        // No destination IDs needed for hangup action
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+    }
 
     updateMutation.mutate({ id: selectedGroup.id, data: requestData });
   };
@@ -711,8 +785,11 @@ export default function RingGroups() {
   const renderFormDialog = (isEdit: boolean) => {
     // Debug logging for fallback selects
     console.log('=== RING GROUPS DEBUG ===');
+    console.log('isLoadingAllRingGroups:', isLoadingAllRingGroups);
     console.log('allRingGroupsData RAW:', allRingGroupsData);
-    console.log('allRingGroups extracted:', allRingGroups);
+    console.log('allRingGroupsData?.data:', allRingGroupsData?.data);
+    console.log('allRingGroups (after filter):', allRingGroups);
+    console.log('selectedGroup:', selectedGroup);
     console.log('Available data for fallback selects:', {
       allRingGroups: allRingGroups?.length || 0,
       availableIvrMenus: availableIvrMenus?.length || 0,
