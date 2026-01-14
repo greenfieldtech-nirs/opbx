@@ -11,6 +11,7 @@ use App\Http\Resources\ConferenceRoomResource;
 use App\Models\ConferenceRoom;
 use App\Http\Controllers\Traits\AppliesFilters;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -145,12 +146,12 @@ class ConferenceRoomController extends AbstractApiCrudController
     /**
      * Check for references before deleting a conference room.
      */
-    protected function beforeDestroy(ConferenceRoom $conferenceRoom, Request $request): void
+    protected function beforeDestroy(Model $model, Request $request): void
     {
         $this->checkResourceReferencesBeforeDelete(
             'conference_room',
-            $conferenceRoom->id,
-            $conferenceRoom->organization_id
+            $model->id,
+            $model->organization_id
         );
     }
 

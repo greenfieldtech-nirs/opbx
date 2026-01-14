@@ -270,12 +270,12 @@ class RingGroupController extends AbstractApiCrudController
     /**
      * Check for references before deleting a ring group.
      */
-    protected function beforeDestroy(RingGroup $ringGroup, Request $request): void
+    protected function beforeDestroy(Model $model, Request $request): void
     {
         $this->checkResourceReferencesBeforeDelete(
             'ring_group',
-            $ringGroup->id,
-            $ringGroup->organization_id
+            $model->id,
+            $model->organization_id
         );
     }
 
