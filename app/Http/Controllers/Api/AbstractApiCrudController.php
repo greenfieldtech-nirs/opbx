@@ -165,6 +165,51 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Check if a specific field has changed by comparing old and new values.
+     * Handles JSON/array fields specially by using json_encode comparison.
+     *
+     * @param Model $model The model being updated
+     * @param string $key The field name
+     * @param mixed $newValue The new value from validated input
+     * @return bool True if the field has changed
+     */
+    protected function isFieldChanged(Model $model, string $key, $newValue): bool
+    {
+        $oldValue = $model->{$key};
+
+        // Check if this field is cast as an array/json/object type
+        $casts = $model->getCasts();
+        if (isset($casts[$key]) && in_array($casts[$key], ['array', 'json', 'object', 'collection'], true)) {
+            // For JSON/array fields, use json_encode comparison to handle nested structures
+            return json_encode($oldValue) !== json_encode($newValue);
+        }
+
+        // For other fields (strings, integers, enums, etc.), use loose comparison
+        return $oldValue != $newValue;
+    }
+
+    /**
+     * Get list of changed field names from validated data.
+     * Properly handles JSON/array fields and scalar fields.
+     *
+     * @param Model $model The model being updated
+     * @param array $validated The validated input data
+     * @return array Array of field names that have changed
+     */
+    protected function getChangedFields(Model $model, array $validated): array
+    {
+        $changedFields = [];
+
+        foreach ($validated as $key => $value) {
+            if ($this->isFieldChanged($model, $key, $value)) {
+                $changedFields[] = $key;
+            }
+        }
+
+        return $changedFields;
+    }
+
+    /**
      * Get the model instance for authorization and scoping.
      *
      * Override for custom model resolution logic.
@@ -575,13 +620,8 @@ abstract class AbstractApiCrudController extends Controller
             ? $request->validated() 
             : $request->all();
 
-        // Track changed fields for logging
-        $changedFields = [];
-        foreach ($validated as $key => $value) {
-            if ($model->{$key} != $value) {
-                $changedFields[] = $key;
-            }
-        }
+        // Track changed fields for logging (handles JSON/array fields properly)
+        $changedFields = $this->getChangedFields($model, $validated);
 
         $context = $this->getLoggingContext();
         Log::info('Updating ' . $this->getResourceKey(), array_merge($context, [
