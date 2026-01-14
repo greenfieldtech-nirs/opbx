@@ -421,7 +421,7 @@ abstract class AbstractApiCrudController extends Controller
         $collection = $resourceClass::collection($models);
         
         return response()->json([
-            $this->getPluralResourceKey() => $collection->resolve(),
+            'data' => $collection->resolve(),
             'meta' => [
                 'current_page' => $models->currentPage(),
                 'per_page' => $models->perPage(),
@@ -482,7 +482,7 @@ abstract class AbstractApiCrudController extends Controller
             $resourceClass = $this->getResourceClass();
             return response()->json([
                 'message' => $this->getCreateSuccessMessage(),
-                $this->getResourceKey() => new $resourceClass($model),
+                'data' => new $resourceClass($model),
             ], 201);
         } catch (\Exception $e) {
             $context = $this->getLoggingContext();
@@ -540,7 +540,7 @@ abstract class AbstractApiCrudController extends Controller
 
         $resourceClass = $this->getResourceClass();
         return response()->json([
-            $this->getResourceKey() => new $resourceClass($model),
+            'data' => new $resourceClass($model),
         ]);
     }
 
@@ -620,7 +620,7 @@ abstract class AbstractApiCrudController extends Controller
             $resourceClass = $this->getResourceClass();
             return response()->json([
                 'message' => $this->getUpdateSuccessMessage(),
-                $this->getResourceKey() => new $resourceClass($model),
+                'data' => new $resourceClass($model),
             ]);
         } catch (\Exception $e) {
             $context = $this->getLoggingContext();

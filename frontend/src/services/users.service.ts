@@ -20,9 +20,9 @@ export const usersService = {
    * GET /users
    */
   getAll: (params?: UsersFilterParams): Promise<PaginatedResponse<User>> => {
-    return api.get<{ users: User[]; meta: any }>('/users', { params })
+    return api.get<{ data: User[]; meta: any }>('/users', { params })
       .then(res => ({
-        data: res.data.users,
+        data: res.data.data,
         meta: res.data.meta,
       }));
   },
@@ -32,8 +32,8 @@ export const usersService = {
    * GET /users/:id
    */
   getById: (id: string): Promise<User> => {
-    return api.get<{ user: User }>(`/users/${id}`)
-      .then(res => res.data.user);
+    return api.get<{ data: User }>(`/users/${id}`)
+      .then(res => res.data.data);
   },
 
   /**
@@ -41,8 +41,8 @@ export const usersService = {
    * POST /users
    */
   create: (data: CreateUserRequest): Promise<User> => {
-    return api.post<{ message: string; user: User }>('/users', data)
-      .then(res => res.data.user);
+    return api.post<{ message: string; data: User }>('/users', data)
+      .then(res => res.data.data);
   },
 
   /**
@@ -50,8 +50,8 @@ export const usersService = {
    * PUT /users/:id
    */
   update: (id: string, data: UpdateUserRequest): Promise<User> => {
-    return api.put<{ message: string; user: User }>(`/users/${id}`, data)
-      .then(res => res.data.user);
+    return api.put<{ message: string; data: User }>(`/users/${id}`, data)
+      .then(res => res.data.data);
   },
 
   /**

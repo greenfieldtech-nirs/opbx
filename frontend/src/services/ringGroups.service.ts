@@ -27,9 +27,9 @@ export const ringGroupsService = {
    * Get all ring groups with optional filters
    */
   getAll: (params?: RingGroupFilters): Promise<PaginatedResponse<RingGroup>> => {
-    return api.get<{ ringgroups: RingGroup[]; meta: any }>('/ring-groups', { params })
+    return api.get<{ data: RingGroup[]; meta: any }>('/ring-groups', { params })
       .then(res => ({
-        data: res.data.ringgroups,
+        data: res.data.data,
         meta: res.data.meta,
       }));
   },
@@ -38,24 +38,24 @@ export const ringGroupsService = {
    * Get ring group by ID
    */
   getById: (id: string): Promise<RingGroup> => {
-    return api.get<{ ringgroup: RingGroup }>(`/ring-groups/${id}`)
-      .then(res => res.data.ringgroup);
+    return api.get<{ data: RingGroup }>(`/ring-groups/${id}`)
+      .then(res => res.data.data);
   },
 
   /**
    * Create new ring group
    */
   create: (data: CreateRingGroupRequest): Promise<RingGroup> => {
-    return api.post<{ message: string; ringgroup: RingGroup }>('/ring-groups', data)
-      .then(res => res.data.ringgroup);
+    return api.post<{ message: string; data: RingGroup }>('/ring-groups', data)
+      .then(res => res.data.data);
   },
 
   /**
    * Update ring group
    */
   update: (id: string, data: UpdateRingGroupRequest): Promise<RingGroup> => {
-    return api.put<{ message: string; ringgroup: RingGroup }>(`/ring-groups/${id}`, data)
-      .then(res => res.data.ringgroup);
+    return api.put<{ message: string; data: RingGroup }>(`/ring-groups/${id}`, data)
+      .then(res => res.data.data);
   },
 
   /**

@@ -16,9 +16,9 @@ export const cdrService = {
    * Get all CDRs with optional filters
    */
   getAll: (params?: CDRFilters): Promise<PaginatedResponse<CallDetailRecord>> => {
-    return api.get<{ calldetailrecords: CallDetailRecord[]; meta: any }>('/call-detail-records', { params })
+    return api.get<{ data: CallDetailRecord[]; meta: any }>('/call-detail-records', { params })
       .then(res => ({
-        data: res.data.calldetailrecords,
+        data: res.data.data,
         meta: res.data.meta,
       }));
   },
@@ -27,10 +27,10 @@ export const cdrService = {
    * Get CDR by ID with raw_cdr data included
    */
   getById: (id: number | string): Promise<CallDetailRecord> => {
-    return api.get<{ calldetailrecord: CallDetailRecord }>(`/call-detail-records/${id}`, {
+    return api.get<{ data: CallDetailRecord }>(`/call-detail-records/${id}`, {
       params: { include: 'raw_cdr' },
     })
-      .then(res => res.data.calldetailrecord);
+      .then(res => res.data.data);
   },
 
   /**
