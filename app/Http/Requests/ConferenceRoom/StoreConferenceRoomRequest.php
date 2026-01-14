@@ -14,20 +14,7 @@ use Illuminate\Validation\Rules\Enum;
  */
 class StoreConferenceRoomRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        $user = $this->user();
 
-        if (!$user) {
-            return false;
-        }
-
-        // Only Owner and PBX Admin can create conference rooms
-        return $user->isOwner() || $user->isPBXAdmin();
-    }
 
     /**
      * Get the validation rules that apply to the request.

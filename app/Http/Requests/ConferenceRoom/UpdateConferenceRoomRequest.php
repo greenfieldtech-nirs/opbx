@@ -14,23 +14,7 @@ use Illuminate\Validation\Rules\Enum;
  */
 class UpdateConferenceRoomRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        $user = $this->user();
-        $conferenceRoom = $this->route('conference_room');
 
-        if (!$user || !$conferenceRoom) {
-            return false;
-        }
-
-        // Only Owner and PBX Admin can update conference rooms
-        // And the room must belong to their organization
-        return ($user->isOwner() || $user->isPBXAdmin())
-            && $user->organization_id === $conferenceRoom->organization_id;
-    }
 
     /**
      * Get the validation rules that apply to the request.
