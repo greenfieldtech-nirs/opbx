@@ -12,6 +12,7 @@ import type {
 import type {
   IvrMenu,
   CallDetailRecord,
+  Recording,
 } from '@/types/api.types';
 
 /**
@@ -84,6 +85,7 @@ export const phoneNumbersService = createResourceService<DIDNumber>('phone-numbe
 export const ivrMenusService = createResourceService<IvrMenu>('ivr-menus');
 export const businessHoursService = createResourceService<BusinessHours>('business-hours');
 export const outboundWhitelistService = createResourceService<OutboundWhitelist>('outbound-whitelist');
+export const recordingsService = createResourceService<Recording>('recordings');
 
 /**
  * Resource factory class for dynamic service creation
