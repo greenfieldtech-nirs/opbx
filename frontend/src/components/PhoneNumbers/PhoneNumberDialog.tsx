@@ -7,9 +7,9 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
+import { ringGroupsService } from '@/services/createResourceService';
 import { businessHoursService } from '@/services/businessHours.service';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
+import { conferenceRoomsService } from '@/services/createResourceService';
 import type { DIDNumber, RoutingType, CreateDIDRequest, UpdateDIDRequest } from '@/types/api.types';
 import {
   Dialog,

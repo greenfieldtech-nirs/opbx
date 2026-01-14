@@ -69,7 +69,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
+import { conferenceRoomsService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import type { ConferenceRoom, CreateConferenceRoomRequest, UpdateConferenceRoomRequest, Status } from '@/types';
 import { cn } from '@/lib/utils';

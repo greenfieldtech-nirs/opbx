@@ -23,6 +23,11 @@ class RingGroup extends Model
     use HasFactory;
 
     /**
+     * Default field list for lazy loading minimal relationships in CRUD operations.
+     */
+    public const DEFAULT_RELATIONSHIP_FIELDS = ['members.extension.user:id,name', 'fallbackExtension:id,extension_number'];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>

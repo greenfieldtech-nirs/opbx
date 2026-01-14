@@ -18,7 +18,8 @@ use Tests\TestCase;
 /**
  * Unit tests for StoreOutboundWhitelistRequest validation.
  *
- * Tests validation rules, authorization, and data preparation.
+ * Tests validation rules and data preparation.
+ * Authorization is now handled by the controller and policies.
  */
 class StoreOutboundWhitelistRequestTest extends TestCase
 {
@@ -63,42 +64,6 @@ class StoreOutboundWhitelistRequestTest extends TestCase
             'role' => UserRole::PBX_USER,
             'status' => UserStatus::ACTIVE,
         ]);
-    }
-
-    /**
-     * Test authorize allows owner and pbx admin.
-     */
-    public function test_authorize_allows_owner_and_pbx_admin(): void
-    {
-        // Owner can create
-        $request = new StoreOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => $this->owner);
-        $this->assertTrue($request->authorize());
-
-        // PBX Admin can create
-        $request = new StoreOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => $this->pbxAdmin);
-        $this->assertTrue($request->authorize());
-    }
-
-    /**
-     * Test authorize denies pbx user.
-     */
-    public function test_authorize_denies_pbx_user(): void
-    {
-        $request = new StoreOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => $this->pbxUser);
-        $this->assertFalse($request->authorize());
-    }
-
-    /**
-     * Test authorize denies unauthenticated user.
-     */
-    public function test_authorize_denies_unauthenticated_user(): void
-    {
-        $request = new StoreOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => null);
-        $this->assertFalse($request->authorize());
     }
 
     /**

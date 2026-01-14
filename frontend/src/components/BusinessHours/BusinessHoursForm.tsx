@@ -22,7 +22,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
 import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
+import { ringGroupsService } from '@/services/createResourceService';
 import type { BusinessHours, CreateBusinessHoursRequest, UpdateBusinessHoursRequest, RoutingType } from '@/types/api.types';
 
 // Validation schema

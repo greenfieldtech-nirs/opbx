@@ -47,9 +47,9 @@ import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
 import logger from '@/utils/logger';
 import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
-import { ivrMenusService } from '@/services/ivrMenus.service';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
+import { ringGroupsService } from '@/services/createResourceService';
+import { ivrMenusService } from '@/services/createResourceService';
+import { conferenceRoomsService } from '@/services/createResourceService';
 import { cn } from '@/lib/utils';
 import {
   type BusinessHoursSchedule,

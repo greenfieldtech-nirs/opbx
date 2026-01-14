@@ -19,7 +19,8 @@ use Tests\TestCase;
 /**
  * Unit tests for UpdateOutboundWhitelistRequest validation.
  *
- * Tests validation rules, authorization, and data preparation.
+ * Tests validation rules and data preparation.
+ * Authorization is now handled by the controller and policies.
  */
 class UpdateOutboundWhitelistRequestTest extends TestCase
 {
@@ -72,50 +73,7 @@ class UpdateOutboundWhitelistRequestTest extends TestCase
         ]);
     }
 
-    /**
-     * Test authorize allows owner and pbx admin.
-     */
-    public function test_authorize_allows_owner_and_pbx_admin(): void
-    {
-        // Create route for the request
-        Route::get('/test/{outbound_whitelist}', function () {
-            return 'test';
-        })->name('test');
 
-        // Owner can update
-        $request = new UpdateOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => $this->owner);
-        $request->setRouteResolver(fn () => $this->createMockRoute($this->outboundWhitelist));
-        $this->assertTrue($request->authorize());
-
-        // PBX Admin can update
-        $request = new UpdateOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => $this->pbxAdmin);
-        $request->setRouteResolver(fn () => $this->createMockRoute($this->outboundWhitelist));
-        $this->assertTrue($request->authorize());
-    }
-
-    /**
-     * Test authorize denies pbx user.
-     */
-    public function test_authorize_denies_pbx_user(): void
-    {
-        $request = new UpdateOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => $this->pbxUser);
-        $request->setRouteResolver(fn () => $this->createMockRoute($this->outboundWhitelist));
-        $this->assertFalse($request->authorize());
-    }
-
-    /**
-     * Test authorize denies unauthenticated user.
-     */
-    public function test_authorize_denies_unauthenticated_user(): void
-    {
-        $request = new UpdateOutboundWhitelistRequest();
-        $request->setUserResolver(fn () => null);
-        $request->setRouteResolver(fn () => $this->createMockRoute($this->outboundWhitelist));
-        $this->assertFalse($request->authorize());
-    }
 
     /**
      * Test validation rules are correct.

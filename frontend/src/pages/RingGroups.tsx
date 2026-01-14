@@ -3,12 +3,12 @@
  * Full CRUD operations with backend API integration
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ringGroupsService } from '@/services/ringGroups.service';
+import { ringGroupsService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   RingGroup,
@@ -119,7 +119,7 @@ import { CSS } from '@dnd-kit/utilities';
 // Sortable item component for drag-and-drop
 interface SortableItemProps {
   id: string;
-  children: React.ReactNode;
+  children: (dragHandleProps: any) => React.ReactNode;
 }
 
 function SortableItem({ id, children }: SortableItemProps) {
@@ -138,9 +138,15 @@ function SortableItem({ id, children }: SortableItemProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Pass listeners only to the drag handle, not the entire container
+  const dragHandleProps = {
+    ...attributes,
+    ...listeners,
+  };
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
+    <div ref={setNodeRef} style={style}>
+      {children(dragHandleProps)}
     </div>
   );
 }
@@ -264,12 +270,35 @@ export default function RingGroups() {
   const availableAiAssistants = aiAssistantsData?.data || [];
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
-  const { data: allRingGroupsData } = useQuery({
+  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
     queryKey: ['ring-groups-all'],
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
+    staleTime: 60000, // 1 minute - keep fresh for form usage
   });
 
-  const allRingGroups = allRingGroupsData?.data || [];
+  // Filter out current ring group when editing (can't fallback to self)
+  const allRingGroups = useMemo(() => {
+    console.log('[allRingGroups useMemo] Computing...');
+    console.log('  - allRingGroupsData:', allRingGroupsData);
+    console.log('  - allRingGroupsData?.data:', allRingGroupsData?.data);
+    console.log('  - typeof allRingGroupsData?.data:', typeof allRingGroupsData?.data);
+    console.log('  - Array.isArray(allRingGroupsData?.data):', Array.isArray(allRingGroupsData?.data));
+    console.log('  - selectedGroup:', selectedGroup);
+    
+    const groups = allRingGroupsData?.data || [];
+    console.log('  - groups (before filter):', groups);
+    console.log('  - groups.length:', groups.length);
+    
+    if (selectedGroup) {
+      const filtered = groups.filter(g => g.id !== selectedGroup.id);
+      console.log('  - filtered (after removing current):', filtered);
+      console.log('  - filtered.length:', filtered.length);
+      return filtered;
+    }
+    
+    console.log('  - returning all groups (no selectedGroup)');
+    return groups;
+  }, [allRingGroupsData, selectedGroup]);
 
   const availableExtensions = extensionsData?.data || [];
 
@@ -507,20 +536,53 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData = {
+    // Build request data - only include the fallback ID that matches the selected action
+    const requestData: any = {
       name: formData.name!,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
       timeout: formData.timeout!,
       ring_turns: formData.ring_turns!,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
+
+    // Only include the relevant fallback ID based on fallback_action
+    // Set others to null to clear them
+    switch (formData.fallback_action) {
+      case 'extension':
+        requestData.fallback_extension_id = formData.fallback_extension_id;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ring_group':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ivr_menu':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ai_assistant':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        break;
+      case 'hangup':
+        // No destination IDs needed for hangup action
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+    }
 
     createMutation.mutate(requestData);
   };
@@ -535,20 +597,53 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData = {
+    // Build request data - only include the fallback ID that matches the selected action
+    const requestData: any = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy as RingGroupStrategy,
       timeout: formData.timeout,
       ring_turns: formData.ring_turns,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
       status: formData.status as RingGroupStatus,
       members,
     };
+
+    // Only include the relevant fallback ID based on fallback_action
+    // Set others to null to clear them
+    switch (formData.fallback_action) {
+      case 'extension':
+        requestData.fallback_extension_id = formData.fallback_extension_id;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ring_group':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ivr_menu':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ai_assistant':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        break;
+      case 'hangup':
+        // No destination IDs needed for hangup action
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+    }
 
     updateMutation.mutate({ id: selectedGroup.id, data: requestData });
   };
@@ -709,7 +804,28 @@ export default function RingGroups() {
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
-    const title = isEdit ? 'Edit Ring Group DEBUG' : 'Create Ring Group';
+    // Debug logging for fallback selects
+    console.log('=== RING GROUPS DEBUG ===');
+    console.log('isLoadingAllRingGroups:', isLoadingAllRingGroups);
+    console.log('allRingGroupsData RAW:', allRingGroupsData);
+    console.log('allRingGroupsData?.data:', allRingGroupsData?.data);
+    console.log('allRingGroups (after filter):', allRingGroups);
+    console.log('selectedGroup:', selectedGroup);
+    console.log('Available data for fallback selects:', {
+      allRingGroups: allRingGroups?.length || 0,
+      availableIvrMenus: availableIvrMenus?.length || 0,
+      availableAiAssistants: availableAiAssistants?.length || 0,
+      availableExtensions: availableExtensions?.length || 0,
+    });
+    console.log('Current formData fallback values:', {
+      fallback_action: formData.fallback_action,
+      fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
+    });
+
+    const title = isEdit ? 'Edit Ring Group' : 'Create Ring Group';
     const description = isEdit
       ? 'Update ring group settings and members'
       : 'Configure a new ring group with extension members';
@@ -804,47 +920,49 @@ export default function RingGroups() {
                       <div className="border rounded-lg divide-y">
                         {formData.members.map((member, index) => (
                           <SortableItem key={member.extension_id} id={member.extension_id}>
-                            <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
-                              <div className="cursor-grab">
-                                <GripVertical className="h-4 w-4 text-gray-400" />
-                              </div>
+                            {(dragHandleProps) => (
+                              <div className="p-3 flex items-center gap-3 hover:bg-gray-50">
+                                <div className="cursor-grab" {...dragHandleProps}>
+                                  <GripVertical className="h-4 w-4 text-gray-400" />
+                                </div>
 
-                              <div className="flex-1">
-                                <Select
-                                  value={member.extension_id}
-                                  onValueChange={(value) => updateMemberExtension(index, value)}
+                                <div className="flex-1">
+                                  <Select
+                                    value={member.extension_id}
+                                    onValueChange={(value) => updateMemberExtension(index, value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
+                                        <SelectItem key={ext.id} value={ext.id}>
+                                          {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeMember(index)}
                                 >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
-                                      <SelectItem key={ext.id} value={ext.id}>
-                                        {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
-
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeMember(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            )}
                           </SortableItem>
                         ))}
                       </div>
                     </SortableContext>
                   </DndContext>
                 ) : (
-                  <div className="border rounded-lg divide-y">
-                    {formData.members.map((member, index) => (
-                      <div key={index} className="p-3 flex items-center gap-3">
+                   <div className="border rounded-lg divide-y">
+                     {formData.members.map((member, index) => (
+                       <div key={member.extension_id} className="p-3 flex items-center gap-3">
                         <div className="flex flex-col gap-1">
                           <Button
                             type="button"
@@ -1074,31 +1192,68 @@ export default function RingGroups() {
                     </SelectContent>
                   </Select>
                 )}
-                {formData.fallback_action === 'ring_group' && (
-                  <Select
-                    value={formData.fallback_ring_group_id || ''}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fallback_ring_group_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select ring group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allRingGroups.map((group) => (
-                        <SelectItem key={group.id} value={group.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
-                              <Users className="h-3.5 w-3.5" />
-                              {group.name}
-                            </Badge>
+                {formData.fallback_action === 'ring_group' && (() => {
+                  console.log('[RENDER] Ring Group Select - allRingGroups:', allRingGroups);
+                  console.log('[RENDER] Ring Group Select - allRingGroups.length:', allRingGroups.length);
+                  console.log('[RENDER] Ring Group Select - formData.fallback_ring_group_id:', formData.fallback_ring_group_id);
+                  return (
+                    <Select
+                      value={formData.fallback_ring_group_id || ''}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ring_group_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select ring group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allRingGroups.length === 0 && (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            No ring groups available
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {formData.fallback_action === 'ai_assistant' && (
+                        )}
+                        {allRingGroups.map((group) => {
+                          console.log('[RENDER] Mapping ring group:', group);
+                          return (
+                            <SelectItem key={group.id} value={group.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
+                                  <Users className="h-3.5 w-3.5" />
+                                  {group.name}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
+                 {formData.fallback_action === 'ivr_menu' && (
+                   <Select
+                     value={formData.fallback_ivr_menu_id || ''}
+                     onValueChange={(value) =>
+                       setFormData({ ...formData, fallback_ivr_menu_id: value })
+                     }
+                   >
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select IVR menu" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       {availableIvrMenus.map((menu) => (
+                         <SelectItem key={menu.id} value={menu.id.toString()}>
+                           <div className="flex items-center gap-2">
+                             <Badge variant="outline" className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200">
+                               <Menu className="h-3.5 w-3.5" />
+                               {menu.name}
+                             </Badge>
+                           </div>
+                         </SelectItem>
+                       ))}
+                     </SelectContent>
+                   </Select>
+                 )}
+                 {formData.fallback_action === 'ai_assistant' && (
                   <Select
                     value={formData.fallback_ai_assistant_id || ''}
                     onValueChange={(value) =>

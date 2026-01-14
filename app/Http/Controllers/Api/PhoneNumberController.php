@@ -54,11 +54,7 @@ class PhoneNumberController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         Log::info('Retrieving phone numbers list', [
             'request_id' => $requestId,
@@ -124,11 +120,7 @@ class PhoneNumberController extends Controller
     public function show(Request $request, DidNumber $phoneNumber): PhoneNumberResource
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Authorization check
         $this->authorize('view', $phoneNumber);
@@ -156,11 +148,7 @@ class PhoneNumberController extends Controller
     public function store(StorePhoneNumberRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -225,11 +213,7 @@ class PhoneNumberController extends Controller
     public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Authorization check
         $this->authorize('update', $phoneNumber);
@@ -290,11 +274,7 @@ class PhoneNumberController extends Controller
     public function destroy(Request $request, DidNumber $phoneNumber): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Authorization check
         $this->authorize('delete', $phoneNumber);
