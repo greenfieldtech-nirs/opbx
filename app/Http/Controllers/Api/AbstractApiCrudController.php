@@ -365,10 +365,6 @@ abstract class AbstractApiCrudController extends Controller
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
         $this->authorize($this->getViewAnyAbility(), $this->getModelClass());
 
         // Build query
@@ -445,10 +441,6 @@ abstract class AbstractApiCrudController extends Controller
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
 
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
         $this->authorize($this->getCreateAbility(), $this->getModelClass());
 
         // Get validated data - works with FormRequest objects
@@ -517,10 +509,6 @@ abstract class AbstractApiCrudController extends Controller
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
 
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
         $model = $this->resolveModel($request);
         $this->authorize($this->getViewAbility(), $model);
 
@@ -563,10 +551,6 @@ abstract class AbstractApiCrudController extends Controller
     {
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
 
         $model = $this->resolveModel($request);
 
@@ -666,10 +650,6 @@ abstract class AbstractApiCrudController extends Controller
     {
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
 
         $model = $this->resolveModel($request);
         $this->authorize($this->getDeleteAbility(), $model);

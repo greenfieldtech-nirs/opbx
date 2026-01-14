@@ -41,11 +41,7 @@ class BusinessHoursController extends Controller
     public function index(Request $request): BusinessHoursScheduleCollection
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('viewAny', BusinessHoursSchedule::class);
 
@@ -118,11 +114,7 @@ class BusinessHoursController extends Controller
     public function store(StoreBusinessHoursScheduleRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -203,11 +195,7 @@ class BusinessHoursController extends Controller
     public function show(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('view', $businessHour);
 
@@ -252,11 +240,7 @@ class BusinessHoursController extends Controller
     public function update(UpdateBusinessHoursScheduleRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
@@ -353,11 +337,7 @@ class BusinessHoursController extends Controller
     public function destroy(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('delete', $businessHour);
 
@@ -426,11 +406,7 @@ class BusinessHoursController extends Controller
     public function duplicate(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('duplicate', $businessHour);
 

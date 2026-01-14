@@ -36,10 +36,7 @@ class IvrMenuController extends Controller
     public function getVoices(Request $request): JsonResponse
     {
         try {
-            $user = $this->getAuthenticatedUser($request);
-            if (!$user) {
-                return response()->json(['error' => 'Unauthenticated'], 401);
-            }
+            $user = $this->getAuthenticatedUser();
 
             // Get organization Cloudonix settings
             $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $user->organization_id)->first();
@@ -427,11 +424,7 @@ class IvrMenuController extends Controller
     public function index(Request $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         Log::info('Retrieving IVR menus list', [
             'request_id' => $requestId,
@@ -521,11 +514,7 @@ class IvrMenuController extends Controller
     public function store(StoreIvrMenuRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -611,11 +600,7 @@ class IvrMenuController extends Controller
     public function show(Request $request, IvrMenu $ivrMenu): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($ivrMenu->organization_id !== $user->organization_id) {
@@ -658,11 +643,7 @@ class IvrMenuController extends Controller
     public function update(UpdateIvrMenuRequest $request, IvrMenu $ivrMenu): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($ivrMenu->organization_id !== $user->organization_id) {
@@ -766,11 +747,7 @@ class IvrMenuController extends Controller
     public function destroy(Request $request, IvrMenu $ivrMenu): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($ivrMenu->organization_id !== $user->organization_id) {

@@ -31,16 +31,16 @@ trait ApiRequestHandler
     }
 
     /**
-     * Get authenticated user and handle unauthenticated requests.
+     * Get authenticated user and abort if not authenticated.
      *
-     * @return object|null User model or JsonResponse
+     * @return object User model (never null - aborts with 401 if not authenticated)
      */
-    protected function getAuthenticatedUser(): ?object
+    protected function getAuthenticatedUser(): object
     {
         $user = request()->user();
 
         if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            abort(401, 'Unauthenticated');
         }
 
         return $user;
@@ -50,9 +50,9 @@ trait ApiRequestHandler
      * Log request and handle with consistent response structure.
      *
      * @param string $action Description of the action being performed
-     *param array $data Response data
-     *param array $extra Additional metadata to log
-     *return JsonResponse
+     * @param array $data Response data
+     * @param array $extra Additional metadata to log
+     * @return JsonResponse
      */
     protected function logAndRespond(
         string $action,
@@ -61,10 +61,6 @@ trait ApiRequestHandler
     ): JsonResponse {
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
-
-        if ($user instanceof JsonResponse) {
-            return $user; // Unauthenticated response
-        }
 
         try {
             Log::info($action, array_merge([

@@ -99,11 +99,7 @@ class SettingsController extends Controller
     public function updateCloudonixSettings(UpdateCloudonixSettingsRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -249,11 +245,7 @@ class SettingsController extends Controller
     public function validateCloudonixCredentials(ValidateCloudonixRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -383,11 +375,7 @@ class SettingsController extends Controller
     public function getOutboundTrunks(): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = auth()->user();
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Check authorization using policy
         $this->authorize('viewAny', CloudonixSettings::class);

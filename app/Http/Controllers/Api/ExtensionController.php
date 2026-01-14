@@ -40,7 +40,7 @@ class ExtensionController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('viewAny', Extension::class);
 
@@ -127,7 +127,7 @@ class ExtensionController extends Controller
     ): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
+        $currentUser = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -232,11 +232,7 @@ class ExtensionController extends Controller
     public function show(Request $request, Extension $extension): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         $this->authorize('view', $extension);
 
@@ -286,11 +282,7 @@ class ExtensionController extends Controller
     ): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($extension->organization_id !== $currentUser->organization_id) {
@@ -422,11 +414,7 @@ class ExtensionController extends Controller
     ): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         $this->authorize('delete', $extension);
 
@@ -512,11 +500,7 @@ class ExtensionController extends Controller
     public function compareSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         $this->authorize('viewAny', Extension::class);
 
@@ -574,11 +558,7 @@ class ExtensionController extends Controller
         CloudonixSubscriberService $subscriberService
     ): JsonResponse {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can reset extension passwords
         if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
@@ -702,11 +682,7 @@ class ExtensionController extends Controller
     public function getPassword(Request $request, Extension $extension): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can view extension passwords
         if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
@@ -764,11 +740,7 @@ class ExtensionController extends Controller
     public function performSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can sync extensions
         if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
