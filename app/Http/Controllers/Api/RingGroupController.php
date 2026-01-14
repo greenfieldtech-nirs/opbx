@@ -116,18 +116,57 @@ class RingGroupController extends AbstractApiCrudController
         $this->applyFilters($query, $request, $this->getFilterConfig());
     }
 
+    /**
+     * Normalize fallback fields based on fallback action.
+     * Ensures only the relevant fallback ID is set based on the action type.
+     *
+     * @param array $validated Validated request data
+     * @param RingGroup|null $ringGroup Existing ring group for fallback values (null for store)
+     * @return array Normalized validated data with correct fallback IDs
+     */
+    protected function normalizeFallbackFields(array $validated, ?RingGroup $ringGroup = null): array
+    {
+        // Determine the active fallback action
+        $action = $validated['fallback_action'] ?? ($ringGroup?->fallback_action->value ?? null);
+
+        // Clear all fallback IDs first
+        $validated['fallback_extension_id'] = null;
+        $validated['fallback_ring_group_id'] = null;
+        $validated['fallback_ivr_menu_id'] = null;
+        $validated['fallback_ai_assistant_id'] = null;
+
+        // Set only the relevant fallback ID based on action type
+        switch ($action) {
+            case 'extension':
+                $validated['fallback_extension_id'] = $validated['fallback_extension_id']
+                    ?? $ringGroup?->fallback_extension_id;
+                break;
+            case 'ring_group':
+                $validated['fallback_ring_group_id'] = $validated['fallback_ring_group_id']
+                    ?? $ringGroup?->fallback_ring_group_id;
+                break;
+            case 'ivr_menu':
+                $validated['fallback_ivr_menu_id'] = $validated['fallback_ivr_menu_id']
+                    ?? $ringGroup?->fallback_ivr_menu_id;
+                break;
+            case 'ai_assistant':
+                $validated['fallback_ai_assistant_id'] = $validated['fallback_ai_assistant_id']
+                    ?? $ringGroup?->fallback_ai_assistant_id;
+                break;
+            // Other actions (voicemail, hangup, etc.) don't need fallback IDs
+        }
+
+        return $validated;
+    }
+
     protected function beforeStore(array $validated, Request $request): array
     {
         // Extract members data for later processing
         $this->tempMembersData = $validated['members'] ?? [];
         unset($validated['members']);
 
-        // Ensure only the relevant fallback ID is set based on the action
-        $action = $validated['fallback_action'] ?? null;
-        $validated['fallback_extension_id'] = ($action === 'extension') ? ($validated['fallback_extension_id'] ?? null) : null;
-        $validated['fallback_ring_group_id'] = ($action === 'ring_group') ? ($validated['fallback_ring_group_id'] ?? null) : null;
-        $validated['fallback_ivr_menu_id'] = ($action === 'ivr_menu') ? ($validated['fallback_ivr_menu_id'] ?? null) : null;
-        $validated['fallback_ai_assistant_id'] = ($action === 'ai_assistant') ? ($validated['fallback_ai_assistant_id'] ?? null) : null;
+        // Normalize fallback fields based on action
+        $validated = $this->normalizeFallbackFields($validated);
 
         return $validated;
     }
@@ -204,13 +243,8 @@ class RingGroupController extends AbstractApiCrudController
         $this->tempMembersData = $validated['members'] ?? [];
         unset($validated['members']);
 
-        // Ensure only the relevant fallback ID is set based on the action
-        $action = $validated['fallback_action'] ?? $model->fallback_action->value;
-
-        $validated['fallback_extension_id'] = ($action === 'extension') ? ($validated['fallback_extension_id'] ?? $model->fallback_extension_id) : null;
-        $validated['fallback_ring_group_id'] = ($action === 'ring_group') ? ($validated['fallback_ring_group_id'] ?? $model->fallback_ring_group_id) : null;
-        $validated['fallback_ivr_menu_id'] = ($action === 'ivr_menu') ? ($validated['fallback_ivr_menu_id'] ?? $model->fallback_ivr_menu_id) : null;
-        $validated['fallback_ai_assistant_id'] = ($action === 'ai_assistant') ? ($validated['fallback_ai_assistant_id'] ?? $model->fallback_ai_assistant_id) : null;
+        // Normalize fallback fields based on action
+        $validated = $this->normalizeFallbackFields($validated, $model);
 
         return $validated;
     }
