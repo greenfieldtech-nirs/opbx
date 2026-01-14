@@ -527,26 +527,13 @@ class BusinessHoursController extends Controller
 
     /**
      * Transform action data for storage in database.
-     * Handles both structured format {type: string, target_id: string} and legacy string format.
+     * Expects structured format {type: string, target_id: string}.
      *
-     * @param  array{type: string, target_id: string}|string  $actionData
+     * @param  array{type: string, target_id: string}  $actionData
      * @return array{action: array{target_id: string}, action_type: string}
      */
-    private function transformActionDataForStorage(array|string $actionData): array
+    private function transformActionDataForStorage(array $actionData): array
     {
-        // Handle legacy string format (backward compatibility)
-        if (is_string($actionData)) {
-            // For now, assume string format represents extension IDs
-            // TODO: Remove this backward compatibility once frontend is fully migrated
-            return [
-                'action' => [
-                    'target_id' => 'ext-'.$actionData,
-                ],
-                'action_type' => 'extension',
-            ];
-        }
-
-        // Handle structured format
         return [
             'action' => [
                 'target_id' => $actionData['target_id'],
