@@ -323,6 +323,18 @@ class BusinessHoursController extends Controller
             'schedule_name' => $businessHour->name,
         ]);
 
+        // Check for references before deletion
+        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $result = $referenceChecker->checkReferences('business_hours', $businessHour->id, $businessHour->organization_id);
+
+        if ($result['has_references']) {
+            return response()->json([
+                'error' => 'Cannot delete business hours schedule',
+                'message' => 'This business hours schedule is being used and cannot be deleted. Please remove all references first.',
+                'references' => $result['references'],
+            ], 409);
+        }
+
         try {
             DB::transaction(function () use ($businessHour): void {
                 // Soft delete the schedule (cascade deletes will handle related records)

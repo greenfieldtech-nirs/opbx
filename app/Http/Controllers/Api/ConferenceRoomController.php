@@ -142,6 +142,18 @@ class ConferenceRoomController extends AbstractApiCrudController
         return false;
     }
 
+    /**
+     * Check for references before deleting a conference room.
+     */
+    protected function beforeDestroy(ConferenceRoom $conferenceRoom, Request $request): void
+    {
+        $this->checkResourceReferencesBeforeDelete(
+            'conference_room',
+            $conferenceRoom->id,
+            $conferenceRoom->organization_id
+        );
+    }
+
     // No need to override store() and update()
     // Laravel will automatically resolve and validate FormRequest classes
     // based on route-model binding and type hints in the parent controller

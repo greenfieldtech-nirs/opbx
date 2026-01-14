@@ -113,6 +113,31 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Check if a resource is referenced elsewhere before deletion.
+     *
+     * This method should be called from beforeDestroy() hooks in controllers
+     * that need reference checking. It will throw ResourceInUseException if
+     * references exist.
+     *
+     * @param string $resourceType The type of resource ('extension', 'ring_group', etc.)
+     * @param int $resourceId The ID of the resource
+     * @param int $organizationId The organization ID for tenant scoping
+     * @throws \App\Exceptions\ResourceInUseException
+     */
+    protected function checkResourceReferencesBeforeDelete(
+        string $resourceType,
+        int $resourceId,
+        int $organizationId
+    ): void {
+        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $result = $referenceChecker->checkReferences($resourceType, $resourceId, $organizationId);
+
+        if ($result['has_references']) {
+            throw new \App\Exceptions\ResourceInUseException($resourceType, $result['references']);
+        }
+    }
+
+    /**
      * Hook method called after deleting a model.
      */
     protected function afterDestroy(Model $model, Request $request): void

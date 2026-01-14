@@ -481,56 +481,34 @@ class IvrMenuController extends Controller
             ], 404);
         }
 
-        // Check if IVR menu is referenced by other IVR menus
-        $referencingMenus = DB::table('ivr_menu_options')
-            ->join('ivr_menus', 'ivr_menu_options.ivr_menu_id', '=', 'ivr_menus.id')
-            ->where('ivr_menu_options.destination_type', 'ivr_menu')
-            ->where('ivr_menu_options.destination_id', $ivrMenu->id)
-            ->where('ivr_menus.organization_id', $user->organization_id)
-            ->select('ivr_menus.id', 'ivr_menus.name')
-            ->distinct()
-            ->get();
+        // Check for references before deletion
+        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $result = $referenceChecker->checkReferences('ivr_menu', $ivrMenu->id, $ivrMenu->organization_id);
 
-        // Check if IVR menu is used as failover in other menus
-        $failoverMenus = IvrMenu::where('organization_id', $user->organization_id)
-            ->where('failover_destination_type', 'ivr_menu')
-            ->where('failover_destination_id', $ivrMenu->id)
-            ->where('id', '!=', $ivrMenu->id)
-            ->select('id', 'name')
-            ->get();
-
-        // Check if IVR menu is referenced by DID routing
-        $referencingDids = DB::table('did_numbers')
-            ->where('routing_type', 'ivr_menu')
-            ->where('routing_config->ivr_menu_id', $ivrMenu->id)
-            ->where('organization_id', $user->organization_id)
-            ->select('id', 'phone_number')
-            ->get();
-
-        $hasReferences = $referencingMenus->isNotEmpty() || $failoverMenus->isNotEmpty() || $referencingDids->isNotEmpty();
-
-        if ($hasReferences) {
+        if ($result['has_references']) {
+            // Transform references to maintain backward compatibility with existing response format
             $references = [];
-
-            if ($referencingMenus->isNotEmpty()) {
-                $references['ivr_menus'] = $referencingMenus->map(fn($menu) => [
-                    'id' => $menu->id,
-                    'name' => $menu->name,
-                ])->toArray();
-            }
-
-            if ($failoverMenus->isNotEmpty()) {
-                $references['failover_menus'] = $failoverMenus->map(fn($menu) => [
-                    'id' => $menu->id,
-                    'name' => $menu->name,
-                ])->toArray();
-            }
-
-            if ($referencingDids->isNotEmpty()) {
-                $references['phone_numbers'] = $referencingDids->map(fn($did) => [
-                    'id' => $did->id,
-                    'phone_number' => $did->phone_number,
-                ])->toArray();
+            foreach ($result['references'] as $type => $items) {
+                switch ($type) {
+                    case 'ivr_menu_options':
+                        $references['ivr_menus'] = array_map(fn($item) => [
+                            'id' => $item['ivr_menu_id'],
+                            'name' => $item['ivr_menu_name'],
+                        ], $items);
+                        break;
+                    case 'ivr_failovers':
+                        $references['failover_menus'] = array_map(fn($item) => [
+                            'id' => $item['id'],
+                            'name' => $item['ivr_menu_name'],
+                        ], $items);
+                        break;
+                    case 'did_numbers':
+                        $references['phone_numbers'] = array_map(fn($item) => [
+                            'id' => $item['id'],
+                            'phone_number' => $item['phone_number'],
+                        ], $items);
+                        break;
+                }
             }
 
             return response()->json([

@@ -404,6 +404,18 @@ class ExtensionController extends Controller
 
         // Log will be handled by success/failure methods below
 
+        // Check for references before deletion
+        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $result = $referenceChecker->checkReferences('extension', $extension->id, $extension->organization_id);
+
+        if ($result['has_references']) {
+            return response()->json([
+                'error' => 'Cannot delete extension',
+                'message' => 'This extension is being used and cannot be deleted. Please remove all references first.',
+                'references' => $result['references'],
+            ], 409);
+        }
+
         // Add audit logging for extension deletion (before actual deletion)
         try {
             AuditLogger::logExtensionDeleted($request, $extension->id, $extension->extension_number);
