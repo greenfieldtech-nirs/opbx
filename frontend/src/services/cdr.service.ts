@@ -25,16 +25,6 @@ export const cdrService = {
   },
 
   /**
-   * Get CDR by ID with raw_cdr data included
-   */
-  getById: (id: number | string): Promise<CallDetailRecord> => {
-    return api.get<{ data: CallDetailRecord }>(`/call-detail-records/${id}`, {
-      params: { include: 'raw_cdr' },
-    })
-      .then(res => res.data.data);
-  },
-
-  /**
    * Export CDRs to CSV
    */
   async exportToCsv(filters?: CDRFilters): Promise<Blob> {
