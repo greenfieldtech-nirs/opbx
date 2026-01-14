@@ -9,6 +9,7 @@ use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\ConferenceRoom\UpdateConferenceRoomRequest;
 use App\Http\Resources\ConferenceRoomResource;
 use App\Models\ConferenceRoom;
+use App\Http\Controllers\Traits\AppliesFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ use Illuminate\Http\Request;
  */
 class ConferenceRoomController extends AbstractApiCrudController
 {
+    use AppliesFilters;
     /**
      * Get the model class name for this controller.
      */
@@ -66,22 +68,31 @@ class ConferenceRoomController extends AbstractApiCrudController
     }
 
     /**
+     * Get the filter configuration for the index method.
+     *
+     * @return array<string, array>
+     */
+    protected function getFilterConfig(): array
+    {
+        return [
+            'status' => [
+                'type' => 'enum',
+                'enum' => UserStatus::class,
+                'scope' => 'withStatus'
+            ],
+            'search' => [
+                'type' => 'search',
+                'scope' => 'search'
+            ]
+        ];
+    }
+
+    /**
      * Apply custom filters to the query.
      */
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Apply status filter
-        if ($request->has('status')) {
-            $status = UserStatus::tryFrom($request->input('status'));
-            if ($status) {
-                $query->withStatus($status);
-            }
-        }
-
-        // Apply search filter
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
+        $this->applyFilters($query, $request, $this->getFilterConfig());
     }
 
     /**

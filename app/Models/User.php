@@ -20,6 +20,11 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
+     * Default field list for eager/lazy loading extension relationship.
+     */
+    public const DEFAULT_EXTENSION_FIELDS = 'extension:id,user_id,extension_number';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>

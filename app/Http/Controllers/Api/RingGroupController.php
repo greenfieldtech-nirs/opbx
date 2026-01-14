@@ -11,6 +11,7 @@ use App\Http\Requests\RingGroup\UpdateRingGroupRequest;
 use App\Http\Resources\RingGroupResource;
 use App\Models\RingGroup;
 use App\Models\RingGroupMember;
+use App\Http\Controllers\Traits\AppliesFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Log;
  */
 class RingGroupController extends AbstractApiCrudController
 {
+    use AppliesFilters;
     protected function getModelClass(): string
     {
         return RingGroup::class;
@@ -84,25 +86,34 @@ class RingGroupController extends AbstractApiCrudController
         ]);
     }
 
+    /**
+     * Get the filter configuration for the index method.
+     *
+     * @return array<string, array>
+     */
+    protected function getFilterConfig(): array
+    {
+        return [
+            'strategy' => [
+                'type' => 'enum',
+                'enum' => RingGroupStrategy::class,
+                'scope' => 'withStrategy'
+            ],
+            'status' => [
+                'type' => 'enum',
+                'enum' => RingGroupStatus::class,
+                'scope' => 'withStatus'
+            ],
+            'search' => [
+                'type' => 'search',
+                'scope' => 'search'
+            ]
+        ];
+    }
+
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        if ($request->has('strategy')) {
-            $strategy = RingGroupStrategy::tryFrom($request->input('strategy'));
-            if ($strategy) {
-                $query->withStrategy($strategy);
-            }
-        }
-
-        if ($request->has('status')) {
-            $status = RingGroupStatus::tryFrom($request->input('status'));
-            if ($status) {
-                $query->withStatus($status);
-            }
-        }
-
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
+        $this->applyFilters($query, $request, $this->getFilterConfig());
     }
 
     protected function beforeStore(array $validated, Request $request): array
@@ -133,7 +144,7 @@ class RingGroupController extends AbstractApiCrudController
         }
 
         // Load relationships
-        $model->load(['members.extension.user:id,name', 'fallbackExtension:id,extension_number']);
+        $model->loadMissing(RingGroup::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
     private array $tempMembersData = [];
@@ -141,7 +152,7 @@ class RingGroupController extends AbstractApiCrudController
     protected function afterShow(Model $model, Request $request): void
     {
         // Load relationships
-        $model->load(['members.extension.user:id,name', 'fallbackExtension:id,extension_number']);
+        $model->loadMissing(RingGroup::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
     protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
@@ -219,7 +230,7 @@ class RingGroupController extends AbstractApiCrudController
         }
 
         // Reload relationships
-        $model->load(['members.extension.user:id,name', 'fallbackExtension:id,extension_number']);
+        $model->loadMissing(RingGroup::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
 }

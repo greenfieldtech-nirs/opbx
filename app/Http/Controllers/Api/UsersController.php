@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Traits\ValidatesTenantScope;
+use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Log;
  */
 class UsersController extends AbstractApiCrudController
 {
+    use AppliesFilters;
     use ValidatesTenantScope;
 
     /**
@@ -74,33 +76,39 @@ class UsersController extends AbstractApiCrudController
     }
 
     /**
+     * Get the filter configuration for the index method.
+     *
+     * @return array<string, array>
+     */
+    protected function getFilterConfig(): array
+    {
+        return [
+            'role' => [
+                'type' => 'enum',
+                'enum' => UserRole::class,
+                'scope' => 'withRole'
+            ],
+            'status' => [
+                'type' => 'enum',
+                'enum' => UserStatus::class,
+                'scope' => 'withStatus'
+            ],
+            'search' => [
+                'type' => 'search',
+                'scope' => 'search'
+            ]
+        ];
+    }
+
+    /**
      * Apply custom filters to the query.
      */
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Apply role filter
-        if ($request->has('role')) {
-            $role = UserRole::tryFrom($request->input('role'));
-            if ($role) {
-                $query->withRole($role);
-            }
-        }
-
-        // Apply status filter
-        if ($request->has('status')) {
-            $status = UserStatus::tryFrom($request->input('status'));
-            if ($status) {
-                $query->withStatus($status);
-            }
-        }
-
-        // Apply search filter
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
+        $this->applyFilters($query, $request, $this->getFilterConfig());
 
         // Always eager load extension relationship
-        $query->with('extension:id,user_id,extension_number');
+        $query->with(User::DEFAULT_EXTENSION_FIELDS);
     }
 
     /**
@@ -171,7 +179,7 @@ class UsersController extends AbstractApiCrudController
     protected function afterStore(Model $model, Request $request): void
     {
         // Reload extension relationship
-        $model->load('extension:id,user_id,extension_number');
+        $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
     }
 
     /**
@@ -180,7 +188,7 @@ class UsersController extends AbstractApiCrudController
     protected function afterUpdate(Model $model, Request $request): void
     {
         // Reload extension relationship
-        $model->load('extension:id,user_id,extension_number');
+        $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
     }
 
     /**

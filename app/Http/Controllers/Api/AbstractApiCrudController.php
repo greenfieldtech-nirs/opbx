@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Controllers\Traits\LogsOperations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Abstract base controller for CRUD API operations.
@@ -23,7 +25,7 @@ use Illuminate\Support\Facades\Log;
  */
 abstract class AbstractApiCrudController extends Controller
 {
-    use ApiRequestHandler;
+    use ApiRequestHandler, LogsOperations;
 
     /**
      * Get the model class name for this controller.
@@ -285,7 +287,7 @@ abstract class AbstractApiCrudController extends Controller
         $modelClass = $this->getModelClass();
         $className = class_basename($modelClass);
 
-        return strtolower($className);
+        return Str::snake($className);
     }
 
     /**
@@ -446,6 +448,17 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Enrich log context with common fields like request_id.
+     *
+     * @param array $context The base context
+     * @return array The enriched context
+     */
+    protected function enrichLogContext(array $context): array
+    {
+        return array_merge($this->getLoggingContext(), $context);
+    }
+
+    /**
      * Display a paginated list of models.
      */
     public function index(Request $request): JsonResponse
@@ -496,14 +509,13 @@ abstract class AbstractApiCrudController extends Controller
             }
         }
 
-        $context = $this->getLoggingContext();
-        Log::info($this->getPluralResourceKey() . ' list retrieved', array_merge($context, [
+        $this->logListRetrieved($this->getResourceKey(), [
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
             'total' => $models->total(),
             'per_page' => $perPage,
             'filters' => $filters,
-        ]));
+        ]);
 
         $resourceClass = $this->getResourceClass();
         $collection = $resourceClass::collection($models);
@@ -536,11 +548,7 @@ abstract class AbstractApiCrudController extends Controller
             ? $request->validated() 
             : $request->all();
 
-        $context = $this->getLoggingContext();
-        Log::info('Creating new ' . $this->getResourceKey(), array_merge($context, [
-            'creator_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-        ]));
+        // Log will be handled by success/failure methods below
 
         try {
             // Conditionally wrap in transaction based on hook complexity
@@ -577,12 +585,11 @@ abstract class AbstractApiCrudController extends Controller
                 $this->afterStore($model, $request);
             }
 
-            $context = $this->getLoggingContext();
-            Log::info($this->getResourceKey() . ' created successfully', array_merge($context, [
+            $this->logOperationCompleted($this->getResourceKey(), 'creation', [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
-            ]));
+            ]);
 
             $resourceClass = $this->getResourceClass();
             return response()->json([
@@ -590,14 +597,13 @@ abstract class AbstractApiCrudController extends Controller
                 'data' => new $resourceClass($model),
             ], 201);
         } catch (\Exception $e) {
-            $context = $this->getLoggingContext();
-            Log::error($this->getCreateErrorMessage(), array_merge($context, [
+            $this->logOperationFailed($this->getResourceKey(), 'creation', [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]));
+            ]);
 
             return response()->json([
                 'error' => $this->getCreateErrorMessage(),
@@ -633,12 +639,11 @@ abstract class AbstractApiCrudController extends Controller
             ], 404);
         }
 
-        $context = $this->getLoggingContext();
-        Log::info($this->getResourceKey() . ' details retrieved', array_merge($context, [
+        $this->logDetailsRetrieved($this->getResourceKey(), [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
             $this->getResourceKey() . '_id' => $model->id,
-        ]));
+        ]);
 
         // Apply after show hook (for loading additional relationships)
         $this->afterShow($model, $request);
@@ -683,13 +688,7 @@ abstract class AbstractApiCrudController extends Controller
         // Track changed fields for logging (handles JSON/array fields properly)
         $changedFields = $this->getChangedFields($model, $validated);
 
-        $context = $this->getLoggingContext();
-        Log::info('Updating ' . $this->getResourceKey(), array_merge($context, [
-            'updater_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            $this->getResourceKey() . '_id' => $model->id,
-            'changed_fields' => $changedFields,
-        ]));
+        // Log will be handled by success/failure methods below
 
         // Acquire distributed lock if needed
         $lock = $this->acquireUpdateLock($model, $request);
@@ -722,13 +721,12 @@ abstract class AbstractApiCrudController extends Controller
             // Reload model
             $model->refresh();
 
-            $context = $this->getLoggingContext();
-            Log::info($this->getResourceKey() . ' updated successfully', array_merge($context, [
+            $this->logOperationCompleted($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
                 'changed_fields' => $changedFields,
-            ]));
+            ]);
 
             $resourceClass = $this->getResourceClass();
             return response()->json([
@@ -736,15 +734,14 @@ abstract class AbstractApiCrudController extends Controller
                 'data' => new $resourceClass($model),
             ]);
         } catch (\Exception $e) {
-            $context = $this->getLoggingContext();
-            Log::error($this->getUpdateErrorMessage(), array_merge($context, [
+            $this->logOperationFailed($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]));
+            ]);
 
             return response()->json([
                 'error' => $this->getUpdateErrorMessage(),
@@ -783,12 +780,7 @@ abstract class AbstractApiCrudController extends Controller
             ], 404);
         }
 
-        $context = $this->getLoggingContext();
-        Log::info('Deleting ' . $this->getResourceKey(), array_merge($context, [
-            'deleter_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            $this->getResourceKey() . '_id' => $model->id,
-        ]));
+        // Log will be handled by success/failure methods below
 
         try {
             // Conditionally wrap in transaction based on hook complexity
@@ -815,24 +807,22 @@ abstract class AbstractApiCrudController extends Controller
                 $this->afterDestroy($model, $request);
             }
 
-            $context = $this->getLoggingContext();
-            Log::info($this->getResourceKey() . ' deleted successfully', array_merge($context, [
+            $this->logOperationCompleted($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
-            ]));
+            ]);
 
             return response()->json(null, 204);
         } catch (\Exception $e) {
-            $context = $this->getLoggingContext();
-            Log::error($this->getDeleteErrorMessage(), array_merge($context, [
+            $this->logOperationFailed($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 $this->getResourceKey() . '_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]));
+            ]);
 
             return response()->json([
                 'error' => $this->getDeleteErrorMessage(),

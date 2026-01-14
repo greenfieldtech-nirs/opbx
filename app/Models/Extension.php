@@ -20,6 +20,11 @@ class Extension extends Model
     use HasFactory;
 
     /**
+     * Default field list for eager/lazy loading user relationship.
+     */
+    public const DEFAULT_USER_FIELDS = 'user:id,organization_id,name,email,role,status';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
