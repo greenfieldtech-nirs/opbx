@@ -107,20 +107,16 @@ class ConferenceRoomController extends AbstractApiCrudController
     /**
      * Override store method to use specific request class.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreConferenceRoomRequest $request): JsonResponse
     {
-        // Type assertion for proper validation
-        assert($request instanceof StoreConferenceRoomRequest);
         return parent::store($request);
     }
 
     /**
      * Override update method to use specific request class.
      */
-    public function update(Request $request): JsonResponse
+    public function update(UpdateConferenceRoomRequest $request): JsonResponse
     {
-        // Type assertion for proper validation
-        assert($request instanceof UpdateConferenceRoomRequest);
         return parent::update($request);
     }
 }

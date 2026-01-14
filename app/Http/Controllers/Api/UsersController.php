@@ -140,9 +140,10 @@ class UsersController extends AbstractApiCrudController
     /**
      * Hook method called before deleting a model.
      */
-    protected function beforeDestroy(User $model, Request $request): void
+    protected function beforeDestroy(Model $model, Request $request): void
     {
-        $currentUser = $this->getAuthenticatedUser($request);
+        assert($model instanceof User);
+        $currentUser = $this->getAuthenticatedUser();
 
         // Business logic: Cannot delete last owner in organization
         if ($model->role === UserRole::OWNER) {
@@ -166,7 +167,7 @@ class UsersController extends AbstractApiCrudController
     /**
      * Hook method called after storing a new model.
      */
-    protected function afterStore(User $model, Request $request): void
+    protected function afterStore(Model $model, Request $request): void
     {
         // Reload extension relationship
         $model->load('extension:id,user_id,extension_number');
@@ -175,7 +176,7 @@ class UsersController extends AbstractApiCrudController
     /**
      * Hook method called after updating a model.
      */
-    protected function afterUpdate(User $model, Request $request): void
+    protected function afterUpdate(Model $model, Request $request): void
     {
         // Reload extension relationship
         $model->load('extension:id,user_id,extension_number');

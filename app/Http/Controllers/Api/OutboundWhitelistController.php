@@ -9,6 +9,7 @@ use App\Http\Requests\OutboundWhitelist\UpdateOutboundWhitelistRequest;
 use App\Http\Resources\OutboundWhitelistResource;
 use App\Models\OutboundWhitelist;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**

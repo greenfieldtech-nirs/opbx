@@ -28,7 +28,7 @@ trait ValidatesTenantScope
     protected function validateTenantScope(Request $request, mixed $model, string $modelName = 'resource'): ?JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
+        $currentUser = $this->getAuthenticatedUser();
 
         // Check if model has organization_id property
         if (!property_exists($model, 'organization_id')) {
@@ -82,7 +82,7 @@ trait ValidatesTenantScope
      *
      * Assumes the controller uses ApiRequestHandler trait.
      */
-    abstract protected function getAuthenticatedUser(Request $request): ?User;
+    abstract protected function getAuthenticatedUser(): ?object;
 
     /**
      * Helper method to get the request ID.
