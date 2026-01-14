@@ -119,6 +119,52 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Hook method to acquire a distributed lock before updating a model.
+     * Return null for no locking (default behavior).
+     * 
+     * @return \Illuminate\Contracts\Cache\Lock|null
+     */
+    protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
+    {
+        // Default implementation - no locking
+        return null;
+    }
+
+    /**
+     * Hook method to release a distributed lock after updating a model.
+     */
+    protected function releaseUpdateLock(?\Illuminate\Contracts\Cache\Lock $lock, Model $model, Request $request): void
+    {
+        // Default implementation - no action
+    }
+
+    /**
+     * Hook method called after showing a model (for loading additional relationships).
+     */
+    protected function afterShow(Model $model, Request $request): void
+    {
+        // Default implementation - no action
+    }
+
+    /**
+     * Hook method to build the index query with custom eager loading.
+     * Override this to add with(), withCount(), etc.
+     */
+    protected function buildIndexQuery(Builder $query, Request $request): void
+    {
+        // Default implementation - no custom query building
+    }
+
+    /**
+     * Get the default sort order for index method.
+     * Override to change from 'asc' to 'desc'.
+     */
+    protected function getDefaultSortOrder(): string
+    {
+        return 'asc';
+    }
+
+    /**
      * Get the model instance for authorization and scoping.
      *
      * Override for custom model resolution logic.
@@ -329,12 +375,15 @@ abstract class AbstractApiCrudController extends Controller
         $modelClass = $this->getModelClass();
         $query = $modelClass::query()->forOrganization($user->organization_id);
 
+        // Apply custom query building (eager loading, etc.)
+        $this->buildIndexQuery($query, $request);
+
         // Apply custom filters
         $this->applyCustomFilters($query, $request);
 
         // Apply sorting
         $sortField = $request->input('sort_by', $this->getDefaultSortField());
-        $sortOrder = $request->input('sort_order', 'asc');
+        $sortOrder = $request->input('sort_order', $this->getDefaultSortOrder());
 
         // Validate sort field
         $allowedSortFields = $this->getAllowedSortFields();
@@ -345,7 +394,7 @@ abstract class AbstractApiCrudController extends Controller
         // Validate sort order
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc'], true)
             ? strtolower($sortOrder)
-            : 'asc';
+            : $this->getDefaultSortOrder();
 
         $query->orderBy($sortField, $sortOrder);
 
@@ -498,6 +547,9 @@ abstract class AbstractApiCrudController extends Controller
             $this->getResourceKey() . '_id' => $model->id,
         ]);
 
+        // Apply after show hook (for loading additional relationships)
+        $this->afterShow($model, $request);
+
         $resourceClass = $this->getResourceClass();
         return response()->json([
             $this->getResourceKey() => new $resourceClass($model),
@@ -555,6 +607,9 @@ abstract class AbstractApiCrudController extends Controller
             'changed_fields' => $changedFields,
         ]);
 
+        // Acquire distributed lock if needed
+        $lock = $this->acquireUpdateLock($model, $request);
+
         try {
             DB::transaction(function () use ($model, $validated, $request): void {
                 // Apply before hook
@@ -598,6 +653,9 @@ abstract class AbstractApiCrudController extends Controller
                 'error' => $this->getUpdateErrorMessage(),
                 'message' => $this->getUpdateUserErrorMessage(),
             ], 500);
+        } finally {
+            // Always release the lock if acquired
+            $this->releaseUpdateLock($lock ?? null, $model, $request);
         }
     }
 

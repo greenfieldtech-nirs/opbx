@@ -26,41 +26,42 @@ export const ringGroupsService = {
   /**
    * Get all ring groups with optional filters
    */
-  async getAll(filters?: RingGroupFilters): Promise<PaginatedResponse<RingGroup>> {
-    const response = await api.get<PaginatedResponse<RingGroup>>('/ring-groups', {
-      params: filters,
-    });
-    return response.data;
+  getAll: (params?: RingGroupFilters): Promise<PaginatedResponse<RingGroup>> => {
+    return api.get<{ ringgroups: RingGroup[]; meta: any }>('/ring-groups', { params })
+      .then(res => ({
+        data: res.data.ringgroups,
+        meta: res.data.meta,
+      }));
   },
 
   /**
    * Get ring group by ID
    */
-  async getById(id: string): Promise<RingGroup> {
-    const response = await api.get<RingGroup>(`/ring-groups/${id}`);
-    return response.data;
+  getById: (id: string): Promise<RingGroup> => {
+    return api.get<{ ringgroup: RingGroup }>(`/ring-groups/${id}`)
+      .then(res => res.data.ringgroup);
   },
 
   /**
    * Create new ring group
    */
-  async create(data: CreateRingGroupRequest): Promise<RingGroup> {
-    const response = await api.post<RingGroup>('/ring-groups', data);
-    return response.data;
+  create: (data: CreateRingGroupRequest): Promise<RingGroup> => {
+    return api.post<{ message: string; ringgroup: RingGroup }>('/ring-groups', data)
+      .then(res => res.data.ringgroup);
   },
 
   /**
    * Update ring group
    */
-  async update(id: string, data: UpdateRingGroupRequest): Promise<RingGroup> {
-    const response = await api.put<RingGroup>(`/ring-groups/${id}`, data);
-    return response.data;
+  update: (id: string, data: UpdateRingGroupRequest): Promise<RingGroup> => {
+    return api.put<{ message: string; ringgroup: RingGroup }>(`/ring-groups/${id}`, data)
+      .then(res => res.data.ringgroup);
   },
 
   /**
    * Delete ring group
    */
-  async delete(id: string): Promise<void> {
-    await api.delete(`/ring-groups/${id}`);
+  delete: (id: string): Promise<void> => {
+    return api.delete(`/ring-groups/${id}`);
   },
 };
