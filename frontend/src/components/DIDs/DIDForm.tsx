@@ -20,9 +20,9 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
+import { ringGroupsService } from '@/services/createResourceService';
 import { businessHoursService } from '@/services/businessHours.service';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { ivrMenusService } from '@/services/createResourceService';
 import type { DIDNumber, CreateDIDRequest, UpdateDIDRequest, RoutingType } from '@/types/api.types';
 
 // Validation schema

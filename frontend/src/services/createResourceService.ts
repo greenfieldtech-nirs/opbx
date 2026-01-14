@@ -1,4 +1,18 @@
 import api from './api';
+import type {
+  User,
+  Extension,
+  ConferenceRoom,
+  CallLog,
+  RingGroup,
+  DIDNumber,
+  BusinessHours,
+  OutboundWhitelist,
+} from '@/types';
+import type {
+  IvrMenu,
+  CallDetailRecord,
+} from '@/types/api.types';
 
 /**
  * Generic Service Instance Interface
@@ -10,9 +24,9 @@ export interface ServiceInstance<T = any> {
     data: T[];
     meta: {
       total: number;
-      currentPage: number;
-      lastPage: number;
-      perPage: number;
+      current_page: number;
+      last_page: number;
+      per_page: number;
       from?: number;
       to?: number;
     };
@@ -54,115 +68,7 @@ export function createResourceService<T>(resource: string): ServiceInstance<T> {
   };
 }
 
-/**
- * Type definitions for common resources
- */
-export interface User {
-  id: number;
-  organization_id: number;
-  name: string;
-  email: string;
-  role: string;
-  status: string;
-  phone?: string;
-  extension?: {
-    id: number;
-    extension_number: string;
-  };
-  created_at?: string;
-  updated_at?: string;
-}
 
-export interface Extension {
-  id: number;
-  organization_id: number;
-  user_id?: number;
-  extension_number: string;
-  status: string;
-  configuration?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-  user?: User;
-}
-
-export interface ConferenceRoom {
-  id: number;
-  organization_id: number;
-  room_number: string;
-  name: string;
-  status: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface CallLog {
-  id: number;
-  organization_id: number;
-  call_id: string;
-  did_id?: number;
-  extension_id?: number;
-  from: string;
-  to: string;
-  status: string;
-  duration?: number;
-  created_at?: string;
-}
-
-export interface CallDetailRecord {
-  id: number;
-  organization_id: number;
-  call_id: string;
-  did_number: string;
-  caller_number: string;
-  start_time: string;
-  end_time?: string;
-  duration?: number;
-  recording_url?: string;
-  created_at?: string;
-}
-
-export interface Settings {
-  id: number;
-  organization_id: number;
-  key: string;
-  value: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface RingGroup {
-  id: number;
-  organization_id: number;
-  name: string;
-  strategy: string;
-  ring_timeout?: number;
-  status: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Recording {
-  id: number;
-  organization_id: number;
-  call_id: string;
-  did_number: string;
-  caller_number: string;
-  recording_url: string;
-  duration: number;
-  file_size: number;
-  created_by: number;
-  created_at?: string;
-}
-
-export interface PhoneNumber {
-  id: number;
-  organization_id: number;
-  phone_number: string;
-  country_code: string;
-  status: string;
-  created_at?: string;
-  updated_at?: string;
-}
 
 /**
  * Pre-configured service instances for common resources
@@ -171,11 +77,13 @@ export const extensionsService = createResourceService<Extension>('extensions');
 export const usersService = createResourceService<User>('users');
 export const conferenceRoomsService = createResourceService<ConferenceRoom>('conference-rooms');
 export const callLogsService = createResourceService<CallLog>('call-logs');
-export const settingsService = createResourceService<Settings>('settings');
+
 export const ringGroupsService = createResourceService<RingGroup>('ring-groups');
 export const callDetailRecordsService = createResourceService<CallDetailRecord>('call-detail-records');
-export const recordingsService = createResourceService<Recording>('recordings');
-export const phoneNumbersService = createResourceService<PhoneNumber>('phone-numbers');
+export const phoneNumbersService = createResourceService<DIDNumber>('phone-numbers');
+export const ivrMenusService = createResourceService<IvrMenu>('ivr-menus');
+export const businessHoursService = createResourceService<BusinessHours>('business-hours');
+export const outboundWhitelistService = createResourceService<OutboundWhitelist>('outbound-whitelist');
 
 /**
  * Resource factory class for dynamic service creation

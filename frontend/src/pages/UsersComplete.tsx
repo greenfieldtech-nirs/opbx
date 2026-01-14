@@ -84,7 +84,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import type { User, UserRole, Status } from '@/types';
-import { usersService } from '@/services/users.service';
+import { usersService } from '@/services/createResourceService';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;

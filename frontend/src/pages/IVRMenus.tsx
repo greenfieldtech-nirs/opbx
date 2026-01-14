@@ -6,10 +6,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { ivrMenusService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
+import { ringGroupsService } from '@/services/createResourceService';
+import { conferenceRoomsService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';

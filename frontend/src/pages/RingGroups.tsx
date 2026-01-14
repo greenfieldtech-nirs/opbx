@@ -6,9 +6,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ringGroupsService } from '@/services/ringGroups.service';
+import { ringGroupsService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   RingGroup,

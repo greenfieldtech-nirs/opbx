@@ -7,8 +7,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { extensionsService } from '@/services/extensions.service';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
-import { phoneNumbersService } from '@/services/dids.service';
+import { conferenceRoomsService, phoneNumbersService } from '@/services/createResourceService';
 import { cdrService } from '@/services/cdr.service';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

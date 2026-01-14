@@ -1,26 +1,27 @@
 /**
  * CDR (Call Detail Records) Service
  *
- * Handles CDR operations and queries
+ * Handles CDR operations and queries + custom methods
  */
 
 import api from './api';
+import { callDetailRecordsService as baseCdrService } from './createResourceService';
 import type {
   CallDetailRecord,
-  PaginatedResponse,
   CDRFilters,
 } from '@/types/api.types';
 
 export const cdrService = {
+  ...baseCdrService,
+
   /**
-   * Get all CDRs with optional filters
+   * Get CDR by ID with raw_cdr data included
    */
-  getAll: (params?: CDRFilters): Promise<PaginatedResponse<CallDetailRecord>> => {
-    return api.get<{ data: CallDetailRecord[]; meta: any }>('/call-detail-records', { params })
-      .then(res => ({
-        data: res.data.data,
-        meta: res.data.meta,
-      }));
+  getById: (id: number | string): Promise<CallDetailRecord> => {
+    return api.get<{ data: CallDetailRecord }>(`/call-detail-records/${id}`, {
+      params: { include: 'raw_cdr' },
+    })
+      .then(res => res.data.data);
   },
 
   /**

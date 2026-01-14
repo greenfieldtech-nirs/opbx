@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { usersService } from '@/services/users.service'
+import { usersService } from '@/services/createResourceService'
 
 export interface UserFilters {
   search?: string
