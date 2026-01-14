@@ -710,6 +710,9 @@ export default function RingGroups() {
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
     // Debug logging for fallback selects
+    console.log('=== RING GROUPS DEBUG ===');
+    console.log('allRingGroupsData RAW:', allRingGroupsData);
+    console.log('allRingGroups extracted:', allRingGroups);
     console.log('Available data for fallback selects:', {
       allRingGroups: allRingGroups?.length || 0,
       availableIvrMenus: availableIvrMenus?.length || 0,
