@@ -367,8 +367,18 @@ abstract class AbstractApiCrudController extends Controller
         ]);
 
         $resourceClass = $this->getResourceClass();
+        $collection = $resourceClass::collection($models);
+        
         return response()->json([
-            $this->getPluralResourceKey() => $resourceClass::collection($models),
+            $this->getPluralResourceKey() => $collection->items(),
+            'meta' => [
+                'current_page' => $models->currentPage(),
+                'per_page' => $models->perPage(),
+                'total' => $models->total(),
+                'last_page' => $models->lastPage(),
+                'from' => $models->firstItem(),
+                'to' => $models->lastItem(),
+            ],
         ]);
     }
 
