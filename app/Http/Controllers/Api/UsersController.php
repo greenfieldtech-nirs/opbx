@@ -12,6 +12,7 @@ use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -124,7 +125,7 @@ class UsersController extends AbstractApiCrudController
      * @param array<string, mixed> $validated
      * @return array<string, mixed>
      */
-    protected function beforeUpdate(User $model, array $validated, Request $request): array
+    protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
         // Hash password if provided
         if (isset($validated['password']) && !empty($validated['password'])) {
@@ -182,19 +183,7 @@ class UsersController extends AbstractApiCrudController
         $model->load('extension:id,user_id,extension_number');
     }
 
-    /**
-     * Store a newly created user.
-     */
-    public function store(CreateUserRequest $request): JsonResponse
-    {
-        return parent::store($request);
-    }
-
-    /**
-     * Update the specified user.
-     */
-    public function update(UpdateUserRequest $request): JsonResponse
-    {
-        return parent::update($request);
-    }
+    // Note: store() and update() methods are inherited from AbstractApiCrudController
+    // Type hints for specific FormRequest classes are handled by Laravel's dependency injection
+    // The validation is performed by CreateUserRequest and UpdateUserRequest automatically
 }

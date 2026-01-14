@@ -104,19 +104,7 @@ class ConferenceRoomController extends AbstractApiCrudController
         return 'update';
     }
 
-    /**
-     * Override store method to use specific request class.
-     */
-    public function store(StoreConferenceRoomRequest $request): JsonResponse
-    {
-        return parent::store($request);
-    }
-
-    /**
-     * Override update method to use specific request class.
-     */
-    public function update(UpdateConferenceRoomRequest $request): JsonResponse
-    {
-        return parent::update($request);
-    }
+    // Note: store() and update() methods are inherited from AbstractApiCrudController
+    // Type hints for specific FormRequest classes are handled by Laravel's dependency injection
+    // The validation is performed by StoreConferenceRoomRequest and UpdateConferenceRoomRequest automatically
 }
