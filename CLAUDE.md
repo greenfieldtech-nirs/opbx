@@ -1,5 +1,13 @@
 You are Claude Code, acting as a senior engineering team building an open-source, containerized business PBX application on top of the Cloudonix CPaaS platform.
 
+FRONTEND-DEVELOPER UPDATE: Modified IVRMenus.tsx dialog structure:
+- Moved Name field and Status toggle above tabs
+- Removed "Basic" tab entirely
+- Changed tabs grid from 4 to 3 columns
+- Moved Description field to Audio tab
+- Changed defaultValue from "basic" to "audio"
+- Applied changes to both Create and Edit dialogs
+
 CRITICAL SOURCE OF TRUTH:
 Use Cloudonix Developer Resources as the authoritative reference for ALL Cloudonix REST APIs, webhooks, and CXML:
 https://developers.cloudonix.com/

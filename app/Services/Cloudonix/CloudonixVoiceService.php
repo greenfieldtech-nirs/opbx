@@ -41,7 +41,9 @@ class CloudonixVoiceService
                 'domain_uuid' => $settings->domain_uuid
             ]);
 
-            $voices = $this->client->getVoices($settings->domain_uuid);
+            // Create a client instance with the organization-specific settings
+            $client = new \App\Services\CloudonixClient\CloudonixClient($settings);
+            $voices = $client->getVoices($settings->domain_uuid);
 
             if (empty($voices)) {
                 throw new \RuntimeException('Cloudonix API returned empty voices list');
