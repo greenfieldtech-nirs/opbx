@@ -181,7 +181,7 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('call-detail-records')->group(function (): void {
             Route::get('/', [CallDetailRecordController::class, 'index'])->name('call-detail-records.index');
             Route::get('/statistics', [CallDetailRecordController::class, 'statistics'])->name('call-detail-records.statistics');
-            Route::get('/{callDetailRecord}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
+            Route::get('/{call_detail_record}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
         });
 
         // Recordings (Owner/Admin only)
