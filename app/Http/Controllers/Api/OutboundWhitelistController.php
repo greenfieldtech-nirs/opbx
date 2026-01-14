@@ -161,4 +161,31 @@ class OutboundWhitelistController extends AbstractApiCrudController
             ],
         ]);
     }
+
+    /**
+     * Transaction not needed - no hooks perform additional database operations.
+     * Simple single-model create operation is already atomic.
+     */
+    protected function shouldUseTransactionForStore(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Transaction not needed - no hooks perform additional database operations.
+     * Simple single-model update operation is already atomic.
+     */
+    protected function shouldUseTransactionForUpdate(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Transaction not needed - no hooks perform additional database operations.
+     * Simple single-model delete operation is already atomic.
+     */
+    protected function shouldUseTransactionForDestroy(): bool
+    {
+        return false;
+    }
 }

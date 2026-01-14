@@ -165,6 +165,49 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Determine if store operation should use database transaction.
+     * 
+     * Override to return false if:
+     * - beforeStore/afterStore hooks do NOT perform database operations
+     * - Only a single model is being created with no related records
+     * 
+     * Default: true (safe, ensures consistency if hooks perform DB operations)
+     */
+    protected function shouldUseTransactionForStore(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Determine if update operation should use database transaction.
+     * 
+     * Override to return false if:
+     * - beforeUpdate/afterUpdate hooks do NOT perform database operations
+     * - Only a single model is being updated with no related records
+     * 
+     * Default: true (safe, ensures consistency if hooks perform DB operations)
+     */
+    protected function shouldUseTransactionForUpdate(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Determine if destroy operation should use database transaction.
+     * 
+     * Override to return false if:
+     * - beforeDestroy/afterDestroy hooks do NOT perform database operations
+     * - Only a single model is being deleted with no related records
+     * - No business logic checks requiring queries
+     * 
+     * Default: true (safe, ensures consistency if hooks perform DB operations)
+     */
+    protected function shouldUseTransactionForDestroy(): bool
+    {
+        return true;
+    }
+
+    /**
      * Check if a specific field has changed by comparing old and new values.
      * Handles JSON/array fields specially by using json_encode comparison.
      *
@@ -500,7 +543,26 @@ abstract class AbstractApiCrudController extends Controller
         ]));
 
         try {
-            $model = DB::transaction(function () use ($currentUser, $validated, $request): Model {
+            // Conditionally wrap in transaction based on hook complexity
+            if ($this->shouldUseTransactionForStore()) {
+                $model = DB::transaction(function () use ($currentUser, $validated, $request): Model {
+                    // Apply before hook
+                    $validated = $this->beforeStore($validated, $request);
+
+                    // Assign to current user's organization
+                    $validated['organization_id'] = $currentUser->organization_id;
+
+                    // Create model
+                    $modelClass = $this->getModelClass();
+                    $model = $modelClass::create($validated);
+
+                    // Apply after hook
+                    $this->afterStore($model, $request);
+
+                    return $model;
+                });
+            } else {
+                // No transaction needed for simple single-model operations
                 // Apply before hook
                 $validated = $this->beforeStore($validated, $request);
 
@@ -513,9 +575,7 @@ abstract class AbstractApiCrudController extends Controller
 
                 // Apply after hook
                 $this->afterStore($model, $request);
-
-                return $model;
-            });
+            }
 
             $context = $this->getLoggingContext();
             Log::info($this->getResourceKey() . ' created successfully', array_merge($context, [
@@ -635,7 +695,20 @@ abstract class AbstractApiCrudController extends Controller
         $lock = $this->acquireUpdateLock($model, $request);
 
         try {
-            DB::transaction(function () use ($model, $validated, $request): void {
+            // Conditionally wrap in transaction based on hook complexity
+            if ($this->shouldUseTransactionForUpdate()) {
+                DB::transaction(function () use ($model, $validated, $request): void {
+                    // Apply before hook
+                    $validated = $this->beforeUpdate($model, $validated, $request);
+
+                    // Update model
+                    $model->update($validated);
+
+                    // Apply after hook
+                    $this->afterUpdate($model, $request);
+                });
+            } else {
+                // No transaction needed for simple single-model operations
                 // Apply before hook
                 $validated = $this->beforeUpdate($model, $validated, $request);
 
@@ -644,7 +717,7 @@ abstract class AbstractApiCrudController extends Controller
 
                 // Apply after hook
                 $this->afterUpdate($model, $request);
-            });
+            }
 
             // Reload model
             $model->refresh();
@@ -718,7 +791,20 @@ abstract class AbstractApiCrudController extends Controller
         ]));
 
         try {
-            DB::transaction(function () use ($model, $request): void {
+            // Conditionally wrap in transaction based on hook complexity
+            if ($this->shouldUseTransactionForDestroy()) {
+                DB::transaction(function () use ($model, $request): void {
+                    // Apply before hook
+                    $this->beforeDestroy($model, $request);
+
+                    // Delete model
+                    $model->delete();
+
+                    // Apply after hook
+                    $this->afterDestroy($model, $request);
+                });
+            } else {
+                // No transaction needed for simple single-model operations
                 // Apply before hook
                 $this->beforeDestroy($model, $request);
 
@@ -727,7 +813,7 @@ abstract class AbstractApiCrudController extends Controller
 
                 // Apply after hook
                 $this->afterDestroy($model, $request);
-            });
+            }
 
             $context = $this->getLoggingContext();
             Log::info($this->getResourceKey() . ' deleted successfully', array_merge($context, [

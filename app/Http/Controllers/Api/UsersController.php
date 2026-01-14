@@ -183,6 +183,33 @@ class UsersController extends AbstractApiCrudController
         $model->load('extension:id,user_id,extension_number');
     }
 
+    /**
+     * Transaction not needed - hooks only hash password (data transformation).
+     * Simple single-model create operation is already atomic.
+     */
+    protected function shouldUseTransactionForStore(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Transaction not needed - hooks only hash password (data transformation).
+     * Simple single-model update operation is already atomic.
+     */
+    protected function shouldUseTransactionForUpdate(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Transaction IS needed - beforeDestroy() performs query to count owners.
+     * Must ensure owner count check and delete happen atomically.
+     */
+    protected function shouldUseTransactionForDestroy(): bool
+    {
+        return true; // Keep transaction (queries in beforeDestroy hook)
+    }
+
     // No need to override store() and update()
     // Laravel will automatically resolve and validate FormRequest classes
     // based on route-model binding and type hints in the parent controller
