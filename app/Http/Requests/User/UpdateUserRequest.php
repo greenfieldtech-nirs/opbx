@@ -24,28 +24,7 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $currentUser = $this->user();
-        $targetUser = $this->route('user');
-
-        if (!$currentUser || !$targetUser) {
-            return false;
-        }
-
-        // Check if user has permission to manage the target user
-        if (!$currentUser->canManageUser($targetUser)) {
-            return false;
-        }
-
-        // If changing role, PBX Admin can only set role to PBX User or Reporter
-        if ($this->has('role') && $currentUser->role === UserRole::PBX_ADMIN) {
-            $requestedRole = $this->input('role');
-
-            if (!in_array($requestedRole, ['pbx_user', 'reporter'], true)) {
-                return false;
-            }
-        }
-
-        return true;
+        return true; // Authorization is handled by the controller via policy
     }
 
     /**

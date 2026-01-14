@@ -23,27 +23,7 @@ class CreateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $user = $this->user();
-
-        if (!$user) {
-            return false;
-        }
-
-        // Only Owner and PBX Admin can create users
-        if (!$user->isOwner() && !$user->isPBXAdmin()) {
-            return false;
-        }
-
-        // PBX Admin can only create PBX User or Reporter
-        if ($user->isPBXAdmin()) {
-            $requestedRole = $this->input('role');
-
-            if ($requestedRole && !in_array($requestedRole, ['pbx_user', 'reporter'], true)) {
-                return false;
-            }
-        }
-
-        return true;
+        return true; // Authorization is handled by the controller via policy
     }
 
     /**
