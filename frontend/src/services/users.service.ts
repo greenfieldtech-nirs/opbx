@@ -20,9 +20,9 @@ export const usersService = {
    * GET /users
    */
   getAll: (params?: UsersFilterParams): Promise<PaginatedResponse<User>> => {
-    return api.get<{ data: User[]; meta: any }>('/users', { params })
+    return api.get<{ users: User[]; meta: any }>('/users', { params })
       .then(res => ({
-        data: res.data.data,
+        data: res.data.users,
         meta: res.data.meta,
       }));
   },
