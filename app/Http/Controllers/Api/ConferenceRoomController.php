@@ -104,25 +104,7 @@ class ConferenceRoomController extends AbstractApiCrudController
         return 'update';
     }
 
-    /**
-     * Store a newly created conference room.
-     * 
-     * Laravel's DI will inject StoreConferenceRoomRequest and run validation automatically.
-     */
-    public function store(StoreConferenceRoomRequest $request): JsonResponse
-    {
-        // Cast to base Request type for parent compatibility
-        return parent::store($request);
-    }
-
-    /**
-     * Update the specified conference room.
-     * 
-     * Laravel's DI will inject UpdateConferenceRoomRequest and run validation automatically.
-     */
-    public function update(UpdateConferenceRoomRequest $request): JsonResponse
-    {
-        // Cast to base Request type for parent compatibility
-        return parent::update($request);
-    }
+    // No need to override store() and update()
+    // Laravel will automatically resolve and validate FormRequest classes
+    // based on route-model binding and type hints in the parent controller
 }
