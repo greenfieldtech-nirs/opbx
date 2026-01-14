@@ -709,6 +709,21 @@ export default function RingGroups() {
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
+    // Debug logging for fallback selects
+    console.log('Available data for fallback selects:', {
+      allRingGroups: allRingGroups?.length || 0,
+      availableIvrMenus: availableIvrMenus?.length || 0,
+      availableAiAssistants: availableAiAssistants?.length || 0,
+      availableExtensions: availableExtensions?.length || 0,
+    });
+    console.log('Current formData fallback values:', {
+      fallback_action: formData.fallback_action,
+      fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
+    });
+
     const title = isEdit ? 'Edit Ring Group' : 'Create Ring Group';
     const description = isEdit
       ? 'Update ring group settings and members'
@@ -1096,9 +1111,33 @@ export default function RingGroups() {
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
-                )}
-                {formData.fallback_action === 'ai_assistant' && (
+                   </Select>
+                 )}
+                 {formData.fallback_action === 'ivr_menu' && (
+                   <Select
+                     value={formData.fallback_ivr_menu_id || ''}
+                     onValueChange={(value) =>
+                       setFormData({ ...formData, fallback_ivr_menu_id: value })
+                     }
+                   >
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select IVR menu" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       {availableIvrMenus.map((menu) => (
+                         <SelectItem key={menu.id} value={menu.id.toString()}>
+                           <div className="flex items-center gap-2">
+                             <Badge variant="outline" className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200">
+                               <Menu className="h-3.5 w-3.5" />
+                               {menu.name}
+                             </Badge>
+                           </div>
+                         </SelectItem>
+                       ))}
+                     </SelectContent>
+                   </Select>
+                 )}
+                 {formData.fallback_action === 'ai_assistant' && (
                   <Select
                     value={formData.fallback_ai_assistant_id || ''}
                     onValueChange={(value) =>
