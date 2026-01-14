@@ -14,6 +14,7 @@ use App\Models\CloudonixSettings;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
 use App\Services\Cloudonix\CloudonixVoiceService;
+use App\ValueObjects\IvrAudioConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -262,11 +263,10 @@ class IvrMenuController extends Controller
                 // Assign to current user's organization
                 $validated['organization_id'] = $user->organization_id;
 
-                // Resolve audio file path from recording ID if provided
-                $this->resolveAudioFilePath($validated);
-
-                // Ensure only one audio source is active
-                $this->clearUnusedAudioSource($validated);
+                // Resolve audio configuration using value object
+                $audioConfig = IvrAudioConfig::fromRequest($validated, $user);
+                $validated = array_merge($validated, $audioConfig->toArray());
+                unset($validated['recording_id']); // Clean up temporary field
 
                 // Create IVR menu
                 $ivrMenu = IvrMenu::create($validated);
@@ -391,16 +391,15 @@ class IvrMenuController extends Controller
         // Log will be handled by success/failure methods below
 
         try {
-            $ivrMenu = DB::transaction(function () use ($ivrMenu, $validated): IvrMenu {
+            $ivrMenu = DB::transaction(function () use ($ivrMenu, $validated, $user): IvrMenu {
                 // Extract options data
                 $optionsData = $validated['options'] ?? [];
                 unset($validated['options']);
 
-                // Resolve audio file path from recording ID if provided
-                $this->resolveAudioFilePath($validated);
-
-                // Ensure only one audio source is active
-                $this->clearUnusedAudioSource($validated);
+                // Resolve audio configuration using value object
+                $audioConfig = IvrAudioConfig::fromRequest($validated, $user);
+                $validated = array_merge($validated, $audioConfig->toArray());
+                unset($validated['recording_id']); // Clean up temporary field
 
                 // Update IVR menu
                 $ivrMenu->update($validated);
@@ -579,54 +578,4 @@ class IvrMenuController extends Controller
      * @param array $data
      * @return void
      */
-    private function resolveAudioFilePath(array &$data): void
-    {
-        $recordingId = isset($data['recording_id']) ? $data['recording_id'] : null;
-        $audioFilePath = isset($data['audio_file_path']) ? $data['audio_file_path'] : null;
-
-        // Check if recording_id is provided
-        if ($recordingId) {
-            $recording = \App\Models\Recording::find($recordingId);
-        }
-        // Check if audio_file_path is a recording ID (integer or numeric string)
-        elseif ($audioFilePath && (is_int($audioFilePath) || (is_string($audioFilePath) && ctype_digit($audioFilePath)))) {
-            $recording = \App\Models\Recording::find((int) $audioFilePath);
-        }
-
-        if (isset($recording) && $recording && $recording->isActive()) {
-            // Get the authenticated user ID for generating the playback URL
-            $user = auth()->user();
-            if ($user) {
-                $data['audio_file_path'] = $recording->getPlaybackUrl($user->id);
-            }
-        }
-
-        // Remove the recording_id from the data as it's not stored in the IVR menu
-        if (isset($data['recording_id'])) {
-            unset($data['recording_id']);
-        }
-    }
-
-    /**
-     * Clear the unused audio source to ensure only one audio configuration is active.
-     * If TTS text is provided, clear audio file path, and vice versa.
-     *
-     * @param array $data
-     * @return void
-     */
-    private function clearUnusedAudioSource(array &$data): void
-    {
-        $audioFilePath = isset($data['audio_file_path']) ? $data['audio_file_path'] : null;
-        $ttsText = isset($data['tts_text']) ? $data['tts_text'] : null;
-
-        // If TTS text is provided, ensure audio file path is cleared
-        if (!empty($ttsText)) {
-            $data['audio_file_path'] = null;
-        }
-        // If audio file path is provided, ensure TTS text is cleared
-        elseif (!empty($audioFilePath)) {
-            $data['tts_text'] = null;
-            $data['tts_voice'] = null; // Also clear TTS voice when not using TTS
-        }
-    }
 }
