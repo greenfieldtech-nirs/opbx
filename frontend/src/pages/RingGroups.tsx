@@ -507,20 +507,20 @@ export default function RingGroups() {
       priority: member.priority,
     }));
 
-    const requestData = {
-      name: formData.name!,
-      description: formData.description,
-      strategy: formData.strategy as RingGroupStrategy,
-      timeout: formData.timeout!,
-      ring_turns: formData.ring_turns!,
-      fallback_action: formData.fallback_action as RingGroupFallbackAction,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-      status: formData.status as RingGroupStatus,
-      members,
-    };
+     const requestData = {
+       name: formData.name!,
+       description: formData.description,
+       strategy: formData.strategy as RingGroupStrategy,
+       timeout: formData.timeout!,
+       ring_turns: formData.ring_turns!,
+       fallback_action: formData.fallback_action as RingGroupFallbackAction,
+       fallback_extension_id: formData.fallback_extension_id,
+       fallback_ring_group_id: formData.fallback_ring_group_id,
+       fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+       fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
+       status: formData.status as RingGroupStatus,
+       members,
+     };
 
     createMutation.mutate(requestData);
   };
@@ -709,7 +709,7 @@ export default function RingGroups() {
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
-    const title = isEdit ? 'Edit Ring Group DEBUG' : 'Create Ring Group';
+    const title = isEdit ? 'Edit Ring Group' : 'Create Ring Group';
     const description = isEdit
       ? 'Update ring group settings and members'
       : 'Configure a new ring group with extension members';
@@ -842,9 +842,9 @@ export default function RingGroups() {
                     </SortableContext>
                   </DndContext>
                 ) : (
-                  <div className="border rounded-lg divide-y">
-                    {formData.members.map((member, index) => (
-                      <div key={index} className="p-3 flex items-center gap-3">
+                   <div className="border rounded-lg divide-y">
+                     {formData.members.map((member, index) => (
+                       <div key={member.extension_id} className="p-3 flex items-center gap-3">
                         <div className="flex flex-col gap-1">
                           <Button
                             type="button"
