@@ -200,8 +200,10 @@ sequenceDiagram
 
    Edit `.env` with your settings:
    ```env
-   # Cloudonix API
-   CLOUDONIX_API_TOKEN=your_api_token_here
+   # 
+   # Cloudonix API (No longer required - to be configured via your account settings)
+   # CLOUDONIX_API_TOKEN=your_api_token_here
+   # 
    
    # ngrok (for local development)
    NGROK_AUTHTOKEN=your_ngrok_authtoken_here
