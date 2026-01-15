@@ -17,7 +17,7 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Checkbox} from '@/components/ui/checkbox';
-import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
+import {AuroraBackgroundProvider} from '@nauverse/react-aurora-background';
 import opbxLogo from '@/assets/opbx_logo.png';
 
 // Form validation schema
@@ -79,14 +79,15 @@ export default function Login() {
         <div className="min-h-screen bg-white" style={{fontFamily: 'Roboto, sans-serif'}}>
             <div className="grid lg:grid-cols-2 min-h-screen">
                 {/* Left Side - Branding & Welcome */}
-                <div className="relative flex flex-col justify-center p-12 bg-gray-900">
+                <div className="relative flex flex-col justify-center bg-gray-900">
                     <AuroraBackgroundProvider
-                        colors={['#3A29FF', '#FF94B4', '#FF3232']}
-                        numBubbles={4}
-                        animDuration={5}
+                        className="flex items-center justify-center"
+                        colors={['#3A29FF', '#00003a', '#030118']}
+                        numBubbles={2}
+                        animDuration={3}
                         blurAmount="10vw"
-                        bgColor="#111827"
-                        useRandomness={false}
+                        bgColor="#000000"
+                        useRandomness={true}
                     >
                         <div className="relative z-10 max-w-lg mx-auto space-y-8">
                             {/* Logo */}
@@ -193,7 +194,8 @@ export default function Login() {
 
                                 {/* Footer Info */}
                                 <div className="mt-8 text-center text-sm text-gray-600">
-                                    <p>Made with ❤️ by <a href="https://cloudonix.com">Cloudonix</a><br/>No call home scripts included!</p>
+                                    <p>Made with ❤️ by <a href="https://cloudonix.com">Cloudonix</a><br/>No call home
+                                        scripts included!</p>
                                 </div>
                             </CardContent>
                         </Card>

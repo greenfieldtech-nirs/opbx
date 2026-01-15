@@ -7,7 +7,7 @@ export const LoginPage: React.FC = () => {
     return (
         <div className="min-h-screen flex">
             {/* Left side - Aurora Background */}
-            <div className="flex-1 relative overflow-hidden">
+            <div className="flex-1 relative overflow-hidden flex items-center justify-center">
                 <AuroraBackgroundProvider
                     colors={['#3A29FF', '#FF94B4', '#FF3232']}
                     numBubbles={4}
@@ -15,12 +15,11 @@ export const LoginPage: React.FC = () => {
                     blurAmount="10vw"
                     bgColor="#3f5efb"
                     useRandomness={false}
+                    className="w-full h-full flex items-center justify-center"
                 >
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-white text-center">
-                            <h1 className="text-6xl font-bold mb-4">OpBX</h1>
-                            <p className="text-xl opacity-90">Cloud PBX Administration</p>
-                        </div>
+                    <div className="text-white text-center">
+                        <h1 className="text-6xl font-bold mb-4">OpBX</h1>
+                        <p className="text-xl opacity-90">Cloud PBX Administration</p>
                     </div>
                 </AuroraBackgroundProvider>
             </div>
