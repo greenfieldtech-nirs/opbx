@@ -963,19 +963,138 @@ class CloudonixClient
     public function getVoices(string $domainUuid): array
     {
         return $this->circuitBreaker->call(function () use ($domainUuid) {
-            $response = $this->client()->get("/domains/{$domainUuid}/resources/voices");
+            $url = "/domains/{$domainUuid}/resources/voices";
+            $startTime = microtime(true);
 
-            if ($response->failed()) {
-                Log::warning('Cloudonix API: Failed to fetch voices', [
+            Log::info('Cloudonix API: Fetching voices', [
+                'domain_uuid' => $domainUuid,
+                'url' => $this->baseUrl . $url,
+                'method' => 'GET',
+            ]);
+
+            try {
+                $response = $this->client()->get($url);
+                $endTime = microtime(true);
+                $duration = round(($endTime - $startTime) * 1000, 2); // milliseconds
+
+                $statusCode = $response->status();
+                $responseBody = $response->body();
+                $responseHeaders = $response->headers();
+
+                Log::info('Cloudonix API: Voices fetch completed', [
                     'domain_uuid' => $domainUuid,
-                    'status' => $response->status(),
-                    'body' => $response->body()
+                    'url' => $this->baseUrl . $url,
+                    'status_code' => $statusCode,
+                    'duration_ms' => $duration,
+                    'response_size_bytes' => strlen($responseBody),
+                    'content_type' => $responseHeaders['Content-Type'][0] ?? 'unknown',
                 ]);
-                throw new \RuntimeException('Failed to fetch voices from Cloudonix API');
-            }
 
-            return $response->json();
+                if ($response->failed()) {
+                    Log::error('Cloudonix API: Failed to fetch voices - detailed error', [
+                        'domain_uuid' => $domainUuid,
+                        'url' => $this->baseUrl . $url,
+                        'method' => 'GET',
+                        'status_code' => $statusCode,
+                        'duration_ms' => $duration,
+                        'response_headers' => $responseHeaders,
+                        'response_body' => $responseBody,
+                        'response_size_bytes' => strlen($responseBody),
+                        'is_json' => $response->header('Content-Type') === 'application/json',
+                        'json_parseable' => $this->isValidJson($responseBody),
+                        'error_summary' => $this->extractErrorSummary($responseBody, $statusCode),
+                    ]);
+
+                    throw new \RuntimeException(
+                        sprintf('Failed to fetch voices from Cloudonix API: HTTP %d - %s',
+                            $statusCode,
+                            $this->extractErrorMessage($responseBody, $statusCode)
+                        )
+                    );
+                }
+
+                // Log success with summary
+                $voicesData = $response->json();
+                $voicesCount = is_array($voicesData) ? count($voicesData) : 0;
+
+                Log::info('Cloudonix API: Voices fetch successful', [
+                    'domain_uuid' => $domainUuid,
+                    'voices_count' => $voicesCount,
+                    'duration_ms' => $duration,
+                ]);
+
+                return $voicesData;
+            } catch (\Exception $e) {
+                $endTime = microtime(true);
+                $duration = round(($endTime - $startTime) * 1000, 2);
+
+                Log::error('Cloudonix API: Exception during voices fetch', [
+                    'domain_uuid' => $domainUuid,
+                    'url' => $this->baseUrl . $url,
+                    'duration_ms' => $duration,
+                    'exception_class' => get_class($e),
+                    'exception_message' => $e->getMessage(),
+                    'exception_file' => $e->getFile(),
+                    'exception_line' => $e->getLine(),
+                ]);
+
+                throw $e;
+            }
         });
+    }
+
+    /**
+     * Check if a string is valid JSON.
+     */
+    private function isValidJson(string $json): bool
+    {
+        json_decode($json);
+        return json_last_error() === JSON_ERROR_NONE;
+    }
+
+    /**
+     * Extract a brief error summary from response body.
+     */
+    private function extractErrorSummary(string $body, int $statusCode): string
+    {
+        if ($this->isValidJson($body)) {
+            $data = json_decode($body, true);
+            if (isset($data['message'])) {
+                return $data['message'];
+            }
+            if (isset($data['error'])) {
+                return $data['error'];
+            }
+        }
+
+        // Common HTTP status messages
+        $statusMessages = [
+            400 => 'Bad Request',
+            401 => 'Unauthorized',
+            403 => 'Forbidden',
+            404 => 'Not Found',
+            429 => 'Too Many Requests',
+            500 => 'Internal Server Error',
+            502 => 'Bad Gateway',
+            503 => 'Service Unavailable',
+            504 => 'Gateway Timeout',
+        ];
+
+        return $statusMessages[$statusCode] ?? 'Unknown Error';
+    }
+
+    /**
+     * Extract error message from response body.
+     */
+    private function extractErrorMessage(string $body, int $statusCode): string
+    {
+        $summary = $this->extractErrorSummary($body, $statusCode);
+
+        if (strlen($body) > 100) {
+            return $summary . ' (response body truncated)';
+        }
+
+        return $summary;
     }
 
     /**

@@ -185,11 +185,18 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_SCANNER: "off"  # Disable scanner to reduce memory usage
     volumes:
       - ./volumes/minio:/data
     networks:
       - opbx
     command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Limit memory usage
+        reservations:
+          memory: 256M  # Reserve minimum memory
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s

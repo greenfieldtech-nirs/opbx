@@ -9,6 +9,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Profile\UpdateOrganizationRequest;
 use App\Http\Requests\Profile\UpdatePasswordRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
+use App\Services\Logging\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -149,6 +150,22 @@ class ProfileController extends Controller
                 $logData['role_changed'] = true;
                 $logData['old_role'] = $originalData['role'];
                 $logData['new_role'] = $user->role->value;
+
+                // Add audit logging for role change
+                try {
+                    AuditLogger::log('user.role_changed', [
+                        'target_user_id' => $user->id,
+                        'target_user_email' => $user->email,
+                        'old_role' => $originalData['role'],
+                        'new_role' => $user->role->value,
+                    ], AuditLogger::LEVEL_WARNING, $request, $request->user());
+                } catch (\Exception $auditException) {
+                    // Log audit failure but don't fail the operation
+                    Log::error('Failed to log profile role change audit', [
+                        'user_id' => $user->id,
+                        'error' => $auditException->getMessage(),
+                    ]);
+                }
             }
 
             Log::info('Profile updated successfully', $logData);
@@ -313,6 +330,17 @@ class ProfileController extends Controller
                     'tokens_revoked' => true,
                     'ip_address' => $request->ip(),
                 ]);
+
+                // Add audit logging for password change
+                try {
+                    AuditLogger::logPasswordChanged($request, $user);
+                } catch (\Exception $auditException) {
+                    // Log audit failure but don't fail the operation
+                    Log::error('Failed to log password change audit', [
+                        'user_id' => $user->id,
+                        'error' => $auditException->getMessage(),
+                    ]);
+                }
 
                 return response()->json([
                     'message' => 'Password updated successfully. Please log in again with your new password.',

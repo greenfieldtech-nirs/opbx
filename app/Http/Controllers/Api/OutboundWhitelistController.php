@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\OutboundWhitelist\StoreOutboundWhitelistRequest;
 use App\Http\Requests\OutboundWhitelist\UpdateOutboundWhitelistRequest;
+use App\Http\Resources\OutboundWhitelistResource;
 use App\Models\OutboundWhitelist;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Outbound Whitelist management API controller.
@@ -20,50 +18,104 @@ use Illuminate\Support\Facades\Log;
  * Handles CRUD operations for outbound whitelist entries within an organization.
  * All operations are tenant-scoped to the authenticated user's organization.
  */
-class OutboundWhitelistController extends Controller
+class OutboundWhitelistController extends AbstractApiCrudController
 {
-    use ApiRequestHandler;
+
+    /**
+     * Get the model class name for this controller.
+     */
+    protected function getModelClass(): string
+    {
+        return OutboundWhitelist::class;
+    }
+
+    /**
+     * Get the resource class name for transforming models.
+     */
+    protected function getResourceClass(): string
+    {
+        return OutboundWhitelistResource::class;
+    }
+
+    /**
+     * Get the allowed filter fields for the index method.
+     *
+     * @return array<string>
+     */
+    protected function getAllowedFilters(): array
+    {
+        return ['search'];
+    }
+
+    /**
+     * Get the allowed sort fields for the index method.
+     *
+     * @return array<string>
+     */
+    protected function getAllowedSortFields(): array
+    {
+        return ['destination_country', 'destination_prefix', 'outbound_trunk_name', 'created_at', 'updated_at'];
+    }
+
+    /**
+     * Get the default sort field for the index method.
+     */
+    protected function getDefaultSortField(): string
+    {
+        return 'created_at';
+    }
+
+    /**
+     * Apply custom filters to the query.
+     */
+    protected function applyCustomFilters(Builder $query, Request $request): void
+    {
+        // Apply search filter if provided
+        if ($request->has('search') && $request->filled('search')) {
+            $query->search($request->input('search'));
+        }
+    }
+
+    /**
+     * Override route parameter name to match Laravel's apiResource convention.
+     * Laravel converts 'outbound-whitelist' route to 'outbound_whitelist' parameter.
+     */
+    protected function getRouteParameterName(): string
+    {
+        return 'outbound_whitelist';
+    }
 
     /**
      * Display a paginated list of outbound whitelist entries.
      *
-     * @param Request $request
-     * @return JsonResponse
+     * Overrides parent to maintain custom response format with meta pagination info.
      */
     public function index(Request $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
 
         if (!$user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $this->authorize('viewAny', OutboundWhitelist::class);
+        $this->authorize($this->getViewAnyAbility(), $this->getModelClass());
 
-        Log::info('Retrieving outbound whitelist list', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-        ]);
+        // Build query
+        $modelClass = $this->getModelClass();
+        $query = $modelClass::query()->forOrganization($user->organization_id);
 
-        // Build query with organization scope
-        $query = OutboundWhitelist::query()
-            ->forOrganization($user->organization_id);
-
-        // Apply filters
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
+        // Apply custom filters
+        $this->applyCustomFilters($query, $request);
 
         // Apply sorting
-        $sortField = $request->input('sort', 'created_at');
-        $sortOrder = $request->input('order', 'desc');
+        $sortField = $request->input('sort_by', $this->getDefaultSortField());
+        $sortOrder = $request->input('sort_order', 'desc'); // Default to desc for backward compatibility
 
         // Validate sort field
-        $allowedSortFields = ['destination_country', 'destination_prefix', 'outbound_trunk_name', 'created_at', 'updated_at'];
+        $allowedSortFields = $this->getAllowedSortFields();
         if (!in_array($sortField, $allowedSortFields, true)) {
-            $sortField = 'created_at';
+            $sortField = $this->getDefaultSortField();
         }
 
         // Validate sort order
@@ -74,297 +126,66 @@ class OutboundWhitelistController extends Controller
         $query->orderBy($sortField, $sortOrder);
 
         // Paginate
-        $perPage = (int) $request->input('per_page', 25);
+        $perPage = (int) $request->input('per_page', 25); // Default to 25 for backward compatibility
         $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
 
-        $outboundWhitelist = $query->paginate($perPage);
+        $models = $query->paginate($perPage);
 
-        Log::info('Outbound whitelist list retrieved', [
+        // Build filters array for logging
+        $filters = [];
+        foreach ($this->getAllowedFilters() as $filter) {
+            if ($request->has($filter)) {
+                $filters[$filter] = $request->input($filter);
+            }
+        }
+
+        \Illuminate\Support\Facades\Log::info($this->getPluralResourceKey() . ' list retrieved', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
-            'total' => $outboundWhitelist->total(),
+            'total' => $models->total(),
             'per_page' => $perPage,
+            'filters' => $filters,
         ]);
 
+        $resourceClass = $this->getResourceClass();
         return response()->json([
-            'data' => $outboundWhitelist->items(),
+            'data' => $resourceClass::collection($models->items()),
             'meta' => [
-                'current_page' => $outboundWhitelist->currentPage(),
-                'per_page' => $outboundWhitelist->perPage(),
-                'total' => $outboundWhitelist->total(),
-                'last_page' => $outboundWhitelist->lastPage(),
-                'from' => $outboundWhitelist->firstItem(),
-                'to' => $outboundWhitelist->lastItem(),
+                'current_page' => $models->currentPage(),
+                'per_page' => $models->perPage(),
+                'total' => $models->total(),
+                'last_page' => $models->lastPage(),
+                'from' => $models->firstItem(),
+                'to' => $models->lastItem(),
             ],
         ]);
     }
 
     /**
-     * Store a newly created outbound whitelist entry.
-     *
-     * @param StoreOutboundWhitelistRequest $request
-     * @return JsonResponse
+     * Transaction not needed - no hooks perform additional database operations.
+     * Simple single-model create operation is already atomic.
      */
-    public function store(StoreOutboundWhitelistRequest $request): JsonResponse
+    protected function shouldUseTransactionForStore(): bool
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
-        $validated = $request->validated();
-
-        Log::info('Creating new outbound whitelist entry', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'destination_country' => $validated['destination_country'],
-            'destination_prefix' => $validated['destination_prefix'] ?? null,
-        ]);
-
-        try {
-            $outboundWhitelist = DB::transaction(function () use ($user, $validated): OutboundWhitelist {
-                // Assign to current user's organization
-                $validated['organization_id'] = $user->organization_id;
-
-                // Create outbound whitelist entry
-                return OutboundWhitelist::create($validated);
-            });
-
-            Log::info('Outbound whitelist entry created successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'destination_country' => $outboundWhitelist->destination_country,
-            ]);
-
-            return response()->json([
-                'message' => 'Outbound whitelist entry created successfully.',
-                'data' => $outboundWhitelist,
-            ], 201);
-        } catch (\Exception $e) {
-            Log::error('Failed to create outbound whitelist entry', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to create outbound whitelist entry',
-                'message' => 'An error occurred while creating the outbound whitelist entry.',
-            ], 500);
-        }
+        return false;
     }
 
     /**
-     * Display the specified outbound whitelist entry.
-     *
-     * @param Request $request
-     * @param OutboundWhitelist $outboundWhitelist
-     * @return JsonResponse
+     * Transaction not needed - no hooks perform additional database operations.
+     * Simple single-model update operation is already atomic.
      */
-    public function show(Request $request, OutboundWhitelist $outboundWhitelist): JsonResponse
+    protected function shouldUseTransactionForUpdate(): bool
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
-        // Tenant scope check
-        if ($outboundWhitelist->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant outbound whitelist access attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'target_organization_id' => $outboundWhitelist->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'Outbound whitelist entry not found.',
-            ], 404);
-        }
-
-        Log::info('Outbound whitelist entry details retrieved', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'outbound_whitelist_id' => $outboundWhitelist->id,
-        ]);
-
-        return response()->json([
-            'data' => $outboundWhitelist,
-        ]);
+        return false;
     }
 
     /**
-     * Update the specified outbound whitelist entry.
-     *
-     * @param UpdateOutboundWhitelistRequest $request
-     * @param OutboundWhitelist $outboundWhitelist
-     * @return JsonResponse
+     * Transaction not needed - no hooks perform additional database operations.
+     * Simple single-model delete operation is already atomic.
      */
-    public function update(UpdateOutboundWhitelistRequest $request, OutboundWhitelist $outboundWhitelist): JsonResponse
+    protected function shouldUseTransactionForDestroy(): bool
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
-        // Tenant scope check
-        if ($outboundWhitelist->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant outbound whitelist update attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'target_organization_id' => $outboundWhitelist->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'Outbound whitelist entry not found.',
-            ], 404);
-        }
-
-        $validated = $request->validated();
-
-        // Track changed fields for logging
-        $changedFields = [];
-        foreach ($validated as $key => $value) {
-            if ($outboundWhitelist->{$key} != $value) {
-                $changedFields[] = $key;
-            }
-        }
-
-        Log::info('Updating outbound whitelist entry', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'outbound_whitelist_id' => $outboundWhitelist->id,
-            'changed_fields' => $changedFields,
-        ]);
-
-        try {
-            DB::transaction(function () use ($outboundWhitelist, $validated): void {
-                // Update outbound whitelist entry
-                $outboundWhitelist->update($validated);
-            });
-
-            // Reload outbound whitelist entry
-            $outboundWhitelist->refresh();
-
-            Log::info('Outbound whitelist entry updated successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'changed_fields' => $changedFields,
-            ]);
-
-            return response()->json([
-                'message' => 'Outbound whitelist entry updated successfully.',
-                'data' => $outboundWhitelist,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to update outbound whitelist entry', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to update outbound whitelist entry',
-                'message' => 'An error occurred while updating the outbound whitelist entry.',
-            ], 500);
-        }
-    }
-
-    /**
-     * Remove the specified outbound whitelist entry.
-     *
-     * @param Request $request
-     * @param OutboundWhitelist $outboundWhitelist
-     * @return JsonResponse
-     */
-    public function destroy(Request $request, OutboundWhitelist $outboundWhitelist): JsonResponse
-    {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
-        // Check authorization using policy
-        $this->authorize('delete', $outboundWhitelist);
-
-        // Tenant scope check (policy already verifies this, but keeping for logging)
-        if ($outboundWhitelist->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant outbound whitelist deletion attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'target_organization_id' => $outboundWhitelist->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'Outbound whitelist entry not found.',
-            ], 404);
-        }
-
-        Log::info('Deleting outbound whitelist entry', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'outbound_whitelist_id' => $outboundWhitelist->id,
-            'destination_country' => $outboundWhitelist->destination_country,
-        ]);
-
-        try {
-            DB::transaction(function () use ($outboundWhitelist): void {
-                // Delete the outbound whitelist entry
-                $outboundWhitelist->delete();
-            });
-
-            Log::info('Outbound whitelist entry deleted successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-            ]);
-
-            return response()->json(null, 204);
-        } catch (\Exception $e) {
-            Log::error('Failed to delete outbound whitelist entry', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'outbound_whitelist_id' => $outboundWhitelist->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to delete outbound whitelist entry',
-                'message' => 'An error occurred while deleting the outbound whitelist entry.',
-            ], 500);
-        }
+        return false;
     }
 }

@@ -8,11 +8,14 @@ use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Controllers\Traits\LogsOperations;
 use App\Http\Requests\Extension\StoreExtensionRequest;
 use App\Http\Requests\Extension\UpdateExtensionRequest;
 use App\Http\Resources\ExtensionResource;
 use App\Models\Extension;
 use App\Services\CloudonixClient\CloudonixSubscriberService;
+use App\Services\Logging\AuditLogger;
 use App\Services\PasswordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +33,38 @@ use Illuminate\Support\Str;
  */
 class ExtensionController extends Controller
 {
-    use ApiRequestHandler;
+    use ApiRequestHandler, AppliesFilters, LogsOperations;
+
+    /**
+     * Get the filter configuration for the index method.
+     *
+     * @return array<string, array>
+     */
+    protected function getFilterConfig(): array
+    {
+        return [
+            'type' => [
+                'type' => 'enum',
+                'enum' => ExtensionType::class,
+                'scope' => 'withType'
+            ],
+            'status' => [
+                'type' => 'enum',
+                'enum' => UserStatus::class,
+                'scope' => 'withStatus'
+            ],
+            'user_id' => [
+                'type' => 'column',
+                'scope' => 'forUser',
+                'require_filled' => true
+            ],
+            'search' => [
+                'type' => 'search',
+                'scope' => 'search'
+            ]
+        ];
+    }
+
     /**
      * Display a paginated list of extensions.
      *
@@ -40,37 +74,17 @@ class ExtensionController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('viewAny', Extension::class);
 
         // Build query
         $query = Extension::query()
             ->forOrganization($user->organization_id)
-            ->with('user:id,organization_id,name,email,role,status');
+            ->with(Extension::DEFAULT_USER_FIELDS);
 
         // Apply filters
-        if ($request->has('type')) {
-            $type = ExtensionType::tryFrom($request->input('type'));
-            if ($type) {
-                $query->withType($type);
-            }
-        }
-
-        if ($request->has('status')) {
-            $status = UserStatus::tryFrom($request->input('status'));
-            if ($status) {
-                $query->withStatus($status);
-            }
-        }
-
-        if ($request->has('user_id') && $request->filled('user_id')) {
-            $query->forUser($request->input('user_id'));
-        }
-
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
+        $query = $this->applyFilters($query, $request, $this->getFilterConfig());
 
         // Apply sorting
         $sortField = $request->input('sort_by', 'extension_number');
@@ -95,8 +109,7 @@ class ExtensionController extends Controller
 
         $extensions = $query->paginate($perPage);
 
-        Log::info('Extensions list retrieved', [
-            'request_id' => $requestId,
+        $this->logListRetrieved('Extension', [
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
             'total' => $extensions->total(),
@@ -127,17 +140,11 @@ class ExtensionController extends Controller
     ): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
+        $currentUser = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
-        Log::info('Creating new extension', [
-            'request_id' => $requestId,
-            'creator_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'extension_number' => $validated['extension_number'],
-            'type' => $validated['type'],
-        ]);
+        // Log will be handled by success/failure methods below
 
         // Assign to current user's organization
         $validated['organization_id'] = $currentUser->organization_id;
@@ -154,46 +161,28 @@ class ExtensionController extends Controller
             });
 
             // Load user relationship
-            $extension->load('user:id,organization_id,name,email,role,status');
+            $extension->loadMissing(Extension::DEFAULT_USER_FIELDS);
 
-            Log::info('Extension created successfully', [
-                'request_id' => $requestId,
+            $this->logOperationCompleted('Extension', 'creation', [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
             ]);
 
-            // Sync to Cloudonix if USER type extension
-            $cloudonixWarning = null;
-            if ($extension->type === ExtensionType::USER) {
-                $syncResult = $subscriberService->syncToCloudnonix($extension);
-
-                if ($syncResult['success']) {
-                    Log::info('Extension synced to Cloudonix', [
-                        'request_id' => $requestId,
-                        'extension_id' => $extension->id,
-                        'subscriber_id' => $extension->cloudonix_subscriber_id,
-                    ]);
-                } else {
-                    Log::warning('Failed to sync extension to Cloudonix (non-blocking)', [
-                        'request_id' => $requestId,
-                        'extension_id' => $extension->id,
-                        'error' => $syncResult['error'] ?? 'Unknown error',
-                        'details' => $syncResult['details'] ?? [],
-                    ]);
-
-                    // Prepare warning message for API response
-                    $cloudonixWarning = [
-                        'message' => 'Extension created locally but Cloudonix sync failed',
-                        'error' => $syncResult['error'] ?? 'Unknown error',
-                        'details' => $syncResult['details'] ?? [],
-                    ];
-                }
-
-                // Refresh to get updated Cloudonix fields
-                $extension->refresh();
+            // Add audit logging for extension creation
+            try {
+                AuditLogger::logExtensionCreated($request, $extension);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log extension creation audit', [
+                    'extension_id' => $extension->id,
+                    'error' => $auditException->getMessage(),
+                ]);
             }
+
+            // Sync to Cloudonix if USER type extension
+            $cloudonixWarning = $this->syncExtensionToCloudonix($extension, $subscriberService);
 
             $response = [
                 'message' => 'Extension created successfully.',
@@ -207,8 +196,7 @@ class ExtensionController extends Controller
 
             return response()->json($response, 201);
         } catch (\Exception $e) {
-            Log::error('Failed to create extension', [
-                'request_id' => $requestId,
+            $this->logOperationFailed('Extension', 'creation', [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'error' => $e->getMessage(),
@@ -232,11 +220,7 @@ class ExtensionController extends Controller
     public function show(Request $request, Extension $extension): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         $this->authorize('view', $extension);
 
@@ -257,10 +241,9 @@ class ExtensionController extends Controller
         }
 
         // Load user relationship
-        $extension->load('user:id,organization_id,name,email,role,status');
+        $extension->loadMissing(Extension::DEFAULT_USER_FIELDS);
 
-        Log::info('Extension details retrieved', [
-            'request_id' => $requestId,
+        $this->logDetailsRetrieved('Extension', [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
             'extension_id' => $extension->id,
@@ -286,11 +269,7 @@ class ExtensionController extends Controller
     ): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($extension->organization_id !== $currentUser->organization_id) {
@@ -322,13 +301,7 @@ class ExtensionController extends Controller
             }
         }
 
-        Log::info('Updating extension', [
-            'request_id' => $requestId,
-            'updater_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'extension_id' => $extension->id,
-            'changed_fields' => $changedFields,
-        ]);
+        // Log will be handled by success/failure methods below
 
         try {
             DB::transaction(function () use ($extension, $validated): void {
@@ -338,46 +311,34 @@ class ExtensionController extends Controller
 
             // Reload extension and user relationship
             $extension->refresh();
-            $extension->load('user:id,organization_id,name,email,role,status');
+            $extension->loadMissing(Extension::DEFAULT_USER_FIELDS);
 
-            Log::info('Extension updated successfully', [
-                'request_id' => $requestId,
+            $this->logOperationCompleted('Extension', 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
                 'changed_fields' => $changedFields,
             ]);
 
-            // Sync to Cloudonix if USER type extension and already synced
-            $cloudonixWarning = null;
-            if ($extension->type === ExtensionType::USER && $extension->cloudonix_synced) {
-                $syncResult = $subscriberService->syncToCloudnonix($extension, true);
-
-                if ($syncResult['success']) {
-                    Log::info('Extension changes synced to Cloudonix', [
-                        'request_id' => $requestId,
-                        'extension_id' => $extension->id,
-                        'subscriber_id' => $extension->cloudonix_subscriber_id,
-                    ]);
-                } else {
-                    Log::warning('Failed to sync extension changes to Cloudonix (non-blocking)', [
-                        'request_id' => $requestId,
-                        'extension_id' => $extension->id,
-                        'error' => $syncResult['error'] ?? 'Unknown error',
-                        'details' => $syncResult['details'] ?? [],
-                    ]);
-
-                    // Prepare warning message for API response
-                    $cloudonixWarning = [
-                        'message' => 'Extension updated locally but Cloudonix sync failed',
-                        'error' => $syncResult['error'] ?? 'Unknown error',
-                        'details' => $syncResult['details'] ?? [],
-                    ];
-                }
-
-                // Refresh to get any updated fields
-                $extension->refresh();
+            // Add audit logging for extension update
+            try {
+                AuditLogger::logExtensionUpdated($request, $extension, $changedFields);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log extension update audit', [
+                    'extension_id' => $extension->id,
+                    'error' => $auditException->getMessage(),
+                ]);
             }
+
+            // Sync to Cloudonix if USER type extension and already synced
+            $cloudonixWarning = $this->syncExtensionToCloudonix(
+                $extension,
+                $subscriberService,
+                true,
+                'updated',
+                true
+            );
 
             $response = [
                 'message' => 'Extension updated successfully.',
@@ -391,8 +352,7 @@ class ExtensionController extends Controller
 
             return response()->json($response);
         } catch (\Exception $e) {
-            Log::error('Failed to update extension', [
-                'request_id' => $requestId,
+            $this->logOperationFailed('Extension', 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
@@ -422,11 +382,7 @@ class ExtensionController extends Controller
     ): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         $this->authorize('delete', $extension);
 
@@ -446,13 +402,30 @@ class ExtensionController extends Controller
             ], 404);
         }
 
-        Log::info('Deleting extension', [
-            'request_id' => $requestId,
-            'deleter_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'extension_id' => $extension->id,
-            'extension_number' => $extension->extension_number,
-        ]);
+        // Log will be handled by success/failure methods below
+
+        // Check for references before deletion
+        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $result = $referenceChecker->checkReferences('extension', $extension->id, $extension->organization_id);
+
+        if ($result['has_references']) {
+            return response()->json([
+                'error' => 'Cannot delete extension',
+                'message' => 'This extension is being used and cannot be deleted. Please remove all references first.',
+                'references' => $result['references'],
+            ], 409);
+        }
+
+        // Add audit logging for extension deletion (before actual deletion)
+        try {
+            AuditLogger::logExtensionDeleted($request, $extension->id, $extension->extension_number);
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log extension deletion audit', [
+                'extension_id' => $extension->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
 
         try {
             // Unsync from Cloudonix before deletion if synced
@@ -460,15 +433,13 @@ class ExtensionController extends Controller
                 $unsyncSuccess = $subscriberService->unsyncFromCloudonix($extension);
 
                 if ($unsyncSuccess) {
-                    Log::info('Extension unsynced from Cloudonix before deletion', [
-                        'request_id' => $requestId,
+                    $this->logOperationCompleted('Extension', 'unsync', [
                         'extension_id' => $extension->id,
                     ]);
                 } else {
-                    Log::warning('Failed to unsync extension from Cloudonix (non-blocking)', [
-                        'request_id' => $requestId,
+                    $this->logOperationFailed('Extension', 'unsync', [
                         'extension_id' => $extension->id,
-                    ]);
+                    ], true);
                 }
             }
 
@@ -477,8 +448,7 @@ class ExtensionController extends Controller
                 $extension->delete();
             });
 
-            Log::info('Extension deleted successfully', [
-                'request_id' => $requestId,
+            $this->logOperationCompleted('Extension', 'deletion', [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
@@ -486,8 +456,7 @@ class ExtensionController extends Controller
 
             return response()->json(null, 204);
         } catch (\Exception $e) {
-            Log::error('Failed to delete extension', [
-                'request_id' => $requestId,
+            $this->logOperationFailed('Extension', 'deletion', [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
@@ -512,19 +481,11 @@ class ExtensionController extends Controller
     public function compareSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         $this->authorize('viewAny', Extension::class);
 
-        Log::info('Comparing extensions with Cloudonix', [
-            'request_id' => $requestId,
-            'user_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-        ]);
+        // Log will be handled by success/failure methods below
 
         try {
             $organization = $currentUser->organization()->with('cloudonixSettings')->first();
@@ -537,15 +498,13 @@ class ExtensionController extends Controller
 
             $comparison = $subscriberService->compareWithCloudonix($organization);
 
-            Log::info('Extension comparison completed', [
-                'request_id' => $requestId,
+            $this->logOperationCompleted('Extension', 'comparison', [
                 'comparison' => $comparison,
             ]);
 
             return response()->json($comparison);
         } catch (\Exception $e) {
-            Log::error('Failed to compare extensions', [
-                'request_id' => $requestId,
+            $this->logOperationFailed('Extension', 'comparison', [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'error' => $e->getMessage(),
@@ -574,11 +533,7 @@ class ExtensionController extends Controller
         CloudonixSubscriberService $subscriberService
     ): JsonResponse {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can reset extension passwords
         if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
@@ -604,13 +559,7 @@ class ExtensionController extends Controller
             ], 404);
         }
 
-        Log::info('Resetting extension password', [
-            'request_id' => $requestId,
-            'user_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'extension_id' => $extension->id,
-            'extension_number' => $extension->extension_number,
-        ]);
+        // Log will be handled by success/failure methods below
 
         try {
             // Generate new memorable password using the same method as extension creation
@@ -622,46 +571,39 @@ class ExtensionController extends Controller
 
             // Reload extension to get updated data
             $extension->refresh();
-            $extension->load('user:id,organization_id,name,email,role,status');
+            $extension->loadMissing(Extension::DEFAULT_USER_FIELDS);
 
-            Log::info('Extension password reset successfully', [
-                'request_id' => $requestId,
+            $this->logOperationCompleted('Extension', 'password reset', [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
             ]);
 
-            // Sync to Cloudonix if USER type extension and already synced
-            $cloudonixWarning = null;
-            if ($extension->type === ExtensionType::USER && $extension->cloudonix_synced) {
-                $syncResult = $subscriberService->syncToCloudnonix($extension, true);
-
-                if ($syncResult['success']) {
-                    Log::info('Extension password synced to Cloudonix', [
-                        'request_id' => $requestId,
-                        'extension_id' => $extension->id,
-                        'subscriber_id' => $extension->cloudonix_subscriber_id,
-                    ]);
-                } else {
-                    Log::warning('Failed to sync extension password to Cloudonix (non-blocking)', [
-                        'request_id' => $requestId,
-                        'extension_id' => $extension->id,
-                        'error' => $syncResult['error'] ?? 'Unknown error',
-                        'details' => $syncResult['details'] ?? [],
-                    ]);
-
-                    // Prepare warning message for API response
-                    $cloudonixWarning = [
-                        'message' => 'Extension password reset locally but Cloudonix sync failed',
-                        'error' => $syncResult['error'] ?? 'Unknown error',
-                        'details' => $syncResult['details'] ?? [],
-                    ];
-                }
-
-                // Refresh to get any updated fields
-                $extension->refresh();
+            // Add audit logging for password reset
+            try {
+                AuditLogger::log('extension.password_reset', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'user_id' => $extension->user_id,
+                    'organization_id' => $currentUser->organization_id,
+                ], AuditLogger::LEVEL_INFO, $request, $currentUser);
+            } catch (\Exception $auditException) {
+                // Log audit failure but don't fail the operation
+                Log::error('Failed to log extension password reset audit', [
+                    'extension_id' => $extension->id,
+                    'error' => $auditException->getMessage(),
+                ]);
             }
+
+            // Sync to Cloudonix if USER type extension and already synced
+            $cloudonixWarning = $this->syncExtensionToCloudonix(
+                $extension,
+                $subscriberService,
+                true,
+                'password_reset',
+                true
+            );
 
             $response = [
                 'message' => 'Extension password reset successfully.',
@@ -676,8 +618,7 @@ class ExtensionController extends Controller
 
             return response()->json($response);
         } catch (\Exception $e) {
-            Log::error('Failed to reset extension password', [
-                'request_id' => $requestId,
+            $this->logOperationFailed('Extension', 'password reset', [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'extension_id' => $extension->id,
@@ -702,11 +643,7 @@ class ExtensionController extends Controller
     public function getPassword(Request $request, Extension $extension): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can view extension passwords
         if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
@@ -740,8 +677,7 @@ class ExtensionController extends Controller
             ], 400);
         }
 
-        Log::info('Extension password accessed', [
-            'request_id' => $requestId,
+        $this->logDetailsRetrieved('Extension password', [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
             'extension_id' => $extension->id,
@@ -755,6 +691,69 @@ class ExtensionController extends Controller
     }
 
     /**
+     * Sync extension to Cloudonix with proper error handling and logging.
+     *
+     * @param Extension $extension
+     * @param CloudonixSubscriberService $service
+     * @param bool $isUpdate
+     * @param string $syncContext Context for warning message ('created', 'updated', 'password_reset')
+     * @param bool $requireSynced Whether extension must already be synced (default false)
+     * @return array|null Warning array if sync failed, null on success
+     */
+    protected function syncExtensionToCloudonix(
+        Extension $extension,
+        CloudonixSubscriberService $service,
+        bool $isUpdate = false,
+        string $syncContext = 'created',
+        bool $requireSynced = false
+    ): ?array {
+        $requestId = $this->getRequestId();
+
+        // Only sync USER type extensions
+        if ($extension->type !== ExtensionType::USER) {
+            return null;
+        }
+
+        // For updates and password resets, only sync if already synced
+        if ($requireSynced && !$extension->cloudonix_synced) {
+            return null;
+        }
+
+        $syncResult = $service->syncToCloudnonix($extension, $isUpdate);
+
+        if ($syncResult['success']) {
+            $this->logOperationCompleted('Extension', 'sync', [
+                'extension_id' => $extension->id,
+                'subscriber_id' => $extension->cloudonix_subscriber_id,
+            ]);
+        } else {
+            $this->logOperationFailed('Extension', 'sync', [
+                'extension_id' => $extension->id,
+                'error' => $syncResult['error'] ?? 'Unknown error',
+                'details' => $syncResult['details'] ?? [],
+            ], true);
+
+            // Prepare warning message for API response based on context
+            $messageMap = [
+                'created' => 'Extension created locally but Cloudonix sync failed',
+                'updated' => 'Extension updated locally but Cloudonix sync failed',
+                'password_reset' => 'Extension password reset locally but Cloudonix sync failed',
+            ];
+
+            $cloudonixWarning = [
+                'message' => $messageMap[$syncContext] ?? $messageMap['created'],
+                'error' => $syncResult['error'] ?? 'Unknown error',
+                'details' => $syncResult['details'] ?? [],
+            ];
+        }
+
+        // Refresh to get updated Cloudonix fields
+        $extension->refresh();
+
+        return $cloudonixWarning ?? null;
+    }
+
+    /**
      * Perform bi-directional sync between local extensions and Cloudonix.
      *
      * @param Request $request
@@ -764,11 +763,7 @@ class ExtensionController extends Controller
     public function performSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        if (!$currentUser) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can sync extensions
         if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
@@ -778,11 +773,7 @@ class ExtensionController extends Controller
             ], 403);
         }
 
-        Log::info('Starting bi-directional extension sync', [
-            'request_id' => $requestId,
-            'user_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-        ]);
+        // Log will be handled by success/failure methods below
 
         try {
             $organization = $currentUser->organization()->with('cloudonixSettings')->first();
@@ -796,10 +787,9 @@ class ExtensionController extends Controller
             $result = $subscriberService->bidirectionalSync($organization);
 
             if (!$result['success']) {
-                Log::warning('Bi-directional sync failed', [
-                    'request_id' => $requestId,
+                $this->logOperationFailed('Extension', 'bi-directional sync', [
                     'error' => $result['error'] ?? 'Unknown error',
-                ]);
+                ], true);
 
                 return response()->json([
                     'success' => false,
@@ -808,8 +798,7 @@ class ExtensionController extends Controller
                 ], 400);
             }
 
-            Log::info('Bi-directional sync completed successfully', [
-                'request_id' => $requestId,
+            $this->logOperationCompleted('Extension', 'bi-directional sync', [
                 'result' => $result,
             ]);
 
@@ -819,8 +808,7 @@ class ExtensionController extends Controller
                 'result' => $result,
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to perform bi-directional sync', [
-                'request_id' => $requestId,
+            $this->logOperationFailed('Extension', 'bi-directional sync', [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
                 'error' => $e->getMessage(),

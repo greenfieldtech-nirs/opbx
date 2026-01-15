@@ -21,6 +21,7 @@
     },
     "dependencies": {
         "@hookform/resolvers": "^3.3.0",
+        "@nauverse/react-aurora-background": "^1.0.12",
         "@radix-ui/react-dialog": "^1.0.0",
         "@radix-ui/react-dropdown-menu": "^2.0.0",
         "@radix-ui/react-label": "^2.0.0",

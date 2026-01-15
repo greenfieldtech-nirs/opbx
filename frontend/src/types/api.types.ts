@@ -728,3 +728,28 @@ export interface UpdateSentrySettingsRequest {
 // User/Extension status types
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 export type ExtensionStatus = 'active' | 'inactive';
+
+// ============================================================================
+// Recordings
+// ============================================================================
+
+export type RecordingType = 'greeting' | 'hold_music' | 'announcement' | 'other';
+export type RecordingStatus = 'active' | 'inactive' | 'processing' | 'failed';
+
+export interface Recording {
+  id: number;
+  organization_id: number;
+  name: string;
+  type: RecordingType;
+  file_path?: string;
+  remote_url?: string;
+  original_filename?: string;
+  file_size?: number;
+  mime_type?: string;
+  duration_seconds?: number;
+  status: RecordingStatus;
+  created_by?: number;
+  updated_by?: number;
+  created_at: string;
+  updated_at: string;
+}

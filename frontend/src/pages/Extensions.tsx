@@ -13,10 +13,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService } from '@/services/users.service';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,

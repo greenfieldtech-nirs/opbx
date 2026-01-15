@@ -163,11 +163,16 @@ class LogSanitizer
     /**
      * Check if a key is sensitive and should be masked.
      *
-     * @param  string  $key  Key to check
+     * @param  string|int  $key  Key to check
      * @return bool True if key is sensitive
      */
-    private static function isSensitiveKey(string $key): bool
+    private static function isSensitiveKey(string|int $key): bool
     {
+        // Skip numeric keys (array indices)
+        if (is_int($key)) {
+            return false;
+        }
+        
         $lowerKey = strtolower($key);
 
         // Check exact matches

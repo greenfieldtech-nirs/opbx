@@ -1,10 +1,11 @@
 /**
  * Call Logs Service
  *
- * Handles call log and history operations
+ * Handles call log and history operations + custom methods
  */
 
 import api from './api';
+import { callLogsService as baseCallLogsService } from './createResourceService';
 import type {
   CallLog,
   PaginatedResponse,
@@ -15,23 +16,7 @@ import type {
 } from '@/types/api.types';
 
 export const callLogsService = {
-  /**
-   * Get all call logs with optional filters
-   */
-  async getAll(filters?: CallLogFilters): Promise<PaginatedResponse<CallLog>> {
-    const response = await api.get<PaginatedResponse<CallLog>>('/call-logs', {
-      params: filters,
-    });
-    return response.data;
-  },
-
-  /**
-   * Get call log by ID
-   */
-  async getById(id: string): Promise<CallLog> {
-    const response = await api.get<CallLog>(`/call-logs/${id}`);
-    return response.data;
-  },
+  ...baseCallLogsService,
 
   /**
    * Get call log statistics
@@ -68,5 +53,5 @@ export const callLogsService = {
       responseType: 'blob',
     });
     return response.data;
-  },
-};
+   },
+ };

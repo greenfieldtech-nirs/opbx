@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { phoneNumbersService } from '@/services/dids.service';
+import { phoneNumbersService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import type { DIDNumber, RoutingType, CreateDIDRequest, UpdateDIDRequest } from '@/types/api.types';
 import { PhoneNumberDialog } from '@/components/PhoneNumbers/PhoneNumberDialog';

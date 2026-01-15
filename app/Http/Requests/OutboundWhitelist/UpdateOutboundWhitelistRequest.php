@@ -13,22 +13,7 @@ use Illuminate\Validation\Rule;
  */
 class UpdateOutboundWhitelistRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
-    public function authorize(): bool
-    {
-        $user = $this->user();
 
-        if (!$user) {
-            return false;
-        }
-
-        // Only Owner and PBX Admin can update outbound whitelist entries
-        return $user->isOwner() || $user->isPBXAdmin();
-    }
 
     /**
      * Get the validation rules that apply to the request.

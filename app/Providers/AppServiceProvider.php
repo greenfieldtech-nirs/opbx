@@ -50,6 +50,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\RoutingSentryService::class
         );
 
+        $this->app->singleton(
+            \App\Services\Cloudonix\CloudonixVoiceService::class
+        );
+
         // Register Voice Routing Strategies
         $this->app->tag([
             \App\Services\VoiceRouting\Strategies\UserRoutingStrategy::class,
@@ -98,6 +102,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\ConferenceRoom::class, \App\Policies\ConferenceRoomPolicy::class);
         Gate::policy(\App\Models\CloudonixSettings::class, \App\Policies\CloudonixSettingsPolicy::class);
         Gate::policy(\App\Models\Recording::class, \App\Policies\RecordingPolicy::class);
+        Gate::policy(\App\Models\CallDetailRecord::class, \App\Policies\CallDetailRecordPolicy::class);
 
         // Configure rate limiting
         $this->configureRateLimiting();

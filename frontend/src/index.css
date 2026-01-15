@@ -58,3 +58,44 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+@layer utilities {
+  @keyframes wave-1 {
+    0%, 100% {
+      transform: translateX(0%);
+    }
+    50% {
+      transform: translateX(-25px);
+    }
+  }
+
+  @keyframes wave-2 {
+    0%, 100% {
+      transform: translateX(0%);
+    }
+    50% {
+      transform: translateX(25px);
+    }
+  }
+
+  @keyframes wave-3 {
+    0%, 100% {
+      transform: translateX(0%);
+    }
+    50% {
+      transform: translateX(-15px);
+    }
+  }
+
+  .animate-wave-1 {
+    animation: wave-1 10s ease-in-out infinite;
+  }
+
+  .animate-wave-2 {
+    animation: wave-2 8s ease-in-out infinite reverse;
+  }
+
+  .animate-wave-3 {
+    animation: wave-3 6s ease-in-out infinite;
+  }
+}

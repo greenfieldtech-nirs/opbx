@@ -6,10 +6,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ivrMenusService } from '@/services/ivrMenus.service';
+import { ivrMenusService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/ringGroups.service';
-import { conferenceRoomsService } from '@/services/conferenceRooms.service';
+import { ringGroupsService } from '@/services/createResourceService';
+import { conferenceRoomsService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
@@ -54,7 +54,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Combobox } from '@/components/ui/combobox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Plus,
   Search,
@@ -65,6 +72,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   X,
+  ChevronDown,
 } from 'lucide-react';
 
 // Voice selector component with search and advanced filters
@@ -82,51 +90,65 @@ const VoiceSelector: React.FC<{
     return language?.name || languageCode;
   };
 
-  const [searchTerm, setSearchTerm] = useState('');
+
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [providerFilter, setProviderFilter] = useState<string>('all');
 
-  // Restrict to standard voices only for Free Tier users
-  const isFreeTier = cloudonixSettings?.cloudonix_package === 'Free Tier';
-  const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>(isFreeTier ? 'standard' : 'all');
+  // Restrict to standard voices only for users with limited packages
+  const isLimitedTier = !cloudonixSettings?.cloudonix_package ||
+                        cloudonixSettings?.cloudonix_package === 'Free Tier' ||
+                        (typeof cloudonixSettings?.cloudonix_package === 'boolean' && cloudonixSettings.cloudonix_package === false);
+  const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>(isLimitedTier ? 'standard' : 'all');
 
   const filteredVoices = voices.filter((voice: any) => {
-    const matchesSearch = searchTerm === '' ||
-                         voice.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (voice.provider && voice.provider.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         voice.language.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLanguage = languageFilter === 'all' || voice.language === languageFilter;
     const matchesGender = genderFilter === 'all' || voice.gender === genderFilter;
     const matchesProvider = providerFilter === 'all' || voice.provider === providerFilter;
     const matchesPricing = pricingFilter === 'all' || voice.pricing === pricingFilter;
-    return matchesSearch && matchesLanguage && matchesGender && matchesProvider && matchesPricing;
+
+    // Filter out premium voices for limited tier users
+    const matchesTier = !isLimitedTier || voice.premium === false || voice.premium === null;
+
+    return matchesLanguage && matchesGender && matchesProvider && matchesPricing && matchesTier;
   });
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label htmlFor="voice-select">Select Voice</Label>
-        {onRefresh && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRefresh}
-            className="h-8 px-3"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        )}
+      {/* Voice selection */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Voice</Label>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Combobox
+              options={filteredVoices.map((voice: any) => {
+                const languageProviderPricing = `${getLanguageName(voice.language)} / ${voice.provider} / ${voice.pricing}`;
+                return {
+                  value: voice.id,
+                  label: `${voice.name} - ${languageProviderPricing} - ${voice.gender}`,
+                };
+              })}
+              value={value}
+              onValueChange={onChange}
+              placeholder="Choose a voice"
+              searchPlaceholder="Search voices..."
+              emptyText={filteredVoices.length === 0 ? "Loading voices... Please wait..." : "No voices found."}
+            />
+          </div>
+          {onRefresh && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              className="h-8 px-3 shrink-0"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          )}
+        </div>
       </div>
-
-      {/* Search input */}
-      <Input
-        placeholder="Search voices by name, provider, or language..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
 
       {/* Filter row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -198,92 +220,24 @@ const VoiceSelector: React.FC<{
           </Select>
         </div>
 
-        {/* Pricing filter */}
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Pricing</Label>
-          <Select
-            value={pricingFilter}
-            onValueChange={(value: 'all' | 'standard' | 'premium') => {
-              if (isFreeTier && value === 'premium') return; // Prevent selecting premium for Free Tier
-              setPricingFilter(value);
-            }}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {!isFreeTier && <SelectItem value="all">All Tiers</SelectItem>}
-              <SelectItem value="standard">Standard</SelectItem>
-              <SelectItem value="premium" disabled={isFreeTier}>
-                Premium {isFreeTier && "(Upgrade required)"}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          {isFreeTier && (
-            <p className="text-xs text-amber-600">
-              Free Tier limited to standard voices. Upgrade to access premium voices.
-            </p>
-          )}
-        </div>
-      </div>
+         {/* Pricing toggle */}
+         <div className="space-y-1">
+           <Label className="text-xs text-muted-foreground">Voice Tiers</Label>
+           <div className="flex items-center space-x-2">
+             <Switch
+               checked={pricingFilter === 'all'}
+               onCheckedChange={(checked) => {
+                 if (isLimitedTier && !checked) return; // Prevent switching to standard only for limited tier
+                 setPricingFilter(checked ? 'all' : 'standard');
+               }}
+               disabled={isLimitedTier}
+             />
+             <Label className="text-sm font-normal">
+               {pricingFilter === 'all' ? 'All Voices' : 'Standard Only'}
+             </Label>
+           </div>
 
-      {/* Voice selection */}
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Voice</Label>
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a voice" />
-          </SelectTrigger>
-          <SelectContent>
-            {filteredVoices.length === 0 ? (
-              <div className="p-2 text-center text-sm text-muted-foreground">
-                Loading voices... Please wait...
-              </div>
-            ) : (
-              filteredVoices.map((voice: any) => {
-                const languageProviderPricing = `${getLanguageName(voice.language)} / ${voice.provider} / ${voice.pricing}`;
-
-                return (
-                  <SelectItem key={voice.id} value={voice.id}>
-                    <div className="flex items-center w-full">
-                      <Badge
-                        variant="secondary"
-                        className="bg-gray-100 text-gray-800 border-gray-200"
-                        style={{
-                          width: '400px',
-                          padding: '8px 8px',
-                          marginLeft: '12px',
-                          marginRight: '12px'
-                        }}
-                      >
-                        {languageProviderPricing}
-                      </Badge>
-                      <Badge
-                        variant="secondary"
-                        className={`text-center ${
-                          voice.gender === 'female'
-                            ? 'bg-pink-100 text-pink-800 border-pink-200'
-                            : voice.gender === 'male'
-                            ? 'bg-blue-100 text-blue-800 border-blue-200'
-                            : 'bg-gray-100 text-gray-800 border-gray-200'
-                        }`}
-                        style={{
-                          width: '72px',
-                          padding: '8px 8px',
-                          marginLeft: '12px',
-                          marginRight: '12px'
-                        }}
-                      >
-                        {voice.gender}
-                      </Badge>
-                      <span className="font-bold">{voice.name}</span>
-                    </div>
-                  </SelectItem>
-                );
-              })
-            )}
-          </SelectContent>
-        </Select>
+         </div>
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -309,10 +263,11 @@ export default function IVRMenus() {
   const [perPage] = useState(25);
 
   // Dialog states
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedMenu, setSelectedMenu] = useState<IvrMenu | null>(null);
+   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+   const [selectedMenu, setSelectedMenu] = useState<IvrMenu | null>(null);
+   const [isMenuSettingsOpen, setIsMenuSettingsOpen] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<{
@@ -335,10 +290,9 @@ export default function IVRMenus() {
       destination_type: IvrDestinationType;
       destination_id: string;
     }>;
-  }>({
-    name: '',
-    description: '',
-    audio_file_path: '',
+   }>({
+     name: '',
+     audio_file_path: '',
     recording_id: undefined,
     tts_text: '',
     tts_voice: undefined,
@@ -516,10 +470,9 @@ export default function IVRMenus() {
 
   // Reset form
   const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      audio_file_path: '',
+     setFormData({
+       name: '',
+       audio_file_path: '',
       recording_id: undefined,
       tts_text: '',
       tts_voice: undefined,
@@ -533,32 +486,26 @@ export default function IVRMenus() {
     });
   };
 
-  // Handle create
-  const handleCreate = () => {
-    if (!formData.name || !formData.options || formData.options.length === 0) {
-      toast.error('Name and at least one option are required');
-      return;
-    }
+   // Handle create
+   const handleCreate = () => {
+     if (!formData.name || !formData.options || formData.options.length === 0) {
+       toast.error('Name and at least one option are required');
+       return;
+     }
 
-    if (formData.options.length > 20) {
-      toast.error('Maximum 20 menu options allowed');
-      return;
-    }
+     if (formData.options.length > 20) {
+       toast.error('Maximum 20 menu options allowed');
+       return;
+     }
 
-    if (formData.description && formData.description.length > 1000) {
-      toast.error('Description must be 1000 characters or less');
-      return;
-    }
-
-    if (formData.audio_file_path && formData.audio_file_path.length > 500) {
+     if (formData.audio_file_path && formData.audio_file_path.length > 500) {
       toast.error('Audio file path must be 500 characters or less');
       return;
     }
 
-     const requestData: CreateIvrMenuRequest = {
-       name: formData.name,
-       description: formData.description,
-       audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
+      const requestData: CreateIvrMenuRequest = {
+        name: formData.name,
+        audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
        recording_id: formData.useTTS ? undefined : formData.recording_id,
        tts_text: formData.useTTS ? formData.tts_text : undefined,
        tts_voice: formData.useTTS ? formData.tts_voice : undefined,
@@ -580,34 +527,28 @@ export default function IVRMenus() {
     createMutation.mutate(requestData);
   };
 
-  // Handle update
-  const handleUpdate = () => {
-    if (!selectedMenu) return;
+   // Handle update
+   const handleUpdate = () => {
+     if (!selectedMenu) return;
 
-    if (!formData.name || !formData.options || formData.options.length === 0) {
-      toast.error('Name and at least one option are required');
-      return;
-    }
+     if (!formData.name || !formData.options || formData.options.length === 0) {
+       toast.error('Name and at least one option are required');
+       return;
+     }
 
-    if (formData.options.length > 20) {
-      toast.error('Maximum 20 menu options allowed');
-      return;
-    }
+     if (formData.options.length > 20) {
+       toast.error('Maximum 20 menu options allowed');
+       return;
+     }
 
-    if (formData.description && formData.description.length > 1000) {
-      toast.error('Description must be 1000 characters or less');
-      return;
-    }
-
-    if (formData.audio_file_path && formData.audio_file_path.length > 500) {
+     if (formData.audio_file_path && formData.audio_file_path.length > 500) {
       toast.error('Audio file path must be 500 characters or less');
       return;
     }
 
-     const requestData: UpdateIvrMenuRequest = {
-       name: formData.name,
-       description: formData.description,
-       audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
+      const requestData: UpdateIvrMenuRequest = {
+        name: formData.name,
+        audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
        recording_id: formData.useTTS ? undefined : formData.recording_id,
        tts_text: formData.useTTS ? formData.tts_text : undefined,
        tts_voice: formData.useTTS ? formData.tts_voice : undefined,
@@ -673,10 +614,9 @@ export default function IVRMenus() {
   // Open edit dialog
   const openEditDialog = (menu: IvrMenu) => {
     setSelectedMenu(menu);
-    setFormData({
-      name: menu.name,
-      description: menu.description,
-      audio_file_path: menu.audio_file_path,
+     setFormData({
+       name: menu.name,
+       audio_file_path: menu.audio_file_path,
       recording_id: undefined,
       tts_text: menu.tts_text,
       tts_voice: menu.tts_voice,
@@ -910,90 +850,68 @@ export default function IVRMenus() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic</TabsTrigger>
-              <TabsTrigger value="audio">Audio</TabsTrigger>
-              <TabsTrigger value="options">Options</TabsTrigger>
-              <TabsTrigger value="advanced">Advanced</TabsTrigger>
-            </TabsList>
+          {/* Name and Status fields above tabs */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Main Menu"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="status"
+                  checked={formData.status === 'active'}
+                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
+                />
+                <Label htmlFor="status" className="text-sm font-normal">
+                  {formData.status === 'active' ? 'Active' : 'Disabled'}
+                </Label>
+              </div>
+            </div>
+           </div>
 
-            {/* Debug: Show current form data */}
+            <Tabs defaultValue="audio" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="audio">Audio</TabsTrigger>
+                <TabsTrigger value="options">Menu Options</TabsTrigger>
+              </TabsList>
+
+              {/* Debug: Show current form data */}
             {/* <div className="mb-4 p-2 bg-gray-100 text-xs">
               <strong>Debug - Form Data:</strong>
               <pre>{JSON.stringify(formData, null, 2)}</pre>
             </div> */}
 
-            <TabsContent value="basic" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name || ''}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Main Menu"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as IvrMenuStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description of the IVR menu"
-                  rows={3}
-                  maxLength={1000}
-                />
-                <p className="text-sm text-muted-foreground">
-                  {(formData.description || '').length}/1000 characters
-                  {(formData.description || '').length > 900 && (
-                    <span className="text-amber-600 ml-2">Approaching limit</span>
-                  )}
-                </p>
-              </div>
-            </TabsContent>
+             <TabsContent value="audio" className="space-y-4">
+               <div className="space-y-4">
 
-            <TabsContent value="audio" className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="audio-file"
-                      name="audio-type"
-                      checked={!formData.useTTS}
-                      onChange={() => setFormData({ ...formData, useTTS: false, tts_text: '', audio_file_path: formData.audio_file_path || '' })}
-                    />
-                    <Label htmlFor="audio-file">Audio File</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="text-to-speech"
-                      name="audio-type"
-                      checked={formData.useTTS}
-                      onChange={() => setFormData({ ...formData, useTTS: true, audio_file_path: '', tts_text: formData.tts_text || '' })}
-                    />
-                    <Label htmlFor="text-to-speech">Text-to-Speech</Label>
-                  </div>
-                </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="audio-resource">Audio Resource</Label>
+                   <Select
+                     value={formData.useTTS ? 'text-to-speech' : 'audio-file'}
+                     onValueChange={(value) => {
+                       if (value === 'text-to-speech') {
+                         setFormData({ ...formData, useTTS: true, audio_file_path: '', tts_text: formData.tts_text || '' });
+                       } else {
+                         setFormData({ ...formData, useTTS: false, tts_text: '', audio_file_path: formData.audio_file_path || '' });
+                       }
+                     }}
+                   >
+                     <SelectTrigger>
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="audio-file">Audio File</SelectItem>
+                       <SelectItem value="text-to-speech">Text-to-Speech</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
 
                 {!formData.useTTS ? (
                   <div className="space-y-4">
@@ -1255,144 +1173,153 @@ export default function IVRMenus() {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+                   </div>
+                 )}
 
-            <TabsContent value="advanced" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="max-timeout">Max Timeout (seconds)</Label>
-                  <Select
-                    value={String(formData.max_timeout || 3)}
-                    onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How long to wait for the user to first input speech or DTMF
-                  </p>
-                </div>
+                 {/* Menu Settings - Collapsible */}
+                 <Collapsible open={isMenuSettingsOpen} onOpenChange={setIsMenuSettingsOpen}>
+                   <CollapsibleTrigger asChild>
+                     <Button variant="outline" className="flex w-full justify-between p-4 font-medium">
+                       Menu Settings
+                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isMenuSettingsOpen ? 'rotate-180' : ''}`} />
+                     </Button>
+                   </CollapsibleTrigger>
+                   <CollapsibleContent className="space-y-4 pt-4">
+                     <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                         <Label htmlFor="max-timeout">Max Timeout (seconds)</Label>
+                         <Select
+                           value={String(formData.max_timeout || 3)}
+                           onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                               <SelectItem key={num} value={String(num)}>
+                                 {num}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                         <p className="text-sm text-muted-foreground">
+                           How long to wait for the user to first input speech or DTMF
+                         </p>
+                       </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
-                  <Select
-                    value={String(formData.inter_digit_timeout || 2)}
-                    onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How long to wait between DTMF digits
-                  </p>
-                </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
+                         <Select
+                           value={String(formData.inter_digit_timeout || 2)}
+                           onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                               <SelectItem key={num} value={String(num)}>
+                                 {num}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                         <p className="text-sm text-muted-foreground">
+                           How long to wait between DTMF digits
+                         </p>
+                       </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="max-turns">Maximum Turns</Label>
-                  <Select
-                    value={String(formData.max_turns || 3)}
-                    onValueChange={(value) => setFormData({ ...formData, max_turns: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How many times to replay the menu on invalid input
-                  </p>
-                </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="max-turns">Maximum Turns</Label>
+                         <Select
+                           value={String(formData.max_turns || 3)}
+                           onValueChange={(value) => setFormData({ ...formData, max_turns: parseInt(value) })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                               <SelectItem key={num} value={String(num)}>
+                                 {num}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                         <p className="text-sm text-muted-foreground">
+                           How many times to replay the menu on invalid input
+                         </p>
+                       </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="failover-type">Failover Destination</Label>
-                  <Select
-                    value={formData.failover_destination_type}
-                    onValueChange={(value) => setFormData({
-                      ...formData,
-                      failover_destination_type: value as IvrDestinationType,
-                      failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hangup">Hang Up</SelectItem>
-                      <SelectItem value="extension">Extension</SelectItem>
-                      <SelectItem value="ring_group">Ring Group</SelectItem>
-                      <SelectItem value="conference_room">Conference Room</SelectItem>
-                      <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="failover-type">Failover Destination</Label>
+                         <Select
+                           value={formData.failover_destination_type}
+                           onValueChange={(value) => setFormData({
+                             ...formData,
+                             failover_destination_type: value as IvrDestinationType,
+                             failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
+                           })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="hangup">Hang Up</SelectItem>
+                             <SelectItem value="extension">Extension</SelectItem>
+                             <SelectItem value="ring_group">Ring Group</SelectItem>
+                             <SelectItem value="conference_room">Conference Room</SelectItem>
+                             <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                     </div>
 
-              {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
-                <div className="space-y-2">
-                  <Label>Failover Destination</Label>
-                  <Select
-                    key={`failover-${formData.failover_destination_type}`}
-                    value={formData.failover_destination_id || ''}
-                    onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select failover destination" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.failover_destination_type === 'extension' &&
-                        availableDestinations?.extensions?.map((ext) => (
-                          <SelectItem key={ext.id} value={ext.id}>
-                            {ext.label}
-                          </SelectItem>
-                        ))}
-                      {formData.failover_destination_type === 'ring_group' &&
-                        availableDestinations?.ring_groups?.map((rg) => (
-                          <SelectItem key={rg.id} value={rg.id}>
-                            {rg.label}
-                          </SelectItem>
-                        ))}
-                      {formData.failover_destination_type === 'conference_room' &&
-                        availableDestinations?.conference_rooms?.map((cr) => (
-                          <SelectItem key={cr.id} value={cr.id}>
-                            {cr.label}
-                          </SelectItem>
-                        ))}
-                      {formData.failover_destination_type === 'ivr_menu' &&
-                        availableDestinations?.ivr_menus?.map((menu) => (
-                          <SelectItem key={menu.id} value={menu.id}>
-                            {menu.label}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </TabsContent>
+                     {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
+                       <div className="space-y-2">
+                         <Label>Failover Destination</Label>
+                         <Select
+                           key={`failover-${formData.failover_destination_type}`}
+                           value={formData.failover_destination_id || ''}
+                           onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue placeholder="Select failover destination" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {formData.failover_destination_type === 'extension' &&
+                               availableDestinations?.extensions?.map((ext) => (
+                                 <SelectItem key={ext.id} value={ext.id}>
+                                   {ext.label}
+                                 </SelectItem>
+                               ))}
+                             {formData.failover_destination_type === 'ring_group' &&
+                               availableDestinations?.ring_groups?.map((rg) => (
+                                 <SelectItem key={rg.id} value={rg.id}>
+                                   {rg.label}
+                                 </SelectItem>
+                               ))}
+                             {formData.failover_destination_type === 'conference_room' &&
+                               availableDestinations?.conference_rooms?.map((cr) => (
+                                 <SelectItem key={cr.id} value={cr.id}>
+                                   {cr.label}
+                                 </SelectItem>
+                               ))}
+                             {formData.failover_destination_type === 'ivr_menu' &&
+                               availableDestinations?.ivr_menus?.map((menu) => (
+                                 <SelectItem key={menu.id} value={menu.id}>
+                                   {menu.label}
+                                 </SelectItem>
+                               ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                     )}
+                   </CollapsibleContent>
+                 </Collapsible>
+               </div>
+             </TabsContent>
           </Tabs>
 
           <DialogFooter>
@@ -1416,84 +1343,62 @@ export default function IVRMenus() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic</TabsTrigger>
-              <TabsTrigger value="audio">Audio</TabsTrigger>
-              <TabsTrigger value="options">Options</TabsTrigger>
-              <TabsTrigger value="advanced">Advanced</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Name *</Label>
-                  <Input
-                    id="edit-name"
-                    value={formData.name || ''}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Main Menu"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as IvrMenuStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description of the IVR menu"
-                  rows={3}
-                  maxLength={1000}
+          {/* Name and Status fields above tabs */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name *</Label>
+              <Input
+                id="edit-name"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Main Menu"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-status">Status</Label>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="edit-status"
+                  checked={formData.status === 'active'}
+                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
                 />
-                <p className="text-sm text-muted-foreground">
-                  {(formData.description || '').length}/1000 characters
-                  {(formData.description || '').length > 900 && (
-                    <span className="text-amber-600 ml-2">Approaching limit</span>
-                  )}
-                </p>
+                <Label htmlFor="edit-status" className="text-sm font-normal">
+                  {formData.status === 'active' ? 'Active' : 'Disabled'}
+                </Label>
               </div>
-            </TabsContent>
+            </div>
+           </div>
 
-            <TabsContent value="audio" className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="edit-audio-file"
-                      name="edit-audio-type"
-                      checked={!formData.useTTS}
-                      onChange={() => setFormData({ ...formData, useTTS: false, tts_text: '', audio_file_path: formData.audio_file_path || '' })}
-                    />
-                    <Label htmlFor="edit-audio-file">Audio File</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="edit-text-to-speech"
-                      name="edit-audio-type"
-                      checked={formData.useTTS}
-                      onChange={() => setFormData({ ...formData, useTTS: true, audio_file_path: '', tts_text: formData.tts_text || '' })}
-                    />
-                    <Label htmlFor="edit-text-to-speech">Text-to-Speech</Label>
-                  </div>
-                </div>
+            <Tabs defaultValue="audio" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="audio">Audio</TabsTrigger>
+                <TabsTrigger value="options">Menu Options</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="audio" className="space-y-4">
+               <div className="space-y-4">
+
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-audio-resource">Audio Resource</Label>
+                   <Select
+                     value={formData.useTTS ? 'text-to-speech' : 'audio-file'}
+                     onValueChange={(value) => {
+                       if (value === 'text-to-speech') {
+                         setFormData({ ...formData, useTTS: true, audio_file_path: '', tts_text: formData.tts_text || '' });
+                       } else {
+                         setFormData({ ...formData, useTTS: false, tts_text: '', audio_file_path: formData.audio_file_path || '' });
+                       }
+                     }}
+                   >
+                     <SelectTrigger>
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="audio-file">Audio File</SelectItem>
+                       <SelectItem value="text-to-speech">Text-to-Speech</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
 
                 {!formData.useTTS ? (
                   <div className="space-y-4">
@@ -1755,144 +1660,153 @@ export default function IVRMenus() {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+                   </div>
+                 )}
 
-            <TabsContent value="advanced" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-max-timeout">Max Timeout (seconds)</Label>
-                  <Select
-                    value={String(formData.max_timeout || 3)}
-                    onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How long to wait for the user to first input speech or DTMF
-                  </p>
-                </div>
+                 {/* Menu Settings - Collapsible */}
+                 <Collapsible open={isMenuSettingsOpen} onOpenChange={setIsMenuSettingsOpen}>
+                   <CollapsibleTrigger asChild>
+                     <Button variant="outline" className="flex w-full justify-between p-4 font-medium">
+                       Menu Settings
+                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isMenuSettingsOpen ? 'rotate-180' : ''}`} />
+                     </Button>
+                   </CollapsibleTrigger>
+                   <CollapsibleContent className="space-y-4 pt-4">
+                     <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                         <Label htmlFor="edit-max-timeout">Max Timeout (seconds)</Label>
+                         <Select
+                           value={String(formData.max_timeout || 3)}
+                           onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                               <SelectItem key={num} value={String(num)}>
+                                 {num}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                         <p className="text-sm text-muted-foreground">
+                           How long to wait for the user to first input speech or DTMF
+                         </p>
+                       </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
-                  <Select
-                    value={String(formData.inter_digit_timeout || 2)}
-                    onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How long to wait between DTMF digits
-                  </p>
-                </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="edit-inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
+                         <Select
+                           value={String(formData.inter_digit_timeout || 2)}
+                           onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                               <SelectItem key={num} value={String(num)}>
+                                 {num}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                         <p className="text-sm text-muted-foreground">
+                           How long to wait between DTMF digits
+                         </p>
+                       </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-max-turns">Maximum Turns</Label>
-                  <Select
-                    value={String(formData.max_turns || 3)}
-                    onValueChange={(value) => setFormData({ ...formData, max_turns: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How many times to replay the menu on invalid input
-                  </p>
-                </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="edit-max-turns">Maximum Turns</Label>
+                         <Select
+                           value={String(formData.max_turns || 3)}
+                           onValueChange={(value) => setFormData({ ...formData, max_turns: parseInt(value) })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                               <SelectItem key={num} value={String(num)}>
+                                 {num}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                         <p className="text-sm text-muted-foreground">
+                           How many times to replay the menu on invalid input
+                         </p>
+                       </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-failover-type">Failover Destination</Label>
-                  <Select
-                    value={formData.failover_destination_type}
-                    onValueChange={(value) => setFormData({
-                      ...formData,
-                      failover_destination_type: value as IvrDestinationType,
-                      failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hangup">Hang Up</SelectItem>
-                      <SelectItem value="extension">Extension</SelectItem>
-                      <SelectItem value="ring_group">Ring Group</SelectItem>
-                      <SelectItem value="conference_room">Conference Room</SelectItem>
-                      <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                       <div className="space-y-2">
+                         <Label htmlFor="edit-failover-type">Failover Destination</Label>
+                         <Select
+                           value={formData.failover_destination_type}
+                           onValueChange={(value) => setFormData({
+                             ...formData,
+                             failover_destination_type: value as IvrDestinationType,
+                             failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
+                           })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="hangup">Hang Up</SelectItem>
+                             <SelectItem value="extension">Extension</SelectItem>
+                             <SelectItem value="ring_group">Ring Group</SelectItem>
+                             <SelectItem value="conference_room">Conference Room</SelectItem>
+                             <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                     </div>
 
-              {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
-                <div className="space-y-2">
-                  <Label>Failover Destination</Label>
-                  <Select
-                    key={`failover-${formData.failover_destination_type}`}
-                    value={formData.failover_destination_id || ''}
-                    onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select failover destination" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.failover_destination_type === 'extension' &&
-                        availableDestinations?.extensions?.map((ext) => (
-                          <SelectItem key={ext.id} value={ext.id}>
-                            {ext.label}
-                          </SelectItem>
-                        ))}
-                      {formData.failover_destination_type === 'ring_group' &&
-                        availableDestinations?.ring_groups?.map((rg) => (
-                          <SelectItem key={rg.id} value={rg.id}>
-                            {rg.label}
-                          </SelectItem>
-                        ))}
-                      {formData.failover_destination_type === 'conference_room' &&
-                        availableDestinations?.conference_rooms?.map((cr) => (
-                          <SelectItem key={cr.id} value={cr.id}>
-                            {cr.label}
-                          </SelectItem>
-                        ))}
-                      {formData.failover_destination_type === 'ivr_menu' &&
-                        availableDestinations?.ivr_menus?.map((menu) => (
-                          <SelectItem key={menu.id} value={menu.id}>
-                            {menu.label}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </TabsContent>
+                     {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
+                       <div className="space-y-2">
+                         <Label>Failover Destination</Label>
+                         <Select
+                           key={`failover-${formData.failover_destination_type}`}
+                           value={formData.failover_destination_id || ''}
+                           onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue placeholder="Select failover destination" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {formData.failover_destination_type === 'extension' &&
+                               availableDestinations?.extensions?.map((ext) => (
+                                 <SelectItem key={ext.id} value={ext.id}>
+                                   {ext.label}
+                                 </SelectItem>
+                               ))}
+                             {formData.failover_destination_type === 'ring_group' &&
+                               availableDestinations?.ring_groups?.map((rg) => (
+                                 <SelectItem key={rg.id} value={rg.id}>
+                                   {rg.label}
+                                 </SelectItem>
+                               ))}
+                             {formData.failover_destination_type === 'conference_room' &&
+                               availableDestinations?.conference_rooms?.map((cr) => (
+                                 <SelectItem key={cr.id} value={cr.id}>
+                                   {cr.label}
+                                 </SelectItem>
+                               ))}
+                             {formData.failover_destination_type === 'ivr_menu' &&
+                               availableDestinations?.ivr_menus?.map((menu) => (
+                                 <SelectItem key={menu.id} value={menu.id}>
+                                   {menu.label}
+                                 </SelectItem>
+                               ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                     )}
+                   </CollapsibleContent>
+                 </Collapsible>
+               </div>
+             </TabsContent>
           </Tabs>
 
           <DialogFooter>

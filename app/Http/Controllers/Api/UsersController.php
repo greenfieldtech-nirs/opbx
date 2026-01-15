@@ -6,11 +6,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Controllers\Traits\ValidatesTenantScope;
+use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
+use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\Logging\AuditLogger;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,403 +27,257 @@ use Illuminate\Support\Facades\Log;
  * Handles CRUD operations for users within an organization.
  * All operations are tenant-scoped to the authenticated user's organization.
  */
-class UsersController extends Controller
+class UsersController extends AbstractApiCrudController
 {
-    use ApiRequestHandler;
+    use AppliesFilters;
+    use ValidatesTenantScope;
+
     /**
-     * Display a paginated list of users.
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * Get the model class name for this controller.
      */
-    public function index(Request $request): JsonResponse
+    protected function getModelClass(): string
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
+        return User::class;
+    }
 
-        // Check authorization using policy
-        $this->authorize('viewAny', User::class);
+    /**
+     * Get the resource class name for transforming models.
+     */
+    protected function getResourceClass(): string
+    {
+        return UserResource::class;
+    }
 
-        Log::info('Users list access authorized', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'role' => $user->role->value,
-        ]);
+    /**
+     * Get the allowed filter fields for the index method.
+     *
+     * @return array<string>
+     */
+    protected function getAllowedFilters(): array
+    {
+        return ['role', 'status', 'search'];
+    }
 
-        // Build query
-        $query = User::query()
-            ->forOrganization($user->organization_id)
-            ->with('extension:id,user_id,extension_number');
+    /**
+     * Get the allowed sort fields for the index method.
+     *
+     * @return array<string>
+     */
+    protected function getAllowedSortFields(): array
+    {
+        return ['name', 'email', 'created_at', 'role', 'status'];
+    }
 
-        // Apply filters
-        if ($request->has('role')) {
-            $role = UserRole::tryFrom($request->input('role'));
-            if ($role) {
-                $query->withRole($role);
-            }
-        }
+    /**
+     * Get the default sort field for the index method.
+     */
+    protected function getDefaultSortField(): string
+    {
+        return 'created_at';
+    }
 
-        if ($request->has('status')) {
-            $status = UserStatus::tryFrom($request->input('status'));
-            if ($status) {
-                $query->withStatus($status);
-            }
-        }
-
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
-
-        // Apply sorting
-        $sortField = $request->input('sort', 'created_at');
-        $sortOrder = $request->input('order', 'desc');
-
-        // Validate sort field
-        $allowedSortFields = ['name', 'email', 'created_at', 'role', 'status'];
-        if (!in_array($sortField, $allowedSortFields, true)) {
-            $sortField = 'created_at';
-        }
-
-        // Validate sort order
-        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc'], true)
-            ? strtolower($sortOrder)
-            : 'desc';
-
-        $query->orderBy($sortField, $sortOrder);
-
-        // Paginate
-        $perPage = (int) $request->input('per_page', 25);
-        $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
-
-        $users = $query->paginate($perPage);
-
-        Log::info('Users list retrieved', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'total' => $users->total(),
-            'per_page' => $perPage,
-            'filters' => [
-                'role' => $request->input('role'),
-                'status' => $request->input('status'),
-                'search' => $request->input('search'),
+    /**
+     * Get the filter configuration for the index method.
+     *
+     * @return array<string, array>
+     */
+    protected function getFilterConfig(): array
+    {
+        return [
+            'role' => [
+                'type' => 'enum',
+                'enum' => UserRole::class,
+                'scope' => 'withRole'
             ],
-        ]);
-
-        return response()->json([
-            'data' => $users->items(),
-            'meta' => [
-                'current_page' => $users->currentPage(),
-                'per_page' => $users->perPage(),
-                'total' => $users->total(),
-                'last_page' => $users->lastPage(),
-                'from' => $users->firstItem(),
-                'to' => $users->lastItem(),
+            'status' => [
+                'type' => 'enum',
+                'enum' => UserStatus::class,
+                'scope' => 'withStatus'
             ],
-        ]);
+            'search' => [
+                'type' => 'search',
+                'scope' => 'search'
+            ]
+        ];
     }
 
     /**
-     * Store a newly created user.
-     *
-     * @param CreateUserRequest $request
-     * @return JsonResponse
+     * Apply custom filters to the query.
      */
-    public function store(CreateUserRequest $request): JsonResponse
+    protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
+        $this->applyFilters($query, $request, $this->getFilterConfig());
 
-        // Check authorization using policy
-        $this->authorize('create', User::class);
-
-        $validated = $request->validated();
-
-        Log::info('Creating new user', [
-            'request_id' => $requestId,
-            'creator_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'new_user_email' => $validated['email'],
-            'new_user_role' => $validated['role'],
-        ]);
-
-        try {
-            $user = DB::transaction(function () use ($currentUser, $validated): User {
-                // Hash password
-                $validated['password'] = Hash::make($validated['password']);
-
-                // Assign to current user's organization
-                $validated['organization_id'] = $currentUser->organization_id;
-
-                // Create user
-                $user = User::create($validated);
-
-                return $user;
-            });
-
-            // Load extension relationship
-            $user->load('extension:id,user_id,extension_number');
-
-            Log::info('User created successfully', [
-                'request_id' => $requestId,
-                'creator_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'created_user_id' => $user->id,
-                'created_user_email' => $user->email,
-            ]);
-
-            return response()->json([
-                'message' => 'User created successfully.',
-                'user' => $user,
-            ], 201);
-        } catch (\Exception $e) {
-            Log::error('Failed to create user', [
-                'request_id' => $requestId,
-                'creator_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to create user',
-                'message' => 'An error occurred while creating the user.',
-            ], 500);
-        }
+        // Always eager load extension relationship
+        $query->with(User::DEFAULT_EXTENSION_FIELDS);
     }
 
     /**
-     * Display the specified user.
+     * Hook method called before storing a new model.
      *
-     * @param Request $request
-     * @param User $user
-     * @return JsonResponse
+     * @param array<string, mixed> $validated
+     * @return array<string, mixed>
      */
-    public function show(Request $request, User $user): JsonResponse
+    protected function beforeStore(array $validated, Request $request): array
     {
-        $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        // Check authorization using policy
-        $this->authorize('view', $user);
-
-        // Tenant scope check
-        if ($user->organization_id !== $currentUser->organization_id) {
-            Log::warning('Cross-tenant user access attempt', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'target_organization_id' => $user->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'User not found.',
-            ], 404);
+        // Hash password
+        if (isset($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
         }
 
-        // Load extension relationship
-        $user->load('extension:id,user_id,extension_number');
-
-        Log::info('User details retrieved', [
-            'request_id' => $requestId,
-            'user_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'target_user_id' => $user->id,
-        ]);
-
-        return response()->json([
-            'user' => $user,
-        ]);
+        return $validated;
     }
 
     /**
-     * Update the specified user.
+     * Hook method called before updating a model.
      *
-     * @param UpdateUserRequest $request
-     * @param User $user
-     * @return JsonResponse
+     * @param array<string, mixed> $validated
+     * @return array<string, mixed>
      */
-    public function update(UpdateUserRequest $request, User $user): JsonResponse
+    protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        // Check authorization using policy
-        $this->authorize('update', $user);
-
-        // Tenant scope check
-        if ($user->organization_id !== $currentUser->organization_id) {
-            Log::warning('Cross-tenant user update attempt', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'target_organization_id' => $user->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'User not found.',
-            ], 404);
+        // Hash password if provided
+        if (isset($validated['password']) && !empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            // Remove password from validated data if not provided
+            unset($validated['password']);
         }
 
-        $validated = $request->validated();
-
-        // Track changed fields for logging
-        $changedFields = [];
-        foreach ($validated as $key => $value) {
-            if ($key !== 'password' && $user->{$key} != $value) {
-                $changedFields[] = $key;
-            }
-        }
-
-        Log::info('Updating user', [
-            'request_id' => $requestId,
-            'updater_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'target_user_id' => $user->id,
-            'changed_fields' => $changedFields,
-        ]);
-
-        try {
-            DB::transaction(function () use ($user, $validated): void {
-                // Hash password if provided
-                if (isset($validated['password']) && !empty($validated['password'])) {
-                    $validated['password'] = Hash::make($validated['password']);
-                } else {
-                    // Remove password from validated data if not provided
-                    unset($validated['password']);
-                }
-
-                // Update user
-                $user->update($validated);
-            });
-
-            // Reload user and extension relationship
-            $user->refresh();
-            $user->load('extension:id,user_id,extension_number');
-
-            Log::info('User updated successfully', [
-                'request_id' => $requestId,
-                'updater_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'updated_user_id' => $user->id,
-                'changed_fields' => $changedFields,
-            ]);
-
-            return response()->json([
-                'message' => 'User updated successfully.',
-                'user' => $user,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to update user', [
-                'request_id' => $requestId,
-                'updater_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to update user',
-                'message' => 'An error occurred while updating the user.',
-            ], 500);
-        }
+        return $validated;
     }
 
     /**
-     * Remove the specified user.
-     *
-     * @param Request $request
-     * @param User $user
-     * @return JsonResponse
+     * Hook method called before deleting a model.
      */
-    public function destroy(Request $request, User $user): JsonResponse
+    protected function beforeDestroy(Model $model, Request $request): void
     {
-        $requestId = $this->getRequestId();
-        $currentUser = $this->getAuthenticatedUser($request);
-
-        // Check authorization using policy
-        $this->authorize('delete', $user);
-
-        // Tenant scope check
-        if ($user->organization_id !== $currentUser->organization_id) {
-            Log::warning('Cross-tenant user deletion attempt', [
-                'request_id' => $requestId,
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'target_organization_id' => $user->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'User not found.',
-            ], 404);
-        }
+        assert($model instanceof User);
+        $currentUser = $this->getAuthenticatedUser();
 
         // Business logic: Cannot delete last owner in organization
-        if ($user->role === UserRole::OWNER) {
+        if ($model->role === UserRole::OWNER) {
             $ownerCount = User::forOrganization($currentUser->organization_id)
                 ->withRole(UserRole::OWNER)
                 ->count();
 
             if ($ownerCount <= 1) {
                 Log::warning('Blocked deletion of last owner', [
-                    'request_id' => $requestId,
+                    'request_id' => $this->getRequestId(),
                     'user_id' => $currentUser->id,
                     'organization_id' => $currentUser->organization_id,
-                    'target_user_id' => $user->id,
+                    'target_user_id' => $model->id,
                 ]);
 
-                return response()->json([
-                    'error' => 'Conflict',
-                    'message' => 'Cannot delete the last owner in the organization.',
-                ], 409);
+                abort(409, 'Cannot delete the last owner in the organization.');
             }
         }
 
-        Log::info('Deleting user', [
-            'request_id' => $requestId,
-            'deleter_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            'target_user_id' => $user->id,
-            'target_user_email' => $user->email,
-            'target_user_role' => $user->role->value,
-        ]);
-
+        // Add audit logging for user deletion (before actual deletion)
         try {
-            DB::transaction(function () use ($user): void {
-                // Hard delete the user
-                $user->delete();
-            });
-
-            Log::info('User deleted successfully', [
-                'request_id' => $requestId,
-                'deleter_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'deleted_user_id' => $user->id,
+            AuditLogger::logUserDeleted($request, $model->id, $model->email);
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log user deletion audit', [
+                'user_id' => $model->id,
+                'error' => $auditException->getMessage(),
             ]);
-
-            return response()->json(null, 204);
-        } catch (\Exception $e) {
-            Log::error('Failed to delete user', [
-                'request_id' => $requestId,
-                'deleter_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_user_id' => $user->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to delete user',
-                'message' => 'An error occurred while deleting the user.',
-            ], 500);
         }
     }
+
+    /**
+     * Hook method called after storing a new model.
+     */
+    protected function afterStore(Model $model, Request $request): void
+    {
+        // Reload extension relationship
+        $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+
+        // Add audit logging for user creation
+        try {
+            assert($model instanceof User);
+            $currentUser = $this->getAuthenticatedUser();
+            AuditLogger::logUserCreated($request, $model);
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log user creation audit', [
+                'user_id' => $model->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Hook method called after updating a model.
+     */
+    protected function afterUpdate(Model $model, Request $request): void
+    {
+        // Reload extension relationship
+        $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+
+        // Add audit logging for user updates
+        try {
+            assert($model instanceof User);
+            $currentUser = $this->getAuthenticatedUser();
+
+            // Get validated data to check what changed
+            $validated = method_exists($request, 'validated')
+                ? $request->validated()
+                : $request->all();
+
+            // Check if role changed specifically
+            if (isset($validated['role']) && $validated['role'] !== $model->role->value) {
+                // Role was changed - log this specifically
+                AuditLogger::log('user.role_changed', [
+                    'target_user_id' => $model->id,
+                    'target_user_email' => $model->email,
+                    'old_role' => $model->getOriginal('role'),
+                    'new_role' => $model->role->value,
+                ], AuditLogger::LEVEL_WARNING, $request, $currentUser);
+            }
+
+            // Log general user update
+            $changes = $this->getChangedFields($model, $validated);
+            if (!empty($changes)) {
+                AuditLogger::logUserUpdated($request, $model, $changes);
+            }
+        } catch (\Exception $auditException) {
+            // Log audit failure but don't fail the operation
+            Log::error('Failed to log user update audit', [
+                'user_id' => $model->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Transaction not needed - hooks only hash password (data transformation).
+     * Simple single-model create operation is already atomic.
+     */
+    protected function shouldUseTransactionForStore(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Transaction not needed - hooks only hash password (data transformation).
+     * Simple single-model update operation is already atomic.
+     */
+    protected function shouldUseTransactionForUpdate(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Transaction IS needed - beforeDestroy() performs query to count owners.
+     * Must ensure owner count check and delete happen atomically.
+     */
+    protected function shouldUseTransactionForDestroy(): bool
+    {
+        return true; // Keep transaction (queries in beforeDestroy hook)
+    }
+
+    // No need to override store() and update()
+    // Laravel will automatically resolve and validate FormRequest classes
+    // based on route-model binding and type hints in the parent controller
 }

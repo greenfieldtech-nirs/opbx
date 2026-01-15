@@ -6,8 +6,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\BusinessHoursStatus;
 use App\Http\Controllers\Controller;
-
-
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
 use App\Http\Requests\BusinessHours\UpdateBusinessHoursScheduleRequest;
@@ -32,20 +30,14 @@ use Illuminate\Support\Facades\Log;
 class BusinessHoursController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Display a paginated list of business hours schedules.
-     *
-     * @param Request $request
-     * @return BusinessHoursScheduleCollection
      */
     public function index(Request $request): BusinessHoursScheduleCollection
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            abort(401, 'Unauthenticated');
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('viewAny', BusinessHoursSchedule::class);
 
@@ -81,7 +73,7 @@ class BusinessHoursController extends Controller
 
         // Validate sort field
         $allowedSortFields = ['name', 'status', 'created_at', 'updated_at'];
-        if (!in_array($sortField, $allowedSortFields, true)) {
+        if (! in_array($sortField, $allowedSortFields, true)) {
             $sortField = 'name';
         }
 
@@ -111,18 +103,11 @@ class BusinessHoursController extends Controller
 
     /**
      * Store a newly created business hours schedule.
-     *
-     * @param StoreBusinessHoursScheduleRequest $request
-     * @return JsonResponse
      */
     public function store(StoreBusinessHoursScheduleRequest $request): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
@@ -134,28 +119,23 @@ class BusinessHoursController extends Controller
         ]);
 
         try {
-            $schedule = DB::transaction(function () use ($user, $validated): BusinessHoursSchedule {
-                // Transform action data for storage
-                $openHoursActionData = $this->transformActionDataForStorage($validated['open_hours_action']);
-                $closedHoursActionData = $this->transformActionDataForStorage($validated['closed_hours_action']);
+            // Prepare data
+            $data = $this->prepareBusinessHoursData($validated);
 
-                // Create the main schedule
-                $schedule = BusinessHoursSchedule::create([
+            $schedule = DB::transaction(function () use ($data, $user): BusinessHoursSchedule {
+                // Create schedule
+                $schedule = BusinessHoursSchedule::create(array_merge($data['basic'], [
                     'organization_id' => $user->organization_id,
-                    'name' => $validated['name'],
-                    'status' => $validated['status'],
-                    'open_hours_action' => $openHoursActionData['action'],
-                    'open_hours_action_type' => $openHoursActionData['action_type'],
-                    'closed_hours_action' => $closedHoursActionData['action'],
-                    'closed_hours_action_type' => $closedHoursActionData['action_type'],
-                ]);
+                    'open_hours_action' => $data['actions']['open_hours']['action'],
+                    'open_hours_action_type' => $data['actions']['open_hours']['action_type'],
+                    'closed_hours_action' => $data['actions']['closed_hours']['action'],
+                    'closed_hours_action_type' => $data['actions']['closed_hours']['action_type'],
+                ]));
 
-                // Create schedule days and time ranges
-                $this->createScheduleDays($schedule, $validated['schedule']);
-
-                // Create exceptions if provided
-                if (!empty($validated['exceptions'])) {
-                    $this->createExceptions($schedule, $validated['exceptions']);
+                // Persist schedule days and exceptions
+                $this->createScheduleDays($schedule, $data['schedule']);
+                if (! empty($data['exceptions'])) {
+                    $this->createExceptions($schedule, $data['exceptions']);
                 }
 
                 return $schedule;
@@ -195,19 +175,11 @@ class BusinessHoursController extends Controller
 
     /**
      * Display the specified business hours schedule.
-     *
-     * @param Request $request
-     * @param BusinessHoursSchedule $businessHour
-     * @return JsonResponse
      */
     public function show(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('view', $businessHour);
 
@@ -244,19 +216,11 @@ class BusinessHoursController extends Controller
 
     /**
      * Update the specified business hours schedule.
-     *
-     * @param UpdateBusinessHoursScheduleRequest $request
-     * @param BusinessHoursSchedule $businessHour
-     * @return JsonResponse
      */
     public function update(UpdateBusinessHoursScheduleRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
@@ -284,30 +248,12 @@ class BusinessHoursController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($businessHour, $validated): void {
-                // Transform action data for storage
-                $openHoursActionData = $this->transformActionDataForStorage($validated['open_hours_action']);
-                $closedHoursActionData = $this->transformActionDataForStorage($validated['closed_hours_action']);
+            // Prepare data
+            $data = $this->prepareBusinessHoursData($validated);
 
-                // Update main schedule
-                $businessHour->update([
-                    'name' => $validated['name'],
-                    'status' => $validated['status'],
-                    'open_hours_action' => $openHoursActionData['action'],
-                    'open_hours_action_type' => $openHoursActionData['action_type'],
-                    'closed_hours_action' => $closedHoursActionData['action'],
-                    'closed_hours_action_type' => $closedHoursActionData['action_type'],
-                ]);
-
-                // Delete existing schedule days and recreate
-                $businessHour->scheduleDays()->delete();
-                $this->createScheduleDays($businessHour, $validated['schedule']);
-
-                // Delete existing exceptions and recreate
-                $businessHour->exceptions()->delete();
-                if (!empty($validated['exceptions'])) {
-                    $this->createExceptions($businessHour, $validated['exceptions']);
-                }
+            DB::transaction(function () use ($businessHour, $data): void {
+                // Persist all changes
+                $this->persistBusinessHours($businessHour, $data);
             });
 
             // Reload schedule with relationships
@@ -345,19 +291,11 @@ class BusinessHoursController extends Controller
 
     /**
      * Remove the specified business hours schedule.
-     *
-     * @param Request $request
-     * @param BusinessHoursSchedule $businessHour
-     * @return JsonResponse
      */
     public function destroy(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('delete', $businessHour);
 
@@ -384,6 +322,18 @@ class BusinessHoursController extends Controller
             'schedule_id' => $businessHour->id,
             'schedule_name' => $businessHour->name,
         ]);
+
+        // Check for references before deletion
+        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $result = $referenceChecker->checkReferences('business_hours', $businessHour->id, $businessHour->organization_id);
+
+        if ($result['has_references']) {
+            return response()->json([
+                'error' => 'Cannot delete business hours schedule',
+                'message' => 'This business hours schedule is being used and cannot be deleted. Please remove all references first.',
+                'references' => $result['references'],
+            ], 409);
+        }
 
         try {
             DB::transaction(function () use ($businessHour): void {
@@ -418,19 +368,11 @@ class BusinessHoursController extends Controller
 
     /**
      * Duplicate an existing business hours schedule.
-     *
-     * @param Request $request
-     * @param BusinessHoursSchedule $businessHour
-     * @return JsonResponse
      */
     public function duplicate(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser($request);
-
-        if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         $this->authorize('duplicate', $businessHour);
 
@@ -466,7 +408,7 @@ class BusinessHoursController extends Controller
                 // Create new schedule with " (Copy)" suffix
                 $newSchedule = BusinessHoursSchedule::create([
                     'organization_id' => $businessHour->organization_id,
-                    'name' => $businessHour->name . ' (Copy)',
+                    'name' => $businessHour->name.' (Copy)',
                     'status' => $businessHour->status,
                     'open_hours_action' => $businessHour->open_hours_action,
                     'open_hours_action_type' => $businessHour->open_hours_action_type,
@@ -547,27 +489,63 @@ class BusinessHoursController extends Controller
     }
 
     /**
-     * Transform action data for storage in database.
-     * Handles both structured format {type: string, target_id: string} and legacy string format.
+     * Prepare business hours data for storage.
      *
-     * @param array{type: string, target_id: string}|string $actionData
+     * @param  array  $validated  Validated request data
+     * @return array Structured data ready for persistence
+     */
+    protected function prepareBusinessHoursData(array $validated): array
+    {
+        return [
+            'basic' => [
+                'name' => $validated['name'],
+                'status' => $validated['status'],
+            ],
+            'actions' => [
+                'open_hours' => $this->transformActionDataForStorage($validated['open_hours_action']),
+                'closed_hours' => $this->transformActionDataForStorage($validated['closed_hours_action']),
+            ],
+            'schedule' => $validated['schedule'] ?? [],
+            'exceptions' => $validated['exceptions'] ?? [],
+        ];
+    }
+
+    /**
+     * Persist business hours schedule, days, and exceptions to database.
+     *
+     * @param  BusinessHoursSchedule  $schedule  The schedule to update
+     * @param  array  $data  Prepared data from prepareBusinessHoursData()
+     */
+    protected function persistBusinessHours(BusinessHoursSchedule $schedule, array $data): void
+    {
+        // Update the main schedule record
+        $schedule->update(array_merge($data['basic'], [
+            'open_hours_action' => $data['actions']['open_hours']['action'],
+            'open_hours_action_type' => $data['actions']['open_hours']['action_type'],
+            'closed_hours_action' => $data['actions']['closed_hours']['action'],
+            'closed_hours_action_type' => $data['actions']['closed_hours']['action_type'],
+        ]));
+
+        // Delete existing schedule days and recreate
+        $schedule->scheduleDays()->delete();
+        $this->createScheduleDays($schedule, $data['schedule']);
+
+        // Delete existing exceptions and recreate
+        $schedule->exceptions()->delete();
+        if (! empty($data['exceptions'])) {
+            $this->createExceptions($schedule, $data['exceptions']);
+        }
+    }
+
+    /**
+     * Transform action data for storage in database.
+     * Expects structured format {type: string, target_id: string}.
+     *
+     * @param  array{type: string, target_id: string}  $actionData
      * @return array{action: array{target_id: string}, action_type: string}
      */
-    private function transformActionDataForStorage(array|string $actionData): array
+    private function transformActionDataForStorage(array $actionData): array
     {
-        // Handle legacy string format (backward compatibility)
-        if (is_string($actionData)) {
-            // For now, assume string format represents extension IDs
-            // TODO: Remove this backward compatibility once frontend is fully migrated
-            return [
-                'action' => [
-                    'target_id' => 'ext-' . $actionData,
-                ],
-                'action_type' => 'extension',
-            ];
-        }
-
-        // Handle structured format
         return [
             'action' => [
                 'target_id' => $actionData['target_id'],
@@ -579,8 +557,7 @@ class BusinessHoursController extends Controller
     /**
      * Transform stored action data into structured format for API response.
      *
-     * @param BusinessHoursSchedule $schedule
-     * @param string $actionField 'open_hours' or 'closed_hours'
+     * @param  string  $actionField  'open_hours' or 'closed_hours'
      * @return array{type: string, target_id: string}
      */
     private function transformActionForResponse(BusinessHoursSchedule $schedule, string $actionField): array
@@ -602,9 +579,7 @@ class BusinessHoursController extends Controller
     /**
      * Create schedule days and time ranges for a business hours schedule.
      *
-     * @param BusinessHoursSchedule $schedule
-     * @param array<string, array<string, mixed>> $scheduleDaysData
-     * @return void
+     * @param  array<string, array<string, mixed>>  $scheduleDaysData
      */
     private function createScheduleDays(BusinessHoursSchedule $schedule, array $scheduleDaysData): void
     {
@@ -616,7 +591,7 @@ class BusinessHoursController extends Controller
             ]);
 
             // Create time ranges if day is enabled
-            if (!empty($dayData['time_ranges'])) {
+            if (! empty($dayData['time_ranges'])) {
                 foreach ($dayData['time_ranges'] as $timeRangeData) {
                     BusinessHoursTimeRange::create([
                         'business_hours_schedule_day_id' => $scheduleDay->id,
@@ -631,9 +606,7 @@ class BusinessHoursController extends Controller
     /**
      * Create exceptions and exception time ranges for a business hours schedule.
      *
-     * @param BusinessHoursSchedule $schedule
-     * @param array<int, array<string, mixed>> $exceptionsData
-     * @return void
+     * @param  array<int, array<string, mixed>>  $exceptionsData
      */
     private function createExceptions(BusinessHoursSchedule $schedule, array $exceptionsData): void
     {
@@ -648,7 +621,7 @@ class BusinessHoursController extends Controller
             // Create time ranges only if type is special_hours and time_ranges provided
             if (
                 $exceptionData['type'] === 'special_hours'
-                && !empty($exceptionData['time_ranges'])
+                && ! empty($exceptionData['time_ranges'])
             ) {
                 foreach ($exceptionData['time_ranges'] as $timeRangeData) {
                     BusinessHoursExceptionTimeRange::create([
