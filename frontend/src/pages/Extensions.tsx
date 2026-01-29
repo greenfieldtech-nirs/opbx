@@ -85,6 +85,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import type { Extension, ExtensionType, Status, CreateExtensionRequest, UpdateExtensionRequest } from '@/types';
 
 // Sort direction type
@@ -1552,45 +1553,41 @@ export default function ExtensionsComplete() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Extension Number */}
-            <div className="space-y-2">
-              <Label htmlFor="extension_number">
-                Extension Number <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="extension_number"
-                value={formData.extension_number}
-                onChange={(e) => setFormData({ ...formData, extension_number: e.target.value })}
-                placeholder="1001"
-                autoComplete="off"
-              />
-              <p className="text-xs text-muted-foreground">
-                Next available: {getNextExtensionNumber(extensions)}
-              </p>
-              {formErrors.extension_number && (
-                <p className="text-sm text-destructive">{formErrors.extension_number}</p>
-              )}
-            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {/* Extension Number */}
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="extension_number">
+                  Extension Number <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="extension_number"
+                  value={formData.extension_number}
+                  onChange={(e) => setFormData({ ...formData, extension_number: e.target.value })}
+                  placeholder="1001"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Next available: {getNextExtensionNumber(extensions)}
+                </p>
+                {formErrors.extension_number && (
+                  <p className="text-sm text-destructive">{formErrors.extension_number}</p>
+                )}
+              </div>
 
-            {/* Assign to User */}
-            <div className="space-y-2">
-              <Label htmlFor="user_id">Assign to User (Optional)</Label>
-              <Select
-                value={formData.user_id}
-                onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-              >
-                <SelectTrigger id="user_id">
-                  <SelectValue placeholder="Select user or leave unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id.toString()}>
-                      {user.name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Status Toggle */}
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <div className="flex items-center gap-3 pt-6">
+                  <Switch
+                    id="status"
+                    checked={formData.status === 'active'}
+                    onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
+                  />
+                  <span className="text-sm font-medium">
+                    {formData.status === 'active' ? 'Active' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Extension Type */}
@@ -1616,21 +1613,23 @@ export default function ExtensionsComplete() {
               </Select>
             </div>
 
-            {/* Status */}
+            {/* Assign to User */}
             <div className="space-y-2">
-              <Label htmlFor="status">
-                Status <span className="text-destructive">*</span>
-              </Label>
+              <Label htmlFor="user_id">Assign to User (Optional)</Label>
               <Select
-                value={formData.status}
-                onValueChange={(value: Status) => setFormData({ ...formData, status: value })}
+                value={formData.user_id}
+                onValueChange={(value) => setFormData({ ...formData, user_id: value })}
               >
-                <SelectTrigger id="status">
-                  <SelectValue />
+                <SelectTrigger id="user_id">
+                  <SelectValue placeholder="Select user or leave unassigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="unassigned">Leave Unassigned</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name} ({user.email})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1665,43 +1664,40 @@ export default function ExtensionsComplete() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Extension Number (Read-only) */}
-            <div className="space-y-2">
-              <Label htmlFor="edit_extension_number">Extension Number</Label>
-              <Input
-                id="edit_extension_number"
-                value={formData.extension_number}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">
-                Extension number cannot be changed
-              </p>
+            <div className="grid grid-cols-3 gap-4">
+              {/* Extension Number (Read-only) */}
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="edit_extension_number">Extension Number</Label>
+                <Input
+                  id="edit_extension_number"
+                  value={formData.extension_number}
+                  readOnly
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Extension number cannot be changed
+                </p>
+              </div>
+
+              {/* Status Toggle */}
+              <div className="space-y-2">
+                <Label htmlFor="edit_status">Status</Label>
+                <div className="flex items-center gap-3 pt-6">
+                  <Switch
+                    id="edit_status"
+                    checked={formData.status === 'active'}
+                    onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
+                    disabled={currentUser.role === 'pbx_user'}
+                  />
+                  <span className="text-sm font-medium">
+                    {formData.status === 'active' ? 'Active' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Assign to User */}
-            <div className="space-y-2">
-              <Label htmlFor="edit_user_id">Assign to User (Optional)</Label>
-              <Select
-                value={formData.user_id}
-                onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-              >
-                <SelectTrigger id="edit_user_id">
-                  <SelectValue placeholder="Select user or leave unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id.toString()}>
-                      {user.name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Extension Type (can be changed with warning) */}
+            {/* Extension Type */}
             <div className="space-y-2">
               <Label htmlFor="edit_type">
                 Extension Type <span className="text-destructive">*</span>
@@ -1725,22 +1721,23 @@ export default function ExtensionsComplete() {
               </Select>
             </div>
 
-            {/* Status */}
+            {/* Assign to User */}
             <div className="space-y-2">
-              <Label htmlFor="edit_status">
-                Status <span className="text-destructive">*</span>
-              </Label>
+              <Label htmlFor="edit_user_id">Assign to User (Optional)</Label>
               <Select
-                value={formData.status}
-                onValueChange={(value: Status) => setFormData({ ...formData, status: value })}
-                disabled={currentUser.role === 'pbx_user'}
+                value={formData.user_id}
+                onValueChange={(value) => setFormData({ ...formData, user_id: value })}
               >
-                <SelectTrigger id="edit_status">
-                  <SelectValue />
+                <SelectTrigger id="edit_user_id">
+                  <SelectValue placeholder="Select user or leave unassigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="unassigned">Leave Unassigned</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name} ({user.email})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
