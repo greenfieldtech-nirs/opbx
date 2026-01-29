@@ -18,26 +18,26 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,
   Search,
-   X,
-   MoreVertical,
-   Edit,
-   Trash2,
-   Phone,
-   Copy,
-   ChevronDown,
-   ChevronUp,
-   Eye,
-   EyeOff,
-   UserCheck,
-   UserX,
-   Users,
-   Menu,
-   Bot,
-   ArrowRight,
-   Check,
-   Activity,
-   RefreshCw,
-   Key,
+  X,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Phone,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  UserCheck,
+  UserX,
+  Users,
+  Menu,
+  Bot,
+  ArrowRight,
+  Check,
+  Activity,
+  RefreshCw,
+  Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -200,11 +200,11 @@ export default function ExtensionsComplete() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-   const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
-   const [showExtensionDetail, setShowExtensionDetail] = useState(false);
-   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
-   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
-   const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
+  const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
+  const [showExtensionDetail, setShowExtensionDetail] = useState(false);
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
 
   // Form state
   const [formData, setFormData] = useState<ExtensionFormData>({
@@ -301,90 +301,90 @@ export default function ExtensionsComplete() {
     },
   });
 
-   // Reset password mutation
-   const resetPasswordMutation = useMutation({
-     mutationFn: (extensionId: string) => extensionsService.resetPassword(extensionId),
-     onSuccess: (data, extensionId) => {
-       queryClient.invalidateQueries({ queryKey: ['extensions'] });
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: (extensionId: string) => extensionsService.resetPassword(extensionId),
+    onSuccess: (data, extensionId) => {
+      queryClient.invalidateQueries({ queryKey: ['extensions'] });
 
-       // Store the new password temporarily for display
-       setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
+      // Store the new password temporarily for display
+      setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
 
-       // Automatically hide the password after 30 seconds for security
-       setTimeout(() => {
-         setTempPasswords(prev => {
-           const next = new Map(prev);
-           next.delete(extensionId);
-           return next;
-         });
-       }, 30000);
+      // Automatically hide the password after 30 seconds for security
+      setTimeout(() => {
+        setTempPasswords(prev => {
+          const next = new Map(prev);
+          next.delete(extensionId);
+          return next;
+        });
+      }, 30000);
 
-       toast.success(
-         `Password reset successfully! New password: ${data.new_password}`,
-         {
-           duration: 10000,
-           action: {
-             label: 'Copy',
-             onClick: () => {
-               navigator.clipboard.writeText(data.new_password).then(() => {
-                 toast.success('Password copied to clipboard!');
-               });
-             },
-           },
-         }
-       );
+      toast.success(
+        `Password reset successfully! New password: ${data.new_password}`,
+        {
+          duration: 10000,
+          action: {
+            label: 'Copy',
+            onClick: () => {
+              navigator.clipboard.writeText(data.new_password).then(() => {
+                toast.success('Password copied to clipboard!');
+              });
+            },
+          },
+        }
+      );
 
-       // Show Cloudonix warning if present
-       if (data.cloudonix_warning) {
-         toast.warning(data.cloudonix_warning.message, { duration: 8000 });
-       }
-     },
-     onError: (error: any) => {
-       const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to reset extension password';
-       toast.error(message);
-     },
-   });
+      // Show Cloudonix warning if present
+      if (data.cloudonix_warning) {
+        toast.warning(data.cloudonix_warning.message, { duration: 8000 });
+      }
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to reset extension password';
+      toast.error(message);
+    },
+  });
 
-   // Sync mutation
-   const syncMutation = useMutation({
-     mutationFn: () => extensionsService.performSync(),
-     onMutate: () => {
-       setIsSyncing(true);
-       toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
-     },
-     onSuccess: (data) => {
-       queryClient.invalidateQueries({ queryKey: ['extensions'] });
-       setIsSyncNeeded(false);
-       const toCreated = data.to_cloudonix?.created || 0;
-       const fromCreated = data.from_cloudonix?.created || 0;
-       toast.success(
-         `Extensions synchronized! Created ${toCreated} in Cloudonix, imported ${fromCreated} from Cloudonix`,
-         { id: 'sync-extensions' }
-       );
-     },
-     onError: (error: any) => {
-       const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
-       toast.error(message, { id: 'sync-extensions' });
-     },
-     onSettled: () => {
-       setIsSyncing(false);
-     },
-   });
+  // Sync mutation
+  const syncMutation = useMutation({
+    mutationFn: () => extensionsService.performSync(),
+    onMutate: () => {
+      setIsSyncing(true);
+      toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      setIsSyncNeeded(false);
+      const toCreated = data.to_cloudonix?.created || 0;
+      const fromCreated = data.from_cloudonix?.created || 0;
+      toast.success(
+        `Extensions synchronized! Created ${toCreated} in Cloudonix, imported ${fromCreated} from Cloudonix`,
+        { id: 'sync-extensions' }
+      );
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
+      toast.error(message, { id: 'sync-extensions' });
+    },
+    onSettled: () => {
+      setIsSyncing(false);
+    },
+  });
 
   // Handle sync button click
   const handleSync = () => {
     syncMutation.mutate();
   };
 
-   // Check user permissions
-   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
-   const canEdit = (extension: Extension) => {
-     if (['owner', 'pbx_admin'].includes(currentUser.role)) return true;
-     if (currentUser.role === 'pbx_user' && extension.user_id === currentUser.id) return true;
-     return false;
-   };
-   const canResetPassword = ['owner', 'pbx_admin'].includes(currentUser.role);
-   const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
+  // Check user permissions
+  const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
+  const canEdit = (extension: Extension) => {
+    if (['owner', 'pbx_admin'].includes(currentUser.role)) return true;
+    if (currentUser.role === 'pbx_user' && extension.user_id === currentUser.id) return true;
+    return false;
+  };
+  const canResetPassword = ['owner', 'pbx_admin'].includes(currentUser.role);
+  const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = currentUser.role === 'reporter';
 
   // Client-side assignment filter (backend doesn't expose this yet)
@@ -1318,44 +1318,44 @@ export default function ExtensionsComplete() {
       <Card>
         <CardContent className="p-0">
           <Table>
-             <TableHeader>
-               <TableRow>
-                 <TableHead className="cursor-pointer" onClick={() => handleSort('extension_number')}>
-                   <div className="flex items-center gap-2">
-                     Extension Number
-                     {getSortIcon('extension_number')}
-                   </div>
-                 </TableHead>
-                 {displayedExtensions.some(ext => ext.type === 'user') && (
-                   <TableHead>Password</TableHead>
-                 )}
-                 <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
-                   <div className="flex items-center gap-2">
-                     Type
-                     {getSortIcon('type')}
-                   </div>
-                 </TableHead>
-                 <TableHead>Assigned To</TableHead>
-                 <TableHead>Details</TableHead>
-                 <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
-                   <div className="flex items-center gap-2">
-                     Status
-                     {getSortIcon('status')}
-                   </div>
-                 </TableHead>
-                 <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                   <div className="flex items-center gap-2">
-                     Created
-                     {getSortIcon('created_at')}
-                   </div>
-                 </TableHead>
-                 <TableHead className="text-right">Actions</TableHead>
-               </TableRow>
-             </TableHeader>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('extension_number')}>
+                  <div className="flex items-center gap-2">
+                    Extension Number
+                    {getSortIcon('extension_number')}
+                  </div>
+                </TableHead>
+                {displayedExtensions.some(ext => ext.type === 'user') && (
+                  <TableHead>Password</TableHead>
+                )}
+                <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
+                  <div className="flex items-center gap-2">
+                    Type
+                    {getSortIcon('type')}
+                  </div>
+                </TableHead>
+                <TableHead>Assigned To</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
+                  <div className="flex items-center gap-2">
+                    Status
+                    {getSortIcon('status')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
+                  <div className="flex items-center gap-2">
+                    Created
+                    {getSortIcon('created_at')}
+                  </div>
+                </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
             <TableBody>
-               {displayedExtensions.length === 0 ? (
-                 <TableRow>
-                   <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 8 : 7} className="text-center py-12">
+              {displayedExtensions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 8 : 7} className="text-center py-12">
                     <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No extensions found</h3>
                     <p className="text-muted-foreground mb-4">
@@ -1384,54 +1384,58 @@ export default function ExtensionsComplete() {
                       >
                         {extension.extension_number}
                       </button>
-                     </TableCell>
-                     {displayedExtensions.some(ext => ext.type === 'user') && (
-                       <TableCell>
-                         {extension.type === 'user' ? (
-                           <div className="flex items-center gap-2">
-                             <span className="font-mono text-sm">
-                               {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
-                             </span>
-                             <div className="flex items-center gap-1">
-                               <Button
-                                 variant="ghost"
-                                 size="sm"
-                                 className="h-7 w-7 p-0"
-                                 onClick={() => togglePasswordVisibility(extension.id)}
-                                 title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
-                               >
-                                 {visiblePasswords.has(extension.id) ? (
-                                   <EyeOff className="h-4 w-4" />
-                                 ) : (
-                                   <Eye className="h-4 w-4" />
-                                 )}
-                               </Button>
-                               <Button
-                                 variant="ghost"
-                                 size="sm"
-                                 className="h-7 w-7 p-0"
-                                 onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
-                                 title="Copy password"
-                               >
-                                 <Copy className="h-4 w-4" />
-                               </Button>
-                             </div>
-                           </div>
-                         ) : (
-                           <span className="text-muted-foreground">-</span>
-                         )}
-                       </TableCell>
-                     )}
-                     <TableCell>{getTypeBadge(extension.type)}</TableCell>
-                     <TableCell className="text-sm text-muted-foreground">
-                       {extension.type === 'user' && extension.user ? extension.user.name : '-'}
-                     </TableCell>
-                     <TableCell>
-                       {getDetailsBadge(extension)}
-                     </TableCell>
+                    </TableCell>
+                    {displayedExtensions.some(ext => ext.type === 'user') && (
+                      <TableCell>
+                        {extension.type === 'user' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm">
+                              {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => togglePasswordVisibility(extension.id)}
+                                title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
+                              >
+                                {visiblePasswords.has(extension.id) ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
+                                title="Copy password"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell>{getTypeBadge(extension.type)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {extension.type === 'user' && extension.user ? extension.user.name : '-'}
+                    </TableCell>
                     <TableCell>
-                      <Badge className={cn(getStatusColor(extension.status))}>
-                        {extension.status}
+                      {getDetailsBadge(extension)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={cn(getStatusColor(extension.status), "cursor-pointer hover:opacity-80 transition-opacity")}
+                        onClick={() => handleToggleStatus(extension)}
+                        title="Click to toggle status"
+                      >
+                        {extension.status === 'active' ? 'Active' : 'Disabled'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -1456,33 +1460,33 @@ export default function ExtensionsComplete() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
-                               {canEdit(extension) && (
-                                 <>
-                                   <DropdownMenuItem onClick={() => openEditDialog(extension)}>
-                                     <Edit className="h-4 w-4 mr-2" />
-                                     Edit Extension
-                                   </DropdownMenuItem>
-                                   {canResetPassword && extension.type === 'user' && (
-                                     <>
-                                       <DropdownMenuSeparator />
-                                       <DropdownMenuItem
-                                         onClick={() => {
-                                           setSelectedExtension(extension);
-                                           setShowResetPasswordDialog(true);
-                                         }}
-                                       >
-                                         <Key className="h-4 w-4 mr-2" />
-                                         Reset Password
-                                       </DropdownMenuItem>
-                                     </>
-                                   )}
-                                   <DropdownMenuSeparator />
-                                   <DropdownMenuItem onClick={() => handleToggleStatus(extension)}>
-                                     <Activity className="h-4 w-4 mr-2" />
-                                     {extension.status === 'active' ? 'Deactivate' : 'Activate'}
-                                   </DropdownMenuItem>
-                                 </>
-                               )}
+                              {canEdit(extension) && (
+                                <>
+                                  <DropdownMenuItem onClick={() => openEditDialog(extension)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Extension
+                                  </DropdownMenuItem>
+                                  {canResetPassword && extension.type === 'user' && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setSelectedExtension(extension);
+                                          setShowResetPasswordDialog(true);
+                                        }}
+                                      >
+                                        <Key className="h-4 w-4 mr-2" />
+                                        Reset Password
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleToggleStatus(extension)}>
+                                    <Activity className="h-4 w-4 mr-2" />
+                                    {extension.status === 'active' ? 'Deactivate' : 'Activate'}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               {canDelete && (
                                 <>
                                   <DropdownMenuSeparator />
@@ -1553,85 +1557,67 @@ export default function ExtensionsComplete() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              {/* Extension Number */}
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="extension_number">
-                  Extension Number <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="extension_number"
-                  value={formData.extension_number}
-                  onChange={(e) => setFormData({ ...formData, extension_number: e.target.value })}
-                  placeholder="1001"
-                  autoComplete="off"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Next available: {getNextExtensionNumber(extensions)}
-                </p>
-                {formErrors.extension_number && (
-                  <p className="text-sm text-destructive">{formErrors.extension_number}</p>
-                )}
-              </div>
-
-              {/* Status Toggle */}
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <div className="flex items-center gap-3 pt-6">
-                  <Switch
-                    id="status"
-                    checked={formData.status === 'active'}
-                    onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
-                  />
-                  <span className="text-sm font-medium">
-                    {formData.status === 'active' ? 'Active' : 'Disabled'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Extension Type */}
+            {/* Extension Number */}
             <div className="space-y-2">
-              <Label htmlFor="type">
-                Extension Type <span className="text-destructive">*</span>
+              <Label htmlFor="extension_number">
+                Extension Number <span className="text-destructive">*</span>
               </Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-              >
-                <SelectTrigger id="type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">PBX User Extension</SelectItem>
-                  <SelectItem value="conference">Conference Room</SelectItem>
-                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                  <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
-                  <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                  <SelectItem value="forward">Forward</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="extension_number"
+                value={formData.extension_number}
+                onChange={(e) => setFormData({ ...formData, extension_number: e.target.value })}
+                placeholder="1001"
+                autoComplete="off"
+              />
+
+              {formErrors.extension_number && (
+                <p className="text-sm text-destructive">{formErrors.extension_number}</p>
+              )}
             </div>
 
-            {/* Assign to User */}
-            <div className="space-y-2">
-              <Label htmlFor="user_id">Assign to User (Optional)</Label>
-              <Select
-                value={formData.user_id}
-                onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-              >
-                <SelectTrigger id="user_id">
-                  <SelectValue placeholder="Select user or leave unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id.toString()}>
-                      {user.name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Extension Type & Assignment */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="type">
+                  Extension Type <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger id="type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">PBX User Extension</SelectItem>
+                    <SelectItem value="conference">Conference Room</SelectItem>
+                    <SelectItem value="ring_group">Ring Group</SelectItem>
+                    <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
+                    <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                    <SelectItem value="forward">Forward</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="user_id">Assign to User (Optional)</Label>
+                <Select
+                  value={formData.user_id}
+                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
+                >
+                  <SelectTrigger id="user_id">
+                    <SelectValue placeholder="Select user or leave unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id.toString()}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Type-specific fields */}
@@ -1664,82 +1650,65 @@ export default function ExtensionsComplete() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              {/* Extension Number (Read-only) */}
-              <div className="col-span-2 space-y-2">
-                <Label htmlFor="edit_extension_number">Extension Number</Label>
-                <Input
-                  id="edit_extension_number"
-                  value={formData.extension_number}
-                  readOnly
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Extension number cannot be changed
-                </p>
-              </div>
+            {/* Extension Number (Read-only) */}
+            <div className="space-y-2">
+              <Label htmlFor="edit_extension_number">Extension Number</Label>
+              <Input
+                id="edit_extension_number"
+                value={formData.extension_number}
+                readOnly
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">
+                Extension number cannot be changed
+              </p>
+            </div>
 
-              {/* Status Toggle */}
+            {/* Extension Type & Assignment */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit_status">Status</Label>
-                <div className="flex items-center gap-3 pt-6">
-                  <Switch
-                    id="edit_status"
-                    checked={formData.status === 'active'}
-                    onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
-                    disabled={currentUser.role === 'pbx_user'}
-                  />
-                  <span className="text-sm font-medium">
-                    {formData.status === 'active' ? 'Active' : 'Disabled'}
-                  </span>
-                </div>
+                <Label htmlFor="edit_type">
+                  Extension Type <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
+                  disabled={currentUser.role === 'pbx_user'}
+                >
+                  <SelectTrigger id="edit_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">PBX User Extension</SelectItem>
+                    <SelectItem value="conference">Conference Room</SelectItem>
+                    <SelectItem value="ring_group">Ring Group</SelectItem>
+                    <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
+                    <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                    <SelectItem value="forward">Forward</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
 
-            {/* Extension Type */}
-            <div className="space-y-2">
-              <Label htmlFor="edit_type">
-                Extension Type <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-                disabled={currentUser.role === 'pbx_user'}
-              >
-                <SelectTrigger id="edit_type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">PBX User Extension</SelectItem>
-                  <SelectItem value="conference">Conference Room</SelectItem>
-                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                  <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
-                  <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                  <SelectItem value="forward">Forward</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Assign to User */}
-            <div className="space-y-2">
-              <Label htmlFor="edit_user_id">Assign to User (Optional)</Label>
-              <Select
-                value={formData.user_id}
-                onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-              >
-                <SelectTrigger id="edit_user_id">
-                  <SelectValue placeholder="Select user or leave unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id.toString()}>
-                      {user.name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label htmlFor="edit_user_id">Assign to User (Optional)</Label>
+                <Select
+                  value={formData.user_id}
+                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
+                >
+                  <SelectTrigger id="edit_user_id">
+                    <SelectValue placeholder="Select user or leave unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id.toString()}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Type-specific fields */}
@@ -1969,10 +1938,10 @@ export default function ExtensionsComplete() {
                   </div>
                 </div>
 
-                 {/* Type-specific configuration display */}
-                 {selectedExtension.configuration && selectedExtension.type !== 'user' && (
-                   <div className="space-y-3">
-                     <h3 className="text-sm font-semibold text-muted-foreground">Configuration</h3>
+                {/* Type-specific configuration display */}
+                {selectedExtension.configuration && selectedExtension.type !== 'user' && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Configuration</h3>
                     <div className="p-4 bg-muted rounded-lg space-y-2">
                       {selectedExtension.type === 'conference' && (
                         <>
@@ -2177,164 +2146,164 @@ export default function ExtensionsComplete() {
                           </div>
                         </>
                       )}
-                        {selectedExtension.type === 'ivr' && (
-                          <>
-                            {(() => {
-                              // Handle configuration as object or direct value
-                              let ivrId: any = null;
-                              if (typeof selectedExtension.configuration === 'object' && selectedExtension.configuration) {
-                                ivrId = selectedExtension.configuration.ivr_id || selectedExtension.configuration.ivr_menu_id;
-                              } else {
-                                // Configuration might be just the IVR menu ID
-                                ivrId = selectedExtension.configuration;
-                              }
-                              const ivrMenu = ivrId ? ivrMenus.find(menu => menu.id == ivrId) : null;
+                      {selectedExtension.type === 'ivr' && (
+                        <>
+                          {(() => {
+                            // Handle configuration as object or direct value
+                            let ivrId: any = null;
+                            if (typeof selectedExtension.configuration === 'object' && selectedExtension.configuration) {
+                              ivrId = selectedExtension.configuration.ivr_id || selectedExtension.configuration.ivr_menu_id;
+                            } else {
+                              // Configuration might be just the IVR menu ID
+                              ivrId = selectedExtension.configuration;
+                            }
+                            const ivrMenu = ivrId ? ivrMenus.find(menu => menu.id == ivrId) : null;
 
-                              if (!ivrMenu) {
-                                return (
-                                  <div className="text-sm text-muted-foreground">
-                                    IVR menu not found or not configured
-                                  </div>
-                                );
-                              }
-
+                            if (!ivrMenu) {
                               return (
-                                <>
+                                <div className="text-sm text-muted-foreground">
+                                  IVR menu not found or not configured
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">IVR Menu:</span>
+                                  <span className="text-sm font-medium">{ivrMenu.name}</span>
+                                </div>
+                                {ivrMenu.description && (
                                   <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">IVR Menu:</span>
-                                    <span className="text-sm font-medium">{ivrMenu.name}</span>
+                                    <span className="text-sm text-muted-foreground">Description:</span>
+                                    <span className="text-sm font-medium">{ivrMenu.description}</span>
                                   </div>
-                                  {ivrMenu.description && (
-                                    <div className="flex justify-between">
-                                      <span className="text-sm text-muted-foreground">Description:</span>
-                                      <span className="text-sm font-medium">{ivrMenu.description}</span>
-                                    </div>
-                                  )}
-                                  <div className="space-y-2">
-                                    <span className="text-sm text-muted-foreground">Audio Configuration:</span>
-                                    <div className="ml-4 space-y-1">
-                                      {ivrMenu.audio_file_path && (
-                                        <div className="text-xs">
-                                          <span className="font-medium">File:</span> {ivrMenu.audio_file_path}
-                                        </div>
-                                      )}
-                                      {ivrMenu.tts_text && (
-                                        <div className="text-xs">
-                                          <span className="font-medium">TTS Text:</span> "{ivrMenu.tts_text}"
-                                        </div>
-                                      )}
-                                      {ivrMenu.tts_voice && (
-                                        <div className="text-xs">
-                                          <span className="font-medium">Voice:</span> {ivrMenu.tts_voice}
-                                        </div>
-                                      )}
-                                      {!ivrMenu.audio_file_path && !ivrMenu.tts_text && (
-                                        <div className="text-xs text-muted-foreground">No audio configured</div>
-                                      )}
-                                    </div>
+                                )}
+                                <div className="space-y-2">
+                                  <span className="text-sm text-muted-foreground">Audio Configuration:</span>
+                                  <div className="ml-4 space-y-1">
+                                    {ivrMenu.audio_file_path && (
+                                      <div className="text-xs">
+                                        <span className="font-medium">File:</span> {ivrMenu.audio_file_path}
+                                      </div>
+                                    )}
+                                    {ivrMenu.tts_text && (
+                                      <div className="text-xs">
+                                        <span className="font-medium">TTS Text:</span> "{ivrMenu.tts_text}"
+                                      </div>
+                                    )}
+                                    {ivrMenu.tts_voice && (
+                                      <div className="text-xs">
+                                        <span className="font-medium">Voice:</span> {ivrMenu.tts_voice}
+                                      </div>
+                                    )}
+                                    {!ivrMenu.audio_file_path && !ivrMenu.tts_text && (
+                                      <div className="text-xs text-muted-foreground">No audio configured</div>
+                                    )}
                                   </div>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Max Timeout:</span>
+                                  <span className="text-sm font-medium">{ivrMenu.max_timeout}s</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Inter-digit Timeout:</span>
+                                  <span className="text-sm font-medium">{ivrMenu.inter_digit_timeout}s</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Max Turns:</span>
+                                  <span className="text-sm font-medium">{ivrMenu.max_turns}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Failover Action:</span>
+                                  <span className="text-sm font-medium capitalize">
+                                    {ivrMenu.failover_destination_type?.replace('_', ' ') || 'None'}
+                                  </span>
+                                </div>
+                                {ivrMenu.failover_destination_type && ivrMenu.failover_destination_id && (
                                   <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Max Timeout:</span>
-                                    <span className="text-sm font-medium">{ivrMenu.max_timeout}s</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Inter-digit Timeout:</span>
-                                    <span className="text-sm font-medium">{ivrMenu.inter_digit_timeout}s</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Max Turns:</span>
-                                    <span className="text-sm font-medium">{ivrMenu.max_turns}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Failover Action:</span>
-                                    <span className="text-sm font-medium capitalize">
-                                      {ivrMenu.failover_destination_type?.replace('_', ' ') || 'None'}
+                                    <span className="text-sm text-muted-foreground">Failover Destination:</span>
+                                    <span className="text-sm font-medium">
+                                      {(() => {
+                                        switch (ivrMenu.failover_destination_type) {
+                                          case 'extension':
+                                            const ext = extensions?.find(e => e.id == ivrMenu.failover_destination_id);
+                                            return ext ? `Ext ${ext.extension_number}` : `Extension ${ivrMenu.failover_destination_id}`;
+                                          case 'ring_group':
+                                            const rg = ringGroups?.find(g => g.id == ivrMenu.failover_destination_id);
+                                            return rg ? rg.name : `Ring Group ${ivrMenu.failover_destination_id}`;
+                                          case 'conference_room':
+                                            const cr = conferenceRooms?.find(r => r.id == ivrMenu.failover_destination_id);
+                                            return cr ? cr.name : `Conference ${ivrMenu.failover_destination_id}`;
+                                          case 'ivr_menu':
+                                            const ivr = ivrMenus?.find(m => m.id == ivrMenu.failover_destination_id);
+                                            return ivr ? ivr.name : `IVR Menu ${ivrMenu.failover_destination_id}`;
+                                          default:
+                                            return ivrMenu.failover_destination_id;
+                                        }
+                                      })()}
                                     </span>
                                   </div>
-                                  {ivrMenu.failover_destination_type && ivrMenu.failover_destination_id && (
-                                    <div className="flex justify-between">
-                                      <span className="text-sm text-muted-foreground">Failover Destination:</span>
-                                      <span className="text-sm font-medium">
-                                        {(() => {
-                                          switch (ivrMenu.failover_destination_type) {
-                                            case 'extension':
-                                              const ext = extensions?.find(e => e.id == ivrMenu.failover_destination_id);
-                                              return ext ? `Ext ${ext.extension_number}` : `Extension ${ivrMenu.failover_destination_id}`;
-                                            case 'ring_group':
-                                              const rg = ringGroups?.find(g => g.id == ivrMenu.failover_destination_id);
-                                              return rg ? rg.name : `Ring Group ${ivrMenu.failover_destination_id}`;
-                                            case 'conference_room':
-                                              const cr = conferenceRooms?.find(r => r.id == ivrMenu.failover_destination_id);
-                                              return cr ? cr.name : `Conference ${ivrMenu.failover_destination_id}`;
-                                            case 'ivr_menu':
-                                              const ivr = ivrMenus?.find(m => m.id == ivrMenu.failover_destination_id);
-                                              return ivr ? ivr.name : `IVR Menu ${ivrMenu.failover_destination_id}`;
-                                            default:
-                                              return ivrMenu.failover_destination_id;
-                                          }
-                                        })()}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Status:</span>
-                                    <Badge className={cn(
-                                      ivrMenu.status === 'active'
-                                        ? 'bg-green-100 text-green-800 border-green-200'
-                                        : 'bg-gray-100 text-gray-800 border-gray-200'
-                                    )}>
-                                      {ivrMenu.status}
-                                    </Badge>
-                                  </div>
-                                  {ivrMenu.options && ivrMenu.options.length > 0 && (
-                                    <div className="space-y-2">
-                                      <span className="text-sm text-muted-foreground">Menu Options:</span>
-                                      <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
-                                        {ivrMenu.options.map((option: any, index: number) => (
-                                          <div key={option.id || index} className="text-xs border rounded p-2 bg-muted/50">
-                                            <div className="flex justify-between items-center mb-1">
-                                              <span className="font-medium">Press {option.input_digits}</span>
-                                              <span className="text-muted-foreground">Priority: {option.priority}</span>
-                                            </div>
-                                            {option.description && (
-                                              <div className="mb-1 text-muted-foreground">{option.description}</div>
-                                            )}
-                                            <div className="text-muted-foreground">
-                                              → {(() => {
-                                                switch (option.destination_type) {
-                                                  case 'extension':
-                                                    const ext = extensions?.find(e => e.extension_number == option.destination_id);
-                                                    return ext ? `Ext ${ext.extension_number}` : `Extension ${option.destination_id}`;
-                                                  case 'ring_group':
-                                                    const rg = ringGroups?.find(g => g.id == option.destination_id);
-                                                    return rg ? `Ring Group: ${rg.name}` : `Ring Group ${option.destination_id}`;
-                                                  case 'conference_room':
-                                                    const cr = conferenceRooms?.find(r => r.id == option.destination_id);
-                                                    return cr ? `Conference: ${cr.name}` : `Conference ${option.destination_id}`;
-                                                  case 'ivr_menu':
-                                                    const ivr = ivrMenus?.find(m => m.id == option.destination_id);
-                                                    return ivr ? `IVR Menu: ${ivr.name}` : `IVR Menu ${option.destination_id}`;
-                                                  default:
-                                                    return `${option.destination_type}: ${option.destination_id}`;
-                                                }
-                                              })()}
-                                            </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">Status:</span>
+                                  <Badge className={cn(
+                                    ivrMenu.status === 'active'
+                                      ? 'bg-green-100 text-green-800 border-green-200'
+                                      : 'bg-gray-100 text-gray-800 border-gray-200'
+                                  )}>
+                                    {ivrMenu.status}
+                                  </Badge>
+                                </div>
+                                {ivrMenu.options && ivrMenu.options.length > 0 && (
+                                  <div className="space-y-2">
+                                    <span className="text-sm text-muted-foreground">Menu Options:</span>
+                                    <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
+                                      {ivrMenu.options.map((option: any, index: number) => (
+                                        <div key={option.id || index} className="text-xs border rounded p-2 bg-muted/50">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="font-medium">Press {option.input_digits}</span>
+                                            <span className="text-muted-foreground">Priority: {option.priority}</span>
                                           </div>
-                                        ))}
-                                      </div>
+                                          {option.description && (
+                                            <div className="mb-1 text-muted-foreground">{option.description}</div>
+                                          )}
+                                          <div className="text-muted-foreground">
+                                            → {(() => {
+                                              switch (option.destination_type) {
+                                                case 'extension':
+                                                  const ext = extensions?.find(e => e.extension_number == option.destination_id);
+                                                  return ext ? `Ext ${ext.extension_number}` : `Extension ${option.destination_id}`;
+                                                case 'ring_group':
+                                                  const rg = ringGroups?.find(g => g.id == option.destination_id);
+                                                  return rg ? `Ring Group: ${rg.name}` : `Ring Group ${option.destination_id}`;
+                                                case 'conference_room':
+                                                  const cr = conferenceRooms?.find(r => r.id == option.destination_id);
+                                                  return cr ? `Conference: ${cr.name}` : `Conference ${option.destination_id}`;
+                                                case 'ivr_menu':
+                                                  const ivr = ivrMenus?.find(m => m.id == option.destination_id);
+                                                  return ivr ? `IVR Menu: ${ivr.name}` : `IVR Menu ${option.destination_id}`;
+                                                default:
+                                                  return `${option.destination_type}: ${option.destination_id}`;
+                                              }
+                                            })()}
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </>
-                        )}
-                       {selectedExtension.type === 'forward' && (
-                         <div className="flex justify-between">
-                           <span className="text-sm text-muted-foreground">Forward To:</span>
-                           <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
-                         </div>
-                       )}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
+                      {selectedExtension.type === 'forward' && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Forward To:</span>
+                          <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
