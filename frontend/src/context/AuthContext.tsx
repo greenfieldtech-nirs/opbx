@@ -7,7 +7,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authService } from '@/services/auth.service';
 import { storage } from '@/utils/storage';
-import type { User, LoginRequest } from '@/types';
+import type { User, LoginRequest, RegisterRequest } from '@/types';
 import { getApiErrorMessage } from '@/services/api';
 
 interface AuthContextType {
@@ -16,6 +16,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginRequest, onSuccess?: () => void) => Promise<void>;
+  register: (data: RegisterRequest, onSuccess?: () => void) => Promise<void>;
   logout: (onSuccess?: () => void) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -79,6 +80,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
+   * Register new organization and admin user
+   */
+  const register = async (data: RegisterRequest, onSuccess?: () => void): Promise<void> => {
+    try {
+      const response = await authService.register(data);
+
+      storage.setToken(response.access_token);
+      storage.setUser(response.user);
+
+      setToken(response.access_token);
+      setUser(response.user);
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      throw new Error(message);
+    }
+  };
+
+  /**
    * Logout user
    */
   const logout = async (onSuccess?: () => void): Promise<void> => {
@@ -118,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!token && !!user,
     isLoading,
     login,
+    register,
     logout,
     refreshUser,
   };

@@ -11,6 +11,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +19,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
 import opbxLogo from '@/assets/opbx_logo.png';
-import { authService } from '@/services/auth.service';
 
 const commonTimezones = [
   'America/New_York',
@@ -75,7 +75,7 @@ export default function Register() {
   const navigate = useNavigate();
 
   const {
-    register,
+    register: formRegister,
     handleSubmit,
     trigger,
     watch,
@@ -98,6 +98,14 @@ export default function Register() {
 
   const organizationName = watch('organization.name');
 
+  const { register: registerUser, isAuthenticated: authIsAuthenticated, isLoading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && authIsAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authIsAuthenticated, authLoading, navigate]);
+
   const handleContinue = async () => {
     const isValid = await trigger('organization');
     if (isValid) {
@@ -113,7 +121,7 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await authService.register({
+      await registerUser({
         organization: {
           name: data.organization.name,
           timezone: data.organization.timezone,
@@ -124,10 +132,9 @@ export default function Register() {
           password: data.admin.password,
           password_confirmation: data.admin.password_confirmation,
         },
-      });
+      }, () => navigate('/dashboard'));
 
-      toast.success('Organization registered successfully! Please log in.');
-      navigate('/login');
+      toast.success('Organization registered successfully!');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Registration failed');
     } finally {
@@ -192,7 +199,7 @@ export default function Register() {
                           placeholder="Acme Corporation"
                           disabled={isLoading}
                           className="h-11"
-                          {...register('organization.name')}
+                          {...formRegister('organization.name')}
                         />
                         {errors.organization?.name && (
                           <p className="text-sm text-destructive">{errors.organization.name.message}</p>
@@ -209,11 +216,7 @@ export default function Register() {
                         <Select
                           defaultValue={watch('organization.timezone')}
                           onValueChange={(value) => {
-                            const select = document.getElementById('timezone') as HTMLInputElement;
-                            if (select) {
-                              select.value = value;
-                            }
-                            register('organization.timezone').onChange({ target: { value } });
+                            formRegister('organization.timezone').onChange({ target: { value } });
                           }}
                           disabled={isLoading}
                         >
@@ -254,7 +257,7 @@ export default function Register() {
                           placeholder="John Doe"
                           disabled={isLoading}
                           className="h-11"
-                          {...register('admin.name')}
+                          {...formRegister('admin.name')}
                         />
                         {errors.admin?.name && (
                           <p className="text-sm text-destructive">{errors.admin.name.message}</p>
@@ -271,7 +274,7 @@ export default function Register() {
                           placeholder="admin@example.com"
                           disabled={isLoading}
                           className="h-11"
-                          {...register('admin.email')}
+                          {...formRegister('admin.email')}
                         />
                         {errors.admin?.email && (
                           <p className="text-sm text-destructive">{errors.admin.email.message}</p>
@@ -288,7 +291,7 @@ export default function Register() {
                           placeholder="Create a strong password"
                           disabled={isLoading}
                           className="h-11"
-                          {...register('admin.password')}
+                          {...formRegister('admin.password')}
                         />
                         {errors.admin?.password && (
                           <p className="text-sm text-destructive">{errors.admin.password.message}</p>
@@ -308,7 +311,7 @@ export default function Register() {
                           placeholder="Confirm your password"
                           disabled={isLoading}
                           className="h-11"
-                          {...register('admin.password_confirmation')}
+                          {...formRegister('admin.password_confirmation')}
                         />
                         {errors.admin?.password_confirmation && (
                           <p className="text-sm text-destructive">{errors.admin.password_confirmation.message}</p>
