@@ -159,10 +159,10 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->ip())
                 ->response(function (Request $request, array $headers) {
                     // Return CXML format for voice routing endpoints
-                    $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-                        '<Response>' . "\n" .
-                        '  <Say language="en-US">Service temporarily unavailable. Rate limit exceeded.</Say>' . "\n" .
-                        '  <Hangup/>' . "\n" .
+                    $cxml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".
+                        '<Response>'."\n".
+                        '  <Say language="en-US">Service temporarily unavailable. Rate limit exceeded.</Say>'."\n".
+                        '  <Hangup/>'."\n".
                         '</Response>';
 
                     return response($cxml, 429, array_merge($headers, [
@@ -193,6 +193,21 @@ class AppServiceProvider extends ServiceProvider
                         'error' => 'Too Many Requests',
                         'message' => 'Too many login attempts. Please try again later.',
                         'retry_after' => $headers['Retry-After'] ?? null,
+                    ], 429, $headers);
+                });
+        });
+
+        // Registration - 10 requests per hour per IP to prevent abuse
+        RateLimiter::for('registration', function (Request $request) {
+            return Limit::perHour(config('rate_limiting.registration', 10))
+                ->by($request->ip())
+                ->response(function (Request $request, array $headers) {
+                    return response()->json([
+                        'error' => [
+                            'code' => 'RATE_LIMIT_EXCEEDED',
+                            'message' => 'Too many registration attempts. Please try again in 1 hour.',
+                            'retry_after' => $headers['Retry-After'] ?? 3600,
+                        ],
                     ], 429, $headers);
                 });
         });

@@ -328,6 +328,44 @@ export interface RefreshResponse {
   expires_in: number;
 }
 
+export interface OrganizationRegistration {
+  name: string;
+  timezone: string;
+}
+
+export interface AdminUserRegistration {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface RegisterRequest {
+  organization: OrganizationRegistration;
+  admin: AdminUserRegistration;
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: User;
+  organization: Organization;
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+}
+
+export interface RegisterValidationResponse {
+  valid: boolean;
+  available: {
+    organization_name: boolean;
+    admin_email: boolean;
+  };
+  errors?: {
+    organization_name?: string[];
+    admin_email?: string[];
+  };
+}
+
 // ============================================================================
 // Request Types - Users
 // ============================================================================
