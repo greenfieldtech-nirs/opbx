@@ -9,6 +9,10 @@ import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, PhoneCall, Clock, ArrowRightLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StandardDataTable, EmptyState } from '@/components/design-system';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import type { ActiveCall } from '@/types/api.types';
 
 /**
  * Get status color for call status badges
@@ -41,15 +45,18 @@ const getDirectionIcon = (direction: string | null) => {
 };
 
 export default function LiveCalls() {
-   // Fetch active calls with polling every 5 seconds (not rate limited)
-   const { data: activeCallsResponse, isLoading, error, refetch } = useQuery({
-     queryKey: ['active-calls'],
-     queryFn: () => sessionUpdatesService.getActiveCalls(),
-     refetchInterval: 5000, // Poll every 5 seconds
-     staleTime: 2000, // Consider data fresh for 2 seconds
-   });
+  // Fetch active calls with polling every 5 seconds (not rate limited)
+  const { data: activeCallsResponse, isLoading, error, refetch } = useQuery({
+    queryKey: ['active-calls'],
+    queryFn: () => sessionUpdatesService.getActiveCalls(),
+    refetchInterval: 5000, // Poll every 5 seconds
+    staleTime: 2000, // Consider data fresh for 2 seconds
+  });
 
-  const activeCalls = activeCallsResponse?.data || [];
+  const activeCalls = ((activeCallsResponse?.data as ActiveCall[]) || []).map(call => ({
+    ...call,
+    id: call.session_id
+  }));
   const meta = activeCallsResponse?.meta;
 
   return (
@@ -166,97 +173,83 @@ export default function LiveCalls() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
-          {activeCalls.map((call) => (
-            <Card key={call.session_id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <PhoneCall className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {call.caller_id || 'Unknown Caller'}
+        <>
+          {/* Active Calls Table */}
+          <Card>
+            <CardContent className="pt-6">
+              <StandardDataTable<ActiveCall & { id: string | number }>
+                data={activeCalls as (ActiveCall & { id: string | number })[]}
+                isLoading={isLoading}
+                identityIcon={PhoneCall}
+                identityIconBg="bg-blue-100"
+                identityIconColor="text-blue-600"
+                getIdentityPrimary={(call) => call.caller_id || 'Unknown Caller'}
+                getIdentitySecondary={(call) => `To: ${call.destination || 'Unknown'}`}
+                columns={[
+                  {
+                    header: 'Direction',
+                    cell: (call) => (
+                      <div className="flex items-center gap-2">
                         {getDirectionIcon(call.direction)}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-1">
-                        <ArrowRightLeft className="h-3 w-3" />
-                        To: {call.destination || 'Unknown'}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span
-                      className={cn(
-                        'px-3 py-1 rounded-full text-xs font-medium border',
-                        getStatusColor(call.status)
-                      )}
-                    >
-                      {call.status}
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
+                        <span className="capitalize text-sm">{call.direction}</span>
+                      </div>
+                    )
+                  },
+                  {
+                    header: 'Status',
+                    accessorKey: 'status' as any,
+                    cell: (call) => (
+                      <Badge
+                        variant="outline"
+                        className={cn('px-3 py-1', getStatusColor(call.status))}
+                      >
+                        {call.status}
+                      </Badge>
+                    )
+                  },
+                  {
+                    header: 'Duration',
+                    accessorKey: 'formatted_duration' as any,
+                    cell: (call) => (
+                      <span className="font-mono font-medium">{call.formatted_duration}</span>
+                    )
+                  },
+                  {
+                    header: 'Started',
+                    accessorKey: 'session_created_at' as any,
+                    cell: (call) => new Date(call.session_created_at).toLocaleTimeString()
+                  },
+                  {
+                    header: 'Session ID',
+                    accessorKey: 'session_id' as any,
+                    cell: (call) => (
+                      <span className="font-mono text-xs text-muted-foreground">{call.session_id}</span>
+                    )
+                  }
+                ]}
+                emptyState={
+                  <EmptyState
+                    icon={PhoneCall}
+                    title="No active calls at the moment"
+                    description="Calls will appear here automatically when they become active"
+                  />
+                }
+              />
+            </CardContent>
+          </Card>
 
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Duration
-                    </p>
-                    <p className="font-medium font-mono text-lg">
-                      {call.formatted_duration}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Session ID</p>
-                    <p className="font-medium font-mono text-sm">
-                      {call.session_id}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Domain</p>
-                    <p className="font-medium truncate" title={call.domain || 'N/A'}>
-                      {call.domain || 'N/A'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Started</p>
-                    <p className="font-medium">
-                      {new Date(call.session_created_at).toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-
-                {/* QoS Indicator */}
-                {call.has_qos_data && (
-                  <div className="mt-4 p-2 bg-green-50 rounded-md border border-green-200">
-                    <p className="text-xs text-green-700 flex items-center gap-1">
-                      📊 Quality metrics available for this call
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          {/* Manual Refresh Button */}
+          <div className="flex justify-center">
+            <Button
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="px-4 py-2"
+            >
+              {isLoading ? 'Refreshing...' : 'Refresh Now'}
+            </Button>
+          </div>
+        </>
       )}
-
-      {/* Manual Refresh Button */}
-      <div className="flex justify-center">
-        <button
-          onClick={() => refetch()}
-          disabled={isLoading}
-          className={cn(
-            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-            "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
-          )}
-        >
-          {isLoading ? 'Refreshing...' : 'Refresh Now'}
-        </button>
-      </div>
     </div>
   );
 }

@@ -5,16 +5,27 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { ringGroupsService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
 import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
 import type {
   RingGroup,
-  RingGroupMember,
   RingGroupStrategy,
-  RingGroupStatus,
+  Status
+} from '@/types';
+import type {
   RingGroupFallbackAction,
   CreateRingGroupRequest,
   UpdateRingGroupRequest,
@@ -162,7 +173,7 @@ export default function RingGroups() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<RingGroupStrategy | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<RingGroupStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'members' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -253,7 +264,11 @@ export default function RingGroups() {
     }),
   });
 
-  const ringGroups = ringGroupsData?.data || [];
+  const ringGroups = (ringGroupsData?.data || []).map(group => ({
+    ...group,
+    id: group.id
+  }));
+  const totalPages = ringGroupsData?.meta?.last_page || 1;
 
   // Fetch available extensions (type: user, status: active)
   const { data: extensionsData } = useQuery({
@@ -284,18 +299,18 @@ export default function RingGroups() {
     console.log('  - typeof allRingGroupsData?.data:', typeof allRingGroupsData?.data);
     console.log('  - Array.isArray(allRingGroupsData?.data):', Array.isArray(allRingGroupsData?.data));
     console.log('  - selectedGroup:', selectedGroup);
-    
+
     const groups = allRingGroupsData?.data || [];
     console.log('  - groups (before filter):', groups);
     console.log('  - groups.length:', groups.length);
-    
+
     if (selectedGroup) {
       const filtered = groups.filter(g => g.id !== selectedGroup.id);
       console.log('  - filtered (after removing current):', filtered);
       console.log('  - filtered.length:', filtered.length);
       return filtered;
     }
-    
+
     console.log('  - returning all groups (no selectedGroup)');
     return groups;
   }, [allRingGroupsData, selectedGroup]);
@@ -312,7 +327,7 @@ export default function RingGroups() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data),
+    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
       setIsCreateDialogOpen(false);
@@ -328,7 +343,7 @@ export default function RingGroups() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateRingGroupRequest }) =>
-      ringGroupsService.update(id, data),
+      ringGroupsService.update(id, data as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
       setIsEditDialogOpen(false);
@@ -342,7 +357,6 @@ export default function RingGroups() {
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ringGroupsService.delete(id),
     onSuccess: () => {
@@ -356,6 +370,17 @@ export default function RingGroups() {
       toast.error(message);
     },
   });
+
+  // Handle status toggle
+  const handleToggleStatus = async (group: RingGroup) => {
+    const newStatus: Status = group.status === 'active' ? 'inactive' : 'active';
+
+    // We only need to send the status for a toggle
+    updateMutation.mutate({
+      id: group.id,
+      data: { status: newStatus } as any
+    });
+  };
 
   // Badge configuration for destination types
   const getDestinationBadgeConfig = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension') => {
@@ -544,7 +569,7 @@ export default function RingGroups() {
       timeout: formData.timeout!,
       ring_turns: formData.ring_turns!,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
-      status: formData.status as RingGroupStatus,
+      status: formData.status as Status,
       members,
     };
 
@@ -584,7 +609,7 @@ export default function RingGroups() {
         break;
     }
 
-    createMutation.mutate(requestData);
+    createMutation.mutate(requestData as any);
   };
 
   // Handle edit
@@ -605,7 +630,7 @@ export default function RingGroups() {
       timeout: formData.timeout,
       ring_turns: formData.ring_turns,
       fallback_action: formData.fallback_action as RingGroupFallbackAction,
-      status: formData.status as RingGroupStatus,
+      status: formData.status as Status,
       members,
     };
 
@@ -645,7 +670,7 @@ export default function RingGroups() {
         break;
     }
 
-    updateMutation.mutate({ id: selectedGroup.id, data: requestData });
+    updateMutation.mutate({ id: selectedGroup.id, data: requestData as any });
   };
 
   // Handle delete
@@ -845,12 +870,12 @@ export default function RingGroups() {
         </Alert>
 
         <div className="space-y-4 py-4">
-          {/* Name and Status */}
-          <div className="space-y-2">
-            <Label htmlFor="name">
-              Name <span className="text-red-500">*</span>
-            </Label>
-            <div className="flex items-center gap-3">
+          {/* Name and Strategy side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                Name <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="name"
                 value={formData.name || ''}
@@ -858,20 +883,50 @@ export default function RingGroups() {
                 placeholder="e.g., Sales Team"
                 className={formErrors.name ? 'border-red-500' : ''}
               />
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
-                  }
-                />
-                <Label htmlFor="status" className="text-sm">
-                  {formData.status === 'active' ? 'Active' : 'Inactive'}
-                </Label>
-              </div>
+              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
             </div>
-            {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+
+            <div className="space-y-2">
+              <Label htmlFor="strategy">
+                Ring Strategy <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.strategy}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, strategy: value as RingGroupStrategy })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simultaneous">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      <span>Simultaneous (Ring All)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="round_robin">
+                    <div className="flex items-center gap-2">
+                      <RotateCw className="h-4 w-4" />
+                      <span>Round Robin</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="sequential">
+                    <div className="flex items-center gap-2">
+                      <List className="h-4 w-4" />
+                      <span>Sequential</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {getStrategyDescription(formData.strategy as RingGroupStrategy)}
+            </p>
           </div>
 
           {/* Members */}
@@ -960,9 +1015,9 @@ export default function RingGroups() {
                     </SortableContext>
                   </DndContext>
                 ) : (
-                   <div className="border rounded-lg divide-y">
-                     {formData.members.map((member, index) => (
-                       <div key={member.extension_id} className="p-3 flex items-center gap-3">
+                  <div className="border rounded-lg divide-y">
+                    {formData.members.map((member, index) => (
+                      <div key={member.extension_id} className="p-3 flex items-center gap-3">
                         <div className="flex flex-col gap-1">
                           <Button
                             type="button"
@@ -1026,45 +1081,7 @@ export default function RingGroups() {
             )}
           </div>
 
-          {/* Strategy */}
-          <div className="space-y-2">
-            <Label htmlFor="strategy">
-              Ring Strategy <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.strategy}
-              onValueChange={(value) =>
-                setFormData({ ...formData, strategy: value as RingGroupStrategy })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="simultaneous">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>Simultaneous (Ring All)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="round_robin">
-                  <div className="flex items-center gap-2">
-                    <RotateCw className="h-4 w-4" />
-                    <span>Round Robin</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="sequential">
-                  <div className="flex items-center gap-2">
-                    <List className="h-4 w-4" />
-                    <span>Sequential</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              {getStrategyDescription(formData.strategy as RingGroupStrategy)}
-            </p>
-          </div>
+
 
           {/* Timeout and Ring Turns */}
           <div className="grid grid-cols-2 gap-4">
@@ -1174,9 +1191,10 @@ export default function RingGroups() {
                         fallback_extension_number: ext?.extension_number,
                       });
                     }}
+                    disabled={availableExtensions.length === 0}
                   >
                     <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Select extension" />
+                      <SelectValue placeholder={availableExtensions.length === 0 ? "No Available Options for Extension" : "Select extension"} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableExtensions.map((ext) => (
@@ -1192,76 +1210,66 @@ export default function RingGroups() {
                     </SelectContent>
                   </Select>
                 )}
-                {formData.fallback_action === 'ring_group' && (() => {
-                  console.log('[RENDER] Ring Group Select - allRingGroups:', allRingGroups);
-                  console.log('[RENDER] Ring Group Select - allRingGroups.length:', allRingGroups.length);
-                  console.log('[RENDER] Ring Group Select - formData.fallback_ring_group_id:', formData.fallback_ring_group_id);
-                  return (
-                    <Select
-                      value={formData.fallback_ring_group_id || ''}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ring_group_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select ring group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allRingGroups.length === 0 && (
-                          <div className="p-2 text-sm text-muted-foreground">
-                            No ring groups available
+                {formData.fallback_action === 'ring_group' && (
+                  <Select
+                    value={formData.fallback_ring_group_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ring_group_id: value })
+                    }
+                    disabled={allRingGroups.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={allRingGroups.length === 0 ? "No Available Options for Ring Group" : "Select ring group"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allRingGroups.map((group) => (
+                        <SelectItem key={group.id} value={group.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
+                              <Users className="h-3.5 w-3.5" />
+                              {group.name}
+                            </Badge>
                           </div>
-                        )}
-                        {allRingGroups.map((group) => {
-                          console.log('[RENDER] Mapping ring group:', group);
-                          return (
-                            <SelectItem key={group.id} value={group.id.toString()}>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
-                                  <Users className="h-3.5 w-3.5" />
-                                  {group.name}
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  );
-                })()}
-                 {formData.fallback_action === 'ivr_menu' && (
-                   <Select
-                     value={formData.fallback_ivr_menu_id || ''}
-                     onValueChange={(value) =>
-                       setFormData({ ...formData, fallback_ivr_menu_id: value })
-                     }
-                   >
-                     <SelectTrigger>
-                       <SelectValue placeholder="Select IVR menu" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {availableIvrMenus.map((menu) => (
-                         <SelectItem key={menu.id} value={menu.id.toString()}>
-                           <div className="flex items-center gap-2">
-                             <Badge variant="outline" className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200">
-                               <Menu className="h-3.5 w-3.5" />
-                               {menu.name}
-                             </Badge>
-                           </div>
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 )}
-                 {formData.fallback_action === 'ai_assistant' && (
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ivr_menu' && (
+                  <Select
+                    value={formData.fallback_ivr_menu_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ivr_menu_id: value })
+                    }
+                    disabled={availableIvrMenus.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={availableIvrMenus.length === 0 ? "No Available Options for IVR Menu" : "Select IVR menu"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableIvrMenus.map((menu) => (
+                        <SelectItem key={menu.id} value={menu.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200">
+                              <Menu className="h-3.5 w-3.5" />
+                              {menu.name}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ai_assistant' && (
                   <Select
                     value={formData.fallback_ai_assistant_id || ''}
                     onValueChange={(value) =>
                       setFormData({ ...formData, fallback_ai_assistant_id: value })
                     }
+                    disabled={availableAiAssistants.length === 0}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select AI assistant" />
+                      <SelectValue placeholder={availableAiAssistants.length === 0 ? "No Available Options for AI Assistant" : "Select AI assistant"} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableAiAssistants.map((assistant) => (
@@ -1384,7 +1392,7 @@ export default function RingGroups() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1394,171 +1402,121 @@ export default function RingGroups() {
       {/* Table */}
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => toggleSort('name')}
-                  >
-                    Name
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => toggleSort('strategy')}
-                  >
-                    Strategy
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => toggleSort('members')}
-                  >
-                    Members
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead>Timeout / Turns</TableHead>
-                <TableHead>Fallback</TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => toggleSort('status')}
-                  >
-                    Status
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Loading ring groups...
-                  </TableCell>
-                </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-red-500 py-8">
-                    Error loading ring groups. Please try again.
-                  </TableCell>
-                </TableRow>
-              ) : ringGroups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
-                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No ring groups found</h3>
-                    <p className="text-muted-foreground mb-4">
-                      {searchQuery || strategyFilter !== 'all' || statusFilter !== 'all'
-                        ? 'Try adjusting your filters'
-                        : 'Get started by creating your first ring group'}
-                    </p>
-                    {canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' && (
-                      <Button onClick={openCreateDialog}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Ring Group
-                      </Button>
+          <StandardDataTable<RingGroup>
+            data={ringGroups}
+            isLoading={isLoading}
+            onRowClick={setSelectedGroup}
+            identityIcon={Users}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(group) => group.name}
+            getIdentitySecondary={() => 'Ring Group'}
+            onIdentityClick={setSelectedGroup}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={toggleSort}
+            onView={setSelectedGroup}
+            onEdit={(group) => openEditDialog(group as ExtendedRingGroup)}
+            onDelete={openDeleteDialog}
+            columns={[
+              {
+                header: 'Strategy',
+                sortKey: 'strategy',
+                cell: (group) => (
+                  <Badge variant="outline" className="capitalize">
+                    {group.strategy.replace('_', ' ')}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Members',
+                sortKey: 'members',
+                cell: (group) => (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    {group.members?.length || 0} members
+                  </div>
+                )
+              },
+              {
+                header: 'Timeout / Turns',
+                cell: (group) => (
+                  <span className="text-sm text-muted-foreground">
+                    {group.timeout}s / {group.ring_turns} turns
+                  </span>
+                )
+              },
+              {
+                header: 'Fallback',
+                cell: (group) => (
+                  <Badge variant="secondary" className="text-[10px] py-0">
+                    {group.fallback_action.replace('_', ' ')}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (group) => (
+                  <Badge
+                    variant={group.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      group.status === 'active'
+                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                ringGroups.map((group) => (
-                  <TableRow key={group.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{group.name}</div>
-                        {group.description && (
-                          <div className="text-sm text-muted-foreground line-clamp-1">
-                            {group.description}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStrategyIcon(group.strategy)}
-                        <Badge variant="outline">{getStrategyDisplayName(group.strategy)}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{group.members.length}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{group.timeout}s</div>
-                        <div className="text-xs text-muted-foreground">{group.ring_turns} {group.ring_turns === 1 ? 'turn' : 'turns'}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getFallbackIcon(group.fallback_action)}
-                        <span className="text-sm">
-                          {getFallbackDisplayText(
-                            group as ExtendedRingGroup,
-                            ringGroups || [],
-                            availableIvrMenus || []
-                          )}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={group.status === 'active' ? 'default' : 'secondary'}>
-                        {group.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDetailSheet(group)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {canManage && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(group as ExtendedRingGroup)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openDeleteDialog(group)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleStatus(group);
+                    }}
+                  >
+                    {group.status === 'active' ? 'Active' : 'Disabled'}
+                  </Badge>
+                )
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Users}
+                title="No ring groups found"
+                description={searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first ring group'}
+                action={canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' ? {
+                  label: "Create Ring Group",
+                  onClick: openCreateDialog
+                } : undefined}
+              />
+            }
+          />
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, allRingGroups?.length || 0)} of {allRingGroups?.length || 0} ring groups
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1630,7 +1588,7 @@ export default function RingGroups() {
                   <div>
                     <h3 className="text-sm font-medium mb-2">Status</h3>
                     <Badge variant={selectedGroup.status === 'active' ? 'default' : 'secondary'}>
-                      {selectedGroup.status}
+                      {selectedGroup.status === 'active' ? 'Active' : 'Disabled'}
                     </Badge>
                   </div>
                 </div>
@@ -1686,6 +1644,6 @@ export default function RingGroups() {
           )}
         </SheetContent>
       </Sheet>
-    </div>
+    </div >
   );
 }

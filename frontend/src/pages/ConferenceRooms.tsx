@@ -13,6 +13,7 @@ import {
   Video,
   ChevronDown,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +75,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
 import { toast } from 'sonner';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -724,209 +730,147 @@ export default function ConferenceRooms() {
         </CardContent>
       </Card>
 
-      {/* Conference Rooms Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Conference Rooms</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading...' : `${totalRooms} room${totalRooms !== 1 ? 's' : ''}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading || error || rooms.length === 0 ? (
-            // Empty/Loading/Error States
-            <div className="text-center py-12">
-              {isLoading ? (
-                <p className="text-muted-foreground">Loading conference rooms...</p>
-              ) : error ? (
-                <div className="text-destructive">
-                  <p className="font-semibold mb-2">Error loading conference rooms</p>
-                  <p className="text-sm text-muted-foreground">Please try again later</p>
-                </div>
-              ) : (
-                <>
-                  <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No conference rooms found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {searchQuery || statusFilter !== 'all'
-                      ? 'Try adjusting your filters'
-                      : 'Get started by creating your first conference room'}
-                  </p>
-                  {canManageRooms && !searchQuery && statusFilter === 'all' && (
-                    <Button onClick={openCreateDialog}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Conference Room
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      className="cursor-pointer select-none hover:bg-gray-50"
-                      onClick={() => handleSort('name')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Room Name
-                        {sortField === 'name' && (
-                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer select-none hover:bg-gray-50"
-                      onClick={() => handleSort('max_participants')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Capacity
-                        {sortField === 'max_participants' && (
-                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Audio Settings</TableHead>
-                    <TableHead>Security</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rooms.map((room) => {
-                    const securityFeatures = [];
-                    if (room.pin_required) securityFeatures.push('PIN');
-                    if (room.wait_for_host) securityFeatures.push('Wait for Host');
-
-                    const audioFeatures = [];
-                    if (room.recording_enabled) audioFeatures.push('Recording');
-                    if (room.talk_detection_enabled) audioFeatures.push('Talk Detection');
-                    if (room.mute_on_entry) audioFeatures.push('Mute on Entry');
-                    if (room.music_on_hold) audioFeatures.push('Music on Hold');
-
-                    return (
-                      <TableRow
-                        key={room.id}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => openDetailSheet(room)}
-                      >
-                        <TableCell className="font-medium">{room.name}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            {room.max_participants}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  variant={room.status === 'active' ? 'default' : 'secondary'}
-                                  className={cn(
-                                    "cursor-pointer transition-all hover:scale-105",
-                                    room.status === 'active'
-                                      ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                  )}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleStatus(room);
-                                  }}
-                                >
-                                  {room.status === 'active' ? 'Active' : 'Disabled'}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Click to toggle status</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell>
-                          {audioFeatures.length > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <Mic className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-xs">{audioFeatures.join(', ')}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Default</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {securityFeatures.length > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <Lock className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">{securityFeatures.join(', ')}</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">None</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          {canManageRooms ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(room)}>
-                                  <Edit2 className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => openDeleteDialog(room)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (
-                            <Button variant="ghost" size="sm">View</Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalRooms)} of {totalRooms} rooms
+        <CardContent className="pt-6">
+          <StandardDataTable<ConferenceRoom>
+            data={rooms}
+            isLoading={isLoading}
+            onRowClick={openDetailSheet}
+            identityIcon={Mic}
+            identityIconBg="bg-purple-100"
+            identityIconColor="text-purple-600"
+            getIdentityPrimary={(room) => room.name}
+            getIdentitySecondary={() => 'Conference Room'}
+            onIdentityClick={openDetailSheet}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onView={openDetailSheet}
+            onEdit={openEditDialog}
+            onDelete={(room) => {
+              setSelectedRoom(room); // Assuming setRoomToDelete is setSelectedRoom
+              setIsDeleteDialogOpen(true); // Assuming setShowDeleteDialog is setIsDeleteDialogOpen
+            }}
+            columns={[
+              {
+                header: 'Capacity',
+                sortKey: 'max_participants',
+                cell: (room) => (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    {room.max_participants}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <div className="text-sm">
-                      Page {currentPage} of {totalPages}
+                )
+              },
+              {
+                header: 'Status',
+                cell: (room) => (
+                  <Badge
+                    variant={room.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      room.status === 'active'
+                        ? "bg-green-100 text-green-800 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleStatus(room);
+                    }}
+                  >
+                    {room.status === 'active' ? 'Active' : 'Inactive'}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Audio Settings',
+                cell: (room) => {
+                  const audioFeatures = [];
+                  if (room.recording_enabled) audioFeatures.push('Recording');
+                  if (room.talk_detection_enabled) audioFeatures.push('Talk Detection');
+                  if (room.mute_on_entry) audioFeatures.push('Mute on Entry');
+                  if (room.music_on_hold) audioFeatures.push('Music on Hold');
+
+                  return audioFeatures.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {audioFeatures.slice(0, 2).map((feature) => (
+                        <Badge key={feature} variant="outline" className="text-[10px] py-0">
+                          {feature}
+                        </Badge>
+                      ))}
+                      {audioFeatures.length > 2 && (
+                        <Badge variant="outline" className="text-[10px] py-0">
+                          +{audioFeatures.length - 2}
+                        </Badge>
+                      )}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Standard</span>
+                  );
+                }
+              },
+              {
+                header: 'Security',
+                cell: (room) => {
+                  const securityFeatures = [];
+                  if (room.pin_required) securityFeatures.push('PIN');
+                  if (room.wait_for_host) securityFeatures.push('Wait for Host');
+
+                  return securityFeatures.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {securityFeatures.map((feature) => (
+                        <Badge key={feature} variant="outline" className="text-[10px] py-0 border-orange-200 text-orange-700">
+                          {feature}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Open</span>
+                  );
+                }
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Video}
+                title="No conference rooms found"
+                description={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first conference room'}
+                action={canManageRooms && !searchQuery && statusFilter === 'all' ? {
+                  label: "Add Conference Room",
+                  onClick: openCreateDialog
+                } : undefined}
+              />
+            }
+          />
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalRooms)} of {totalRooms} rooms
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
                 </div>
-              )}
-            </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -1201,6 +1145,6 @@ export default function ConferenceRooms() {
           )}
         </SheetContent>
       </Sheet>
-    </div>
+    </div >
   );
 }

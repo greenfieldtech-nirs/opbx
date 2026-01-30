@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Eye, Pause, Play, Plus, Search, Trash2, Upload, Loader2, Filter, X } from 'lucide-react';
+import { Database, Download, Eye, Pause, Play, Plus, Search, Trash2, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
@@ -17,10 +17,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { StandardDataTable, EmptyState } from '@/components/design-system';
+import type { Recording } from '@/types/api.types';
 
 export default function Recordings() {
-  const [recordingsPage, setRecordingsPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
 
   // Form state for filters
   const [filterForm, setFilterForm] = useState({
@@ -56,13 +59,13 @@ export default function Recordings() {
     isLoading: recordingsIsLoading,
     refetch: refetchRecordings,
   } = useQuery({
-    queryKey: ['recordings', recordingsPage, filterForm],
+    queryKey: ['recordings', currentPage, filterForm],
     queryFn: () => recordingsService.getAll({
       ...filterForm,
       search: filterForm.search || undefined,
       type: filterForm.type !== 'all' ? filterForm.type : undefined,
       status: filterForm.status !== 'all' ? filterForm.status : undefined,
-      page: recordingsPage,
+      page: currentPage,
     }),
   });
 
@@ -80,44 +83,44 @@ export default function Recordings() {
     },
   });
 
-   // Download recording mutation
-   const downloadRecordingMutation = useMutation({
-     mutationFn: async (recording: any) => {
-       // Step 1: Get the secure download URL and filename from API
-       const response = await fetch(`/api/v1/recordings/${recording.id}/download`, {
-      headers: {
-        'Authorization': `Bearer ${storage.getToken()}`,
-      },
-       });
+  // Download recording mutation
+  const downloadRecordingMutation = useMutation({
+    mutationFn: async (recording: any) => {
+      // Step 1: Get the secure download URL and filename from API
+      const response = await fetch(`/api/v1/recordings/${recording.id}/download`, {
+        headers: {
+          'Authorization': `Bearer ${storage.getToken()}`,
+        },
+      });
 
-       if (!response.ok) {
-         throw new Error('Failed to get download URL');
-       }
+      if (!response.ok) {
+        throw new Error('Failed to get download URL');
+      }
 
-       const data = await response.json();
+      const data = await response.json();
 
-       // Step 2: Download from the secure MinIO URL
-       const downloadResponse = await fetch(data.download_url);
-       if (!downloadResponse.ok) {
-         throw new Error('Failed to download file from storage');
-       }
+      // Step 2: Download from the secure MinIO URL
+      const downloadResponse = await fetch(data.download_url);
+      if (!downloadResponse.ok) {
+        throw new Error('Failed to download file from storage');
+      }
 
-       const blob = await downloadResponse.blob();
+      const blob = await downloadResponse.blob();
 
-       // Step 3: Create download with correct filename
-       const url = window.URL.createObjectURL(blob);
-       const a = document.createElement('a');
-       a.href = url;
-       a.download = data.filename;
-       document.body.appendChild(a);
-       a.click();
-       window.URL.revokeObjectURL(url);
-       document.body.removeChild(a);
-     },
-     onError: (error: any) => {
-       toast.error('Failed to download recording: ' + error.message);
-     },
-   });
+      // Step 3: Create download with correct filename
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
+    onError: (error: any) => {
+      toast.error('Failed to download recording: ' + error.message);
+    },
+  });
 
   // Delete recording mutation
   const deleteRecordingMutation = useMutation({
@@ -196,15 +199,7 @@ export default function Recordings() {
     }
   };
 
-  const handleApplyFilters = () => {
-    const newFilters: any = { page: 1 };
-    if (filterForm.search) newFilters.search = filterForm.search;
-    if (filterForm.type) newFilters.type = filterForm.type;
-    if (filterForm.status) newFilters.status = filterForm.status;
 
-    setFilterForm(newFilters);
-    setRecordingsPage(1);
-  };
 
   const handleClearFilters = () => {
     setFilterForm({
@@ -212,8 +207,8 @@ export default function Recordings() {
       type: '',
       status: '',
     });
-    setRecordingsPage(1);
-    setShowFilters(false);
+    setCurrentPage(1);
+    setCurrentPage(1);
   };
 
   if (recordingsData?.data === undefined) {
@@ -232,7 +227,7 @@ export default function Recordings() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Database className="h-8 w-8" />
+            <Mic className="h-8 w-8" />
             Recordings
           </h1>
           <p className="text-muted-foreground mt-1">Manage audio files for IVR and announcements</p>
@@ -242,260 +237,215 @@ export default function Recordings() {
             <span className="text-foreground">Recordings</span>
           </div>
         </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowRemoteDialog(true)} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Remote URL
+          </Button>
+          <Button onClick={() => setShowUploadDialog(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Upload File
+          </Button>
+        </div>
       </div>
 
-      {/* Recordings Section */}
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>Recordings</CardTitle>
-              <CardDescription>
-                {recordingsData?.meta?.total || 0} total recordings
-              </CardDescription>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search recordings..."
+                value={filterForm.search}
+                onChange={(e) => {
+                  setFilterForm({ ...filterForm, search: e.target.value });
+                  setCurrentPage(1);
+                }}
+                className="pl-9"
+              />
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetchRecordings()}
-                disabled={recordingsIsLoading}
-              >
-                <Loader2 className={cn('h-4 w-4 mr-2', recordingsIsLoading && 'animate-spin')} />
-                Refresh
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetchRecordings()}
+              disabled={recordingsIsLoading}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', recordingsIsLoading && 'animate-spin')} />
+            </Button>
+
+            {/* Type Filter */}
+            <Select
+              value={filterForm.type || 'all'}
+              onValueChange={(value) => {
+                setFilterForm({ ...filterForm, type: value });
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[150px]">
                 <Filter className="h-4 w-4 mr-2" />
-                {showFilters ? 'Hide Filters' : 'Show Filters'}
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="upload">Uploaded</SelectItem>
+                <SelectItem value="remote">Remote</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Status Filter */}
+            <Select
+              value={filterForm.status || 'all'}
+              onValueChange={(value) => {
+                setFilterForm({ ...filterForm, status: value });
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="All status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {(filterForm.search || (filterForm.type && filterForm.type !== 'all') || (filterForm.status && filterForm.status !== 'all')) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
               </Button>
-              <Button onClick={() => setShowRemoteDialog(true)} variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Remote URL
-              </Button>
-              <Button onClick={() => setShowUploadDialog(true)} size="sm">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </Button>
-            </div>
+            )}
           </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          {showFilters && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="filter-search">Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      id="filter-search"
-                      placeholder="Search recordings..."
-                      value={filterForm.search}
-                      onChange={(e) => setFilterForm({ ...filterForm, search: e.target.value })}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="filter-type">Type</Label>
-                  <Select
-                    value={filterForm.type || 'all'}
-                    onValueChange={(value) => setFilterForm({ ...filterForm, type: value })}
-                  >
-                    <SelectTrigger id="filter-type">
-                      <SelectValue placeholder="All types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="upload">Uploaded</SelectItem>
-                      <SelectItem value="remote">Remote</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="filter-status">Status</Label>
-                  <Select
-                    value={filterForm.status || 'all'}
-                    onValueChange={(value) => setFilterForm({ ...filterForm, status: value })}
-                  >
-                    <SelectTrigger id="filter-status">
-                      <SelectValue placeholder="All status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <Button onClick={handleApplyFilters} size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Apply Filters
-                </Button>
-                <Button onClick={handleClearFilters} variant="outline" size="sm">
-                  <X className="h-4 w-4 mr-2" />
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-          )}
+        </CardContent>
+      </Card>
 
-          {/* Recordings List */}
-          {recordingsIsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {recordingsData?.data?.length === 0 ? (
-                  <div className="col-span-full text-center py-12">
-                    <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No recordings found</h3>
-                    <p className="text-muted-foreground mb-4">
-                      {Object.keys(filterForm).length > 1
-                        ? 'Try adjusting your filters'
-                        : 'Get started by uploading a file or adding a remote URL'}
-                    </p>
-                    {!filterForm.search && !filterForm.type && !filterForm.status && (
-                      <div className="flex gap-2 justify-center">
-                        <Button onClick={() => setShowUploadDialog(true)} variant="outline">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload File
-                        </Button>
-                        <Button onClick={() => setShowRemoteDialog(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Remote URL
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  recordingsData?.data?.map((recording: any) => (
-                    <Card key={recording.id} className="hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-lg truncate">{recording.name}</CardTitle>
-                            <CardDescription className="flex items-center gap-2 mt-1">
-                              {recording.type === 'upload' ? (
-                                <Badge variant="secondary">📁 Local</Badge>
-                              ) : (
-                                <Badge variant="outline">🔗 Remote</Badge>
-                              )}
-                            </CardDescription>
-                          </div>
-                          <Badge
-                            variant={recording.status === 'active' ? 'default' : 'secondary'}
-                            className="ml-2"
-                          >
-                            {recording.status}
-                          </Badge>
-                        </div>
-                      </CardHeader>
+      {/* Recordings Table */}
+      <Card>
+        <CardContent className="pt-6">
 
-                      <CardContent className="pt-0">
-                        <div className="space-y-3">
-                          <div className="text-sm text-muted-foreground">
-                            <div>Created: {formatDateTime(recording.created_at)}</div>
-                            <div>By: {recording.created_by}</div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handlePlayback(recording)}
-                            >
-                              {currentlyPlaying === recording.id ? (
-                                <>
-                                  <Pause className="h-3 w-3 mr-1" />
-                                  Pause
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="h-3 w-3 mr-1" />
-                                  Play
-                                </>
-                              )}
-                            </Button>
-
-                            {recording.type === 'upload' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDownload(recording)}
-                                disabled={downloadRecordingMutation.isPending}
-                              >
-                                <Download className="h-3 w-3 mr-1" />
-                                Download
-                              </Button>
-                            )}
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSelectedRecording(recording)}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              Details
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(recording)}
-                              disabled={deleteRecordingMutation.isPending}
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-
-              {/* Pagination */}
-              {recordingsData && recordingsData.data.length > 0 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {recordingsData.meta?.from || 0} to {recordingsData.meta?.to || 0} of{' '}
-                    {recordingsData.meta?.total} recordings
-                  </div>
+          {/* Recordings Table */}
+          <StandardDataTable<Recording>
+            data={recordingsData?.data || []}
+            isLoading={recordingsIsLoading}
+            onRowClick={(recording) => setSelectedRecording(recording)}
+            identityIcon={Database}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(recording) => recording.name}
+            getIdentitySecondary={(recording) => recording.type === 'upload' ? '📁 Local' : '🔗 Remote'}
+            onIdentityClick={(recording) => setSelectedRecording(recording)}
+            onView={(recording) => setSelectedRecording(recording)}
+            onDelete={handleDelete}
+            columns={[
+              {
+                header: 'Status',
+                accessorKey: 'status',
+                cell: (recording) => (
+                  <Badge variant={recording.status === 'active' ? 'default' : 'secondary'}>
+                    {recording.status}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Created By',
+                accessorKey: 'created_by'
+              },
+              {
+                header: 'Created At',
+                accessorKey: 'created_at',
+                cell: (recording) => formatDateTime(recording.created_at)
+              },
+              {
+                header: 'Actions',
+                className: 'w-[180px]',
+                cell: (recording) => (
                   <div className="flex gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRecordingsPage(recordingsPage - 1)}
-                      disabled={recordingsPage === 1}
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayback(recording);
+                      }}
+                      title={currentlyPlaying === recording.id ? 'Pause' : 'Play'}
                     >
-                      Previous
+                      {currentlyPlaying === recording.id ? (
+                        <Pause className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <Play className="h-4 w-4 text-blue-600" />
+                      )}
                     </Button>
-                    <div className="flex items-center px-3 text-sm">
-                      Page {recordingsData.meta?.current_page} of {recordingsData.meta?.last_page}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRecordingsPage(recordingsPage + 1)}
-                      disabled={recordingsPage >= (recordingsData.meta?.last_page || 1)}
-                    >
-                      Next
-                    </Button>
+                    {recording.type === 'upload' && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(recording);
+                        }}
+                        disabled={downloadRecordingMutation.isPending}
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
+                )
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Database}
+                title="No recordings found"
+                description={filterForm.search || filterForm.type || filterForm.status ? 'Try adjusting your filters' : 'Get started by uploading a file or adding a remote URL'}
+                action={!filterForm.search && !filterForm.type && !filterForm.status ? {
+                  label: "Upload File",
+                  onClick: () => setShowUploadDialog(true)
+                } : undefined}
+              />
+            }
+          />
+
+          {/* Pagination */}
+          {recordingsData?.data && recordingsData.data.length > 0 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {recordingsData.meta?.from || 0} to {recordingsData.meta?.to || 0} of{' '}
+                {recordingsData.meta?.total} recordings
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center px-3 text-sm">
+                  Page {recordingsData.meta?.current_page} of {recordingsData.meta?.last_page}
                 </div>
-              )}
-            </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= (recordingsData.meta?.last_page || 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -9,7 +9,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { phoneNumbersService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
-import type { DIDNumber, RoutingType, CreateDIDRequest, UpdateDIDRequest } from '@/types/api.types';
+import type {
+  DIDNumber,
+  Status,
+  RoutingType,
+  CreateDIDRequest,
+  UpdateDIDRequest,
+  PaginatedResponse
+} from '@/types';
 import { PhoneNumberDialog } from '@/components/PhoneNumbers/PhoneNumberDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,6 +51,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
 import {
   Plus,
   Search,
@@ -58,9 +71,10 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import { formatPhoneNumber } from '@/utils/formatters';
-import { cn } from '@/lib/utils';
+
 
 export default function PhoneNumbers() {
   const queryClient = useQueryClient();
@@ -73,9 +87,11 @@ export default function PhoneNumbers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [routingTypeFilter, setRoutingTypeFilter] = useState<RoutingType | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Dialog states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -93,7 +109,17 @@ export default function PhoneNumbers() {
   }, [searchQuery]);
 
   // Fetch phone numbers with React Query
-  const { data: phoneNumbersData, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data: phoneNumbersResponse, isLoading, error, refetch, isPlaceholderData } = useQuery<{
+    data: DIDNumber[];
+    meta: {
+      total: number;
+      current_page: number;
+      last_page: number;
+      per_page: number;
+      from?: number;
+      to?: number;
+    };
+  }>({
     queryKey: [
       'phone-numbers',
       {
@@ -102,6 +128,8 @@ export default function PhoneNumbers() {
         search: debouncedSearch,
         routing_type: routingTypeFilter !== 'all' ? routingTypeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        sort_field: sortField,
+        sort_direction: sortDirection,
       },
     ],
     queryFn: () =>
@@ -111,12 +139,15 @@ export default function PhoneNumbers() {
         search: debouncedSearch || undefined,
         routing_type: routingTypeFilter !== 'all' ? routingTypeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        sort_field: sortField || undefined,
+        sort_direction: sortDirection,
       }),
   });
 
-  const phoneNumbers = phoneNumbersData?.data || [];
-  const totalPhoneNumbers = phoneNumbersData?.meta?.total || 0;
-  const totalPages = phoneNumbersData?.meta?.last_page || 1;
+  const phoneNumbers = phoneNumbersResponse?.data || [];
+  const totalPhoneNumbers = phoneNumbersResponse?.meta?.total || 0;
+  const totalPages = phoneNumbersResponse?.meta?.last_page || 1;
+  const isRefetching = isPlaceholderData; // Correlation with UI logic
 
   // Create mutation
   const createMutation = useMutation({
@@ -195,11 +226,20 @@ export default function PhoneNumbers() {
   };
 
   const handleToggleStatus = (phoneNumber: DIDNumber) => {
-    const newStatus = phoneNumber.status === 'active' ? 'inactive' : 'active';
+    const newStatus: Status = phoneNumber.status === 'active' ? 'inactive' : 'active';
     updateMutation.mutate({
       id: phoneNumber.id,
-      data: { status: newStatus as 'active' | 'inactive' },
+      data: { status: newStatus },
     });
+  };
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
   };
 
   // Get routing type icon and color
@@ -272,9 +312,12 @@ export default function PhoneNumbers() {
     setRoutingTypeFilter('all');
     setStatusFilter('all');
     setCurrentPage(1);
+    setSortField(null);
+    setSortDirection('asc');
   };
 
   const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all';
+  const paginatedPhoneNumbers = phoneNumbers; // Assuming phoneNumbers is already paginated by the API
 
   return (
     <div className="space-y-6">
@@ -365,177 +408,140 @@ export default function PhoneNumbers() {
 
       {/* Phone Numbers Table */}
       <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : phoneNumbers.length === 0 ? (
-            <div className="text-center py-12">
-              <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No phone numbers found</h3>
-              <p className="text-muted-foreground mb-4">
-                {hasActiveFilters
-                  ? 'Try adjusting your filters'
-                  : 'Get started by adding your first phone number'}
-              </p>
-              {canManage && !hasActiveFilters && (
-                <Button onClick={handleCreateClick}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Phone Number
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead>Routing Type</TableHead>
-                    <TableHead>Destination</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {phoneNumbers.map((phoneNumber) => {
-                    const routingDisplay = getRoutingTypeDisplay(phoneNumber.routing_type);
-                    const RoutingIcon = routingDisplay.icon;
+        <CardContent className="pt-6">
+          <StandardDataTable<DIDNumber>
+            data={paginatedPhoneNumbers}
+            isLoading={isLoading}
+            onRowClick={(phoneNumber) => {
+              setSelectedPhoneNumber(phoneNumber);
+              setIsEditDialogOpen(true);
+            }}
+            identityIcon={Phone}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(phoneNumber) => formatPhoneNumber(phoneNumber.phone_number)}
+            getIdentitySecondary={(phoneNumber) => phoneNumber.friendly_name || 'Phone Number'}
+            onIdentityClick={(phoneNumber) => {
+              setSelectedPhoneNumber(phoneNumber);
+              setIsEditDialogOpen(true);
+            }}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onView={(phoneNumber) => {
+              setSelectedPhoneNumber(phoneNumber);
+              setIsEditDialogOpen(true);
+            }}
+            onEdit={(phoneNumber) => {
+              setSelectedPhoneNumber(phoneNumber);
+              setIsEditDialogOpen(true);
+            }}
+            onDelete={handleDeleteClick}
+            columns={[
+              {
+                header: 'Routing Type',
+                cell: (phoneNumber) => {
+                  const routingDisplay = getRoutingTypeDisplay(phoneNumber.routing_type);
+                  const RoutingIcon = routingDisplay.icon;
+                  return (
+                    <Badge variant="outline" className={cn('text-xs border', routingDisplay.color)}>
+                      <RoutingIcon className="h-3 w-3 mr-1" />
+                      {routingDisplay.label}
+                    </Badge>
+                  );
+                }
+              },
+              {
+                header: 'Destination',
+                cell: (phoneNumber) => (
+                  <span className="text-sm">{getDestinationDisplay(phoneNumber)}</span>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (phoneNumber) => (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant={phoneNumber.status === 'active' ? 'default' : 'secondary'}
+                          className={cn(
+                            "text-xs cursor-pointer transition-all hover:scale-105 active:scale-95",
+                            phoneNumber.status === 'active'
+                              ? "bg-green-100 text-green-800 hover:bg-green-200"
+                              : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleStatus(phoneNumber);
+                          }}
+                        >
+                          {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Click to toggle status</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )
+              },
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Phone}
+                title="No phone numbers found"
+                description={hasActiveFilters ? 'Try adjusting your filters' : 'Get started by adding your first phone number'}
+                action={canManage && !hasActiveFilters ? {
+                  label: "Add Number",
+                  onClick: () => setIsCreateDialogOpen(true)
+                } : undefined}
+              />
+            }
+          />
 
-                    return (
-                      <TableRow key={phoneNumber.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Phone className="h-5 w-5 text-blue-600" />
-                            <div>
-                              <div className="font-medium">
-                                {formatPhoneNumber(phoneNumber.phone_number)}
-                              </div>
-                              {phoneNumber.friendly_name && (
-                                <div className="text-sm text-muted-foreground">
-                                  {phoneNumber.friendly_name}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={cn('border', routingDisplay.color)}>
-                            <RoutingIcon className="h-3 w-3 mr-1" />
-                            {routingDisplay.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{getDestinationDisplay(phoneNumber)}</TableCell>
-                        <TableCell>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  variant={phoneNumber.status === 'active' ? 'default' : 'secondary'}
-                                  className={cn(
-                                    'cursor-pointer transition-all hover:scale-105 active:scale-95',
-                                    phoneNumber.status === 'active'
-                                      ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                                  )}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleStatus(phoneNumber);
-                                  }}
-                                >
-                                  {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Click to toggle status</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {canManage && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditClick(phoneNumber)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteClick(phoneNumber)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * perPage + 1} to{' '}
-                    {Math.min(currentPage * perPage, totalPhoneNumbers)} of {totalPhoneNumbers}{' '}
-                    phone numbers
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pageNum;
-                        if (totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i;
-                        } else {
-                          pageNum = currentPage - 2 + i;
-                        }
-
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={currentPage === pageNum ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setCurrentPage(pageNum)}
-                          >
-                            {pageNum}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalPhoneNumbers)} of {totalPhoneNumbers} phone numbers
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mr-4">
+                  {isLoading || isPlaceholderData ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                      <span>Refreshing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                      <span>Updated just now</span>
+                    </>
+                  )}
                 </div>
-              )}
-            </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -86,7 +86,18 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import type { Extension, ExtensionType, Status, CreateExtensionRequest, UpdateExtensionRequest } from '@/types';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
+import type {
+  Extension,
+  ExtensionType,
+  Status,
+  CreateExtensionRequest,
+  UpdateExtensionRequest
+} from '@/types';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -237,7 +248,10 @@ export default function ExtensionsComplete() {
     queryFn: () => ringGroupsService.getAll({ per_page: 100, status: 'active' }),
   });
 
-  const ringGroups = ringGroupsData?.data || [];
+  const ringGroups = (ringGroupsData?.data || []).map(group => ({
+    ...group,
+    id: group.id
+  }));
 
   // Fetch IVR menus for table display
   const { data: ivrMenusData } = useQuery({
@@ -647,7 +661,7 @@ export default function ExtensionsComplete() {
     // Only include user_id for USER type extensions
     if (formData.type === 'user') {
       if (formData.user_id && formData.user_id !== 'unassigned') {
-        createData.user_id = parseInt(formData.user_id, 10);
+        createData.user_id = formData.user_id;
       } else {
         createData.user_id = null;
       }
@@ -720,7 +734,7 @@ export default function ExtensionsComplete() {
     // Only include user_id for USER type extensions
     if (formData.type === 'user') {
       if (formData.user_id && formData.user_id !== 'unassigned') {
-        updateData.user_id = parseInt(formData.user_id, 10);
+        updateData.user_id = formData.user_id;
       } else {
         updateData.user_id = null;
       }
@@ -750,11 +764,10 @@ export default function ExtensionsComplete() {
     });
   };
 
-  // Handle toggle status
-  const handleToggleStatus = (extension: Extension) => {
-    const newStatus: Status = extension.status === 'active' ? 'inactive' : 'active';
+  // Handle update status
+  const handleUpdateStatus = (id: string, newStatus: Status) => {
     updateMutation.mutate({
-      id: extension.id,
+      id: id,
       data: { status: newStatus },
     });
   };
@@ -1314,217 +1327,140 @@ export default function ExtensionsComplete() {
         </CardContent>
       </Card>
 
-      {/* Extensions Table */}
+      {/* Extensions Table Card */}
       <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('extension_number')}>
-                  <div className="flex items-center gap-2">
-                    Extension Number
-                    {getSortIcon('extension_number')}
-                  </div>
-                </TableHead>
-                {displayedExtensions.some(ext => ext.type === 'user') && (
-                  <TableHead>Password</TableHead>
-                )}
-                <TableHead className="cursor-pointer" onClick={() => handleSort('type')}>
-                  <div className="flex items-center gap-2">
-                    Type
-                    {getSortIcon('type')}
-                  </div>
-                </TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('status')}>
-                  <div className="flex items-center gap-2">
-                    Status
-                    {getSortIcon('status')}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                  <div className="flex items-center gap-2">
-                    Created
-                    {getSortIcon('created_at')}
-                  </div>
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedExtensions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={displayedExtensions.some(ext => ext.type === 'user') ? 8 : 7} className="text-center py-12">
-                    <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No extensions found</h3>
-                    <p className="text-muted-foreground mb-4">
-                      {hasActiveFilters
-                        ? 'Try adjusting your filters'
-                        : 'Get started by creating your first extension'}
-                    </p>
-                    {canCreate && !hasActiveFilters && (
-                      <Button onClick={openCreateDialog}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Extension
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                displayedExtensions.map((extension) => (
-                  <TableRow key={extension.id} className="group">
-                    <TableCell>
-                      <button
-                        onClick={() => {
-                          setSelectedExtension(extension);
-                          setShowExtensionDetail(true);
-                        }}
-                        className="font-mono font-semibold text-primary hover:underline"
-                      >
-                        {extension.extension_number}
-                      </button>
-                    </TableCell>
-                    {displayedExtensions.some(ext => ext.type === 'user') && (
-                      <TableCell>
-                        {extension.type === 'user' ? (
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm">
-                              {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={() => togglePasswordVisibility(extension.id)}
-                                title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
-                              >
-                                {visiblePasswords.has(extension.id) ? (
-                                  <EyeOff className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={() => copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number)}
-                                title="Copy password"
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    )}
-                    <TableCell>{getTypeBadge(extension.type)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {extension.type === 'user' && extension.user ? extension.user.name : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {getDetailsBadge(extension)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(getStatusColor(extension.status), "cursor-pointer hover:opacity-80 transition-opacity")}
-                        onClick={() => handleToggleStatus(extension)}
-                        title="Click to toggle status"
-                      >
-                        {extension.status === 'active' ? 'Active' : 'Disabled'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(extension.created_at)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {!isReadOnly && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedExtension(extension);
-                                  setShowExtensionDetail(true);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              {canEdit(extension) && (
-                                <>
-                                  <DropdownMenuItem onClick={() => openEditDialog(extension)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Extension
-                                  </DropdownMenuItem>
-                                  {canResetPassword && extension.type === 'user' && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={() => {
-                                          setSelectedExtension(extension);
-                                          setShowResetPasswordDialog(true);
-                                        }}
-                                      >
-                                        <Key className="h-4 w-4 mr-2" />
-                                        Reset Password
-                                      </DropdownMenuItem>
-                                    </>
-                                  )}
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleToggleStatus(extension)}>
-                                    <Activity className="h-4 w-4 mr-2" />
-                                    {extension.status === 'active' ? 'Deactivate' : 'Activate'}
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {canDelete && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => {
-                                      setSelectedExtension(extension);
-                                      setShowDeleteDialog(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Extension
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+        <CardContent className="pt-6">
+          <StandardDataTable<Extension>
+            data={displayedExtensions}
+            isLoading={isLoading}
+            onRowClick={(extension) => {
+              setSelectedExtension(extension);
+              setShowExtensionDetail(true);
+            }}
+            identityIcon={Phone}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(extension) => extension.extension_number}
+            getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
+            onIdentityClick={(extension) => {
+              setSelectedExtension(extension);
+              setShowExtensionDetail(true);
+            }}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onView={(extension) => {
+              setSelectedExtension(extension);
+              setShowExtensionDetail(true);
+            }}
+            onEdit={openEditDialog}
+            onDelete={(extension) => {
+              setSelectedExtension(extension);
+              setShowDeleteDialog(true);
+            }}
+            columns={[
+              ...(displayedExtensions.some(ext => ext.type === 'user') ? [{
+                header: 'Password',
+                cell: (extension: Extension) => (
+                  extension.type === 'user' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm">
+                        {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePasswordVisibility(extension.id);
+                          }}
+                          title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
+                        >
+                          {visiblePasswords.has(extension.id) ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number);
+                          }}
+                          title="Copy password"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )
+                )
+              }] as Column<Extension>[] : []),
+              {
+                header: 'Type',
+                sortKey: 'type',
+                cell: (extension) => getTypeBadge(extension.type)
+              },
+              {
+                header: 'Linked To',
+                cell: (extension) => getDetailsBadge(extension)
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (extension) => (
+                  <Badge
+                    className={cn(getStatusColor(extension.status), "text-xs cursor-pointer hover:opacity-80 transition-opacity")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
+                    }}
+                  >
+                    {extension.status}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Created',
+                sortKey: 'created_at',
+                cell: (extension) => (
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(extension.created_at).toLocaleDateString()}
+                  </span>
+                )
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Phone}
+                title="No extensions found"
+                description={hasActiveFilters ? 'Try adjusting your filters' : 'Get started by creating your first extension'}
+                action={!debouncedSearch && statusFilter === 'all' && ['owner', 'pbx_admin'].includes(currentUser?.role || '') ? {
+                  label: 'Create Extension',
+                  onClick: () => setShowCreateDialog(true)
+                } : undefined}
+              />
+            }
+          />
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
-                Showing {(currentPage - 1) * perPage + 1} to{' '}
-                {Math.min(currentPage * perPage, totalExtensions)} of {totalExtensions} extensions
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalExtensions)} of {totalExtensions} extensions
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(currentPage - 1)}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
                   Previous
@@ -1535,7 +1471,7 @@ export default function ExtensionsComplete() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(currentPage + 1)}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
                   Next
@@ -1547,7 +1483,7 @@ export default function ExtensionsComplete() {
       </Card>
 
       {/* Create Extension Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      < Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog} >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Extension</DialogTitle>
@@ -1637,10 +1573,10 @@ export default function ExtensionsComplete() {
             <Button onClick={handleCreateExtension}>Create Extension</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Edit Extension Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      < Dialog open={showEditDialog} onOpenChange={setShowEditDialog} >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Extension</DialogTitle>
@@ -1674,11 +1610,17 @@ export default function ExtensionsComplete() {
                 <Select
                   value={formData.type}
                   onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-                  disabled={currentUser.role === 'pbx_user'}
                 >
-                  <SelectTrigger id="edit_type">
-                    <SelectValue />
-                  </SelectTrigger>
+                  {(currentUser?.role as string) === 'pbx_user' && (
+                    <SelectTrigger id="edit_type" disabled>
+                      <SelectValue />
+                    </SelectTrigger>
+                  )}
+                  {(currentUser?.role as string) !== 'pbx_user' && (
+                    <SelectTrigger id="edit_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                  )}
                   <SelectContent>
                     <SelectItem value="user">PBX User Extension</SelectItem>
                     <SelectItem value="conference">Conference Room</SelectItem>
@@ -1729,10 +1671,10 @@ export default function ExtensionsComplete() {
             <Button onClick={handleEditExtension}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Reset Password Confirmation Dialog */}
-      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+      < Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog} >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reset Extension Password?</DialogTitle>
@@ -1789,10 +1731,10 @@ export default function ExtensionsComplete() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      < Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Extension?</DialogTitle>
@@ -1823,10 +1765,10 @@ export default function ExtensionsComplete() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Extension Detail Slide-Over */}
-      <Sheet open={showExtensionDetail} onOpenChange={setShowExtensionDetail}>
+      < Sheet open={showExtensionDetail} onOpenChange={setShowExtensionDetail} >
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           {selectedExtension && (
             <>
@@ -2111,12 +2053,11 @@ export default function ExtensionsComplete() {
                                     {ringGroup.fallback_action?.replace('_', ' ')}
                                   </span>
                                 </div>
-                                {ringGroup.fallback_action === 'extension' && ringGroup.fallback_extension && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Fallback Extension:</span>
-                                    <span className="text-sm font-medium font-mono">
-                                      {ringGroup.fallback_extension.extension_number}
-                                    </span>
+
+                                {ringGroup.fallback_action === 'extension' && ringGroup.fallback_extension_id && (
+                                  <div className="flex items-center gap-1">
+                                    <ArrowRight className="h-3 w-3" />
+                                    <span>Ext: {ringGroup.fallback_extension_id}</span>
                                   </div>
                                 )}
                                 <div className="flex justify-between">
@@ -2339,7 +2280,7 @@ export default function ExtensionsComplete() {
             </>
           )}
         </SheetContent>
-      </Sheet>
-    </div>
+      </Sheet >
+    </div >
   );
 }

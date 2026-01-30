@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter, RefreshCw, Phone, Menu, Users, Bot, ArrowRight } from 'lucide-react';
+import { Clock, Plus, Search, Edit, Trash2, X, Copy, Calendar, CheckCircle, XCircle, Filter, RefreshCw, Phone, Menu, Users, Bot, ArrowRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,10 +38,24 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
@@ -52,36 +66,34 @@ import { ivrMenusService } from '@/services/createResourceService';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { cn } from '@/lib/utils';
 import {
-  type BusinessHoursSchedule,
-  type WeeklySchedule,
-  type DaySchedule,
-  type TimeRange,
-  type ExceptionDate,
-  type DayOfWeek,
-  type ScheduleStatus,
-  type ExceptionType,
-   type Country,
-    mockDidBusinessHours,
-    mockExtensions,
-    getScheduleSummary,
-    getDetailedHours,
-    isValidTimeFormat,
-    isEndTimeAfterStart,
-    formatExceptionDate,
-    getNextExceptionId,
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
+import type {
+  BusinessHoursSchedule,
+  ScheduleStatus,
+  WeeklySchedule,
+  ExceptionDate,
+  BusinessHoursAction,
+  DayOfWeek,
+  DaySchedule,
+  TimeRange,
+  ExceptionType,
+  Country,
+} from '@/types';
+import {
+  mockDidBusinessHours,
+  mockExtensions,
+  getScheduleSummary,
+  getDetailedHours,
+  isValidTimeFormat,
+  isEndTimeAfterStart,
+  formatExceptionDate,
+  getNextExceptionId,
   getNextTimeRangeId,
 } from '@/mock/businessHours';
 
-// Action types for business hours routing
-export type BusinessHoursActionType =
-  | 'extension'
-  | 'ivr_menu'
-  | 'ring_group';
-
-export interface BusinessHoursAction {
-  type: BusinessHoursActionType;
-  target_id?: string;
-}
 
 // ============================================================================
 // Helper Functions
@@ -673,7 +685,9 @@ const BusinessHours: React.FC = () => {
   // State for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleStatus>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'created_at'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'status' | 'updated_at'>('name'); // Added status and updated_at for sorting
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10); // Assuming a default per page value
 
   // Dialog states
   const [isCreateEditDialogOpen, setIsCreateEditDialogOpen] = useState(false);
@@ -708,7 +722,7 @@ const BusinessHours: React.FC = () => {
     queryFn: () => businessHoursService.getAll(),
   });
 
-  const schedules = schedulesData?.data || [];
+  const allSchedules = (schedulesData?.data || []) as BusinessHoursSchedule[];
 
   // Fetch extensions for select boxes
   const { data: extensionsData } = useQuery({
@@ -784,7 +798,7 @@ const BusinessHours: React.FC = () => {
 
   // Filtered and sorted schedules
   const filteredSchedules = useMemo(() => {
-    let filtered = schedules;
+    let filtered = allSchedules;
 
     // Apply search filter
     if (searchQuery) {
@@ -792,7 +806,7 @@ const BusinessHours: React.FC = () => {
       filtered = filtered.filter(
         (schedule) =>
           schedule.name.toLowerCase().includes(query) ||
-          schedule.description?.toLowerCase().includes(query)
+          (schedule as any).description?.toLowerCase().includes(query)
       );
     }
 
@@ -805,15 +819,26 @@ const BusinessHours: React.FC = () => {
     filtered = [...filtered].sort((a, b) => {
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
-      } else {
+      } else if (sortBy === 'created_at') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else if (sortBy === 'status') {
+        return a.status.localeCompare(b.status);
+      } else if (sortBy === 'updated_at') {
+        return new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime();
       }
+      return 0;
     });
 
     return filtered;
-  }, [schedules, searchQuery, statusFilter, sortBy]);
+  }, [allSchedules, searchQuery, statusFilter, sortBy]);
 
-  // Handle schedule template application (moved to dialog component)
+  const totalPages = Math.ceil(filteredSchedules.length / perPage);
+  const schedules = useMemo(() => {
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    return filteredSchedules.slice(startIndex, endIndex);
+  }, [filteredSchedules, currentPage, perPage]);
+
 
   // Initialize form for create
   const handleCreateNew = () => {
@@ -824,6 +849,7 @@ const BusinessHours: React.FC = () => {
       exceptions: [],
       open_hours_action: null,
       closed_hours_action: null,
+      timezone: 'America/New_York', // Default timezone
     };
     setFormData(initialSchedule);
     setOpenHoursAction(null);
@@ -1110,6 +1136,7 @@ const BusinessHours: React.FC = () => {
       closed_hours_action: closedHoursAction!,
       schedule: formData.schedule!,
       exceptions: formData.exceptions || [],
+      timezone: formData.timezone || 'America/New_York',
     };
 
     if (editingSchedule) {
@@ -1122,7 +1149,7 @@ const BusinessHours: React.FC = () => {
   };
 
   // Handle delete
-  const handleDeleteClick = (schedule: BusinessHoursSchedule) => {
+  const handleOpenDelete = (schedule: BusinessHoursSchedule) => {
     setSelectedSchedule(schedule);
     setIsDeleteDialogOpen(true);
   };
@@ -1145,9 +1172,13 @@ const BusinessHours: React.FC = () => {
   };
 
   // Handle detail view
-  const handleViewDetails = (schedule: BusinessHoursSchedule) => {
+  const handleOpenDetail = (schedule: BusinessHoursSchedule) => {
     setSelectedSchedule(schedule);
     setIsDetailSheetOpen(true);
+  };
+
+  const handleOpenEdit = (schedule: BusinessHoursSchedule) => {
+    handleEdit(schedule);
   };
 
   return (
@@ -1222,124 +1253,120 @@ const BusinessHours: React.FC = () => {
               <SelectContent>
                 <SelectItem value="name">Name</SelectItem>
                 <SelectItem value="created_at">Created Date</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+                <SelectItem value="updated_at">Last Modified</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Business Hours Schedules Card */}
+      {/* Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Business Hours Schedules</CardTitle>
-          <CardDescription>
-            {filteredSchedules.length} {filteredSchedules.length === 1 ? 'schedule' : 'schedules'} configured
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Loading business hours...</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-12 text-destructive">
-              <p>Error loading business hours: {(error as any).message}</p>
-            </div>
-          ) : filteredSchedules.length === 0 ? (
-            <div className="text-center py-12">
-              <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No schedules found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || statusFilter !== 'all'
-                  ? 'Try adjusting your filters'
-                  : 'Get started by creating your first business hours schedule'}
-              </p>
-              {canManage && !searchQuery && statusFilter === 'all' && (
-                <Button onClick={handleCreateNew}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Schedule
+        <CardContent className="pt-6">
+          <StandardDataTable<BusinessHoursSchedule>
+            data={schedules}
+            isLoading={isLoading}
+            onRowClick={handleOpenDetail}
+            identityIcon={Clock}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(schedule) => schedule.name}
+            getIdentitySecondary={() => 'Business Hours'}
+            onIdentityClick={handleOpenDetail}
+            sortField={sortBy}
+            sortDirection="asc"
+            onSort={(field) => setSortBy(field as any)}
+            onView={handleOpenDetail}
+            onEdit={handleOpenEdit}
+            onDelete={handleOpenDelete}
+            columns={[
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (schedule) => (
+                  <Badge
+                    variant={schedule.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      schedule.status === 'active'
+                        ? "bg-green-100 text-green-800 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    )}
+                  >
+                    {schedule.status === 'active' ? 'Active' : 'Disabled'}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Timezone',
+                cell: (schedule) => (
+                  <span className="text-sm text-muted-foreground">{schedule.timezone}</span>
+                )
+              },
+              {
+                header: 'Exceptions',
+                cell: (schedule) => (
+                  <Badge variant="outline" className="text-xs">
+                    {(schedule.exceptions || []).length} exceptions
+                  </Badge>
+                )
+              },
+              {
+                header: 'Last Modified',
+                sortKey: 'updated_at',
+                cell: (schedule) => (
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(schedule.updated_at || '').toLocaleDateString()}
+                  </span>
+                )
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Clock}
+                title="No business hours found"
+                description={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first business hours schedule'}
+                action={canManage && !searchQuery && statusFilter === 'all' ? {
+                  label: "Create Schedule",
+                  onClick: () => setIsCreateEditDialogOpen(true)
+                } : undefined}
+              />
+            }
+          />
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, allSchedules?.length || 0)} of {allSchedules?.length || 0} schedules
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
                 </Button>
-              )}
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-4 font-medium">Name</th>
-                  <th className="text-left p-4 font-medium">Status</th>
-                  {canManage && <th className="text-right p-4 font-medium">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSchedules.map((schedule) => {
-                  return (
-                    <tr
-                      key={schedule.id}
-                      className="border-b hover:bg-gray-50 cursor-pointer"
-                      onClick={() => handleViewDetails(schedule)}
-                    >
-                      <td className="p-4">
-                        <div className="space-y-1">
-                          <div className="font-medium">{schedule.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {getScheduleSummary(schedule.schedule)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {schedule.exceptions.length} exception{schedule.exceptions.length !== 1 ? 's' : ''}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          {schedule.status === 'active' ? (
-                            <>
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span>Active</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="h-4 w-4 text-gray-400" />
-                              <span>Disabled</span>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      {canManage && (
-                        <td className="p-4">
-                          <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(schedule);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteClick(schedule);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           )}
         </CardContent>
       </Card>
 
-      {/* Pagination info */}
       {filteredSchedules.length > 0 && (
         <div className="text-sm text-muted-foreground">
           Showing {filteredSchedules.length} schedule{filteredSchedules.length !== 1 ? 's' : ''}
@@ -2191,10 +2218,10 @@ const HolidayImportButton: React.FC<HolidayImportButtonProps> = ({ onImportHolid
 
       const data = await response.json();
       setHolidays(data);
-      } catch (err) {
-        setError('Failed to load holidays. Please try again.');
-        logger.error('Error fetching holidays:', { error: err });
-      } finally {
+    } catch (err) {
+      setError('Failed to load holidays. Please try again.');
+      logger.error('Error fetching holidays:', { error: err });
+    } finally {
       setLoadingHolidays(false);
     }
   };
@@ -2334,43 +2361,43 @@ const HolidayImportButton: React.FC<HolidayImportButtonProps> = ({ onImportHolid
                 )}
 
                 {!loadingHolidays && !error && holidays.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Select Holidays</Label>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={selectAll}>
-                      Select All
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={selectNone}>
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg p-4 space-y-2 max-h-[400px] overflow-y-auto">
-                  {holidays.map(holiday => (
-                    <div key={holiday.date} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`holiday-${holiday.date}`}
-                        checked={selectedHolidays.has(holiday.date)}
-                        onCheckedChange={() => toggleHoliday(holiday.date)}
-                      />
-                      <Label htmlFor={`holiday-${holiday.date}`} className="font-normal flex-1 cursor-pointer">
-                        <span className="font-medium">{holiday.name}</span>
-                        {holiday.localName !== holiday.name && (
-                          <span className="text-muted-foreground text-xs ml-2">({holiday.localName})</span>
-                        )}
-                        <span className="text-muted-foreground ml-2 text-xs">- {holiday.date}</span>
-                      </Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Select Holidays</Label>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={selectAll}>
+                          Select All
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={selectNone}>
+                          Clear
+                        </Button>
+                      </div>
                     </div>
-                  ))}
-                </div>
 
-                <p className="text-sm text-muted-foreground">
-                  {selectedHolidays.size} of {holidays.length} holidays selected
-                </p>
-              </div>
-            )}
+                    <div className="border rounded-lg p-4 space-y-2 max-h-[400px] overflow-y-auto">
+                      {holidays.map(holiday => (
+                        <div key={holiday.date} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`holiday-${holiday.date}`}
+                            checked={selectedHolidays.has(holiday.date)}
+                            onCheckedChange={() => toggleHoliday(holiday.date)}
+                          />
+                          <Label htmlFor={`holiday-${holiday.date}`} className="font-normal flex-1 cursor-pointer">
+                            <span className="font-medium">{holiday.name}</span>
+                            {holiday.localName !== holiday.name && (
+                              <span className="text-muted-foreground text-xs ml-2">({holiday.localName})</span>
+                            )}
+                            <span className="text-muted-foreground ml-2 text-xs">- {holiday.date}</span>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-sm text-muted-foreground">
+                      {selectedHolidays.size} of {holidays.length} holidays selected
+                    </p>
+                  </div>
+                )}
 
                 {!loadingHolidays && !error && selectedCountry && holidays.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
@@ -2499,9 +2526,8 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
                   <div key={day} className="space-y-1">
                     <div className="text-xs font-medium text-muted-foreground">{day}</div>
                     <div
-                      className={`border rounded p-2 text-xs ${
-                        isOpen ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                      }`}
+                      className={`border rounded p-2 text-xs ${isOpen ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                        }`}
                     >
                       {isOpen ? (
                         daySchedule.time_ranges.length === 1 ? (

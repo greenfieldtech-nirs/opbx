@@ -776,7 +776,7 @@ export type ExtensionStatus = 'active' | 'inactive';
 // Recordings
 // ============================================================================
 
-export type RecordingType = 'greeting' | 'hold_music' | 'announcement' | 'other';
+export type RecordingType = 'greeting' | 'hold_music' | 'announcement' | 'other' | 'upload' | 'remote';
 export type RecordingStatus = 'active' | 'inactive' | 'processing' | 'failed';
 
 export interface Recording {

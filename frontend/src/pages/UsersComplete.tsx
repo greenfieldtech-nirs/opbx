@@ -35,6 +35,7 @@ import {
   Calendar,
   Shield,
   Activity,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getRoleColor, getRoleDisplayName, getStatusColor } from '@/utils/formatters';
@@ -83,6 +84,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
 import type { User, UserRole, Status } from '@/types';
 import { usersService } from '@/services/createResourceService';
 
@@ -247,12 +259,6 @@ export default function UsersComplete() {
       setSortField(field);
       setSortDirection('asc');
     }
-  };
-
-  // Get sort icon
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
   };
 
   // Clear all filters
@@ -429,6 +435,7 @@ export default function UsersComplete() {
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
                 className="mt-4"
               >
+                <RefreshCw className="h-4 w-4 mr-2" />
                 Retry
               </Button>
             </div>
@@ -549,239 +556,165 @@ export default function UsersComplete() {
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Extension" />
               </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  <SelectItem value="has">Has Extension</SelectItem>
-                  <SelectItem value="none">No Extension</SelectItem>
-                </SelectContent>
-              </Select>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                <SelectItem value="has">Has Extension</SelectItem>
+                <SelectItem value="none">No Extension</SelectItem>
+              </SelectContent>
+            </Select>
 
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-2" />
-                  Clear Filters
-                </Button>
-              )}
-            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       {/* Users Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>All Users</CardTitle>
-          <CardDescription>
-            Showing {paginatedUsers.length} of {totalUsers} users
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {paginatedUsers.length === 0 ? (
-            <div className="text-center py-12">
-              <UserX className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No users found</h3>
-              <p className="text-muted-foreground mb-4">
-                {hasActiveFilters
-                  ? 'Try adjusting your filters'
-                  : 'Get started by creating your first user'}
-              </p>
-              {!hasActiveFilters && (
-                <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      className="cursor-pointer select-none hover:bg-gray-50"
-                      onClick={() => handleSort('name')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Name
-                        {getSortIcon('name')}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer select-none hover:bg-gray-50"
-                      onClick={() => handleSort('email')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Email
-                        {getSortIcon('email')}
-                      </div>
-                    </TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Extension</TableHead>
-                    <TableHead
-                      className="cursor-pointer select-none hover:bg-gray-50"
-                      onClick={() => handleSort('created_at')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Created
-                        {getSortIcon('created_at')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <button
-                          onClick={() => openUserDetail(user)}
-                          className="flex items-center gap-3 hover:underline text-left"
-                        >
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                            <UserCheck className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <div className="font-medium">{user.name}</div>
-                            {user.role === 'owner' && (
-                              <div className="text-xs text-purple-600 flex items-center gap-1">
-                                <Shield className="h-3 w-3" />
-                                Organization Owner
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{user.email}</span>
-                          <button
-                            onClick={() => copyToClipboard(user.email, 'Email')}
-                            className="opacity-0 group-hover:opacity-100 hover:text-foreground transition-opacity"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn('text-xs', getRoleColor(user.role))}>
-                          {getRoleDisplayName(user.role)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn('text-xs', getStatusColor(user.status))}>
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.extension ? (
-                          <code className="px-2 py-1 bg-gray-100 rounded text-sm">
-                            {user.extension.extension_number}
-                          </code>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDate(user.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openUserDetail(user)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(user)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit User
-                              </DropdownMenuItem>
-                              {user.role !== 'owner' && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
-                                    <UserCheck className="h-4 w-4 mr-2" />
-                                    {user.status === 'active' ? 'Deactivate' : 'Activate'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => {
-                                      setSelectedUser(user);
-                                      setShowDeleteDialog(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete User
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground">Rows per page:</p>
-                    <Select
-                      value={perPage.toString()}
-                      onValueChange={(value) => {
-                        setPerPage(parseInt(value));
-                        setCurrentPage(1);
+        <CardContent className="pt-6">
+          <StandardDataTable<User>
+            data={paginatedUsers}
+            isLoading={isLoading}
+            onRowClick={openUserDetail}
+            identityIcon={UserCheck}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(user) => user.name}
+            getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : 'PBX User'}
+            onIdentityClick={openUserDetail}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onView={openUserDetail}
+            onEdit={openEditDialog}
+            onDelete={(user) => {
+              setSelectedUser(user);
+              setShowDeleteDialog(true);
+            }}
+            columns={[
+              {
+                header: 'Email',
+                accessorKey: 'email',
+                sortKey: 'email',
+                cell: (user) => (
+                  <div className="flex items-center gap-2 group">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">{user.email}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard(user.email, 'Email');
                       }}
+                      className="opacity-0 group-hover:opacity-100 hover:text-foreground transition-opacity"
                     >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="25">25</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Copy className="h-3 w-3" />
+                    </button>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <p className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(currentPage - 1)}
-                        disabled={currentPage === 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
+                )
+              },
+              {
+                header: 'Role',
+                cell: (user) => (
+                  <Badge className={cn('text-xs', getRoleColor(user.role))}>
+                    {getRoleDisplayName(user.role)}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Status',
+                cell: (user) => (
+                  <Badge className={cn('text-xs', getStatusColor(user.status))}>
+                    {user.status}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Extension',
+                cell: (user) => user.extension ? (
+                  <code className="px-2 py-1 bg-gray-100 rounded text-sm group-hover:bg-gray-200">
+                    {user.extension.extension_number}
+                  </code>
+                ) : (
+                  <span className="text-muted-foreground text-sm">-</span>
+                )
+              },
+              {
+                header: 'Created',
+                sortKey: 'created_at',
+                cell: (user) => (
+                  <span className="text-muted-foreground text-sm">
+                    {formatDate(user.created_at)}
+                  </span>
+                )
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={UserX}
+                title="No users found"
+                description={hasActiveFilters ? 'Try adjusting your filters' : 'Get started by creating your first user'}
+                action={!hasActiveFilters ? {
+                  label: "Add User",
+                  onClick: () => setShowCreateDialog(true),
+                } : undefined}
+              />
+            }
+          />
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">Rows per page:</p>
+                <Select
+                  value={perPage.toString()}
+                  onValueChange={(value) => {
+                    setPerPage(parseInt(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
                 </div>
-              )}
-            </>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
+
 
       {/* Create User Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -1376,6 +1309,6 @@ export default function UsersComplete() {
           </div>
         </SheetContent>
       </Sheet>
-    </div>
+    </div >
   );
 }
