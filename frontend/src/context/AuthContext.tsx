@@ -5,9 +5,10 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/auth.service';
 import { storage } from '@/utils/storage';
-import type { User, LoginRequest } from '@/types';
+import type { User, LoginRequest, RegisterRequest } from '@/types';
 import { getApiErrorMessage } from '@/services/api';
 
 interface AuthContextType {
@@ -16,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginRequest, onSuccess?: () => void) => Promise<void>;
+  register: (data: RegisterRequest, onSuccess?: () => void) => Promise<void>;
   logout: (onSuccess?: () => void) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -23,6 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(storage.getUser());
   const [token, setToken] = useState<string | null>(storage.getToken());
   const [isLoading, setIsLoading] = useState(true);
@@ -61,6 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authService.login(credentials);
 
+      // Clear all cached queries before setting new user data
+      queryClient.clear();
+
       // Store auth data
       storage.setToken(response.access_token);
       storage.setUser(response.user);
@@ -69,6 +75,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(response.user);
 
       // Call success callback (for navigation)
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      throw new Error(message);
+    }
+  };
+
+  /**
+   * Register new organization and admin user
+   */
+  const register = async (data: RegisterRequest, onSuccess?: () => void): Promise<void> => {
+    try {
+      const response = await authService.register(data);
+
+      // Clear all cached queries before setting new user data
+      queryClient.clear();
+
+      storage.setToken(response.access_token);
+      storage.setUser(response.user);
+
+      setToken(response.access_token);
+      setUser(response.user);
+
       if (onSuccess) {
         onSuccess();
       }
@@ -91,6 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       storage.clearAll();
       setToken(null);
       setUser(null);
+
+      // Clear all cached queries to remove user-specific data
+      queryClient.clear();
 
       // Call success callback (for navigation)
       if (onSuccess) {
@@ -118,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!token && !!user,
     isLoading,
     login,
+    register,
     logout,
     refreshUser,
   };

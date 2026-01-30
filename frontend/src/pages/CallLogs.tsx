@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
+import { StandardDataTable, EmptyState } from '@/components/design-system';
 import { JsonViewer } from '@textea/json-viewer';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -161,7 +162,7 @@ export default function CallLogs() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {/* Filters */}
           {showFilters && (
             <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
@@ -236,110 +237,87 @@ export default function CallLogs() {
           )}
 
           {/* CDR Table */}
-          {cdrIsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-4 font-medium whitespace-nowrap">Session Time</th>
-                      <th className="text-left p-4 font-medium whitespace-nowrap">From</th>
-                      <th className="text-left p-4 font-medium whitespace-nowrap">To</th>
-                      <th className="text-left p-4 font-medium whitespace-nowrap">Disposition</th>
-                      <th className="text-left p-4 font-medium whitespace-nowrap">Duration</th>
-                      <th className="text-left p-4 font-medium whitespace-nowrap">Connected Time</th>
-                      <th className="text-left p-4 font-medium whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!cdrData?.data || cdrData.data.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="text-center py-12">
-                          <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">No CDRs found</h3>
-                          <p className="text-muted-foreground">
-                            {Object.keys(cdrFilters).length > 1
-                              ? 'Try adjusting your filters'
-                              : 'CDRs will appear here once calls are completed'}
-                          </p>
-                        </td>
-                      </tr>
-                    ) : (
-                      cdrData.data.map((cdr) => (
-                        <tr key={cdr.id} className="border-b hover:bg-gray-50">
-                          <td className="p-4 text-sm whitespace-nowrap">
-                            {formatDateTime(cdr.session_timestamp)}
-                          </td>
-                          <td className="p-4 whitespace-nowrap">{formatPhoneNumber(cdr.from)}</td>
-                          <td className="p-4 whitespace-nowrap">{formatPhoneNumber(cdr.to)}</td>
-                          <td className="p-4">
-                            <span
-                              className={cn(
-                                'px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap',
-                                getDispositionColor(cdr.disposition)
-                              )}
-                            >
-                              {cdr.disposition}
-                            </span>
-                          </td>
-                          <td className="p-4 text-muted-foreground whitespace-nowrap">
-                            {cdr.duration_formatted}
-                          </td>
-                          <td className="p-4 text-muted-foreground whitespace-nowrap">
-                            {cdr.billsec_formatted}
-                          </td>
-                          <td className="p-4">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewCdrDetails(cdr)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Details
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
+          <StandardDataTable<CallDetailRecord & { id: string | number }>
+            data={(cdrData?.data || []).map(cdr => ({ ...cdr, id: cdr.id }))}
+            isLoading={cdrIsLoading}
+            identityIcon={Database}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(cdr) => formatPhoneNumber(cdr.from)}
+            getIdentitySecondary={(cdr) => `To: ${formatPhoneNumber(cdr.to)}`}
+            onRowClick={handleViewCdrDetails}
+            onView={handleViewCdrDetails}
+            canEdit={false}
+            canDelete={false}
+            columns={[
+              {
+                header: 'Session Time',
+                accessorKey: 'session_timestamp' as any,
+                cell: (cdr) => formatDateTime(cdr.session_timestamp)
+              },
+              {
+                header: 'Disposition',
+                accessorKey: 'disposition' as any,
+                cell: (cdr) => (
+                  <span
+                    className={cn(
+                      'px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap',
+                      getDispositionColor(cdr.disposition)
                     )}
-                  </tbody>
-                </table>
-              </div>
+                  >
+                    {cdr.disposition}
+                  </span>
+                )
+              },
+              {
+                header: 'Duration',
+                accessorKey: 'duration_formatted' as any,
+              },
+              {
+                header: 'Connected Time',
+                accessorKey: 'billsec_formatted' as any,
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Database}
+                title="No CDRs found"
+                description={Object.keys(cdrFilters).length > 1
+                  ? 'Try adjusting your filters'
+                  : 'CDRs will appear here once calls are completed'}
+              />
+            }
+          />
 
-              {/* Pagination */}
-              {cdrData && cdrData.data.length > 0 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {cdrData.meta.from || 0} to {cdrData.meta.to || 0} of{' '}
-                    {cdrData.meta.total} records
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCdrPage(cdrPage - 1)}
-                      disabled={cdrPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center px-3 text-sm">
-                      Page {cdrData.meta.current_page} of {cdrData.meta.last_page}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCdrPage(cdrPage + 1)}
-                      disabled={cdrPage >= cdrData.meta.last_page}
-                    >
-                      Next
-                    </Button>
-                  </div>
+          {/* Pagination */}
+          {cdrData && cdrData.data.length > 0 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {cdrData.meta.from || 0} to {cdrData.meta.to || 0} of{' '}
+                {cdrData.meta.total} records
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCdrPage(cdrPage - 1)}
+                  disabled={cdrPage === 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center px-3 text-sm">
+                  Page {cdrData.meta.current_page} of {cdrData.meta.last_page}
                 </div>
-              )}
-            </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCdrPage(cdrPage + 1)}
+                  disabled={cdrPage >= cdrData.meta.last_page}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

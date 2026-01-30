@@ -13,13 +13,13 @@ use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
+use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\RingGroupController;
+use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
-use App\Http\Controllers\Api\SessionUpdateController;
-
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,8 +34,6 @@ use Illuminate\Support\Facades\Broadcast;
 
 // Broadcasting authentication routes (must be before auth middleware)
 Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
-
-
 
 // Test route for debugging
 Route::get('test/audio', function () {
@@ -93,6 +91,7 @@ Route::get('/websocket/health', function () {
 Route::get('/sanctum/csrf-cookie', function () {
     // Access session to trigger cookie creation
     request()->session()->get('_token');
+
     return response()->json(['message' => 'CSRF cookie set']);
 })->middleware(['web', 'throttle:60,1'])->name('sanctum.csrf-cookie');
 
@@ -105,6 +104,14 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:auth')
             ->name('auth.login');
+
+        // Registration (public, rate limited)
+        Route::post('/register', [RegisterController::class, 'register'])
+            ->middleware('throttle:registration')
+            ->name('auth.register');
+
+        Route::get('/register/validate', [RegisterController::class, 'validateRegistration'])
+            ->name('auth.register.validate');
 
         // Protected authentication routes
         Route::middleware('auth:sanctum')->group(function (): void {
@@ -197,7 +204,6 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
         });
-
 
     });
 

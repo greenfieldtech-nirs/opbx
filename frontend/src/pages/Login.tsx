@@ -194,8 +194,21 @@ export default function Login() {
 
                                 {/* Footer Info */}
                                 <div className="mt-8 text-center text-sm text-gray-600">
-                                    <p>Made with ❤️ by <a href="https://cloudonix.com">Cloudonix</a><br/>No call home
+                                    <p>Made with love by <a href="https://cloudonix.com">Cloudonix</a><br/>No call home
                                         scripts included!</p>
+                                    <p className="mt-4">
+                                        New to OPBX?{' '}
+                                        <a
+                                            href="/register"
+                                            className="text-blue-600 hover:text-blue-800 font-medium"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                navigate('/register');
+                                            }}
+                                        >
+                                            Create an organization
+                                        </a>
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>

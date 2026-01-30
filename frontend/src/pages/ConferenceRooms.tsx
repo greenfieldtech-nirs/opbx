@@ -13,6 +13,7 @@ import {
   Video,
   ChevronDown,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +69,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
 import { toast } from 'sonner';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -132,7 +144,8 @@ export default function ConferenceRooms() {
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   const [formData, setFormData] = useState<RoomFormData>(emptyFormData);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isSecurityOpen, setIsSecurityOpen] = useState(false);
+  const [isAudioOpen, setIsAudioOpen] = useState(false);
 
   const canManageRooms = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
 
@@ -177,7 +190,6 @@ export default function ConferenceRooms() {
       queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
-      setIsAdvancedOpen(false);
       toast.success('Conference room created successfully');
     },
     onError: (error: any) => {
@@ -195,7 +207,6 @@ export default function ConferenceRooms() {
       setIsEditDialogOpen(false);
       setSelectedRoom(null);
       setFormData(emptyFormData);
-      setIsAdvancedOpen(false);
       toast.success('Conference room updated successfully');
     },
     onError: (error: any) => {
@@ -322,6 +333,14 @@ export default function ConferenceRooms() {
     updateMutation.mutate({ id: selectedRoom.id, data: requestData });
   };
 
+  const handleToggleStatus = (room: ConferenceRoom) => {
+    const newStatus = room.status === 'active' ? 'inactive' : 'active';
+    updateMutation.mutate({
+      id: room.id,
+      data: { status: newStatus }
+    });
+  };
+
   const handleDeleteRoom = () => {
     if (!selectedRoom) return;
     deleteMutation.mutate(selectedRoom.id);
@@ -329,7 +348,8 @@ export default function ConferenceRooms() {
 
   const openCreateDialog = () => {
     setFormData(emptyFormData);
-    setIsAdvancedOpen(false);
+    setIsSecurityOpen(false);
+    setIsAudioOpen(false);
     setIsCreateDialogOpen(true);
   };
 
@@ -353,7 +373,8 @@ export default function ConferenceRooms() {
       talk_detection_enabled: room.talk_detection_enabled,
       talk_detection_webhook_url: room.talk_detection_webhook_url || '',
     });
-    setIsAdvancedOpen(false);
+    setIsSecurityOpen(false);
+    setIsAudioOpen(false);
     setIsEditDialogOpen(true);
   };
 
@@ -369,34 +390,21 @@ export default function ConferenceRooms() {
 
   const renderRoomForm = () => (
     <div className="space-y-4">
-      {/* Basic Fields */}
-      <div className="space-y-2">
-        <Label htmlFor="name">
-          Conference Room Name <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="name"
-          placeholder="e.g., Executive Board Room"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          placeholder="Brief description of this conference room's purpose..."
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          rows={3}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-4">
+        <div className="col-span-3 space-y-2">
+          <Label htmlFor="name">
+            Conference Room Name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="name"
+            placeholder="e.g., Executive Board Room"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          />
+        </div>
         <div className="space-y-2">
           <Label htmlFor="max_participants">
-            Maximum Participants <span className="text-destructive">*</span>
+            Max Participants <span className="text-destructive">*</span>
           </Label>
           <Input
             id="max_participants"
@@ -407,49 +415,23 @@ export default function ConferenceRooms() {
             onChange={(e) => setFormData({ ...formData, max_participants: e.target.value })}
           />
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
-          <Select
-            value={formData.status}
-            onValueChange={(value: 'active' | 'inactive') =>
-              setFormData({ ...formData, status: value })
-            }
-          >
-            <SelectTrigger id="status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
-      {/* Advanced Settings - Collapsible */}
-      <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            <span className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Advanced Settings
-            </span>
-            <ChevronDown
-              className={`h-4 w-4 transition-transform ${
-                isAdvancedOpen ? 'rotate-180' : ''
-              }`}
-            />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 pt-4">
-          {/* Security Settings */}
-          <div className="space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Lock className="h-4 w-4" />
-              Security & Access
-            </h4>
-            <div className="space-y-3 pl-6">
+      {/* Security Settings Collapsible */}
+      <div className="border rounded-md">
+        <Collapsible open={isSecurityOpen} onOpenChange={setIsSecurityOpen}>
+          {/* ... inner logic ... */}
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between p-3 h-auto hover:bg-muted/50">
+              <span className="flex items-center gap-2 font-medium">
+                <Lock className="h-4 w-4 text-blue-500" />
+                Security & Access
+              </span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", isSecurityOpen && "rotate-180")} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="p-3 pt-0 space-y-4 border-t">
+            <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="pin_required">PIN Protection</Label>
@@ -509,15 +491,25 @@ export default function ConferenceRooms() {
                 />
               </div>
             </div>
-          </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
 
-          {/* Audio Settings */}
-          <div className="space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Mic className="h-4 w-4" />
-              Audio Settings
-            </h4>
-            <div className="space-y-3 pl-6">
+      {/* Audio Settings Collapsible */}
+      <div className="border rounded-md">
+        <Collapsible open={isAudioOpen} onOpenChange={setIsAudioOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between p-3 h-auto hover:bg-muted/50">
+              <span className="flex items-center gap-2 font-medium">
+                <Mic className="h-4 w-4 text-purple-500" />
+                Audio Settings
+              </span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", isAudioOpen && "rotate-180")} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="p-3 pt-0 space-y-6 border-t">
+            {/* Basic Audio Controls */}
+            <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="mute_on_entry">Mute on Entry</Label>
@@ -566,15 +558,13 @@ export default function ConferenceRooms() {
                 />
               </div>
             </div>
-          </div>
 
-          {/* Recording Settings */}
-          <div className="space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Video className="h-4 w-4" />
-              Recording
-            </h4>
-            <div className="space-y-3 pl-6">
+            {/* Recording Settings (Moved inside Audio) */}
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="font-medium flex items-center gap-2 text-sm text-muted-foreground">
+                <Video className="h-3.5 w-3.5" />
+                Recording
+              </h4>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="recording_enabled">Enable Recording</Label>
@@ -592,7 +582,7 @@ export default function ConferenceRooms() {
               </div>
 
               {formData.recording_enabled && (
-                <>
+                <div className="space-y-4 pl-4 border-l-2 border-muted ml-1">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="recording_auto_start">Auto-Start Recording</Label>
@@ -621,26 +611,24 @@ export default function ConferenceRooms() {
                       }
                     />
                     <p className="text-sm text-muted-foreground">
-                      HTTP endpoint to receive recording completed events
+                      HTTP endpoint to receive events
                     </p>
                   </div>
-                </>
+                </div>
               )}
             </div>
-          </div>
 
-          {/* Talk Detection */}
-          <div className="space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Mic className="h-4 w-4" />
-              Talk Detection
-            </h4>
-            <div className="space-y-3 pl-6">
+            {/* Talk Detection (Moved inside Audio) */}
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="font-medium flex items-center gap-2 text-sm text-muted-foreground">
+                <Mic className="h-3.5 w-3.5" />
+                Talk Detection
+              </h4>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="talk_detection_enabled">Enable Talk Detection</Label>
                   <p className="text-sm text-muted-foreground">
-                    Send start/stop talking events to webhook endpoint
+                    Send start/stop talking events to webhook
                   </p>
                 </div>
                 <Switch
@@ -653,7 +641,7 @@ export default function ConferenceRooms() {
               </div>
 
               {formData.talk_detection_enabled && (
-                <div className="space-y-2">
+                <div className="space-y-2 pl-4 border-l-2 border-muted ml-1">
                   <Label htmlFor="talk_detection_webhook_url">
                     Webhook URL <span className="text-destructive">*</span>
                   </Label>
@@ -666,15 +654,12 @@ export default function ConferenceRooms() {
                       setFormData({ ...formData, talk_detection_webhook_url: e.target.value })
                     }
                   />
-                  <p className="text-sm text-muted-foreground">
-                    HTTP endpoint to receive participant start/stop talking events
-                  </p>
                 </div>
               )}
             </div>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
     </div>
   );
 
@@ -730,7 +715,7 @@ export default function ConferenceRooms() {
             </Button>
 
             {/* Filter dropdowns */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
@@ -738,157 +723,129 @@ export default function ConferenceRooms() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Conference Rooms Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Conference Rooms</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading...' : `${totalRooms} room${totalRooms !== 1 ? 's' : ''}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading || error || rooms.length === 0 ? (
-            // Empty/Loading/Error States
-            <div className="text-center py-12">
-              {isLoading ? (
-                <p className="text-muted-foreground">Loading conference rooms...</p>
-              ) : error ? (
-                <div className="text-destructive">
-                  <p className="font-semibold mb-2">Error loading conference rooms</p>
-                  <p className="text-sm text-muted-foreground">Please try again later</p>
-                </div>
-              ) : (
-                <>
-                  <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No conference rooms found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {searchQuery || statusFilter !== 'all'
-                      ? 'Try adjusting your filters'
-                      : 'Get started by creating your first conference room'}
-                  </p>
-                  {canManageRooms && !searchQuery && statusFilter === 'all' && (
-                    <Button onClick={openCreateDialog}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Conference Room
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="cursor-pointer select-none hover:bg-gray-50"
-                    onClick={() => handleSort('name')}
+        <CardContent className="pt-6">
+          <StandardDataTable<ConferenceRoom>
+            data={rooms}
+            isLoading={isLoading}
+            onRowClick={openDetailSheet}
+            identityIcon={Mic}
+            identityIconBg="bg-purple-100"
+            identityIconColor="text-purple-600"
+            getIdentityPrimary={(room) => room.name}
+            getIdentitySecondary={() => 'Conference Room'}
+            onIdentityClick={openDetailSheet}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onView={openDetailSheet}
+            onEdit={openEditDialog}
+            onDelete={(room) => {
+              setSelectedRoom(room); // Assuming setRoomToDelete is setSelectedRoom
+              setIsDeleteDialogOpen(true); // Assuming setShowDeleteDialog is setIsDeleteDialogOpen
+            }}
+            columns={[
+              {
+                header: 'Capacity',
+                sortKey: 'max_participants',
+                cell: (room) => (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    {room.max_participants}
+                  </div>
+                )
+              },
+              {
+                header: 'Status',
+                cell: (room) => (
+                  <Badge
+                    variant={room.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      room.status === 'active'
+                        ? "bg-green-100 text-green-800 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleStatus(room);
+                    }}
                   >
-                    <div className="flex items-center gap-2">
-                      Room Name
-                      {sortField === 'name' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    {room.status === 'active' ? 'Active' : 'Inactive'}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Audio Settings',
+                cell: (room) => {
+                  const audioFeatures = [];
+                  if (room.recording_enabled) audioFeatures.push('Recording');
+                  if (room.talk_detection_enabled) audioFeatures.push('Talk Detection');
+                  if (room.mute_on_entry) audioFeatures.push('Mute on Entry');
+                  if (room.music_on_hold) audioFeatures.push('Music on Hold');
+
+                  return audioFeatures.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {audioFeatures.slice(0, 2).map((feature) => (
+                        <Badge key={feature} variant="outline" className="text-[10px] py-0">
+                          {feature}
+                        </Badge>
+                      ))}
+                      {audioFeatures.length > 2 && (
+                        <Badge variant="outline" className="text-[10px] py-0">
+                          +{audioFeatures.length - 2}
+                        </Badge>
                       )}
                     </div>
-                  </TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none hover:bg-gray-50"
-                    onClick={() => handleSort('max_participants')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Capacity
-                      {sortField === 'max_participants' && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Standard</span>
+                  );
+                }
+              },
+              {
+                header: 'Security',
+                cell: (room) => {
+                  const securityFeatures = [];
+                  if (room.pin_required) securityFeatures.push('PIN');
+                  if (room.wait_for_host) securityFeatures.push('Wait for Host');
+
+                  return securityFeatures.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {securityFeatures.map((feature) => (
+                        <Badge key={feature} variant="outline" className="text-[10px] py-0 border-orange-200 text-orange-700">
+                          {feature}
+                        </Badge>
+                      ))}
                     </div>
-                  </TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Security</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rooms.map((room) => {
-                    const securityFeatures = [];
-                    if (room.pin_required) securityFeatures.push('PIN');
-                    if (room.wait_for_host) securityFeatures.push('Wait for Host');
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Open</span>
+                  );
+                }
+              }
+            ]}
+            emptyState={
+              <EmptyState
+                icon={Video}
+                title="No conference rooms found"
+                description={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first conference room'}
+                action={canManageRooms && !searchQuery && statusFilter === 'all' ? {
+                  label: "Add Conference Room",
+                  onClick: openCreateDialog
+                } : undefined}
+              />
+            }
+          />
 
-                    return (
-                      <TableRow
-                        key={room.id}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => openDetailSheet(room)}
-                      >
-                        <TableCell className="font-medium">{room.name}</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {room.description || (
-                            <span className="text-muted-foreground">No description</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            {room.max_participants}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={room.status === 'active' ? 'default' : 'secondary'}>
-                            {room.status === 'active' ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {securityFeatures.length > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <Lock className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">{securityFeatures.join(', ')}</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">None</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          {canManageRooms ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(room)}>
-                                  <Edit2 className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => openDeleteDialog(room)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (
-                            <Button variant="ghost" size="sm">View</Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            </Table>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalRooms)} of {totalRooms} rooms
               </div>
@@ -914,8 +871,6 @@ export default function ConferenceRooms() {
                 </Button>
               </div>
             </div>
-            )}
-            </>
           )}
         </CardContent>
       </Card>
@@ -1190,6 +1145,6 @@ export default function ConferenceRooms() {
           )}
         </SheetContent>
       </Sheet>
-    </div>
+    </div >
   );
 }

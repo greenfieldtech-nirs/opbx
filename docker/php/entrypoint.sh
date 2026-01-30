@@ -27,6 +27,12 @@ done
 
 echo "MySQL is ready!"
 
+# Clear stale caches to ensure routes and config are always fresh
+echo "Clearing stale caches..."
+php artisan route:clear 2>/dev/null || echo "Route cache clear skipped"
+php artisan config:clear 2>/dev/null || echo "Config cache clear skipped"
+php artisan view:clear 2>/dev/null || echo "View cache clear skipped"
+
 # Run migrations only from the main app container (not from queue-worker or scheduler)
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running database migrations..."
@@ -39,7 +45,7 @@ else
     echo "Skipping migrations (RUN_MIGRATIONS=false)..."
 fi
 
-# Cache configuration for production
+# Cache configuration for production (after clearing stale caches)
 if [ "$APP_ENV" = "production" ]; then
     echo "Caching configuration..."
     php artisan config:cache

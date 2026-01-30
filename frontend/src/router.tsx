@@ -9,6 +9,7 @@ import { AppLayout } from '@/components/Layout/AppLayout';
 import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 import { OwnerRoute } from '@/components/Auth/OwnerRoute';
 import Login from '@/pages/Login';
+import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 
 // Lazy load pages for code splitting
@@ -33,6 +34,10 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <Login />,
+  },
+  {
+    path: '/register',
+    element: <Register />,
   },
   {
     path: '/',

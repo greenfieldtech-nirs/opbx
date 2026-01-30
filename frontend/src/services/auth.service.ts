@@ -6,7 +6,7 @@
  */
 
 import api from './api';
-import type { LoginRequest, LoginResponse, RefreshResponse, User } from '@/types';
+import type { LoginRequest, LoginResponse, RefreshResponse, User, RegisterRequest, RegisterResponse, RegisterValidationResponse } from '@/types';
 
 export const authService = {
   /**
@@ -15,6 +15,27 @@ export const authService = {
    */
   login: (credentials: LoginRequest): Promise<LoginResponse> => {
     return api.post<LoginResponse>('/auth/login', credentials)
+      .then(res => res.data);
+  },
+
+  /**
+   * Register new organization with admin user
+   * POST /auth/register
+   */
+  register: (data: RegisterRequest): Promise<RegisterResponse> => {
+    return api.post<RegisterResponse>('/auth/register', data)
+      .then(res => res.data);
+  },
+
+  /**
+   * Validate registration data before submission
+   * GET /auth/register/validate
+   */
+  validateRegistration: (params: {
+    organization_name?: string;
+    admin_email?: string;
+  }): Promise<RegisterValidationResponse> => {
+    return api.get<RegisterValidationResponse>('/auth/register/validate', { params })
       .then(res => res.data);
   },
 

@@ -73,7 +73,7 @@ export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
 
 // ============================================================================
 // Entity Types
@@ -119,10 +119,19 @@ export interface Extension {
   organization_id: string;
   user_id: string | null;
   extension_number: string;
+  name: string;
   password: string;
   type: ExtensionType;
   status: Status;
+  sip_config?: {
+    username?: string;
+    password?: string;
+    server?: string;
+  };
   voicemail_enabled: boolean;
+  voicemail_pin?: string;
+  call_forwarding_enabled: boolean;
+  call_forwarding_number?: string;
   configuration?: Record<string, any>;
   // Eager loaded relationships
   user?: User | null;
@@ -136,15 +145,16 @@ export interface DIDNumber {
   organization_id: string;
   phone_number: string;
   friendly_name?: string;
-   routing_type: RoutingType;
-   routing_config: {
-     extension_id?: string;
-     ai_assistant_id?: string;
-     ring_group_id?: string;
-     business_hours_schedule_id?: string;
-     conference_room_id?: string;
-   };
-   status: Status;
+  routing_type: RoutingType;
+  routing_config: {
+    extension_id?: string;
+    ai_assistant_id?: string;
+    ring_group_id?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
+    ivr_menu_id?: string;
+  };
+  status: Status;
   cloudonix_config?: {
     number_id?: string;
     purchased_at?: string;
@@ -167,18 +177,19 @@ export interface RingGroup {
   id: string;
   organization_id: string;
   name: string;
+  description?: string;
   strategy: RingGroupStrategy;
   timeout: number; // seconds
+  ring_turns: number;
   members: Array<{
     extension_id: string;
+    extension_number: string;
+    user_name: string | null;
     priority: number;
   }>;
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
   fallback_extension_number?: string;
-  fallback_ring_group_id?: string;
-  fallback_ivr_menu_id?: string;
-  fallback_ai_assistant_id?: string;
   status: Status;
   created_at: string;
   updated_at: string;
@@ -190,25 +201,21 @@ export interface BusinessHours {
   organization_id: string;
   name: string;
   timezone: string;
-  schedules: Array<{
-    day_of_week: number; // 0=Sunday, 6=Saturday
-    open_time: string;   // "09:00"
-    close_time: string;  // "17:00"
-  }>;
+  schedule: {
+    [key: string]: {
+      open: string;
+      close: string;
+      enabled: boolean;
+    };
+  };
   holidays: Array<{
     date: string;
     name: string;
   }>;
-  open_hours_routing: {
-    type: 'extension' | 'ring_group';
-    extension_id?: string;
-    ring_group_id?: string;
-  };
-  closed_hours_routing: {
-    type: 'voicemail' | 'extension' | 'ring_group' | 'hangup';
-    extension_id?: string;
-    ring_group_id?: string;
-  };
+  open_routing_type: RoutingType;
+  open_routing_config: Record<string, unknown>;
+  closed_routing_type: RoutingType;
+  closed_routing_config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -326,6 +333,44 @@ export interface RefreshResponse {
   access_token: string;
   token_type: 'Bearer';
   expires_in: number;
+}
+
+export interface OrganizationRegistration {
+  name: string;
+  timezone: string;
+}
+
+export interface AdminUserRegistration {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface RegisterRequest {
+  organization: OrganizationRegistration;
+  admin: AdminUserRegistration;
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: User;
+  organization: Organization;
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+}
+
+export interface RegisterValidationResponse {
+  valid: boolean;
+  available: {
+    organization_name: boolean;
+    admin_email: boolean;
+  };
+  errors?: {
+    organization_name?: string[];
+    admin_email?: string[];
+  };
 }
 
 // ============================================================================
@@ -659,15 +704,15 @@ export interface CloudonixSettings {
   domain_api_key: string | null;
   domain_requests_api_key: string | null;
   webhook_base_url: string | null;
-   no_answer_timeout: number;
-   recording_format: RecordingFormat;
-   cloudonix_package: string | null;
-   callback_url?: string | null;
-   cdr_url?: string | null;
-   is_configured: boolean;
-   has_webhook_auth: boolean;
-   created_at: string;
-   updated_at: string;
+  no_answer_timeout: number;
+  recording_format: RecordingFormat;
+  cloudonix_package: string | null;
+  callback_url?: string | null;
+  cdr_url?: string | null;
+  is_configured: boolean;
+  has_webhook_auth: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UpdateCloudonixSettingsRequest {

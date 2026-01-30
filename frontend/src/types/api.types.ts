@@ -48,7 +48,7 @@ export interface APIError {
 export type Status = 'active' | 'inactive';
 
 // User Roles
-export type UserRole = 'owner' | 'admin' | 'agent';
+export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
 
 // Extension Types
 export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward';
@@ -203,15 +203,16 @@ export interface DIDNumber {
   organization_id: string;
   phone_number: string;
   friendly_name?: string;
-   routing_type: RoutingType;
-   routing_config: {
-     extension_id?: string;
-     ai_assistant_id?: string;
-     ring_group_id?: string;
-     business_hours_schedule_id?: string;
-     conference_room_id?: string;
-   };
-   cloudonix_config?: {
+  routing_type: RoutingType;
+  routing_config: {
+    extension_id?: string;
+    ai_assistant_id?: string;
+    ring_group_id?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
+    ivr_menu_id?: string;
+  };
+  cloudonix_config?: {
     number_id?: string;
     purchased_at?: string;
     monthly_cost?: number;
@@ -725,15 +726,57 @@ export interface UpdateSentrySettingsRequest {
   default_action: 'allow' | 'block' | 'flag';
 }
 
-// User/Extension status types
+// User Status
 export type UserStatus = 'active' | 'inactive' | 'suspended';
+
+// ============================================================================
+// Registration
+// ============================================================================
+
+export interface OrganizationRegistration {
+  name: string;
+  timezone: string;
+}
+
+export interface AdminUserRegistration {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface RegisterRequest {
+  organization: OrganizationRegistration;
+  admin: AdminUserRegistration;
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: User;
+  organization: Organization;
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+}
+
+export interface RegisterValidationResponse {
+  valid: boolean;
+  available: {
+    organization_name: boolean;
+    admin_email: boolean;
+  };
+  errors?: {
+    organization_name?: string[];
+    admin_email?: string[];
+  };
+}
 export type ExtensionStatus = 'active' | 'inactive';
 
 // ============================================================================
 // Recordings
 // ============================================================================
 
-export type RecordingType = 'greeting' | 'hold_music' | 'announcement' | 'other';
+export type RecordingType = 'greeting' | 'hold_music' | 'announcement' | 'other' | 'upload' | 'remote';
 export type RecordingStatus = 'active' | 'inactive' | 'processing' | 'failed';
 
 export interface Recording {
