@@ -5,6 +5,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/auth.service';
 import { storage } from '@/utils/storage';
 import type { User, LoginRequest, RegisterRequest } from '@/types';
@@ -24,6 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(storage.getUser());
   const [token, setToken] = useState<string | null>(storage.getToken());
   const [isLoading, setIsLoading] = useState(true);
@@ -62,6 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authService.login(credentials);
 
+      // Clear all cached queries before setting new user data
+      queryClient.clear();
+
       // Store auth data
       storage.setToken(response.access_token);
       storage.setUser(response.user);
@@ -85,6 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (data: RegisterRequest, onSuccess?: () => void): Promise<void> => {
     try {
       const response = await authService.register(data);
+
+      // Clear all cached queries before setting new user data
+      queryClient.clear();
 
       storage.setToken(response.access_token);
       storage.setUser(response.user);
@@ -114,6 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       storage.clearAll();
       setToken(null);
       setUser(null);
+
+      // Clear all cached queries to remove user-specific data
+      queryClient.clear();
 
       // Call success callback (for navigation)
       if (onSuccess) {
