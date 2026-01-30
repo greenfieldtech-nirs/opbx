@@ -39,6 +39,12 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Plus,
   Search,
   Phone,
@@ -188,6 +194,14 @@ export default function PhoneNumbers() {
     }
   };
 
+  const handleToggleStatus = (phoneNumber: DIDNumber) => {
+    const newStatus = phoneNumber.status === 'active' ? 'inactive' : 'active';
+    updateMutation.mutate({
+      id: phoneNumber.id,
+      data: { status: newStatus as 'active' | 'inactive' },
+    });
+  };
+
   // Get routing type icon and color
   const getRoutingTypeDisplay = (routingType: RoutingType) => {
     switch (routingType) {
@@ -335,7 +349,7 @@ export default function PhoneNumbers() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
 
@@ -414,16 +428,30 @@ export default function PhoneNumbers() {
                         </TableCell>
                         <TableCell>{getDestinationDisplay(phoneNumber)}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={phoneNumber.status === 'active' ? 'default' : 'secondary'}
-                            className={
-                              phoneNumber.status === 'active'
-                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                            }
-                          >
-                            {phoneNumber.status === 'active' ? 'Active' : 'Inactive'}
-                          </Badge>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant={phoneNumber.status === 'active' ? 'default' : 'secondary'}
+                                  className={cn(
+                                    'cursor-pointer transition-all hover:scale-105 active:scale-95',
+                                    phoneNumber.status === 'active'
+                                      ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                  )}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleStatus(phoneNumber);
+                                  }}
+                                >
+                                  {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Click to toggle status</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">

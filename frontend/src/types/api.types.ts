@@ -48,7 +48,7 @@ export interface APIError {
 export type Status = 'active' | 'inactive';
 
 // User Roles
-export type UserRole = 'owner' | 'admin' | 'agent';
+export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
 
 // Extension Types
 export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward';
@@ -203,15 +203,16 @@ export interface DIDNumber {
   organization_id: string;
   phone_number: string;
   friendly_name?: string;
-   routing_type: RoutingType;
-   routing_config: {
-     extension_id?: string;
-     ai_assistant_id?: string;
-     ring_group_id?: string;
-     business_hours_schedule_id?: string;
-     conference_room_id?: string;
-   };
-   cloudonix_config?: {
+  routing_type: RoutingType;
+  routing_config: {
+    extension_id?: string;
+    ai_assistant_id?: string;
+    ring_group_id?: string;
+    business_hours_schedule_id?: string;
+    conference_room_id?: string;
+    ivr_menu_id?: string;
+  };
+  cloudonix_config?: {
     number_id?: string;
     purchased_at?: string;
     monthly_cost?: number;
