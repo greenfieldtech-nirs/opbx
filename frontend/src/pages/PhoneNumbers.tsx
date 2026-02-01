@@ -227,6 +227,7 @@ export default function PhoneNumbers() {
   };
 
   const handleToggleStatus = (phoneNumber: DIDNumber) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus: Status = phoneNumber.status === 'active' ? 'inactive' : 'active';
     updateMutation.mutate({
       id: phoneNumber.id,
@@ -477,17 +478,29 @@ export default function PhoneNumbers() {
                         <Badge
                           variant={phoneNumber.status === 'active' ? 'default' : 'secondary'}
                           className={cn(
-                            "text-xs cursor-pointer transition-all hover:scale-105 active:scale-95",
+                            "text-xs transition-all",
+                            updateMutation.isPending && updateMutation.variables?.id === phoneNumber.id
+                              ? 'opacity-50 cursor-wait'
+                              : 'cursor-pointer hover:scale-105 active:scale-95',
                             phoneNumber.status === 'active'
                               ? "bg-green-100 text-green-800 hover:bg-green-200"
                               : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleToggleStatus(phoneNumber);
+                            if (!updateMutation.isPending) {
+                              handleToggleStatus(phoneNumber);
+                            }
                           }}
                         >
-                          {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
+                          {updateMutation.isPending && updateMutation.variables?.id === phoneNumber.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="h-3 w-3 animate-spin" />
+                              {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
+                            </span>
+                          ) : (
+                            phoneNumber.status === 'active' ? 'Active' : 'Disabled'
+                          )}
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>

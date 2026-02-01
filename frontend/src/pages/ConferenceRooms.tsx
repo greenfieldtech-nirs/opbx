@@ -335,6 +335,7 @@ export default function ConferenceRooms() {
   };
 
   const handleToggleStatus = (room: ConferenceRoom) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus = room.status === 'active' ? 'inactive' : 'active';
     updateMutation.mutate({
       id: room.id,
@@ -826,19 +827,30 @@ export default function ConferenceRooms() {
                     variant={room.status === 'active' ? 'default' : 'secondary'}
                     className={cn(
                       "text-xs",
-                      !isReadOnly && "cursor-pointer transition-all hover:scale-105",
+                      !isReadOnly && (
+                        updateMutation.isPending && updateMutation.variables?.id === room.id
+                          ? 'opacity-50 cursor-wait'
+                          : 'cursor-pointer transition-all hover:scale-105'
+                      ),
                       room.status === 'active'
                         ? 'bg-green-100 text-green-800 hover:bg-green-200'
                         : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) {
+                      if (!isReadOnly && !updateMutation.isPending) {
                         handleToggleStatus(room);
                       }
                     }}
                   >
-                    {room.status === 'active' ? 'Active' : 'Inactive'}
+                    {updateMutation.isPending && updateMutation.variables?.id === room.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {room.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    ) : (
+                      room.status === 'active' ? 'Active' : 'Inactive'
+                    )}
                   </Badge>
                 )
               }

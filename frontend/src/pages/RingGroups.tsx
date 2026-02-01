@@ -30,7 +30,7 @@ import type {
   CreateRingGroupRequest,
   UpdateRingGroupRequest,
 } from '@/types/api.types';
-import type { Extension } from '@/types';
+import type { Extension, RingGroupMember } from '@/types';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -374,6 +374,7 @@ export default function RingGroups() {
 
   // Handle status toggle
   const handleToggleStatus = async (group: RingGroup) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus: Status = group.status === 'active' ? 'inactive' : 'active';
 
     // We only need to send the status for a toggle
@@ -1472,19 +1473,30 @@ export default function RingGroups() {
                     variant={group.status === 'active' ? 'default' : 'secondary'}
                     className={cn(
                       "text-xs",
-                      !isReadOnly && "cursor-pointer transition-all hover:scale-105",
+                      !isReadOnly && (
+                        updateMutation.isPending && updateMutation.variables?.id === group.id
+                          ? 'opacity-50 cursor-wait'
+                          : 'cursor-pointer transition-all hover:scale-105'
+                      ),
                       group.status === 'active'
                         ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) {
+                      if (!isReadOnly && !updateMutation.isPending) {
                         handleToggleStatus(group);
                       }
                     }}
                   >
-                    {group.status === 'active' ? 'Active' : 'Disabled'}
+                    {updateMutation.isPending && updateMutation.variables?.id === group.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {group.status === 'active' ? 'Active' : 'Disabled'}
+                      </span>
+                    ) : (
+                      group.status === 'active' ? 'Active' : 'Disabled'
+                    )}
                   </Badge>
                 )
               }

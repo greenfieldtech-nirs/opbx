@@ -265,7 +265,7 @@ export default function IVRMenus() {
   const [statusFilter, setStatusFilter] = useState<IvrMenuStatus | 'all'>('all');
   const [sortField, setSortField] = useState<'name' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(25);
 
   // Dialog states
@@ -483,6 +483,7 @@ export default function IVRMenus() {
 
   // Handle status toggle
   const handleToggleStatus = (menu: IvrMenu & { id: string | number }) => {
+    if (toggleStatusMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus = menu.status === 'active' ? 'inactive' : 'active';
     toggleStatusMutation.mutate({ id: String(menu.id), status: newStatus });
   };
@@ -778,7 +779,10 @@ export default function IVRMenus() {
                 cell: (menu) => (
                   <Badge
                     className={cn(
-                      'capitalize cursor-pointer transition-all hover:scale-105',
+                      'capitalize transition-all',
+                      toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(menu.id)
+                        ? 'opacity-50 cursor-wait'
+                        : 'cursor-pointer hover:scale-105',
                       menu.status === 'active'
                         ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
                         : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
@@ -786,10 +790,19 @@ export default function IVRMenus() {
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleStatus(menu);
+                      if (!toggleStatusMutation.isPending) {
+                        handleToggleStatus(menu);
+                      }
                     }}
                   >
-                    {menu.status}
+                    {toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(menu.id) ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {menu.status}
+                      </span>
+                    ) : (
+                      menu.status
+                    )}
                   </Badge>
                 )
               }
