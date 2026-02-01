@@ -773,29 +773,6 @@ export default function ConferenceRooms() {
                 )
               },
               {
-                header: 'Status',
-                cell: (room) => (
-                  <Badge
-                    variant={room.status === 'active' ? 'default' : 'secondary'}
-                    className={cn(
-                      "text-xs",
-                      !isReadOnly && "cursor-pointer transition-all hover:scale-105",
-                      room.status === 'active'
-                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) {
-                        handleToggleStatus(room);
-                      }
-                    }}
-                  >
-                    {room.status === 'active' ? 'Active' : 'Inactive'}
-                  </Badge>
-                )
-              },
-              {
                 header: 'Audio Settings',
                 cell: (room) => {
                   const audioFeatures = [];
@@ -841,6 +818,29 @@ export default function ConferenceRooms() {
                     <span className="text-muted-foreground text-xs">Open</span>
                   );
                 }
+              },
+              {
+                header: 'Status',
+                cell: (room) => (
+                  <Badge
+                    variant={room.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs",
+                      !isReadOnly && "cursor-pointer transition-all hover:scale-105",
+                      room.status === 'active'
+                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) {
+                        handleToggleStatus(room);
+                      }
+                    }}
+                  >
+                    {room.status === 'active' ? 'Active' : 'Inactive'}
+                  </Badge>
+                )
               }
             ]}
             emptyState={
