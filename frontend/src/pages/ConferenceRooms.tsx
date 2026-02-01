@@ -148,6 +148,7 @@ export default function ConferenceRooms() {
   const [isAudioOpen, setIsAudioOpen] = useState(false);
 
   const canManageRooms = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const isReadOnly = currentUser?.role === 'reporter';
 
   // Debounce search input
   useEffect(() => {
@@ -667,10 +668,17 @@ export default function ConferenceRooms() {
     <div className="space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Video className="h-8 w-8" />
-            Conference Rooms
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Video className="h-8 w-8" />
+              Conference Rooms
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
             Manage conference rooms for audio/video meetings
           </p>
