@@ -1029,115 +1029,6 @@ export default function ExtensionsComplete() {
     }
   };
 
-  // PBX User view - show only their extension
-  if (currentUser.role === 'pbx_user') {
-    const userExtension = extensions.find(ext => ext.user_id === currentUser.id);
-
-    if (!userExtension) {
-      return (
-        <div className="space-y-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-2">
-                <Phone className="h-8 w-8" />
-                My Extension
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Your phone extension settings
-              </p>
-            </div>
-          </div>
-
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Extension Assigned</h3>
-              <p className="text-muted-foreground">
-                You don't have an extension assigned yet. Contact your administrator.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Phone className="h-8 w-8" />
-              My Extension
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Your phone extension settings
-            </p>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Phone className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <CardTitle>Extension {userExtension.extension_number}</CardTitle>
-                  <CardDescription>{getTypeBadge(userExtension.type)}</CardDescription>
-                </div>
-              </div>
-              <Badge className={cn(getStatusColor(userExtension.status))}>
-                {userExtension.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Extension Number</p>
-                <p className="text-lg font-semibold">{userExtension.extension_number}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Type</p>
-                <div className="mt-1">{getTypeBadge(userExtension.type)}</div>
-              </div>
-              {userExtension.type === 'user' && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Voicemail</p>
-                  <p className="text-lg">
-                    {userExtension.voicemail_enabled ? (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        <Check className="h-3 w-3 mr-1" />
-                        Enabled
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                        <X className="h-3 w-3 mr-1" />
-                        Disabled
-                      </Badge>
-                    )}
-                  </p>
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Created</p>
-                <p className="text-sm">{formatDate(userExtension.created_at)}</p>
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <Button onClick={() => openEditDialog(userExtension)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit My Extension
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   // Loading state
   if (isLoading) {
     return (
@@ -1333,31 +1224,34 @@ export default function ExtensionsComplete() {
           <StandardDataTable<Extension>
             data={displayedExtensions}
             isLoading={isLoading}
-            onRowClick={(extension) => {
+            onRowClick={canCreate ? ((extension) => {
               setSelectedExtension(extension);
               setShowExtensionDetail(true);
-            }}
+            }) : undefined}
             identityIcon={Phone}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(extension) => extension.extension_number}
             getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
-            onIdentityClick={(extension) => {
+            onIdentityClick={canCreate ? ((extension) => {
               setSelectedExtension(extension);
               setShowExtensionDetail(true);
-            }}
+            }) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={(extension) => {
+            onView={canCreate ? ((extension) => {
               setSelectedExtension(extension);
               setShowExtensionDetail(true);
-            }}
-            onEdit={openEditDialog}
-            onDelete={(extension) => {
+            }) : undefined}
+            onEdit={canCreate ? openEditDialog : undefined}
+            onDelete={canCreate ? ((extension) => {
               setSelectedExtension(extension);
               setShowDeleteDialog(true);
-            }}
+            }) : undefined}
+            canView={canCreate}
+            canEdit={canCreate}
+            canDelete={canCreate}
             columns={[
               ...(displayedExtensions.some(ext => ext.type === 'user') ? [{
                 header: 'Password',
