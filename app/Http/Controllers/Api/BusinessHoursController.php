@@ -320,12 +320,12 @@ class BusinessHoursController extends AbstractApiCrudController
             'exceptions' => $validated['exceptions'] ?? [],
             'actions' => [
                 'open_hours' => [
-                    'action' => $validated['open_hours_action']['action'] ?? null,
-                    'action_type' => $validated['open_hours_action']['action_type'] ?? null,
+                    'action' => $validated['open_hours_action']['target_id'] ?? null,
+                    'action_type' => $validated['open_hours_action']['type'] ?? null,
                 ],
                 'closed_hours' => [
-                    'action' => $validated['closed_hours_action']['action'] ?? null,
-                    'action_type' => $validated['closed_hours_action']['action_type'] ?? null,
+                    'action' => $validated['closed_hours_action']['target_id'] ?? null,
+                    'action_type' => $validated['closed_hours_action']['type'] ?? null,
                 ],
             ],
         ];
