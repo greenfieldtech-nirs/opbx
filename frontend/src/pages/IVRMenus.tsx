@@ -469,7 +469,7 @@ export default function IVRMenus() {
 
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: IvrMenuStatus }) =>
-      ivrMenusService.update(id, { status } as any),
+      ivrMenusService.patch(id, { status } as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
