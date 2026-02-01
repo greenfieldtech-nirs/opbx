@@ -407,4 +407,57 @@ class BusinessHoursController extends AbstractApiCrudController
     {
         return 'delete';
     }
+
+    /**
+     * Toggle the status of a business hours schedule.
+     */
+    public function toggleStatus(\App\Http\Requests\BusinessHours\ToggleBusinessHoursStatusRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
+    {
+        $user = $this->getAuthenticatedUser();
+
+        // Tenant scope check
+        if ($businessHour->organization_id !== $user->organization_id) {
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Business hours schedule not found.',
+            ], 404);
+        }
+
+        $newStatus = $request->input('status');
+        $oldStatus = $businessHour->status;
+
+        try {
+            $businessHour->update(['status' => $newStatus]);
+
+            Log::info('Business hours schedule status toggled', [
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'schedule_id' => $businessHour->id,
+                'schedule_name' => $businessHour->name,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+
+            return response()->json([
+                'message' => 'Business hours schedule status updated successfully.',
+                'data' => [
+                    'id' => $businessHour->id,
+                    'status' => $businessHour->status,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle business hours schedule status', [
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'schedule_id' => $businessHour->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update business hours schedule status',
+                'message' => 'An error occurred while updating the schedule status.',
+            ], 500);
+        }
+    }
 }

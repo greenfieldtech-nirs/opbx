@@ -183,6 +183,8 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('business-hours', BusinessHoursController::class);
         Route::post('business-hours/{businessHour}/duplicate', [BusinessHoursController::class, 'duplicate'])
             ->name('business-hours.duplicate');
+        Route::patch('business-hours/{businessHour}/toggle-status', [BusinessHoursController::class, 'toggleStatus'])
+            ->name('business-hours.toggle-status');
 
         // Phone Numbers (DIDs)
         Route::apiResource('phone-numbers', PhoneNumberController::class);
