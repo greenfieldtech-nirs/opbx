@@ -467,6 +467,25 @@ export default function IVRMenus() {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: IvrMenuStatus }) =>
+      ivrMenusService.update(id, { status } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
+      toast.success('IVR menu status updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update IVR menu status');
+    },
+  });
+
+  // Handle status toggle
+  const handleToggleStatus = (menu: IvrMenu & { id: string | number }) => {
+    const newStatus = menu.status === 'active' ? 'inactive' : 'active';
+    toggleStatusMutation.mutate({ id: String(menu.id), status: newStatus });
+  };
+
   // Toggle sort
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -758,12 +777,16 @@ export default function IVRMenus() {
                 cell: (menu) => (
                   <Badge
                     className={cn(
-                      'capitalize',
+                      'capitalize cursor-pointer transition-all hover:scale-105',
                       menu.status === 'active'
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : 'bg-gray-100 text-gray-800 border-gray-200'
+                        ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
                     )}
                     variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleStatus(menu);
+                    }}
                   >
                     {menu.status}
                   </Badge>
@@ -831,8 +854,8 @@ export default function IVRMenus() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Name and Status fields above tabs */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Name field above tabs */}
+          <div className="mb-6">
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
               <Input
@@ -841,19 +864,6 @@ export default function IVRMenus() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., Main Menu"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
-                />
-                <Label htmlFor="status" className="text-sm font-normal">
-                  {formData.status === 'active' ? 'Active' : 'Disabled'}
-                </Label>
-              </div>
             </div>
           </div>
 
@@ -1324,8 +1334,8 @@ export default function IVRMenus() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Name and Status fields above tabs */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Name field above tabs */}
+          <div className="mb-6">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Name *</Label>
               <Input
@@ -1334,19 +1344,6 @@ export default function IVRMenus() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., Main Menu"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="edit-status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
-                />
-                <Label htmlFor="edit-status" className="text-sm font-normal">
-                  {formData.status === 'active' ? 'Active' : 'Disabled'}
-                </Label>
-              </div>
             </div>
           </div>
 
