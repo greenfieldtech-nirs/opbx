@@ -5,18 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
-use App\Enums\UserStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\HttpResponseException;
 
 /**
@@ -48,10 +44,9 @@ class UsersController extends AbstractApiCrudController
 
     private ResilientCacheService $resilientCache;
 
-    public function __construct()
+    public function __construct(?ResilientCacheService $resilientCache = null)
     {
-        parent::__construct();
-        $this->resilientCache = new ResilientCacheService();
+        $this->resilientCache = $resilientCache ?? new ResilientCacheService;
     }
 
     /**
@@ -139,13 +134,14 @@ class UsersController extends AbstractApiCrudController
      * This method uses distributed locking to prevent race conditions where
      * two concurrent requests could both delete the last owner.
      *
-     * @param User $model User being deleted
-     * @param User $currentUser User performing the deletion
+     * @param  User  $model  User being deleted
+     * @param  User  $currentUser  User performing the deletion
+     *
      * @throws HttpResponseException If deletion would leave organization without an owner
      */
     private function preventLastOwnerDeletion(User $model, User $currentUser): void
     {
-        $lockKey = self::LOCK_KEY_ORG_OWNER_DELETE . $currentUser->organization_id;
+        $lockKey = self::LOCK_KEY_ORG_OWNER_DELETE.$currentUser->organization_id;
 
         $result = $this->resilientCache->lock(
             $lockKey,
@@ -268,7 +264,7 @@ class UsersController extends AbstractApiCrudController
     {
         // Clear user from cache
         try {
-            \Illuminate\Support\Facades\Cache::forget('user.' . $model->id);
+            \Illuminate\Support\Facades\Cache::forget('user.'.$model->id);
         } catch (\Exception $e) {
             // Ignore cache errors
         }
