@@ -176,6 +176,8 @@ Route::prefix('v1')->group(function (): void {
         // IVR Menus
         Route::get('ivr-menus/voices', [IvrMenuController::class, 'getVoices'])->name('ivr-menus.voices');
         Route::apiResource('ivr-menus', IvrMenuController::class);
+        Route::patch('ivr-menus/{ivrMenu}/toggle-status', [IvrMenuController::class, 'toggleStatus'])
+            ->name('ivr-menus.toggle-status');
 
         // Business Hours
         Route::apiResource('business-hours', BusinessHoursController::class);

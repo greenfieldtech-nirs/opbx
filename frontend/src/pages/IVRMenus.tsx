@@ -14,6 +14,7 @@ import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
+import api from '@/services/api';
 import { cn } from '@/lib/utils';
 import type {
   IvrMenu,
@@ -469,7 +470,7 @@ export default function IVRMenus() {
 
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: IvrMenuStatus }) =>
-      ivrMenusService.patch(id, { status } as any),
+      api.patch(`/ivr-menus/${id}/toggle-status`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
