@@ -736,23 +736,6 @@ export default function IVRMenus() {
             onDelete={openDeleteDialog}
             columns={[
               {
-                header: 'Status',
-                accessorKey: 'status' as any,
-                cell: (menu) => (
-                  <Badge
-                    className={cn(
-                      'capitalize',
-                      menu.status === 'active'
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : 'bg-gray-100 text-gray-800 border-gray-200'
-                    )}
-                    variant="outline"
-                  >
-                    {menu.status}
-                  </Badge>
-                )
-              },
-              {
                 header: 'Options',
                 cell: (menu) => (
                   <Badge variant="secondary" className="font-mono">
@@ -768,6 +751,23 @@ export default function IVRMenus() {
                 header: 'Created',
                 accessorKey: 'created_at' as any,
                 cell: (menu) => new Date(menu.created_at).toLocaleDateString()
+              },
+              {
+                header: 'Status',
+                accessorKey: 'status' as any,
+                cell: (menu) => (
+                  <Badge
+                    className={cn(
+                      'capitalize',
+                      menu.status === 'active'
+                        ? 'bg-green-100 text-green-800 border-green-200'
+                        : 'bg-gray-100 text-gray-800 border-gray-200'
+                    )}
+                    variant="outline"
+                  >
+                    {menu.status}
+                  </Badge>
+                )
               }
             ]}
             emptyState={
