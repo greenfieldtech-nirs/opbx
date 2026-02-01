@@ -1311,10 +1311,16 @@ export default function ExtensionsComplete() {
                 sortKey: 'status',
                 cell: (extension) => (
                   <Badge
-                    className={cn(getStatusColor(extension.status), "text-xs cursor-pointer hover:opacity-80 transition-opacity")}
+                    className={cn(
+                      getStatusColor(extension.status),
+                      "text-xs",
+                      !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
+                      if (!isReadOnly) {
+                        handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
+                      }
                     }}
                   >
                     {extension.status}

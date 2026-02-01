@@ -1471,14 +1471,17 @@ export default function RingGroups() {
                   <Badge
                     variant={group.status === 'active' ? 'default' : 'secondary'}
                     className={cn(
-                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      "text-xs",
+                      !isReadOnly && "cursor-pointer transition-all hover:scale-105",
                       group.status === 'active'
                         ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleStatus(group);
+                      if (!isReadOnly) {
+                        handleToggleStatus(group);
+                      }
                     }}
                   >
                     {group.status === 'active' ? 'Active' : 'Disabled'}
