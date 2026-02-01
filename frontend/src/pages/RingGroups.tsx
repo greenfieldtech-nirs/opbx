@@ -168,7 +168,7 @@ export default function RingGroups() {
 
   // Permission check
   const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
-  const isReadOnly = currentUser?.role === 'reporter';
+  const isReadOnly = currentUser ? ['reporter', 'pbx_user'].includes(currentUser.role) : false;
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');

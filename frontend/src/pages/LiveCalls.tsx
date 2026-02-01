@@ -47,7 +47,7 @@ const getDirectionIcon = (direction: string | null) => {
 
 export default function LiveCalls() {
   const { user: currentUser } = useAuth();
-  const isReadOnly = currentUser?.role === 'reporter';
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // Fetch active calls with polling every 5 seconds (not rate limited)
   const { data: activeCallsResponse, isLoading, error, refetch } = useQuery({

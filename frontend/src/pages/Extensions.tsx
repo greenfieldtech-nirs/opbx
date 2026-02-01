@@ -399,7 +399,7 @@ export default function ExtensionsComplete() {
   };
   const canResetPassword = ['owner', 'pbx_admin'].includes(currentUser.role);
   const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
-  const isReadOnly = currentUser.role === 'reporter';
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser.role);
 
   // Client-side assignment filter (backend doesn't expose this yet)
   const displayedExtensions = useMemo(() => {

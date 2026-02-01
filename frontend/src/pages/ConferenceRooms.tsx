@@ -148,7 +148,7 @@ export default function ConferenceRooms() {
   const [isAudioOpen, setIsAudioOpen] = useState(false);
 
   const canManageRooms = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
-  const isReadOnly = currentUser?.role === 'reporter';
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // Debounce search input
   useEffect(() => {

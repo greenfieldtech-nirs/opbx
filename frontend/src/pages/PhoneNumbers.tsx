@@ -82,7 +82,7 @@ export default function PhoneNumbers() {
 
   // Permission check
   const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
-  const isReadOnly = currentUser?.role === 'reporter';
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
