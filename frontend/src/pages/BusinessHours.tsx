@@ -1282,23 +1282,6 @@ const BusinessHours: React.FC = () => {
             onDelete={handleOpenDelete}
             columns={[
               {
-                header: 'Status',
-                sortKey: 'status',
-                cell: (schedule) => (
-                  <Badge
-                    variant={schedule.status === 'active' ? 'default' : 'secondary'}
-                    className={cn(
-                      "text-xs cursor-pointer transition-all hover:scale-105",
-                      schedule.status === 'active'
-                        ? "bg-green-100 text-green-800 hover:bg-green-200"
-                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    )}
-                  >
-                    {schedule.status === 'active' ? 'Active' : 'Disabled'}
-                  </Badge>
-                )
-              },
-              {
                 header: 'Timezone',
                 cell: (schedule) => (
                   <span className="text-sm text-muted-foreground">{schedule.timezone}</span>
@@ -1319,6 +1302,23 @@ const BusinessHours: React.FC = () => {
                   <span className="text-sm text-muted-foreground">
                     {new Date(schedule.updated_at || '').toLocaleDateString()}
                   </span>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (schedule) => (
+                  <Badge
+                    variant={schedule.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      schedule.status === 'active'
+                        ? "bg-green-100 text-green-800 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    )}
+                  >
+                    {schedule.status === 'active' ? 'Active' : 'Disabled'}
+                  </Badge>
                 )
               }
             ]}
