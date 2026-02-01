@@ -1253,7 +1253,7 @@ export default function ExtensionsComplete() {
             canEdit={canCreate}
             canDelete={canCreate}
             columns={[
-              ...(displayedExtensions.some(ext => ext.type === 'user') ? [{
+              ...(displayedExtensions.some(ext => ext.type === 'user') && !isReadOnly ? [{
                 header: 'Password',
                 cell: (extension: Extension) => (
                   extension.type === 'user' ? (
