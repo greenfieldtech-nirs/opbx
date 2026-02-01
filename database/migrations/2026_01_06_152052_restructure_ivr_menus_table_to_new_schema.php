@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -14,14 +14,26 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Drop foreign key constraints first
+        // Drop foreign key constraints first (database-agnostic approach)
         Schema::table('ivr_menus', function (Blueprint $table) {
-            $foreignKeys = DB::select("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
-                WHERE TABLE_NAME = 'ivr_menus' AND CONSTRAINT_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL");
+            $foreignKeys = [];
+
+            // MySQL approach
+            if (DB::getDriverName() === 'mysql') {
+                $foreignKeys = DB::select("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+                    WHERE TABLE_NAME = 'ivr_menus' AND CONSTRAINT_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL");
+            }
+            // SQLite approach - use PRAGMA
+            elseif (DB::getDriverName() === 'sqlite') {
+                $foreignKeys = DB::select("PRAGMA foreign_key_list('ivr_menus')");
+            }
 
             foreach ($foreignKeys as $fk) {
                 try {
-                    $table->dropForeign($fk->CONSTRAINT_NAME);
+                    $fkName = DB::getDriverName() === 'sqlite' ? ($fk->id ?? null) : $fk->CONSTRAINT_NAME;
+                    if ($fkName) {
+                        $table->dropForeign($fkName);
+                    }
                 } catch (\Exception $e) {
                     // Ignore if foreign key doesn't exist
                 }
@@ -51,35 +63,42 @@ return new class extends Migration
 
         // Add new columns
         Schema::table('ivr_menus', function (Blueprint $table) {
-            if (!Schema::hasColumn('ivr_menus', 'audio_file_path')) {
+            if (! Schema::hasColumn('ivr_menus', 'audio_file_path')) {
                 $table->string('audio_file_path', 500)->nullable()->after('description');
             }
-            if (!Schema::hasColumn('ivr_menus', 'tts_text')) {
+            if (! Schema::hasColumn('ivr_menus', 'tts_text')) {
                 $table->text('tts_text')->nullable()->after('audio_file_path');
             }
             // tts_voice already added by previous migration
-            if (!Schema::hasColumn('ivr_menus', 'max_turns')) {
+            if (! Schema::hasColumn('ivr_menus', 'max_turns')) {
                 $table->tinyInteger('max_turns')->unsigned()->default(3)->after('tts_voice');
             }
-            if (!Schema::hasColumn('ivr_menus', 'failover_destination_type')) {
+            if (! Schema::hasColumn('ivr_menus', 'failover_destination_type')) {
                 $table->enum('failover_destination_type', ['extension', 'ring_group', 'conference_room', 'ivr_menu', 'hangup'])
                     ->default('hangup')
                     ->after('max_turns');
             }
-            if (!Schema::hasColumn('ivr_menus', 'failover_destination_id')) {
+            if (! Schema::hasColumn('ivr_menus', 'failover_destination_id')) {
                 $table->unsignedBigInteger('failover_destination_id')->nullable()->after('failover_destination_type');
             }
-            if (!Schema::hasColumn('ivr_menus', 'status')) {
+            if (! Schema::hasColumn('ivr_menus', 'status')) {
                 $table->enum('status', ['active', 'inactive'])->default('active')->after('failover_destination_id');
             }
         });
 
-        // Add indexes
-        if (!DB::select("SHOW INDEX FROM ivr_menus WHERE Key_name = 'idx_ivr_menus_org_status'")) {
-            DB::statement('CREATE INDEX idx_ivr_menus_org_status ON ivr_menus (organization_id, status)');
+        // Add indexes (database-agnostic approach)
+        $indexesExist = false;
+        if (DB::getDriverName() === 'mysql') {
+            $indexesExist = count(DB::select("SHOW INDEX FROM ivr_menus WHERE Key_name = 'idx_ivr_menus_org_status'")) > 0;
+        } elseif (DB::getDriverName() === 'sqlite') {
+            $indexesExist = count(DB::select("PRAGMA index_list('ivr_menus')")) > 0;
         }
-        if (!DB::select("SHOW INDEX FROM ivr_menus WHERE Key_name = 'idx_ivr_menus_org_name'")) {
-            DB::statement('CREATE INDEX idx_ivr_menus_org_name ON ivr_menus (organization_id, name)');
+
+        if (! $indexesExist) {
+            Schema::table('ivr_menus', function (Blueprint $table) {
+                $table->index(['organization_id', 'status'], 'idx_ivr_menus_org_status');
+                $table->index(['organization_id', 'name'], 'idx_ivr_menus_org_name');
+            });
         }
     }
 
