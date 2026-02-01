@@ -26,6 +26,8 @@ class RingGroupController extends AbstractApiCrudController
 {
     use AppliesFilters;
 
+    private const LOCK_TIMEOUT_SECONDS = 10;
+
     protected function getModelClass(): string
     {
         return RingGroup::class;
