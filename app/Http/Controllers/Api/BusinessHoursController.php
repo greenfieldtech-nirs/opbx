@@ -310,13 +310,27 @@ class BusinessHoursController extends AbstractApiCrudController
      */
     protected function prepareBusinessHoursData(array $validated): array
     {
+        // Convert schedule from named days format to array format with day_of_week
+        // Frontend sends: {monday: {...}, tuesday: {...}}
+        // Backend needs: [{day_of_week: 'monday', ...}, {day_of_week: 'tuesday', ...}]
+        $scheduleArray = [];
+
+        foreach ($validated['schedule'] as $dayName => $dayData) {
+            $scheduleArray[] = [
+                'day_of_week' => $dayName, // Keep as string: 'monday', 'tuesday', etc.
+                'enabled' => $dayData['enabled'],
+                'time_ranges' => $dayData['time_ranges'] ?? [],
+            ];
+        }
+
         return [
             'basic' => [
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'status' => $validated['status'],
+                'timezone' => $validated['timezone'],
             ],
-            'schedule' => $validated['schedule'],
+            'schedule' => $scheduleArray,
             'exceptions' => $validated['exceptions'] ?? [],
             'actions' => [
                 'open_hours' => [
