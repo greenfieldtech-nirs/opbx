@@ -15,6 +15,7 @@ import {
 } from '@/types/business-hours';
 import { ActionTypeSelector } from './ActionTypeSelector';
 import { TargetSelector } from './TargetSelector';
+import { useToast } from '@/hooks/use-toast';
 
 // Form validation schema
 const timeRangeSchema = z.object({
@@ -87,6 +88,7 @@ export function BusinessHoursForm({ schedule, onSuccess }: BusinessHoursFormProp
   const { id } = useParams();
   const queryClient = useQueryClient();
   const isEditing = !!schedule;
+  const { toast } = useToast();
 
   const {
     register,
@@ -138,12 +140,19 @@ export function BusinessHoursForm({ schedule, onSuccess }: BusinessHoursFormProp
     {
       onSuccess: () => {
         queryClient.invalidateQueries(['business-hours']);
-        alert('Business hours schedule created successfully!');
+        toast({
+          title: 'Success',
+          description: 'Business hours schedule created successfully!',
+        });
         navigate('/business-hours');
         onSuccess?.();
       },
       onError: (error: any) => {
-        alert(error.response?.data?.message || 'Failed to create business hours schedule.');
+        toast({
+          title: 'Error',
+          description: error.response?.data?.message || 'Failed to create business hours schedule.',
+          variant: 'destructive',
+        });
       },
     }
   );
@@ -153,12 +162,19 @@ export function BusinessHoursForm({ schedule, onSuccess }: BusinessHoursFormProp
     {
       onSuccess: () => {
         queryClient.invalidateQueries(['business-hours']);
-        alert('Business hours schedule updated successfully!');
+        toast({
+          title: 'Success',
+          description: 'Business hours schedule updated successfully!',
+        });
         navigate('/business-hours');
         onSuccess?.();
       },
       onError: (error: any) => {
-        alert(error.response?.data?.message || 'Failed to update business hours schedule.');
+        toast({
+          title: 'Error',
+          description: error.response?.data?.message || 'Failed to update business hours schedule.',
+          variant: 'destructive',
+        });
       },
     }
   );
