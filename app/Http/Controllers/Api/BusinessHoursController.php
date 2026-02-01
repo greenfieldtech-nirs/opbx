@@ -7,15 +7,9 @@ namespace App\Http\Controllers\Api;
 use App\Enums\BusinessHoursStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
-use App\Http\Requests\BusinessHours\UpdateBusinessHoursScheduleRequest;
-use App\Http\Resources\BusinessHoursScheduleCollection;
 use App\Http\Resources\BusinessHoursScheduleResource;
-use App\Models\BusinessHoursException;
-use App\Models\BusinessHoursExceptionTimeRange;
 use App\Models\BusinessHoursSchedule;
-use App\Models\BusinessHoursScheduleDay;
-use App\Models\BusinessHoursTimeRange;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,363 +21,194 @@ use Illuminate\Support\Facades\Log;
  * Handles CRUD operations for business hours schedules within an organization.
  * All operations are tenant-scoped to the authenticated user's organization.
  */
-class BusinessHoursController extends Controller
+class BusinessHoursController extends AbstractApiCrudController
 {
     use ApiRequestHandler;
 
     /**
-     * Display a paginated list of business hours schedules.
+     * Get the model class name for this controller.
      */
-    public function index(Request $request): BusinessHoursScheduleCollection
+    protected function getModelClass(): string
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser();
+        return BusinessHoursSchedule::class;
+    }
 
-        $this->authorize('viewAny', BusinessHoursSchedule::class);
+    /**
+     * Get the resource class name for transforming models.
+     */
+    protected function getResourceClass(): string
+    {
+        return BusinessHoursScheduleResource::class;
+    }
 
-        Log::info('Retrieving business hours schedules list', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-        ]);
+    /**
+     * Get the allowed filter fields for the index method.
+     */
+    protected function getAllowedFilters(): array
+    {
+        return ['status', 'search'];
+    }
 
-        // Build query with eager loading
-        $query = BusinessHoursSchedule::query()
-            ->forOrganization($user->organization_id)
-            ->with([
-                'scheduleDays.timeRanges',
-                'exceptions.timeRanges',
-            ]);
+    /**
+     * Get the allowed sort fields for the index method.
+     */
+    protected function getAllowedSortFields(): array
+    {
+        return ['name', 'status', 'created_at', 'updated_at'];
+    }
 
-        // Apply filters
+    /**
+     * Get the default sort field for the index method.
+     */
+    protected function getDefaultSortField(): string
+    {
+        return 'name';
+    }
+
+    /**
+     * Apply custom filters to the query.
+     */
+    protected function applyCustomFilters($query, Request $request): void
+    {
         if ($request->has('status')) {
             $status = BusinessHoursStatus::tryFrom($request->input('status'));
             if ($status) {
                 $query->withStatus($status);
             }
         }
-
-        if ($request->has('search') && $request->filled('search')) {
-            $query->search($request->input('search'));
-        }
-
-        // Apply sorting
-        $sortField = $request->input('sort_by', 'name');
-        $sortOrder = $request->input('sort_order', 'asc');
-
-        // Validate sort field
-        $allowedSortFields = ['name', 'status', 'created_at', 'updated_at'];
-        if (! in_array($sortField, $allowedSortFields, true)) {
-            $sortField = 'name';
-        }
-
-        // Validate sort order
-        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc'], true)
-            ? strtolower($sortOrder)
-            : 'asc';
-
-        $query->orderBy($sortField, $sortOrder);
-
-        // Paginate
-        $perPage = (int) $request->input('per_page', 20);
-        $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
-
-        $schedules = $query->paginate($perPage);
-
-        Log::info('Business hours schedules list retrieved', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'total' => $schedules->total(),
-            'per_page' => $perPage,
-        ]);
-
-        return new BusinessHoursScheduleCollection($schedules);
     }
 
     /**
-     * Store a newly created business hours schedule.
+     * Override index to add eager loading.
      */
-    public function store(StoreBusinessHoursScheduleRequest $request): JsonResponse
+    protected function buildIndexQuery($query, Request $request): void
     {
-        $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
-        $validated = $request->validated();
-
-        Log::info('Creating new business hours schedule', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'schedule_name' => $validated['name'],
-        ]);
-
-        try {
-            // Prepare data
-            $data = $this->prepareBusinessHoursData($validated);
-
-            $schedule = DB::transaction(function () use ($data, $user): BusinessHoursSchedule {
-                // Create schedule
-                $schedule = BusinessHoursSchedule::create(array_merge($data['basic'], [
-                    'organization_id' => $user->organization_id,
-                    'open_hours_action' => $data['actions']['open_hours']['action'],
-                    'open_hours_action_type' => $data['actions']['open_hours']['action_type'],
-                    'closed_hours_action' => $data['actions']['closed_hours']['action'],
-                    'closed_hours_action_type' => $data['actions']['closed_hours']['action_type'],
-                ]));
-
-                // Persist schedule days and exceptions
-                $this->createScheduleDays($schedule, $data['schedule']);
-                if (! empty($data['exceptions'])) {
-                    $this->createExceptions($schedule, $data['exceptions']);
-                }
-
-                return $schedule;
-            });
-
-            // Load relationships for response
-            $schedule->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
-
-            Log::info('Business hours schedule created successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $schedule->id,
-                'schedule_name' => $schedule->name,
+        $query->forOrganization($user->organization_id)
+            ->with([
+                'scheduleDays.timeRanges',
+                'exceptions.timeRanges',
             ]);
-
-            return response()->json([
-                'message' => 'Business hours schedule created successfully.',
-                'data' => new BusinessHoursScheduleResource($schedule),
-            ], 201);
-        } catch (\Exception $e) {
-            Log::error('Failed to create business hours schedule', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to create business hours schedule',
-                'message' => 'An error occurred while creating the business hours schedule.',
-            ], 500);
-        }
     }
 
     /**
-     * Display the specified business hours schedule.
+     * Hook method called before storing a new model.
      */
-    public function show(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
+    protected function beforeStore(array $validated, Request $request): array
     {
-        $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
-        $this->authorize('view', $businessHour);
+        // Prepare data for storage
+        $data = $this->prepareBusinessHoursData($validated);
 
-        // Tenant scope check
-        if ($businessHour->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant business hours access attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-                'schedule_organization_id' => $businessHour->organization_id,
-            ]);
+        // Add organization ID
+        $data['basic']['organization_id'] = $user->organization_id;
+        $data['basic']['open_hours_action'] = $data['actions']['open_hours']['action'];
+        $data['basic']['open_hours_action_type'] = $data['actions']['open_hours']['action_type'];
+        $data['basic']['closed_hours_action'] = $data['actions']['closed_hours']['action'];
+        $data['basic']['closed_hours_action_type'] = $data['actions']['closed_hours']['action_type'];
 
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'Business hours schedule not found.',
-            ], 404);
-        }
-
-        // Load relationships
-        $businessHour->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
-
-        Log::info('Business hours schedule details retrieved', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'schedule_id' => $businessHour->id,
-        ]);
-
-        return response()->json([
-            'data' => new BusinessHoursScheduleResource($businessHour),
-        ]);
+        return $data['basic'];
     }
 
     /**
-     * Update the specified business hours schedule.
+     * Hook method called after storing a new model.
      */
-    public function update(UpdateBusinessHoursScheduleRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
+    protected function afterStore(Model $model, Request $request): void
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser();
+        $validated = $request->all();
+        $data = $this->prepareBusinessHoursData($validated);
 
-        // Tenant scope check
-        if ($businessHour->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant business hours update attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-                'schedule_organization_id' => $businessHour->organization_id,
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'Business hours schedule not found.',
-            ], 404);
+        // Persist schedule days and exceptions
+        $this->createScheduleDays($model, $data['schedule']);
+        if (! empty($data['exceptions'])) {
+            $this->createExceptions($model, $data['exceptions']);
         }
 
-        $validated = $request->validated();
-
-        Log::info('Updating business hours schedule', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'schedule_id' => $businessHour->id,
-        ]);
-
-        try {
-            // Prepare data
-            $data = $this->prepareBusinessHoursData($validated);
-
-            DB::transaction(function () use ($businessHour, $data): void {
-                // Persist all changes
-                $this->persistBusinessHours($businessHour, $data);
-            });
-
-            // Reload schedule with relationships
-            $businessHour->refresh();
-            $businessHour->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
-
-            Log::info('Business hours schedule updated successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-            ]);
-
-            return response()->json([
-                'message' => 'Business hours schedule updated successfully.',
-                'data' => new BusinessHoursScheduleResource($businessHour),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to update business hours schedule', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to update business hours schedule',
-                'message' => 'An error occurred while updating the business hours schedule.',
-            ], 500);
-        }
+        // Load relationships for response
+        $model->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
     }
 
     /**
-     * Remove the specified business hours schedule.
+     * Hook method called before updating a model.
      */
-    public function destroy(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
+    protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        $requestId = $this->getRequestId();
-        $user = $this->getAuthenticatedUser();
+        $data = $this->prepareBusinessHoursData($validated);
 
-        $this->authorize('delete', $businessHour);
+        // Add action data
+        $data['basic']['open_hours_action'] = $data['actions']['open_hours']['action'];
+        $data['basic']['open_hours_action_type'] = $data['actions']['open_hours']['action_type'];
+        $data['basic']['closed_hours_action'] = $data['actions']['closed_hours']['action'];
+        $data['basic']['closed_hours_action_type'] = $data['actions']['closed_hours']['action_type'];
 
-        // Tenant scope check
-        if ($businessHour->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant business hours deletion attempt', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-                'schedule_organization_id' => $businessHour->organization_id,
-            ]);
+        return $data['basic'];
+    }
 
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => 'Business hours schedule not found.',
-            ], 404);
+    /**
+     * Hook method called after updating a model.
+     */
+    protected function afterUpdate(Model $model, Request $request): void
+    {
+        $validated = $request->all();
+        $data = $this->prepareBusinessHoursData($validated);
+
+        // Update schedule days
+        $model->scheduleDays()->delete();
+        $this->createScheduleDays($model, $data['schedule']);
+
+        // Update exceptions
+        $model->exceptions()->delete();
+        if (! empty($data['exceptions'])) {
+            $this->createExceptions($model, $data['exceptions']);
         }
 
-        Log::info('Deleting business hours schedule', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'schedule_id' => $businessHour->id,
-            'schedule_name' => $businessHour->name,
-        ]);
+        // Load relationships for response
+        $model->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
+    }
 
+    /**
+     * Hook method called before deleting a model.
+     */
+    protected function beforeDestroy(Model $model, Request $request): void
+    {
         // Check for references before deletion
-        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
-        $result = $referenceChecker->checkReferences('business_hours', $businessHour->id, $businessHour->organization_id);
-
-        if ($result['has_references']) {
-            return response()->json([
-                'error' => 'Cannot delete business hours schedule',
-                'message' => 'This business hours schedule is being used and cannot be deleted. Please remove all references first.',
-                'references' => $result['references'],
-            ], 409);
-        }
-
-        try {
-            DB::transaction(function () use ($businessHour): void {
-                // Soft delete the schedule (cascade deletes will handle related records)
-                $businessHour->delete();
-            });
-
-            Log::info('Business hours schedule deleted successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-            ]);
-
-            return response()->json(null, 204);
-        } catch (\Exception $e) {
-            Log::error('Failed to delete business hours schedule', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'schedule_id' => $businessHour->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-            ]);
-
-            return response()->json([
-                'error' => 'Failed to delete business hours schedule',
-                'message' => 'An error occurred while deleting the business hours schedule.',
-            ], 500);
-        }
+        $user = $this->getAuthenticatedUser();
+        $this->checkResourceReferencesBeforeDelete(
+            'business_hours_schedule',
+            $model->id,
+            $user->organization_id
+        );
     }
 
     /**
-     * Duplicate an existing business hours schedule.
+     * Hook method called after deleting a model.
+     */
+    protected function afterDestroy(Model $model, Request $request): void
+    {
+        // Clean up related data
+        $model->scheduleDays()->delete();
+        $model->exceptions()->delete();
+    }
+
+    /**
+     * Duplicate a business hours schedule.
      */
     public function duplicate(Request $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
-        $this->authorize('duplicate', $businessHour);
+        $this->authorize('create', BusinessHoursSchedule::class);
 
         // Tenant scope check
         if ($businessHour->organization_id !== $user->organization_id) {
-            Log::warning('Cross-tenant business hours duplication attempt', [
+            Log::warning('Cross-tenant business hours duplicate attempt', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
                 'organization_id' => $user->organization_id,
                 'schedule_id' => $businessHour->id,
-                'schedule_organization_id' => $businessHour->organization_id,
             ]);
 
             return response()->json([
@@ -392,59 +217,52 @@ class BusinessHoursController extends Controller
             ], 404);
         }
 
-        Log::info('Duplicating business hours schedule', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'schedule_id' => $businessHour->id,
-            'schedule_name' => $businessHour->name,
-        ]);
-
         try {
-            $newSchedule = DB::transaction(function () use ($businessHour): BusinessHoursSchedule {
-                // Load relationships if not already loaded
+            $newSchedule = DB::transaction(function () use ($businessHour, $user) {
+                // Load relationships
                 $businessHour->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
 
-                // Create new schedule with " (Copy)" suffix
+                // Create duplicate
                 $newSchedule = BusinessHoursSchedule::create([
-                    'organization_id' => $businessHour->organization_id,
                     'name' => $businessHour->name.' (Copy)',
-                    'status' => $businessHour->status,
+                    'description' => $businessHour->description,
+                    'status' => 'inactive',
+                    'organization_id' => $user->organization_id,
                     'open_hours_action' => $businessHour->open_hours_action,
                     'open_hours_action_type' => $businessHour->open_hours_action_type,
                     'closed_hours_action' => $businessHour->closed_hours_action,
                     'closed_hours_action_type' => $businessHour->closed_hours_action_type,
                 ]);
 
-                // Duplicate schedule days and time ranges
-                foreach ($businessHour->scheduleDays as $scheduleDay) {
-                    $newScheduleDay = BusinessHoursScheduleDay::create([
-                        'business_hours_schedule_id' => $newSchedule->id,
-                        'day_of_week' => $scheduleDay->day_of_week,
-                        'enabled' => $scheduleDay->enabled,
+                // Copy schedule days
+                foreach ($businessHour->scheduleDays as $day) {
+                    $newDay = $newSchedule->scheduleDays()->create([
+                        'day_of_week' => $day->day_of_week,
+                        'enabled' => $day->enabled,
                     ]);
 
-                    foreach ($scheduleDay->timeRanges as $timeRange) {
-                        BusinessHoursTimeRange::create([
-                            'business_hours_schedule_day_id' => $newScheduleDay->id,
+                    foreach ($day->timeRanges as $timeRange) {
+                        $newDay->timeRanges()->create([
                             'start_time' => $timeRange->start_time,
                             'end_time' => $timeRange->end_time,
                         ]);
                     }
                 }
 
-                // Duplicate exceptions and time ranges
+                // Copy exceptions
                 foreach ($businessHour->exceptions as $exception) {
-                    $newException = BusinessHoursException::create([
-                        'business_hours_schedule_id' => $newSchedule->id,
-                        'date' => $exception->date,
+                    $newException = $newSchedule->exceptions()->create([
                         'name' => $exception->name,
-                        'type' => $exception->type,
+                        'date' => $exception->date,
+                        'start_time' => $exception->start_time,
+                        'end_time' => $exception->end_time,
+                        'action' => $exception->action,
+                        'action_type' => $exception->action_type,
+                        'action_id' => $exception->action_id,
                     ]);
 
                     foreach ($exception->timeRanges as $timeRange) {
-                        BusinessHoursExceptionTimeRange::create([
-                            'business_hours_exception_id' => $newException->id,
+                        $newException->timeRanges()->create([
                             'start_time' => $timeRange->start_time,
                             'end_time' => $timeRange->end_time,
                         ]);
@@ -454,7 +272,6 @@ class BusinessHoursController extends Controller
                 return $newSchedule;
             });
 
-            // Load relationships for response
             $newSchedule->load(['scheduleDays.timeRanges', 'exceptions.timeRanges']);
 
             Log::info('Business hours schedule duplicated successfully', [
@@ -489,148 +306,105 @@ class BusinessHoursController extends Controller
     }
 
     /**
-     * Prepare business hours data for storage.
-     *
-     * @param  array  $validated  Validated request data
-     * @return array Structured data ready for persistence
+     * Prepare business hours data from validated request.
      */
     protected function prepareBusinessHoursData(array $validated): array
     {
         return [
             'basic' => [
                 'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
                 'status' => $validated['status'],
             ],
-            'actions' => [
-                'open_hours' => $this->transformActionDataForStorage($validated['open_hours_action']),
-                'closed_hours' => $this->transformActionDataForStorage($validated['closed_hours_action']),
-            ],
-            'schedule' => $validated['schedule'] ?? [],
+            'schedule' => $validated['schedule'],
             'exceptions' => $validated['exceptions'] ?? [],
-        ];
-    }
-
-    /**
-     * Persist business hours schedule, days, and exceptions to database.
-     *
-     * @param  BusinessHoursSchedule  $schedule  The schedule to update
-     * @param  array  $data  Prepared data from prepareBusinessHoursData()
-     */
-    protected function persistBusinessHours(BusinessHoursSchedule $schedule, array $data): void
-    {
-        // Update the main schedule record
-        $schedule->update(array_merge($data['basic'], [
-            'open_hours_action' => $data['actions']['open_hours']['action'],
-            'open_hours_action_type' => $data['actions']['open_hours']['action_type'],
-            'closed_hours_action' => $data['actions']['closed_hours']['action'],
-            'closed_hours_action_type' => $data['actions']['closed_hours']['action_type'],
-        ]));
-
-        // Delete existing schedule days and recreate
-        $schedule->scheduleDays()->delete();
-        $this->createScheduleDays($schedule, $data['schedule']);
-
-        // Delete existing exceptions and recreate
-        $schedule->exceptions()->delete();
-        if (! empty($data['exceptions'])) {
-            $this->createExceptions($schedule, $data['exceptions']);
-        }
-    }
-
-    /**
-     * Transform action data for storage in database.
-     * Expects structured format {type: string, target_id: string}.
-     *
-     * @param  array{type: string, target_id: string}  $actionData
-     * @return array{action: array{target_id: string}, action_type: string}
-     */
-    private function transformActionDataForStorage(array $actionData): array
-    {
-        return [
-            'action' => [
-                'target_id' => $actionData['target_id'],
+            'actions' => [
+                'open_hours' => [
+                    'action' => $validated['open_hours_action']['action'] ?? null,
+                    'action_type' => $validated['open_hours_action']['action_type'] ?? null,
+                ],
+                'closed_hours' => [
+                    'action' => $validated['closed_hours_action']['action'] ?? null,
+                    'action_type' => $validated['closed_hours_action']['action_type'] ?? null,
+                ],
             ],
-            'action_type' => $actionData['type'],
         ];
     }
 
     /**
-     * Transform stored action data into structured format for API response.
-     *
-     * @param  string  $actionField  'open_hours' or 'closed_hours'
-     * @return array{type: string, target_id: string}
+     * Create schedule days and time ranges from data.
      */
-    private function transformActionForResponse(BusinessHoursSchedule $schedule, string $actionField): array
+    protected function createScheduleDays(BusinessHoursSchedule $schedule, array $scheduleData): void
     {
-        $actionType = $actionField === 'open_hours'
-            ? $schedule->getOpenHoursActionType()
-            : $schedule->getClosedHoursActionType();
-
-        $targetId = $actionField === 'open_hours'
-            ? $schedule->getOpenHoursTargetId()
-            : $schedule->getClosedHoursTargetId();
-
-        return [
-            'type' => $actionType->value,
-            'target_id' => $targetId ?? '',
-        ];
-    }
-
-    /**
-     * Create schedule days and time ranges for a business hours schedule.
-     *
-     * @param  array<string, array<string, mixed>>  $scheduleDaysData
-     */
-    private function createScheduleDays(BusinessHoursSchedule $schedule, array $scheduleDaysData): void
-    {
-        foreach ($scheduleDaysData as $dayName => $dayData) {
-            $scheduleDay = BusinessHoursScheduleDay::create([
-                'business_hours_schedule_id' => $schedule->id,
-                'day_of_week' => $dayName,
-                'enabled' => $dayData['enabled'] ?? false,
+        foreach ($scheduleData as $dayData) {
+            $day = $schedule->scheduleDays()->create([
+                'day_of_week' => $dayData['day_of_week'],
+                'enabled' => $dayData['enabled'],
             ]);
 
-            // Create time ranges if day is enabled
-            if (! empty($dayData['time_ranges'])) {
-                foreach ($dayData['time_ranges'] as $timeRangeData) {
-                    BusinessHoursTimeRange::create([
-                        'business_hours_schedule_day_id' => $scheduleDay->id,
-                        'start_time' => $timeRangeData['start_time'],
-                        'end_time' => $timeRangeData['end_time'],
-                    ]);
-                }
+            foreach ($dayData['time_ranges'] ?? [] as $timeRange) {
+                $day->timeRanges()->create([
+                    'start_time' => $timeRange['start_time'],
+                    'end_time' => $timeRange['end_time'],
+                ]);
             }
         }
     }
 
     /**
-     * Create exceptions and exception time ranges for a business hours schedule.
-     *
-     * @param  array<int, array<string, mixed>>  $exceptionsData
+     * Create exceptions from data.
      */
-    private function createExceptions(BusinessHoursSchedule $schedule, array $exceptionsData): void
+    protected function createExceptions(BusinessHoursSchedule $schedule, array $exceptions): void
     {
-        foreach ($exceptionsData as $exceptionData) {
-            $exception = BusinessHoursException::create([
-                'business_hours_schedule_id' => $schedule->id,
-                'date' => $exceptionData['date'],
+        foreach ($exceptions as $exceptionData) {
+            $exception = $schedule->exceptions()->create([
                 'name' => $exceptionData['name'],
-                'type' => $exceptionData['type'],
+                'date' => $exceptionData['date'],
+                'start_time' => $exceptionData['start_time'] ?? null,
+                'end_time' => $exceptionData['end_time'] ?? null,
+                'action' => $exceptionData['action'] ?? null,
+                'action_type' => $exceptionData['action_type'] ?? null,
+                'action_id' => $exceptionData['action_id'] ?? null,
             ]);
 
-            // Create time ranges only if type is special_hours and time_ranges provided
-            if (
-                $exceptionData['type'] === 'special_hours'
-                && ! empty($exceptionData['time_ranges'])
-            ) {
-                foreach ($exceptionData['time_ranges'] as $timeRangeData) {
-                    BusinessHoursExceptionTimeRange::create([
-                        'business_hours_exception_id' => $exception->id,
-                        'start_time' => $timeRangeData['start_time'],
-                        'end_time' => $timeRangeData['end_time'],
-                    ]);
-                }
+            foreach ($exceptionData['time_ranges'] ?? [] as $timeRange) {
+                $exception->timeRanges()->create([
+                    'start_time' => $timeRange['start_time'],
+                    'end_time' => $timeRange['end_time'],
+                ]);
             }
         }
+    }
+
+    /**
+     * Get the view ability for the model.
+     */
+    protected function getViewAbility(): string
+    {
+        return 'view';
+    }
+
+    /**
+     * Get the create ability for the model.
+     */
+    protected function getCreateAbility(): string
+    {
+        return 'create';
+    }
+
+    /**
+     * Get the update ability for the model.
+     */
+    protected function getUpdateAbility(): string
+    {
+        return 'update';
+    }
+
+    /**
+     * Get the delete ability for the model.
+     */
+    protected function getDeleteAbility(): string
+    {
+        return 'delete';
     }
 }
