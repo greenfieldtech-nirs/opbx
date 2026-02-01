@@ -11,8 +11,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -69,7 +67,7 @@ abstract class AbstractApiCrudController extends Controller
     /**
      * Hook method called before storing a new model.
      *
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     protected function beforeStore(array $validated, Request $request): array
@@ -88,7 +86,7 @@ abstract class AbstractApiCrudController extends Controller
     /**
      * Hook method called before updating a model.
      *
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
@@ -119,9 +117,10 @@ abstract class AbstractApiCrudController extends Controller
      * that need reference checking. It will throw ResourceInUseException if
      * references exist.
      *
-     * @param string $resourceType The type of resource ('extension', 'ring_group', etc.)
-     * @param int $resourceId The ID of the resource
-     * @param int $organizationId The organization ID for tenant scoping
+     * @param  string  $resourceType  The type of resource ('extension', 'ring_group', etc.)
+     * @param  int  $resourceId  The ID of the resource
+     * @param  int  $organizationId  The organization ID for tenant scoping
+     *
      * @throws \App\Exceptions\ResourceInUseException
      */
     protected function checkResourceReferencesBeforeDelete(
@@ -148,8 +147,6 @@ abstract class AbstractApiCrudController extends Controller
     /**
      * Hook method to acquire a distributed lock before updating a model.
      * Return null for no locking (default behavior).
-     * 
-     * @return \Illuminate\Contracts\Cache\Lock|null
      */
     protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
     {
@@ -193,11 +190,11 @@ abstract class AbstractApiCrudController extends Controller
 
     /**
      * Determine if store operation should use database transaction.
-     * 
+     *
      * Override to return false if:
      * - beforeStore/afterStore hooks do NOT perform database operations
      * - Only a single model is being created with no related records
-     * 
+     *
      * Default: true (safe, ensures consistency if hooks perform DB operations)
      */
     protected function shouldUseTransactionForStore(): bool
@@ -207,11 +204,11 @@ abstract class AbstractApiCrudController extends Controller
 
     /**
      * Determine if update operation should use database transaction.
-     * 
+     *
      * Override to return false if:
      * - beforeUpdate/afterUpdate hooks do NOT perform database operations
      * - Only a single model is being updated with no related records
-     * 
+     *
      * Default: true (safe, ensures consistency if hooks perform DB operations)
      */
     protected function shouldUseTransactionForUpdate(): bool
@@ -221,12 +218,12 @@ abstract class AbstractApiCrudController extends Controller
 
     /**
      * Determine if destroy operation should use database transaction.
-     * 
+     *
      * Override to return false if:
      * - beforeDestroy/afterDestroy hooks do NOT perform database operations
      * - Only a single model is being deleted with no related records
      * - No business logic checks requiring queries
-     * 
+     *
      * Default: true (safe, ensures consistency if hooks perform DB operations)
      */
     protected function shouldUseTransactionForDestroy(): bool
@@ -238,9 +235,9 @@ abstract class AbstractApiCrudController extends Controller
      * Check if a specific field has changed by comparing old and new values.
      * Handles JSON/array fields specially by using json_encode comparison.
      *
-     * @param Model $model The model being updated
-     * @param string $key The field name
-     * @param mixed $newValue The new value from validated input
+     * @param  Model  $model  The model being updated
+     * @param  string  $key  The field name
+     * @param  mixed  $newValue  The new value from validated input
      * @return bool True if the field has changed
      */
     protected function isFieldChanged(Model $model, string $key, $newValue): bool
@@ -262,8 +259,8 @@ abstract class AbstractApiCrudController extends Controller
      * Get list of changed field names from validated data.
      * Properly handles JSON/array fields and scalar fields.
      *
-     * @param Model $model The model being updated
-     * @param array $validated The validated input data
+     * @param  Model  $model  The model being updated
+     * @param  array  $validated  The validated input data
      * @return array Array of field names that have changed
      */
     protected function getChangedFields(Model $model, array $validated): array
@@ -370,10 +367,7 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getCreateSuccessMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
-
-        return ucfirst($modelName) . ' created successfully.';
+        return $this->getOperationMessage('create', 'success');
     }
 
     /**
@@ -381,10 +375,7 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getUpdateSuccessMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
-
-        return ucfirst($modelName) . ' updated successfully.';
+        return $this->getOperationMessage('update', 'success');
     }
 
     /**
@@ -392,10 +383,7 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getCreateErrorMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
-
-        return 'Failed to create ' . $modelName;
+        return $this->getOperationMessage('create', 'error');
     }
 
     /**
@@ -403,10 +391,7 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getUpdateErrorMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
-
-        return 'Failed to update ' . $modelName;
+        return $this->getOperationMessage('update', 'error');
     }
 
     /**
@@ -414,10 +399,15 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getDeleteErrorMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
+        return $this->getOperationMessage('delete', 'error');
+    }
 
-        return 'Failed to delete ' . $modelName;
+    /**
+     * Get the success message for delete operations.
+     */
+    protected function getDeleteSuccessMessage(): string
+    {
+        return $this->getOperationMessage('delete', 'success');
     }
 
     /**
@@ -425,10 +415,7 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getCreateUserErrorMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
-
-        return 'An error occurred while creating the ' . $modelName . '.';
+        return $this->getOperationMessage('create', 'userError');
     }
 
     /**
@@ -436,10 +423,7 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getUpdateUserErrorMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
-
-        return 'An error occurred while updating the ' . $modelName . '.';
+        return $this->getOperationMessage('update', 'userError');
     }
 
     /**
@@ -447,10 +431,32 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getDeleteUserErrorMessage(): string
     {
-        $modelClass = $this->getModelClass();
-        $modelName = strtolower(class_basename($modelClass));
+        return $this->getOperationMessage('delete', 'userError');
+    }
 
-        return 'An error occurred while deleting the ' . $modelName . '.';
+    /**
+     * Get operation message using parameterized approach.
+     *
+     * @param  string  $operation  The operation (create, update, delete)
+     * @param  string  $type  The message type (success, error, userError)
+     * @return string The formatted message
+     */
+    protected function getOperationMessage(string $operation, string $type): string
+    {
+        $modelName = strtolower(class_basename($this->getModelClass()));
+
+        return match ([$operation, $type]) {
+            ['create', 'success'] => ucfirst($modelName).' created successfully.',
+            ['update', 'success'] => ucfirst($modelName).' updated successfully.',
+            ['delete', 'success'] => ucfirst($modelName).' deleted successfully.',
+            ['create', 'error'] => 'Failed to create '.$modelName,
+            ['update', 'error'] => 'Failed to update '.$modelName,
+            ['delete', 'error'] => 'Failed to delete '.$modelName,
+            ['create', 'userError'] => 'An error occurred while creating the '.$modelName.'.',
+            ['update', 'userError'] => 'An error occurred while updating the '.$modelName.'.',
+            ['delete', 'userError'] => 'An error occurred while deleting the '.$modelName.'.',
+            default => ucfirst($operation).' '.$modelName.' '.$type,
+        };
     }
 
     /**
@@ -469,13 +475,13 @@ abstract class AbstractApiCrudController extends Controller
      */
     protected function getPluralResourceKey(): string
     {
-        return $this->getResourceKey() . 's';
+        return $this->getResourceKey().'s';
     }
 
     /**
      * Enrich log context with common fields like request_id.
      *
-     * @param array $context The base context
+     * @param  array  $context  The base context
      * @return array The enriched context
      */
     protected function enrichLogContext(array $context): array
@@ -509,7 +515,7 @@ abstract class AbstractApiCrudController extends Controller
 
         // Validate sort field
         $allowedSortFields = $this->getAllowedSortFields();
-        if (!in_array($sortField, $allowedSortFields, true)) {
+        if (! in_array($sortField, $allowedSortFields, true)) {
             $sortField = $this->getDefaultSortField();
         }
 
@@ -544,7 +550,7 @@ abstract class AbstractApiCrudController extends Controller
 
         $resourceClass = $this->getResourceClass();
         $collection = $resourceClass::collection($models);
-        
+
         return response()->json([
             'data' => $collection->resolve(),
             'meta' => [
@@ -569,8 +575,8 @@ abstract class AbstractApiCrudController extends Controller
         $this->authorize($this->getCreateAbility(), $this->getModelClass());
 
         // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated') 
-            ? $request->validated() 
+        $validated = method_exists($request, 'validated')
+            ? $request->validated()
             : $request->all();
 
         // Log will be handled by success/failure methods below
@@ -613,10 +619,11 @@ abstract class AbstractApiCrudController extends Controller
             $this->logOperationCompleted($this->getResourceKey(), 'creation', [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey() . '_id' => $model->id,
+                $this->getResourceKey().'_id' => $model->id,
             ]);
 
             $resourceClass = $this->getResourceClass();
+
             return response()->json([
                 'message' => $this->getCreateSuccessMessage(),
                 'data' => new $resourceClass($model),
@@ -651,29 +658,30 @@ abstract class AbstractApiCrudController extends Controller
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
             $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' access attempt', array_merge($context, [
+            Log::warning('Cross-tenant '.$this->getResourceKey().' access attempt', array_merge($context, [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                'target_' . $this->getResourceKey() . '_id' => $model->id,
+                'target_'.$this->getResourceKey().'_id' => $model->id,
                 'target_organization_id' => $model->organization_id,
             ]));
 
             return response()->json([
                 'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()) . ' not found.',
+                'message' => ucfirst($this->getResourceKey()).' not found.',
             ], 404);
         }
 
         $this->logDetailsRetrieved($this->getResourceKey(), [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
-            $this->getResourceKey() . '_id' => $model->id,
+            $this->getResourceKey().'_id' => $model->id,
         ]);
 
         // Apply after show hook (for loading additional relationships)
         $this->afterShow($model, $request);
 
         $resourceClass = $this->getResourceClass();
+
         return response()->json([
             'data' => new $resourceClass($model),
         ]);
@@ -692,22 +700,22 @@ abstract class AbstractApiCrudController extends Controller
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
             $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' update attempt', array_merge($context, [
+            Log::warning('Cross-tenant '.$this->getResourceKey().' update attempt', array_merge($context, [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                'target_' . $this->getResourceKey() . '_id' => $model->id,
+                'target_'.$this->getResourceKey().'_id' => $model->id,
                 'target_organization_id' => $model->organization_id,
             ]));
 
             return response()->json([
                 'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()) . ' not found.',
+                'message' => ucfirst($this->getResourceKey()).' not found.',
             ], 404);
         }
 
         // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated') 
-            ? $request->validated() 
+        $validated = method_exists($request, 'validated')
+            ? $request->validated()
             : $request->all();
 
         // Track changed fields for logging (handles JSON/array fields properly)
@@ -749,11 +757,12 @@ abstract class AbstractApiCrudController extends Controller
             $this->logOperationCompleted($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey() . '_id' => $model->id,
+                $this->getResourceKey().'_id' => $model->id,
                 'changed_fields' => $changedFields,
             ]);
 
             $resourceClass = $this->getResourceClass();
+
             return response()->json([
                 'message' => $this->getUpdateSuccessMessage(),
                 'data' => new $resourceClass($model),
@@ -762,7 +771,7 @@ abstract class AbstractApiCrudController extends Controller
             $this->logOperationFailed($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey() . '_id' => $model->id,
+                $this->getResourceKey().'_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
@@ -792,16 +801,16 @@ abstract class AbstractApiCrudController extends Controller
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
             $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant ' . $this->getResourceKey() . ' deletion attempt', array_merge($context, [
+            Log::warning('Cross-tenant '.$this->getResourceKey().' deletion attempt', array_merge($context, [
                 'user_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                'target_' . $this->getResourceKey() . '_id' => $model->id,
+                'target_'.$this->getResourceKey().'_id' => $model->id,
                 'target_organization_id' => $model->organization_id,
             ]));
 
             return response()->json([
                 'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()) . ' not found.',
+                'message' => ucfirst($this->getResourceKey()).' not found.',
             ], 404);
         }
 
@@ -835,7 +844,7 @@ abstract class AbstractApiCrudController extends Controller
             $this->logOperationCompleted($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey() . '_id' => $model->id,
+                $this->getResourceKey().'_id' => $model->id,
             ]);
 
             return response()->json(null, 204);
@@ -843,7 +852,7 @@ abstract class AbstractApiCrudController extends Controller
             $this->logOperationFailed($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey() . '_id' => $model->id,
+                $this->getResourceKey().'_id' => $model->id,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
