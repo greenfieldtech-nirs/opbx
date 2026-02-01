@@ -25,6 +25,29 @@ abstract class AbstractApiCrudController extends Controller
 {
     use ApiRequestHandler, LogsOperations;
 
+    // ============================================================================
+    // CONTROLLER CONSTANTS
+    // ============================================================================
+
+    /** Default pagination size (20 items per page) */
+    private const int DEFAULT_PER_PAGE = 20;
+
+    /** Maximum pagination size (100 items per page) */
+    private const int MAX_PER_PAGE = 100;
+
+    /** Distributed lock timeout in seconds */
+    private const int LOCK_TIMEOUT_SECONDS = 30;
+
+    /** Default lock acquire block timeout in seconds */
+    private const int DEFAULT_LOCK_BLOCK_SECONDS = 5;
+
+    /** Default sort order */
+    private const string DEFAULT_SORT_ORDER = 'asc';
+
+    // ============================================================================
+    // ABSTRACT METHODS
+    // ============================================================================
+
     /**
      * Get the model class name for this controller.
      */
@@ -527,8 +550,8 @@ abstract class AbstractApiCrudController extends Controller
         $query->orderBy($sortField, $sortOrder);
 
         // Paginate
-        $perPage = (int) $request->input('per_page', 20);
-        $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
+        $perPage = (int) $request->input('per_page', self::DEFAULT_PER_PAGE);
+        $perPage = min(max($perPage, 1), self::MAX_PER_PAGE);
 
         $models = $query->paginate($perPage);
 

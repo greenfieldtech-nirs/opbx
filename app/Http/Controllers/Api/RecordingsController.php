@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
-
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\StoreRecordingRequest;
 use App\Http\Requests\UpdateRecordingRequest;
@@ -17,22 +16,20 @@ use App\Models\Recording;
 use App\Services\Recording\RecordingAccessService;
 use App\Services\Recording\RecordingRemoteService;
 use App\Services\Recording\RecordingUploadService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class RecordingsController extends Controller
 {
     use ApiRequestHandler;
+
     public function __construct(
         private readonly RecordingUploadService $uploadService,
         private readonly RecordingRemoteService $remoteService,
         private readonly RecordingAccessService $accessService
-    ) {
-    }
+    ) {}
 
     /**
      * Display a listing of the resource.
@@ -44,7 +41,7 @@ class RecordingsController extends Controller
         // Handle unauthenticated response
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             // This shouldn't happen for authenticated endpoints, but return error if it does
-            abort(401, 'Authentication required');
+            return $user;
         }
 
         // Set the current user ID for resource generation
@@ -59,7 +56,7 @@ class RecordingsController extends Controller
 
         // Search by name if specified
         if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $query->where('name', 'like', '%'.$request->search.'%');
         }
 
         $recordings = $query->paginate(20);
@@ -94,19 +91,20 @@ class RecordingsController extends Controller
                 $file = $request->file('file');
                 $recording = $this->uploadService->uploadFile($file, $validated['name'], $user);
 
-        // Log the creation
-        $this->accessService->logFileAccess($recording, $user->id, 'created', [
-            'type' => 'upload',
-            'file_size' => $recording->file_size,
-            'mime_type' => $recording->mime_type,
-        ]);
+                // Log the creation
+                $this->accessService->logFileAccess($recording, $user->id, 'created', [
+                    'type' => 'upload',
+                    'file_size' => $recording->file_size,
+                    'mime_type' => $recording->mime_type,
+                ]);
 
-        // Dispatch job for post-processing (metadata extraction)
-        if (config('recordings.queue_processing_enabled', true)) {
-            ProcessRecordingUpload::dispatch($recording->id);
-        }
+                // Dispatch job for post-processing (metadata extraction)
+                if (config('recordings.queue_processing_enabled', true)) {
+                    ProcessRecordingUpload::dispatch($recording->id);
+                }
 
                 RecordingResource::setCurrentUserId($user->id);
+
                 return response()->json([
                     'message' => 'Recording created successfully',
                     'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -116,7 +114,7 @@ class RecordingsController extends Controller
                 // Handle remote URL
                 $validationResult = $this->remoteService->validateUrl($validated['remote_url']);
 
-                if (!$validationResult['success']) {
+                if (! $validationResult['success']) {
                     return response()->json([
                         'error' => 'Invalid remote URL',
                         'message' => $validationResult['message'] ?? 'URL validation failed',
@@ -146,6 +144,7 @@ class RecordingsController extends Controller
             }
 
             RecordingResource::setCurrentUserId($user->id);
+
             return response()->json([
                 'message' => 'Recording created successfully',
                 'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -172,6 +171,7 @@ class RecordingsController extends Controller
         }
 
         RecordingResource::setCurrentUserId($user->id);
+
         return response()->json([
             'data' => new RecordingResource($recording->load(['creator', 'updater'])),
         ]);
@@ -203,6 +203,7 @@ class RecordingsController extends Controller
         ]));
 
         RecordingResource::setCurrentUserId($user->id);
+
         return response()->json([
             'message' => 'Recording updated successfully',
             'data' => new RecordingResource($recording->load(['creator', 'updater'])),
@@ -221,7 +222,7 @@ class RecordingsController extends Controller
             return $user;
         }
 
-        if (!$recording->isUploaded()) {
+        if (! $recording->isUploaded()) {
             return response()->json(['error' => 'Only uploaded recordings can be downloaded'], 400);
         }
 
@@ -235,13 +236,11 @@ class RecordingsController extends Controller
         ]);
 
         return response()->json([
-            'download_url' => '/api/v1/recordings/download?token=' . urlencode($token),
+            'download_url' => '/api/v1/recordings/download?token='.urlencode($token),
             'filename' => $recording->original_filename ?? $recording->file_path,
             'expires_in' => 1800, // 30 minutes
         ]);
     }
-
-
 
     /**
      * Securely serve a recording file using an access token (handles both streaming and downloading).
@@ -250,7 +249,7 @@ class RecordingsController extends Controller
     {
         $token = $request->query('token');
 
-        if (!$token) {
+        if (! $token) {
             return response()->json(['error' => 'Invalid access token'], 401);
         }
 
@@ -266,17 +265,17 @@ class RecordingsController extends Controller
             $recording = $this->accessService->validateAccessToken($token, $user->id);
         }
 
-        if (!$recording) {
+        if (! $recording) {
             return response()->json(['error' => 'Access denied or token expired'], 403);
         }
 
-        if (!$recording->file_path) {
+        if (! $recording->file_path) {
             return response()->json(['error' => 'File not found'], 404);
         }
 
         // Check if file exists in MinIO storage
         $filePath = "{$recording->organization_id}/{$recording->file_path}";
-        if (!Storage::disk('recordings')->exists($filePath)) {
+        if (! Storage::disk('recordings')->exists($filePath)) {
             return response()->json(['error' => 'File not found in storage'], 404);
         }
 
@@ -320,7 +319,7 @@ class RecordingsController extends Controller
             $headers['Accept-Ranges'] = 'bytes';
         } else {
             // For downloading, set attachment disposition
-            $headers['Content-Disposition'] = 'attachment; filename="' . ($recording->original_filename ?? $recording->file_path) . '"';
+            $headers['Content-Disposition'] = 'attachment; filename="'.($recording->original_filename ?? $recording->file_path).'"';
         }
 
         return response()->stream(function () use ($fileContent) {
@@ -340,7 +339,7 @@ class RecordingsController extends Controller
             return $user;
         }
         // Check if user has permission to delete recordings
-        if (!$user->hasRole(UserRole::OWNER) && !$user->hasRole(UserRole::PBX_ADMIN)) {
+        if (! $user->hasRole(UserRole::OWNER) && ! $user->hasRole(UserRole::PBX_ADMIN)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -405,70 +404,71 @@ class RecordingsController extends Controller
                 'user_agent' => $request->userAgent(),
             ]);
 
-        // Check if file exists in MinIO storage first
-        $exists = Storage::disk('recordings')->exists($filePath);
-        Log::info('MinIO file existence check', [
-            'file_path' => $filePath,
-            'exists' => $exists,
-        ]);
-
-        $fileContent = null;
-        $source = 'minio';
-
-        if ($exists) {
-            // Get file content from MinIO
-            $fileContent = Storage::disk('recordings')->get($filePath);
-        } else {
-            // Fallback: check local storage (for legacy IVR files)
-            $localPath = "ivr/{$filename}";
-            $localExists = Storage::disk('public')->exists($localPath);
-            Log::info('Local file fallback check', [
-                'local_path' => $localPath,
-                'exists' => $localExists,
+            // Check if file exists in MinIO storage first
+            $exists = Storage::disk('recordings')->exists($filePath);
+            Log::info('MinIO file existence check', [
+                'file_path' => $filePath,
+                'exists' => $exists,
             ]);
 
-            if ($localExists) {
-                $fileContent = Storage::disk('public')->get($localPath);
-                $source = 'local';
-                Log::info('Serving file from local storage', [
-                    'file_path' => $filePath,
-                    'local_path' => $localPath,
-                ]);
-            }
-        }
+            $fileContent = null;
+            $source = 'minio';
 
-        if (!$fileContent) {
-            Log::warning('Audio file not found in any storage', [
+            if ($exists) {
+                // Get file content from MinIO
+                $fileContent = Storage::disk('recordings')->get($filePath);
+            } else {
+                // Fallback: check local storage (for legacy IVR files)
+                $localPath = "ivr/{$filename}";
+                $localExists = Storage::disk('public')->exists($localPath);
+                Log::info('Local file fallback check', [
+                    'local_path' => $localPath,
+                    'exists' => $localExists,
+                ]);
+
+                if ($localExists) {
+                    $fileContent = Storage::disk('public')->get($localPath);
+                    $source = 'local';
+                    Log::info('Serving file from local storage', [
+                        'file_path' => $filePath,
+                        'local_path' => $localPath,
+                    ]);
+                }
+            }
+
+            if (! $fileContent) {
+                Log::warning('Audio file not found in any storage', [
+                    'path' => $path,
+                    'file_path' => $filePath,
+                    'local_path' => "ivr/{$filename}",
+                    'organization_id' => $orgId,
+                    'filename' => $filename,
+                ]);
+
+                return response()->json(['error' => 'File not found'], 404);
+            }
+
+            // Get MIME type from file extension or default to audio
+            $mimeType = $this->getMimeTypeFromFilename($filename);
+
+            // Log external access for monitoring
+            Log::info('External audio file access', [
                 'path' => $path,
-                'file_path' => $filePath,
-                'local_path' => "ivr/{$filename}",
                 'organization_id' => $orgId,
                 'filename' => $filename,
+                'file_path' => $filePath,
+                'source' => $source,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'mime_type' => $mimeType,
             ]);
-            return response()->json(['error' => 'File not found'], 404);
-        }
 
-        // Get MIME type from file extension or default to audio
-        $mimeType = $this->getMimeTypeFromFilename($filename);
-
-        // Log external access for monitoring
-        Log::info('External audio file access', [
-            'path' => $path,
-            'organization_id' => $orgId,
-            'filename' => $filename,
-            'file_path' => $filePath,
-            'source' => $source,
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'mime_type' => $mimeType,
-        ]);
-
-        return response($fileContent, 200, [
-            'Content-Type' => $mimeType,
-            'Content-Length' => strlen($fileContent),
-            'Cache-Control' => 'public, max-age=300', // Cache for 5 minutes
-            'Access-Control-Allow-Origin' => '*', // Allow cross-origin for Cloudonix
-        ]);
+            return response($fileContent, 200, [
+                'Content-Type' => $mimeType,
+                'Content-Length' => strlen($fileContent),
+                'Cache-Control' => 'public, max-age=300', // Cache for 5 minutes
+                'Access-Control-Allow-Origin' => '*', // Allow cross-origin for Cloudonix
+            ]);
         } catch (\Exception $e) {
             Log::error('Error serving MinIO file', [
                 'path' => $path,
@@ -478,7 +478,7 @@ class RecordingsController extends Controller
 
             return response()->json([
                 'error' => 'Internal server error',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }

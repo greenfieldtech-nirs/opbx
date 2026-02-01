@@ -6,17 +6,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
-use App\Http\Requests\RingGroup\StoreRingGroupRequest;
-use App\Http\Requests\RingGroup\UpdateRingGroupRequest;
+use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Resources\RingGroupResource;
 use App\Models\RingGroup;
 use App\Models\RingGroupMember;
-use App\Http\Controllers\Traits\AppliesFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,6 +25,7 @@ use Illuminate\Support\Facades\Log;
 class RingGroupController extends AbstractApiCrudController
 {
     use AppliesFilters;
+
     protected function getModelClass(): string
     {
         return RingGroup::class;
@@ -76,14 +74,14 @@ class RingGroupController extends AbstractApiCrudController
             'members.extension.user:id,name',
             'fallbackExtension:id,extension_number',
         ])
-        ->withCount([
-            'members',
-            'members as active_members_count' => function ($query) {
-                $query->whereHas('extension', function ($q) {
-                    $q->where('status', 'active');
-                });
-            },
-        ]);
+            ->withCount([
+                'members',
+                'members as active_members_count' => function ($query) {
+                    $query->whereHas('extension', function ($q) {
+                        $q->where('status', 'active');
+                    });
+                },
+            ]);
     }
 
     /**
@@ -97,17 +95,17 @@ class RingGroupController extends AbstractApiCrudController
             'strategy' => [
                 'type' => 'enum',
                 'enum' => RingGroupStrategy::class,
-                'scope' => 'withStrategy'
+                'scope' => 'withStrategy',
             ],
             'status' => [
                 'type' => 'enum',
                 'enum' => RingGroupStatus::class,
-                'scope' => 'withStatus'
+                'scope' => 'withStatus',
             ],
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
-            ]
+                'scope' => 'search',
+            ],
         ];
     }
 
@@ -120,8 +118,8 @@ class RingGroupController extends AbstractApiCrudController
      * Normalize fallback fields based on fallback action.
      * Ensures only the relevant fallback ID is set based on the action type.
      *
-     * @param array $validated Validated request data
-     * @param RingGroup|null $ringGroup Existing ring group for fallback values (null for store)
+     * @param  array  $validated  Validated request data
+     * @param  RingGroup|null  $ringGroup  Existing ring group for fallback values (null for store)
      * @return array Normalized validated data with correct fallback IDs
      */
     protected function normalizeFallbackFields(array $validated, ?RingGroup $ringGroup = null): array
@@ -159,7 +157,7 @@ class RingGroupController extends AbstractApiCrudController
                 $validated['fallback_ai_assistant_id'] = $incomingAiAssistantId
                     ?? $ringGroup?->fallback_ai_assistant_id;
                 break;
-            // Other actions (voicemail, hangup, etc.) don't need fallback IDs
+                // Other actions (voicemail, hangup, etc.) don't need fallback IDs
         }
 
         return $validated;
@@ -203,13 +201,13 @@ class RingGroupController extends AbstractApiCrudController
     protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
     {
         $lockKey = "lock:ring_group:{$model->id}";
-        $lock = Cache::lock($lockKey, 30);
-        
+        $lock = Cache::lock($lockKey, self::LOCK_TIMEOUT_SECONDS);
+
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
 
-        // Try to acquire lock with 5 second timeout
-        if (!$lock->block(5)) {
+        // Try to acquire lock with timeout
+        if (! $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS)) {
             Log::warning('Failed to acquire ring group lock', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -217,7 +215,10 @@ class RingGroupController extends AbstractApiCrudController
                 'lock_key' => $lockKey,
             ]);
 
-            abort(409, 'Ring group is currently being modified. Please try again.');
+            return response()->json([
+                'error' => 'Conflict',
+                'message' => 'Ring group is currently being modified. Please try again.',
+            ], 409);
         }
 
         Log::debug('Ring group lock acquired', [
@@ -233,7 +234,7 @@ class RingGroupController extends AbstractApiCrudController
     {
         if ($lock) {
             $lock->release();
-            
+
             $requestId = $this->getRequestId();
             Log::debug('Ring group lock released', [
                 'request_id' => $requestId,
@@ -284,5 +285,4 @@ class RingGroupController extends AbstractApiCrudController
             $model->organization_id
         );
     }
-
 }

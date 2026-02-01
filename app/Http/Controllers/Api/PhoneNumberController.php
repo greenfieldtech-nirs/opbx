@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-
-
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
@@ -22,7 +19,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Phone Numbers (DID) management API controller.
@@ -40,6 +36,7 @@ use Illuminate\Support\Str;
 class PhoneNumberController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Display a paginated list of phone numbers.
      *
@@ -47,9 +44,6 @@ class PhoneNumberController extends Controller
      * - status: Filter by active/inactive
      * - routing_type: Filter by routing type
      * - search: Search in phone_number and friendly_name
-     *
-     * @param Request $request
-     * @return AnonymousResourceCollection
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -112,10 +106,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Display the specified phone number.
-     *
-     * @param Request $request
-     * @param DidNumber $phoneNumber
-     * @return PhoneNumberResource
      */
     public function show(Request $request, DidNumber $phoneNumber): PhoneNumberResource
     {
@@ -141,9 +131,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Store a newly created phone number.
-     *
-     * @param StorePhoneNumberRequest $request
-     * @return JsonResponse
      */
     public function store(StorePhoneNumberRequest $request): JsonResponse
     {
@@ -205,10 +192,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Update the specified phone number.
-     *
-     * @param UpdatePhoneNumberRequest $request
-     * @param DidNumber $phoneNumber
-     * @return PhoneNumberResource
      */
     public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource
     {
@@ -260,16 +243,16 @@ class PhoneNumberController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            abort(500, 'Failed to update phone number');
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update phone number',
+                'error_code' => 'UPDATE_FAILED',
+            ], 500);
         }
     }
 
     /**
      * Remove the specified phone number.
-     *
-     * @param Request $request
-     * @param DidNumber $phoneNumber
-     * @return JsonResponse
      */
     public function destroy(Request $request, DidNumber $phoneNumber): JsonResponse
     {
@@ -327,9 +310,6 @@ class PhoneNumberController extends Controller
      * Load related resource for a single phone number based on routing_type.
      *
      * Prevents N+1 queries by manually loading the related model.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadRelatedResource(DidNumber $phoneNumber): void
     {
@@ -349,8 +329,7 @@ class PhoneNumberController extends Controller
      *
      * Optimizes queries by grouping phone numbers by routing_type and batch loading.
      *
-     * @param array<DidNumber> $phoneNumbers
-     * @return void
+     * @param  array<DidNumber>  $phoneNumbers
      */
     private function loadRelatedResources(array $phoneNumbers): void
     {
@@ -371,7 +350,7 @@ class PhoneNumberController extends Controller
         ];
 
         foreach ($phoneNumbers as $phoneNumber) {
-            if (!isset($phoneNumbersByType[$phoneNumber->routing_type])) {
+            if (! isset($phoneNumbersByType[$phoneNumber->routing_type])) {
                 continue;
             }
 
@@ -389,7 +368,7 @@ class PhoneNumberController extends Controller
         }
 
         // Batch load extensions
-        if (!empty($extensionIds)) {
+        if (! empty($extensionIds)) {
             $extensions = Extension::whereIn('id', array_filter($extensionIds))->get()->keyBy('id');
             foreach ($phoneNumbersByType['extension'] as $phoneNumber) {
                 $extensionId = $phoneNumber->getTargetExtensionId();
@@ -400,7 +379,7 @@ class PhoneNumberController extends Controller
         }
 
         // Batch load ring groups
-        if (!empty($ringGroupIds)) {
+        if (! empty($ringGroupIds)) {
             $ringGroups = RingGroup::whereIn('id', array_filter($ringGroupIds))->get()->keyBy('id');
             foreach ($phoneNumbersByType['ring_group'] as $phoneNumber) {
                 $ringGroupId = $phoneNumber->getTargetRingGroupId();
@@ -411,7 +390,7 @@ class PhoneNumberController extends Controller
         }
 
         // Batch load business hours schedules
-        if (!empty($scheduleIds)) {
+        if (! empty($scheduleIds)) {
             $schedules = BusinessHoursSchedule::whereIn('id', array_filter($scheduleIds))->get()->keyBy('id');
             foreach ($phoneNumbersByType['business_hours'] as $phoneNumber) {
                 $scheduleId = $phoneNumber->getTargetBusinessHoursId();
@@ -422,7 +401,7 @@ class PhoneNumberController extends Controller
         }
 
         // Batch load conference rooms
-        if (!empty($conferenceRoomIds)) {
+        if (! empty($conferenceRoomIds)) {
             $conferenceRooms = ConferenceRoom::whereIn('id', array_filter($conferenceRoomIds))->get()->keyBy('id');
             foreach ($phoneNumbersByType['conference_room'] as $phoneNumber) {
                 $conferenceRoomId = $phoneNumber->getTargetConferenceRoomId();
@@ -433,7 +412,7 @@ class PhoneNumberController extends Controller
         }
 
         // Batch load AI assistants
-        if (!empty($aiAssistantIds)) {
+        if (! empty($aiAssistantIds)) {
             $aiAssistants = Extension::whereIn('id', array_filter($aiAssistantIds))
                 ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
                 ->get()
@@ -447,7 +426,7 @@ class PhoneNumberController extends Controller
         }
 
         // Batch load IVR menus
-        if (!empty($ivrMenuIds)) {
+        if (! empty($ivrMenuIds)) {
             $ivrMenus = IvrMenu::whereIn('id', array_filter($ivrMenuIds))->get()->keyBy('id');
             foreach ($phoneNumbersByType['ivr_menu'] as $phoneNumber) {
                 $ivrMenuId = $phoneNumber->getTargetIvrMenuId();
@@ -460,9 +439,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Load extension for a phone number.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadExtension(DidNumber $phoneNumber): void
     {
@@ -477,9 +453,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Load ring group for a phone number.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadRingGroup(DidNumber $phoneNumber): void
     {
@@ -494,9 +467,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Load business hours schedule for a phone number.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadBusinessHoursSchedule(DidNumber $phoneNumber): void
     {
@@ -511,9 +481,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Load conference room for a phone number.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadConferenceRoom(DidNumber $phoneNumber): void
     {
@@ -528,9 +495,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Load AI assistant for a phone number.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadAiAssistant(DidNumber $phoneNumber): void
     {
@@ -547,9 +511,6 @@ class PhoneNumberController extends Controller
 
     /**
      * Load IVR menu for a phone number.
-     *
-     * @param DidNumber $phoneNumber
-     * @return void
      */
     private function loadIvrMenu(DidNumber $phoneNumber): void
     {

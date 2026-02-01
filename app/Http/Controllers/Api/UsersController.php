@@ -6,18 +6,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
-use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Controllers\Traits\AppliesFilters;
-use App\Http\Requests\User\CreateUserRequest;
-use App\Http\Requests\User\UpdateUserRequest;
+use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
@@ -87,17 +83,17 @@ class UsersController extends AbstractApiCrudController
             'role' => [
                 'type' => 'enum',
                 'enum' => UserRole::class,
-                'scope' => 'withRole'
+                'scope' => 'withRole',
             ],
             'status' => [
                 'type' => 'enum',
                 'enum' => UserStatus::class,
-                'scope' => 'withStatus'
+                'scope' => 'withStatus',
             ],
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
-            ]
+                'scope' => 'search',
+            ],
         ];
     }
 
@@ -115,7 +111,7 @@ class UsersController extends AbstractApiCrudController
     /**
      * Hook method called before storing a new model.
      *
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     protected function beforeStore(array $validated, Request $request): array
@@ -131,13 +127,13 @@ class UsersController extends AbstractApiCrudController
     /**
      * Hook method called before updating a model.
      *
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
         // Hash password if provided
-        if (isset($validated['password']) && !empty($validated['password'])) {
+        if (isset($validated['password']) && ! empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
             // Remove password from validated data if not provided
@@ -169,7 +165,13 @@ class UsersController extends AbstractApiCrudController
                     'target_user_id' => $model->id,
                 ]);
 
-                abort(409, 'Cannot delete the last owner in the organization.');
+                throw new \Symfony\Component\HttpKernel\Exception\HttpResponseException(
+                    response()->json([
+                        'success' => false,
+                        'message' => 'Cannot delete the last owner in the organization.',
+                        'error_code' => 'LAST_OWNER_DELETE_BLOCKED',
+                    ], 409)
+                );
             }
         }
 
@@ -238,7 +240,7 @@ class UsersController extends AbstractApiCrudController
 
             // Log general user update
             $changes = $this->getChangedFields($model, $validated);
-            if (!empty($changes)) {
+            if (! empty($changes)) {
                 AuditLogger::logUserUpdated($request, $model, $changes);
             }
         } catch (\Exception $auditException) {
