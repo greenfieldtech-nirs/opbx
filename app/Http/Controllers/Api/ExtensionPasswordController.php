@@ -64,6 +64,8 @@ class ExtensionPasswordController extends Controller
             'organization_id' => $user->organization_id,
             'extension_id' => $extension->id,
             'extension_number' => $extension->extension_number,
+            'action' => 'password_retrieved',
+            'security_event' => true,
         ]);
 
         return response()->json([
@@ -73,7 +75,8 @@ class ExtensionPasswordController extends Controller
                 'password' => $extension->password,
                 'warning' => 'This password is only shown once. Store it securely.',
             ],
-        ]);
+        ])->header('X-Security-Warning', 'Password exposed in response - handle securely')
+            ->header('X-Password-Expires', 'Once retrieved, regenerate if needed');
     }
 
     /**
@@ -115,6 +118,8 @@ class ExtensionPasswordController extends Controller
                 'organization_id' => $user->organization_id,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
+                'action' => 'password_reset',
+                'security_event' => true,
             ]);
 
             return response()->json([
@@ -125,7 +130,8 @@ class ExtensionPasswordController extends Controller
                     'new_password' => $newPassword,
                     'warning' => 'This is the only time the password will be shown. Store it securely.',
                 ],
-            ]);
+            ])->header('X-Security-Warning', 'Password exposed in response - handle securely')
+                ->header('X-Password-Expires', 'Once retrieved, regenerate if needed');
         } catch (\Exception $e) {
             Log::error('Failed to reset extension password', [
                 'request_id' => $requestId,

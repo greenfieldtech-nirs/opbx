@@ -84,16 +84,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Production security warning: Redis password should be configured
+        // Production security: Redis password validation
         if ($this->app->environment('production')) {
-            if (empty(config('database.redis.default.password'))) {
-                Log::critical('SECURITY WARNING: Redis password not set in production!', [
+            $redisPassword = config('database.redis.default.password');
+
+            if (empty($redisPassword)) {
+                Log::critical('SECURITY CRITICAL: Redis password not configured in production!', [
                     'message' => 'Redis is running without password protection',
                     'recommendation' => 'Set REDIS_PASSWORD in your .env file',
                     'command' => 'php artisan generate:password',
-                    'risk' => 'Unauthorized access to Redis data (sessions, cache, call state)',
+                    'risk' => 'Unauthorized access to Redis data (sessions, cache, call state, idempotency keys)',
                 ]);
+
+                // In production, block startup if Redis password is missing
+                // Uncomment the following line to enforce strict security:
+                // throw new \RuntimeException('Redis password must be configured in production. Set REDIS_PASSWORD in .env file.');
             }
+
+            // Also validate other critical security settings
+            $this->validateSecurityConfiguration();
         }
 
         // Register model policies
@@ -119,6 +128,40 @@ class AppServiceProvider extends ServiceProvider
         // Disable model events for CLI commands if needed
         if ($this->app->runningInConsole()) {
             // Add any console-specific bootstrapping here
+        }
+    }
+
+    /**
+     * Validate critical security configuration in production.
+     *
+     * Logs warnings for missing security settings but does not block startup.
+     * For stricter enforcement, uncomment the exception throws.
+     */
+    protected function validateSecurityConfiguration(): void
+    {
+        $issues = [];
+
+        // Check Redis password
+        if (empty(config('database.redis.default.password'))) {
+            $issues[] = 'Redis password not configured';
+        }
+
+        // Check APP_KEY is set
+        if (empty(config('app.key')) || strlen(config('app.key')) < 32) {
+            $issues[] = 'APP_KEY not set or invalid';
+        }
+
+        // Check session configuration
+        if (config('session.driver') === 'database' && empty(config('session.lifetime'))) {
+            $issues[] = 'Session lifetime not configured';
+        }
+
+        // Log all security configuration issues
+        if (! empty($issues)) {
+            Log::warning('Security configuration issues detected', [
+                'issues' => $issues,
+                'recommendation' => 'Review and fix the security configuration issues listed above',
+            ]);
         }
     }
 
