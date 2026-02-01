@@ -1297,46 +1297,46 @@ export default function ExtensionsComplete() {
                   )
                 )
               }] as Column<Extension>[] : []),
-              {
-                header: 'Type',
-                sortKey: 'type',
-                cell: (extension) => getTypeBadge(extension.type)
-              },
-              {
-                header: 'Linked To',
-                cell: (extension) => getDetailsBadge(extension)
-              },
-              {
-                header: 'Status',
-                sortKey: 'status',
-                cell: (extension) => (
-                  <Badge
-                    className={cn(
-                      getStatusColor(extension.status),
-                      "text-xs",
-                      !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) {
-                        handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
-                      }
-                    }}
-                  >
-                    {extension.status}
-                  </Badge>
-                )
-              },
-              {
-                header: 'Created',
-                sortKey: 'created_at',
-                cell: (extension) => (
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(extension.created_at).toLocaleDateString()}
-                  </span>
-                )
-              }
-            ]}
+                {
+                  header: 'Type',
+                  sortKey: 'type',
+                  cell: (extension) => getTypeBadge(extension.type)
+                },
+                {
+                  header: 'Linked To',
+                  cell: (extension) => getDetailsBadge(extension)
+                },
+                {
+                  header: 'Created',
+                  sortKey: 'created_at',
+                  cell: (extension) => (
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(extension.created_at).toLocaleDateString()}
+                    </span>
+                  )
+                },
+                {
+                  header: 'Status',
+                  sortKey: 'status',
+                  cell: (extension) => (
+                    <Badge
+                      className={cn(
+                        getStatusColor(extension.status),
+                        "text-xs",
+                        !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isReadOnly) {
+                          handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
+                        }
+                      }}
+                    >
+                      {extension.status}
+                    </Badge>
+                  )
+                }
+              ]}
             emptyState={
               <EmptyState
                 icon={Phone}
