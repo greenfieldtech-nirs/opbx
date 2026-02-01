@@ -7,7 +7,9 @@ use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
-use App\Http\Controllers\Api\ExtensionController;
+use App\Http\Controllers\Api\ExtensionCloudonixController;
+use App\Http\Controllers\Api\ExtensionCrudController;
+use App\Http\Controllers\Api\ExtensionPasswordController;
 use App\Http\Controllers\Api\IvrMenuController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
@@ -145,15 +147,25 @@ Route::prefix('v1')->group(function (): void {
         // Users
         Route::apiResource('users', UsersController::class);
 
-        // Extensions
-        Route::get('extensions/sync/compare', [ExtensionController::class, 'compareSync']);
-        Route::post('extensions/sync', [ExtensionController::class, 'performSync']);
-        Route::get('extensions/{extension}/password', [ExtensionController::class, 'getPassword'])
-            ->name('extensions.password');
-        Route::put('extensions/{extension}/reset-password', [ExtensionController::class, 'resetPassword'])
-            ->middleware(['auth:sanctum', 'sensitive-operations'])
-            ->name('extensions.reset-password');
-        Route::apiResource('extensions', ExtensionController::class);
+        // Extensions - CRUD (using ExtensionCrudController)
+        Route::apiResource('extensions', ExtensionCrudController::class);
+
+        // Extensions - Cloudonix sync (using ExtensionCloudonixController)
+        Route::prefix('extensions')->group(function (): void {
+            Route::get('sync/compare', [ExtensionCloudonixController::class, 'compareSync'])
+                ->name('extensions.sync.compare');
+            Route::post('sync', [ExtensionCloudonixController::class, 'performSync'])
+                ->name('extensions.sync.perform');
+        });
+
+        // Extensions - Password operations (using ExtensionPasswordController)
+        Route::prefix('extensions/{extension}')->group(function (): void {
+            Route::get('password', [ExtensionPasswordController::class, 'getPassword'])
+                ->name('extensions.password');
+            Route::put('reset-password', [ExtensionPasswordController::class, 'resetPassword'])
+                ->middleware(['auth:sanctum', 'sensitive-operations'])
+                ->name('extensions.reset-password');
+        });
 
         // Conference Rooms
         Route::apiResource('conference-rooms', ConferenceRoomController::class);
