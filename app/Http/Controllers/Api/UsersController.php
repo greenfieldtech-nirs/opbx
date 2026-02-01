@@ -10,12 +10,14 @@ use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpResponseException;
 
 /**
  * Users management API controller.
@@ -27,6 +29,30 @@ class UsersController extends AbstractApiCrudController
 {
     use AppliesFilters;
     use ValidatesTenantScope;
+
+    /**
+     * Lock key prefix for owner deletion protection.
+     * Prevents race condition when deleting the last owner.
+     */
+    private const LOCK_KEY_ORG_OWNER_DELETE = 'lock:org:owner_delete:';
+
+    /**
+     * Lock timeout in seconds for owner deletion.
+     */
+    private const LOCK_TIMEOUT_SECONDS = 10;
+
+    /**
+     * Maximum wait time to acquire lock.
+     */
+    private const LOCK_WAIT_SECONDS = 5;
+
+    private ResilientCacheService $resilientCache;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->resilientCache = new ResilientCacheService();
+    }
 
     /**
      * Get the model class name for this controller.
@@ -61,11 +87,11 @@ class UsersController extends AbstractApiCrudController
      */
     protected function getAllowedSortFields(): array
     {
-        return ['name', 'email', 'created_at', 'role', 'status'];
+        return ['name', 'email', 'role', 'status', 'created_at', 'updated_at'];
     }
 
     /**
-     * Get the default sort field for the index method.
+     * Get the default sort field.
      */
     protected function getDefaultSortField(): string
     {
@@ -73,78 +99,17 @@ class UsersController extends AbstractApiCrudController
     }
 
     /**
-     * Get the filter configuration for the index method.
-     *
-     * @return array<string, array>
+     * Get the default sort order.
      */
-    protected function getFilterConfig(): array
+    protected function getDefaultSortOrder(): string
     {
-        return [
-            'role' => [
-                'type' => 'enum',
-                'enum' => UserRole::class,
-                'scope' => 'withRole',
-            ],
-            'status' => [
-                'type' => 'enum',
-                'enum' => UserStatus::class,
-                'scope' => 'withStatus',
-            ],
-            'search' => [
-                'type' => 'search',
-                'scope' => 'search',
-            ],
-        ];
-    }
-
-    /**
-     * Apply custom filters to the query.
-     */
-    protected function applyCustomFilters(Builder $query, Request $request): void
-    {
-        $this->applyFilters($query, $request, $this->getFilterConfig());
-
-        // Always eager load extension relationship
-        $query->with(User::DEFAULT_EXTENSION_FIELDS);
-    }
-
-    /**
-     * Hook method called before storing a new model.
-     *
-     * @param  array<string, mixed>  $validated
-     * @return array<string, mixed>
-     */
-    protected function beforeStore(array $validated, Request $request): array
-    {
-        // Hash password
-        if (isset($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        }
-
-        return $validated;
-    }
-
-    /**
-     * Hook method called before updating a model.
-     *
-     * @param  array<string, mixed>  $validated
-     * @return array<string, mixed>
-     */
-    protected function beforeUpdate(Model $model, array $validated, Request $request): array
-    {
-        // Hash password if provided
-        if (isset($validated['password']) && ! empty($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            // Remove password from validated data if not provided
-            unset($validated['password']);
-        }
-
-        return $validated;
+        return 'desc';
     }
 
     /**
      * Hook method called before deleting a model.
+     *
+     * Implements race condition protection for owner deletion using distributed locking.
      */
     protected function beforeDestroy(Model $model, Request $request): void
     {
@@ -153,26 +118,7 @@ class UsersController extends AbstractApiCrudController
 
         // Business logic: Cannot delete last owner in organization
         if ($model->role === UserRole::OWNER) {
-            $ownerCount = User::forOrganization($currentUser->organization_id)
-                ->withRole(UserRole::OWNER)
-                ->count();
-
-            if ($ownerCount <= 1) {
-                Log::warning('Blocked deletion of last owner', [
-                    'request_id' => $this->getRequestId(),
-                    'user_id' => $currentUser->id,
-                    'organization_id' => $currentUser->organization_id,
-                    'target_user_id' => $model->id,
-                ]);
-
-                throw new \Symfony\Component\HttpKernel\Exception\HttpResponseException(
-                    response()->json([
-                        'success' => false,
-                        'message' => 'Cannot delete the last owner in the organization.',
-                        'error_code' => 'LAST_OWNER_DELETE_BLOCKED',
-                    ], 409)
-                );
-            }
+            $this->preventLastOwnerDeletion($model, $currentUser);
         }
 
         // Add audit logging for user deletion (before actual deletion)
@@ -184,6 +130,73 @@ class UsersController extends AbstractApiCrudController
                 'user_id' => $model->id,
                 'error' => $auditException->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Prevent deletion of the last owner using distributed locking.
+     *
+     * This method uses distributed locking to prevent race conditions where
+     * two concurrent requests could both delete the last owner.
+     *
+     * @param User $model User being deleted
+     * @param User $currentUser User performing the deletion
+     * @throws HttpResponseException If deletion would leave organization without an owner
+     */
+    private function preventLastOwnerDeletion(User $model, User $currentUser): void
+    {
+        $lockKey = self::LOCK_KEY_ORG_OWNER_DELETE . $currentUser->organization_id;
+
+        $result = $this->resilientCache->lock(
+            $lockKey,
+            function () use ($model, $currentUser) {
+                // Get fresh owner count WITHIN the lock
+                $ownerCount = User::forOrganization($currentUser->organization_id)
+                    ->withRole(UserRole::OWNER)
+                    ->count();
+
+                // Check if deleting this owner would leave organization without an owner
+                if ($model->role === UserRole::OWNER && $ownerCount <= 1) {
+                    Log::warning('Blocked deletion of last owner', [
+                        'request_id' => $this->getRequestId(),
+                        'user_id' => $currentUser->id,
+                        'organization_id' => $currentUser->organization_id,
+                        'target_user_id' => $model->id,
+                        'owner_count' => $ownerCount,
+                    ]);
+
+                    throw new HttpResponseException(
+                        response()->json([
+                            'success' => false,
+                            'message' => 'Cannot delete the last owner in the organization.',
+                            'error_code' => 'LAST_OWNER_DELETE_BLOCKED',
+                        ], 409)
+                    );
+                }
+
+                return true;
+            },
+            self::LOCK_TIMEOUT_SECONDS,
+            self::LOCK_WAIT_SECONDS
+        );
+
+        if ($result === null) {
+            // Lock acquisition failed
+            Log::warning('Failed to acquire lock for owner deletion check', [
+                'request_id' => $this->getRequestId(),
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_user_id' => $model->id,
+                'lock_key' => $lockKey,
+            ]);
+
+            throw new HttpResponseException(
+                response()->json([
+                    'success' => false,
+                    'message' => 'System is busy. Please try again.',
+                    'error_code' => 'LOCK_ACQUISITION_FAILED',
+                ], 409)
+            );
         }
     }
 
@@ -238,11 +251,7 @@ class UsersController extends AbstractApiCrudController
                 ], AuditLogger::LEVEL_WARNING, $request, $currentUser);
             }
 
-            // Log general user update
-            $changes = $this->getChangedFields($model, $validated);
-            if (! empty($changes)) {
-                AuditLogger::logUserUpdated($request, $model, $changes);
-            }
+            AuditLogger::logUserUpdated($request, $model);
         } catch (\Exception $auditException) {
             // Log audit failure but don't fail the operation
             Log::error('Failed to log user update audit', [
@@ -253,7 +262,21 @@ class UsersController extends AbstractApiCrudController
     }
 
     /**
-     * Transaction not needed - hooks only hash password (data transformation).
+     * Hook method called after deleting a model.
+     */
+    protected function afterDelete(Model $model, Request $request): void
+    {
+        // Clear user from cache
+        try {
+            \Illuminate\Support\Facades\Cache::forget('user.' . $model->id);
+        } catch (\Exception $e) {
+            // Ignore cache errors
+        }
+    }
+
+    /**
+     * Determine if the store operation should use database transaction.
+     *
      * Simple single-model create operation is already atomic.
      */
     protected function shouldUseTransactionForStore(): bool
@@ -262,7 +285,8 @@ class UsersController extends AbstractApiCrudController
     }
 
     /**
-     * Transaction not needed - hooks only hash password (data transformation).
+     * Determine if the update operation should use database transaction.
+     *
      * Simple single-model update operation is already atomic.
      */
     protected function shouldUseTransactionForUpdate(): bool
@@ -271,15 +295,12 @@ class UsersController extends AbstractApiCrudController
     }
 
     /**
-     * Transaction IS needed - beforeDestroy() performs query to count owners.
-     * Must ensure owner count check and delete happen atomically.
+     * Determine if the destroy operation should use database transaction.
+     *
+     * Owner deletion check requires atomicity - must use transaction.
      */
     protected function shouldUseTransactionForDestroy(): bool
     {
-        return true; // Keep transaction (queries in beforeDestroy hook)
+        return true;
     }
-
-    // No need to override store() and update()
-    // Laravel will automatically resolve and validate FormRequest classes
-    // based on route-model binding and type hints in the parent controller
 }
