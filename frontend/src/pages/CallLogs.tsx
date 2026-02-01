@@ -2,14 +2,15 @@
  * Call Logs Page
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
+import { extensionsService } from '@/services/extensions.service';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -18,21 +19,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Database, Download, Eye, Filter, X, Loader2, RefreshCw } from 'lucide-react';
+import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Lock } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
-import { JsonViewer } from '@textea/json-viewer';
+import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
-
-
-
-
-
+import { JsonViewer } from '@textea/json-viewer';
 export default function CallLogs() {
+  const { user: currentUser } = useAuth();
+  const isPbxUser = currentUser?.role === 'pbx_user';
+  const isReadOnly = isPbxUser || currentUser?.role === 'reporter';
+
   // CDR state
   const [cdrPage, setCdrPage] = useState(1);
   const [cdrFilters, setCdrFilters] = useState<CDRFilters>({ per_page: 50 });
@@ -48,6 +50,37 @@ export default function CallLogs() {
     to_date: '',
     disposition: '',
   });
+
+  // For PBX Users, find their extension number
+  const [userExtensionNumber, setUserExtensionNumber] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserExtension = async () => {
+      if (isPbxUser) {
+        try {
+          const extensionsData = await extensionsService.getAll({ per_page: 100 });
+          const userExtension = extensionsData.data.find((ext: any) => ext.user_id === currentUser?.id);
+          if (userExtension) {
+            setUserExtensionNumber(userExtension.extension_number);
+          }
+        } catch (error) {
+          logger.error('Failed to fetch user extension:', { error });
+        }
+      }
+    };
+    fetchUserExtension();
+  }, [isPbxUser, currentUser?.id]);
+
+  // Set default filter for PBX Users to show only their calls
+  useEffect(() => {
+    if (isPbxUser && userExtensionNumber) {
+      setCdrFilters({ 
+        per_page: 50,
+        from: userExtensionNumber,  // Show calls from their extension
+        to: userExtensionNumber,    // Or to their extension
+      });
+    }
+  }, [isPbxUser, userExtensionNumber]);
 
   // CDR query
   const {
@@ -386,9 +419,9 @@ export default function CallLogs() {
                 </TabsList>
 
                 <TabsContent value="executions" className="space-y-4 min-w-0">
-                  {selectedCdr.raw_cdr?.session?.profile?.application ? (
+                  {(selectedCdr.raw_cdr?.session as any)?.profile?.application ? (
                     <div className="space-y-4 min-w-0">
-                      {selectedCdr.raw_cdr.session.profile.application
+                      {(selectedCdr.raw_cdr as any).session.profile.application
                         .sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime())
                         .map((execution: any, index: number) => (
                           <div key={index} className="border rounded-lg p-4 bg-gray-50 min-w-0">

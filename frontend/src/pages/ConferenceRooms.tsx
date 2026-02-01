@@ -746,11 +746,13 @@ export default function ConferenceRooms() {
             sortDirection={sortDirection}
             onSort={handleSort}
             onView={openDetailSheet}
-            onEdit={openEditDialog}
-            onDelete={(room) => {
-              setSelectedRoom(room); // Assuming setRoomToDelete is setSelectedRoom
-              setIsDeleteDialogOpen(true); // Assuming setShowDeleteDialog is setIsDeleteDialogOpen
-            }}
+            onEdit={canManageRooms ? openEditDialog : undefined}
+            onDelete={canManageRooms ? ((room) => {
+              setSelectedRoom(room);
+              setIsDeleteDialogOpen(true);
+            }) : undefined}
+            canEdit={canManageRooms}
+            canDelete={canManageRooms}
             columns={[
               {
                 header: 'Capacity',
