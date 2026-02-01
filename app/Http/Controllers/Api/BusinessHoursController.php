@@ -377,6 +377,16 @@ class BusinessHoursController extends AbstractApiCrudController
     }
 
     /**
+     * Get the route parameter name for model binding.
+     *
+     * Override to match the route definition (business_hour instead of business_hours_schedule).
+     */
+    protected function getRouteParameterName(): string
+    {
+        return 'business_hour';
+    }
+
+    /**
      * Get the view ability for the model.
      */
     protected function getViewAbility(): string
