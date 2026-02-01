@@ -148,6 +148,7 @@ export default function ConferenceRooms() {
   const [isAudioOpen, setIsAudioOpen] = useState(false);
 
   const canManageRooms = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // Debounce search input
   useEffect(() => {
@@ -334,6 +335,7 @@ export default function ConferenceRooms() {
   };
 
   const handleToggleStatus = (room: ConferenceRoom) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus = room.status === 'active' ? 'inactive' : 'active';
     updateMutation.mutate({
       id: room.id,
@@ -667,10 +669,17 @@ export default function ConferenceRooms() {
     <div className="space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Video className="h-8 w-8" />
-            Conference Rooms
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Video className="h-8 w-8" />
+              Conference Rooms
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
             Manage conference rooms for audio/video meetings
           </p>
@@ -746,11 +755,13 @@ export default function ConferenceRooms() {
             sortDirection={sortDirection}
             onSort={handleSort}
             onView={openDetailSheet}
-            onEdit={openEditDialog}
-            onDelete={(room) => {
-              setSelectedRoom(room); // Assuming setRoomToDelete is setSelectedRoom
-              setIsDeleteDialogOpen(true); // Assuming setShowDeleteDialog is setIsDeleteDialogOpen
-            }}
+            onEdit={canManageRooms ? openEditDialog : undefined}
+            onDelete={canManageRooms ? ((room) => {
+              setSelectedRoom(room);
+              setIsDeleteDialogOpen(true);
+            }) : undefined}
+            canEdit={canManageRooms}
+            canDelete={canManageRooms}
             columns={[
               {
                 header: 'Capacity',
@@ -760,26 +771,6 @@ export default function ConferenceRooms() {
                     <Users className="h-4 w-4" />
                     {room.max_participants}
                   </div>
-                )
-              },
-              {
-                header: 'Status',
-                cell: (room) => (
-                  <Badge
-                    variant={room.status === 'active' ? 'default' : 'secondary'}
-                    className={cn(
-                      "text-xs cursor-pointer transition-all hover:scale-105",
-                      room.status === 'active'
-                        ? "bg-green-100 text-green-800 hover:bg-green-200"
-                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleStatus(room);
-                    }}
-                  >
-                    {room.status === 'active' ? 'Active' : 'Inactive'}
-                  </Badge>
                 )
               },
               {
@@ -828,6 +819,40 @@ export default function ConferenceRooms() {
                     <span className="text-muted-foreground text-xs">Open</span>
                   );
                 }
+              },
+              {
+                header: 'Status',
+                cell: (room) => (
+                  <Badge
+                    variant={room.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs",
+                      !isReadOnly && (
+                        updateMutation.isPending && updateMutation.variables?.id === room.id
+                          ? 'opacity-50 cursor-wait'
+                          : 'cursor-pointer transition-all hover:scale-105'
+                      ),
+                      room.status === 'active'
+                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly && !updateMutation.isPending) {
+                        handleToggleStatus(room);
+                      }
+                    }}
+                  >
+                    {updateMutation.isPending && updateMutation.variables?.id === room.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {room.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    ) : (
+                      room.status === 'active' ? 'Active' : 'Inactive'
+                    )}
+                  </Badge>
+                )
               }
             ]}
             emptyState={

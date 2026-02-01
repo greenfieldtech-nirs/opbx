@@ -172,6 +172,14 @@ export interface DIDNumber {
   updated_at: string;
 }
 
+// Ring Group Member
+export interface RingGroupMember {
+  extension_id: string;
+  extension_number: string;
+  user_name: string | null;
+  priority: number;
+}
+
 // Ring Group
 export interface RingGroup {
   id: string;
@@ -181,12 +189,7 @@ export interface RingGroup {
   strategy: RingGroupStrategy;
   timeout: number; // seconds
   ring_turns: number;
-  members: Array<{
-    extension_id: string;
-    extension_number: string;
-    user_name: string | null;
-    priority: number;
-  }>;
+  members: RingGroupMember[];
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
   fallback_extension_number?: string;
@@ -556,6 +559,71 @@ export interface ConferenceRoomsFilterParams extends PaginationParams {
 // ============================================================================
 // Request Types - Business Hours
 // ============================================================================
+
+// Additional Business Hours Types
+export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+export interface TimeRange {
+  id: string;
+  start_time: string; // HH:mm format
+  end_time: string;   // HH:mm format
+}
+
+export interface DaySchedule {
+  enabled: boolean;
+  time_ranges: TimeRange[];
+}
+
+export interface WeeklySchedule {
+  monday: DaySchedule;
+  tuesday: DaySchedule;
+  wednesday: DaySchedule;
+  thursday: DaySchedule;
+  friday: DaySchedule;
+  saturday: DaySchedule;
+  sunday: DaySchedule;
+}
+
+export type ExceptionType = 'closed' | 'special_hours';
+
+export interface ExceptionDate {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  type: ExceptionType;
+  time_ranges?: TimeRange[];
+}
+
+export type ScheduleStatus = 'active' | 'inactive';
+
+export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference' | 'ai_assistant' | 'forward';
+
+export interface BusinessHoursAction {
+  type: BusinessHoursActionType;
+  target_id: string;
+}
+
+export interface BusinessHoursSchedule {
+  id: string;
+  organization_id: string;
+  name: string;
+  timezone: string;
+  status: ScheduleStatus;
+  schedule: WeeklySchedule;
+  exceptions: ExceptionDate[];
+  open_hours_action: BusinessHoursAction;
+  closed_hours_action: BusinessHoursAction;
+  current_status?: 'open' | 'closed' | 'exception';
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by?: string;
+}
+
+export interface Country {
+  countryCode: string;
+  name: string;
+}
 
 export interface CreateBusinessHoursRequest {
   name: string;

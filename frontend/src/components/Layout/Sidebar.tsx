@@ -33,17 +33,16 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Users', href: '/users', icon: Users, roles: ['owner', 'pbx_admin'] },
-  { name: 'Extensions', href: '/extensions', icon: Phone },
-  { name: 'Conference Rooms', href: '/conference-rooms', icon: Video },
-  { name: 'Phone Numbers', href: '/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin'] },
-  { name: 'Ring Groups', href: '/ring-groups', icon: UserPlus },
-  { name: 'IVR Menus', href: '/ivr-menus', icon: Menu },
-  { name: 'Business Hours', href: '/business-hours', icon: Clock },
+  { name: 'Extensions', href: '/extensions', icon: Phone, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'Conference Rooms', href: '/conference-rooms', icon: Video, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'Phone Numbers', href: '/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin', 'reporter'] },
+  { name: 'Ring Groups', href: '/ring-groups', icon: UserPlus, roles: ['owner', 'pbx_admin', 'reporter'] },
+  { name: 'IVR Menus', href: '/ivr-menus', icon: Menu, roles: ['owner', 'pbx_admin'] },
+  { name: 'Business Hours', href: '/business-hours', icon: Clock, roles: ['owner', 'pbx_admin'] },
   { name: 'Outbound Whitelist', href: '/outbound-whitelist', icon: Shield, roles: ['owner'] },
-  { name: 'Call Logs', href: '/call-logs', icon: FileText },
-  { name: 'Recordings', href: '/recordings', icon: Volume2, roles: ['owner', 'admin'] },
-  { name: 'Live Calls', href: '/live-calls', icon: Activity },
-
+  { name: 'Call Logs', href: '/call-logs', icon: FileText, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'Recordings', href: '/recordings', icon: Volume2, roles: ['owner', 'pbx_admin'] },
+  { name: 'Live Calls', href: '/live-calls', icon: Activity, roles: ['owner', 'pbx_admin', 'reporter'] },
 ];
 
 export function Sidebar() {

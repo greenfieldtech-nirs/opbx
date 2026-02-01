@@ -59,6 +59,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
+import api from '@/services/api';
 import logger from '@/utils/logger';
 import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -76,6 +77,7 @@ import type {
   WeeklySchedule,
   ExceptionDate,
   BusinessHoursAction,
+  BusinessHoursActionType,
   DayOfWeek,
   DaySchedule,
   TimeRange,
@@ -722,7 +724,9 @@ const BusinessHours: React.FC = () => {
     queryFn: () => businessHoursService.getAll(),
   });
 
-  const allSchedules = (schedulesData?.data || []) as BusinessHoursSchedule[];
+  // TODO: Backend returns BusinessHours but component expects BusinessHoursSchedule with additional fields
+  // Currently using mock data which has the correct structure
+  const allSchedules = (schedulesData?.data || []) as unknown as BusinessHoursSchedule[];
 
   // Fetch extensions for select boxes
   const { data: extensionsData } = useQuery({
@@ -795,6 +799,26 @@ const BusinessHours: React.FC = () => {
       toast.error(error.response?.data?.message || 'Failed to delete business hours schedule.');
     },
   });
+
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'inactive' }) =>
+      api.patch(`/business-hours/${id}/toggle-status`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      toast.success('Business hours schedule status updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update schedule status');
+    },
+  });
+
+  // Handle status toggle
+  const handleToggleStatus = (schedule: BusinessHoursSchedule) => {
+    if (toggleStatusMutation.isPending) return; // Prevent multiple simultaneous toggles
+    const newStatus = schedule.status === 'active' ? 'inactive' : 'active';
+    toggleStatusMutation.mutate({ id: String(schedule.id), status: newStatus });
+  };
 
   // Filtered and sorted schedules
   const filteredSchedules = useMemo(() => {
@@ -1282,23 +1306,6 @@ const BusinessHours: React.FC = () => {
             onDelete={handleOpenDelete}
             columns={[
               {
-                header: 'Status',
-                sortKey: 'status',
-                cell: (schedule) => (
-                  <Badge
-                    variant={schedule.status === 'active' ? 'default' : 'secondary'}
-                    className={cn(
-                      "text-xs cursor-pointer transition-all hover:scale-105",
-                      schedule.status === 'active'
-                        ? "bg-green-100 text-green-800 hover:bg-green-200"
-                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    )}
-                  >
-                    {schedule.status === 'active' ? 'Active' : 'Disabled'}
-                  </Badge>
-                )
-              },
-              {
                 header: 'Timezone',
                 cell: (schedule) => (
                   <span className="text-sm text-muted-foreground">{schedule.timezone}</span>
@@ -1319,6 +1326,39 @@ const BusinessHours: React.FC = () => {
                   <span className="text-sm text-muted-foreground">
                     {new Date(schedule.updated_at || '').toLocaleDateString()}
                   </span>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (schedule) => (
+                  <Badge
+                    variant={schedule.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs transition-all",
+                      toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(schedule.id)
+                        ? 'opacity-50 cursor-wait'
+                        : 'cursor-pointer hover:scale-105',
+                      schedule.status === 'active'
+                        ? "bg-green-100 text-green-800 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!toggleStatusMutation.isPending) {
+                        handleToggleStatus(schedule);
+                      }
+                    }}
+                  >
+                    {toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(schedule.id) ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {schedule.status === 'active' ? 'Active' : 'Disabled'}
+                      </span>
+                    ) : (
+                      schedule.status === 'active' ? 'Active' : 'Disabled'
+                    )}
+                  </Badge>
                 )
               }
             ]}
@@ -1667,30 +1707,19 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
           <div className="space-y-4">
             <h3 className="font-semibold">Basic Information</h3>
 
-            <div className="flex items-center justify-between">
-              <div className="flex-1 mr-4">
-                <Label htmlFor="name">
-                  Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name || ''}
-                  onChange={(e) => onFormChange('name', e.target.value)}
-                  placeholder="Main Office Hours"
-                />
-                {formErrors.name && (
-                  <p className="text-sm text-destructive">{formErrors.name}</p>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) => onFormChange('status', checked ? 'active' : 'inactive')}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {formData.status === 'active' ? 'Active' : 'Disabled'}
-                </span>
-              </div>
+            <div>
+              <Label htmlFor="name">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="name"
+                value={formData.name || ''}
+                onChange={(e) => onFormChange('name', e.target.value)}
+                placeholder="Main Office Hours"
+              />
+              {formErrors.name && (
+                <p className="text-sm text-destructive">{formErrors.name}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

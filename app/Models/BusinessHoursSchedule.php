@@ -38,6 +38,7 @@ class BusinessHoursSchedule extends Model
         'organization_id',
         'name',
         'status',
+        'timezone',
         'open_hours_action',
         'open_hours_action_type',
         'closed_hours_action',
@@ -114,8 +115,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Get the current status of the business hours (open/closed/exception).
-     *
-     * @return string
      */
     public function getCurrentStatusAttribute(): string
     {
@@ -128,9 +127,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Check if the business is currently open based on current time.
-     *
-     * @param Carbon|null $dateTime
-     * @return bool
      */
     public function isCurrentlyOpen(?Carbon $dateTime = null): bool
     {
@@ -152,7 +148,7 @@ class BusinessHoursSchedule extends Model
             ->where('day_of_week', $dayOfWeek->value)
             ->first();
 
-        if (!$scheduleDay || !$scheduleDay->enabled) {
+        if (! $scheduleDay || ! $scheduleDay->enabled) {
             return false;
         }
 
@@ -170,9 +166,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Get the exception for a given date, if any.
-     *
-     * @param Carbon $dateTime
-     * @return BusinessHoursException|null
      */
     public function getExceptionForDate(Carbon $dateTime): ?BusinessHoursException
     {
@@ -186,7 +179,6 @@ class BusinessHoursSchedule extends Model
     /**
      * Get the routing action based on current time.
      *
-     * @param Carbon|null $dateTime
      * @return array|string
      */
     public function getCurrentRouting(?Carbon $dateTime = null)
@@ -206,16 +198,12 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Convert business hours action to routing format expected by CallRoutingService.
-     *
-     * @param array $action
-     * @param BusinessHoursActionType $actionType
-     * @return array
      */
     private function convertActionToRoutingFormat(array $action, BusinessHoursActionType $actionType): array
     {
         $targetId = $action['target_id'] ?? null;
 
-        if (!$targetId) {
+        if (! $targetId) {
             return ['type' => 'voicemail', 'config' => []];
         }
 
@@ -259,10 +247,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Scope query to business hours schedules in a specific organization.
-     *
-     * @param Builder $query
-     * @param int|string $organizationId
-     * @return Builder
      */
     public function scopeForOrganization(Builder $query, int|string $organizationId): Builder
     {
@@ -271,10 +255,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Scope query to business hours schedules with a specific status.
-     *
-     * @param Builder $query
-     * @param BusinessHoursStatus $status
-     * @return Builder
      */
     public function scopeWithStatus(Builder $query, BusinessHoursStatus $status): Builder
     {
@@ -283,10 +263,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Scope query to search business hours schedules by name.
-     *
-     * @param Builder $query
-     * @param string $search
-     * @return Builder
      */
     public function scopeSearch(Builder $query, string $search): Builder
     {
@@ -295,9 +271,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Scope query to active business hours schedules only.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -306,8 +279,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Get the open hours action type.
-     *
-     * @return BusinessHoursActionType
      */
     public function getOpenHoursActionType(): BusinessHoursActionType
     {
@@ -316,8 +287,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Get the closed hours action type.
-     *
-     * @return BusinessHoursActionType
      */
     public function getClosedHoursActionType(): BusinessHoursActionType
     {
@@ -326,31 +295,26 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Get the open hours target ID.
-     *
-     * @return string|null
      */
     public function getOpenHoursTargetId(): ?string
     {
         $action = $this->open_hours_action;
+
         return is_array($action) ? ($action['target_id'] ?? null) : $action;
     }
 
     /**
      * Get the closed hours target ID.
-     *
-     * @return string|null
      */
     public function getClosedHoursTargetId(): ?string
     {
         $action = $this->closed_hours_action;
+
         return is_array($action) ? ($action['target_id'] ?? null) : $action;
     }
 
     /**
      * Get the current routing action type.
-     *
-     * @param Carbon|null $dateTime
-     * @return BusinessHoursActionType
      */
     public function getCurrentRoutingType(?Carbon $dateTime = null): BusinessHoursActionType
     {
@@ -361,9 +325,6 @@ class BusinessHoursSchedule extends Model
 
     /**
      * Get the current routing target ID.
-     *
-     * @param Carbon|null $dateTime
-     * @return string|null
      */
     public function getCurrentRoutingTargetId(?Carbon $dateTime = null): ?string
     {

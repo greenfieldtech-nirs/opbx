@@ -6,62 +6,22 @@
 // Imports
 // ============================================================================
 
-import type { BusinessHoursAction } from '../pages/BusinessHours';
+import type {
+  BusinessHoursAction,
+  BusinessHoursSchedule,
+  DayOfWeek,
+  TimeRange,
+  DaySchedule,
+  WeeklySchedule,
+  ExceptionType,
+  ExceptionDate,
+  ScheduleStatus,
+  Country,
+} from '@/types';
 
 // ============================================================================
 // Type Definitions
 // ============================================================================
-
-export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
-
-export interface TimeRange {
-  id: string;
-  start_time: string; // HH:mm format
-  end_time: string;   // HH:mm format
-}
-
-export interface DaySchedule {
-  enabled: boolean;
-  time_ranges: TimeRange[];
-}
-
-export interface WeeklySchedule {
-  monday: DaySchedule;
-  tuesday: DaySchedule;
-  wednesday: DaySchedule;
-  thursday: DaySchedule;
-  friday: DaySchedule;
-  saturday: DaySchedule;
-  sunday: DaySchedule;
-}
-
-export type ExceptionType = 'closed' | 'special_hours';
-
-export interface ExceptionDate {
-  id: string;
-  date: string; // YYYY-MM-DD
-  name: string;
-  type: ExceptionType;
-  time_ranges?: TimeRange[];
-}
-
-export type ScheduleStatus = 'active' | 'inactive';
-
-export interface BusinessHoursSchedule {
-  id: string;
-  organization_id: string;
-  name: string;
-  status: ScheduleStatus;
-  schedule: WeeklySchedule;
-  exceptions: ExceptionDate[];
-  open_hours_action: BusinessHoursAction;
-  closed_hours_action: BusinessHoursAction;
-  current_status?: 'open' | 'closed' | 'exception';
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by?: string;
-}
 
 export type RoutingAction = 'extension' | 'ring_group' | 'voicemail' | 'announcement' | 'hangup';
 
@@ -87,10 +47,19 @@ export interface Holiday {
   name: string;
 }
 
-export interface Country {
-  countryCode: string;
-  name: string;
-}
+// Re-export types for convenience
+export type {
+  BusinessHoursAction,
+  BusinessHoursSchedule,
+  DayOfWeek,
+  TimeRange,
+  DaySchedule,
+  WeeklySchedule,
+  ExceptionType,
+  ExceptionDate,
+  ScheduleStatus,
+  Country,
+};
 
 // ============================================================================
 // Mock Data

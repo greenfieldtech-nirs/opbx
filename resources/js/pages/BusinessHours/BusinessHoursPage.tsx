@@ -1,53 +1,18 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { businessHoursApi } from '@/lib/api';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useBusinessHours, useDeleteBusinessHours, useDuplicateBusinessHours } from '@/hooks/useBusinessHours';
 import { BusinessHoursSchedule } from '@/types/business-hours';
+import { EmptyState, EmptyStateIcons } from '@/components/ui/EmptyState';
 
 export function BusinessHoursPage() {
   const [search, setSearch] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<BusinessHoursSchedule | null>(null);
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  const { data: schedulesResponse, isLoading } = useQuery(
-    ['business-hours', search],
-    () => businessHoursApi.getAll({
-      search: search || undefined,
-      per_page: 50,
-    }),
-    {
-      keepPreviousData: true,
-    }
-  );
-
-  const deleteMutation = useMutation(
-    (id: string) => businessHoursApi.delete(id),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['business-hours']);
-        alert('Business hours schedule deleted successfully.');
-        setDeleteDialogOpen(false);
-        setScheduleToDelete(null);
-      },
-      onError: (error: any) => {
-        alert(error.response?.data?.message || 'Failed to delete business hours schedule.');
-      },
-    }
-  );
-
-  const duplicateMutation = useMutation(
-    (id: string) => businessHoursApi.duplicate(id),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['business-hours']);
-        alert('Business hours schedule duplicated successfully.');
-      },
-      onError: (error: any) => {
-        alert(error.response?.data?.message || 'Failed to duplicate business hours schedule.');
-      },
-    }
-  );
+  const { data: schedulesResponse, isLoading } = useBusinessHours(search);
+  const deleteMutation = useDeleteBusinessHours();
+  const duplicateMutation = useDuplicateBusinessHours();
 
   const handleDelete = (schedule: BusinessHoursSchedule) => {
     setScheduleToDelete(schedule);
@@ -57,6 +22,8 @@ export function BusinessHoursPage() {
   const confirmDelete = () => {
     if (scheduleToDelete) {
       deleteMutation.mutate(scheduleToDelete.id);
+      setDeleteDialogOpen(false);
+      setScheduleToDelete(null);
     }
   };
 
@@ -104,24 +71,15 @@ export function BusinessHoursPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : schedules.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🕒</div>
-              <h3 className="text-lg font-semibold mb-2">No business hours schedules found</h3>
-              <p className="text-gray-600 mb-4">
-                {search
-                  ? 'Try adjusting your search terms'
-                  : 'Get started by creating your first business hours schedule'}
-              </p>
-              {!search && (
-                <Link
-                  to="/business-hours/create"
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 inline-flex items-center"
-                >
-                  <span className="mr-2">+</span>
-                  Create Schedule
-                </Link>
-              )}
-            </div>
+            <EmptyState
+              icon={EmptyStateIcons.businessHours}
+              title="No business hours schedules found"
+              description="Get started by creating your first business hours schedule"
+              hasFilters={!!search}
+              canCreate={true}
+              onCreate={() => navigate('/business-hours/create')}
+              createLabel="Create Schedule"
+            />
           ) : (
             <table className="w-full">
               <thead>
@@ -177,15 +135,17 @@ export function BusinessHoursPage() {
                         </Link>
                         <button
                           onClick={() => handleDuplicate(schedule)}
-                          className="text-blue-600 hover:underline text-sm"
+                          disabled={duplicateMutation.isLoading}
+                          className="text-blue-600 hover:underline text-sm disabled:opacity-50"
                         >
-                          Duplicate
+                          {duplicateMutation.isLoading ? 'Duplicating...' : 'Duplicate'}
                         </button>
                         <button
                           onClick={() => handleDelete(schedule)}
-                          className="text-red-600 hover:underline text-sm"
+                          disabled={deleteMutation.isLoading}
+                          className="text-red-600 hover:underline text-sm disabled:opacity-50"
                         >
-                          Delete
+                          {deleteMutation.isLoading ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </td>

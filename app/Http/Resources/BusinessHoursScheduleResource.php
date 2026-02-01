@@ -18,7 +18,6 @@ class BusinessHoursScheduleResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -89,6 +88,7 @@ class BusinessHoursScheduleResource extends JsonResource
             'organization_id' => (string) $this->organization_id,
             'name' => $this->name,
             'status' => $this->status->value,
+            'timezone' => $this->timezone ?? 'UTC',
             'schedule' => $schedule,
             'exceptions' => $exceptions,
             'open_hours_action' => $openHoursAction,

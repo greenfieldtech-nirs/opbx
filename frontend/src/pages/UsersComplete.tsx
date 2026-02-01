@@ -625,14 +625,6 @@ export default function UsersComplete() {
                 )
               },
               {
-                header: 'Status',
-                cell: (user) => (
-                  <Badge className={cn('text-xs', getStatusColor(user.status))}>
-                    {user.status}
-                  </Badge>
-                )
-              },
-              {
                 header: 'Extension',
                 cell: (user) => user.extension ? (
                   <code className="px-2 py-1 bg-gray-100 rounded text-sm group-hover:bg-gray-200">
@@ -649,6 +641,14 @@ export default function UsersComplete() {
                   <span className="text-muted-foreground text-sm">
                     {formatDate(user.created_at)}
                   </span>
+                )
+              },
+              {
+                header: 'Status',
+                cell: (user) => (
+                  <Badge className={cn('text-xs', getStatusColor(user.status))}>
+                    {user.status}
+                  </Badge>
                 )
               }
             ]}

@@ -16,11 +16,11 @@ use Symfony\Component\HttpFoundation\Response;
  * Verify Voice Webhook Authentication
  *
  * Validates voice routing requests from Cloudonix using Bearer token authentication.
- * This middleware:
- * 1. Extracts the Bearer token from Authorization header
- * 2. Identifies the organization from DID or extension in the request
- * 3. Verifies the token against the organization's domain_requests_api_key
- * 4. Attaches organization_id to the request for controller use
+ *
+ * Authentication Flow:
+ * 1. Extract Domain from JSON body (required for organization identification)
+ * 2. Find CloudonixSettings by domain_name or domain_uuid
+ * 3. Verify Bearer token matches the organization's domain_requests_api_key
  *
  * Used for: voice/route, voice/ivr-input, voice/ring-group-callback
  */
@@ -35,13 +35,6 @@ class VerifyVoiceWebhookAuth
      */
     public function handle(Request $request, Closure $next): Response
     {
-        Log::info('Voice webhook auth middleware triggered', [
-            'ip' => $request->ip(),
-            'path' => $request->path(),
-            'method' => $request->method(),
-            'headers' => $request->headers->all(),
-        ]);
-
         // Get Authorization header
         $authHeader = $request->header('Authorization');
 
@@ -72,8 +65,14 @@ class VerifyVoiceWebhookAuth
         $fromNumber = $this->normalizePhoneNumber($payload['from'] ?? $payload['From'] ?? null);
         $toNumber = $this->normalizePhoneNumber($payload['to'] ?? $payload['To'] ?? null);
 
-        // Also check X-Cx-Apikey header (Cloudonix specific)
-        $cxApiKey = $request->header('X-Cx-Apikey');
+        if (!$domain) {
+            Log::warning('Voice webhook missing Domain in request body', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+            ]);
+
+            return $this->badRequestResponse('Missing Domain in request');
+        }
 
         if (!$toNumber) {
             Log::warning('Voice webhook missing "to" or "To" number', [
@@ -84,114 +83,29 @@ class VerifyVoiceWebhookAuth
             return $this->badRequestResponse('Missing destination number');
         }
 
-        // Identify organization by Bearer token first (most reliable)
-        Log::debug('Voice Webhook Auth: Starting organization identification', [
-            'bearer_token_prefix' => substr($providedToken, 0, 10) . '...',
-            'cx_api_key' => $cxApiKey,
-            'domain' => $domain,
-            'to_number' => $toNumber,
-            'from_number' => $fromNumber,
-        ]);
+        // Verify token for the organization identified by Domain
+        $verificationResult = $this->verifyTokenForDomain($providedToken, $domain, $toNumber, $fromNumber);
 
-        $organizationId = $this->identifyOrganizationByToken($providedToken);
-        $identifiedByToken = $organizationId !== null;
-
-        // If Bearer token didn't work, try X-Cx-Apikey header
-        if (!$organizationId && $cxApiKey) {
-            Log::debug('Voice Webhook Auth: Trying X-Cx-Apikey for identification');
-            $organizationId = $this->identifyOrganizationByToken($cxApiKey);
-            $identifiedByToken = $organizationId !== null;
-        }
-
-        Log::debug('Voice Webhook Auth: Token identification result', [
-            'token_used' => $identifiedByToken ? 'bearer' : ($cxApiKey && $this->identifyOrganizationByToken($cxApiKey) ? 'cx-apikey' : 'none'),
-            'identified_by_token' => $identifiedByToken,
-            'organization_id' => $organizationId,
-        ]);
-
-        if (!$organizationId) {
-            // Fallback: identify by domain from payload
-            if ($domain) {
-                $organizationId = $this->identifyOrganizationByDomain($domain);
-                Log::debug('Voice Webhook Auth: Domain identification result', [
-                    'identified_by_domain' => $organizationId !== null,
-                    'organization_id' => $organizationId,
-                ]);
-            }
-
-            if (!$organizationId) {
-                // Final fallback: identify by DID or extension (legacy method)
-                $organizationId = $this->identifyOrganization($toNumber, $fromNumber);
-                Log::debug('Voice Webhook Auth: Phone number identification result', [
-                    'identified_by_phone' => $organizationId !== null,
-                    'organization_id' => $organizationId,
-                ]);
-            }
-        }
-
-        if (!$organizationId) {
-            Log::warning('Voice webhook - unable to identify organization', [
+        if (!$verificationResult['verified']) {
+            Log::warning('Voice webhook authentication failed', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
                 'domain' => $domain,
-                'from_number' => $fromNumber,
                 'to_number' => $toNumber,
-                'token_prefix' => substr($providedToken, 0, 4) . '...',
+                'reason' => $verificationResult['reason'] ?? 'unknown',
             ]);
 
-            return $this->notFoundResponse('Unable to identify organization');
+            return $this->unauthorizedResponse();
         }
 
-        // Get organization's Cloudonix settings
-        $settings = CloudonixSettings::where('organization_id', $organizationId)->first();
-
-        if (!$settings) {
-            Log::warning('Voice webhook for organization without Cloudonix settings', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-                'organization_id' => $organizationId,
-                'domain' => $domain,
-                'from_number' => $fromNumber,
-                'to_number' => $toNumber,
-            ]);
-
-            return $this->configErrorResponse('Cloudonix settings not configured');
-        }
-
-        // Verify token if we didn't identify by token (constant-time comparison)
-        if (!$identifiedByToken) {
-            if (empty($settings->domain_requests_api_key)) {
-                Log::warning('Voice webhook for organization without domain requests API key', [
-                    'ip' => $request->ip(),
-                    'path' => $request->path(),
-                    'organization_id' => $organizationId,
-                    'domain' => $domain,
-                    'from_number' => $fromNumber,
-                    'to_number' => $toNumber,
-                ]);
-
-                return $this->configErrorResponse('API key not configured');
-            }
-
-            if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
-                Log::warning('Voice webhook auth token verification failed', [
-                    'ip' => $request->ip(),
-                    'path' => $request->path(),
-                    'organization_id' => $organizationId,
-                    'domain' => $domain,
-                    'from_number' => $fromNumber,
-                    'to_number' => $toNumber,
-                ]);
-
-                return $this->unauthorizedResponse();
-            }
-        }
+        $organizationId = $verificationResult['organization_id'];
 
         // Authentication successful
         Log::info('Voice webhook authenticated', [
             'ip' => $request->ip(),
             'path' => $request->path(),
             'organization_id' => $organizationId,
+            'domain' => $domain,
             'from_number' => $fromNumber,
             'to_number' => $toNumber,
         ]);
@@ -203,52 +117,25 @@ class VerifyVoiceWebhookAuth
     }
 
     /**
-     * Identify organization by Bearer token (domain_requests_api_key)
+     * Verify token against the organization identified by Domain.
+     *
+     * Flow:
+     * 1. Find CloudonixSettings by domain_name or domain_uuid
+     * 2. Verify Bearer token matches domain_requests_api_key
+     *
+     * @param string $providedToken The Bearer token from the request
+     * @param string $domain Domain name from the request
+     * @param string|null $toNumber Destination phone number for context
+     * @param string|null $fromNumber Source phone number for context
+     * @return array{verified: bool, organization_id?: int, reason?: string}
      */
-    private function identifyOrganizationByToken(string $token): ?int
-    {
-        Log::info('Voice Webhook: Identifying organization by token');
-
-        $settings = CloudonixSettings::where('domain_requests_api_key', $token)->first();
-
-        if ($settings) {
-            Log::info('Voice Webhook: Organization identified by token', [
-                'settings_id' => $settings->id,
-                'organization_id' => $settings->organization_id,
-                'domain_name' => $settings->domain_name,
-                'domain_uuid' => $settings->domain_uuid,
-            ]);
-            return $settings->organization_id;
-        }
-
-        Log::info('Voice Webhook: No organization found for token - checking all settings');
-        // Debug: Show all CloudonixSettings for troubleshooting
-        $allSettings = CloudonixSettings::all(['id', 'organization_id', 'domain_name', 'domain_uuid']);
-        Log::info('Voice Webhook: All CloudonixSettings records', [
-            'count' => $allSettings->count(),
-            'settings' => $allSettings->map(function($s) {
-                return [
-                    'id' => $s->id,
-                    'org_id' => $s->organization_id,
-                    'domain' => $s->domain_name,
-                    'uuid' => $s->domain_uuid,
-                ];
-            })->toArray(),
-        ]);
-
-        return null;
-    }
-
-    /**
-     * Identify organization by Cloudonix domain name or UUID
-     */
-    private function identifyOrganizationByDomain(string $domain): ?int
-    {
-        Log::info('Voice Webhook: Identifying organization by domain', [
-            'domain' => $domain,
-        ]);
-
-        // Try to find by domain name first
+    private function verifyTokenForDomain(
+        string $providedToken,
+        string $domain,
+        ?string $toNumber,
+        ?string $fromNumber
+    ): array {
+        // Find CloudonixSettings by domain
         $settings = CloudonixSettings::where('domain_name', $domain)->first();
 
         if (!$settings) {
@@ -256,107 +143,51 @@ class VerifyVoiceWebhookAuth
             $settings = CloudonixSettings::where('domain_uuid', $domain)->first();
         }
 
-        if ($settings) {
-            Log::info('Voice Webhook: Organization identified by domain', [
-                'settings_id' => $settings->id,
+        if (!$settings) {
+            Log::warning('Voice webhook: Organization not found for domain', [
+                'domain' => $domain,
+                'to_number' => $toNumber,
+            ]);
+
+            return [
+                'verified' => false,
+                'reason' => 'domain_not_found',
+            ];
+        }
+
+        // Verify token matches domain_requests_api_key
+        if (empty($settings->domain_requests_api_key)) {
+            Log::warning('Voice webhook: Organization has no API key configured', [
                 'organization_id' => $settings->organization_id,
-                'matched_by' => $settings->domain_name === $domain ? 'name' : 'uuid',
+                'domain' => $domain,
             ]);
-            return $settings->organization_id;
+
+            return [
+                'verified' => false,
+                'reason' => 'api_key_not_configured',
+            ];
         }
 
-        Log::info('Voice Webhook: No organization found for domain');
-        return null;
-    }
-
-    /**
-     * Identify organization by DID (external call) or extension (internal call)
-     */
-    private function identifyOrganization(?string $toNumber, ?string $fromNumber): ?int
-    {
-        Log::debug('Voice Webhook: Identifying organization', [
-            'to_number' => $toNumber,
-            'from_number' => $fromNumber,
-        ]);
-
-        // Try to identify organization by DID (external call scenario)
-        $didNumber = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('phone_number', $toNumber)
-            ->where('status', 'active')
-            ->first();
-
-        if ($didNumber) {
-            Log::debug('Voice Webhook: Organization identified by DID', [
-                'did_number' => $toNumber,
-                'organization_id' => $didNumber->organization_id,
+        if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
+            Log::warning('Voice webhook: Token mismatch', [
+                'organization_id' => $settings->organization_id,
+                'domain' => $domain,
             ]);
-            return $didNumber->organization_id;
+
+            return [
+                'verified' => false,
+                'reason' => 'invalid_token',
+            ];
         }
 
-        // Try to identify organization by extension (internal call scenario)
-        // Check if From is an extension
-        if ($fromNumber) {
-            $fromExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('extension_number', $fromNumber)
-                ->whereIn('type', ['user', 'ai_assistant'])
-                ->where('status', 'active')
-                ->first();
-
-            if ($fromExtension) {
-                Log::debug('Voice Webhook: Organization identified by extension', [
-                    'extension_number' => $fromNumber,
-                    'organization_id' => $fromExtension->organization_id,
-                ]);
-                return $fromExtension->organization_id;
-            }
-
-            // For IVR callbacks, also check if To number might be an extension
-            // This handles cases where the call flow changes the number context
-            $toExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('extension_number', $toNumber)
-                ->whereIn('type', ['user', 'ai_assistant'])
-                ->where('status', 'active')
-                ->first();
-
-            if ($toExtension) {
-                Log::debug('Voice Webhook: Organization identified by To extension (IVR callback)', [
-                    'extension_number' => $toNumber,
-                    'organization_id' => $toExtension->organization_id,
-                ]);
-                return $toExtension->organization_id;
-            }
-        }
-
-        // Try reverse lookup - check if To number is an extension
-        if ($toNumber) {
-            $toExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                ->where('extension_number', $toNumber)
-                ->whereIn('type', ['user', 'ai_assistant'])
-                ->where('status', 'active')
-                ->first();
-
-            if ($toExtension) {
-                Log::debug('Voice Webhook: Organization identified by To extension (fallback)', [
-                    'extension_number' => $toNumber,
-                    'organization_id' => $toExtension->organization_id,
-                ]);
-                return $toExtension->organization_id;
-            }
-        }
-
-        Log::warning('Voice Webhook: Unable to identify organization from numbers', [
-            'to_number' => $toNumber,
-            'from_number' => $fromNumber,
-        ]);
-
-        return null;
+        return [
+            'verified' => true,
+            'organization_id' => $settings->organization_id,
+        ];
     }
 
     /**
      * Normalize phone number by removing formatting characters
-     *
-     * Note: Does NOT add + prefix automatically because we need to support
-     * both extension numbers (e.g., "1005") and E.164 phone numbers (e.g., "+14155551234")
      */
     private function normalizePhoneNumber(?string $number): ?string
     {
@@ -364,7 +195,6 @@ class VerifyVoiceWebhookAuth
             return null;
         }
 
-        // Remove non-numeric characters except +
         $number = preg_replace('/[^0-9+]/', '', $number);
 
         return $number;
@@ -372,9 +202,6 @@ class VerifyVoiceWebhookAuth
 
     /**
      * Return unauthorized response in CXML format
-     *
-     * Since voice webhooks expect CXML responses, return errors
-     * in CXML format instead of JSON.
      */
     private function unauthorizedResponse(): Response
     {
@@ -400,36 +227,6 @@ class VerifyVoiceWebhookAuth
             '</Response>';
 
         return response($cxml, 400)
-            ->header('Content-Type', 'application/xml');
-    }
-
-    /**
-     * Return not found response in CXML format
-     */
-    private function notFoundResponse(string $message): Response
-    {
-        $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            "  <Say language=\"en-US\">Not found. {$message}.</Say>" . "\n" .
-            '  <Hangup/>' . "\n" .
-            '</Response>';
-
-        return response($cxml, 404)
-            ->header('Content-Type', 'application/xml');
-    }
-
-    /**
-     * Return configuration error response in CXML format
-     */
-    private function configErrorResponse(string $message): Response
-    {
-        $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            "  <Say language=\"en-US\">Configuration error. {$message}.</Say>" . "\n" .
-            '  <Hangup/>' . "\n" .
-            '</Response>';
-
-        return response($cxml, 500)
             ->header('Content-Type', 'application/xml');
     }
 }

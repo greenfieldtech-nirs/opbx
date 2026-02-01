@@ -14,6 +14,7 @@ import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
+import api from '@/services/api';
 import { cn } from '@/lib/utils';
 import type {
   IvrMenu,
@@ -264,7 +265,7 @@ export default function IVRMenus() {
   const [statusFilter, setStatusFilter] = useState<IvrMenuStatus | 'all'>('all');
   const [sortField, setSortField] = useState<'name' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(25);
 
   // Dialog states
@@ -466,6 +467,26 @@ export default function IVRMenus() {
       toast.error(error.response?.data?.message || 'Failed to delete IVR menu');
     },
   });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: IvrMenuStatus }) =>
+      api.patch(`/ivr-menus/${id}/toggle-status`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
+      toast.success('IVR menu status updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update IVR menu status');
+    },
+  });
+
+  // Handle status toggle
+  const handleToggleStatus = (menu: IvrMenu & { id: string | number }) => {
+    if (toggleStatusMutation.isPending) return; // Prevent multiple simultaneous toggles
+    const newStatus = menu.status === 'active' ? 'inactive' : 'active';
+    toggleStatusMutation.mutate({ id: String(menu.id), status: newStatus });
+  };
 
   // Toggle sort
   const toggleSort = (field: typeof sortField) => {
@@ -736,23 +757,6 @@ export default function IVRMenus() {
             onDelete={openDeleteDialog}
             columns={[
               {
-                header: 'Status',
-                accessorKey: 'status' as any,
-                cell: (menu) => (
-                  <Badge
-                    className={cn(
-                      'capitalize',
-                      menu.status === 'active'
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : 'bg-gray-100 text-gray-800 border-gray-200'
-                    )}
-                    variant="outline"
-                  >
-                    {menu.status}
-                  </Badge>
-                )
-              },
-              {
                 header: 'Options',
                 cell: (menu) => (
                   <Badge variant="secondary" className="font-mono">
@@ -768,6 +772,39 @@ export default function IVRMenus() {
                 header: 'Created',
                 accessorKey: 'created_at' as any,
                 cell: (menu) => new Date(menu.created_at).toLocaleDateString()
+              },
+              {
+                header: 'Status',
+                accessorKey: 'status' as any,
+                cell: (menu) => (
+                  <Badge
+                    className={cn(
+                      'capitalize transition-all',
+                      toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(menu.id)
+                        ? 'opacity-50 cursor-wait'
+                        : 'cursor-pointer hover:scale-105',
+                      menu.status === 'active'
+                        ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
+                    )}
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!toggleStatusMutation.isPending) {
+                        handleToggleStatus(menu);
+                      }
+                    }}
+                  >
+                    {toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(menu.id) ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {menu.status}
+                      </span>
+                    ) : (
+                      menu.status
+                    )}
+                  </Badge>
+                )
               }
             ]}
             emptyState={
@@ -831,8 +868,8 @@ export default function IVRMenus() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Name and Status fields above tabs */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Name field above tabs */}
+          <div className="mb-6">
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
               <Input
@@ -841,19 +878,6 @@ export default function IVRMenus() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., Main Menu"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
-                />
-                <Label htmlFor="status" className="text-sm font-normal">
-                  {formData.status === 'active' ? 'Active' : 'Disabled'}
-                </Label>
-              </div>
             </div>
           </div>
 
@@ -1324,8 +1348,8 @@ export default function IVRMenus() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Name and Status fields above tabs */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Name field above tabs */}
+          <div className="mb-6">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Name *</Label>
               <Input
@@ -1334,19 +1358,6 @@ export default function IVRMenus() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., Main Menu"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="edit-status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? 'active' : 'inactive' })}
-                />
-                <Label htmlFor="edit-status" className="text-sm font-normal">
-                  {formData.status === 'active' ? 'Active' : 'Disabled'}
-                </Label>
-              </div>
             </div>
           </div>
 

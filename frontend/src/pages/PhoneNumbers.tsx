@@ -82,6 +82,7 @@ export default function PhoneNumbers() {
 
   // Permission check
   const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
@@ -226,6 +227,7 @@ export default function PhoneNumbers() {
   };
 
   const handleToggleStatus = (phoneNumber: DIDNumber) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus: Status = phoneNumber.status === 'active' ? 'inactive' : 'active';
     updateMutation.mutate({
       id: phoneNumber.id,
@@ -324,10 +326,17 @@ export default function PhoneNumbers() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <PhoneCall className="h-8 w-8" />
-            Phone Numbers
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <PhoneCall className="h-8 w-8" />
+              Phone Numbers
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">Manage inbound phone numbers and routing</p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
@@ -412,31 +421,33 @@ export default function PhoneNumbers() {
           <StandardDataTable<DIDNumber>
             data={paginatedPhoneNumbers}
             isLoading={isLoading}
-            onRowClick={(phoneNumber) => {
+            onRowClick={canManage ? ((phoneNumber) => {
               setSelectedPhoneNumber(phoneNumber);
               setIsEditDialogOpen(true);
-            }}
+            }) : undefined}
             identityIcon={Phone}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(phoneNumber) => formatPhoneNumber(phoneNumber.phone_number)}
             getIdentitySecondary={(phoneNumber) => phoneNumber.friendly_name || 'Phone Number'}
-            onIdentityClick={(phoneNumber) => {
+            onIdentityClick={canManage ? ((phoneNumber) => {
               setSelectedPhoneNumber(phoneNumber);
               setIsEditDialogOpen(true);
-            }}
+            }) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={(phoneNumber) => {
+            onView={canManage ? ((phoneNumber) => {
               setSelectedPhoneNumber(phoneNumber);
               setIsEditDialogOpen(true);
-            }}
-            onEdit={(phoneNumber) => {
+            }) : undefined}
+            onEdit={canManage ? ((phoneNumber) => {
               setSelectedPhoneNumber(phoneNumber);
               setIsEditDialogOpen(true);
-            }}
-            onDelete={handleDeleteClick}
+            }) : undefined}
+            onDelete={canManage ? handleDeleteClick : undefined}
+            canEdit={canManage}
+            canDelete={canManage}
             columns={[
               {
                 header: 'Routing Type',
@@ -467,17 +478,29 @@ export default function PhoneNumbers() {
                         <Badge
                           variant={phoneNumber.status === 'active' ? 'default' : 'secondary'}
                           className={cn(
-                            "text-xs cursor-pointer transition-all hover:scale-105 active:scale-95",
+                            "text-xs transition-all",
+                            updateMutation.isPending && updateMutation.variables?.id === phoneNumber.id
+                              ? 'opacity-50 cursor-wait'
+                              : 'cursor-pointer hover:scale-105 active:scale-95',
                             phoneNumber.status === 'active'
                               ? "bg-green-100 text-green-800 hover:bg-green-200"
                               : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleToggleStatus(phoneNumber);
+                            if (!updateMutation.isPending) {
+                              handleToggleStatus(phoneNumber);
+                            }
                           }}
                         >
-                          {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
+                          {updateMutation.isPending && updateMutation.variables?.id === phoneNumber.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="h-3 w-3 animate-spin" />
+                              {phoneNumber.status === 'active' ? 'Active' : 'Disabled'}
+                            </span>
+                          ) : (
+                            phoneNumber.status === 'active' ? 'Active' : 'Disabled'
+                          )}
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>

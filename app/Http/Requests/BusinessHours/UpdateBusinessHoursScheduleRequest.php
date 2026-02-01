@@ -7,8 +7,6 @@ namespace App\Http\Requests\BusinessHours;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
-use App\Enums\DayOfWeek;
-use App\Models\BusinessHoursSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -20,14 +18,12 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
         $user = $this->user();
 
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -63,6 +59,11 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             'status' => [
                 'required',
                 new Enum(BusinessHoursStatus::class),
+            ],
+            'timezone' => [
+                'required',
+                'string',
+                'timezone:all',
             ],
             'open_hours_action' => [
                 'required',
@@ -209,8 +210,6 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
 
     /**
      * Prepare the data for validation.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {
@@ -219,7 +218,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
         foreach ($days as $day) {
-            if (!isset($schedule[$day])) {
+            if (! isset($schedule[$day])) {
                 $schedule[$day] = [
                     'enabled' => false,
                     'time_ranges' => [],
@@ -227,21 +226,19 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             }
         }
 
-        if (!empty($schedule)) {
+        if (! empty($schedule)) {
             $this->merge(['schedule' => $schedule]);
         }
 
-
-
         // Deduplicate exception dates (silently use first occurrence)
         $exceptions = $this->input('exceptions', []);
-        if (!empty($exceptions)) {
+        if (! empty($exceptions)) {
             $seenDates = [];
             $uniqueExceptions = [];
 
             foreach ($exceptions as $exception) {
                 $date = $exception['date'] ?? null;
-                if ($date && !in_array($date, $seenDates)) {
+                if ($date && ! in_array($date, $seenDates)) {
                     $seenDates[] = $date;
                     $uniqueExceptions[] = $exception;
                 }
@@ -251,13 +248,10 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         }
     }
 
-
-
     /**
      * Configure the validator instance.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -272,7 +266,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                 if (($daySchedule['enabled'] ?? false) && empty($daySchedule['time_ranges'])) {
                     $validator->errors()->add(
                         "schedule.{$dayName}",
-                        ucfirst($dayName) . ' is enabled but has no time ranges.'
+                        ucfirst($dayName).' is enabled but has no time ranges.'
                     );
                 }
             }
@@ -292,7 +286,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                 // Validate that closed exceptions don't have time ranges
                 if (
                     ($exception['type'] ?? '') === BusinessHoursExceptionType::CLOSED->value
-                    && !empty($exception['time_ranges'])
+                    && ! empty($exception['time_ranges'])
                 ) {
                     $validator->errors()->add(
                         "exceptions.{$index}",
@@ -310,10 +304,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
     /**
      * Validate that the action structure is consistent.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param string $field
-     * @param array $action
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
      */
     private function validateActionStructure($validator, string $field, array $action): void
     {
@@ -323,9 +314,9 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         if ($type && $targetId) {
             // For extension actions, target_id should be a valid extension identifier
             if ($type === BusinessHoursActionType::EXTENSION->value) {
-                if (!preg_match('/^ext-[a-zA-Z0-9_-]+$/', $targetId)) {
+                if (! preg_match('/^ext-[a-zA-Z0-9_-]+$/', $targetId)) {
                     $validator->errors()->add(
-                        $field . '.target_id',
+                        $field.'.target_id',
                         'Extension target ID must be in format: ext-{identifier}'
                     );
                 }
@@ -333,9 +324,9 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
 
             // For ring group actions, target_id should be a valid ring group identifier
             if ($type === BusinessHoursActionType::RING_GROUP->value) {
-                if (!preg_match('/^rg-[a-zA-Z0-9_-]+$/', $targetId)) {
+                if (! preg_match('/^rg-[a-zA-Z0-9_-]+$/', $targetId)) {
                     $validator->errors()->add(
-                        $field . '.target_id',
+                        $field.'.target_id',
                         'Ring group target ID must be in format: rg-{identifier}'
                     );
                 }
@@ -343,9 +334,9 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
 
             // For IVR menu actions, target_id should be a valid IVR menu identifier
             if ($type === BusinessHoursActionType::IVR_MENU->value) {
-                if (!preg_match('/^ivr-[a-zA-Z0-9_-]+$/', $targetId)) {
+                if (! preg_match('/^ivr-[a-zA-Z0-9_-]+$/', $targetId)) {
                     $validator->errors()->add(
-                        $field . '.target_id',
+                        $field.'.target_id',
                         'IVR menu target ID must be in format: ivr-{identifier}'
                     );
                 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
@@ -14,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Authentication API controller using Laravel Sanctum.
@@ -31,10 +31,72 @@ use Illuminate\Support\Str;
 class AuthController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Token expiration time in minutes (24 hours).
      */
     private const TOKEN_EXPIRATION_MINUTES = 1440;
+
+    /**
+     * Token abilities for scoped access control.
+     *
+     * Security: Using scoped tokens instead of wildcard ['*'] to limit
+     * the damage if a token is compromised.
+     *
+     * Note: Using string keys (enum values) instead of enum instances
+     * because PHP constants cannot have enum instances as array keys.
+     */
+    private const TOKEN_ABILITIES = [
+        // Owner: Full access to all resources
+        'owner' => [
+            'extension:*',
+            'user:*',
+            'ring-group:*',
+            'did-number:*',
+            'recording:*',
+            'settings:*',
+            'business-hours:*',
+            'conference:*',
+            'ivr:*',
+            'voice-agent:*',
+            'call-log:*',
+            'outbound-whitelist:*',
+            'recording-download:*',
+        ],
+        // PBX Admin: Full access except user management and sensitive settings
+        'pbx_admin' => [
+            'extension:*',
+            'user:read',
+            'user:update',
+            'ring-group:*',
+            'did-number:*',
+            'recording:read',
+            'business-hours:*',
+            'conference:*',
+            'ivr:*',
+            'call-log:*',
+        ],
+        // PBX User: Read access to most, can update own extension
+        'pbx_user' => [
+            'extension:read',
+            'extension:update:own',
+            'user:read',
+            'ring-group:read',
+            'did-number:read',
+            'recording:read',
+            'call-log:read',
+        ],
+        // Reporter: Read-only access
+        'reporter' => [
+            'extension:read',
+            'user:read',
+            'ring-group:read',
+            'did-number:read',
+            'recording:read',
+            'call-log:read',
+            'business-hours:read',
+        ],
+    ];
 
     /**
      * Authenticate user and issue authentication credentials.
@@ -160,17 +222,18 @@ class AuthController extends Controller
         // Revoke all existing tokens for security
         $user->tokens()->delete();
 
-        // Create new token with expiration
+        // Create new token with role-scoped abilities
+        $abilities = $this->getTokenAbilities($user->role);
         $token = $user->createToken(
             'api-token',
-            ['*'],
+            $abilities,
             now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
         )->plainTextToken;
 
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60, // Convert to seconds
+            'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
             'user' => [
                 'id' => $user->id,
                 'organization_id' => $user->organization_id,
@@ -222,6 +285,21 @@ class AuthController extends Controller
 
         // Default to token-based for backward compatibility
         return false;
+    }
+
+    /**
+     * Get token abilities based on user role.
+     *
+     * Security: Returns role-specific abilities instead of wildcard ['*']
+     * to limit token scope and reduce impact of token compromise.
+     *
+     * @param UserRole $role User's role
+     * @return array Token abilities
+     */
+    private function getTokenAbilities(UserRole $role): array
+    {
+        $roleValue = $role->value;
+        return self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
     }
 
     /**
@@ -357,10 +435,11 @@ class AuthController extends Controller
         // Revoke current token
         $request->user()->currentAccessToken()->delete();
 
-        // Create new token with expiration
+        // Create new token with role-scoped abilities
+        $abilities = $this->getTokenAbilities($user->role);
         $token = $user->createToken(
             'api-token',
-            ['*'],
+            $abilities,
             now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
         )->plainTextToken;
 
@@ -376,4 +455,3 @@ class AuthController extends Controller
         ]);
     }
 }
-

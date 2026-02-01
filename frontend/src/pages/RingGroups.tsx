@@ -30,7 +30,7 @@ import type {
   CreateRingGroupRequest,
   UpdateRingGroupRequest,
 } from '@/types/api.types';
-import type { Extension } from '@/types';
+import type { Extension, RingGroupMember } from '@/types';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -168,6 +168,7 @@ export default function RingGroups() {
 
   // Permission check
   const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
+  const isReadOnly = currentUser ? ['reporter', 'pbx_user'].includes(currentUser.role) : false;
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
@@ -373,6 +374,7 @@ export default function RingGroups() {
 
   // Handle status toggle
   const handleToggleStatus = async (group: RingGroup) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
     const newStatus: Status = group.status === 'active' ? 'inactive' : 'active';
 
     // We only need to send the status for a toggle
@@ -1329,10 +1331,17 @@ export default function RingGroups() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <UserPlus className="h-8 w-8" />
-            Ring Groups
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <UserPlus className="h-8 w-8" />
+              Ring Groups
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">Manage extension ring groups and routing strategies</p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
@@ -1405,19 +1414,21 @@ export default function RingGroups() {
           <StandardDataTable<RingGroup>
             data={ringGroups}
             isLoading={isLoading}
-            onRowClick={setSelectedGroup}
+            onRowClick={canManage ? setSelectedGroup : undefined}
             identityIcon={Users}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(group) => group.name}
             getIdentitySecondary={() => 'Ring Group'}
-            onIdentityClick={setSelectedGroup}
+            onIdentityClick={canManage ? setSelectedGroup : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
-            onView={setSelectedGroup}
-            onEdit={(group) => openEditDialog(group as ExtendedRingGroup)}
-            onDelete={openDeleteDialog}
+            onView={canManage ? setSelectedGroup : undefined}
+            onEdit={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
+            onDelete={canManage ? openDeleteDialog : undefined}
+            canEdit={canManage}
+            canDelete={canManage}
             columns={[
               {
                 header: 'Strategy',
@@ -1461,17 +1472,31 @@ export default function RingGroups() {
                   <Badge
                     variant={group.status === 'active' ? 'default' : 'secondary'}
                     className={cn(
-                      "text-xs cursor-pointer transition-all hover:scale-105",
+                      "text-xs",
+                      !isReadOnly && (
+                        updateMutation.isPending && updateMutation.variables?.id === group.id
+                          ? 'opacity-50 cursor-wait'
+                          : 'cursor-pointer transition-all hover:scale-105'
+                      ),
                       group.status === 'active'
                         ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleStatus(group);
+                      if (!isReadOnly && !updateMutation.isPending) {
+                        handleToggleStatus(group);
+                      }
                     }}
                   >
-                    {group.status === 'active' ? 'Active' : 'Disabled'}
+                    {updateMutation.isPending && updateMutation.variables?.id === group.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {group.status === 'active' ? 'Active' : 'Disabled'}
+                      </span>
+                    ) : (
+                      group.status === 'active' ? 'Active' : 'Disabled'
+                    )}
                   </Badge>
                 )
               }

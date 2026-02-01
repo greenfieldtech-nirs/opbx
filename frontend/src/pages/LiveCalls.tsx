@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, PhoneCall, Clock, ArrowRightLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,9 @@ const getDirectionIcon = (direction: string | null) => {
 };
 
 export default function LiveCalls() {
+  const { user: currentUser } = useAuth();
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
+
   // Fetch active calls with polling every 5 seconds (not rate limited)
   const { data: activeCallsResponse, isLoading, error, refetch } = useQuery({
     queryKey: ['active-calls'],
@@ -64,10 +68,17 @@ export default function LiveCalls() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Activity className="h-8 w-8 text-blue-600" />
-            Live Calls
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Activity className="h-8 w-8 text-blue-600" />
+              Live Calls
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
             Real-time active call monitoring using session updates
           </p>

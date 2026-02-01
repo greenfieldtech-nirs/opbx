@@ -9,8 +9,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Controllers\Traits\LogsOperations;
 use App\Http\Requests\StoreIvrMenuRequest;
+use App\Http\Requests\ToggleIvrMenuStatusRequest;
 use App\Http\Requests\UpdateIvrMenuRequest;
-use App\Models\CloudonixSettings;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
 use App\Services\Cloudonix\CloudonixVoiceService;
@@ -36,8 +36,6 @@ class IvrMenuController extends Controller
 
     /**
      * Get available TTS voices for IVR menus.
-     *
-     * @return JsonResponse
      */
     public function getVoices(Request $request): JsonResponse
     {
@@ -47,37 +45,37 @@ class IvrMenuController extends Controller
         // Get organization Cloudonix settings
         $organization = $currentUser->organization()->with('cloudonixSettings')->first();
 
-        if (!$organization || !$organization->cloudonixSettings) {
+        if (! $organization || ! $organization->cloudonixSettings) {
             Log::error('Cloudonix settings missing for organization', [
                 'request_id' => $requestId,
-                'organization_id' => $currentUser->organization_id
+                'organization_id' => $currentUser->organization_id,
             ]);
 
             return response()->json([
                 'error' => 'Cloudonix settings not configured for your organization.',
                 'troubleshooting' => [
                     'Contact your system administrator',
-                    'Ensure Cloudonix integration is properly set up for your organization'
-                ]
+                    'Ensure Cloudonix integration is properly set up for your organization',
+                ],
             ], 503);
         }
 
         $settings = $organization->cloudonixSettings;
 
-        if (!$settings->domain_uuid || !$settings->domain_api_key) {
+        if (! $settings->domain_uuid || ! $settings->domain_api_key) {
             Log::error('Incomplete Cloudonix settings', [
                 'request_id' => $requestId,
                 'organization_id' => $currentUser->organization_id,
-                'has_domain_uuid' => !empty($settings->domain_uuid),
-                'has_api_key' => !empty($settings->domain_api_key)
+                'has_domain_uuid' => ! empty($settings->domain_uuid),
+                'has_api_key' => ! empty($settings->domain_api_key),
             ]);
 
             return response()->json([
                 'error' => 'Cloudonix settings are incomplete.',
                 'troubleshooting' => [
                     'Contact your system administrator',
-                    'Ensure domain UUID and API key are configured in organization settings'
-                ]
+                    'Ensure domain UUID and API key are configured in organization settings',
+                ],
             ], 503);
         }
 
@@ -88,7 +86,7 @@ class IvrMenuController extends Controller
 
             return response()->json([
                 'data' => $voices,
-                'filters' => $filters
+                'filters' => $filters,
             ]);
 
         } catch (\RuntimeException $e) {
@@ -101,7 +99,7 @@ class IvrMenuController extends Controller
                 $troubleshooting = [
                     'Check API token validity',
                     'Regenerate API key in Cloudonix dashboard',
-                    'Update organization settings with new token'
+                    'Update organization settings with new token',
                 ];
             } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'connection') || str_contains($errorMessage, 'network')) {
                 $statusCode = 502; // Bad Gateway
@@ -109,14 +107,14 @@ class IvrMenuController extends Controller
                 $troubleshooting = [
                     'Check network connectivity',
                     'Verify Cloudonix API is accessible',
-                    'Try again in a few minutes'
+                    'Try again in a few minutes',
                 ];
             } else {
                 $statusCode = 502; // Bad Gateway
-                $userMessage = 'Cloudonix API error: ' . $errorMessage;
+                $userMessage = 'Cloudonix API error: '.$errorMessage;
                 $troubleshooting = [
                     'Check Cloudonix service status',
-                    'Contact Cloudonix support if issue persists'
+                    'Contact Cloudonix support if issue persists',
                 ];
             }
 
@@ -125,40 +123,33 @@ class IvrMenuController extends Controller
                 'organization_id' => $currentUser->organization_id,
                 'domain_uuid' => $settings->domain_uuid,
                 'error' => $errorMessage,
-                'status_code' => $statusCode
+                'status_code' => $statusCode,
             ]);
 
             return response()->json([
                 'error' => $userMessage,
-                'troubleshooting' => $troubleshooting
+                'troubleshooting' => $troubleshooting,
             ], $statusCode);
         } catch (\Exception $e) {
             Log::error('Unexpected error in getVoices', [
                 'request_id' => $requestId,
                 'error' => $e->getMessage(),
                 'organization_id' => $currentUser->organization_id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'error' => 'An unexpected error occurred while fetching voices.',
                 'troubleshooting' => [
                     'Contact system administrator',
-                    'Check application logs for details'
-                ]
+                    'Check application logs for details',
+                ],
             ], 500);
         }
     }
 
-
-
-
-
     /**
      * Display a paginated list of IVR menus.
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -174,14 +165,14 @@ class IvrMenuController extends Controller
         $query = IvrMenu::query()
             ->forOrganization($user->organization_id);
 
-        if (!$isDropdownRequest) {
+        if (! $isDropdownRequest) {
             $query->with([
                 'options' => function ($query) {
                     $query->select('id', 'ivr_menu_id', 'input_digits', 'description', 'destination_type', 'destination_id', 'priority')
                         ->orderBy('priority', 'asc');
                 },
             ])
-            ->withCount('options');
+                ->withCount('options');
         }
 
         // Apply filters
@@ -202,7 +193,7 @@ class IvrMenuController extends Controller
 
         // Validate sort field
         $allowedSortFields = ['name', 'status', 'created_at', 'updated_at'];
-        if (!in_array($sortField, $allowedSortFields, true)) {
+        if (! in_array($sortField, $allowedSortFields, true)) {
             $sortField = 'created_at';
         }
 
@@ -241,9 +232,6 @@ class IvrMenuController extends Controller
 
     /**
      * Store a newly created IVR menu.
-     *
-     * @param StoreIvrMenuRequest $request
-     * @return JsonResponse
      */
     public function store(StoreIvrMenuRequest $request): JsonResponse
     {
@@ -318,10 +306,6 @@ class IvrMenuController extends Controller
 
     /**
      * Display the specified IVR menu.
-     *
-     * @param Request $request
-     * @param IvrMenu $ivrMenu
-     * @return JsonResponse
      */
     public function show(Request $request, IvrMenu $ivrMenu): JsonResponse
     {
@@ -360,10 +344,6 @@ class IvrMenuController extends Controller
 
     /**
      * Update the specified IVR menu.
-     *
-     * @param UpdateIvrMenuRequest $request
-     * @param IvrMenu $ivrMenu
-     * @return JsonResponse
      */
     public function update(UpdateIvrMenuRequest $request, IvrMenu $ivrMenu): JsonResponse
     {
@@ -455,10 +435,6 @@ class IvrMenuController extends Controller
 
     /**
      * Remove the specified IVR menu.
-     *
-     * @param Request $request
-     * @param IvrMenu $ivrMenu
-     * @return JsonResponse
      */
     public function destroy(Request $request, IvrMenu $ivrMenu): JsonResponse
     {
@@ -491,19 +467,19 @@ class IvrMenuController extends Controller
             foreach ($result['references'] as $type => $items) {
                 switch ($type) {
                     case 'ivr_menu_options':
-                        $references['ivr_menus'] = array_map(fn($item) => [
+                        $references['ivr_menus'] = array_map(fn ($item) => [
                             'id' => $item['ivr_menu_id'],
                             'name' => $item['ivr_menu_name'],
                         ], $items);
                         break;
                     case 'ivr_failovers':
-                        $references['failover_menus'] = array_map(fn($item) => [
+                        $references['failover_menus'] = array_map(fn ($item) => [
                             'id' => $item['id'],
                             'name' => $item['ivr_menu_name'],
                         ], $items);
                         break;
                     case 'did_numbers':
-                        $references['phone_numbers'] = array_map(fn($item) => [
+                        $references['phone_numbers'] = array_map(fn ($item) => [
                             'id' => $item['id'],
                             'phone_number' => $item['phone_number'],
                         ], $items);
@@ -550,10 +526,63 @@ class IvrMenuController extends Controller
     }
 
     /**
+     * Toggle the status of an IVR menu.
+     */
+    public function toggleStatus(ToggleIvrMenuStatusRequest $request, IvrMenu $ivrMenu): JsonResponse
+    {
+        $user = $this->getAuthenticatedUser();
+
+        // Tenant scope check
+        if ($ivrMenu->organization_id !== $user->organization_id) {
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'IVR menu not found.',
+            ], 404);
+        }
+
+        $newStatus = $request->input('status');
+        $oldStatus = $ivrMenu->status;
+
+        try {
+            $ivrMenu->update(['status' => $newStatus]);
+
+            $this->logOperationCompleted('IVR menu', 'status toggle', [
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'ivr_menu_id' => $ivrMenu->id,
+                'ivr_menu_name' => $ivrMenu->name,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+
+            return response()->json([
+                'message' => 'IVR menu status updated successfully.',
+                'data' => [
+                    'id' => $ivrMenu->id,
+                    'status' => $ivrMenu->status,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            $this->logOperationFailed('IVR menu', 'status toggle', [
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'ivr_menu_id' => $ivrMenu->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update IVR menu status',
+                'message' => 'An error occurred while updating the IVR menu status.',
+            ], 500);
+        }
+    }
+
+    /**
      * Resolve the audio file path from either a direct URL or a recording ID.
      * If recording_id is provided or audio_file_path contains a recording ID, look up the recording and get its playback URL.
      *
-     * @param array $data
+     * @param  array  $data
      * @return void
      */
 }

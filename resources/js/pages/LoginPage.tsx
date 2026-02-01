@@ -1,9 +1,66 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 export const LoginPage: React.FC = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { toast } = useToast();
+    const navigate = useNavigate();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!email || !password) {
+            toast({
+                title: 'Error',
+                description: 'Please enter both email and password.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ email, password }),
+            });
+
+            if (response.ok) {
+                toast({
+                    title: 'Success',
+                    description: 'Login successful. Redirecting...',
+                });
+                navigate('/dashboard');
+            } else {
+                const data = await response.json();
+                toast({
+                    title: 'Error',
+                    description: data.message || 'Invalid credentials.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'An unexpected error occurred. Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex">
             {/* Left side - Aurora Background */}
@@ -33,7 +90,7 @@ export const LoginPage: React.FC = () => {
                             Enter your credentials to access the PBX administration
                         </p>
                     </div>
-                    <div className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <label htmlFor="email" className="text-sm font-medium">
                                 Email
@@ -42,6 +99,9 @@ export const LoginPage: React.FC = () => {
                                 id="email"
                                 type="email"
                                 placeholder="admin@example.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                disabled={isLoading}
                                 className="w-full"
                             />
                         </div>
@@ -53,18 +113,26 @@ export const LoginPage: React.FC = () => {
                                 id="password"
                                 type="password"
                                 placeholder="Enter your password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                disabled={isLoading}
                                 className="w-full"
                             />
                         </div>
-                        <Button className="w-full" size="lg">
-                            Sign In
+                        <Button 
+                            type="submit" 
+                            className="w-full" 
+                            size="lg"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Signing in...' : 'Sign In'}
                         </Button>
                         <div className="text-center text-sm text-gray-600">
                             <a href="#" className="hover:underline">
                                 Forgot your password?
                             </a>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>

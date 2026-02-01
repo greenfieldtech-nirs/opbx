@@ -35,6 +35,7 @@ export interface ServiceInstance<T = any> {
   getById: (id: string | number) => Promise<{ data: T }>;
   create: (data: Partial<T>) => Promise<{ data: T }>;
   update: (id: string | number, data: Partial<T>) => Promise<{ data: T }>;
+  patch: (id: string | number, data: Partial<T>) => Promise<{ data: T }>;
   delete: (id: string | number) => Promise<void>;
 }
 
@@ -60,6 +61,10 @@ export function createResourceService<T>(resource: string): ServiceInstance<T> {
     },
     update: async (id: string | number, data: Partial<T>) => {
       const response = await api.put(`/${resource}/${id}`, data);
+      return response.data;
+    },
+    patch: async (id: string | number, data: Partial<T>) => {
+      const response = await api.patch(`/${resource}/${id}`, data);
       return response.data;
     },
     delete: async (id: string | number) => {
