@@ -23,21 +23,21 @@ class RateLimitPerOrganization
 
     public function __construct()
     {
-        $this->cache = new ResilientCacheService();
+        $this->cache = new ResilientCacheService;
     }
 
     /**
      * Handle an incoming request.
      *
-     * @param \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response) $next
-     * @param string $limitType The rate limit configuration key (e.g., 'webhook', 'api', 'voice_routing')
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  string  $limitType  The rate limit configuration key (e.g., 'webhook', 'api', 'voice_routing')
      */
     public function handle(Request $request, Closure $next, string $limitType = 'default'): Response
     {
         // Extract organization ID from request
         $organizationId = $this->extractOrganizationId($request);
 
-        if (!$organizationId) {
+        if (! $organizationId) {
             Log::warning('Rate limit: Organization not identified', [
                 'path' => $request->path(),
                 'ip' => $request->ip(),
@@ -52,7 +52,7 @@ class RateLimitPerOrganization
         // Get rate limit configuration
         $limits = config("rate-limiting.{$limitType}");
 
-        if (!$limits) {
+        if (! $limits) {
             Log::error('Rate limit: Invalid limit type', [
                 'limit_type' => $limitType,
                 'organization_id' => $organizationId,
@@ -63,7 +63,7 @@ class RateLimitPerOrganization
         }
 
         // Fallback to hardcoded defaults if config not loaded (e.g., in tests)
-        if (!$limits) {
+        if (! $limits) {
             $limits = [
                 'max_attempts' => 60,
                 'per_minutes' => 1,
@@ -85,10 +85,10 @@ class RateLimitPerOrganization
                 'message' => "Maximum {$maxAttempts} requests per {$perMinutes} minute(s) allowed",
                 'retry_after' => 60,
             ], 429)
-            ->header('Retry-After', '60')
-            ->header('X-RateLimit-Limit', (string) $maxAttempts)
-            ->header('X-RateLimit-Remaining', '0')
-            ->header('X-RateLimit-Reset', (string) (time() + 60));
+                ->header('Retry-After', '60')
+                ->header('X-RateLimit-Limit', (string) $maxAttempts)
+                ->header('X-RateLimit-Remaining', '0')
+                ->header('X-RateLimit-Reset', (string) (time() + 60));
         }
 
         // Record usage for monitoring
@@ -158,14 +158,6 @@ class RateLimitPerOrganization
         }
 
         return $newCount;
-    }
-
-        // Increment counter - reset TTL to full window on each request
-        // This is acceptable for rate limiting as it prevents abuse
-        $attempts = $current + 1;
-        Cache::put($key, $attempts, now()->addMinutes($minutes));
-
-        return $attempts;
     }
 
     /**
