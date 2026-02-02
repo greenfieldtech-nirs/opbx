@@ -145,7 +145,8 @@ class RateLimitPerOrganization
     private function incrementAttempts(string $key, int $minutes): int
     {
         // Use Redis connection directly for atomic operations
-        $redis = Cache::connection()->getRedis();
+        // Get the Redis client from the cache connection
+        $redis = Cache::connection()->client();
 
         // Atomic increment (INCR is always atomic in Redis)
         $newCount = $redis->incr($key);
