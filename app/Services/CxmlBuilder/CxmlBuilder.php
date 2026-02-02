@@ -10,13 +10,23 @@ use DOMElement;
 /**
  * CXML response builder for Cloudonix voice applications.
  *
+ * SECURITY: All user input is encoded using htmlspecialchars with ENT_XML1 to prevent
+ * XSS attacks through CXML responses. This ensures that any special characters in
+ * user-controlled data (extension numbers, names, URLs) are properly escaped.
+ *
  * @see https://developers.cloudonix.com/Documentation/voiceApplication
  * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/dial
  */
 class CxmlBuilder
 {
     private DOMDocument $document;
+
     private DOMElement $response;
+
+    /**
+     * XML encoding constant for security - prevents XSS in CXML responses.
+     */
+    private const XML_ENCODING = ENT_XML1 | ENT_QUOTES;
 
     public function __construct()
     {
@@ -30,10 +40,10 @@ class CxmlBuilder
     /**
      * Add Dial verb to route call to a number or SIP URI.
      *
-     * @param string|array<string> $targets Phone number(s) or SIP URI(s)
-     * @param int|null $timeout Timeout in seconds
-     * @param string|null $action Callback URL after dial completes
-     * @param string|null $trunks Trunk identifier(s) to use for dialing
+     * @param  string|array<string>  $targets  Phone number(s) or SIP URI(s)
+     * @param  int|null  $timeout  Timeout in seconds
+     * @param  string|null  $action  Callback URL after dial completes
+     * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
      */
     public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null): self
     {
@@ -150,9 +160,9 @@ class CxmlBuilder
     /**
      * Add Service noun to Dial verb for service provider forwarding.
      *
-     * @param string $serviceUrl The service provider URL
-     * @param string|null $serviceToken Optional service authentication token
-     * @param array<string, mixed> $params Additional service parameters
+     * @param  string  $serviceUrl  The service provider URL
+     * @param  string|null  $serviceToken  Optional service authentication token
+     * @param  array<string, mixed>  $params  Additional service parameters
      */
     public function addDialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): self
     {
@@ -179,14 +189,14 @@ class CxmlBuilder
     /**
      * Add Dial verb with nested Conference for conference room access.
      *
-     * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
-     * @param bool $startOnEnter Start conference when participant enters
-     * @param bool $endOnExit End conference when last participant exits
-     * @param int|null $maxParticipants Maximum number of participants
-     * @param string|null $waitUrl URL for hold music while waiting
-     * @param bool $muteOnEntry Mute participant when they enter
-     * @param bool $announceJoinLeave Announce when participants join/leave
-     * @param int|null $timeout Dial timeout in seconds
+     * @param  string  $conferenceIdentifier  Clean conference identifier (letters/digits only)
+     * @param  bool  $startOnEnter  Start conference when participant enters
+     * @param  bool  $endOnExit  End conference when last participant exits
+     * @param  int|null  $maxParticipants  Maximum number of participants
+     * @param  string|null  $waitUrl  URL for hold music while waiting
+     * @param  bool  $muteOnEntry  Mute participant when they enter
+     * @param  bool  $announceJoinLeave  Announce when participants join/leave
+     * @param  int|null  $timeout  Dial timeout in seconds
      */
     public function dialConference(
         string $conferenceIdentifier,
@@ -232,12 +242,12 @@ class CxmlBuilder
     /**
      * Build dial action for an extension.
      *
-     * @param string $sipUri SIP URI of the extension
-     * @param int|null $timeout Timeout in seconds
+     * @param  string  $sipUri  SIP URI of the extension
+     * @param  int|null  $timeout  Timeout in seconds
      */
     public static function dialExtension(string $sipUri, ?int $timeout = null): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->dial($sipUri, $timeout ?? config('cloudonix.cxml.default_timeout', 30));
 
         return $builder->build();
@@ -246,12 +256,12 @@ class CxmlBuilder
     /**
      * Build dial action for a ring group (multiple extensions).
      *
-     * @param array<string> $sipUris Array of SIP URIs
-     * @param int|null $timeout Timeout in seconds
+     * @param  array<string>  $sipUris  Array of SIP URIs
+     * @param  int|null  $timeout  Timeout in seconds
      */
     public static function dialRingGroup(array $sipUris, ?int $timeout = null): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->dial($sipUris, $timeout ?? config('cloudonix.cxml.default_timeout', 30));
 
         return $builder->build();
@@ -262,7 +272,7 @@ class CxmlBuilder
      */
     public static function busy(string $message = 'All agents are currently busy. Please try again later.'): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->say($message)
             ->hangup();
 
@@ -274,7 +284,7 @@ class CxmlBuilder
      */
     public static function sendToVoicemail(?string $action = null): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->voicemail(action: $action);
 
         return $builder->build();
@@ -283,10 +293,10 @@ class CxmlBuilder
     /**
      * Build a conference room response with Dial wrapper.
      *
-     * @param string $conferenceIdentifier Clean conference identifier (letters/digits only)
-     * @param int|null $maxParticipants Maximum participants
-     * @param bool $muteOnEntry Whether to mute participants on entry
-     * @param bool $announceJoinLeave Whether to announce joins/leaves
+     * @param  string  $conferenceIdentifier  Clean conference identifier (letters/digits only)
+     * @param  int|null  $maxParticipants  Maximum participants
+     * @param  bool  $muteOnEntry  Whether to mute participants on entry
+     * @param  bool  $announceJoinLeave  Whether to announce joins/leaves
      */
     public static function joinConference(
         string $conferenceIdentifier,
@@ -294,7 +304,7 @@ class CxmlBuilder
         bool $muteOnEntry = false,
         bool $announceJoinLeave = false
     ): string {
-        $builder = new self();
+        $builder = new self;
         $builder->dialConference(
             $conferenceIdentifier,
             true, // startOnEnter
@@ -312,12 +322,12 @@ class CxmlBuilder
     /**
      * Build an unavailable response.
      *
-     * @param string $message The unavailable message
+     * @param  string  $message  The unavailable message
      */
     public static function unavailable(string $message = 'The extension you are trying to reach is unavailable.'): string
     {
-        $builder = new self();
-        $builder->say($message . ' Goodbye.')
+        $builder = new self;
+        $builder->say($message.' Goodbye.')
             ->hangup();
 
         return $builder->build();
@@ -326,14 +336,14 @@ class CxmlBuilder
     /**
      * Build a simple dial response.
      *
-     * @param string $destination The destination to dial
-     * @param string|null $callerId Optional caller ID
-     * @param int|null $timeout Optional timeout in seconds
-     * @param string|null $trunks Trunk identifier(s) to use for dialing
+     * @param  string  $destination  The destination to dial
+     * @param  string|null  $callerId  Optional caller ID
+     * @param  int|null  $timeout  Optional timeout in seconds
+     * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
      */
     public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->dial($destination, $timeout, null, $trunks);
 
         return $builder->build();
@@ -342,10 +352,10 @@ class CxmlBuilder
     /**
      * Build a say with optional hangup response.
      *
-     * @param string $message The message to say
-     * @param bool $hangupAfter Whether to hangup after saying
-     * @param string|null $voice Voice type
-     * @param string|null $language Language code
+     * @param  string  $message  The message to say
+     * @param  bool  $hangupAfter  Whether to hangup after saying
+     * @param  string|null  $voice  Voice type
+     * @param  string|null  $language  Language code
      */
     public static function sayWithHangup(
         string $message,
@@ -353,7 +363,7 @@ class CxmlBuilder
         ?string $voice = null,
         ?string $language = null
     ): string {
-        $builder = new self();
+        $builder = new self;
         $builder->say($message, $voice, $language);
 
         if ($hangupAfter) {
@@ -368,7 +378,7 @@ class CxmlBuilder
      */
     public static function simpleHangup(): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->hangup();
 
         return $builder->build();
@@ -377,13 +387,13 @@ class CxmlBuilder
     /**
      * Build service provider dialing response.
      *
-     * @param string $serviceUrl The service provider URL
-     * @param string|null $serviceToken Optional service authentication token
-     * @param array<string, mixed> $params Additional service parameters
+     * @param  string  $serviceUrl  The service provider URL
+     * @param  string|null  $serviceToken  Optional service authentication token
+     * @param  array<string, mixed>  $params  Additional service parameters
      */
     public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): string
     {
-        $builder = new self();
+        $builder = new self;
         $builder->addDialService($serviceUrl, $serviceToken, $params);
 
         return $builder->build();
@@ -394,12 +404,12 @@ class CxmlBuilder
      *
      * Used for Cloudonix Service providers like Retell, VAPI, etc.
      *
-     * @param string $provider The service provider name (e.g., 'retell', 'vapi')
-     * @param string $phoneNumber The service provider phone number
+     * @param  string  $provider  The service provider name (e.g., 'retell', 'vapi')
+     * @param  string  $phoneNumber  The service provider phone number
      */
     public static function dialServiceProvider(string $provider, string $phoneNumber): string
     {
-        $builder = new self();
+        $builder = new self;
         $dial = $builder->document->createElement('Dial');
         $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
         $service->setAttribute('provider', $provider);
@@ -412,12 +422,12 @@ class CxmlBuilder
     /**
      * Add Gather verb for DTMF input collection.
      *
-     * @param string $nestedVerbs XML string of nested verbs (Say, Play, etc.)
-     * @param string $action Callback URL for input processing
-     * @param int $timeout Timeout in seconds
-     * @param string $finishOnKey Key that ends input collection
-     * @param int $minDigits Minimum number of digits to collect
-     * @param int $maxDigits Maximum number of digits to collect
+     * @param  string  $nestedVerbs  XML string of nested verbs (Say, Play, etc.)
+     * @param  string  $action  Callback URL for input processing
+     * @param  int  $timeout  Timeout in seconds
+     * @param  string  $finishOnKey  Key that ends input collection
+     * @param  int  $minDigits  Minimum number of digits to collect
+     * @param  int  $maxDigits  Maximum number of digits to collect
      */
     public function addGather(
         string $nestedVerbs,
@@ -441,8 +451,8 @@ class CxmlBuilder
         }
 
         // Parse and append nested verbs
-        $tempDoc = new DOMDocument();
-        $tempDoc->loadXML('<root>' . $nestedVerbs . '</root>', LIBXML_NOERROR | LIBXML_NOWARNING);
+        $tempDoc = new DOMDocument;
+        $tempDoc->loadXML('<root>'.$nestedVerbs.'</root>', LIBXML_NOERROR | LIBXML_NOWARNING);
 
         if ($tempDoc->documentElement) {
             foreach ($tempDoc->documentElement->childNodes as $node) {
@@ -461,12 +471,12 @@ class CxmlBuilder
     /**
      * Build a Gather response with nested content.
      *
-     * @param string $nestedVerbs XML string of nested verbs
-     * @param string $action Callback URL for input processing
-     * @param int $timeout Timeout in seconds
-     * @param string $finishOnKey Key that ends input collection
-     * @param int $minDigits Minimum number of digits to collect
-     * @param int $maxDigits Maximum number of digits to collect
+     * @param  string  $nestedVerbs  XML string of nested verbs
+     * @param  string  $action  Callback URL for input processing
+     * @param  int  $timeout  Timeout in seconds
+     * @param  string  $finishOnKey  Key that ends input collection
+     * @param  int  $minDigits  Minimum number of digits to collect
+     * @param  int  $maxDigits  Maximum number of digits to collect
      */
     public static function gather(
         string $nestedVerbs,
@@ -477,15 +487,16 @@ class CxmlBuilder
         int $maxDigits = 1,
         ?int $maxTimeout = null
     ): string {
-        $builder = new self();
+        $builder = new self;
+
         return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits, $maxTimeout)->build();
     }
 
     /**
      * Get Play verb XML fragment.
      *
-     * @param string $url Audio file URL to play
-     * @param int|null $loop Number of times to loop (0 = infinite)
+     * @param  string  $url  Audio file URL to play
+     * @param  int|null  $loop  Number of times to loop (0 = infinite)
      */
     public static function playXml(string $url, ?int $loop = null): string
     {
@@ -505,9 +516,9 @@ class CxmlBuilder
     /**
      * Get Say verb XML fragment.
      *
-     * @param string $text Text to speak
-     * @param string|null $voice Voice to use
-     * @param string|null $language Language code
+     * @param  string  $text  Text to speak
+     * @param  string|null  $voice  Voice to use
+     * @param  string|null  $language  Language code
      */
     public static function sayXml(string $text, ?string $voice = null, ?string $language = null): string
     {
@@ -545,8 +556,7 @@ class CxmlBuilder
     /**
      * Convert the CXML to a Laravel HTTP Response.
      *
-     * @param int $status HTTP status code (default: 200)
-     * @return \Illuminate\Http\Response
+     * @param  int  $status  HTTP status code (default: 200)
      */
     public function toResponse(int $status = 200): \Illuminate\Http\Response
     {

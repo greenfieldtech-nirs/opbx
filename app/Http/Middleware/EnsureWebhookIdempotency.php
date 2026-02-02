@@ -199,12 +199,40 @@ class EnsureWebhookIdempotency
      */
     private function getIdempotencyKey(Request $request): ?string
     {
-        // Try to get explicit idempotency key from header
+        // Priority 1: Explicit idempotency key from header (if provided)
         $headerKey = $request->header('X-Idempotency-Key');
 
         if ($headerKey) {
             return $headerKey;
         }
+
+        // Priority 2: Cloudonix webhook standard fields
+        $callId = $request->input('CallSid') ?? $request->input('call_id');
+        $eventType = $request->input('CallStatus') ?? $request->input('event_type');
+        $timestamp = $request->input('timestamp') ?? $request->input('CallTimestamp');
+
+        if ($callId && $eventType) {
+            // Include timestamp to prevent replay attacks and ensure uniqueness
+            $keyComponents = [
+                'call_id' => $callId,
+                'event_type' => $eventType,
+                'timestamp' => $timestamp ?? time(),
+            ];
+
+            return hash('sha256', json_encode($keyComponents, JSON_PRESERVE_ZERO_FRICTION));
+        }
+
+        // Priority 3: Full payload as last resort
+        // Use JSON_PRESERVE_ZERO_FRICTION for deterministic encoding
+        // This ensures the same payload always produces the same hash
+        $payload = $request->all();
+
+        if (!empty($payload)) {
+            return hash('sha256', json_encode($payload, JSON_PRESERVE_ZERO_FRICTION));
+        }
+
+        return null;
+    }
 
         // Try to get from Cloudonix webhook payload
         $callId = $request->input('CallSid') ?? $request->input('call_id');

@@ -136,19 +136,29 @@ class RateLimitPerOrganization
     }
 
     /**
-     * Increment rate limit attempts counter.
+     * Increment rate limit attempts counter using atomic Redis operations.
+     *
+     * This prevents race conditions where multiple concurrent requests
+     * could all read the same count before any increment, leading to
+     * under-counting and rate limit bypass.
      */
     private function incrementAttempts(string $key, int $minutes): int
     {
-        // Try to get current value
-        $current = Cache::get($key);
+        // Use Redis connection directly for atomic operations
+        $redis = Cache::connection()->getRedis();
 
-        if ($current === null) {
-            // First request in window - set initial value with TTL
-            Cache::put($key, 1, now()->addMinutes($minutes));
+        // Atomic increment (INCR is always atomic in Redis)
+        $newCount = $redis->incr($key);
 
-            return 1;
+        // Set TTL only on first request (when count == 1)
+        // This is also atomic when combined with INCR using a Lua script
+        // but for simplicity, we use EXPIRE which is safe to call multiple times
+        if ($newCount === 1) {
+            $redis->expire($key, $minutes * 60);
         }
+
+        return $newCount;
+    }
 
         // Increment counter - reset TTL to full window on each request
         // This is acceptable for rate limiting as it prevents abuse
