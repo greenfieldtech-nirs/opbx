@@ -60,7 +60,7 @@ class SecurityHeaders
             "font-src 'self' data:",
 
             // Connect sources: self, WebSocket connections, and configured API domains
-            "connect-src 'self' ws: wss: " . $this->getAllowedApiDomains(),
+            "connect-src 'self' ws: wss: ".$this->getAllowedApiDomains(),
 
             // Object sources: none (prevents plugins like Flash, Java applets)
             "object-src 'none'",
@@ -118,7 +118,7 @@ class SecurityHeaders
         // Force HTTPS in production (HSTS)
         if (app()->environment('production')) {
             $hstsDirectives = [
-                'max-age=' . config('security.hsts_max_age', 31536000),
+                'max-age='.config('security.hsts_max_age', 31536000),
             ];
 
             if (config('security.hsts_include_subdomains', true)) {
@@ -131,9 +131,6 @@ class SecurityHeaders
 
             $response->headers->set('Strict-Transport-Security', implode('; ', $hstsDirectives));
         }
-
-        // Prevent XSS attacks (legacy, for older browsers)
-        $response->headers->set('X-XSS-Protection', '1; mode=block');
 
         return $response;
     }
@@ -165,7 +162,7 @@ class SecurityHeaders
         if ($cloudonixDomain) {
             $parsed = parse_url($cloudonixDomain);
             if (isset($parsed['scheme']) && isset($parsed['host'])) {
-                $domains[] = $parsed['scheme'] . '://' . $parsed['host'];
+                $domains[] = $parsed['scheme'].'://'.$parsed['host'];
             }
         }
 

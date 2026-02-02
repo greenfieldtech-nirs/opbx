@@ -256,9 +256,6 @@ class AuthController extends Controller
      * - Request has Authorization Bearer header (for logout/refresh of existing token sessions)
      * - OR request explicitly asks for token auth via X-Auth-Mode header
      * - OR request doesn't meet cookie auth criteria (default)
-     *
-     * @param Request $request
-     * @return bool
      */
     private function shouldUseCookieAuth(Request $request): bool
     {
@@ -293,12 +290,13 @@ class AuthController extends Controller
      * Security: Returns role-specific abilities instead of wildcard ['*']
      * to limit token scope and reduce impact of token compromise.
      *
-     * @param UserRole $role User's role
+     * @param  UserRole  $role  User's role
      * @return array Token abilities
      */
     private function getTokenAbilities(UserRole $role): array
     {
         $roleValue = $role->value;
+
         return self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
     }
 
@@ -363,6 +361,32 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
+
+        // Defensive validation: Ensure user belongs to a valid, active organization
+        if (! $user->organization) {
+            Log::warning('User has no organization', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+
+            return response()->json([
+                'error' => 'Invalid organization',
+                'message' => 'Your account is not associated with a valid organization',
+            ], 403);
+        }
+
+        if ($user->organization->status->value !== 'active') {
+            Log::warning('User organization is not active', [
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'organization_status' => $user->organization->status->value,
+            ]);
+
+            return response()->json([
+                'error' => 'Organization inactive',
+                'message' => 'Your organization is not active. Please contact support.',
+            ], 403);
+        }
 
         return response()->json([
             'user' => [
