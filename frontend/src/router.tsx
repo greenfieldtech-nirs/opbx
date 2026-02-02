@@ -30,9 +30,10 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 
 
-export const router = createBrowserRouter([
-  {
-    path: '/login',
+export const router = createBrowserRouter(
+  [
+    {
+      path: '/login',
     element: <Login />,
   },
   {
@@ -118,4 +119,7 @@ export const router = createBrowserRouter([
 
     ],
   },
-]);
+],
+{
+  basename: '/ui',
+});

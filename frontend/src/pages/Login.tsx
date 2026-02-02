@@ -54,9 +54,19 @@ export default function Login() {
 
         try {
             await login(data, () => navigate('/dashboard'));
-            toast.success('Login successful!');
+            try {
+                toast.success('Login successful!');
+            } catch {
+                console.log('Login successful');
+            }
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Login failed');
+            const message = error instanceof Error ? error.message : 'Login failed';
+            try {
+                toast.error(message);
+            } catch {
+                console.error('Login failed:', message);
+                alert(message);
+            }
         } finally {
             setIsLoading(false);
         }
