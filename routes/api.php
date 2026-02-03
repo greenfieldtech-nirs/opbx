@@ -147,16 +147,17 @@ Route::prefix('v1')->group(function (): void {
         // Users
         Route::apiResource('users', UsersController::class);
 
-        // Extensions - CRUD (using ExtensionCrudController)
-        Route::apiResource('extensions', ExtensionCrudController::class);
-
         // Extensions - Cloudonix sync (using ExtensionCloudonixController)
+        // Must be defined BEFORE apiResource to avoid wildcard matching issues
         Route::prefix('extensions')->group(function (): void {
             Route::get('sync/compare', [ExtensionCloudonixController::class, 'compareSync'])
                 ->name('extensions.sync.compare');
             Route::post('sync', [ExtensionCloudonixController::class, 'performSync'])
                 ->name('extensions.sync.perform');
         });
+
+        // Extensions - CRUD (using ExtensionCrudController)
+        Route::apiResource('extensions', ExtensionCrudController::class);
 
         // Extensions - Password operations (using ExtensionPasswordController)
         Route::prefix('extensions/{extension}')->group(function (): void {
@@ -228,5 +229,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/active', [SessionUpdateController::class, 'getActiveCalls'])->name('session-updates.active');
         Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
         Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
+        Route::delete('/{sessionId}/disconnect', [SessionUpdateController::class, 'disconnectSession'])->name('session-updates.disconnect');
     });
 });

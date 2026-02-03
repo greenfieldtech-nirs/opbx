@@ -517,27 +517,29 @@ POST   /webhooks/cloudonix/cdr
 
 ### Voice Webhook Authentication
 **Middleware**: `VerifyVoiceWebhookAuth`
-**Methods** (tried in order):
-1. `X-Cx-Apikey` header
-2. `Authorization: Bearer {token}` header
-3. Domain name lookup in `cloudonix_settings.domain_name`
-4. DID/extension number lookup
+**Authentication Flow**:
+1. Extract Bearer token from `Authorization: Bearer {token}` header
+2. Extract Domain from JSON body (`Domain` or `domain` field)
+3. Find organization by `domain_name` or `domain_uuid` in CloudonixSettings
+4. Verify Bearer token matches the organization's `domain_requests_api_key`
 
 **Security Features:**
-- Constant-time string comparison
-- Timestamp validation (5-minute window)
+- Constant-time string comparison (hash_equals)
 - Organization identification and isolation
+- Per-organization API keys stored encrypted in database
 
 ### Status Webhook Authentication
 **Middleware**: `VerifyCloudonixSignature`
-**Method**: HMAC-SHA256 signature verification
-**Secret**: `CLOUDONIX_WEBHOOK_SECRET` environment variable
-**Header**: `X-Cloudonix-Signature: {signature}`
 
-**Special CDR Authentication:**
-- No signature required for CDRs
-- Organization identified by `owner.domain.uuid`
+**CDR Webhooks** (`/api/webhooks/cloudonix/cdr`):
+- No Bearer token required
+- Organization identified by `owner.domain.uuid` in payload
 - Matched against `cloudonix_settings.domain_uuid`
+
+**Status Webhooks** (`/call-status`, `/session-update`, `/call-initiated`):
+- Bearer token from `Authorization: Bearer {token}` header
+- Token verified against `domain_requests_api_key` in CloudonixSettings
+- Falls back to searching by token if no domain UUID in payload
 
 ## Error Responses
 
@@ -555,8 +557,8 @@ POST   /webhooks/cloudonix/cdr
 ### Webhook Error Response (JSON)
 ```json
 {
-  "error": "Invalid signature",
-  "code": "INVALID_SIGNATURE"
+  "error": "Unauthorized - Invalid token",
+  "code": "INVALID_TOKEN"
 }
 ```
 

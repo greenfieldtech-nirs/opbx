@@ -23,7 +23,8 @@ class ExtensionCloudonixController extends Controller
 
     public function __construct(
         protected CloudonixSubscriberService $cloudonixSubscriberService
-    ) {}
+    ) {
+    }
 
     /**
      * Compare local extensions with Cloudonix subscribers.
@@ -42,39 +43,18 @@ class ExtensionCloudonixController extends Controller
         ]);
 
         try {
-            $extensions = Extension::forOrganization($user->organization_id)->get();
-            $subscriberCounts = [];
-            $localCounts = [];
+            $result = $this->cloudonixSubscriberService->compareWithCloudonix($user->organization);
 
-            foreach ($extensions as $extension) {
-                if ($extension->cloudonix_identity) {
-                    $subscriberCounts[$extension->cloudonix_identity] = true;
-                }
-                $localCounts[$extension->extension_number] = true;
+            // Log details if successful
+            if (!isset($result['error'])) {
+                Log::info('Comparison completed successfully', [
+                    'request_id' => $requestId,
+                    'user_id' => $user->id,
+                    'needs_sync' => $result['needs_sync'],
+                ]);
             }
 
-            $missingInCloudonix = [];
-            foreach ($extensions as $extension) {
-                if ($extension->type->value === 'user' && ! $extension->cloudonix_identity) {
-                    $missingInCloudonix[] = $extension->extension_number;
-                }
-            }
-
-            $result = [
-                'total_local_extensions' => count($extensions),
-                'extensions_in_cloudonix' => count($subscriberCounts),
-                'missing_in_cloudonix' => $missingInCloudonix,
-                'local_extension_numbers' => array_keys($localCounts),
-            ];
-
-            Log::info('Comparison completed successfully', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'total_local' => $result['total_local_extensions'],
-                'in_cloudonix' => $result['extensions_in_cloudonix'],
-            ]);
-
-            return response()->json(['data' => $result]);
+            return response()->json($result);
         } catch (\Exception $e) {
             Log::error('Failed to compare extensions with Cloudonix', [
                 'request_id' => $requestId,
@@ -99,74 +79,25 @@ class ExtensionCloudonixController extends Controller
         $user = $this->getAuthenticatedUser();
 
         $this->authorize('create', Extension::class);
-        $this->authorize('update', Extension::class);
-
-        $scope = $request->input('scope', 'all');
 
         Log::info('Syncing extensions with Cloudonix', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
-            'scope' => $scope,
         ]);
 
         try {
-            $extensions = Extension::forOrganization($user->organization_id);
+            // Use the service's bidirectional sync which handles both directions
+            $result = $this->cloudonixSubscriberService->bidirectionalSync($user->organization);
 
-            if ($scope === 'missing') {
-                $extensions = $extensions->whereNull('cloudonix_identity');
+            if (!$result['success']) {
+                throw new \Exception($result['error'] ?? 'Unknown error during sync');
             }
 
-            $extensions = $extensions->get();
-            $synced = 0;
-            $failed = 0;
-            $errors = [];
-
-            foreach ($extensions as $extension) {
-                if ($extension->type->value !== 'user') {
-                    continue;
-                }
-
-                try {
-                    $subscriber = $this->cloudonixSubscriberService->createOrUpdateSubscriber(
-                        $user->organization,
-                        $extension
-                    );
-
-                    if ($subscriber && ! empty($subscriber['identity'])) {
-                        $extension->update(['cloudonix_identity' => $subscriber['identity']]);
-                        $synced++;
-                    } else {
-                        $failed++;
-                        $errors[] = [
-                            'extension' => $extension->extension_number,
-                            'reason' => 'No subscriber identity returned',
-                        ];
-                    }
-                } catch (\Exception $e) {
-                    $failed++;
-                    $errors[] = [
-                        'extension' => $extension->extension_number,
-                        'reason' => $e->getMessage(),
-                    ];
-                }
-            }
-
-            Log::info('Sync completed', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'synced' => $synced,
-                'failed' => $failed,
-            ]);
-
-            return response()->json([
-                'message' => 'Sync completed successfully.',
-                'data' => [
-                    'synced' => $synced,
-                    'failed' => $failed,
-                    'errors' => $errors,
-                ],
-            ]);
+            return response()->json(array_merge(
+                ['message' => 'Sync completed successfully.'],
+                $result
+            ));
         } catch (\Exception $e) {
             Log::error('Failed to sync extensions with Cloudonix', [
                 'request_id' => $requestId,

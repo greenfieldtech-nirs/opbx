@@ -21,9 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Extension management API controller.
@@ -46,30 +44,27 @@ class ExtensionController extends Controller
             'type' => [
                 'type' => 'enum',
                 'enum' => ExtensionType::class,
-                'scope' => 'withType'
+                'scope' => 'withType',
             ],
             'status' => [
                 'type' => 'enum',
                 'enum' => UserStatus::class,
-                'scope' => 'withStatus'
+                'scope' => 'withStatus',
             ],
             'user_id' => [
                 'type' => 'column',
                 'scope' => 'forUser',
-                'require_filled' => true
+                'require_filled' => true,
             ],
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
-            ]
+                'scope' => 'search',
+            ],
         ];
     }
 
     /**
      * Display a paginated list of extensions.
-     *
-     * @param Request $request
-     * @return AnonymousResourceCollection
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -92,7 +87,7 @@ class ExtensionController extends Controller
 
         // Validate sort field
         $allowedSortFields = ['extension_number', 'type', 'status', 'created_at', 'updated_at'];
-        if (!in_array($sortField, $allowedSortFields, true)) {
+        if (! in_array($sortField, $allowedSortFields, true)) {
             $sortField = 'extension_number';
         }
 
@@ -127,33 +122,108 @@ class ExtensionController extends Controller
 
     /**
      * Store a newly created extension.
-     *
-     * @param StoreExtensionRequest $request
-     * @param PasswordGenerator $passwordGenerator
-     * @param CloudonixSubscriberService $subscriberService
-     * @return JsonResponse
      */
     public function store(
         StoreExtensionRequest $request,
         PasswordGenerator $passwordGenerator,
         CloudonixSubscriberService $subscriberService
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
 
         $validated = $request->validated();
 
-        // Log will be handled by success/failure methods below
+        // DEBUG: Log validated data
+        Log::info('[ExtensionController] Validated data received', [
+            'request_id' => $requestId,
+            'validated_type' => $validated['type'] ?? 'NOT SET',
+            'validated_keys' => array_keys($validated),
+            'raw_type_value' => is_object($validated['type'] ?? null) ? get_class($validated['type']) : gettype($validated['type'] ?? null),
+        ]);
 
         // Assign to current user's organization
         $validated['organization_id'] = $currentUser->organization_id;
 
-        // Auto-generate strong passphrase for the extension (3 words)
-        $validated['password'] = $passwordGenerator->generate();
+        // Only USER type extensions need a password for SIP authentication
+        // Other types (Conference, IVR, AI Assistant, Ring Group, Forward) don't require passwords
+        $extensionType = $validated['type'] ?? null;
+
+        // Handle both string and enum object cases
+        // Laravel's Enum validation can return either the string value or the enum object
+        if (is_object($extensionType) && $extensionType instanceof ExtensionType) {
+            $isUserExtension = $extensionType === ExtensionType::USER;
+            $extensionTypeValue = $extensionType->value;
+        } elseif (is_string($extensionType)) {
+            $isUserExtension = $extensionType === ExtensionType::USER->value;
+            $extensionTypeValue = $extensionType;
+        } else {
+            $isUserExtension = false;
+            $extensionTypeValue = 'UNKNOWN';
+        }
+
+        Log::info('[ExtensionController] Type comparison check', [
+            'request_id' => $requestId,
+            'extension_type_raw' => $validated['type'] ?? null,
+            'extension_type_class' => is_object($validated['type'] ?? null) ? get_class($validated['type']) : 'NOT_OBJECT',
+            'extension_type_value' => $extensionTypeValue,
+            'user_type_value' => ExtensionType::USER->value,
+            'is_user_extension' => $isUserExtension,
+        ]);
+
+        if ($isUserExtension) {
+            // Auto-generate strong passphrase for USER extensions (3 words)
+            $generatedPassword = '';
+
+            if (! empty($passwordGenerator)) {
+                $generatedPassword = $passwordGenerator->generate();
+            }
+
+            // Fallback: generate a secure random password if service injection failed
+            if (empty($generatedPassword)) {
+                Log::warning('[ExtensionController] Using fallback password generation', [
+                    'request_id' => $requestId,
+                    'creator_id' => $currentUser->id,
+                ]);
+                $generatedPassword = bin2hex(random_bytes(16)); // 32 character hex string
+            }
+
+            if (empty($generatedPassword)) {
+                Log::error('[ExtensionController] Failed to generate password', [
+                    'request_id' => $requestId,
+                    'creator_id' => $currentUser->id,
+                ]);
+
+                return response()->json([
+                    'error' => 'Password generation failed',
+                    'message' => 'Could not generate a secure password for the extension.',
+                ], 500);
+            }
+
+            $validated['password'] = $generatedPassword;
+
+            Log::info('[ExtensionController] Password generated for USER extension', [
+                'request_id' => $requestId,
+                'extension_number' => $validated['extension_number'] ?? 'UNKNOWN',
+                'password_length' => strlen($generatedPassword),
+            ]);
+        } else {
+            // Non-USER extensions don't need passwords
+            Log::info('[ExtensionController] Skipping password generation for non-USER extension', [
+                'request_id' => $requestId,
+                'extension_number' => $validated['extension_number'] ?? 'UNKNOWN',
+                'extension_type' => $extensionType,
+            ]);
+        }
 
         try {
             $extension = DB::transaction(function () use ($validated): Extension {
+                // DEBUG: Log what's being passed to create
+                Log::info('[ExtensionController] Creating extension with data', [
+                    'extension_number' => $validated['extension_number'] ?? 'MISSING',
+                    'has_password' => isset($validated['password']),
+                    'password_value' => isset($validated['password']) ? 'set ('.strlen($validated['password']).' chars)' : 'NOT SET',
+                ]);
+
                 // Create extension
                 $extension = Extension::create($validated);
 
@@ -212,10 +282,6 @@ class ExtensionController extends Controller
 
     /**
      * Display the specified extension.
-     *
-     * @param Request $request
-     * @param Extension $extension
-     * @return JsonResponse
      */
     public function show(Request $request, Extension $extension): JsonResponse
     {
@@ -256,18 +322,13 @@ class ExtensionController extends Controller
 
     /**
      * Update the specified extension.
-     *
-     * @param UpdateExtensionRequest $request
-     * @param Extension $extension
-     * @param CloudonixSubscriberService $subscriberService
-     * @return JsonResponse
      */
     public function update(
         UpdateExtensionRequest $request,
         Extension $extension,
-        CloudonixSubscriberService $subscriberService
-    ): JsonResponse
-    {
+        CloudonixSubscriberService $subscriberService,
+        PasswordGenerator $passwordGenerator
+    ): JsonResponse {
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
 
@@ -288,6 +349,38 @@ class ExtensionController extends Controller
         }
 
         $validated = $request->validated();
+
+        // Check if extension type is changing to USER
+        $oldType = $extension->type->value;
+        $newType = $validated['type'] ?? $oldType;
+        $isChangingToUser = ($oldType !== ExtensionType::USER->value && $newType === ExtensionType::USER->value);
+
+        // If changing to USER type, ensure password is set
+        if ($isChangingToUser) {
+            // Check if password needs to be generated
+            if (empty($extension->password)) {
+                $generatedPassword = '';
+
+                if (! empty($passwordGenerator)) {
+                    $generatedPassword = $passwordGenerator->generate();
+                }
+
+                // Fallback if service injection failed
+                if (empty($generatedPassword)) {
+                    $generatedPassword = bin2hex(random_bytes(16));
+                }
+
+                $validated['password'] = $generatedPassword;
+
+                Log::info('[ExtensionController] Auto-generated password for extension type change to USER', [
+                    'request_id' => $requestId,
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'old_type' => $oldType,
+                    'new_type' => $newType,
+                ]);
+            }
+        }
 
         // Track changed fields for logging
         $changedFields = [];
@@ -331,13 +424,18 @@ class ExtensionController extends Controller
                 ]);
             }
 
-            // Sync to Cloudonix if USER type extension and already synced
+            // Determine sync requirements
+            // If changing TO USER, don't require previously synced (force new sync)
+            // Otherwise, only sync if already synced
+            $requireSynced = ! $isChangingToUser;
+
+            // Sync to Cloudonix if USER type extension
             $cloudonixWarning = $this->syncExtensionToCloudonix(
                 $extension,
                 $subscriberService,
-                true,
+                true,  // isUpdate
                 'updated',
-                true
+                $requireSynced
             );
 
             $response = [
@@ -369,18 +467,12 @@ class ExtensionController extends Controller
 
     /**
      * Remove the specified extension.
-     *
-     * @param Request $request
-     * @param Extension $extension
-     * @param CloudonixSubscriberService $subscriberService
-     * @return JsonResponse
      */
     public function destroy(
         Request $request,
         Extension $extension,
         CloudonixSubscriberService $subscriberService
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $requestId = $this->getRequestId();
         $currentUser = $this->getAuthenticatedUser();
 
@@ -473,10 +565,6 @@ class ExtensionController extends Controller
 
     /**
      * Compare local extensions with Cloudonix subscribers.
-     *
-     * @param Request $request
-     * @param CloudonixSubscriberService $subscriberService
-     * @return JsonResponse
      */
     public function compareSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
@@ -490,7 +578,7 @@ class ExtensionController extends Controller
         try {
             $organization = $currentUser->organization()->with('cloudonixSettings')->first();
 
-            if (!$organization) {
+            if (! $organization) {
                 return response()->json([
                     'error' => 'Organization not found',
                 ], 404);
@@ -519,12 +607,6 @@ class ExtensionController extends Controller
 
     /**
      * Reset the password for the specified extension.
-     *
-     * @param Request $request
-     * @param Extension $extension
-     * @param PasswordGenerator $passwordGenerator
-     * @param CloudonixSubscriberService $subscriberService
-     * @return JsonResponse
      */
     public function resetPassword(
         Request $request,
@@ -536,7 +618,7 @@ class ExtensionController extends Controller
         $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can reset extension passwords
-        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
+        if (! $currentUser->isOwner() && ! $currentUser->isPBXAdmin()) {
             return response()->json([
                 'error' => 'Unauthorized',
                 'message' => 'Only Owner and PBX Admin can reset extension passwords.',
@@ -635,10 +717,6 @@ class ExtensionController extends Controller
 
     /**
      * Get the password for the specified extension.
-     *
-     * @param Request $request
-     * @param Extension $extension
-     * @return JsonResponse
      */
     public function getPassword(Request $request, Extension $extension): JsonResponse
     {
@@ -646,7 +724,7 @@ class ExtensionController extends Controller
         $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can view extension passwords
-        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
+        if (! $currentUser->isOwner() && ! $currentUser->isPBXAdmin()) {
             return response()->json([
                 'error' => 'Unauthorized',
                 'message' => 'Only Owner and PBX Admin can view extension passwords.',
@@ -693,11 +771,8 @@ class ExtensionController extends Controller
     /**
      * Sync extension to Cloudonix with proper error handling and logging.
      *
-     * @param Extension $extension
-     * @param CloudonixSubscriberService $service
-     * @param bool $isUpdate
-     * @param string $syncContext Context for warning message ('created', 'updated', 'password_reset')
-     * @param bool $requireSynced Whether extension must already be synced (default false)
+     * @param  string  $syncContext  Context for warning message ('created', 'updated', 'password_reset')
+     * @param  bool  $requireSynced  Whether extension must already be synced (default false)
      * @return array|null Warning array if sync failed, null on success
      */
     protected function syncExtensionToCloudonix(
@@ -715,7 +790,7 @@ class ExtensionController extends Controller
         }
 
         // For updates and password resets, only sync if already synced
-        if ($requireSynced && !$extension->cloudonix_synced) {
+        if ($requireSynced && ! $extension->cloudonix_synced) {
             return null;
         }
 
@@ -755,10 +830,6 @@ class ExtensionController extends Controller
 
     /**
      * Perform bi-directional sync between local extensions and Cloudonix.
-     *
-     * @param Request $request
-     * @param CloudonixSubscriberService $subscriberService
-     * @return JsonResponse
      */
     public function performSync(Request $request, CloudonixSubscriberService $subscriberService): JsonResponse
     {
@@ -766,7 +837,7 @@ class ExtensionController extends Controller
         $currentUser = $this->getAuthenticatedUser();
 
         // Only Owner and PBX Admin can sync extensions
-        if (!$currentUser->isOwner() && !$currentUser->isPBXAdmin()) {
+        if (! $currentUser->isOwner() && ! $currentUser->isPBXAdmin()) {
             return response()->json([
                 'error' => 'Unauthorized',
                 'message' => 'Only Owner and PBX Admin can sync extensions.',
@@ -778,7 +849,7 @@ class ExtensionController extends Controller
         try {
             $organization = $currentUser->organization()->with('cloudonixSettings')->first();
 
-            if (!$organization) {
+            if (! $organization) {
                 return response()->json([
                     'error' => 'Organization not found',
                 ], 404);
@@ -786,7 +857,7 @@ class ExtensionController extends Controller
 
             $result = $subscriberService->bidirectionalSync($organization);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 $this->logOperationFailed('Extension', 'bi-directional sync', [
                     'error' => $result['error'] ?? 'Unknown error',
                 ], true);

@@ -416,7 +416,7 @@ REDIS_PORT=6379
 
 # Cloudonix
 CLOUDONIX_API_BASE_URL=https://api.cloudonix.io
-CLOUDONIX_WEBHOOK_SECRET=webhook_secret
+# API credentials are configured per-organization in Settings → Cloudonix
 
 # Broadcasting
 BROADCAST_DRIVER=redis

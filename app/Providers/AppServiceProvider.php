@@ -54,6 +54,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Cloudonix\CloudonixVoiceService::class
         );
 
+        $this->app->singleton(
+            \App\Services\PasswordGenerator::class
+        );
+
         // Register Voice Routing Strategies
         $this->app->tag([
             \App\Services\VoiceRouting\Strategies\UserRoutingStrategy::class,
