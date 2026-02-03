@@ -53,9 +53,9 @@ api.interceptors.response.use(
       }
 
       storage.clearAll();
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      // Redirect to login if not already there (respect /ui basename)
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/ui/login';
       }
     }
 
