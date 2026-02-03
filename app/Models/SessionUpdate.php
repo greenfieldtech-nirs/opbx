@@ -42,7 +42,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\Carbon $processed_at
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
- *
  * @property-read Organization $organization
  */
 class SessionUpdate extends Model
@@ -55,6 +54,7 @@ class SessionUpdate extends Model
     protected $fillable = [
         'organization_id',
         'session_id',
+        'session_token',
         'event_id',
         'domain_id',
         'domain',
@@ -103,7 +103,7 @@ class SessionUpdate extends Model
     {
         parent::boot();
 
-        static::addGlobalScope(new OrganizationScope());
+        static::addGlobalScope(new OrganizationScope);
     }
 
     /**
@@ -153,7 +153,7 @@ class SessionUpdate extends Model
     {
         return $query->where(function ($q) use ($search) {
             $q->where('caller_id', 'like', "%{$search}%")
-              ->orWhere('destination', 'like', "%{$search}%");
+                ->orWhere('destination', 'like', "%{$search}%");
         });
     }
 }

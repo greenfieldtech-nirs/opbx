@@ -124,21 +124,22 @@ export function StandardDataTable<T extends { id: string | number }>({
                             </div>
                         </TableHead>
                         {columns.map((column, idx) => (
-                            <TableHead
-                                key={idx}
-                                className={cn(
-                                    column.className,
-                                    column.sortKey && onSort && "cursor-pointer"
-                                )}
-                                onClick={() => column.sortKey && onSort && onSort(column.sortKey)}
-                            >
-                                <div className="flex items-center">
+                            <TableHead key={idx} className={column.className}>
+                                <button
+                                    onClick={() => column.sortKey && onSort?.(column.sortKey)}
+                                    className={cn(
+                                        "flex items-center gap-1",
+                                        column.sortKey && onSort && "hover:text-foreground cursor-pointer"
+                                    )}
+                                >
                                     {column.header}
-                                    {column.sortKey && onSort && renderSortIcon(column.sortKey)}
-                                </div>
+                                    {column.sortKey && renderSortIcon(column.sortKey)}
+                                </button>
                             </TableHead>
                         ))}
-                        <TableHead className="text-right">Actions</TableHead>
+                        {(canView || canEdit || canDelete) && (
+                            <TableHead className="text-right">Actions</TableHead>
+                        )}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -187,17 +188,18 @@ export function StandardDataTable<T extends { id: string | number }>({
                                 </TableCell>
                             ))}
 
-                            {/* Actions Cell */}
-                            <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                    {canView && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 w-8 p-0"
-                                                    onClick={(e) => handleAction(onView, item, e)}
+                            {/* Actions Cell - only render if at least one action is enabled */}
+                            {(canView || canEdit || canDelete) && (
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                        {canView && (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0"
+                                                        onClick={(e) => handleAction(onView, item, e)}
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
@@ -237,6 +239,7 @@ export function StandardDataTable<T extends { id: string | number }>({
                                     )}
                                 </div>
                             </TableCell>
+                            )}
                         </TableRow>
                     ))}
                 </TableBody>

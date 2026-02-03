@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-
-
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 class SessionUpdateController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Get active calls for the authenticated user's organization.
      *
@@ -58,13 +56,23 @@ class SessionUpdateController extends Controller
                     ->pluck('session_id')
                     ->unique();
 
-                // Then get active calls, excluding completed sessions
-                $activeCalls = DB::table('session_updates')
-                    ->where('organization_id', $organizationId)
-                    ->whereIn('status', ['processing', 'ringing', 'connected'])
-                    ->where('updated_at', '>=', now()->subHours(24))
-                    ->whereNotIn('session_id', $completedSessionIds)
-                    ->orderBy('updated_at', 'desc')
+                // Get the latest session_update for each active session using a subquery
+                // This ensures we get the most recent status for each session
+                $activeCalls = DB::table('session_updates as su1')
+                    ->select('su1.*')
+                    ->join(DB::raw('(SELECT session_id, MAX(id) as max_id 
+                                     FROM session_updates 
+                                     WHERE organization_id = '.$organizationId.'
+                                     AND status IN ("processing", "ringing", "connected", "answer")
+                                     AND updated_at >= "'.now()->subHours(24)->toDateTimeString().'"
+                                     GROUP BY session_id) as su2'),
+                        function ($join) {
+                            $join->on('su1.session_id', '=', 'su2.session_id')
+                                ->on('su1.id', '=', 'su2.max_id');
+                        })
+                    ->where('su1.organization_id', $organizationId)
+                    ->whereNotIn('su1.session_id', $completedSessionIds)
+                    ->orderBy('su1.updated_at', 'desc')
                     ->get();
 
                 \Log::info('Active calls query executed', [
@@ -80,14 +88,11 @@ class SessionUpdateController extends Controller
                 throw $e;
             }
 
-            // Group by session_id and get latest update for each session
+            // The query already gives us the latest record for each session
+            // so we can directly use it without additional grouping
             $latestBySession = [];
             foreach ($activeCalls as $call) {
-                $sessionId = $call->session_id;
-                if (! isset($latestBySession[$sessionId]) ||
-                    strtotime($call->updated_at) > strtotime($latestBySession[$sessionId]->updated_at)) {
-                    $latestBySession[$sessionId] = $call;
-                }
+                $latestBySession[$call->session_id] = $call;
             }
 
             // Apply filters
@@ -333,5 +338,195 @@ class SessionUpdateController extends Controller
         $remainingMinutes = $minutes % 60;
 
         return $hours.'h '.$remainingMinutes.'m '.$remainingSeconds.'s';
+    }
+
+    /**
+     * Disconnect an active session.
+     *
+     * Makes a DELETE request to Cloudonix API to terminate the session.
+     * Requires admin or owner role.
+     */
+    public function disconnectSession(int $sessionId): JsonResponse
+    {
+        try {
+            // Get the authenticated user
+            $user = auth()->user();
+
+            \Log::info('Disconnect session request initiated', [
+                'session_id' => $sessionId,
+                'user_authenticated' => $user !== null,
+                'user_id' => $user?->id,
+                'user_role' => $user?->role ?? 'null',
+                'user_organization_id' => $user?->organization_id ?? 'null',
+            ]);
+
+            if (! $user) {
+                \Log::warning('Disconnect failed: User not authenticated', ['session_id' => $sessionId]);
+
+                return response()->json(['error' => 'Authentication required'], 401);
+            }
+
+            // Check if user has permission to disconnect calls
+            // Convert enum to string value if needed
+            $userRoleValue = $user->role instanceof \App\Enums\UserRole
+                ? $user->role->value
+                : $user->role;
+
+            $allowedRoles = ['admin', 'owner', 'pbx_admin'];
+            $hasPermission = in_array($userRoleValue, $allowedRoles);
+
+            \Log::info('Permission check for disconnect', [
+                'session_id' => $sessionId,
+                'user_id' => $user->id,
+                'user_role' => $userRoleValue,
+                'user_role_type' => gettype($user->role),
+                'user_role_class' => is_object($user->role) ? get_class($user->role) : 'not an object',
+                'allowed_roles' => $allowedRoles,
+                'has_permission' => $hasPermission,
+            ]);
+
+            if (! $hasPermission) {
+                \Log::warning('Disconnect failed: Insufficient permissions', [
+                    'session_id' => $sessionId,
+                    'user_id' => $user->id,
+                    'user_role' => $userRoleValue,
+                ]);
+
+                return response()->json([
+                    'error' => 'Forbidden',
+                    'message' => 'You do not have permission to disconnect calls',
+                ], 403);
+            }
+
+            if (! isset($user->organization_id) || empty($user->organization_id)) {
+                \Log::error('Disconnect failed: User missing organization', [
+                    'session_id' => $sessionId,
+                    'user_id' => $user->id,
+                ]);
+
+                return response()->json(['error' => 'User not associated with an organization'], 403);
+            }
+
+            // Verify the session belongs to this organization
+            $session = DB::table('session_updates')
+                ->where('session_id', $sessionId)
+                ->where('organization_id', $user->organization_id)
+                ->first();
+
+            \Log::info('Session lookup result', [
+                'session_id' => $sessionId,
+                'organization_id' => $user->organization_id,
+                'session_found' => $session !== null,
+                'session_status' => $session?->status ?? 'null',
+            ]);
+
+            if (! $session) {
+                \Log::warning('Disconnect failed: Session not found or wrong organization', [
+                    'session_id' => $sessionId,
+                    'user_organization_id' => $user->organization_id,
+                ]);
+
+                return response()->json([
+                    'error' => 'Not Found',
+                    'message' => 'Session not found or does not belong to your organization',
+                ], 404);
+            }
+
+            // Get organization's Cloudonix settings
+            $organization = \App\Models\Organization::find($user->organization_id);
+
+            \Log::info('Organization and settings lookup', [
+                'session_id' => $sessionId,
+                'organization_id' => $user->organization_id,
+                'organization_found' => $organization !== null,
+                'has_cloudonix_settings' => $organization?->cloudonixSettings !== null,
+                'domain_uuid' => $organization?->cloudonixSettings?->domain_uuid ?? 'null',
+                'has_api_key' => ! empty($organization?->cloudonixSettings?->domain_api_key),
+            ]);
+
+            if (! $organization || ! $organization->cloudonixSettings) {
+                \Log::error('Disconnect failed: Missing Cloudonix settings', [
+                    'session_id' => $sessionId,
+                    'organization_id' => $user->organization_id,
+                ]);
+
+                return response()->json([
+                    'error' => 'Configuration Error',
+                    'message' => 'Cloudonix settings not configured for this organization',
+                ], 500);
+            }
+
+            // Get the session token from our database (received from webhooks)
+            $sessionToken = $session->session_token;
+
+            \Log::info('Session token retrieved from database', [
+                'session_id' => $sessionId,
+                'has_token' => $sessionToken !== null,
+                'session_token' => $sessionToken ? substr($sessionToken, 0, 10).'...' : 'null',
+            ]);
+
+            if (! $sessionToken) {
+                \Log::error('Session token not found in database', [
+                    'session_id' => $sessionId,
+                    'message' => 'Token may not have been received from Cloudonix webhooks yet',
+                ]);
+
+                return response()->json([
+                    'error' => 'Session token not available',
+                    'message' => 'Unable to disconnect: session token not yet received from Cloudonix. Please try again in a moment.',
+                ], 400);
+            }
+
+            // Call Cloudonix API to disconnect the session using the token
+            \Log::info('Calling Cloudonix API to disconnect session', [
+                'session_id' => $sessionId,
+                'session_token' => substr($sessionToken, 0, 10).'...',
+                'organization_id' => $user->organization_id,
+                'domain_uuid' => $organization->cloudonixSettings->domain_uuid,
+                'domain_name' => $organization->cloudonixSettings->domain_name ?? $session->domain,
+                'api_base_url' => config('cloudonix.api.base_url'),
+            ]);
+
+            $client = new \App\Services\CloudonixClient\CloudonixClient($organization);
+            $success = $client->disconnectSession($sessionToken);
+
+            \Log::info('Cloudonix API disconnect result', [
+                'session_id' => $sessionId,
+                'success' => $success,
+            ]);
+
+            if (! $success) {
+                \Log::error('Disconnect failed: Cloudonix API returned failure', [
+                    'session_id' => $sessionId,
+                ]);
+
+                return response()->json([
+                    'error' => 'Failed to disconnect session',
+                    'message' => 'Cloudonix API request failed. Check logs for details.',
+                ], 500);
+            }
+
+            \Log::info('Session disconnected successfully via Live Calls UI', [
+                'session_id' => $sessionId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session disconnected successfully',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Exception during disconnect session', [
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Internal Server Error',
+                'message' => 'Failed to disconnect session: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

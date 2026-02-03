@@ -23,17 +23,23 @@ use Illuminate\Support\Facades\Log;
 class CloudonixClient
 {
     private string $baseUrl;
+
     private string $token;
+
     private int $timeout;
+
     private ?string $domainUuid;
+
     private ?string $customerId;
+
     private CircuitBreaker $circuitBreaker;
 
     /**
      * Create a new CloudonixClient instance.
      *
-     * @param CloudonixSettings|Organization|null $settings Organization settings or Organization model
-     * @param bool $requireCredentials Whether to require credentials at instantiation (default: true)
+     * @param  CloudonixSettings|Organization|null  $settings  Organization settings or Organization model
+     * @param  bool  $requireCredentials  Whether to require credentials at instantiation (default: true)
+     *
      * @throws \RuntimeException If API token is not configured and credentials are required
      */
     public function __construct(CloudonixSettings|Organization|null $settings = null, bool $requireCredentials = true)
@@ -42,7 +48,7 @@ class CloudonixClient
         $baseUrl = config('cloudonix.api.base_url');
         if (empty($baseUrl)) {
             throw new \RuntimeException(
-                'Cloudonix API base URL is not configured. ' .
+                'Cloudonix API base URL is not configured. '.
                 'Please set CLOUDONIX_API_BASE_URL in your .env file (e.g., https://api.cloudonix.io)'
             );
         }
@@ -63,18 +69,21 @@ class CloudonixClient
 
             if ($requireCredentials && (empty($this->token) || empty($this->domainUuid))) {
                 throw new \RuntimeException(
-                    'Organization Cloudonix settings are not properly configured. ' .
-                    'Both domain_api_key and domain_uuid are required. ' .
+                    'Organization Cloudonix settings are not properly configured. '.
+                    'Both domain_api_key and domain_uuid are required. '.
                     'Please configure them in the Settings page.'
                 );
             }
         } else {
-            // Fall back to global config for backward compatibility (call management)
-            $this->token = config('cloudonix.api.token', '');
+            // No CloudonixSettings provided - credentials must be passed explicitly
+            $this->token = '';
             $this->domainUuid = null;
 
-            if ($requireCredentials && empty($this->token)) {
-                throw new \RuntimeException('Cloudonix API token is not configured');
+            if ($requireCredentials) {
+                throw new \RuntimeException(
+                    'CloudonixClient requires CloudonixSettings or explicit credentials. '.
+                    'Please instantiate with an Organization or CloudonixSettings model.'
+                );
             }
         }
 
@@ -94,7 +103,7 @@ class CloudonixClient
     {
         return Http::timeout($this->timeout)
             ->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
+                'Authorization' => 'Bearer '.$this->token,
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ])
@@ -104,10 +113,9 @@ class CloudonixClient
     /**
      * Execute an API call with circuit breaker protection.
      *
-     * @param callable $callback The API call to execute
-     * @param string $cacheKey Optional cache key for fallback data
-     * @param mixed $fallbackValue Fallback value if circuit is open and no cache
-     * @return mixed
+     * @param  callable  $callback  The API call to execute
+     * @param  string  $cacheKey  Optional cache key for fallback data
+     * @param  mixed  $fallbackValue  Fallback value if circuit is open and no cache
      */
     protected function withCircuitBreaker(callable $callback, ?string $cacheKey = null, mixed $fallbackValue = null): mixed
     {
@@ -165,7 +173,7 @@ class CloudonixClient
     /**
      * Get call status by call ID.
      *
-     * @param string $callId The Cloudonix call ID
+     * @param  string  $callId  The Cloudonix call ID
      * @return array<string, mixed>|null
      */
     public function getCallStatus(string $callId): ?array
@@ -211,7 +219,7 @@ class CloudonixClient
     /**
      * Get CDR (Call Detail Record) by call ID.
      *
-     * @param string $callId The Cloudonix call ID
+     * @param  string  $callId  The Cloudonix call ID
      * @return array<string, mixed>|null
      */
     public function getCallCdr(string $callId): ?array
@@ -257,7 +265,7 @@ class CloudonixClient
     /**
      * Hangup a call.
      *
-     * @param string $callId The Cloudonix call ID
+     * @param  string  $callId  The Cloudonix call ID
      */
     public function hangupCall(string $callId): bool
     {
@@ -297,14 +305,178 @@ class CloudonixClient
     }
 
     /**
+     * Get session details from Cloudonix.
+     *
+     * Makes a GET request to /customers/self/domains/{domain-id}/sessions/{session-id}
+     * to retrieve session information including the session token.
+     *
+     * @param  int|string  $sessionId  The Cloudonix session ID
+     * @return array<string, mixed>|null Session details or null on failure
+     */
+    public function getSession(int|string $sessionId): ?array
+    {
+        if (empty($this->domainUuid)) {
+            throw new \RuntimeException(
+                'Domain UUID is required for session operations. '.
+                'Please instantiate CloudonixClient with CloudonixSettings.'
+            );
+        }
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($sessionId) {
+                try {
+                    $url = "/customers/{$this->customerId}/domains/{$this->domainUuid}/sessions/{$sessionId}";
+                    $fullUrl = $this->baseUrl.$url;
+
+                    Log::info('CloudonixClient: Fetching session details', [
+                        'session_id' => $sessionId,
+                        'url' => $fullUrl,
+                    ]);
+
+                    $response = $this->client()->get($url);
+
+                    if ($response->successful()) {
+                        $data = $response->json();
+                        Log::info('CloudonixClient: Session details retrieved', [
+                            'session_id' => $sessionId,
+                            'has_token' => isset($data['token']),
+                        ]);
+
+                        return $data;
+                    }
+
+                    Log::warning('CloudonixClient: Failed to get session details', [
+                        'session_id' => $sessionId,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('CloudonixClient: Exception while getting session', [
+                        'session_id' => $sessionId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null,
+            fallbackValue: null
+        );
+    }
+
+    /**
+     * Disconnect a session by session ID.
+     *
+     * Makes a DELETE request to /customers/self/domains/{domain-id}/sessions/{session-id}
+     * to terminate an active session.
+     *
+     * @see https://developers.cloudonix.com/cloudonixRestOpenAPI#/operations/deleteSession
+     *
+     * @param  int|string  $sessionId  The Cloudonix session ID
+     * @return bool True on success, false on failure
+     */
+    public function disconnectSession(int|string $sessionId): bool
+    {
+        if (empty($this->domainUuid)) {
+            throw new \RuntimeException(
+                'Domain UUID is required for session operations. '.
+                'Please instantiate CloudonixClient with CloudonixSettings.'
+            );
+        }
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($sessionId) {
+                try {
+                    // Correct URL format: /customers/self/domains/{domain-id}/sessions/{session-id}
+                    $url = "/customers/{$this->customerId}/domains/{$this->domainUuid}/sessions/{$sessionId}";
+                    $fullUrl = $this->baseUrl.$url;
+
+                    Log::info('CloudonixClient: Attempting to disconnect session', [
+                        'session_id' => $sessionId,
+                        'url' => $fullUrl,
+                        'method' => 'DELETE',
+                        'base_url' => $this->baseUrl,
+                        'customer_id' => $this->customerId,
+                        'domain_uuid' => $this->domainUuid,
+                        'has_token' => ! empty($this->token),
+                        'token_prefix' => substr($this->token, 0, 4),
+                    ]);
+
+                    $response = $this->client()
+                        ->delete($url);
+
+                    $statusCode = $response->status();
+                    $responseBody = $response->body();
+                    $isSuccessful = $response->successful();
+
+                    Log::info('CloudonixClient: Disconnect session response', [
+                        'session_id' => $sessionId,
+                        'url' => $fullUrl,
+                        'status_code' => $statusCode,
+                        'is_successful' => $isSuccessful,
+                        'response_body' => $responseBody,
+                        'response_headers' => $response->headers(),
+                    ]);
+
+                    if ($isSuccessful) {
+                        Log::info('CloudonixClient: Successfully disconnected session', [
+                            'session_id' => $sessionId,
+                            'status_code' => $statusCode,
+                        ]);
+
+                        return true;
+                    }
+
+                    // 404 means session doesn't exist (already ended or never existed)
+                    // This is not necessarily an error - treat it as success
+                    if ($statusCode === 404) {
+                        Log::info('CloudonixClient: Session not found (already ended)', [
+                            'session_id' => $sessionId,
+                            'status_code' => $statusCode,
+                        ]);
+
+                        return true;
+                    }
+
+                    Log::warning('CloudonixClient: Failed to disconnect session', [
+                        'session_id' => $sessionId,
+                        'url' => $fullUrl,
+                        'status_code' => $statusCode,
+                        'response_body' => $responseBody,
+                        'is_client_error' => $statusCode >= 400 && $statusCode < 500,
+                        'is_server_error' => $statusCode >= 500,
+                    ]);
+
+                    return false;
+                } catch (\Exception $e) {
+                    Log::error('CloudonixClient: Exception while disconnecting session', [
+                        'session_id' => $sessionId,
+                        'exception_class' => get_class($e),
+                        'exception_message' => $e->getMessage(),
+                        'exception_file' => $e->getFile(),
+                        'exception_line' => $e->getLine(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null, // No caching for write operations
+            fallbackValue: false
+        );
+    }
+
+    /**
      * Get list of calls with optional filters.
      *
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>|null
      */
     public function listCalls(array $filters = []): ?array
     {
-        $cacheKey = 'cloudonix:calls:' . md5(json_encode($filters));
+        $cacheKey = 'cloudonix:calls:'.md5(json_encode($filters));
 
         return $this->withCircuitBreaker(
             callback: function () use ($filters, $cacheKey) {
@@ -352,8 +524,8 @@ class CloudonixClient
      * Makes a GET request to /customers/self/domains/{domain-uuid}
      * to verify that the API key is valid and has access to the domain.
      *
-     * @param string $domainUuid The domain UUID to validate
-     * @param string $apiKey The API key (Bearer token) to authenticate with
+     * @param  string  $domainUuid  The domain UUID to validate
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
      * @return array{valid: bool, profile: array<string, mixed>|null} Validation result with domain profile data
      */
     public function validateDomain(string $domainUuid, string $apiKey): array
@@ -361,13 +533,13 @@ class CloudonixClient
         try {
             Log::info('Validating Cloudonix domain credentials', [
                 'domain_uuid' => $domainUuid,
-                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'api_key_prefix' => substr($apiKey, 0, 4).'...',
             ]);
 
             // Create temporary client with provided credentials
             $tempClient = Http::timeout($this->timeout)
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
@@ -409,9 +581,9 @@ class CloudonixClient
      * Makes a PUT request to /customers/self/domains/{domain-uuid}
      * to update domain configuration settings like call-timeout and recording format.
      *
-     * @param string $domainUuid The domain UUID to update
-     * @param string $apiKey The API key (Bearer token) to authenticate with
-     * @param array<string, mixed> $profileData Profile settings to update (call-timeout, recording-media-type, etc.)
+     * @param  string  $domainUuid  The domain UUID to update
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @param  array<string, mixed>  $profileData  Profile settings to update (call-timeout, recording-media-type, etc.)
      * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
      */
     public function updateDomain(string $domainUuid, string $apiKey, array $profileData): array
@@ -419,14 +591,14 @@ class CloudonixClient
         try {
             Log::info('Updating Cloudonix domain profile', [
                 'domain_uuid' => $domainUuid,
-                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'api_key_prefix' => substr($apiKey, 0, 4).'...',
                 'profile_data' => $profileData,
             ]);
 
             // Create temporary client with provided credentials
             $tempClient = Http::timeout($this->timeout)
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
@@ -446,7 +618,7 @@ class CloudonixClient
                 'success' => $success,
             ]);
 
-            if (!$success) {
+            if (! $success) {
                 $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
 
                 return [
@@ -486,9 +658,9 @@ class CloudonixClient
      * Makes a POST request to /customers/{customer-id}/domains/{domain-id}/applications
      * to create a new CXML voice application for call routing.
      *
-     * @param string $domainUuid The domain UUID
-     * @param string $apiKey The API key (Bearer token) to authenticate with
-     * @param array<string, mixed> $applicationData Application configuration (name, type, url, method, profile)
+     * @param  string  $domainUuid  The domain UUID
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @param  array<string, mixed>  $applicationData  Application configuration (name, type, url, method, profile)
      * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
      */
     public function createVoiceApplication(string $domainUuid, string $apiKey, array $applicationData): array
@@ -496,14 +668,14 @@ class CloudonixClient
         try {
             Log::info('Creating Cloudonix voice application', [
                 'domain_uuid' => $domainUuid,
-                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'api_key_prefix' => substr($apiKey, 0, 4).'...',
                 'application_name' => $applicationData['name'] ?? null,
             ]);
 
             // Create temporary client with provided credentials
             $tempClient = Http::timeout($this->timeout)
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
@@ -524,7 +696,7 @@ class CloudonixClient
                 'application_id' => $responseBody['id'] ?? null,
             ]);
 
-            if (!$success) {
+            if (! $success) {
                 $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
 
                 return [
@@ -560,9 +732,9 @@ class CloudonixClient
      * Makes a PUT request to /customers/{customer-id}/domains/{domain-id}
      * to set the default application that will handle incoming calls.
      *
-     * @param string $domainUuid The domain UUID
-     * @param string $apiKey The API key (Bearer token) to authenticate with
-     * @param int $applicationId The application ID to set as default
+     * @param  string  $domainUuid  The domain UUID
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @param  int  $applicationId  The application ID to set as default
      * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
      */
     public function updateDomainDefaultApplication(string $domainUuid, string $apiKey, int $applicationId): array
@@ -570,14 +742,14 @@ class CloudonixClient
         try {
             Log::info('Updating Cloudonix domain default application', [
                 'domain_uuid' => $domainUuid,
-                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'api_key_prefix' => substr($apiKey, 0, 4).'...',
                 'application_id' => $applicationId,
             ]);
 
             // Create temporary client with provided credentials
             $tempClient = Http::timeout($this->timeout)
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
@@ -597,7 +769,7 @@ class CloudonixClient
                 'success' => $success,
             ]);
 
-            if (!$success) {
+            if (! $success) {
                 $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
 
                 return [
@@ -633,10 +805,10 @@ class CloudonixClient
      * Makes a PUT request to /customers/{customer-id}/domains/{domain-id}/applications/{application-id}
      * to update the voice application configuration, including the URL endpoint.
      *
-     * @param string $domainUuid The domain UUID
-     * @param string $apiKey The API key (Bearer token) to authenticate with
-     * @param int $applicationId The application ID to update
-     * @param array<string, mixed> $applicationData Application configuration to update (url, method, profile, etc.)
+     * @param  string  $domainUuid  The domain UUID
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @param  int  $applicationId  The application ID to update
+     * @param  array<string, mixed>  $applicationData  Application configuration to update (url, method, profile, etc.)
      * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
      */
     public function updateVoiceApplication(string $domainUuid, string $apiKey, int $applicationId, array $applicationData): array
@@ -644,7 +816,7 @@ class CloudonixClient
         try {
             Log::info('Updating Cloudonix voice application', [
                 'domain_uuid' => $domainUuid,
-                'api_key_prefix' => substr($apiKey, 0, 4) . '...',
+                'api_key_prefix' => substr($apiKey, 0, 4).'...',
                 'application_id' => $applicationId,
                 'application_data' => $applicationData,
             ]);
@@ -652,7 +824,7 @@ class CloudonixClient
             // Create temporary client with provided credentials
             $tempClient = Http::timeout($this->timeout)
                 ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
@@ -673,7 +845,7 @@ class CloudonixClient
                 'success' => $success,
             ]);
 
-            if (!$success) {
+            if (! $success) {
                 $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
 
                 return [
@@ -717,7 +889,7 @@ class CloudonixClient
     {
         if (empty($this->domainUuid)) {
             throw new \RuntimeException(
-                'Domain UUID is required for subscriber operations. ' .
+                'Domain UUID is required for subscriber operations. '.
                 'Please instantiate CloudonixClient with CloudonixSettings.'
             );
         }
@@ -728,9 +900,9 @@ class CloudonixClient
     /**
      * Create a new subscriber in Cloudonix.
      *
-     * @param string $msisdn Extension number/phone number
-     * @param string $sipPassword SIP authentication password
-     * @param array<string, mixed>|null $profile Optional profile data
+     * @param  string  $msisdn  Extension number/phone number
+     * @param  string  $sipPassword  SIP authentication password
+     * @param  array<string, mixed>|null  $profile  Optional profile data
      * @return array<string, mixed>|null Subscriber data or null on failure
      */
     public function createSubscriber(string $msisdn, string $sipPassword, ?array $profile = null): ?array
@@ -748,7 +920,7 @@ class CloudonixClient
             $url = $this->getSubscriberBaseUrl();
 
             Log::debug('Cloudonix API request: Create Subscriber', [
-                'url' => $this->baseUrl . $url,
+                'url' => $this->baseUrl.$url,
                 'payload' => [
                     'msisdn' => $msisdn,
                     'sipPassword' => '***', // Masked for security
@@ -773,7 +945,7 @@ class CloudonixClient
 
             Log::error('Failed to create Cloudonix subscriber', [
                 'msisdn' => $msisdn,
-                'url' => $this->baseUrl . $url,
+                'url' => $this->baseUrl.$url,
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'payload' => [
@@ -797,14 +969,14 @@ class CloudonixClient
     /**
      * Update an existing subscriber in Cloudonix.
      *
-     * @param string $subscriberId The Cloudonix subscriber ID
-     * @param array<string, mixed> $data Update data (msisdn, sipPassword, profile, etc.)
+     * @param  string  $subscriberId  The Cloudonix subscriber ID
+     * @param  array<string, mixed>  $data  Update data (msisdn, sipPassword, profile, etc.)
      * @return array<string, mixed>|null Updated subscriber data or null on failure
      */
     public function updateSubscriber(string $subscriberId, array $data): ?array
     {
         try {
-            $url = $this->getSubscriberBaseUrl() . "/{$subscriberId}";
+            $url = $this->getSubscriberBaseUrl()."/{$subscriberId}";
 
             $response = $this->client()
                 ->put($url, $data);
@@ -839,13 +1011,13 @@ class CloudonixClient
     /**
      * Delete a subscriber from Cloudonix.
      *
-     * @param string $subscriberId The Cloudonix subscriber ID
+     * @param  string  $subscriberId  The Cloudonix subscriber ID
      * @return bool True on success, false on failure
      */
     public function deleteSubscriber(string $subscriberId): bool
     {
         try {
-            $url = $this->getSubscriberBaseUrl() . "/{$subscriberId}";
+            $url = $this->getSubscriberBaseUrl()."/{$subscriberId}";
 
             $response = $this->client()
                 ->delete($url);
@@ -878,13 +1050,13 @@ class CloudonixClient
     /**
      * Get a subscriber from Cloudonix.
      *
-     * @param string $subscriberId The Cloudonix subscriber ID
+     * @param  string  $subscriberId  The Cloudonix subscriber ID
      * @return array<string, mixed>|null Subscriber data or null on failure
      */
     public function getSubscriber(string $subscriberId): ?array
     {
         try {
-            $url = $this->getSubscriberBaseUrl() . "/{$subscriberId}";
+            $url = $this->getSubscriberBaseUrl()."/{$subscriberId}";
 
             $response = $this->client()
                 ->get($url);
@@ -921,7 +1093,7 @@ class CloudonixClient
             $url = $this->getSubscriberBaseUrl();
 
             Log::debug('Cloudonix API request: List Subscribers', [
-                'url' => $this->baseUrl . $url,
+                'url' => $this->baseUrl.$url,
             ]);
 
             $response = $this->client()
@@ -938,7 +1110,7 @@ class CloudonixClient
             }
 
             Log::error('Failed to list Cloudonix subscribers', [
-                'url' => $this->baseUrl . $url,
+                'url' => $this->baseUrl.$url,
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
@@ -956,8 +1128,6 @@ class CloudonixClient
     /**
      * Get available voices for the domain.
      *
-     * @param string $domainUuid
-     * @return array
      * @throws \RuntimeException
      */
     public function getVoices(string $domainUuid): array
@@ -968,7 +1138,7 @@ class CloudonixClient
 
             Log::info('Cloudonix API: Fetching voices', [
                 'domain_uuid' => $domainUuid,
-                'url' => $this->baseUrl . $url,
+                'url' => $this->baseUrl.$url,
                 'method' => 'GET',
             ]);
 
@@ -983,7 +1153,7 @@ class CloudonixClient
 
                 Log::info('Cloudonix API: Voices fetch completed', [
                     'domain_uuid' => $domainUuid,
-                    'url' => $this->baseUrl . $url,
+                    'url' => $this->baseUrl.$url,
                     'status_code' => $statusCode,
                     'duration_ms' => $duration,
                     'response_size_bytes' => strlen($responseBody),
@@ -993,7 +1163,7 @@ class CloudonixClient
                 if ($response->failed()) {
                     Log::error('Cloudonix API: Failed to fetch voices - detailed error', [
                         'domain_uuid' => $domainUuid,
-                        'url' => $this->baseUrl . $url,
+                        'url' => $this->baseUrl.$url,
                         'method' => 'GET',
                         'status_code' => $statusCode,
                         'duration_ms' => $duration,
@@ -1030,7 +1200,7 @@ class CloudonixClient
 
                 Log::error('Cloudonix API: Exception during voices fetch', [
                     'domain_uuid' => $domainUuid,
-                    'url' => $this->baseUrl . $url,
+                    'url' => $this->baseUrl.$url,
                     'duration_ms' => $duration,
                     'exception_class' => get_class($e),
                     'exception_message' => $e->getMessage(),
@@ -1049,6 +1219,7 @@ class CloudonixClient
     private function isValidJson(string $json): bool
     {
         json_decode($json);
+
         return json_last_error() === JSON_ERROR_NONE;
     }
 
@@ -1091,7 +1262,7 @@ class CloudonixClient
         $summary = $this->extractErrorSummary($body, $statusCode);
 
         if (strlen($body) > 100) {
-            return $summary . ' (response body truncated)';
+            return $summary.' (response body truncated)';
         }
 
         return $summary;
@@ -1109,7 +1280,7 @@ class CloudonixClient
     {
         if (empty($this->domainUuid)) {
             throw new \RuntimeException(
-                'Domain UUID is required for trunk operations. ' .
+                'Domain UUID is required for trunk operations. '.
                 'Please instantiate CloudonixClient with CloudonixSettings.'
             );
         }
@@ -1122,7 +1293,7 @@ class CloudonixClient
                     $url = "/customers/{$this->customerId}/domains/{$this->domainUuid}/trunks";
 
                     Log::debug('Cloudonix API request: List Outbound Trunks', [
-                        'url' => $this->baseUrl . $url,
+                        'url' => $this->baseUrl.$url,
                         'domain_uuid' => $this->domainUuid,
                     ]);
 
@@ -1156,7 +1327,7 @@ class CloudonixClient
 
                     Log::warning('Failed to fetch outbound trunks from Cloudonix', [
                         'domain_uuid' => $this->domainUuid,
-                        'url' => $this->baseUrl . $url,
+                        'url' => $this->baseUrl.$url,
                         'status' => $response->status(),
                         'body' => $response->body(),
                     ]);
