@@ -41,6 +41,10 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     # Run database seeders on fresh installations (creates default admin user)
     echo "Checking if database seeding is needed..."
     php artisan db:seed --force --no-interaction || echo "Seeding skipped or already completed"
+
+    # Initialize storage (MinIO bucket setup)
+    echo "Initializing storage..."
+    php artisan storage:initialize || echo "Storage initialization skipped (may already be initialized)"
 else
     echo "Skipping migrations (RUN_MIGRATIONS=false)..."
 fi

@@ -60,7 +60,7 @@ class Recording extends Model
      */
     protected static function booted(): void
     {
-        static::addGlobalScope(new OrganizationScope());
+        static::addGlobalScope(new OrganizationScope);
     }
 
     /**
@@ -123,7 +123,7 @@ class Recording extends Model
         }
 
         if ($this->isUploaded()) {
-            return asset('storage/recordings/' . $this->organization_id . '/' . $this->file_path);
+            return asset('storage/recordings/'.$this->organization_id.'/'.$this->file_path);
         }
 
         return '';
@@ -133,8 +133,9 @@ class Recording extends Model
      * Get the playback URL for the recording.
      * For uploaded files, returns token-based URL to secure download endpoint.
      * For remote files, returns the remote URL directly.
+     * Uses organization's webhook base URL for external access.
      *
-     * @param int $userId The user ID to generate the token for
+     * @param  int  $userId  The user ID to generate the token for
      */
     public function getPlaybackUrl(int $userId): string
     {
@@ -147,7 +148,11 @@ class Recording extends Model
             $accessService = app(\App\Services\Recording\RecordingAccessService::class);
             $token = $accessService->generateAccessToken($this, $userId);
 
-            return route('recordings.secure-download') . '?token=' . urlencode($token);
+            // Use organization's webhook base URL (for external access like Cloudonix)
+            $baseUrl = $this->getOrganizationBaseUrl();
+            $path = route('recordings.secure-download', [], false); // Get path only
+
+            return "{$baseUrl}{$path}?token=".urlencode($token);
         }
 
         return '';
@@ -156,8 +161,9 @@ class Recording extends Model
     /**
      * Get the download URL for the recording.
      * For uploaded files, generates a token-based URL to the secure download endpoint.
+     * Uses organization's webhook base URL for external access.
      *
-     * @param int $userId The user ID to generate the token for
+     * @param  int  $userId  The user ID to generate the token for
      */
     public function getDownloadUrl(int $userId): string
     {
@@ -166,10 +172,30 @@ class Recording extends Model
             $accessService = app(\App\Services\Recording\RecordingAccessService::class);
             $token = $accessService->generateAccessToken($this, $userId);
 
-            return route('recordings.secure-download') . '?token=' . urlencode($token);
+            // Use organization's webhook base URL (for external access like Cloudonix)
+            $baseUrl = $this->getOrganizationBaseUrl();
+            $path = route('recordings.secure-download', [], false); // Get path only
+
+            return "{$baseUrl}{$path}?token=".urlencode($token);
         }
 
         return '';
+    }
+
+    /**
+     * Get the organization's base URL for external access.
+     * Uses webhook_base_url from CloudonixSettings, or falls back to APP_URL.
+     */
+    private function getOrganizationBaseUrl(): string
+    {
+        $organization = $this->organization()->first();
+
+        if ($organization && $organization->cloudonixSettings && ! empty($organization->cloudonixSettings->webhook_base_url)) {
+            return rtrim($organization->cloudonixSettings->webhook_base_url, '/');
+        }
+
+        // Fallback to APP_URL if no webhook base URL is configured
+        return rtrim(config('app.url'), '/');
     }
 
     /**
@@ -190,7 +216,7 @@ class Recording extends Model
      */
     public function getFormattedFileSize(): string
     {
-        if (!$this->file_size) {
+        if (! $this->file_size) {
             return 'Unknown';
         }
 
@@ -203,7 +229,7 @@ class Recording extends Model
             $i++;
         }
 
-        return round($bytes, 2) . ' ' . $units[$i];
+        return round($bytes, 2).' '.$units[$i];
     }
 
     /**
@@ -211,7 +237,7 @@ class Recording extends Model
      */
     public function getFormattedDuration(): string
     {
-        if (!$this->duration_seconds) {
+        if (! $this->duration_seconds) {
             return 'Unknown';
         }
 
