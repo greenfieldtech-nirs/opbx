@@ -318,8 +318,7 @@ PUSHER_SCHEME=http
 
 # Cloudonix API
 CLOUDONIX_API_BASE_URL=https://api.cloudonix.io
-CLOUDONIX_API_TOKEN=
-CLOUDONIX_WEBHOOK_SECRET=
+# API credentials are configured per-organization in Settings → Cloudonix
 
 # File Storage
 FILESYSTEM_DISK=minio

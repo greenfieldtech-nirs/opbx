@@ -278,21 +278,26 @@ docker compose exec nginx curl -I http://app/webhooks/cloudonix/call-initiated
 
 #### 3. Authentication Failures
 
-**Symptoms:** Webhooks rejected with 401/403 errors
+**Symptoms:** Webhooks rejected with 401 errors
 
 **Check:**
 ```bash
-# Verify webhook secret in .env
-grep CLOUDONIX_WEBHOOK_SECRET .env
+# Verify Cloudonix API token in .env
+grep CLOUDONIX_API_TOKEN .env
 
 # Check Laravel logs for auth details
 docker compose exec app tail -f storage/logs/laravel.log
 ```
 
 **Common issues:**
-- Incorrect webhook secret
-- Signature calculation errors
-- Timestamp outside tolerance window
+- Missing or incorrect Cloudonix API token
+- Organization not configured with domain_requests_api_key
+- Bearer token mismatch
+
+**Solution:**
+1. Ensure `CLOUDONIX_API_TOKEN` is set in `.env`
+2. Configure domain_requests_api_key in Organization Settings → Cloudonix
+3. Verify the Bearer token matches what Cloudonix is sending
 
 #### 4. Tunnel Disconnects
 

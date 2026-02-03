@@ -11,6 +11,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Resources\ExtensionResource;
 use App\Models\Extension;
+use App\Services\CloudonixClient\CloudonixSubscriberService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -23,6 +24,14 @@ use Illuminate\Http\Request;
 class ExtensionCrudController extends AbstractApiCrudController
 {
     use ApiRequestHandler, AppliesFilters;
+
+    /**
+     * Constructor.
+     */
+    public function __construct(
+        protected CloudonixSubscriberService $subscriberService
+    ) {
+    }
 
     /**
      * Get the filter configuration for the index method.
@@ -138,5 +147,200 @@ class ExtensionCrudController extends AbstractApiCrudController
     protected function getDeleteAbility(): string
     {
         return 'delete';
+    }
+
+    /**
+     * Hook called before storing a new extension.
+     *
+     * Generates password for USER type extensions.
+     */
+    protected function beforeStore(array $validated, Request $request): array
+    {
+        $type = ExtensionType::from($validated['type']);
+
+        // Generate password for USER type extensions
+        if ($type === ExtensionType::USER) {
+            $extension = new Extension();
+            $validated['password'] = $extension->generateSecurePassword();
+
+            \Log::info('Generated password for new USER extension', [
+                'extension_number' => $validated['extension_number'],
+                'organization_id' => $request->user()->organization_id,
+            ]);
+        } else {
+            // Ensure password is null for non-USER extensions
+            $validated['password'] = null;
+        }
+
+        return $validated;
+    }
+
+    /**
+     * Hook called after storing a new extension.
+     *
+     * Syncs USER type extensions to Cloudonix.
+     */
+    protected function afterStore(Model $model, Request $request): void
+    {
+        /** @var Extension $extension */
+        $extension = $model;
+
+        // Load user relationship for API response
+        $extension->load(Extension::DEFAULT_USER_FIELDS);
+
+        // Sync to Cloudonix if USER type extension
+        if ($extension->type === ExtensionType::USER) {
+            $syncResult = $this->subscriberService->syncToCloudnonix($extension);
+
+            if ($syncResult['success']) {
+                \Log::info('Extension synced to Cloudonix', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'subscriber_id' => $extension->cloudonix_subscriber_id,
+                ]);
+
+                // Refresh to get updated Cloudonix fields
+                $extension->refresh();
+            } else {
+                \Log::warning('Failed to sync extension to Cloudonix (non-blocking)', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'error' => $syncResult['error'] ?? 'Unknown error',
+                    'details' => $syncResult['details'] ?? [],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Hook called before updating an extension.
+     *
+     * Handles password generation/clearing when type changes.
+     */
+    protected function beforeUpdate(Model $model, array $validated, Request $request): array
+    {
+        /** @var Extension $extension */
+        $extension = $model;
+
+        // Check if type is being changed
+        if (isset($validated['type'])) {
+            $newType = ExtensionType::from($validated['type']);
+            $oldType = $extension->type;
+
+            // Changing TO USER type
+            if ($newType === ExtensionType::USER && $oldType !== ExtensionType::USER) {
+                // Generate password if not already present
+                if (empty($extension->password)) {
+                    $validated['password'] = $extension->generateSecurePassword();
+
+                    \Log::info('Generated password for extension type change to USER', [
+                        'extension_id' => $extension->id,
+                        'extension_number' => $extension->extension_number,
+                        'old_type' => $oldType->value,
+                        'new_type' => $newType->value,
+                    ]);
+                }
+            }
+
+            // Changing FROM USER type
+            if ($oldType === ExtensionType::USER && $newType !== ExtensionType::USER) {
+                // Clear password
+                $validated['password'] = null;
+
+                \Log::info('Cleared password for extension type change from USER', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'old_type' => $oldType->value,
+                    'new_type' => $newType->value,
+                ]);
+            }
+        }
+
+        return $validated;
+    }
+
+    /**
+     * Hook called after updating an extension.
+     *
+     * Handles Cloudonix sync/unsync based on type changes.
+     */
+    protected function afterUpdate(Model $model, Request $request): void
+    {
+        /** @var Extension $extension */
+        $extension = $model;
+
+        // Get the original type before update
+        $originalType = $extension->getOriginal('type');
+        $currentType = $extension->type;
+
+        // Type changed TO USER - sync to Cloudonix
+        if ($currentType === ExtensionType::USER && $originalType !== ExtensionType::USER->value) {
+            $syncResult = $this->subscriberService->syncToCloudnonix($extension);
+
+            if ($syncResult['success']) {
+                \Log::info('Extension synced to Cloudonix after type change', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'old_type' => $originalType,
+                    'new_type' => $currentType->value,
+                ]);
+
+                // Refresh to get updated Cloudonix fields
+                $extension->refresh();
+            } else {
+                \Log::warning('Failed to sync extension to Cloudonix after type change', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'error' => $syncResult['error'] ?? 'Unknown error',
+                ]);
+            }
+        }
+
+        // Type changed FROM USER - unsync from Cloudonix
+        if ($originalType === ExtensionType::USER->value && $currentType !== ExtensionType::USER) {
+            $unsyncResult = $this->subscriberService->unsyncFromCloudonix($extension);
+
+            if ($unsyncResult) {
+                \Log::info('Extension unsynced from Cloudonix after type change', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'old_type' => $originalType,
+                    'new_type' => $currentType->value,
+                ]);
+            } else {
+                \Log::warning('Failed to unsync extension from Cloudonix after type change', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Hook called before deleting an extension.
+     *
+     * Unsyncs USER type extensions from Cloudonix.
+     */
+    protected function beforeDestroy(Model $model, Request $request): void
+    {
+        /** @var Extension $extension */
+        $extension = $model;
+
+        // Unsync from Cloudonix if USER type extension
+        if ($extension->type === ExtensionType::USER) {
+            $unsyncResult = $this->subscriberService->unsyncFromCloudonix($extension);
+
+            if ($unsyncResult) {
+                \Log::info('Extension unsynced from Cloudonix before deletion', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                ]);
+            } else {
+                \Log::warning('Failed to unsync extension from Cloudonix before deletion (continuing with deletion)', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                ]);
+            }
+        }
     }
 }
