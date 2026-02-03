@@ -375,11 +375,11 @@ class AuthController extends Controller
             ], 403);
         }
 
-        if ($user->organization->status->value !== 'active') {
+        if ($user->organization->status !== 'active') {
             Log::warning('User organization is not active', [
                 'user_id' => $user->id,
                 'organization_id' => $user->organization_id,
-                'organization_status' => $user->organization->status->value,
+                'organization_status' => $user->organization->status,
             ]);
 
             return response()->json([

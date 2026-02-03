@@ -116,11 +116,11 @@ class CloudonixWebhookController extends Controller
         }
 
         // Validate organization is active
-        if ($organization->status !== \App\Enums\UserStatus::ACTIVE) {
+        if ($organization->status !== 'active') {
             Log::error('Organization is not active', [
                 'call_id' => $callId,
                 'organization_id' => $organizationId,
-                'organization_status' => $organization->status->value,
+                'organization_status' => $organization->status,
             ]);
 
             return response(

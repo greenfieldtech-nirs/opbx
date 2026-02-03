@@ -36,19 +36,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedToken = storage.getToken();
       const storedUser = storage.getUser<User>();
 
+      console.log('[AuthContext] Verifying auth on mount...', {
+        hasToken: !!storedToken,
+        hasUser: !!storedUser,
+        userEmail: storedUser?.email
+      });
+
       if (storedToken && storedUser) {
         try {
+          console.log('[AuthContext] Calling authService.me() to verify token...');
           // Verify token is still valid by fetching user profile
           const currentUser = await authService.me();
+          console.log('[AuthContext] Token verified successfully', {
+            userId: currentUser.id,
+            email: currentUser.email
+          });
           setUser(currentUser);
           setToken(storedToken);
           storage.setUser(currentUser);
         } catch (error) {
-          console.error('Auth verification failed:', error);
+          console.error('[AuthContext] Auth verification failed:', error);
           storage.clearAll();
           setUser(null);
           setToken(null);
         }
+      } else {
+        console.log('[AuthContext] No stored credentials found, user not authenticated');
       }
 
       setIsLoading(false);
