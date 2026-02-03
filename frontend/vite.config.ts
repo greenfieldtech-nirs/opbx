@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0', // Required for Docker
-    allowedHosts: ['opbx_frontend', '.localhost'],
+    allowedHosts: ['opbx_frontend', 'localhost', '.localhost'],
     proxy: {
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8000',
