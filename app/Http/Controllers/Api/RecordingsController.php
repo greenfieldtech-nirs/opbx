@@ -271,10 +271,11 @@ class RecordingsController extends Controller
 
         // For token-based access, we allow access with just the token
         // The token contains user information and is cryptographically validated
-        $user = $this->getAuthenticatedUser(); // May be null for token-only access (like audio playback)
+        // Use auth()->user() directly to avoid abort() from getAuthenticatedUser()
+        $user = auth()->user(); // May be null for token-only access (like audio playback)
 
-        // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        // Validate the access token with or without user context
+        if ($user === null) {
             // For token-only access, we allow anonymous access with just the token
             $recording = $this->accessService->validateAccessToken($token, null);
         } else {
