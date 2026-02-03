@@ -30,28 +30,29 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 
 
+// App router with /ui basename (authenticated routes)
 export const router = createBrowserRouter(
   [
     {
       path: '/login',
-    element: <Login />,
-  },
-  {
-    path: '/register',
-    element: <Register />,
-  },
-  {
-    path: '/',
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/dashboard" replace />,
-      },
+      element: <Login />,
+    },
+    {
+      path: '/register',
+      element: <Register />,
+    },
+    {
+      path: '/',
+      element: (
+        <ProtectedRoute>
+          <AppLayout />
+        </ProtectedRoute>
+      ),
+      children: [
+        {
+          index: true,
+          element: <Navigate to="/dashboard" replace />,
+        },
       {
         path: 'dashboard',
         element: <Dashboard />,
