@@ -345,6 +345,7 @@ export default function Recordings() {
             onIdentityClick={(recording) => setSelectedRecording(recording)}
             onView={(recording) => setSelectedRecording(recording)}
             onDelete={handleDelete}
+            canEdit={false}
             columns={[
               {
                 header: 'Status',

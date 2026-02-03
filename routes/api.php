@@ -56,6 +56,43 @@ Route::get('/health', function () {
     ]);
 })->name('health');
 
+Route::get('/storage/health', function () {
+    try {
+        $disk = Storage::disk('recordings');
+        $bucket = config('filesystems.disks.recordings.bucket');
+        $endpoint = config('filesystems.disks.recordings.endpoint');
+
+        // Test connectivity
+        $disk->files();
+
+        // Test write/read
+        $testFile = '.health-check-'.time();
+        $testContent = 'health-check-'.now()->timestamp;
+        $disk->put($testFile, $testContent);
+        $readContent = $disk->get($testFile);
+        $disk->delete($testFile);
+
+        $isHealthy = ($readContent === $testContent);
+
+        return response()->json([
+            'status' => $isHealthy ? 'ok' : 'degraded',
+            'storage' => 'recordings',
+            'bucket' => $bucket,
+            'endpoint' => $endpoint,
+            'writable' => $isHealthy,
+            'readable' => $isHealthy,
+            'timestamp' => now()->toIso8601String(),
+        ], $isHealthy ? 200 : 503);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'storage' => 'recordings',
+            'error' => $e->getMessage(),
+            'timestamp' => now()->toIso8601String(),
+        ], 503);
+    }
+})->name('storage.health');
+
 Route::get('/websocket/health', function () {
     try {
         // Test Pusher/Soketi connection

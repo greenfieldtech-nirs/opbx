@@ -32,10 +32,11 @@ class RecordingUploadService
     /**
      * Upload and process an audio file.
      *
-     * @param UploadedFile $file The uploaded file
-     * @param string $name The recording name
-     * @param User $user The user uploading the file
+     * @param  UploadedFile  $file  The uploaded file
+     * @param  string  $name  The recording name
+     * @param  User  $user  The user uploading the file
      * @return Recording The created recording
+     *
      * @throws \Exception If validation or upload fails
      */
     public function uploadFile(UploadedFile $file, string $name, User $user): Recording
@@ -52,7 +53,7 @@ class RecordingUploadService
         Log::info('RecordingUploadService: Storing file', [
             'organization_id' => $user->organization_id,
             'filename' => $filename,
-            'disk' => 'recordings'
+            'disk' => 'recordings',
         ]);
 
         try {
@@ -60,7 +61,7 @@ class RecordingUploadService
             $filePath = "{$user->organization_id}/{$filename}";
             $realPath = $file->getRealPath();
 
-            if (!$realPath || !file_exists($realPath)) {
+            if (! $realPath || ! file_exists($realPath)) {
                 throw new \Exception('Uploaded file is not accessible.');
             }
 
@@ -75,9 +76,26 @@ class RecordingUploadService
                 throw new \Exception('File size mismatch during storage.');
             }
 
-            $stored = Storage::disk('recordings')->put($filePath, $fileContent);
+            $disk = Storage::disk('recordings');
 
-            if (!$stored) {
+            // Check if storage is accessible before attempting to store
+            try {
+                $disk->files();
+            } catch (\Aws\S3\Exception\S3Exception $e) {
+                if (str_contains($e->getMessage(), 'NoSuchBucket')) {
+                    Log::error('RecordingUploadService: MinIO bucket does not exist', [
+                        'bucket' => config('filesystems.disks.recordings.bucket'),
+                        'endpoint' => config('filesystems.disks.recordings.endpoint'),
+                        'organization_id' => $user->organization_id,
+                    ]);
+                    throw new \Exception('Storage bucket is not initialized. Please contact system administrator.');
+                }
+                throw $e;
+            }
+
+            $stored = $disk->put($filePath, $fileContent);
+
+            if (! $stored) {
                 throw new \Exception('Failed to store the uploaded file.');
             }
 
@@ -87,16 +105,42 @@ class RecordingUploadService
                 'path' => $path,
                 'organization_id' => $user->organization_id,
                 'filename' => $filename,
-                'file_size' => strlen($fileContent)
+                'file_size' => strlen($fileContent),
             ]);
+
+        } catch (\Aws\S3\Exception\S3Exception $e) {
+            // Handle S3/MinIO specific errors with more context
+            $errorCode = $e->getAwsErrorCode();
+            $errorMessage = $e->getMessage();
+
+            Log::error('RecordingUploadService: S3/MinIO storage error', [
+                'error_code' => $errorCode,
+                'error_message' => $errorMessage,
+                'organization_id' => $user->organization_id,
+                'filename' => $filename,
+                'endpoint' => config('filesystems.disks.recordings.endpoint'),
+                'bucket' => config('filesystems.disks.recordings.bucket'),
+            ]);
+
+            // Provide user-friendly error messages
+            if ($errorCode === 'NoSuchBucket') {
+                throw new \Exception('Storage is not properly configured. Please run: php artisan storage:initialize');
+            } elseif ($errorCode === 'InvalidAccessKeyId' || $errorCode === 'SignatureDoesNotMatch') {
+                throw new \Exception('Storage authentication failed. Please check MinIO credentials.');
+            } elseif (str_contains($errorMessage, 'Connection refused') || str_contains($errorMessage, 'Could not resolve host')) {
+                throw new \Exception('Cannot connect to storage service. Please ensure MinIO is running.');
+            } else {
+                throw new \Exception('Storage error: '.$errorMessage);
+            }
 
         } catch (\Exception $e) {
             Log::error('RecordingUploadService: File storage failed', [
                 'error' => $e->getMessage(),
+                'error_class' => get_class($e),
                 'organization_id' => $user->organization_id,
                 'filename' => $filename,
                 'real_path' => $file->getRealPath() ?? 'unknown',
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
@@ -140,7 +184,6 @@ class RecordingUploadService
     /**
      * Validate the uploaded file.
      *
-     * @param UploadedFile $file
      * @throws \Exception If validation fails
      */
     private function validateFile(UploadedFile $file): void
@@ -157,13 +200,13 @@ class RecordingUploadService
 
         // Check MIME type
         $mimeType = $file->getMimeType();
-        if (!in_array($mimeType, $allowedMimeTypes, true)) {
+        if (! in_array($mimeType, $allowedMimeTypes, true)) {
             throw new \Exception('Invalid file type. Only MP3 and WAV files are allowed.');
         }
 
         // Additional security check: ensure the file extension matches allowed extensions
         $extension = strtolower($file->getClientOriginalExtension());
-        if (!in_array($extension, $allowedExtensions, true)) {
+        if (! in_array($extension, $allowedExtensions, true)) {
             throw new \Exception('Invalid file extension. Only .mp3 and .wav files are allowed.');
         }
 
@@ -180,7 +223,6 @@ class RecordingUploadService
     /**
      * Check file content for basic security issues.
      *
-     * @param UploadedFile $file
      * @throws \Exception If suspicious content is detected
      */
     private function checkFileContent(UploadedFile $file): void
@@ -193,7 +235,7 @@ class RecordingUploadService
 
             // Check for MP3 signature (ID3 or MPEG frame)
             if ($file->getMimeType() === 'audio/mpeg') {
-                if (!preg_match('/^(ID3|\xFF[\xFB\xF3\xE3])/', $header)) {
+                if (! preg_match('/^(ID3|\xFF[\xFB\xF3\xE3])/', $header)) {
                     throw new \Exception('File does not appear to be a valid MP3 file.');
                 }
             }
@@ -214,9 +256,6 @@ class RecordingUploadService
 
     /**
      * Check if filename contains dangerous characters.
-     *
-     * @param string $filename
-     * @return bool
      */
     private function containsDangerousCharacters(string $filename): bool
     {
@@ -242,10 +281,6 @@ class RecordingUploadService
 
     /**
      * Generate a secure, unique filename.
-     *
-     * @param string $originalName
-     * @param string $extension
-     * @return string
      */
     private function generateSecureFilename(string $originalName, string $extension): string
     {
@@ -253,7 +288,7 @@ class RecordingUploadService
         $sanitizedName = Str::slug($baseName, '_');
         $uniqueId = Str::random(8);
 
-        return $uniqueId . '_' . $sanitizedName . '.' . strtolower($extension);
+        return $uniqueId.'_'.$sanitizedName.'.'.strtolower($extension);
     }
 
     /**
@@ -261,9 +296,6 @@ class RecordingUploadService
      *
      * Note: Since FFMPEG is not available, we'll use basic PHP functions
      * to extract what we can. This is a simplified implementation.
-     *
-     * @param UploadedFile $file
-     * @return array
      */
     private function extractMetadata(UploadedFile $file): array
     {
@@ -273,7 +305,7 @@ class RecordingUploadService
             // Get file path for reading
             $filePath = $file->getRealPath();
 
-            if (!$filePath || !file_exists($filePath)) {
+            if (! $filePath || ! file_exists($filePath)) {
                 return $metadata;
             }
 
@@ -304,9 +336,6 @@ class RecordingUploadService
 
     /**
      * Extract basic metadata from WAV files.
-     *
-     * @param string $filePath
-     * @return array
      */
     private function extractWavMetadata(string $filePath): array
     {
@@ -314,7 +343,7 @@ class RecordingUploadService
 
         try {
             $handle = fopen($filePath, 'rb');
-            if (!$handle) {
+            if (! $handle) {
                 return $metadata;
             }
 
