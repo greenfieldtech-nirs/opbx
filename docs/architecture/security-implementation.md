@@ -105,49 +105,36 @@ class OrganizationScope implements Scope
 
 ### Dual Authentication Mechanisms
 
+OpBX uses per-organization Bearer token authentication for Cloudonix webhooks. Authentication is configured per-organization in the Cloudonix Settings page.
+
 #### Voice Webhooks (`VerifyVoiceWebhookAuth`)
 **Endpoints**: `/voice/route`, `/voice/ivr-input`, `/callbacks/voice/ring-group-callback`
 
-**Authentication Methods** (tried in order):
-1. `X-Cx-Apikey` header
-2. `Authorization: Bearer {token}` header
-3. Domain name lookup in `cloudonix_settings.domain_name`
-4. DID/extension number lookup
+**Authentication Flow**:
+1. Extract Bearer token from `Authorization: Bearer {token}` header
+2. Extract Domain from JSON body (`Domain` or `domain` field)
+3. Find organization by `domain_name` or `domain_uuid` in CloudonixSettings
+4. Verify Bearer token matches the organization's `domain_requests_api_key`
 
 **Security Features**:
-- Token validation against `domain_requests_api_key`
+- Token validation against per-organization `domain_requests_api_key` (encrypted in DB)
 - Organization resolution and isolation
 - CXML error responses for voice applications
 
 #### Status/CDR Webhooks (`VerifyCloudonixSignature`)
 **Endpoints**: `/webhooks/cloudonix/call-initiated`, `/call-status`, `/session-update`, `/cdr`
 
-**Authentication Method**: HMAC-SHA256 signature verification
-- **Header**: `X-Cloudonix-Signature`
-- **Secret**: `CLOUDONIX_WEBHOOK_SECRET` environment variable
-- **Algorithm**: SHA256 HMAC with constant-time comparison
-
-**Special CDR Handling**:
-- No signature required for CDRs
-- Organization identified by `owner.domain.uuid`
+**CDR Webhooks Authentication**:
+- No Bearer token required
+- Organization identified by `owner.domain.uuid` in payload
 - Matched against `cloudonix_settings.domain_uuid`
 
+**Status Webhooks Authentication**:
+- Bearer token from `Authorization: Bearer {token}` header
+- Token verified against `domain_requests_api_key` in CloudonixSettings
+- Falls back to searching by token if no domain UUID in payload
+
 ### Webhook Security Features
-
-#### Timestamp Validation
-```php
-private function isValidTimestamp(array $payload): bool
-{
-    $timestamp = $payload['timestamp'] ?? null;
-    if (!$timestamp) return false;
-
-    $requestTime = Carbon::createFromTimestamp($timestamp);
-    $now = Carbon::now();
-
-    // 5-minute tolerance window
-    return abs($now->diffInSeconds($requestTime)) <= 300;
-}
-```
 
 #### Idempotency Protection
 - **Redis-based keys**: `idem:webhook:{hash}`
@@ -483,13 +470,21 @@ class SecurityHeadersTest extends TestCase
 ```php
 class WebhookAuthenticationTest extends TestCase
 {
-    public function test_invalid_signature_returns_401()
+    public function test_missing_bearer_token_returns_401()
     {
         $payload = ['test' => 'data'];
-        $signature = 'invalid_signature';
+
+        $response = $this->postJson('/webhooks/cloudonix/call-status', $payload);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_invalid_bearer_token_returns_401()
+    {
+        $payload = ['test' => 'data'];
 
         $response = $this->postJson('/webhooks/cloudonix/call-status', $payload, [
-            'X-Cloudonix-Signature' => $signature
+            'Authorization' => 'Bearer invalid_token'
         ]);
 
         $response->assertStatus(401);

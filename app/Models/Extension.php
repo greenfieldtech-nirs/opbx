@@ -77,8 +77,6 @@ class Extension extends Model
 
     /**
      * Get the organization that owns the extension.
-     *
-     * @return BelongsTo
      */
     public function organization(): BelongsTo
     {
@@ -87,8 +85,6 @@ class Extension extends Model
 
     /**
      * Get the user assigned to this extension.
-     *
-     * @return BelongsTo
      */
     public function user(): BelongsTo
     {
@@ -97,8 +93,6 @@ class Extension extends Model
 
     /**
      * Check if the extension is active.
-     *
-     * @return bool
      */
     public function isActive(): bool
     {
@@ -107,8 +101,6 @@ class Extension extends Model
 
     /**
      * Check if the extension is inactive.
-     *
-     * @return bool
      */
     public function isInactive(): bool
     {
@@ -117,9 +109,6 @@ class Extension extends Model
 
     /**
      * Check if extension belongs to a specific user.
-     *
-     * @param int|string $userId
-     * @return bool
      */
     public function belongsToUser(int|string $userId): bool
     {
@@ -128,8 +117,6 @@ class Extension extends Model
 
     /**
      * Get formatted extension number with padding.
-     *
-     * @return string
      */
     public function getFormattedNumberAttribute(): string
     {
@@ -138,8 +125,6 @@ class Extension extends Model
 
     /**
      * Get the SIP URI for this extension.
-     *
-     * @return string|null
      */
     public function getSipUri(): ?string
     {
@@ -159,8 +144,6 @@ class Extension extends Model
 
     /**
      * Check if extension has a SIP URI configured.
-     *
-     * @return bool
      */
     public function hasSipUri(): bool
     {
@@ -169,10 +152,6 @@ class Extension extends Model
 
     /**
      * Scope query to extensions in a specific organization.
-     *
-     * @param Builder $query
-     * @param int|string $organizationId
-     * @return Builder
      */
     public function scopeForOrganization(Builder $query, int|string $organizationId): Builder
     {
@@ -181,10 +160,6 @@ class Extension extends Model
 
     /**
      * Scope query to extensions with a specific type.
-     *
-     * @param Builder $query
-     * @param ExtensionType $type
-     * @return Builder
      */
     public function scopeWithType(Builder $query, ExtensionType $type): Builder
     {
@@ -193,10 +168,6 @@ class Extension extends Model
 
     /**
      * Scope query to extensions with a specific status.
-     *
-     * @param Builder $query
-     * @param UserStatus $status
-     * @return Builder
      */
     public function scopeWithStatus(Builder $query, UserStatus $status): Builder
     {
@@ -205,10 +176,6 @@ class Extension extends Model
 
     /**
      * Scope query to extensions assigned to a specific user.
-     *
-     * @param Builder $query
-     * @param int|string $userId
-     * @return Builder
      */
     public function scopeForUser(Builder $query, int|string $userId): Builder
     {
@@ -217,10 +184,6 @@ class Extension extends Model
 
     /**
      * Scope query to search extensions by extension number.
-     *
-     * @param Builder $query
-     * @param string $search
-     * @return Builder
      */
     public function scopeSearch(Builder $query, string $search): Builder
     {
@@ -229,9 +192,6 @@ class Extension extends Model
 
     /**
      * Scope query to active extensions only.
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -240,9 +200,6 @@ class Extension extends Model
 
     /**
      * Scope query to unassigned extensions (no user).
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeUnassigned(Builder $query): Builder
     {
@@ -255,10 +212,27 @@ class Extension extends Model
      * This method provides explicit, audited access to the password field.
      * All accesses are logged for security monitoring.
      *
-     * @return string
+     * Only USER type extensions have SIP passwords. Other extension types
+     * (Conference, IVR, AI Assistant, Ring Group, Forward) return null.
+     *
+     * @return string|null The SIP password for USER extensions, null for other types
      */
-    public function getSipPassword(): string
+    public function getSipPassword(): ?string
     {
+        // Only USER extensions have SIP passwords
+        if ($this->type !== ExtensionType::USER) {
+            Log::warning('SIP password requested for non-USER extension', [
+                'extension_id' => $this->id,
+                'extension_number' => $this->extension_number,
+                'extension_type' => $this->type->value,
+                'organization_id' => $this->organization_id,
+                'accessed_by' => auth()->id(),
+            ]);
+
+            return null;
+        }
+
+        // Log the access for security auditing
         Log::info('SIP password accessed', [
             'extension_id' => $this->id,
             'extension_number' => $this->extension_number,
@@ -275,10 +249,24 @@ class Extension extends Model
      * Generates a new cryptographically secure password and saves it.
      * The regeneration is logged for audit purposes.
      *
-     * @return string The new password
+     * Only USER type extensions can have SIP passwords regenerated.
+     *
+     * @return string|null The new password for USER extensions, null for other types
      */
-    public function regeneratePassword(): string
+    public function regeneratePassword(): ?string
     {
+        // Only USER extensions can have SIP passwords
+        if ($this->type !== ExtensionType::USER) {
+            Log::warning('Cannot regenerate password for non-USER extension', [
+                'extension_id' => $this->id,
+                'extension_number' => $this->extension_number,
+                'extension_type' => $this->type->value,
+                'organization_id' => $this->organization_id,
+            ]);
+
+            return null;
+        }
+
         $this->password = $this->generateSecurePassword();
         $this->save();
 
@@ -297,7 +285,7 @@ class Extension extends Model
      *
      * @return string A 32-character hexadecimal string
      */
-    private function generateSecurePassword(): string
+    public function generateSecurePassword(): string
     {
         return bin2hex(random_bytes(16)); // 32 character hex string
     }

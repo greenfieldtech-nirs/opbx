@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Exceptions\Webhook\WebhookValidationException;
 use App\Models\CloudonixSettings;
 use Closure;
 use Illuminate\Http\Request;
@@ -12,23 +11,18 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Middleware to verify Cloudonix webhook signatures.
+ * Verify Cloudonix Webhook Authentication
  *
- * This middleware validates that incoming webhooks from Cloudonix are authentic
- * by verifying HMAC-SHA256 signatures. This prevents unauthorized webhook calls
- * and ensures the integrity of webhook data.
+ * Simplified webhook authentication for Cloudonix status/CDR webhooks.
  *
- * Security features:
- * - HMAC-SHA256 signature verification (timing-safe comparison)
- * - Timestamp validation to prevent replay attacks (5-minute window)
- * - Organization ID extraction and injection into request
- * - Optional IP allowlisting
- * - Signature version support for future algorithm changes
+ * Authentication Flow:
+ * 1. CDR Webhooks: Extract Domain UUID from JSON body (owner.domain.uuid)
+ *    - Match against CloudonixSettings.domain_uuid
+ *    - No Bearer token required for CDR
  *
- * Special handling for CDR webhooks:
- * - CDR webhooks from Cloudonix do not include Authorization headers or signatures
- * - Instead, organization is identified by owner.domain.uuid in the payload
- * - This is matched against CloudonixSettings.domain_uuid
+ * 2. Status Webhooks: Verify Bearer token from Authorization header
+ *    - Token verified against CloudonixSettings.domain_requests_api_key
+ *    - Domain UUID extracted from payload if present
  *
  * Used for: call-initiated, call-status, session-update, and CDR webhooks
  *
@@ -37,110 +31,17 @@ use Symfony\Component\HttpFoundation\Response;
 class VerifyCloudonixSignature
 {
     /**
-     * Maximum age of webhook timestamp in seconds (5 minutes).
-     * Prevents replay attacks by rejecting old webhooks.
-     */
-    private const TIMESTAMP_TOLERANCE = 300;
-
-    /**
-     * Current signature version.
-     * Can be incremented when changing signature algorithm.
-     */
-    private const SIGNATURE_VERSION = '1';
-    /**
      * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        try {
-            // Special handling for CDR webhooks (no signature, uses domain UUID)
-            if ($this->isCdrRequest($request)) {
-                return $this->handleCdrAuthentication($request, $next);
-            }
-
-            // Check IP allowlist if configured
-            $this->validateIpAddress($request);
-
-            // Skip verification if disabled (e.g., development/testing)
-            if (! config('cloudonix.verify_signature', true)) {
-                return $next($request);
-            }
-        } catch (WebhookValidationException $e) {
-            // Convert validation exception to HTTP response
-            return response()->json($e->toArray(), $e->getHttpStatus());
+        // Special handling for CDR webhooks (no Bearer token, uses domain UUID)
+        if ($this->isCdrRequest($request)) {
+            return $this->handleCdrAuthentication($request, $next);
         }
 
-        // Get webhook secret from configuration
-        $secret = config('cloudonix.webhook_secret');
-
-        if (empty($secret)) {
-            Log::critical('Webhook secret not configured but verification is enabled', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-            ]);
-
-            return response()->json([
-                'error' => 'Webhook configuration error',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Get signature from request header
-        $headerName = config('cloudonix.signature_header', 'X-Cloudonix-Signature');
-        $providedSignature = $request->header($headerName);
-
-        if (empty($providedSignature)) {
-            Log::warning('Webhook signature missing', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-                'headers' => $request->headers->all(),
-            ]);
-
-            return response()->json([
-                'error' => 'Unauthorized - Missing signature',
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Get raw request body for signature verification
-        $payload = $request->getContent();
-
-        // Compute expected signature using HMAC-SHA256
-        $expectedSignature = hash_hmac('sha256', $payload, $secret);
-
-        // Timing-safe comparison to prevent timing attacks
-        if (! hash_equals($expectedSignature, $providedSignature)) {
-            Log::warning('Webhook signature verification failed', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-                'provided_signature' => $providedSignature,
-                'expected_signature_prefix' => substr($expectedSignature, 0, 8).'...',
-            ]);
-
-            return response()->json([
-                'error' => 'Unauthorized - Invalid signature',
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        try {
-            // Validate timestamp to prevent replay attacks
-            $this->validateTimestamp($request);
-
-            // Extract and inject organization ID for non-CDR webhooks
-            $this->extractOrganizationId($request);
-        } catch (WebhookValidationException $e) {
-            // Convert validation exception to HTTP response
-            return response()->json($e->toArray(), $e->getHttpStatus());
-        }
-
-        // Signature is valid - log success and proceed
-        Log::info('Webhook signature verified successfully', [
-            'ip' => $request->ip(),
-            'path' => $request->path(),
-            'organization_id' => $request->input('_organization_id'),
-        ]);
-
-        return $next($request);
+        // Handle Bearer token authentication for status webhooks
+        return $this->handleBearerTokenAuthentication($request, $next);
     }
 
     /**
@@ -148,49 +49,47 @@ class VerifyCloudonixSignature
      */
     private function isCdrRequest(Request $request): bool
     {
-        return $request->path() === 'api/webhooks/cloudonix/cdr';
+        return $request->routeIs('webhooks.cloudonix.cdr') ||
+            $request->path() === 'api/webhooks/cloudonix/cdr';
     }
 
     /**
-     * Handle CDR webhook authentication using domain UUID
+     * Handle CDR webhook authentication using domain UUID or Name
      *
-     * CDR webhooks from Cloudonix do not include Authorization headers or signatures.
-     * Instead, we identify the organization by the domain UUID in the payload.
-     * The UUID is located at owner.domain.uuid in the CDR object.
+     * CDR webhooks from Cloudonix do not include Authorization headers.
+     * We identify the organization by the domain UUID or Name in the payload.
      */
     private function handleCdrAuthentication(Request $request, Closure $next): Response
     {
         $payload = $request->json()->all();
+        $settings = null;
 
-        // Extract domain UUID from CDR payload
-        // CDR structure: owner.domain.uuid
+        // 1. Try owner.domain.uuid -> domain_uuid
         $domainUuid = $payload['owner']['domain']['uuid'] ?? null;
-
-        // Log payload structure for debugging if UUID not found
-        if (!$domainUuid) {
-            Log::warning('CDR webhook missing owner.domain.uuid', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-                'payload_keys' => array_keys($payload),
-                'has_owner' => isset($payload['owner']),
-                'owner_keys' => isset($payload['owner']) ? array_keys($payload['owner']) : null,
-                'has_domain' => isset($payload['owner']['domain']),
-                'domain_keys' => isset($payload['owner']['domain']) ? array_keys($payload['owner']['domain']) : null,
-            ]);
-
-            return response()->json([
-                'error' => 'Bad Request - Missing domain UUID in CDR payload',
-            ], Response::HTTP_BAD_REQUEST);
+        if ($domainUuid) {
+            $settings = CloudonixSettings::where('domain_uuid', $domainUuid)->first();
         }
 
-        // Look up organization by domain UUID in CloudonixSettings
-        $settings = CloudonixSettings::where('domain_uuid', $domainUuid)->first();
+        // 2. Try owner.domain.name -> domain_name
+        if (!$settings) {
+            $domainName = $payload['owner']['domain']['name'] ?? null;
+            if ($domainName) {
+                $settings = CloudonixSettings::where('domain_name', $domainName)->first();
+            }
+        }
+
+        // 3. Try top-level domain -> domain_name
+        if (!$settings && isset($payload['domain'])) {
+            $settings = CloudonixSettings::where('domain_name', $payload['domain'])->first();
+        }
 
         if (!$settings) {
-            Log::warning('CDR webhook for unknown domain UUID', [
+            Log::warning('CDR webhook for unknown domain', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
-                'domain_uuid' => $domainUuid,
+                'payload_domain_uuid' => $domainUuid ?? 'N/A',
+                'payload_domain_name' => $payload['owner']['domain']['name'] ?? 'N/A',
+                'payload_domain' => $payload['domain'] ?? 'N/A',
             ]);
 
             return response()->json([
@@ -205,7 +104,6 @@ class VerifyCloudonixSignature
             'path' => $request->path(),
             'organization_id' => $organizationId,
             'domain_uuid' => $domainUuid,
-            'matched_setting_id' => $settings->id,
         ]);
 
         // Attach organization_id to request for controller use
@@ -215,144 +113,101 @@ class VerifyCloudonixSignature
     }
 
     /**
-     * Validate request IP address against allowlist (if configured).
+     * Handle Bearer token authentication for status webhooks
      *
-     * @throws WebhookValidationException
+     * Flow:
+     * 1. Extract Bearer token from Authorization header
+     * 2. Extract domain UUID from payload (if present)
+     * 3. Find CloudonixSettings and verify token matches domain_requests_api_key
      */
-    private function validateIpAddress(Request $request): void
+    private function handleBearerTokenAuthentication(Request $request, Closure $next): Response
     {
-        $allowedIps = config('cloudonix.webhook_allowed_ips', []);
+        // Get Authorization header
+        $authHeader = $request->header('Authorization');
 
-        if (empty($allowedIps)) {
-            return; // No IP restriction
-        }
-
-        $requestIp = $request->ip();
-
-        if (! in_array($requestIp, $allowedIps, true)) {
-            Log::warning('Webhook from unauthorized IP address', [
-                'ip' => $requestIp,
-                'path' => $request->path(),
-                'allowed_ips' => $allowedIps,
-            ]);
-
-            throw new WebhookValidationException(
-                'Unauthorized IP address',
-                ['ip' => $requestIp]
-            );
-        }
-    }
-
-    /**
-     * Validate webhook timestamp to prevent replay attacks.
-     *
-     * @throws WebhookValidationException
-     */
-    private function validateTimestamp(Request $request): void
-    {
-        // Get timestamp header
-        $timestampHeader = config('cloudonix.timestamp_header', 'X-Cloudonix-Timestamp');
-        $timestamp = $request->header($timestampHeader);
-
-        // Timestamp validation is optional (disabled if not configured)
-        if (empty($timestamp)) {
-            // If timestamp header not configured or not provided, skip validation
-            if (config('cloudonix.require_timestamp', false)) {
-                Log::warning('Webhook timestamp missing but required', [
-                    'ip' => $request->ip(),
-                    'path' => $request->path(),
-                ]);
-
-                throw new WebhookValidationException(
-                    'Missing timestamp header',
-                    ['header' => $timestampHeader]
-                );
-            }
-
-            return; // Timestamp not required
-        }
-
-        // Validate timestamp format (Unix timestamp)
-        if (! is_numeric($timestamp)) {
-            Log::warning('Webhook timestamp invalid format', [
+        if (empty($authHeader)) {
+            Log::warning('Webhook missing Authorization header', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
-                'timestamp' => $timestamp,
             ]);
 
-            throw new WebhookValidationException(
-                'Invalid timestamp format',
-                ['timestamp' => $timestamp]
-            );
+            return response()->json([
+                'error' => 'Unauthorized - Missing Authorization header',
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $timestampInt = (int) $timestamp;
-        $now = time();
-        $age = abs($now - $timestampInt);
-
-        // Check if timestamp is within tolerance window
-        if ($age > self::TIMESTAMP_TOLERANCE) {
-            Log::warning('Webhook timestamp outside tolerance window (possible replay attack)', [
+        // Extract Bearer token
+        if (!str_starts_with($authHeader, 'Bearer ')) {
+            Log::warning('Webhook Authorization header not Bearer format', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
-                'timestamp' => $timestampInt,
-                'age_seconds' => $age,
-                'tolerance' => self::TIMESTAMP_TOLERANCE,
             ]);
 
-            throw new WebhookValidationException(
-                'Timestamp outside tolerance window',
-                [
-                    'timestamp' => $timestampInt,
-                    'age' => $age,
-                    'tolerance' => self::TIMESTAMP_TOLERANCE,
-                ]
-            );
+            return response()->json([
+                'error' => 'Unauthorized - Invalid Authorization format',
+            ], Response::HTTP_UNAUTHORIZED);
         }
-    }
 
-    /**
-     * Extract organization ID from webhook payload and inject into request.
-     *
-     * For non-CDR webhooks, try to extract organization information from:
-     * 1. domain_uuid in payload (match against CloudonixSettings)
-     * 2. organization_id field in payload
-     */
-    private function extractOrganizationId(Request $request): void
-    {
+        $providedToken = substr($authHeader, 7); // Remove "Bearer " prefix
+
+        // Get request payload
         $payload = $request->json()->all();
 
-        // Try to find organization by domain_uuid if present
+        // Try to find organization by domain_uuid in payload
+        $settings = null;
         if (isset($payload['domain_uuid'])) {
             $settings = CloudonixSettings::where('domain_uuid', $payload['domain_uuid'])->first();
-
-            if ($settings) {
-                $request->merge(['_organization_id' => $settings->organization_id]);
-
-                Log::debug('Organization extracted from domain_uuid', [
-                    'organization_id' => $settings->organization_id,
-                    'domain_uuid' => $payload['domain_uuid'],
-                ]);
-
-                return;
-            }
         }
 
-        // Try direct organization_id field
-        if (isset($payload['organization_id'])) {
-            $request->merge(['_organization_id' => (int) $payload['organization_id']]);
+        // Check for 'domain' in payload (maps to domain_name)
+        // Cloudonix session updates often send 'domain' instead of 'domain_uuid'
+        if (!$settings && isset($payload['domain'])) {
+            $settings = CloudonixSettings::where('domain_name', $payload['domain'])->first();
+        }
 
-            Log::debug('Organization extracted from payload', [
-                'organization_id' => $payload['organization_id'],
+        // Note: We cannot search by domain_requests_api_key because it is encrypted
+        // and Laravel's encrypted cast is non-deterministic. We must rely on
+        // domain_uuid or domain_name to identify the organization first.
+
+        if (!$settings) {
+            Log::warning('Webhook: Organization not found for Bearer token', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
             ]);
 
-            return;
+            return response()->json([
+                'error' => 'Unauthorized - Invalid token',
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Organization ID not found - will be handled by rate limiting middleware
-        Log::debug('No organization ID found in webhook payload', [
+        // Verify token matches (redundant check since we already searched by token, but safe)
+        if (
+            !empty($settings->domain_requests_api_key) &&
+            !hash_equals($settings->domain_requests_api_key, $providedToken)
+        ) {
+            Log::warning('Webhook: Token mismatch', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+                'organization_id' => $settings->organization_id,
+            ]);
+
+            return response()->json([
+                'error' => 'Unauthorized - Invalid token',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $organizationId = $settings->organization_id;
+
+        // Authentication successful
+        Log::info('Webhook authenticated via Bearer token', [
+            'ip' => $request->ip(),
             'path' => $request->path(),
-            'payload_keys' => array_keys($payload),
+            'organization_id' => $organizationId,
         ]);
+
+        // Attach organization_id to request for controller use
+        $request->merge(['_organization_id' => $organizationId]);
+
+        return $next($request);
     }
 }

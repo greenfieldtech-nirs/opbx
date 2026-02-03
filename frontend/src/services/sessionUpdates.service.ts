@@ -93,4 +93,14 @@ export const sessionUpdatesService = {
       hasQosData: call.has_qos_data,
     };
   },
+
+  /**
+   * Disconnect an active session
+   */
+  async disconnectSession(sessionId: number): Promise<{ success: boolean; message: string }> {
+    const response = await api.delete<{ success: boolean; message: string }>(
+      `/session-updates/${sessionId}/disconnect`
+    );
+    return response.data;
+  },
 };

@@ -4,16 +4,17 @@
  * Real-time active calls monitoring using session-updates API
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, PhoneCall, Clock, ArrowRightLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Activity, PhoneCall, Clock, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, PhoneOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { ActiveCall } from '@/types/api.types';
+import { toast } from 'sonner';
 
 /**
  * Get status color for call status badges
@@ -48,6 +49,7 @@ const getDirectionIcon = (direction: string | null) => {
 export default function LiveCalls() {
   const { user: currentUser } = useAuth();
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
+  const queryClient = useQueryClient();
 
   // Fetch active calls with polling every 5 seconds (not rate limited)
   const { data: activeCallsResponse, isLoading, error, refetch } = useQuery({
@@ -56,6 +58,26 @@ export default function LiveCalls() {
     refetchInterval: 5000, // Poll every 5 seconds
     staleTime: 2000, // Consider data fresh for 2 seconds
   });
+
+  // Disconnect session mutation
+  const disconnectMutation = useMutation({
+    mutationFn: (sessionId: number) => sessionUpdatesService.disconnectSession(sessionId),
+    onSuccess: (data, sessionId) => {
+      toast.success('Session disconnected successfully');
+      // Invalidate and refetch active calls
+      queryClient.invalidateQueries({ queryKey: ['active-calls'] });
+    },
+    onError: (error: any, sessionId) => {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to disconnect session';
+      toast.error(errorMessage);
+    },
+  });
+
+  const handleDisconnect = (sessionId: number) => {
+    if (confirm('Are you sure you want to disconnect this call?')) {
+      disconnectMutation.mutate(sessionId);
+    }
+  };
 
   const activeCalls = ((activeCallsResponse?.data as ActiveCall[]) || []).map(call => ({
     ...call,
@@ -236,8 +258,29 @@ export default function LiveCalls() {
                     cell: (call) => (
                       <span className="font-mono text-xs text-muted-foreground">{call.session_id}</span>
                     )
-                  }
+                  },
+                  ...(!isReadOnly ? [{
+                    header: 'Actions',
+                    cell: (call) => (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDisconnect(call.session_id);
+                        }}
+                        disabled={disconnectMutation.isPending}
+                        className="gap-2"
+                      >
+                        <PhoneOff className="h-4 w-4" />
+                        Disconnect
+                      </Button>
+                    )
+                  }] : [])
                 ]}
+                canView={false}
+                canEdit={false}
+                canDelete={false}
                 emptyState={
                   <EmptyState
                     icon={PhoneCall}

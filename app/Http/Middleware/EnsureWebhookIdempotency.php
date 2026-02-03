@@ -219,7 +219,7 @@ class EnsureWebhookIdempotency
                 'timestamp' => $timestamp ?? time(),
             ];
 
-            return hash('sha256', json_encode($keyComponents, JSON_PRESERVE_ZERO_FRICTION));
+            return hash('sha256', json_encode($keyComponents, JSON_PRESERVE_ZERO_FRACTION));
         }
 
         // Priority 3: Full payload as last resort
@@ -228,27 +228,11 @@ class EnsureWebhookIdempotency
         $payload = $request->all();
 
         if (!empty($payload)) {
-            return hash('sha256', json_encode($payload, JSON_PRESERVE_ZERO_FRICTION));
+            return hash('sha256', json_encode($payload, JSON_PRESERVE_ZERO_FRACTION));
         }
 
         return null;
     }
 
-        // Try to get from Cloudonix webhook payload
-        $callId = $request->input('CallSid') ?? $request->input('call_id');
-        $eventType = $request->input('CallStatus') ?? $request->input('event_type');
 
-        if ($callId && $eventType) {
-            return hash('sha256', $callId . ':' . $eventType);
-        }
-
-        // Generate from full payload as last resort
-        $payload = $request->all();
-
-        if (!empty($payload)) {
-            return hash('sha256', json_encode($payload));
-        }
-
-        return null;
-    }
 }

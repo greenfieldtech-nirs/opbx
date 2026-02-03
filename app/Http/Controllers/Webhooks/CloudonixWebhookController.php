@@ -373,6 +373,7 @@ class CloudonixWebhookController extends Controller
             // Validate required fields
             $validated = $request->validate([
                 'id' => 'required|integer',
+                'token' => 'nullable|string',
                 'eventId' => 'nullable|string',
                 'domainId' => 'nullable|integer',
                 'domain' => 'nullable|string',
@@ -443,6 +444,7 @@ class CloudonixWebhookController extends Controller
             $sessionUpdate = new SessionUpdate([
                 'organization_id' => $organizationId,
                 'session_id' => $validated['id'],
+                'session_token' => $validated['token'] ?? null,
                 'event_id' => $validated['eventId'],
                 'domain_id' => $validated['domainId'],
                 'domain' => $validated['domain'],
@@ -651,10 +653,14 @@ class CloudonixWebhookController extends Controller
         $callStartTimeSeconds = $callStartTimeMs ? intval($callStartTimeMs / 1000) : null;
         $callAnswerTimeSeconds = $callAnswerTimeMs ? intval($callAnswerTimeMs / 1000) : null;
 
+        // Extract session token from session.token field
+        $sessionToken = $sessionData['token'] ?? null;
+
         // Create session update record for final call status
         $sessionUpdate = new SessionUpdate([
             'organization_id' => $organizationId,
             'session_id' => $sessionId,
+            'session_token' => $sessionToken,
             'event_id' => $eventId,
             'domain_id' => $sessionData['domainId'] ?? null,
             'domain' => $request->input('domain'),
