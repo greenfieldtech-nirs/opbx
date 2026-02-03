@@ -46,6 +46,12 @@ api.interceptors.response.use(
   (error: AxiosError<APIError>) => {
     // Handle 401 Unauthorized - token expired or invalid
     if (error.response?.status === 401) {
+      // Don't redirect for login requests - show error toast instead
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (isLoginRequest) {
+        return Promise.reject(error);
+      }
+
       storage.clearAll();
       // Redirect to login if not already there
       if (window.location.pathname !== '/login') {
@@ -77,16 +83,25 @@ export default api;
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<APIError>;
+    const errorData = axiosError.response?.data?.error;
 
-    // Return validation errors if present
-    if (axiosError.response?.data?.error?.details) {
-      const details = axiosError.response.data.error.details;
+    // Return validation errors if present (array format)
+    if (errorData?.details && Array.isArray(errorData.details)) {
+      const details = errorData.details;
       return details.map(d => `${d.field}: ${d.message}`).join(', ');
     }
 
+    // Return validation errors if present (object format - e.g. {"email": "wrong@test.com"})
+    if (errorData?.details && typeof errorData.details === 'object' && !Array.isArray(errorData.details)) {
+      const details = errorData.details as Record<string, string>;
+      return Object.entries(details)
+        .map(([field, value]) => `${field}: ${value}`)
+        .join(', ');
+    }
+
     // Return error message
-    if (axiosError.response?.data?.error?.message) {
-      return axiosError.response.data.error.message;
+    if (errorData?.message) {
+      return errorData.message;
     }
 
     // Return generic network error

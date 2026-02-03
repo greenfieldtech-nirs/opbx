@@ -212,6 +212,9 @@ class RecordingsController extends Controller
 
     /**
      * Generate a secure download URL for the specified recording file.
+     *
+     * Security Improvement: Returns download endpoint URL without embedding token.
+     * Client should use Authorization header for secure token transmission.
      */
     public function download(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
     {
@@ -235,22 +238,35 @@ class RecordingsController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
+        // Security improvement: Return endpoint URL and token separately
+        // Client should use Authorization header for secure transmission
         return response()->json([
-            'download_url' => '/api/v1/recordings/download?token='.urlencode($token),
+            'download_endpoint' => '/api/v1/recordings/download',
+            'token' => $token,
             'filename' => $recording->original_filename ?? $recording->file_path,
             'expires_in' => 1800, // 30 minutes
+            'authorization_header' => 'Bearer '.$token,
+            'security_note' => 'For security, include the token in the Authorization header: Authorization: Bearer '.$token,
         ]);
     }
 
     /**
      * Securely serve a recording file using an access token (handles both streaming and downloading).
+     *
+     * Security Improvement: Accepts token from Authorization header to prevent token
+     * exposure in URL query strings, server logs, and browser history.
      */
     public function secureDownload(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse|\Illuminate\Http\JsonResponse
     {
-        $token = $request->query('token');
+        // Security improvement: Accept token from Authorization header (preferred)
+        // Fall back to query parameter for backwards compatibility
+        $token = $request->bearerToken() ?? $request->query('token');
 
         if (! $token) {
-            return response()->json(['error' => 'Invalid access token'], 401);
+            return response()->json([
+                'error' => 'Access token required',
+                'message' => 'Provide token via Authorization header (Bearer token) or query parameter (?token=xxx)',
+            ], 401);
         }
 
         // For token-based access, we allow access with just the token
