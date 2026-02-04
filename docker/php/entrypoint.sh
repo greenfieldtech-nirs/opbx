@@ -43,20 +43,11 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan db:seed --force --no-interaction || echo "Seeding skipped or already completed"
 
     # Initialize storage (MinIO bucket setup)
-    echo "Initializing storage..."
-    php artisan storage:initialize || echo "Storage initialization skipped (may already be initialized)"
-else
-    echo "Skipping migrations (RUN_MIGRATIONS=false)..."
-fi
+echo "Initializing storage..."
+php artisan storage:initialize
 
-# Cache configuration for production (after clearing stale caches)
-if [ "$APP_ENV" = "production" ]; then
-    echo "Caching configuration..."
-    php artisan config:cache
-    # Note: route:cache disabled due to Laravel 12 CompiledRouteCollection compatibility issue
-    # php artisan route:cache
-    php artisan view:cache
-fi
+echo "Validating configuration..."
+php artisan config:validate --quiet || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."
 
 echo "Starting PHP-FPM..."
 exec "$@"
