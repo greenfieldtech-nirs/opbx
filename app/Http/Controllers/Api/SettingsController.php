@@ -501,10 +501,8 @@ class SettingsController extends Controller
         int $organizationId
     ): ?string {
         try {
-            // Generate webhook URL for voice routing using webhook_base_url
-            $baseUrl = ! empty($settings->webhook_base_url)
-                ? rtrim($settings->webhook_base_url, '/')
-                : rtrim(config('app.url'), '/');
+            // Generate webhook URL for voice routing using effective webhook base URL
+            $baseUrl = rtrim($settings->effective_webhook_base_url ?? config('app.url'), '/');
             $webhookUrl = "{$baseUrl}/api/voice/route";
 
             Log::info('[VOICE_APP_SETUP] Starting voice application setup', [
