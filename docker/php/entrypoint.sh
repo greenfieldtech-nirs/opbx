@@ -43,11 +43,12 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan db:seed --force --no-interaction || echo "Seeding skipped or already completed"
 
     # Initialize storage (MinIO bucket setup)
-echo "Initializing storage..."
-php artisan storage:initialize
+    echo "Initializing storage..."
+    php artisan storage:initialize
 
-echo "Validating configuration..."
-php artisan config:validate --silent || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."
+    echo "Validating configuration..."
+    php artisan config:validate --silent || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."
+fi
 
 echo "Starting PHP-FPM..."
 exec "$@"
