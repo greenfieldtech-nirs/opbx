@@ -177,7 +177,7 @@ class CloudonixSettings extends Model
      */
     public function hasWebhookAuth(): bool
     {
-        return !empty($this->domain_requests_api_key);
+        return ! empty($this->domain_requests_api_key);
     }
 
     /**
@@ -203,5 +203,4 @@ class CloudonixSettings extends Model
     {
         return WebhookUrlResolver::getWebhookUrlDetails($this->organization);
     }
-}
 }
