@@ -764,6 +764,14 @@ export type ExtensionStatus = Status;
 
 export type RecordingFormat = 'wav' | 'mp3';
 
+export interface WebhookUrlDetails {
+  effective_url: string | null;
+  application_url: string | null;
+  organization_url: string | null;
+  is_overridden: boolean;
+  source: 'application' | 'organization';
+}
+
 export interface CloudonixSettings {
   id: number;
   organization_id: number;
@@ -777,6 +785,7 @@ export interface CloudonixSettings {
   cloudonix_package: string | null;
   callback_url?: string | null;
   cdr_url?: string | null;
+  webhook_url_details?: WebhookUrlDetails;
   is_configured: boolean;
   has_webhook_auth: boolean;
   created_at: string;

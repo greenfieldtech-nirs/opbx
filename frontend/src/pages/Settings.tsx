@@ -12,6 +12,8 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { settingsService } from '@/services/settings.service';
 import logger from '@/utils/logger';
+import { useConfig } from '@/context/ConfigContext';
+import { ConfigurationWarning } from '@/components/ConfigurationWarning';
 
 import { getApiErrorMessage } from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -74,6 +76,7 @@ const settingsSchema = z.object({
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export default function Settings() {
+  const { shouldHideWebhookFields } = useConfig();
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
@@ -325,6 +328,9 @@ export default function Settings() {
           <p className="mt-2 text-gray-600">Configure your OPBX integration with Cloudonix</p>
         </div>
 
+        {/* Configuration Warning Banner */}
+        <ConfigurationWarning />
+
         <Card className={isValidating ? 'pointer-events-none opacity-60' : ''}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -562,40 +568,74 @@ export default function Settings() {
               {/* Divider */}
               <div className="border-t pt-6" />
 
-              {/* Webhook Base URL */}
-              <div className="space-y-2">
-                <Label htmlFor="webhook_base_url" className="flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
-                  Webhook Base URL
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>
-                        Custom base URL for webhook endpoints (CDR and Session Update Callback).
-                        If not specified, the default application URL will be used.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <Input
-                  id="webhook_base_url"
-                  type="url"
-                  placeholder="https://example.com (optional)"
-                  disabled={isValidating}
-                  {...register('webhook_base_url')}
-                />
-                {errors.webhook_base_url && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <XCircle className="h-3 w-3" />
-                    {errors.webhook_base_url.message}
+              {/* Webhook Base URL - Conditional Display */}
+              {shouldHideWebhookFields ? (
+                // Show read-only display when overridden by application config
+                <div className="space-y-2">
+                  <Label htmlFor="effective_webhook_url" className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Webhook Base URL (Application Level)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          The webhook base URL is configured at the application level by your system administrator.
+                          This setting cannot be changed per organization.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    id="effective_webhook_url"
+                    type="text"
+                    value={settingsData?.webhook_url_details?.effective_url || '(Not configured)'}
+                    readOnly
+                    disabled
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    Managed by system administrator
                   </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Optional: Custom base URL for webhook endpoints. Leave empty to use the default application URL.
-                </p>
-              </div>
+                </div>
+              ) : (
+                // Show editable field when not overridden
+                <div className="space-y-2">
+                  <Label htmlFor="webhook_base_url" className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Webhook Base URL
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          Custom base URL for webhook endpoints (CDR and Session Update Callback).
+                          If not specified, the default application URL will be used.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    id="webhook_base_url"
+                    type="url"
+                    placeholder="https://example.com (optional)"
+                    disabled={isValidating}
+                    {...register('webhook_base_url')}
+                  />
+                  {errors.webhook_base_url && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {errors.webhook_base_url.message}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Optional: Custom base URL for webhook endpoints. Leave empty to use the default application URL.
+                  </p>
+                </div>
+              )}
 
               {/* Divider */}
               <div className="border-t pt-6" />
@@ -686,93 +726,95 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Domain CDR Endpoint and Session Update Callback URL - Side by Side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Domain CDR Endpoint (Read-only) */}
-                <div className="space-y-2">
-                  <Label htmlFor="cdr_url" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Domain CDR Endpoint
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>
-                          Webhook URL for receiving Call Detail Records (CDR) from Cloudonix. This endpoint
-                          will receive CDR data for local storage and processing.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="cdr_url"
-                      type="text"
-                      value={settingsData?.cdr_url || '(Not yet generated)'}
-                      readOnly
-                      disabled
-                      className="flex-1"
-                    />
-                     <Button
-                       type="button"
-                       variant="outline"
-                       onClick={() =>
-                         settingsData?.cdr_url &&
-                         handleCopyToClipboard(settingsData.cdr_url, 'CDR Endpoint URL')
-                       }
-                       disabled={!settingsData?.cdr_url || isValidating}
-                     >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+              {/* Domain CDR Endpoint and Session Update Callback URL - Conditional Display */}
+              {!shouldHideWebhookFields && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Domain CDR Endpoint (Read-only) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="cdr_url" className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Domain CDR Endpoint
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>
+                            Webhook URL for receiving Call Detail Records (CDR) from Cloudonix. This endpoint
+                            will receive CDR data for local storage and processing.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cdr_url"
+                        type="text"
+                        value={settingsData?.cdr_url || '(Not yet generated)'}
+                        readOnly
+                        disabled
+                        className="flex-1"
+                      />
+                       <Button
+                         type="button"
+                         variant="outline"
+                         onClick={() =>
+                           settingsData?.cdr_url &&
+                           handleCopyToClipboard(settingsData.cdr_url, 'CDR Endpoint URL')
+                         }
+                         disabled={!settingsData?.cdr_url || isValidating}
+                       >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-configured in Cloudonix for CDR events
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Auto-configured in Cloudonix for CDR events
-                  </p>
-                </div>
 
-                {/* Callback URL (Read-only) */}
-                <div className="space-y-2">
-                  <Label htmlFor="callback_url" className="flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" />
-                    Domain Session Update Callback URL
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>
-                          This is your webhook URL for receiving call events from Cloudonix.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="callback_url"
-                      type="text"
-                      value={settingsData?.callback_url || '(Not yet generated)'}
-                      readOnly
-                      disabled
-                      className="flex-1"
-                    />
-                     <Button
-                       type="button"
-                       variant="outline"
-                       onClick={() =>
-                         settingsData?.callback_url &&
-                         handleCopyToClipboard(settingsData.callback_url, 'Callback URL')
-                       }
-                       disabled={!settingsData?.callback_url || isValidating}
-                     >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                  {/* Callback URL (Read-only) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="callback_url" className="flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4" />
+                      Domain Session Update Callback URL
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>
+                            This is your webhook URL for receiving call events from Cloudonix.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="callback_url"
+                        type="text"
+                        value={settingsData?.callback_url || '(Not yet generated)'}
+                        readOnly
+                        disabled
+                        className="flex-1"
+                      />
+                       <Button
+                         type="button"
+                         variant="outline"
+                         onClick={() =>
+                           settingsData?.callback_url &&
+                           handleCopyToClipboard(settingsData.callback_url, 'Callback URL')
+                         }
+                         disabled={!settingsData?.callback_url || isValidating}
+                       >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-configured in Cloudonix for session updates
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Auto-configured in Cloudonix for session updates
-                  </p>
                 </div>
-              </div>
+              )}
 
             </form>
           </CardContent>
