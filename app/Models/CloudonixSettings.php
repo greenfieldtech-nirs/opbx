@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\WebhookUrlResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -99,10 +100,8 @@ class CloudonixSettings extends Model
      */
     public function getCallbackUrl(): string
     {
-        // Use custom webhook base URL if configured, otherwise fall back to APP_URL
-        $baseUrl = !empty($this->webhook_base_url)
-            ? rtrim($this->webhook_base_url, '/')
-            : rtrim(config('app.url'), '/');
+        // Use effective webhook base URL (considers application-level override)
+        $baseUrl = rtrim($this->effective_webhook_base_url ?? config('app.url'), '/');
 
         return "{$baseUrl}/api/webhooks/cloudonix/session-update";
     }
@@ -114,12 +113,23 @@ class CloudonixSettings extends Model
      */
     public function getCdrUrl(): string
     {
-        // Use custom webhook base URL if configured, otherwise fall back to APP_URL
-        $baseUrl = !empty($this->webhook_base_url)
-            ? rtrim($this->webhook_base_url, '/')
-            : rtrim(config('app.url'), '/');
+        // Use effective webhook base URL (considers application-level override)
+        $baseUrl = rtrim($this->effective_webhook_base_url ?? config('app.url'), '/');
 
         return "{$baseUrl}/api/webhooks/cloudonix/cdr";
+    }
+
+    /**
+     * Get the voice route webhook URL for Cloudonix voice applications.
+     *
+     * This URL is used by Cloudonix voice applications to request call routing instructions.
+     */
+    public function getVoiceRouteUrl(): string
+    {
+        // Use effective webhook base URL (considers application-level override)
+        $baseUrl = rtrim($this->effective_webhook_base_url ?? config('app.url'), '/');
+
+        return "{$baseUrl}/api/voice/route";
     }
 
     /**
@@ -129,7 +139,7 @@ class CloudonixSettings extends Model
      */
     public function getMaskedDomainApiKey(): ?string
     {
-        if (!$this->domain_api_key) {
+        if (! $this->domain_api_key) {
             return null;
         }
 
@@ -140,7 +150,7 @@ class CloudonixSettings extends Model
             return str_repeat('*', $length);
         }
 
-        return substr($key, 0, 4) . str_repeat('*', $length - 8) . substr($key, -4);
+        return substr($key, 0, 4).str_repeat('*', $length - 8).substr($key, -4);
     }
 
     /**
@@ -150,7 +160,7 @@ class CloudonixSettings extends Model
      */
     public function getMaskedDomainRequestsApiKey(): ?string
     {
-        if (!$this->domain_requests_api_key) {
+        if (! $this->domain_requests_api_key) {
             return null;
         }
 
@@ -161,7 +171,7 @@ class CloudonixSettings extends Model
             return str_repeat('*', $length);
         }
 
-        return substr($key, 0, 4) . str_repeat('*', $length - 8) . substr($key, -4);
+        return substr($key, 0, 4).str_repeat('*', $length - 8).substr($key, -4);
     }
 
     /**
@@ -169,7 +179,7 @@ class CloudonixSettings extends Model
      */
     public function isConfigured(): bool
     {
-        return !empty($this->domain_uuid) && !empty($this->domain_api_key);
+        return ! empty($this->domain_uuid) && ! empty($this->domain_api_key);
     }
 
     /**
@@ -177,6 +187,30 @@ class CloudonixSettings extends Model
      */
     public function hasWebhookAuth(): bool
     {
-        return !empty($this->domain_requests_api_key);
+        return ! empty($this->domain_requests_api_key);
+    }
+
+    /**
+     * Get effective webhook base URL (considering application-level override)
+     */
+    public function getEffectiveWebhookBaseUrlAttribute(): ?string
+    {
+        return WebhookUrlResolver::resolveWebhookBaseUrl($this->organization);
+    }
+
+    /**
+     * Check if webhook URL is overridden at application level
+     */
+    public function isWebhookUrlOverridden(): bool
+    {
+        return WebhookUrlResolver::isWebhookUrlOverridden($this->organization);
+    }
+
+    /**
+     * Get webhook URL details including override status
+     */
+    public function getWebhookUrlDetails(): array
+    {
+        return WebhookUrlResolver::getWebhookUrlDetails($this->organization);
     }
 }

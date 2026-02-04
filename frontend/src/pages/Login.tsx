@@ -37,7 +37,7 @@ export default function Login() {
     // Redirect to dashboard if already authenticated
     useEffect(() => {
         if (!authLoading && isAuthenticated) {
-            navigate('/dashboard', {replace: true});
+            navigate('/ui/dashboard', {replace: true});
         }
     }, [isAuthenticated, authLoading, navigate]);
 
@@ -53,7 +53,7 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            await login(data, () => navigate('/dashboard'));
+            await login(data, () => navigate('/ui/dashboard'));
             try {
                 toast.success('Login successful!');
             } catch {
@@ -209,11 +209,11 @@ export default function Login() {
                                     <p className="mt-4">
                                         New to OPBX?{' '}
                                         <a
-                                            href="/register"
+                                            href="/ui/register"
                                             className="text-blue-600 hover:text-blue-800 font-medium"
                                             onClick={(e) => {
                                                 e.preventDefault();
-                                                navigate('/register');
+                                                navigate('/ui/register');
                                             }}
                                         >
                                             Create an organization

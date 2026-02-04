@@ -45,7 +45,7 @@ export function OwnerRoute({ children }: OwnerRouteProps) {
 
   // Redirect to dashboard if not owner
   if (!isOwner) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/ui/dashboard" replace />;
   }
 
   // User is owner, render children

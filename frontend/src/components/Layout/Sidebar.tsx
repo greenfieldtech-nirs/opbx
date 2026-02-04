@@ -31,18 +31,18 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Users', href: '/users', icon: Users, roles: ['owner', 'pbx_admin'] },
-  { name: 'Extensions', href: '/extensions', icon: Phone, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-  { name: 'Conference Rooms', href: '/conference-rooms', icon: Video, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-  { name: 'Phone Numbers', href: '/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin', 'reporter'] },
-  { name: 'Ring Groups', href: '/ring-groups', icon: UserPlus, roles: ['owner', 'pbx_admin', 'reporter'] },
-  { name: 'IVR Menus', href: '/ivr-menus', icon: Menu, roles: ['owner', 'pbx_admin'] },
-  { name: 'Business Hours', href: '/business-hours', icon: Clock, roles: ['owner', 'pbx_admin'] },
-  { name: 'Outbound Whitelist', href: '/outbound-whitelist', icon: Shield, roles: ['owner'] },
-  { name: 'Call Logs', href: '/call-logs', icon: FileText, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-  { name: 'Recordings', href: '/recordings', icon: Volume2, roles: ['owner', 'pbx_admin'] },
-  { name: 'Live Calls', href: '/live-calls', icon: Activity, roles: ['owner', 'pbx_admin', 'reporter'] },
+  { name: 'Dashboard', href: '/ui/dashboard', icon: LayoutDashboard },
+  { name: 'Users', href: '/ui/users', icon: Users, roles: ['owner', 'pbx_admin'] },
+  { name: 'Extensions', href: '/ui/extensions', icon: Phone, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'Conference Rooms', href: '/ui/conference-rooms', icon: Video, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'Phone Numbers', href: '/ui/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin', 'reporter'] },
+  { name: 'Ring Groups', href: '/ui/ring-groups', icon: UserPlus, roles: ['owner', 'pbx_admin', 'reporter'] },
+  { name: 'IVR Menus', href: '/ui/ivr-menus', icon: Menu, roles: ['owner', 'pbx_admin'] },
+  { name: 'Business Hours', href: '/ui/business-hours', icon: Clock, roles: ['owner', 'pbx_admin'] },
+  { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: Shield, roles: ['owner'] },
+  { name: 'Call Logs', href: '/ui/call-logs', icon: FileText, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'Recordings', href: '/ui/recordings', icon: Volume2, roles: ['owner', 'pbx_admin'] },
+  { name: 'Live Calls', href: '/ui/live-calls', icon: Activity, roles: ['owner', 'pbx_admin', 'reporter'] },
 ];
 
 export function Sidebar() {

@@ -39,8 +39,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] Verifying auth on mount...', {
         hasToken: !!storedToken,
         hasUser: !!storedUser,
-        userEmail: storedUser?.email
+        userEmail: storedUser?.email,
+        pathname: window.location.pathname
       });
+
+      // Skip auth verification on public pages to avoid 401 redirects
+      const isPublicPage = window.location.pathname === '/' ||
+                          window.location.pathname === '/ui/register' ||
+                          window.location.pathname === '/ui/login';
+
+      if (isPublicPage) {
+        console.log('[AuthContext] Public page detected, skipping auth verification');
+        // If there's stored auth data, verify it silently without blocking page load
+        if (storedToken && storedUser) {
+          setUser(storedUser);
+          setToken(storedToken);
+        }
+        setIsLoading(false);
+        return;
+      }
 
       if (storedToken && storedUser) {
         try {

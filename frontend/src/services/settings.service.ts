@@ -33,7 +33,7 @@ export const settingsService = {
    * GET /settings/cloudonix
    */
   getCloudonixSettings: (): Promise<CloudonixSettings> => {
-    return api.get<{ settings: CloudonixSettings | null; callback_url: string; cdr_url: string }>('/settings/cloudonix')
+    return api.get<{ settings: CloudonixSettings | null; callback_url: string; cdr_url: string; webhook_url_details?: any }>('/settings/cloudonix')
       .then(res => {
         if (!res.data.settings) {
           // Return default settings structure if no settings exist
@@ -47,17 +47,19 @@ export const settingsService = {
             recording_format: 'mp3',
             callback_url: res.data.callback_url,
             cdr_url: res.data.cdr_url,
+            webhook_url_details: res.data.webhook_url_details,
             is_configured: false,
             has_webhook_auth: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as CloudonixSettings;
         }
-        // Merge callback_url and cdr_url into settings object
+        // Merge callback_url, cdr_url, and webhook_url_details into settings object
         return {
           ...res.data.settings,
           callback_url: res.data.callback_url,
           cdr_url: res.data.cdr_url,
+          webhook_url_details: res.data.webhook_url_details,
         };
       });
   },
@@ -81,11 +83,12 @@ export const settingsService = {
    * PUT /settings/cloudonix
    */
   updateCloudonixSettings: (data: UpdateCloudonixSettingsRequest): Promise<CloudonixSettings> => {
-    return api.put<{ message: string; settings: CloudonixSettings; callback_url: string; cdr_url: string }>('/settings/cloudonix', data)
+    return api.put<{ message: string; settings: CloudonixSettings; callback_url: string; cdr_url: string; webhook_url_details?: any }>('/settings/cloudonix', data)
       .then(res => ({
         ...res.data.settings,
         callback_url: res.data.callback_url,
         cdr_url: res.data.cdr_url,
+        webhook_url_details: res.data.webhook_url_details,
       }));
   },
 

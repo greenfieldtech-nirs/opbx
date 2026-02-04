@@ -1,7 +1,7 @@
 /**
  * Application Router
  *
- * Defines all routes with protected route logic
+ * Unified router handling both public and protected routes
  */
 
 import { createBrowserRouter, Navigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { OwnerRoute } from '@/components/Auth/OwnerRoute';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
+import Home from '@/pages/Home';
 
 // Lazy load pages for code splitting
 import { lazy } from 'react';
@@ -30,18 +31,25 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 
 
-export const router = createBrowserRouter(
-  [
-    {
-      path: '/login',
+// Unified router - NO basename, handles all routes
+export const router = createBrowserRouter([
+  // Public homepage
+  {
+    path: '/',
+    element: <Home />,
+  },
+  // Public auth routes (under /ui for consistency with existing setup)
+  {
+    path: '/ui/login',
     element: <Login />,
   },
   {
-    path: '/register',
+    path: '/ui/register',
     element: <Register />,
   },
+  // Protected app routes (under /ui)
   {
-    path: '/',
+    path: '/ui',
     element: (
       <ProtectedRoute>
         <AppLayout />
@@ -50,7 +58,7 @@ export const router = createBrowserRouter(
     children: [
       {
         index: true,
-        element: <Navigate to="/dashboard" replace />,
+        element: <Navigate to="/ui/dashboard" replace />,
       },
       {
         path: 'dashboard',
@@ -117,9 +125,6 @@ export const router = createBrowserRouter(
          ),
        },
 
-    ],
+     ],
   },
-],
-{
-  basename: '/ui',
-});
+]);
