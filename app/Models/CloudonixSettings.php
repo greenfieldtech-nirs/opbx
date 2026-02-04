@@ -120,6 +120,19 @@ class CloudonixSettings extends Model
     }
 
     /**
+     * Get the voice route webhook URL for Cloudonix voice applications.
+     *
+     * This URL is used by Cloudonix voice applications to request call routing instructions.
+     */
+    public function getVoiceRouteUrl(): string
+    {
+        // Use effective webhook base URL (considers application-level override)
+        $baseUrl = rtrim($this->effective_webhook_base_url ?? config('app.url'), '/');
+
+        return "{$baseUrl}/api/voice/route";
+    }
+
+    /**
      * Get a masked version of the domain API key.
      *
      * Shows only the first 4 and last 4 characters.
