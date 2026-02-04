@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\ConferenceRoomController;
+use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
 use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
