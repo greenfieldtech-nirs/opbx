@@ -58,6 +58,18 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // Don't redirect if user is on public pages (homepage, register)
+      const isPublicPage = window.location.pathname === '/' || 
+                          window.location.pathname === '/ui/register' ||
+                          window.location.pathname === '/ui/login';
+      
+      if (isPublicPage) {
+        console.log('[API] 401 on public page, not redirecting');
+        // Clear storage but don't redirect
+        storage.clearAll();
+        return Promise.reject(error);
+      }
+
       console.log('[API] Clearing storage and redirecting to login');
       storage.clearAll();
       // Redirect to login if not already there (respect /ui basename)

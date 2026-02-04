@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-
-
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\Settings\UpdateCloudonixSettingsRequest;
 use App\Http\Requests\Settings\ValidateCloudonixRequest;
 use App\Models\CloudonixSettings;
@@ -27,25 +24,23 @@ use Illuminate\Support\Str;
 class SettingsController extends Controller
 {
     use ApiRequestHandler;
+
     /**
      * Create a new controller instance.
      */
     public function __construct(
         private readonly CloudonixClient $cloudonixClient
-    ) {
-    }
+    ) {}
 
     /**
      * Get Cloudonix settings for the authenticated user's organization.
-     *
-     * @return JsonResponse
      */
     public function getCloudonixSettings(): JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
@@ -61,41 +56,39 @@ class SettingsController extends Controller
             'has_settings' => $settings !== null,
         ]);
 
-        if (!$settings) {
+        if (! $settings) {
             return response()->json([
                 'settings' => null,
-                'callback_url' => (new CloudonixSettings())->getCallbackUrl(),
-                'cdr_url' => (new CloudonixSettings())->getCdrUrl(),
+                'callback_url' => (new CloudonixSettings)->getCallbackUrl(),
+                'cdr_url' => (new CloudonixSettings)->getCdrUrl(),
             ]);
         }
 
         return response()->json([
-             'settings' => [
-                 'id' => $settings->id,
-                 'organization_id' => $settings->organization_id,
-                 'domain_uuid' => $settings->domain_uuid,
-                 'domain_name' => $settings->domain_name,
-                 'domain_api_key' => $settings->domain_api_key, // Show real key (owner only)
-                 'domain_requests_api_key' => $settings->domain_requests_api_key, // Show real key (owner only)
-                 'webhook_base_url' => $settings->webhook_base_url,
-                 'no_answer_timeout' => $settings->no_answer_timeout,
-                 'recording_format' => $settings->recording_format,
-                 'cloudonix_package' => $settings->cloudonix_package,
-                 'is_configured' => $settings->isConfigured(),
-                 'has_webhook_auth' => $settings->hasWebhookAuth(),
-                 'created_at' => $settings->created_at->toIso8601String(),
-                 'updated_at' => $settings->updated_at->toIso8601String(),
-             ],
+            'settings' => [
+                'id' => $settings->id,
+                'organization_id' => $settings->organization_id,
+                'domain_uuid' => $settings->domain_uuid,
+                'domain_name' => $settings->domain_name,
+                'domain_api_key' => $settings->domain_api_key, // Show real key (owner only)
+                'domain_requests_api_key' => $settings->domain_requests_api_key, // Show real key (owner only)
+                'webhook_base_url' => $settings->webhook_base_url,
+                'no_answer_timeout' => $settings->no_answer_timeout,
+                'recording_format' => $settings->recording_format,
+                'cloudonix_package' => $settings->cloudonix_package,
+                'is_configured' => $settings->isConfigured(),
+                'has_webhook_auth' => $settings->hasWebhookAuth(),
+                'created_at' => $settings->created_at->toIso8601String(),
+                'updated_at' => $settings->updated_at->toIso8601String(),
+            ],
             'callback_url' => $settings->getCallbackUrl(),
             'cdr_url' => $settings->getCdrUrl(),
+            'webhook_url_details' => $settings->getWebhookUrlDetails(),
         ]);
     }
 
     /**
      * Update Cloudonix settings for the authenticated user's organization.
-     *
-     * @param UpdateCloudonixSettingsRequest $request
-     * @return JsonResponse
      */
     public function updateCloudonixSettings(UpdateCloudonixSettingsRequest $request): JsonResponse
     {
@@ -108,8 +101,8 @@ class SettingsController extends Controller
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
-            'has_domain_uuid' => !empty($validated['domain_uuid']),
-            'has_domain_api_key' => !empty($validated['domain_api_key']),
+            'has_domain_uuid' => ! empty($validated['domain_uuid']),
+            'has_domain_api_key' => ! empty($validated['domain_api_key']),
         ]);
 
         try {
@@ -134,11 +127,21 @@ class SettingsController extends Controller
             try {
                 $changes = [];
                 // Track which fields were changed (excluding sensitive fields like API keys)
-                if (isset($validated['domain_uuid'])) $changes[] = 'domain_uuid';
-                if (isset($validated['domain_name'])) $changes[] = 'domain_name';
-                if (isset($validated['webhook_base_url'])) $changes[] = 'webhook_base_url';
-                if (isset($validated['no_answer_timeout'])) $changes[] = 'no_answer_timeout';
-                if (isset($validated['recording_format'])) $changes[] = 'recording_format';
+                if (isset($validated['domain_uuid'])) {
+                    $changes[] = 'domain_uuid';
+                }
+                if (isset($validated['domain_name'])) {
+                    $changes[] = 'domain_name';
+                }
+                if (isset($validated['webhook_base_url'])) {
+                    $changes[] = 'webhook_base_url';
+                }
+                if (isset($validated['no_answer_timeout'])) {
+                    $changes[] = 'no_answer_timeout';
+                }
+                if (isset($validated['recording_format'])) {
+                    $changes[] = 'recording_format';
+                }
 
                 AuditLogger::logCloudonixConfigUpdated($request, $changes);
             } catch (\Exception $auditException) {
@@ -182,7 +185,7 @@ class SettingsController extends Controller
                     $profileData
                 );
 
-                if (!$syncResult['success']) {
+                if (! $syncResult['success']) {
                     Log::warning('Failed to sync settings to Cloudonix', [
                         'request_id' => $requestId,
                         'user_id' => $user->id,
@@ -190,7 +193,7 @@ class SettingsController extends Controller
                         'error' => $syncResult['message'],
                     ]);
 
-                    $cloudonixSyncWarning = 'Settings saved locally, but failed to sync to Cloudonix: ' . $syncResult['message'];
+                    $cloudonixSyncWarning = 'Settings saved locally, but failed to sync to Cloudonix: '.$syncResult['message'];
                 } else {
                     Log::info('Settings synced to Cloudonix successfully', [
                         'request_id' => $requestId,
@@ -259,9 +262,6 @@ class SettingsController extends Controller
 
     /**
      * Validate Cloudonix domain credentials without saving.
-     *
-     * @param ValidateCloudonixRequest $request
-     * @return JsonResponse
      */
     public function validateCloudonixCredentials(ValidateCloudonixRequest $request): JsonResponse
     {
@@ -357,15 +357,13 @@ class SettingsController extends Controller
 
     /**
      * Generate a secure random API key for webhook authentication.
-     *
-     * @return JsonResponse
      */
     public function generateRequestsApiKey(): JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
@@ -390,8 +388,6 @@ class SettingsController extends Controller
 
     /**
      * Get outbound voice trunks from Cloudonix API.
-     *
-     * @return JsonResponse
      */
     public function getOutboundTrunks(): JsonResponse
     {
@@ -403,7 +399,7 @@ class SettingsController extends Controller
 
         $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
 
-        if (!$settings || !$settings->isConfigured()) {
+        if (! $settings || ! $settings->isConfigured()) {
             return response()->json([
                 'error' => 'Cloudonix settings not configured',
                 'message' => 'Please configure Cloudonix settings before fetching outbound trunks.',
@@ -467,7 +463,7 @@ class SettingsController extends Controller
     /**
      * Generate a cryptographically secure random API key.
      *
-     * @param int $length The length of the API key
+     * @param  int  $length  The length of the API key
      * @return string The generated API key
      */
     private function generateSecureApiKey(int $length = 32): string
@@ -492,10 +488,10 @@ class SettingsController extends Controller
      *
      * Creates a new voice application or updates existing one, then sets it as the domain's default application.
      *
-     * @param CloudonixSettings $settings The Cloudonix settings
-     * @param string $requestId Request ID for logging
-     * @param int $userId User ID for logging
-     * @param int $organizationId Organization ID for logging
+     * @param  CloudonixSettings  $settings  The Cloudonix settings
+     * @param  string  $requestId  Request ID for logging
+     * @param  int  $userId  User ID for logging
+     * @param  int  $organizationId  Organization ID for logging
      * @return void
      */
     private function setupVoiceApplication(
@@ -505,11 +501,8 @@ class SettingsController extends Controller
         int $organizationId
     ): ?string {
         try {
-            // Generate webhook URL for voice routing using webhook_base_url
-            $baseUrl = !empty($settings->webhook_base_url)
-                ? rtrim($settings->webhook_base_url, '/')
-                : rtrim(config('app.url'), '/');
-            $webhookUrl = "{$baseUrl}/api/voice/route";
+            // Generate webhook URL for voice routing using effective webhook base URL
+            $webhookUrl = $settings->getVoiceRouteUrl();
 
             Log::info('[VOICE_APP_SETUP] Starting voice application setup', [
                 'request_id' => $requestId,
@@ -525,7 +518,7 @@ class SettingsController extends Controller
 
             if ($shouldCreateNew) {
                 // Create new application with unique name
-                $appName = 'opbx-routing-application-' . Str::random(8);
+                $appName = 'opbx-routing-application-'.Str::random(8);
 
                 Log::info('[VOICE_APP_SETUP] Creating new voice application', [
                     'request_id' => $requestId,
@@ -541,7 +534,7 @@ class SettingsController extends Controller
                     'type' => 'cxml',
                     'url' => $webhookUrl,
                     'method' => 'POST',
-                    'profile' => new \stdClass(), // Empty object, not array
+                    'profile' => new \stdClass, // Empty object, not array
                 ];
 
                 Log::info('[VOICE_APP_SETUP] Application payload prepared', [
@@ -556,8 +549,8 @@ class SettingsController extends Controller
                     $applicationPayload
                 );
 
-                if (!$appResult['success']) {
-                    $errorMessage = 'Failed to create voice application: ' . ($appResult['message'] ?? 'Unknown error');
+                if (! $appResult['success']) {
+                    $errorMessage = 'Failed to create voice application: '.($appResult['message'] ?? 'Unknown error');
 
                     Log::error('[VOICE_APP_SETUP] Voice application creation failed', [
                         'request_id' => $requestId,
@@ -587,7 +580,7 @@ class SettingsController extends Controller
                 $applicationId = $settings->voice_application_id;
 
                 // Generate expected webhook URL for comparison
-                $expectedWebhookUrl = "{$baseUrl}/api/voice/route";
+                $expectedWebhookUrl = $settings->getVoiceRouteUrl();
 
                 Log::info('[VOICE_APP_SETUP] Using existing voice application - checking if URL update needed', [
                     'request_id' => $requestId,
@@ -607,11 +600,11 @@ class SettingsController extends Controller
                     [
                         'url' => $expectedWebhookUrl,
                         'method' => 'POST',
-                        'profile' => new \stdClass(), // Ensure profile is an object
+                        'profile' => new \stdClass, // Ensure profile is an object
                     ]
                 );
 
-                if (!$updateResult['success']) {
+                if (! $updateResult['success']) {
                     Log::warning('[VOICE_APP_SETUP] Failed to update voice application URL', [
                         'request_id' => $requestId,
                         'user_id' => $userId,
@@ -647,8 +640,8 @@ class SettingsController extends Controller
                 $applicationId
             );
 
-            if (!$defaultAppResult['success']) {
-                $errorMessage = 'Failed to set default application: ' . ($defaultAppResult['message'] ?? 'Unknown error');
+            if (! $defaultAppResult['success']) {
+                $errorMessage = 'Failed to set default application: '.($defaultAppResult['message'] ?? 'Unknown error');
 
                 Log::error('[VOICE_APP_SETUP] Failed to set default application', [
                     'request_id' => $requestId,
@@ -699,7 +692,7 @@ class SettingsController extends Controller
 
             return null; // Success - no error
         } catch (\Exception $e) {
-            $errorMessage = 'Exception during voice application setup: ' . $e->getMessage();
+            $errorMessage = 'Exception during voice application setup: '.$e->getMessage();
 
             Log::error('[VOICE_APP_SETUP] Exception during voice application setup', [
                 'request_id' => $requestId,

@@ -102,7 +102,7 @@ export default function Register() {
 
   useEffect(() => {
     if (!authLoading && authIsAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate('/ui/dashboard', { replace: true });
     }
   }, [authIsAuthenticated, authLoading, navigate]);
 
@@ -132,7 +132,7 @@ export default function Register() {
           password: data.admin.password,
           password_confirmation: data.admin.password_confirmation,
         },
-      }, () => navigate('/dashboard'));
+      }, () => navigate('/ui/dashboard'));
 
       toast.success('Organization registered successfully!');
     } catch (error) {
@@ -344,11 +344,11 @@ export default function Register() {
                   <p className="text-sm text-gray-600">
                     Already have an account?{' '}
                     <a
-                      href="/login"
+                      href="/ui/login"
                       className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                       onClick={(e) => {
                         e.preventDefault();
-                        navigate('/login');
+                        navigate('/ui/login');
                       }}
                     >
                       Sign in
