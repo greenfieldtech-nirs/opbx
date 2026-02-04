@@ -100,10 +100,8 @@ class CloudonixSettings extends Model
      */
     public function getCallbackUrl(): string
     {
-        // Use custom webhook base URL if configured, otherwise fall back to APP_URL
-        $baseUrl = ! empty($this->webhook_base_url)
-            ? rtrim($this->webhook_base_url, '/')
-            : rtrim(config('app.url'), '/');
+        // Use effective webhook base URL (considers application-level override)
+        $baseUrl = rtrim($this->getEffectiveWebhookBaseUrl(), '/');
 
         return "{$baseUrl}/api/webhooks/cloudonix/session-update";
     }
@@ -115,10 +113,8 @@ class CloudonixSettings extends Model
      */
     public function getCdrUrl(): string
     {
-        // Use custom webhook base URL if configured, otherwise fall back to APP_URL
-        $baseUrl = ! empty($this->webhook_base_url)
-            ? rtrim($this->webhook_base_url, '/')
-            : rtrim(config('app.url'), '/');
+        // Use effective webhook base URL (considers application-level override)
+        $baseUrl = rtrim($this->getEffectiveWebhookBaseUrl(), '/');
 
         return "{$baseUrl}/api/webhooks/cloudonix/cdr";
     }
