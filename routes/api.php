@@ -167,6 +167,10 @@ Route::prefix('v1')->group(function (): void {
 
     // Protected API routes
     Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
+        // Application configuration (public to authenticated users)
+        Route::get('config/application', [ConfigurationController::class, 'index'])
+            ->name('config.application');
+
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
