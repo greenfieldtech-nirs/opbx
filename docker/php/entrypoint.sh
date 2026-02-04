@@ -47,7 +47,7 @@ echo "Initializing storage..."
 php artisan storage:initialize
 
 echo "Validating configuration..."
-php artisan config:validate --quiet || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."
+php artisan config:validate --silent || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."
 
 echo "Starting PHP-FPM..."
 exec "$@"

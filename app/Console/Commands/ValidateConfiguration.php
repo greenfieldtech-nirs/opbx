@@ -19,7 +19,7 @@ class ValidateConfiguration extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'config:validate
-                          {--quiet : Only show errors}';
+                          {--silent : Only show errors}';
 
     /**
      * The console command description.
@@ -31,7 +31,7 @@ class ValidateConfiguration extends Command
      */
     public function handle(): int
     {
-        $quiet = $this->option('quiet');
+        $quiet = $this->option('silent');
 
         if (! $quiet) {
             $this->info('Validating OpBX configuration...');
