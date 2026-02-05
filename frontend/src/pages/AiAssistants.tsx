@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
-  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -321,24 +320,31 @@ export default function AiAssistants() {
   const columns: Column<AiAssistant>[] = [
     {
       header: 'Protocol',
-      cell: (assistant) => (
-        <Badge
-          variant={assistant.protocol === 'websocket' ? 'default' : 'secondary'}
-          className="text-xs"
-        >
-          {assistant.protocol === 'websocket' ? (
-            <>
-              <Wifi className="h-3 w-3 mr-1" />
-              WebSocket
-            </>
-          ) : (
-            <>
-              <Phone className="h-3 w-3 mr-1" />
-              SIP
-            </>
-          )}
-        </Badge>
-      )
+      cell: (assistant) => {
+        // Get protocol from assistant, or fallback to provider's protocol
+        const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
+        const protocol = assistant.protocol || provider?.protocol || 'sip';
+        const isWebSocket = protocol === 'websocket';
+        
+        return (
+          <Badge
+            variant={isWebSocket ? 'default' : 'secondary'}
+            className="text-xs"
+          >
+            {isWebSocket ? (
+              <>
+                <Wifi className="h-3 w-3 mr-1" />
+                WebSocket
+              </>
+            ) : (
+              <>
+                <Phone className="h-3 w-3 mr-1" />
+                SIP
+              </>
+            )}
+          </Badge>
+        );
+      }
     },
     {
       header: 'Provider',
@@ -346,15 +352,6 @@ export default function AiAssistants() {
         const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
         return <div className="font-medium text-sm">{provider?.name || assistant.provider}</div>;
       }
-    },
-    {
-      header: 'Usage',
-      cell: (assistant) => (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Users className="h-4 w-4" />
-          {assistant.usage_count || 0} ext
-        </div>
-      )
     },
     {
       header: 'Updated',
