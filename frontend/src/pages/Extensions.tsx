@@ -15,8 +15,8 @@ import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
 import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService } from '@/services/createResourceService';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
+import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
-import { AiAssistantConfigForm } from '@/components/Extensions/AiAssistantConfigForm';
 import {
   Plus,
   Search,
@@ -273,6 +273,14 @@ export default function ExtensionsComplete() {
   });
 
   const ivrMenus = ivrMenusData?.data || [];
+
+  // Fetch AI Assistants for dropdown
+  const { data: aiAssistantsData } = useQuery({
+    queryKey: ['ai-assistants', { per_page: 100, status: 'active' }],
+    queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
+  });
+
+  const aiAssistants = aiAssistantsData?.data || [];
 
   // Fetch AI Assistant providers for detail view
   const { data: aiProvidersData } = useQuery({
@@ -994,11 +1002,38 @@ export default function ExtensionsComplete() {
 
       case 'ai_assistant':
         return (
-          <AiAssistantConfigForm
-            formData={formData}
-            setFormData={setFormData}
-            formErrors={formErrors}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="ai_assistant_id">
+              AI Assistant <span className="text-destructive">*</span>
+            </Label>
+            {aiAssistants.length === 0 ? (
+              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                No AI Assistants Available
+              </div>
+            ) : (
+              <Select
+                value={formData.ai_assistant_id}
+                onValueChange={(value) => setFormData({ ...formData, ai_assistant_id: value })}
+              >
+                <SelectTrigger id="ai_assistant_id">
+                  <SelectValue placeholder="Select an AI assistant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {aiAssistants.map((assistant) => (
+                    <SelectItem key={assistant.id} value={assistant.id.toString()}>
+                      {assistant.name} ({assistant.provider})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-xs text-muted-foreground">
+              AI assistants are managed in a separate page
+            </p>
+            {formErrors.ai_assistant_id && (
+              <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>
+            )}
+          </div>
         );
 
       case 'forward':
