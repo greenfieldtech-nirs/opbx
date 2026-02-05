@@ -18,15 +18,13 @@ class UpdateExtensionRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
         $user = $this->user();
         $extension = $this->route('extension');
 
-        if (!$user || !$extension instanceof Extension) {
+        if (! $user || ! $extension instanceof Extension) {
             return false;
         }
 
@@ -88,46 +86,56 @@ class UpdateExtensionRequest extends FormRequest
             ],
             // Type-specific configuration validation
             'configuration.conference_room_id' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::CONFERENCE->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CONFERENCE->value),
                 'nullable',
                 'integer',
             ],
             'configuration.ring_group_id' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::RING_GROUP->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::RING_GROUP->value),
                 'nullable',
                 'integer',
             ],
             'configuration.ivr_id' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::IVR->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::IVR->value),
                 'nullable',
                 'integer',
             ],
+            // AI Assistant validation handled dynamically in withValidator()
+            'configuration.protocol' => [
+                'nullable',
+                'string',
+                Rule::in(['sip', 'websocket']),
+            ],
             'configuration.provider' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
                 'nullable',
                 'string',
                 'max:100',
             ],
             'configuration.phone_number' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
+                'nullable',
+                'string',
+                'regex:/^\+[1-9]\d{1,14}$/', // E.164 format
+            ],
+            'configuration.phone_number' => [
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
                 'nullable',
                 'string',
                 'regex:/^\+[1-9]\d{1,14}$/', // E.164 format
             ],
             'configuration.container_application_name' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
                 'nullable',
                 'string',
                 'max:255',
             ],
             'configuration.container_block_name' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
                 'nullable',
                 'string',
                 'max:255',
             ],
             'configuration.forward_to' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::FORWARD->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::FORWARD->value),
                 'nullable',
                 'string',
                 'max:50',
@@ -161,8 +169,7 @@ class UpdateExtensionRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -236,6 +243,75 @@ class UpdateExtensionRequest extends FormRequest
                     'Extension number cannot be changed after creation.'
                 );
             }
+
+            // Dynamic AI Assistant validation
+            if ($type === ExtensionType::AI_ASSISTANT->value) {
+                $this->validateAiAssistantConfiguration($validator);
+            }
         });
+    }
+
+    /**
+     * Validate AI Assistant configuration based on provider and protocol.
+     */
+    private function validateAiAssistantConfiguration($validator): void
+    {
+        $config = $this->input('configuration', []);
+        $provider = $config['provider'] ?? null;
+        $protocol = $config['protocol'] ?? 'sip'; // Default to sip for backward compatibility
+
+        if (! $provider) {
+            $validator->errors()->add('configuration.provider', 'Provider is required for AI Assistant extensions.');
+
+            return;
+        }
+
+        // Get provider definition from registry
+        $providerRegistry = app(ProviderRegistry::class);
+        $providerDef = $providerRegistry->getProvider($provider);
+
+        if (! $providerDef) {
+            $validator->errors()->add('configuration.provider', "Invalid provider: {$provider}");
+
+            return;
+        }
+
+        // Validate protocol matches provider
+        if ($providerDef->protocol !== $protocol) {
+            $validator->errors()->add(
+                'configuration.protocol',
+                "Provider {$provider} requires protocol: {$providerDef->protocol}"
+            );
+        }
+
+        // Validate required fields for this provider
+        foreach ($providerDef->configFields as $field) {
+            if ($field->required && empty($config[$field->name])) {
+                $validator->errors()->add(
+                    "configuration.{$field->name}",
+                    "{$field->label} is required for {$providerDef->name}."
+                );
+            }
+
+            // Apply field-specific validation rules
+            if (! empty($config[$field->name]) && ! empty($field->validationRules)) {
+                $value = $config[$field->name];
+                foreach ($field->validationRules as $rule) {
+                    if ($rule === 'string' && ! is_string($value)) {
+                        $validator->errors()->add("configuration.{$field->name}", "{$field->label} must be a string.");
+                    } elseif (str_starts_with($rule, 'max:')) {
+                        $max = (int) substr($rule, 4);
+                        if (is_string($value) && strlen($value) > $max) {
+                            $validator->errors()->add("configuration.{$field->name}", "{$field->label} must not exceed {$max} characters.");
+                        }
+                    } elseif (str_starts_with($rule, 'regex:')) {
+                        $pattern = substr($rule, 6);
+                        if (! preg_match($pattern, $value)) {
+                            $validator->errors()->add("configuration.{$field->name}", "{$field->label} format is invalid.");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
