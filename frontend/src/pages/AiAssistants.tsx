@@ -633,31 +633,6 @@ export default function AiAssistants() {
               </Select>
             </div>
 
-            {/* Provider Info */}
-            {selectedProvider && (
-              <div className="rounded-md border bg-muted/50 p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant={selectedProvider.protocol === 'websocket' ? 'default' : 'secondary'}>
-                    {selectedProvider.protocol === 'websocket' ? (
-                      <>
-                        <Wifi className="h-3 w-3 mr-1" />
-                        WebSocket
-                      </>
-                    ) : (
-                      <>
-                        <Phone className="h-3 w-3 mr-1" />
-                        SIP
-                      </>
-                    )}
-                  </Badge>
-                  <span className="text-sm font-medium">{selectedProvider.name}</span>
-                </div>
-                {selectedProvider.description && (
-                  <p className="text-xs text-muted-foreground">{selectedProvider.description}</p>
-                )}
-              </div>
-            )}
-
             {/* Dynamic Configuration Fields */}
             {selectedProvider?.config_fields && selectedProvider.config_fields.length > 0 && (
               <div className="space-y-4 pt-4 border-t">
@@ -759,30 +734,6 @@ export default function AiAssistants() {
                 </SelectContent>
               </Select>
             </div>
-
-            {selectedProvider && (
-              <div className="rounded-md border bg-muted/50 p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant={selectedProvider.protocol === 'websocket' ? 'default' : 'secondary'}>
-                    {selectedProvider.protocol === 'websocket' ? (
-                      <>
-                        <Wifi className="h-3 w-3 mr-1" />
-                        WebSocket
-                      </>
-                    ) : (
-                      <>
-                        <Phone className="h-3 w-3 mr-1" />
-                        SIP
-                      </>
-                    )}
-                  </Badge>
-                  <span className="text-sm font-medium">{selectedProvider.name}</span>
-                </div>
-                {selectedProvider.description && (
-                  <p className="text-xs text-muted-foreground">{selectedProvider.description}</p>
-                )}
-              </div>
-            )}
 
             {selectedProvider?.config_fields && selectedProvider.config_fields.length > 0 && (
               <div className="space-y-4 pt-4 border-t">
