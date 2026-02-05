@@ -556,9 +556,11 @@ export default function ExtensionsComplete() {
           return 'Not configured';
         }
         case 'ai_assistant': {
-          const provider = extension.configuration?.provider || 'Unknown';
-          const phoneNumber = extension.configuration?.phone_number || 'Not set';
-          return `${phoneNumber} @ ${provider}`;
+          if (extension.ai_assistant) {
+            return extension.ai_assistant.name;
+          }
+          const assistantId = extension.configuration?.ai_assistant_id || extension.ai_assistant_id;
+          return assistantId ? `AI Assistant #${assistantId}` : 'Not configured';
         }
         case 'forward': {
           return extension.configuration?.forward_to || 'Not configured';
