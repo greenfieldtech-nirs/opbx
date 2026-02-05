@@ -147,6 +147,30 @@ class AiAssistant extends Model
     }
 
     /**
+     * Scope a query to search by name, description, or provider.
+     */
+    public function scopeSearch($query, string $search)
+    {
+        return $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('provider', 'like', "%{$search}%");
+        });
+    }
+
+    /**
+     * Scope a query to filter by status using UserStatus enum.
+     */
+    public function scopeWithStatus($query, $status)
+    {
+        if ($status instanceof UserStatus) {
+            return $query->where('status', $status);
+        }
+
+        return $query->where('status', UserStatus::from($status));
+    }
+
+    /**
      * Get the provider definition from the registry.
      */
     public function getProviderDefinition(): ?ProviderDefinition
