@@ -48,16 +48,19 @@ class SessionUpdateController extends Controller
 
             // Query for active calls using raw database query to avoid model issues
             try {
-                // First, get sessions that have final CDR status (completed calls)
+                // First, get sessions that have been completed or deleted
+                // These sessions should not appear in the active calls list
                 $completedSessionIds = DB::table('session_updates')
                     ->where('organization_id', $organizationId)
-                    ->where('action', 'cdr_final_status')
+                    ->whereIn('action', ['cdr_final_status', 'deleted'])
                     ->where('updated_at', '>=', now()->subHours(24))
                     ->pluck('session_id')
                     ->unique();
 
                 // Get the latest session_update for each active session using a subquery
                 // This ensures we get the most recent status for each session
+                // We also exclude sessions that have ever been deleted or finalized,
+                // even if there are stale records after the deletion
                 $activeCalls = DB::table('session_updates as su1')
                     ->select('su1.*')
                     ->join(DB::raw('(SELECT session_id, MAX(id) as max_id 
@@ -72,6 +75,7 @@ class SessionUpdateController extends Controller
                         })
                     ->where('su1.organization_id', $organizationId)
                     ->whereNotIn('su1.session_id', $completedSessionIds)
+                    ->whereNotIn('su1.action', ['deleted', 'cdr_final_status'])
                     ->orderBy('su1.updated_at', 'desc')
                     ->get();
 
