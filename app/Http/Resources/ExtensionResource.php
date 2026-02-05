@@ -32,8 +32,8 @@ class ExtensionResource extends JsonResource
             'status' => $this->status->value,
             'voicemail_enabled' => $this->voicemail_enabled,
             'configuration' => $this->configuration ?? [],
-            'user' => new UserResource($this->whenLoaded('user')),
-            'ai_assistant' => new AiAssistantResource($this->whenLoaded('aiAssistant')),
+            'user' => $this->whenLoaded('user', fn () => new UserResource($this->user)),
+            'ai_assistant' => $this->whenLoaded('aiAssistant', fn () => $this->aiAssistant ? new AiAssistantResource($this->aiAssistant) : null),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

@@ -155,6 +155,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      * Hook called before storing a new extension.
      *
      * Generates password for USER type extensions.
+     * Extracts ai_assistant_id from configuration and sets as direct column.
      */
     protected function beforeStore(array $validated, Request $request): array
     {
@@ -172,6 +173,12 @@ class ExtensionCrudController extends AbstractApiCrudController
         } else {
             // Ensure password is null for non-USER extensions
             $validated['password'] = null;
+        }
+
+        // Extract ai_assistant_id from configuration and set as direct column
+        if ($type === ExtensionType::AI_ASSISTANT && isset($validated['configuration']['ai_assistant_id'])) {
+            $validated['ai_assistant_id'] = $validated['configuration']['ai_assistant_id'];
+            // Keep it in configuration for backward compatibility if needed
         }
 
         return $validated;
@@ -221,6 +228,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      * Hook called before updating an extension.
      *
      * Handles password generation/clearing when type changes.
+     * Extracts ai_assistant_id from configuration and sets as direct column.
      */
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
@@ -259,6 +267,19 @@ class ExtensionCrudController extends AbstractApiCrudController
                     'new_type' => $newType->value,
                 ]);
             }
+
+            // Changing FROM AI_ASSISTANT type
+            if ($oldType === ExtensionType::AI_ASSISTANT && $newType !== ExtensionType::AI_ASSISTANT) {
+                // Clear ai_assistant_id
+                $validated['ai_assistant_id'] = null;
+            }
+        }
+
+        // Extract ai_assistant_id from configuration and set as direct column
+        $currentType = isset($validated['type']) ? ExtensionType::from($validated['type']) : $extension->type;
+        if ($currentType === ExtensionType::AI_ASSISTANT && isset($validated['configuration']['ai_assistant_id'])) {
+            $validated['ai_assistant_id'] = $validated['configuration']['ai_assistant_id'];
+            // Keep it in configuration for backward compatibility if needed
         }
 
         return $validated;
