@@ -7,6 +7,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,18 +19,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import aiAssistantsService from '@/services/aiAssistants.service';
 import type { Extension, CreateExtensionRequest, UpdateExtensionRequest, ExtensionType, ExtensionStatus } from '@/types/api.types';
 
 // Validation schema
 const extensionSchema = z.object({
   extension_number: z.string().min(2, 'Extension number is required').max(10, 'Extension number too long'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  type: z.enum(['user', 'virtual', 'queue'] as const),
+  type: z.enum(['user', 'virtual', 'queue', 'ai_assistant'] as const),
   status: z.enum(['active', 'inactive'] as const),
   voicemail_enabled: z.boolean(),
   voicemail_pin: z.string().optional(),
   call_forwarding_enabled: z.boolean(),
   call_forwarding_number: z.string().optional(),
+  ai_assistant_id: z.string().optional(),
 });
 
 type ExtensionFormData = z.infer<typeof extensionSchema>;
@@ -43,6 +46,14 @@ interface ExtensionFormProps {
 
 export function ExtensionForm({ extension, onSubmit, onCancel, isLoading }: ExtensionFormProps) {
   const isEdit = !!extension;
+
+  // Fetch AI Assistants for the dropdown
+  const { data: aiAssistantsData } = useQuery({
+    queryKey: ['ai-assistants', { status: 'active' }],
+    queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
+  });
+
+  const aiAssistants = aiAssistantsData?.data || [];
 
   const {
     register,
@@ -61,6 +72,7 @@ export function ExtensionForm({ extension, onSubmit, onCancel, isLoading }: Exte
       voicemail_pin: extension?.voicemail_pin || '',
       call_forwarding_enabled: extension?.call_forwarding_enabled || false,
       call_forwarding_number: extension?.call_forwarding_number || '',
+      ai_assistant_id: (extension as any)?.ai_assistant_id || '',
     },
   });
 
@@ -68,6 +80,7 @@ export function ExtensionForm({ extension, onSubmit, onCancel, isLoading }: Exte
   const status = watch('status');
   const voicemailEnabled = watch('voicemail_enabled');
   const callForwardingEnabled = watch('call_forwarding_enabled');
+  const aiAssistantId = watch('ai_assistant_id');
 
   const handleFormSubmit = (data: ExtensionFormData) => {
     const submitData: CreateExtensionRequest | UpdateExtensionRequest = {
@@ -79,6 +92,7 @@ export function ExtensionForm({ extension, onSubmit, onCancel, isLoading }: Exte
       ...(data.voicemail_enabled && data.voicemail_pin && { voicemail_pin: data.voicemail_pin }),
       call_forwarding_enabled: data.call_forwarding_enabled,
       ...(data.call_forwarding_enabled && data.call_forwarding_number && { call_forwarding_number: data.call_forwarding_number }),
+      ...(data.type === 'ai_assistant' && data.ai_assistant_id && { ai_assistant_id: Number(data.ai_assistant_id) }),
     };
 
     onSubmit(submitData);
@@ -138,12 +152,50 @@ export function ExtensionForm({ extension, onSubmit, onCancel, isLoading }: Exte
             <SelectItem value="user">User Extension</SelectItem>
             <SelectItem value="virtual">Virtual Extension</SelectItem>
             <SelectItem value="queue">Queue</SelectItem>
+            <SelectItem value="ai_assistant">AI Assistant</SelectItem>
           </SelectContent>
         </Select>
         {errors.type && (
           <p className="text-sm text-destructive">{errors.type.message}</p>
         )}
       </div>
+
+      {/* AI Assistant Selector - Only shown when type is ai_assistant */}
+      {type === 'ai_assistant' && (
+        <div className="space-y-2">
+          <Label htmlFor="ai_assistant_id">
+            AI Assistant <span className="text-destructive">*</span>
+          </Label>
+          {aiAssistants.length === 0 ? (
+            <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+              No AI Assistants Available
+            </div>
+          ) : (
+            <Select
+              value={aiAssistantId}
+              onValueChange={(value) => setValue('ai_assistant_id', value)}
+              disabled={isLoading || aiAssistants.length === 0}
+            >
+              <SelectTrigger id="ai_assistant_id">
+                <SelectValue placeholder="Select AI Assistant" />
+              </SelectTrigger>
+              <SelectContent>
+                {aiAssistants.map((assistant) => (
+                  <SelectItem key={assistant.id} value={String(assistant.id)}>
+                    {assistant.name} ({assistant.provider})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {errors.ai_assistant_id && (
+            <p className="text-sm text-destructive">{errors.ai_assistant_id.message}</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Select a pre-configured AI Assistant to handle calls to this extension
+          </p>
+        </div>
+      )}
 
       {/* Status */}
       <div className="space-y-2">
