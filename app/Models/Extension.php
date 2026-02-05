@@ -44,6 +44,7 @@ class Extension extends Model
         'service_url',
         'service_token',
         'service_params',
+        'ai_assistant_id',
     ];
 
     /**
@@ -92,6 +93,14 @@ class Extension extends Model
     }
 
     /**
+     * Get the AI assistant assigned to this extension.
+     */
+    public function aiAssistant(): BelongsTo
+    {
+        return $this->belongsTo(AiAssistant::class);
+    }
+
+    /**
      * Check if the extension is active.
      */
     public function isActive(): bool
@@ -135,7 +144,7 @@ class Extension extends Model
         }
 
         // For other extension types, check configuration for SIP URI
-        if (!$this->configuration || !isset($this->configuration['sip_uri'])) {
+        if (! $this->configuration || ! isset($this->configuration['sip_uri'])) {
             return null;
         }
 

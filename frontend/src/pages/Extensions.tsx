@@ -610,11 +610,9 @@ export default function ExtensionsComplete() {
     }
 
     if (formData.type === 'ai_assistant') {
-      if (!formData.ai_provider) {
-        errors.ai_provider = 'AI provider is required';
+      if (!formData.ai_assistant_id) {
+        errors.ai_assistant_id = 'AI assistant selection is required';
       }
-      // Note: Field-specific validation is done by backend based on provider requirements
-      // Frontend only checks that provider is selected
     }
 
     if (formData.type === 'forward') {
@@ -668,14 +666,12 @@ export default function ExtensionsComplete() {
         }
         break;
       case 'ai_assistant':
-        configuration.provider = formData.ai_provider;
-        // Add all AI assistant fields if they have values
-        if (formData.ai_phone_number) configuration.phone_number = formData.ai_phone_number;
-        if (formData.ai_bot_id) configuration.bot_id = formData.ai_bot_id;
-        if (formData.ai_auth_token) configuration.auth_token = formData.ai_auth_token;
-        if (formData.ai_api_key) configuration.api_key = formData.ai_api_key;
-        if (formData.ai_assistant_id) configuration.assistant_id = formData.ai_assistant_id;
-        if (formData.ai_session_id) configuration.session_id = formData.ai_session_id;
+        if (formData.ai_assistant_id) {
+          const parsed = parseInt(formData.ai_assistant_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_assistant_id = parsed;
+          }
+        }
         break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
@@ -748,14 +744,12 @@ export default function ExtensionsComplete() {
         }
         break;
       case 'ai_assistant':
-        configuration.provider = formData.ai_provider;
-        // Add all AI assistant fields if they have values
-        if (formData.ai_phone_number) configuration.phone_number = formData.ai_phone_number;
-        if (formData.ai_bot_id) configuration.bot_id = formData.ai_bot_id;
-        if (formData.ai_auth_token) configuration.auth_token = formData.ai_auth_token;
-        if (formData.ai_api_key) configuration.api_key = formData.ai_api_key;
-        if (formData.ai_assistant_id) configuration.assistant_id = formData.ai_assistant_id;
-        if (formData.ai_session_id) configuration.session_id = formData.ai_session_id;
+        if (formData.ai_assistant_id) {
+          const parsed = parseInt(formData.ai_assistant_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_assistant_id = parsed;
+          }
+        }
         break;
       case 'forward':
         configuration.forward_to = formData.forward_to;

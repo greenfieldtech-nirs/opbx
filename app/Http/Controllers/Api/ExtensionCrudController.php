@@ -30,8 +30,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      */
     public function __construct(
         protected CloudonixSubscriberService $subscriberService
-    ) {
-    }
+    ) {}
 
     /**
      * Get the filter configuration for the index method.
@@ -114,7 +113,10 @@ class ExtensionCrudController extends AbstractApiCrudController
      */
     protected function buildIndexQuery($query, Request $request): void
     {
-        $query->with(Extension::DEFAULT_USER_FIELDS);
+        $query->with([
+            Extension::DEFAULT_USER_FIELDS,
+            'aiAssistant:id,organization_id,name,provider,protocol,status',
+        ]);
     }
 
     /**
@@ -160,7 +162,7 @@ class ExtensionCrudController extends AbstractApiCrudController
 
         // Generate password for USER type extensions
         if ($type === ExtensionType::USER) {
-            $extension = new Extension();
+            $extension = new Extension;
             $validated['password'] = $extension->generateSecurePassword();
 
             \Log::info('Generated password for new USER extension', [
@@ -185,8 +187,11 @@ class ExtensionCrudController extends AbstractApiCrudController
         /** @var Extension $extension */
         $extension = $model;
 
-        // Load user relationship for API response
-        $extension->load(Extension::DEFAULT_USER_FIELDS);
+        // Load relationships for API response
+        $extension->load([
+            Extension::DEFAULT_USER_FIELDS,
+            'aiAssistant:id,organization_id,name,provider,protocol,status',
+        ]);
 
         // Sync to Cloudonix if USER type extension
         if ($extension->type === ExtensionType::USER) {

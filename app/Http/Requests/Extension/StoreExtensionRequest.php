@@ -85,28 +85,11 @@ class StoreExtensionRequest extends FormRequest
                 'nullable',
                 'integer',
             ],
-            // AI Assistant validation handled dynamically in withValidator()
-            'configuration.protocol' => [
-                'nullable',
-                'string',
-                Rule::in(['sip', 'websocket']),
-            ],
-            'configuration.provider' => [
+            'configuration.ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
                 'nullable',
-                'string',
-                'max:100',
-            ],
-            'configuration.phone_number' => [
-                'nullable',
-                'string',
-                'regex:/^\+[1-9]\d{1,14}$/', // E.164 format
-            ],
-            'configuration.phone_number' => [
-                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
-                'nullable',
-                'string',
-                'regex:/^\+[1-9]\d{1,14}$/', // E.164 format
+                'integer',
+                'exists:ai_assistants,id',
             ],
             'configuration.container_application_name' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
@@ -148,9 +131,8 @@ class StoreExtensionRequest extends FormRequest
             'configuration.conference_room_id.required_if' => 'Conference room ID is required for conference extensions.',
             'configuration.ring_group_id.required_if' => 'Ring group ID is required for ring group extensions.',
             'configuration.ivr_id.required_if' => 'IVR ID is required for IVR extensions.',
-            'configuration.provider.required_if' => 'Provider is required for AI assistant extensions.',
-            'configuration.phone_number.required_if' => 'Phone number is required for AI assistant extensions.',
-            'configuration.phone_number.regex' => 'Phone number must be in E.164 format (e.g., +12125551234).',
+            'configuration.ai_assistant_id.required_if' => 'AI assistant selection is required for AI assistant extensions.',
+            'configuration.ai_assistant_id.exists' => 'The selected AI assistant does not exist.',
             'configuration.container_application_name.required_if' => 'Container application name is required for custom logic extensions.',
             'configuration.container_block_name.required_if' => 'Container block name is required for custom logic extensions.',
             'configuration.forward_to.required_if' => 'Forward to destination is required for forward extensions.',
@@ -223,74 +205,19 @@ class StoreExtensionRequest extends FormRequest
                 );
             }
 
-            // Dynamic AI Assistant validation
+            // Validate AI Assistant belongs to same organization
             if ($type === ExtensionType::AI_ASSISTANT->value) {
-                $this->validateAiAssistantConfiguration($validator);
-            }
-        });
-    }
-
-    /**
-     * Validate AI Assistant configuration based on provider and protocol.
-     */
-    private function validateAiAssistantConfiguration($validator): void
-    {
-        $config = $this->input('configuration', []);
-        $provider = $config['provider'] ?? null;
-        $protocol = $config['protocol'] ?? 'sip'; // Default to sip for backward compatibility
-
-        if (! $provider) {
-            $validator->errors()->add('configuration.provider', 'Provider is required for AI Assistant extensions.');
-
-            return;
-        }
-
-        // Get provider definition from registry
-        $providerRegistry = app(ProviderRegistry::class);
-        $providerDef = $providerRegistry->getProvider($provider);
-
-        if (! $providerDef) {
-            $validator->errors()->add('configuration.provider', "Invalid provider: {$provider}");
-
-            return;
-        }
-
-        // Validate protocol matches provider
-        if ($providerDef->protocol !== $protocol) {
-            $validator->errors()->add(
-                'configuration.protocol',
-                "Provider {$provider} requires protocol: {$providerDef->protocol}"
-            );
-        }
-
-        // Validate required fields for this provider
-        foreach ($providerDef->configFields as $field) {
-            if ($field->required && empty($config[$field->name])) {
-                $validator->errors()->add(
-                    "configuration.{$field->name}",
-                    "{$field->label} is required for {$providerDef->name}."
-                );
-            }
-
-            // Apply field-specific validation rules
-            if (! empty($config[$field->name]) && ! empty($field->validationRules)) {
-                $value = $config[$field->name];
-                foreach ($field->validationRules as $rule) {
-                    if ($rule === 'string' && ! is_string($value)) {
-                        $validator->errors()->add("configuration.{$field->name}", "{$field->label} must be a string.");
-                    } elseif (str_starts_with($rule, 'max:')) {
-                        $max = (int) substr($rule, 4);
-                        if (is_string($value) && strlen($value) > $max) {
-                            $validator->errors()->add("configuration.{$field->name}", "{$field->label} must not exceed {$max} characters.");
-                        }
-                    } elseif (str_starts_with($rule, 'regex:')) {
-                        $pattern = substr($rule, 6);
-                        if (! preg_match($pattern, $value)) {
-                            $validator->errors()->add("configuration.{$field->name}", "{$field->label} format is invalid.");
-                        }
+                $aiAssistantId = $this->input('configuration.ai_assistant_id');
+                if ($aiAssistantId) {
+                    $aiAssistant = \App\Models\AiAssistant::find($aiAssistantId);
+                    if ($aiAssistant && $aiAssistant->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'configuration.ai_assistant_id',
+                            'The selected AI assistant does not belong to your organization.'
+                        );
                     }
                 }
             }
-        }
+        });
     }
 }
