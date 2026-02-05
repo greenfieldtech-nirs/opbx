@@ -231,12 +231,28 @@ class AiAssistantController extends AbstractApiCrudController
     }
 
     /**
-     * Customize the index query to include usage count.
+     * Customize the index query to include usage information.
      */
     protected function customizeIndexQuery(Builder $query): void
     {
         // Add usage count via relationship count
+        // Note: We use the extensions relationship which will be scoped to the same organization
         $query->withCount('extensions as usage_count');
+    }
+
+    /**
+     * Customize the show query to include usage information.
+     */
+    protected function customizeShowQuery(Builder $query): void
+    {
+        // Add usage count and extension details
+        // Note: Extensions will be scoped to the same organization as the AI Assistant
+        $query->withCount('extensions as usage_count')
+            ->with(['extensions' => function ($query) {
+                $query->select('id', 'extension_number', 'type', 'status', 'ai_assistant_id', 'organization_id')
+                    ->with('user:id,name,email')
+                    ->limit(10); // Limit to first 10 for performance
+            }]);
     }
 
     /**

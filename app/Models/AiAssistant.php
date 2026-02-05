@@ -100,10 +100,14 @@ class AiAssistant extends Model
 
     /**
      * Get the extensions that use this AI assistant.
+     *
+     * Note: Extensions are scoped to the same organization via the organization scope.
+     * The scope will automatically filter extensions by organization_id.
      */
     public function extensions(): HasMany
     {
-        return $this->hasMany(Extension::class, 'ai_assistant_id');
+        return $this->hasMany(Extension::class, 'ai_assistant_id')
+            ->where('organization_id', $this->organization_id);
     }
 
     /**
@@ -197,11 +201,15 @@ class AiAssistant extends Model
     }
 
     /**
-     * Get the count of extensions using this AI assistant.
+     * Get usage count for this AI assistant.
      */
     public function getUsageCountAttribute(): int
     {
-        return $this->extensions()->count();
+        // Query directly without global scope to avoid organization scope conflicts
+        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('ai_assistant_id', $this->id)
+            ->where('organization_id', $this->organization_id)
+            ->count();
     }
 
     /**
@@ -209,6 +217,10 @@ class AiAssistant extends Model
      */
     public function isInUse(): bool
     {
-        return $this->extensions()->exists();
+        // Query directly without global scope to avoid organization scope conflicts
+        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('ai_assistant_id', $this->id)
+            ->where('organization_id', $this->organization_id)
+            ->exists();
     }
 }
