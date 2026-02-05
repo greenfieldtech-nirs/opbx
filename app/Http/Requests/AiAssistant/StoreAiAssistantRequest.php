@@ -41,7 +41,7 @@ class StoreAiAssistantRequest extends FormRequest
                 'max:1000',
             ],
             'status' => [
-                'required',
+                'nullable',
                 new Enum(UserStatus::class),
             ],
             'provider' => [
