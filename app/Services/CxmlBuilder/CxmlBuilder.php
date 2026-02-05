@@ -540,6 +540,48 @@ class CxmlBuilder
     }
 
     /**
+     * Add Connect verb with Stream noun for WebSocket audio streaming.
+     *
+     * This enables bi-directional audio streaming to WebSocket-based services.
+     *
+     * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     *
+     * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect/stream
+     */
+    public function connectStream(string $websocketUrl): self
+    {
+        // Validate WebSocket URL format
+        if (! str_starts_with($websocketUrl, 'wss://')) {
+            throw new \InvalidArgumentException('WebSocket URL must start with wss://');
+        }
+
+        $connect = $this->document->createElement('Connect');
+        $stream = $this->document->createElement('Stream');
+        $stream->setAttribute('url', htmlspecialchars($websocketUrl, self::XML_ENCODING, 'UTF-8'));
+
+        $connect->appendChild($stream);
+        $this->response->appendChild($connect);
+
+        return $this;
+    }
+
+    /**
+     * Build a Connect Stream response for WebSocket audio streaming.
+     *
+     * Static factory method for creating WebSocket streaming responses.
+     *
+     * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @return string CXML response
+     */
+    public static function streamToWebSocket(string $websocketUrl): string
+    {
+        $builder = new self;
+        $builder->connectStream($websocketUrl);
+
+        return $builder->build();
+    }
+
+    /**
      * Build the CXML response as an XML string.
      */
     public function build(): string
