@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Resources\AiAssistantResource;
 use App\Models\AiAssistant;
+use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistantService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -149,10 +150,40 @@ class AiAssistantController extends AbstractApiCrudController
 
     /**
      * Hook before creating a new AI assistant.
+     * Auto-detects protocol from provider.
      */
     protected function beforeStore(array $data, Request $request): array
     {
-        // Service handles protocol auto-detection and validation
+        // Auto-detect protocol from provider if not explicitly provided
+        if (! isset($data['protocol']) || empty($data['protocol'])) {
+            $providerRegistry = app(ProviderRegistry::class);
+            $provider = $providerRegistry->getProvider($data['provider'] ?? '');
+
+            if ($provider) {
+                $data['protocol'] = $provider->protocol;
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Hook before updating an AI assistant.
+     * Auto-detects protocol if provider changes.
+     */
+    protected function beforeUpdate(Model $model, array $data, Request $request): array
+    {
+        /** @var AiAssistant $model */
+        // If provider is being changed, update protocol accordingly
+        if (isset($data['provider']) && $data['provider'] !== $model->provider) {
+            $providerRegistry = app(ProviderRegistry::class);
+            $provider = $providerRegistry->getProvider($data['provider']);
+
+            if ($provider) {
+                $data['protocol'] = $provider->protocol;
+            }
+        }
+
         return $data;
     }
 
