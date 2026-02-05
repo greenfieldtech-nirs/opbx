@@ -17,7 +17,6 @@ class ExtensionResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -26,13 +25,15 @@ class ExtensionResource extends JsonResource
             'id' => $this->id,
             'organization_id' => $this->organization_id,
             'user_id' => $this->user_id,
+            'ai_assistant_id' => $this->ai_assistant_id,
             'extension_number' => $this->extension_number,
             'name' => $this->user?->name ?? 'Unassigned',
             'type' => $this->type->value,
             'status' => $this->status->value,
             'voicemail_enabled' => $this->voicemail_enabled,
             'configuration' => $this->configuration ?? [],
-            'user' => new UserResource($this->whenLoaded('user')),
+            'user' => $this->whenLoaded('user', fn () => new UserResource($this->user)),
+            'ai_assistant' => $this->whenLoaded('aiAssistant', fn () => $this->aiAssistant ? new AiAssistantResource($this->aiAssistant) : null),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

@@ -30,8 +30,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      */
     public function __construct(
         protected CloudonixSubscriberService $subscriberService
-    ) {
-    }
+    ) {}
 
     /**
      * Get the filter configuration for the index method.
@@ -114,7 +113,10 @@ class ExtensionCrudController extends AbstractApiCrudController
      */
     protected function buildIndexQuery($query, Request $request): void
     {
-        $query->with(Extension::DEFAULT_USER_FIELDS);
+        $query->with([
+            Extension::DEFAULT_USER_FIELDS,
+            'aiAssistant:id,organization_id,name,provider,protocol,status',
+        ]);
     }
 
     /**
@@ -153,6 +155,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      * Hook called before storing a new extension.
      *
      * Generates password for USER type extensions.
+     * Extracts ai_assistant_id from configuration and sets as direct column.
      */
     protected function beforeStore(array $validated, Request $request): array
     {
@@ -160,7 +163,7 @@ class ExtensionCrudController extends AbstractApiCrudController
 
         // Generate password for USER type extensions
         if ($type === ExtensionType::USER) {
-            $extension = new Extension();
+            $extension = new Extension;
             $validated['password'] = $extension->generateSecurePassword();
 
             \Log::info('Generated password for new USER extension', [
@@ -170,6 +173,12 @@ class ExtensionCrudController extends AbstractApiCrudController
         } else {
             // Ensure password is null for non-USER extensions
             $validated['password'] = null;
+        }
+
+        // Extract ai_assistant_id from configuration and set as direct column
+        if ($type === ExtensionType::AI_ASSISTANT && isset($validated['configuration']['ai_assistant_id'])) {
+            $validated['ai_assistant_id'] = $validated['configuration']['ai_assistant_id'];
+            // Keep it in configuration for backward compatibility if needed
         }
 
         return $validated;
@@ -185,8 +194,11 @@ class ExtensionCrudController extends AbstractApiCrudController
         /** @var Extension $extension */
         $extension = $model;
 
-        // Load user relationship for API response
-        $extension->load(Extension::DEFAULT_USER_FIELDS);
+        // Load relationships for API response
+        $extension->load([
+            Extension::DEFAULT_USER_FIELDS,
+            'aiAssistant:id,organization_id,name,provider,protocol,status',
+        ]);
 
         // Sync to Cloudonix if USER type extension
         if ($extension->type === ExtensionType::USER) {
@@ -216,6 +228,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      * Hook called before updating an extension.
      *
      * Handles password generation/clearing when type changes.
+     * Extracts ai_assistant_id from configuration and sets as direct column.
      */
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
@@ -254,6 +267,19 @@ class ExtensionCrudController extends AbstractApiCrudController
                     'new_type' => $newType->value,
                 ]);
             }
+
+            // Changing FROM AI_ASSISTANT type
+            if ($oldType === ExtensionType::AI_ASSISTANT && $newType !== ExtensionType::AI_ASSISTANT) {
+                // Clear ai_assistant_id
+                $validated['ai_assistant_id'] = null;
+            }
+        }
+
+        // Extract ai_assistant_id from configuration and set as direct column
+        $currentType = isset($validated['type']) ? ExtensionType::from($validated['type']) : $extension->type;
+        if ($currentType === ExtensionType::AI_ASSISTANT && isset($validated['configuration']['ai_assistant_id'])) {
+            $validated['ai_assistant_id'] = $validated['configuration']['ai_assistant_id'];
+            // Keep it in configuration for backward compatibility if needed
         }
 
         return $validated;

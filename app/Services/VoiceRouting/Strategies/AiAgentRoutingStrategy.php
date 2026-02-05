@@ -35,12 +35,31 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        // Extract service provider configuration from extension
-        $config = $extension->configuration ?? [];
+        // Load AI Assistant relationship if not already loaded
+        if (! $extension->relationLoaded('aiAssistant')) {
+            $extension->load('aiAssistant');
+        }
 
-        // Determine protocol (default to sip for backward compatibility)
-        $protocol = $config['protocol'] ?? 'sip';
-        $provider = $config['provider'] ?? null;
+        $aiAssistant = $extension->aiAssistant;
+
+        if (! $aiAssistant) {
+            Log::error('Extension has no AI Assistant configured', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+                'ai_assistant_id' => $extension->ai_assistant_id,
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('AI Assistant not configured for this extension'),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        // Extract configuration from AI Assistant
+        $config = $aiAssistant->configuration ?? [];
+        $protocol = $aiAssistant->protocol;
+        $provider = $aiAssistant->provider;
 
         // Route based on protocol
         if ($protocol === 'websocket') {

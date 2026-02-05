@@ -116,6 +116,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\CloudonixSettings::class, \App\Policies\CloudonixSettingsPolicy::class);
         Gate::policy(\App\Models\Recording::class, \App\Policies\RecordingPolicy::class);
         Gate::policy(\App\Models\CallDetailRecord::class, \App\Policies\CallDetailRecordPolicy::class);
+        Gate::policy(\App\Models\AiAssistant::class, \App\Policies\AiAssistantPolicy::class);
 
         // Configure rate limiting
         $this->configureRateLimiting();

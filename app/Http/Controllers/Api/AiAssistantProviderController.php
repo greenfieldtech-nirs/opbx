@@ -36,13 +36,16 @@ class AiAssistantProviderController extends Controller
             'websocket' => [],
         ];
 
+        $providersArray = [];
         foreach ($providers as $provider) {
-            $grouped[$provider->protocol][] = $provider->toArray();
+            $providerArray = $provider->toArray();
+            $providersArray[] = $providerArray;
+            $grouped[$provider->protocol][] = $providerArray;
         }
 
         return response()->json([
             'data' => [
-                'providers' => array_values($providers),
+                'providers' => $providersArray,
                 'grouped' => $grouped,
                 'protocols' => ['sip', 'websocket'],
             ],
