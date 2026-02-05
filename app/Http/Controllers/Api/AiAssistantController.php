@@ -159,7 +159,7 @@ class AiAssistantController extends AbstractApiCrudController
     /**
      * Hook after creating a new AI assistant.
      */
-    protected function afterStore(Model $model, array $data, Request $request): void
+    protected function afterStore(Model $model, Request $request): void
     {
         // Load relationships for response
         $model->load(['creator', 'updater']);
@@ -168,7 +168,7 @@ class AiAssistantController extends AbstractApiCrudController
     /**
      * Hook after updating an AI assistant.
      */
-    protected function afterUpdate(Model $model, array $data, Request $request): void
+    protected function afterUpdate(Model $model, Request $request): void
     {
         // Load relationships for response
         $model->load(['creator', 'updater']);
