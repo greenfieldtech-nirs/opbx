@@ -254,18 +254,4 @@ class AiAssistantController extends AbstractApiCrudController
                     ->limit(10); // Limit to first 10 for performance
             }]);
     }
-
-    /**
-     * Customize the show query to include usage information.
-     */
-    protected function customizeShowQuery(Builder $query): void
-    {
-        // Add usage count and extension details
-        $query->withCount('extensions as usage_count')
-            ->with(['extensions' => function ($query) {
-                $query->select('id', 'extension_number', 'type', 'status')
-                    ->with('user:id,name,email')
-                    ->limit(10); // Limit to first 10 for performance
-            }]);
-    }
 }
