@@ -10,9 +10,7 @@ use App\Models\Organization;
 use App\Models\RingGroup;
 use App\Models\User;
 use App\Services\RoutingSentryService;
-
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class VoiceRoutingRefactorTest extends TestCase
@@ -20,10 +18,15 @@ class VoiceRoutingRefactorTest extends TestCase
     use DatabaseTransactions;
 
     protected Organization $organization;
+
     protected DidNumber $did;
+
     protected User $user;
+
     protected Extension $extension;
+
     protected CloudonixSettings $settings;
+
     protected string $apiKey = 'test-api-key';
 
     protected function setUp(): void
@@ -75,7 +78,7 @@ class VoiceRoutingRefactorTest extends TestCase
     private function getAuthHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Authorization' => 'Bearer '.$this->apiKey,
             'Accept' => 'application/xml',
         ];
     }
@@ -84,12 +87,11 @@ class VoiceRoutingRefactorTest extends TestCase
     public function it_routes_inbound_call_to_user_extension()
     {
 
-
         $response = $this->postJson(route('voice.route'), [
             'From' => '+1987654321',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -99,8 +101,6 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('<Dial', $content);
         $this->assertStringContainsString($this->extension->extension_number, $content);
     }
-
-
 
     /** @test */
     public function it_routes_to_ring_group()
@@ -131,7 +131,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -152,7 +152,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'To' => $this->extension->extension_number,
             'From' => '1002',
             'Direction' => 'internal',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -187,7 +187,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -226,7 +226,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -265,9 +265,9 @@ class VoiceRoutingRefactorTest extends TestCase
             'service_params' => ['model' => 'gpt-4', 'language' => 'en'],
         ]);
 
-        $strategy = new \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy();
-        $request = new \Illuminate\Http\Request();
-        $did = new \App\Models\DidNumber();
+        $strategy = app(\App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class);
+        $request = new \Illuminate\Http\Request;
+        $did = new \App\Models\DidNumber;
         $destination = ['extension' => $aiExtension];
 
         $response = $strategy->route($request, $did, $destination);
@@ -299,9 +299,9 @@ class VoiceRoutingRefactorTest extends TestCase
             ],
         ]);
 
-        $strategy = new \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy();
-        $request = new \Illuminate\Http\Request();
-        $did = new \App\Models\DidNumber();
+        $strategy = app(\App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class);
+        $request = new \Illuminate\Http\Request;
+        $did = new \App\Models\DidNumber;
         $destination = ['extension' => $aiExtension];
 
         $response = $strategy->route($request, $did, $destination);
@@ -340,7 +340,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -377,7 +377,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -418,7 +418,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -452,7 +452,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);
@@ -489,7 +489,7 @@ class VoiceRoutingRefactorTest extends TestCase
             'From' => '+1555555555',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
-            'CallSid' => 'CA' . md5(uniqid()),
+            'CallSid' => 'CA'.md5(uniqid()),
         ], $this->getAuthHeaders());
 
         $response->assertStatus(200);

@@ -118,6 +118,7 @@ export interface Extension {
   id: string;
   organization_id: string;
   user_id: string | null;
+  ai_assistant_id: string | null;
   extension_number: string;
   name: string;
   password: string;
@@ -135,6 +136,13 @@ export interface Extension {
   configuration?: Record<string, any>;
   // Eager loaded relationships
   user?: User | null;
+  ai_assistant?: {
+    id: number;
+    name: string;
+    provider: string;
+    protocol: 'sip' | 'websocket';
+    status: 'active' | 'inactive';
+  } | null;
   created_at: string;
   updated_at: string;
 }

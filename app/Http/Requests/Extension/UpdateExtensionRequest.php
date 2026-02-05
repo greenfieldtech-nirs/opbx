@@ -18,15 +18,13 @@ class UpdateExtensionRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
         $user = $this->user();
         $extension = $this->route('extension');
 
-        if (!$user || !$extension instanceof Extension) {
+        if (! $user || ! $extension instanceof Extension) {
             return false;
         }
 
@@ -88,46 +86,40 @@ class UpdateExtensionRequest extends FormRequest
             ],
             // Type-specific configuration validation
             'configuration.conference_room_id' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::CONFERENCE->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CONFERENCE->value),
                 'nullable',
                 'integer',
             ],
             'configuration.ring_group_id' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::RING_GROUP->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::RING_GROUP->value),
                 'nullable',
                 'integer',
             ],
             'configuration.ivr_id' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::IVR->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::IVR->value),
                 'nullable',
                 'integer',
             ],
-            'configuration.provider' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
+            'configuration.ai_assistant_id' => [
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
                 'nullable',
-                'string',
-                'max:100',
-            ],
-            'configuration.phone_number' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
-                'nullable',
-                'string',
-                'regex:/^\+[1-9]\d{1,14}$/', // E.164 format
+                'integer',
+                'exists:ai_assistants,id',
             ],
             'configuration.container_application_name' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
                 'nullable',
                 'string',
                 'max:255',
             ],
             'configuration.container_block_name' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
                 'nullable',
                 'string',
                 'max:255',
             ],
             'configuration.forward_to' => [
-                Rule::requiredIf(fn() => $this->input('type') === ExtensionType::FORWARD->value),
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::FORWARD->value),
                 'nullable',
                 'string',
                 'max:50',
@@ -149,9 +141,8 @@ class UpdateExtensionRequest extends FormRequest
             'configuration.conference_room_id.required_if' => 'Conference room ID is required for conference extensions.',
             'configuration.ring_group_id.required_if' => 'Ring group ID is required for ring group extensions.',
             'configuration.ivr_id.required_if' => 'IVR ID is required for IVR extensions.',
-            'configuration.provider.required_if' => 'Provider is required for AI assistant extensions.',
-            'configuration.phone_number.required_if' => 'Phone number is required for AI assistant extensions.',
-            'configuration.phone_number.regex' => 'Phone number must be in E.164 format (e.g., +12125551234).',
+            'configuration.ai_assistant_id.required_if' => 'AI assistant selection is required for AI assistant extensions.',
+            'configuration.ai_assistant_id.exists' => 'The selected AI assistant does not exist.',
             'configuration.container_application_name.required_if' => 'Container application name is required for custom logic extensions.',
             'configuration.container_block_name.required_if' => 'Container block name is required for custom logic extensions.',
             'configuration.forward_to.required_if' => 'Forward to destination is required for forward extensions.',
@@ -161,8 +152,7 @@ class UpdateExtensionRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -235,6 +225,20 @@ class UpdateExtensionRequest extends FormRequest
                     'extension_number',
                     'Extension number cannot be changed after creation.'
                 );
+            }
+
+            // Validate AI Assistant belongs to same organization
+            if ($type === ExtensionType::AI_ASSISTANT->value && $this->has('configuration.ai_assistant_id')) {
+                $aiAssistantId = $this->input('configuration.ai_assistant_id');
+                if ($aiAssistantId) {
+                    $aiAssistant = \App\Models\AiAssistant::find($aiAssistantId);
+                    if ($aiAssistant && $aiAssistant->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'configuration.ai_assistant_id',
+                            'The selected AI assistant does not belong to your organization.'
+                        );
+                    }
+                }
             }
         });
     }

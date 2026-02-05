@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
@@ -210,8 +211,21 @@ Route::prefix('v1')->group(function (): void {
                 ->name('extensions.reset-password');
         });
 
+        // AI Assistant Providers
+        Route::prefix('ai-assistant')->group(function (): void {
+            Route::get('providers', [\App\Http\Controllers\Api\AiAssistantProviderController::class, 'index'])
+                ->name('ai-assistant.providers.index');
+            Route::get('providers/{provider}', [\App\Http\Controllers\Api\AiAssistantProviderController::class, 'show'])
+                ->name('ai-assistant.providers.show');
+            Route::get('providers/protocol/{protocol}', [\App\Http\Controllers\Api\AiAssistantProviderController::class, 'byProtocol'])
+                ->name('ai-assistant.providers.by-protocol');
+        });
+
         // Conference Rooms
         Route::apiResource('conference-rooms', ConferenceRoomController::class);
+
+        // AI Assistants
+        Route::apiResource('ai-assistants', AiAssistantController::class);
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);

@@ -14,6 +14,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
 import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService } from '@/services/createResourceService';
+import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
+import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus,
@@ -38,6 +40,7 @@ import {
   Activity,
   RefreshCw,
   Key,
+  Wifi,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -118,6 +121,11 @@ interface ExtensionFormData {
   // AI Assistant
   ai_provider: string;
   ai_phone_number: string;
+  ai_bot_id: string;
+  ai_auth_token: string;
+  ai_api_key: string;
+  ai_assistant_id: string;
+  ai_session_id: string;
   // Custom Logic - Cloudonix Container Application
   container_application_name: string;
   container_block_name: string;
@@ -228,6 +236,11 @@ export default function ExtensionsComplete() {
     ivr_id: '',
     ai_provider: '',
     ai_phone_number: '',
+    ai_bot_id: '',
+    ai_auth_token: '',
+    ai_api_key: '',
+    ai_assistant_id: '',
+    ai_session_id: '',
     container_application_name: '',
     container_block_name: '',
     forward_to: '',
@@ -260,6 +273,22 @@ export default function ExtensionsComplete() {
   });
 
   const ivrMenus = ivrMenusData?.data || [];
+
+  // Fetch AI Assistants for dropdown
+  const { data: aiAssistantsData } = useQuery({
+    queryKey: ['ai-assistants', { per_page: 100, status: 'active' }],
+    queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
+  });
+
+  const aiAssistants = aiAssistantsData?.data || [];
+
+  // Fetch AI Assistant providers for detail view
+  const { data: aiProvidersData } = useQuery({
+    queryKey: ['aiAssistantProviders'],
+    queryFn: () => aiAssistantProvidersService.getAll(),
+  });
+
+  const aiProviders = aiProvidersData?.data?.providers || [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -527,9 +556,11 @@ export default function ExtensionsComplete() {
           return 'Not configured';
         }
         case 'ai_assistant': {
-          const provider = extension.configuration?.provider || 'Unknown';
-          const phoneNumber = extension.configuration?.phone_number || 'Not set';
-          return `${phoneNumber} @ ${provider}`;
+          if (extension.ai_assistant) {
+            return extension.ai_assistant.name;
+          }
+          const assistantId = extension.configuration?.ai_assistant_id || extension.ai_assistant_id;
+          return assistantId ? `AI Assistant #${assistantId}` : 'Not configured';
         }
         case 'forward': {
           return extension.configuration?.forward_to || 'Not configured';
@@ -581,13 +612,8 @@ export default function ExtensionsComplete() {
     }
 
     if (formData.type === 'ai_assistant') {
-      if (!formData.ai_provider) {
-        errors.ai_provider = 'AI provider is required';
-      }
-      if (!formData.ai_phone_number) {
-        errors.ai_phone_number = 'Phone number is required';
-      } else if (!/^\+?[1-9]\d{1,14}$/.test(formData.ai_phone_number)) {
-        errors.ai_phone_number = 'Invalid phone number format';
+      if (!formData.ai_assistant_id) {
+        errors.ai_assistant_id = 'AI assistant selection is required';
       }
     }
 
@@ -642,8 +668,12 @@ export default function ExtensionsComplete() {
         }
         break;
       case 'ai_assistant':
-        configuration.provider = formData.ai_provider;
-        configuration.phone_number = formData.ai_phone_number;
+        if (formData.ai_assistant_id) {
+          const parsed = parseInt(formData.ai_assistant_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_assistant_id = parsed;
+          }
+        }
         break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
@@ -716,8 +746,12 @@ export default function ExtensionsComplete() {
         }
         break;
       case 'ai_assistant':
-        configuration.provider = formData.ai_provider;
-        configuration.phone_number = formData.ai_phone_number;
+        if (formData.ai_assistant_id) {
+          const parsed = parseInt(formData.ai_assistant_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_assistant_id = parsed;
+          }
+        }
         break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
@@ -784,6 +818,11 @@ export default function ExtensionsComplete() {
       ivr_id: '',
       ai_provider: '',
       ai_phone_number: '',
+      ai_bot_id: '',
+      ai_auth_token: '',
+      ai_api_key: '',
+      ai_assistant_id: '',
+      ai_session_id: '',
       container_application_name: '',
       container_block_name: '',
       forward_to: '',
@@ -845,6 +884,11 @@ export default function ExtensionsComplete() {
       ivr_id: ivrId ? ivrId.toString() : '',
       ai_provider: (typeof config === 'object' && config?.provider) ? config.provider : '',
       ai_phone_number: (typeof config === 'object' && config?.phone_number) ? config.phone_number : '',
+      ai_bot_id: (typeof config === 'object' && config?.bot_id) ? config.bot_id : '',
+      ai_auth_token: (typeof config === 'object' && config?.auth_token) ? config.auth_token : '',
+      ai_api_key: (typeof config === 'object' && config?.api_key) ? config.api_key : '',
+      ai_assistant_id: (typeof config === 'object' && config?.assistant_id) ? config.assistant_id : '',
+      ai_session_id: (typeof config === 'object' && config?.session_id) ? config.session_id : '',
       container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
       container_block_name: (typeof config === 'object' && config?.container_block_name) ? config.container_block_name : '',
       forward_to: (typeof config === 'object' && config?.forward_to) ? config.forward_to : '',
@@ -954,51 +998,38 @@ export default function ExtensionsComplete() {
 
       case 'ai_assistant':
         return (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="ai_provider">
-                AI Service Provider <span className="text-destructive">*</span>
-              </Label>
+          <div className="space-y-2">
+            <Label htmlFor="ai_assistant_id">
+              AI Assistant <span className="text-destructive">*</span>
+            </Label>
+            {aiAssistants.length === 0 ? (
+              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                No AI Assistants Available
+              </div>
+            ) : (
               <Select
-                value={formData.ai_provider}
-                onValueChange={(value) => setFormData({ ...formData, ai_provider: value })}
+                value={formData.ai_assistant_id}
+                onValueChange={(value) => setFormData({ ...formData, ai_assistant_id: value })}
               >
-                <SelectTrigger id="ai_provider">
-                  <SelectValue placeholder="Select AI Provider" />
+                <SelectTrigger id="ai_assistant_id">
+                  <SelectValue placeholder="Select an AI assistant" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="VAPI">VAPI</SelectItem>
-                  <SelectItem value="Retell">Retell</SelectItem>
-                  <SelectItem value="Synthflow">Synthflow</SelectItem>
-                  <SelectItem value="Dasha">Dasha</SelectItem>
-                  <SelectItem value="Custom">Custom (Other)</SelectItem>
+                  {aiAssistants.map((assistant) => (
+                    <SelectItem key={assistant.id} value={assistant.id.toString()}>
+                      {assistant.name} ({assistant.provider})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {formErrors.ai_provider && (
-                <p className="text-sm text-destructive">{formErrors.ai_provider}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ai_phone">
-                AI Provider Phone Number <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="ai_phone"
-                type="tel"
-                value={formData.ai_phone_number}
-                onChange={(e) => setFormData({ ...formData, ai_phone_number: e.target.value })}
-                placeholder="+1234567890"
-                autoComplete="off"
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the phone number where Cloudonix will forward calls for AI processing (E.164 format recommended)
-              </p>
-              {formErrors.ai_phone_number && (
-                <p className="text-sm text-destructive">{formErrors.ai_phone_number}</p>
-              )}
-            </div>
-          </>
+            )}
+            <p className="text-xs text-muted-foreground">
+              AI assistants are managed in a separate page
+            </p>
+            {formErrors.ai_assistant_id && (
+              <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>
+            )}
+          </div>
         );
 
       case 'forward':
@@ -1975,18 +2006,81 @@ export default function ExtensionsComplete() {
                           })()}
                         </>
                       )}
-                      {selectedExtension.type === 'ai_assistant' && (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Provider:</span>
-                            <span className="text-sm font-medium">{selectedExtension.configuration.provider}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Phone Number:</span>
-                            <span className="text-sm font-medium font-mono">{selectedExtension.configuration.phone_number}</span>
-                          </div>
-                        </>
-                      )}
+                      {selectedExtension.type === 'ai_assistant' && (() => {
+                        const config = selectedExtension.configuration;
+                        const provider = aiProviders.find((p: any) => p.key === config?.provider);
+                        const protocol = provider?.protocol || 'sip';
+                        
+                        return (
+                          <>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Provider:</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{provider?.name || config?.provider || 'Unknown'}</span>
+                                <Badge variant={protocol === 'websocket' ? 'default' : 'secondary'} className="text-xs">
+                                  {protocol === 'websocket' ? (
+                                    <>
+                                      <Wifi className="h-3 w-3 mr-1" />
+                                      WebSocket
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Phone className="h-3 w-3 mr-1" />
+                                      SIP
+                                    </>
+                                  )}
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            {/* Show SIP phone number */}
+                            {config?.phone_number && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Phone Number:</span>
+                                <span className="text-sm font-medium font-mono">{config.phone_number}</span>
+                              </div>
+                            )}
+                            
+                            {/* Show WebSocket fields */}
+                            {config?.bot_id && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Bot ID:</span>
+                                <span className="text-sm font-medium font-mono">{config.bot_id}</span>
+                              </div>
+                            )}
+                            {config?.auth_token && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Auth Token:</span>
+                                <span className="text-sm font-medium font-mono">{'•'.repeat(12)}</span>
+                              </div>
+                            )}
+                            {config?.api_key && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">API Key:</span>
+                                <span className="text-sm font-medium font-mono">{'•'.repeat(12)}</span>
+                              </div>
+                            )}
+                            {config?.assistant_id && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Assistant ID:</span>
+                                <span className="text-sm font-medium font-mono">{config.assistant_id}</span>
+                              </div>
+                            )}
+                            {config?.session_id && (
+                              <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Session ID:</span>
+                                <span className="text-sm font-medium font-mono">{config.session_id}</span>
+                              </div>
+                            )}
+                            
+                            {provider?.description && (
+                              <div className="pt-2 border-t">
+                                <p className="text-xs text-muted-foreground">{provider.description}</p>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                       {selectedExtension.type === 'ivr' && (
                         <>
                           {(() => {

@@ -19,6 +19,7 @@ import { lazy } from 'react';
 const Users = lazy(() => import('@/pages/UsersComplete'));
 const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
+const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
 const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = lazy(() => import('@/pages/RingGroups'));
 const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
@@ -75,6 +76,10 @@ export const router = createBrowserRouter([
       {
         path: 'conference-rooms',
         element: <ConferenceRooms />,
+      },
+      {
+        path: 'ai-assistants',
+        element: <AiAssistants />,
       },
       {
         path: 'phone-numbers',

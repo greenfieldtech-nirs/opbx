@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[ScopedBy([OrganizationScope::class])]
 class DidNumber extends Model
@@ -151,6 +150,7 @@ class DidNumber extends Model
         }
 
         return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->with('aiAssistant')
             ->where('id', $extensionId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -324,6 +324,4 @@ class DidNumber extends Model
     {
         $this->attributes['_ivr_menu'] = $ivrMenu;
     }
-
-
 }

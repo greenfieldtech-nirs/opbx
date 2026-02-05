@@ -48,10 +48,6 @@ class VoiceRoutingCacheService
      * 2. If miss, load from database
      * 3. Store in cache for future requests
      * 4. If cache unavailable, fallback to database
-     *
-     * @param int $organizationId
-     * @param string $extensionNumber
-     * @return Extension|null
      */
     public function getExtension(int $organizationId, string $extensionNumber): ?Extension
     {
@@ -69,7 +65,13 @@ class VoiceRoutingCacheService
                     ]);
 
                     $query = Extension::withoutGlobalScope(OrganizationScope::class)
-                        ->with('user')
+                        ->with([
+                            'user',
+                            'aiAssistant' => function ($query) use ($organizationId) {
+                                $query->withoutGlobalScope(OrganizationScope::class)
+                                    ->where('organization_id', $organizationId);
+                            },
+                        ])
                         ->where('organization_id', $organizationId)
                         ->where('extension_number', $extensionNumber);
 
@@ -96,7 +98,7 @@ class VoiceRoutingCacheService
 
                     Log::info('Voice routing cache: All extensions in database', [
                         'total_count' => $allExtensions->count(),
-                        'extensions' => $allExtensions->map(function($ext) {
+                        'extensions' => $allExtensions->map(function ($ext) {
                             return [
                                 'id' => $ext->id,
                                 'org_id' => $ext->organization_id,
@@ -140,9 +142,6 @@ class VoiceRoutingCacheService
      * Get active business hours schedule for organization with caching
      *
      * Implements cache-aside pattern for business hours schedules.
-     *
-     * @param int $organizationId
-     * @return BusinessHoursSchedule|null
      */
     public function getActiveBusinessHoursSchedule(int $organizationId): ?BusinessHoursSchedule
     {
@@ -192,10 +191,6 @@ class VoiceRoutingCacheService
      * Invalidate extension cache
      *
      * Called when an extension is updated to ensure cache consistency.
-     *
-     * @param int $organizationId
-     * @param string $extensionNumber
-     * @return void
      */
     public function invalidateExtension(int $organizationId, string $extensionNumber): void
     {
@@ -222,9 +217,6 @@ class VoiceRoutingCacheService
      * Invalidate business hours schedule cache
      *
      * Called when a business hours schedule is updated to ensure cache consistency.
-     *
-     * @param int $organizationId
-     * @return void
      */
     public function invalidateBusinessHoursSchedule(int $organizationId): void
     {
@@ -249,9 +241,6 @@ class VoiceRoutingCacheService
      * Clear all routing cache for an organization
      *
      * Useful for bulk operations or testing.
-     *
-     * @param int $organizationId
-     * @return void
      */
     public function clearOrganizationCache(int $organizationId): void
     {
@@ -274,10 +263,6 @@ class VoiceRoutingCacheService
      * Build cache key for extension lookup
      *
      * Format: routing:extension:{org_id}:{ext_number}
-     *
-     * @param int $organizationId
-     * @param string $extensionNumber
-     * @return string
      */
     private function buildExtensionCacheKey(int $organizationId, string $extensionNumber): string
     {
@@ -288,9 +273,6 @@ class VoiceRoutingCacheService
      * Build cache key for business hours schedule
      *
      * Format: routing:business_hours:{org_id}
-     *
-     * @param int $organizationId
-     * @return string
      */
     private function buildBusinessHoursCacheKey(int $organizationId): string
     {
