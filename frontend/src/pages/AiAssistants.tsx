@@ -55,8 +55,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
@@ -80,16 +78,12 @@ import { cn } from '@/lib/utils';
 
 type AssistantFormData = {
   name: string;
-  description: string;
-  status: 'active' | 'inactive';
   provider: string;
   configuration: Record<string, string>;
 };
 
 const emptyFormData: AssistantFormData = {
   name: '',
-  description: '',
-  status: 'active',
   provider: '',
   configuration: {},
 };
@@ -223,8 +217,7 @@ export default function AiAssistants() {
 
     createMutation.mutate({
       name: formData.name,
-      description: formData.description || undefined,
-      status: formData.status,
+      status: 'active', // All assistants are created as active
       provider: formData.provider,
       configuration: formData.configuration,
     });
@@ -237,8 +230,6 @@ export default function AiAssistants() {
       id: selectedAssistant.id,
       data: {
         name: formData.name,
-        description: formData.description || undefined,
-        status: formData.status,
         provider: formData.provider,
         configuration: formData.configuration,
       },
@@ -250,6 +241,15 @@ export default function AiAssistants() {
     deleteMutation.mutate(selectedAssistant.id);
   };
 
+  const handleToggleStatus = (assistant: AiAssistant) => {
+    if (updateMutation.isPending) return; // Prevent multiple simultaneous toggles
+    const newStatus = assistant.status === 'active' ? 'inactive' : 'active';
+    updateMutation.mutate({
+      id: assistant.id,
+      data: { status: newStatus }
+    });
+  };
+
   const openCreateDialog = () => {
     setFormData(emptyFormData);
     setIsCreateDialogOpen(true);
@@ -259,8 +259,6 @@ export default function AiAssistants() {
     setSelectedAssistant(assistant);
     setFormData({
       name: assistant.name,
-      description: assistant.description || '',
-      status: assistant.status,
       provider: assistant.provider,
       configuration: assistant.configuration || {},
     });
@@ -350,15 +348,6 @@ export default function AiAssistants() {
       }
     },
     {
-      header: 'Status',
-      sortKey: 'status',
-      cell: (assistant) => (
-        <Badge variant={assistant.status === 'active' ? 'default' : 'secondary'}>
-          {assistant.status}
-        </Badge>
-      )
-    },
-    {
       header: 'Usage',
       cell: (assistant) => (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -374,6 +363,34 @@ export default function AiAssistants() {
         <div className="text-sm text-muted-foreground">
           {new Date(assistant.updated_at).toLocaleDateString()}
         </div>
+      )
+    },
+    {
+      header: 'Status',
+      sortKey: 'status',
+      cell: (assistant) => (
+        <Badge
+          variant={assistant.status === 'active' ? 'default' : 'secondary'}
+          className={cn(
+            "text-xs",
+            !isReadOnly && (
+              updateMutation.isPending && updateMutation.variables?.id === assistant.id
+                ? 'opacity-50 cursor-wait'
+                : 'cursor-pointer transition-all hover:scale-105'
+            ),
+            assistant.status === 'active'
+              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isReadOnly && !updateMutation.isPending) {
+              handleToggleStatus(assistant);
+            }
+          }}
+        >
+          {assistant.status === 'active' ? 'Active' : 'Inactive'}
+        </Badge>
       )
     }
   ];
@@ -578,34 +595,6 @@ export default function AiAssistants() {
               />
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="create-description">Description</Label>
-              <Textarea
-                id="create-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Handles customer inquiries 24/7..."
-                rows={3}
-              />
-            </div>
-
-            {/* Status */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="create-status">Status</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Inactive</span>
-                <Switch
-                  id="create-status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
-                  }
-                />
-                <span className="text-sm text-muted-foreground">Active</span>
-              </div>
-            </div>
-
             {/* Provider Selection */}
             <div className="space-y-2">
               <Label htmlFor="create-provider">AI Service Provider *</Label>
@@ -723,7 +712,7 @@ export default function AiAssistants() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Same fields as Create Dialog */}
+            {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="edit-name">Name *</Label>
               <Input
@@ -733,31 +722,7 @@ export default function AiAssistants() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="edit-status">Status</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Inactive</span>
-                <Switch
-                  id="edit-status"
-                  checked={formData.status === 'active'}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
-                  }
-                />
-                <span className="text-sm text-muted-foreground">Active</span>
-              </div>
-            </div>
-
+            {/* Provider Selection */}
             <div className="space-y-2">
               <Label htmlFor="edit-provider">AI Service Provider *</Label>
               <Select value={formData.provider} onValueChange={handleProviderChange}>
