@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +69,11 @@ import { toast } from 'sonner';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  StandardDataTable,
+  Column,
+  EmptyState
+} from '@/components/design-system';
 import type { AiAssistant, CreateAiAssistantRequest, UpdateAiAssistantRequest } from '@/services/aiAssistants.service';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 import { cn } from '@/lib/utils';
@@ -113,6 +119,7 @@ export default function AiAssistants() {
   const [visibleTokens, setVisibleTokens] = useState<Set<string>>(new Set());
 
   const canManageAssistants = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // Debounce search input
   useEffect(() => {
@@ -300,61 +307,140 @@ export default function AiAssistants() {
     });
   };
 
-  // Clear all filters
-  const clearFilters = () => {
-    setSearchQuery('');
-    setStatusFilter('all');
-    setProtocolFilter('all');
-    setProviderFilter('all');
+  // Handle sort
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field as 'name' | 'provider' | 'created_at');
+      setSortDirection('asc');
+    }
   };
 
   const hasActiveFilters = searchQuery || statusFilter !== 'all' || protocolFilter !== 'all' || providerFilter !== 'all';
 
+  // Define columns for StandardDataTable
+  const columns: Column<AiAssistant>[] = [
+    {
+      header: 'Protocol',
+      cell: (assistant) => (
+        <Badge
+          variant={assistant.protocol === 'websocket' ? 'default' : 'secondary'}
+          className="text-xs"
+        >
+          {assistant.protocol === 'websocket' ? (
+            <>
+              <Wifi className="h-3 w-3 mr-1" />
+              WebSocket
+            </>
+          ) : (
+            <>
+              <Phone className="h-3 w-3 mr-1" />
+              SIP
+            </>
+          )}
+        </Badge>
+      )
+    },
+    {
+      header: 'Provider',
+      cell: (assistant) => {
+        const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
+        return <div className="font-medium text-sm">{provider?.name || assistant.provider}</div>;
+      }
+    },
+    {
+      header: 'Status',
+      sortKey: 'status',
+      cell: (assistant) => (
+        <Badge variant={assistant.status === 'active' ? 'default' : 'secondary'}>
+          {assistant.status}
+        </Badge>
+      )
+    },
+    {
+      header: 'Usage',
+      cell: (assistant) => (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Users className="h-4 w-4" />
+          {assistant.usage_count || 0} ext
+        </div>
+      )
+    },
+    {
+      header: 'Updated',
+      sortKey: 'updated_at',
+      cell: (assistant) => (
+        <div className="text-sm text-muted-foreground">
+          {new Date(assistant.updated_at).toLocaleDateString()}
+        </div>
+      )
+    }
+  ];
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">AI Assistants</h1>
-          <p className="text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Bot className="h-8 w-8" />
+              AI Assistants
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground mt-1">
             Manage AI-powered conversational agents for call handling
           </p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">AI Assistants</span>
+          </div>
         </div>
         {canManageAssistants && (
           <Button onClick={openCreateDialog}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create AI Assistant
+            <Plus className="mr-2 h-4 w-4" />
+            Add AI Assistant
           </Button>
         )}
       </div>
 
-      {/* Filters Card */}
+      {/* Filters Section */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3">
             {/* Search */}
-            <div className="lg:col-span-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search name or provider..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search AI assistants..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                autoComplete="off"
+              />
             </div>
 
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
+
+            {/* Filter dropdowns */}
+            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
@@ -363,32 +449,20 @@ export default function AiAssistants() {
               </SelectContent>
             </Select>
 
-            {/* Protocol Filter */}
-            <Select value={protocolFilter} onValueChange={(value: any) => setProtocolFilter(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Protocols" />
+            <Select value={protocolFilter} onValueChange={(val: any) => setProtocolFilter(val)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Protocol" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Protocols</SelectItem>
-                <SelectItem value="sip">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    SIP
-                  </div>
-                </SelectItem>
-                <SelectItem value="websocket">
-                  <div className="flex items-center gap-2">
-                    <Wifi className="h-4 w-4" />
-                    WebSocket
-                  </div>
-                </SelectItem>
+                <SelectItem value="sip">SIP</SelectItem>
+                <SelectItem value="websocket">WebSocket</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Provider Filter */}
             <Select value={providerFilter} onValueChange={setProviderFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Providers" />
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Provider" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Providers</SelectItem>
@@ -400,195 +474,84 @@ export default function AiAssistants() {
               </SelectContent>
             </Select>
           </div>
-
-          {hasActiveFilters && (
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {totalAssistants} assistant{totalAssistants !== 1 ? 's' : ''} found
-              </p>
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Table Card */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>AI Assistants</CardTitle>
-            <CardDescription>
-              {totalAssistants} total assistant{totalAssistants !== 1 ? 's' : ''}
-            </CardDescription>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-          >
-            <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-              <p className="text-muted-foreground mt-2">Loading AI Assistants...</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-12">
-              <p className="text-destructive">Error loading AI Assistants</p>
-              <Button variant="outline" onClick={() => refetch()} className="mt-4">
-                Try Again
-              </Button>
-            </div>
-          ) : assistants.length === 0 ? (
-            <div className="text-center py-12">
-              <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No AI Assistants found</h3>
-              <p className="text-muted-foreground mb-4">
-                {hasActiveFilters
-                  ? 'Try adjusting your filters'
-                  : 'Get started by creating your first AI Assistant'}
-              </p>
-              {canManageAssistants && !hasActiveFilters && (
-                <Button onClick={openCreateDialog}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create AI Assistant
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name & Protocol</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Usage</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assistants.map((assistant) => {
-                    const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
-                    return (
-                      <TableRow
-                        key={assistant.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => openDetailSheet(assistant)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <div className="font-medium">{assistant.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge
-                                  variant={assistant.protocol === 'websocket' ? 'default' : 'secondary'}
-                                  className="text-xs"
-                                >
-                                  {assistant.protocol === 'websocket' ? (
-                                    <>
-                                      <Wifi className="h-3 w-3 mr-1" />
-                                      WebSocket
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Phone className="h-3 w-3 mr-1" />
-                                      SIP
-                                    </>
-                                  )}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{provider?.name || assistant.provider}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={assistant.status === 'active' ? 'default' : 'secondary'}>
-                            {assistant.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{assistant.usage_count || 0} ext</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(assistant.created_at).toLocaleDateString()}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openDetailSheet(assistant)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              {canManageAssistants && (
-                                <>
-                                  <DropdownMenuItem onClick={() => openEditDialog(assistant)}>
-                                    <Edit2 className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => openDeleteDialog(assistant)}
-                                    className="text-destructive"
-                                    disabled={(assistant.usage_count || 0) > 0}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+        <CardContent className="pt-6">
+          <StandardDataTable<AiAssistant>
+            data={assistants}
+            isLoading={isLoading}
+            onRowClick={openDetailSheet}
+            identityIcon={Bot}
+            identityIconBg="bg-blue-100"
+            identityIconColor="text-blue-600"
+            getIdentityPrimary={(assistant) => assistant.name}
+            getIdentitySecondary={(assistant) => {
+              const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
+              return provider?.name || assistant.provider;
+            }}
+            onIdentityClick={openDetailSheet}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onView={openDetailSheet}
+            onEdit={canManageAssistants ? openEditDialog : undefined}
+            onDelete={canManageAssistants ? ((assistant, e) => {
+              if ((assistant.usage_count || 0) > 0) {
+                toast.error(`Cannot delete AI Assistant in use by ${assistant.usage_count} extension(s)`);
+                return;
+              }
+              setSelectedAssistant(assistant);
+              setIsDeleteDialogOpen(true);
+            }) : undefined}
+            canEdit={canManageAssistants}
+            canDelete={canManageAssistants}
+            columns={columns}
+            emptyState={
+              <div className="text-center py-12">
+                <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No AI assistants found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {hasActiveFilters
+                    ? 'Try adjusting your filters'
+                    : 'Get started by creating your first AI Assistant'}
+                </p>
+                {canManageAssistants && !hasActiveFilters && (
+                  <Button onClick={openCreateDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create AI Assistant
+                  </Button>
+                )}
+              </div>
+            }
+          />
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalAssistants)} of {totalAssistants} assistants
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
