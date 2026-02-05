@@ -223,6 +223,9 @@ Route::prefix('v1')->group(function (): void {
         // Conference Rooms
         Route::apiResource('conference-rooms', ConferenceRoomController::class);
 
+        // AI Assistants
+        Route::apiResource('ai-assistants', AiAssistantController::class);
+
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
 
