@@ -248,8 +248,19 @@ class CloudonixWebhookController extends Controller
      */
     private function routeExtensionDirectly(\App\Models\Extension $extension, $request, int $organizationId): string
     {
+        // Verify extension belongs to expected organization
+        if ($extension->organization_id !== $organizationId) {
+            Log::warning('Extension organization mismatch in direct routing', [
+                'extension_id' => $extension->id,
+                'extension_org' => $extension->organization_id,
+                'expected_org' => $organizationId,
+            ]);
+
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
+        }
+
         return match ($extension->type) {
-            \App\Enums\ExtensionType::USER => $this->routeUserExtensionDirectly($extension),
+            \App\Enums\ExtensionType::USER => $this->routeUserExtensionDirectly($extension, $organizationId),
             \App\Enums\ExtensionType::CONFERENCE => $this->routeConferenceExtensionDirectly($extension, $organizationId),
             \App\Enums\ExtensionType::RING_GROUP => $this->routeRingGroupExtensionDirectly($extension, $organizationId),
             default => \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension type not supported'),
@@ -261,8 +272,19 @@ class CloudonixWebhookController extends Controller
      *
      * @return string CXML response
      */
-    private function routeUserExtensionDirectly(\App\Models\Extension $extension): string
+    private function routeUserExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
     {
+        // Verify extension belongs to expected organization
+        if ($extension->organization_id !== $organizationId) {
+            Log::warning('Extension organization mismatch in user routing', [
+                'extension_id' => $extension->id,
+                'extension_org' => $extension->organization_id,
+                'expected_org' => $organizationId,
+            ]);
+
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
+        }
+
         if (! $extension->user || ! $extension->user->isActive()) {
             return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension user not available');
         }
@@ -282,6 +304,17 @@ class CloudonixWebhookController extends Controller
      */
     private function routeConferenceExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
     {
+        // Verify extension belongs to expected organization
+        if ($extension->organization_id !== $organizationId) {
+            Log::warning('Extension organization mismatch in conference routing', [
+                'extension_id' => $extension->id,
+                'extension_org' => $extension->organization_id,
+                'expected_org' => $organizationId,
+            ]);
+
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
+        }
+
         $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
 
         if (! $conferenceRoomId) {
@@ -313,6 +346,17 @@ class CloudonixWebhookController extends Controller
      */
     private function routeRingGroupExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
     {
+        // Verify extension belongs to expected organization
+        if ($extension->organization_id !== $organizationId) {
+            Log::warning('Extension organization mismatch in ring group routing', [
+                'extension_id' => $extension->id,
+                'extension_org' => $extension->organization_id,
+                'expected_org' => $organizationId,
+            ]);
+
+            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
+        }
+
         $ringGroupId = $extension->configuration['ring_group_id'] ?? null;
 
         if (! $ringGroupId) {
@@ -337,7 +381,7 @@ class CloudonixWebhookController extends Controller
             $fallback = $ringGroup->fallback_action;
 
             return match ($fallback['action'] ?? 'hangup') {
-                'extension' => $this->routeFallbackExtensionDirectly($fallback),
+                'extension' => $this->routeFallbackExtensionDirectly($fallback, $organizationId),
                 'voicemail' => \App\Services\CxmlBuilder\CxmlBuilder::sendToVoicemail(),
                 'busy' => \App\Services\CxmlBuilder\CxmlBuilder::busy($fallback['message'] ?? null),
                 default => \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup(),
@@ -352,7 +396,7 @@ class CloudonixWebhookController extends Controller
      *
      * @return string CXML response
      */
-    private function routeFallbackExtensionDirectly(array $fallbackConfig): string
+    private function routeFallbackExtensionDirectly(array $fallbackConfig, int $organizationId): string
     {
         $extensionId = $fallbackConfig['extension_id'] ?? null;
 
@@ -363,6 +407,17 @@ class CloudonixWebhookController extends Controller
         $extension = \App\Models\Extension::find($extensionId);
 
         if (! $extension || ! $extension->isActive()) {
+            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
+        }
+
+        // Verify extension belongs to expected organization
+        if ($extension->organization_id !== $organizationId) {
+            Log::warning('Extension organization mismatch in fallback routing', [
+                'extension_id' => $extension->id,
+                'extension_org' => $extension->organization_id,
+                'expected_org' => $organizationId,
+            ]);
+
             return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
         }
 
