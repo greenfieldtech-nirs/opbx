@@ -218,19 +218,6 @@ class RecordingsController extends Controller
         return response()->json([
             'message' => 'Recording updated successfully',
             'data' => new RecordingResource($recording->load(['creator', 'updater'])),
-        ]));
-    }
-        $validated = $request->validated();
-
-        $recording->update(array_merge($validated, [
-            'updated_by' => $user->id,
-        ]));
-
-        RecordingResource::setCurrentUserId($user->id);
-
-        return response()->json([
-            'message' => 'Recording updated successfully',
-            'data' => new RecordingResource($recording->load(['creator', 'updater'])),
         ]);
     }
 
