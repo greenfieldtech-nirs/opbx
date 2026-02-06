@@ -170,6 +170,11 @@ class RecordingsController extends Controller
             return $user;
         }
 
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
+        }
+
         RecordingResource::setCurrentUserId($user->id);
 
         return response()->json([
@@ -196,6 +201,25 @@ class RecordingsController extends Controller
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
         }
+
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
+        }
+
+        $validated = $request->validated();
+
+        $recording->update(array_merge($validated, [
+            'updated_by' => $user->id,
+        ]));
+
+        RecordingResource::setCurrentUserId($user->id);
+
+        return response()->json([
+            'message' => 'Recording updated successfully',
+            'data' => new RecordingResource($recording->load(['creator', 'updater'])),
+        ]));
+    }
         $validated = $request->validated();
 
         $recording->update(array_merge($validated, [
@@ -223,6 +247,11 @@ class RecordingsController extends Controller
         // Handle unauthenticated response
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
+        }
+
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
         }
 
         if (! $recording->isUploaded()) {
@@ -355,12 +384,16 @@ class RecordingsController extends Controller
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
         }
+
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
+        }
+
         // Check if user has permission to delete recordings
         if (! $user->hasRole(UserRole::OWNER) && ! $user->hasRole(UserRole::PBX_ADMIN)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-
-        // Log the deletion attempt
 
         // Log the deletion attempt
         $this->accessService->logFileAccess($recording, $user->id, 'deleted', [
@@ -546,7 +579,7 @@ class RecordingsController extends Controller
      */
     public static function generateSignedRecordingUrl(string $baseUrl, int $orgId, string $filename, int $ttlSeconds = 3600): string
     {
-        $path = "{$orgId}/" . urlencode($filename);
+        $path = "{$orgId}/".urlencode($filename);
         $expires = time() + $ttlSeconds;
         $signature = self::generateSignature("{$orgId}/{$filename}", $expires);
 
