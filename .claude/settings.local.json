@@ -69,7 +69,9 @@
       "Bash(/tmp/test_recording_playback.sh)",
       "Bash(/tmp/test_upload_debug.sh)",
       "Bash(/tmp/test_upload_and_play.sh)",
-      "Bash(timeout 30 npm run type-check:*)"
+      "Bash(timeout 30 npm run type-check:*)",
+      "Bash(wc:*)",
+      "Bash(git -C /Users/nirs/Documents/repos/opbx.cloudonix.com log --oneline)"
     ]
   }
 }

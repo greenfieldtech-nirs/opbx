@@ -125,11 +125,13 @@ class RateLimitPerOrganization
             return (int) $user->organization_id;
         }
 
-        // Try to get from header (for testing/debugging)
-        $headerOrgId = $request->header('X-Organization-ID');
+        // Try to get from header (for local/testing only)
+        if (app()->environment('local', 'testing')) {
+            $headerOrgId = $request->header('X-Organization-ID');
 
-        if ($headerOrgId) {
-            return (int) $headerOrgId;
+            if ($headerOrgId) {
+                return (int) $headerOrgId;
+            }
         }
 
         return null;

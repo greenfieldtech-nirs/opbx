@@ -45,8 +45,8 @@ class VoiceRoutingRequest extends FormRequest
             // Domain - optional, hostname format
             'Domain' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', 'max:255'],
 
-            // Call status - optional
-            'CallStatus' => ['nullable', 'string', 'in:ringing,answered,completed,failed,busy,no-answer', 'max:20'],
+            // Call status - optional (includes Cloudonix-specific statuses)
+            'CallStatus' => ['nullable', 'string', 'in:ringing,in-progress,answered,completed,failed,busy,no-answer,new', 'max:20'],
 
             // Direction - optional
             'Direction' => ['nullable', 'string', 'in:subscriber,inbound,outbound,application'],

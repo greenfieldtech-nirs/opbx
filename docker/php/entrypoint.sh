@@ -2,6 +2,28 @@
 
 set -e
 
+# Validate passwords are not using default/weak values
+validate_password() {
+    local var_name=$1
+    local var_value=$2
+    local weak_values="secret password rootsecret minioadmin admin 123456"
+
+    for weak in $weak_values; do
+        if [ "$var_value" = "$weak" ]; then
+            echo "ERROR: $var_name is set to a default/weak value ('$weak'). Please set a strong password in .env file."
+            echo "Generate a strong password with: openssl rand -base64 32"
+            exit 1
+        fi
+    done
+}
+
+echo "Validating security settings..."
+validate_password "DB_PASSWORD" "$DB_PASSWORD"
+validate_password "DB_ROOT_PASSWORD" "$MYSQL_ROOT_PASSWORD"
+validate_password "MINIO_ACCESS_KEY" "$MINIO_ACCESS_KEY"
+validate_password "MINIO_SECRET_KEY" "$MINIO_SECRET_KEY"
+echo "Security validation passed."
+
 # Fix file permissions for Laravel
 echo "Fixing file permissions..."
 chmod -R 755 /var/www/html 2>/dev/null || echo "Some files could not be modified (expected for .git files)"

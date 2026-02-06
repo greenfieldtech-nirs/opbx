@@ -170,6 +170,11 @@ class RecordingsController extends Controller
             return $user;
         }
 
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
+        }
+
         RecordingResource::setCurrentUserId($user->id);
 
         return response()->json([
@@ -196,6 +201,12 @@ class RecordingsController extends Controller
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
         }
+
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
+        }
+
         $validated = $request->validated();
 
         $recording->update(array_merge($validated, [
@@ -223,6 +234,11 @@ class RecordingsController extends Controller
         // Handle unauthenticated response
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
+        }
+
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
         }
 
         if (! $recording->isUploaded()) {
@@ -355,12 +371,16 @@ class RecordingsController extends Controller
         if ($user instanceof \Illuminate\Http\JsonResponse) {
             return $user;
         }
+
+        // Verify tenant ownership
+        if ($recording->organization_id !== $user->organization_id) {
+            abort(404);
+        }
+
         // Check if user has permission to delete recordings
         if (! $user->hasRole(UserRole::OWNER) && ! $user->hasRole(UserRole::PBX_ADMIN)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-
-        // Log the deletion attempt
 
         // Log the deletion attempt
         $this->accessService->logFileAccess($recording, $user->id, 'deleted', [
@@ -392,15 +412,50 @@ class RecordingsController extends Controller
 
     /**
      * Serve MinIO files for external access (used by Cloudonix for IVR audio files).
-     * This is a public endpoint that proxies MinIO files without authentication.
+     * Requires a valid HMAC signature with expiration to prevent unauthorized access.
      */
     public function serveMinioFile(Request $request, string $path): \Illuminate\Http\Response
     {
         try {
+            // Verify signed URL parameters
+            $expires = $request->query('expires');
+            $signature = $request->query('sig');
+
+            if (! $expires || ! $signature) {
+                Log::warning('MinIO file request missing signature', [
+                    'path' => $path,
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response('Forbidden', 403);
+            }
+
+            // Check expiration
+            if ((int) $expires < time()) {
+                Log::warning('MinIO file request with expired signature', [
+                    'path' => $path,
+                    'expires' => $expires,
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response('URL expired', 403);
+            }
+
+            // Verify HMAC signature
+            $expectedSignature = self::generateSignature($path, (int) $expires);
+            if (! hash_equals($expectedSignature, $signature)) {
+                Log::warning('MinIO file request with invalid signature', [
+                    'path' => $path,
+                    'ip_address' => $request->ip(),
+                ]);
+
+                return response('Forbidden', 403);
+            }
+
             // Parse the path to extract organization_id and filename
             $pathParts = explode('/', $path, 2);
             if (count($pathParts) !== 2) {
-                return response()->json(['error' => 'Invalid path format'], 400);
+                return response('Invalid path format', 400);
             }
 
             $organization_id = $pathParts[0];
@@ -412,13 +467,12 @@ class RecordingsController extends Controller
             // Construct the MinIO path
             $filePath = "{$orgId}/{$filename}";
 
-            Log::info('MinIO file request', [
+            Log::info('MinIO file request (signed)', [
                 'path' => $path,
                 'organization_id' => $orgId,
                 'filename' => $filename,
                 'file_path' => $filePath,
                 'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
             ]);
 
             // Check if file exists in MinIO storage first
@@ -483,21 +537,40 @@ class RecordingsController extends Controller
             return response($fileContent, 200, [
                 'Content-Type' => $mimeType,
                 'Content-Length' => strlen($fileContent),
-                'Cache-Control' => 'public, max-age=300', // Cache for 5 minutes
-                'Access-Control-Allow-Origin' => '*', // Allow cross-origin for Cloudonix
+                'Cache-Control' => 'public, max-age=300',
             ]);
         } catch (\Exception $e) {
             Log::error('Error serving MinIO file', [
                 'path' => $path,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => 'Internal server error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return response('Internal server error', 500);
         }
+    }
+
+    /**
+     * Generate an HMAC signature for a recording file path and expiration.
+     */
+    public static function generateSignature(string $path, int $expires): string
+    {
+        $data = "{$path}|{$expires}";
+
+        return hash_hmac('sha256', $data, config('app.key'));
+    }
+
+    /**
+     * Generate a signed URL for external access to a recording file.
+     *
+     * Used by IVR routing to create URLs that Cloudonix can fetch.
+     */
+    public static function generateSignedRecordingUrl(string $baseUrl, int $orgId, string $filename, int $ttlSeconds = 3600): string
+    {
+        $path = "{$orgId}/".urlencode($filename);
+        $expires = time() + $ttlSeconds;
+        $signature = self::generateSignature("{$orgId}/{$filename}", $expires);
+
+        return "{$baseUrl}/api/storage/recordings/{$path}?expires={$expires}&sig={$signature}";
     }
 
     /**

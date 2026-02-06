@@ -71,7 +71,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Handling call routing by direction', [
+        Log::debug('VoiceRoutingManager: Handling call routing', [
             'direction' => $direction,
             'to' => $to,
             'from' => $from,
@@ -102,7 +102,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Handling subscriber direction call', [
+        Log::debug('VoiceRoutingManager: Subscriber direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
@@ -162,7 +162,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Handling inbound direction call', [
+        Log::debug('VoiceRoutingManager: Inbound direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
@@ -181,7 +181,7 @@ class VoiceRoutingManager
 
         // Determine call type: check if From is an assigned phone number
         if ($this->isAssignedPhoneNumber($from, $orgId)) {
-            Log::info('VoiceRoutingManager: Detected internal call from DID', [
+            Log::debug('VoiceRoutingManager: Detected internal call from DID', [
                 'from_did' => $from,
                 'to' => $to,
                 'org_id' => $orgId,
@@ -189,7 +189,7 @@ class VoiceRoutingManager
 
             return $this->handleInternalCallFromDid($request);
         } else {
-            Log::info('VoiceRoutingManager: Detected external inbound call to DID', [
+            Log::debug('VoiceRoutingManager: Detected external inbound call to DID', [
                 'from_external' => $from,
                 'to_did' => $to,
                 'org_id' => $orgId,
@@ -214,7 +214,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Processing internal call from DID', [
+        Log::debug('VoiceRoutingManager: Processing internal call from DID', [
             'from_did' => $from,
             'to' => $to,
             'org_id' => $orgId,
@@ -257,7 +257,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Processing external inbound call to DID', [
+        Log::debug('VoiceRoutingManager: Processing external inbound call to DID', [
             'from_external' => $from,
             'to_did' => $to,
             'org_id' => $orgId,
@@ -293,7 +293,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Handling outbound direction call', [
+        Log::debug('VoiceRoutingManager: Outbound direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
@@ -329,7 +329,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::info('VoiceRoutingManager: Handling application direction call', [
+        Log::debug('VoiceRoutingManager: Application direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
@@ -392,7 +392,7 @@ class VoiceRoutingManager
      */
     private function handleExtensionRouting(Request $request, string $to, int $orgId): ?Response
     {
-        Log::info('VoiceRoutingManager: Checking for extension', [
+        Log::debug('VoiceRoutingManager: Checking for extension', [
             'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
             'org_id' => $orgId,
@@ -400,7 +400,7 @@ class VoiceRoutingManager
 
         $extension = $this->cache->getExtension($orgId, $to);
 
-        Log::info('VoiceRoutingManager: Extension lookup result', [
+        Log::debug('VoiceRoutingManager: Extension lookup result', [
             'extension_found' => $extension !== null,
             'extension_id' => $extension?->id,
             'extension_number' => $extension?->extension_number,
@@ -410,7 +410,7 @@ class VoiceRoutingManager
         ]);
 
         if ($extension && $extension->isActive()) {
-            Log::info('VoiceRoutingManager: Internal extension destination', [
+            Log::debug('VoiceRoutingManager: Internal extension destination', [
                 'extension' => $extension->extension_number,
                 'type' => $extension->type->value,
             ]);
@@ -418,7 +418,7 @@ class VoiceRoutingManager
             // Create destination array based on extension type
             $destination = $this->resolveExtensionDestination($extension, $orgId);
 
-            Log::info('VoiceRoutingManager: Extension destination resolution', [
+            Log::debug('VoiceRoutingManager: Extension destination resolution', [
                 'extension' => $extension->extension_number,
                 'type' => $extension->type->value,
                 'destination' => $destination,
@@ -445,7 +445,7 @@ class VoiceRoutingManager
      */
     private function handleDidRouting(Request $request, string $to, int $orgId): ?Response
     {
-        Log::info('VoiceRoutingManager: Checking for DID', [
+        Log::debug('VoiceRoutingManager: Checking for DID', [
             'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
             'org_id' => $orgId,
@@ -457,7 +457,7 @@ class VoiceRoutingManager
             ->where('status', 'active')
             ->first();
 
-        Log::info('VoiceRoutingManager: DID lookup result', [
+        Log::debug('VoiceRoutingManager: DID lookup result', [
             'did_found' => $did !== null,
             'did_id' => $did?->id,
             'did_phone_number' => $did?->phone_number,
@@ -466,7 +466,7 @@ class VoiceRoutingManager
 
         // If DID found, route according to DID configuration
         if ($did) {
-            Log::info('VoiceRoutingManager: Routing to DID destination', [
+            Log::debug('VoiceRoutingManager: Routing to DID destination', [
                 'did_id' => $did->id,
                 'routing_type' => $did->routing_type,
             ]);
@@ -533,7 +533,7 @@ class VoiceRoutingManager
                     $actionType = $schedule->getCurrentRoutingType();
                     $targetId = $schedule->getCurrentRoutingTargetId();
 
-                    Log::info('VoiceRoutingManager: Business hours routing', [
+                    Log::debug('VoiceRoutingManager: Business hours routing', [
                         'did_id' => $did->id,
                         'schedule_id' => $schedule->id,
                         'action_type' => $actionType->value,
@@ -659,7 +659,7 @@ class VoiceRoutingManager
             return response('', 204); // No Content - continue with normal routing
         }
 
-        Log::info('VoiceRoutingManager: Routing to business hours action', [
+        Log::debug('VoiceRoutingManager: Routing to business hours action', [
             'call_sid' => $callSid,
             'action' => $action,
             'organization_id' => $organizationId,
@@ -669,7 +669,7 @@ class VoiceRoutingManager
         $extension = $this->cache->getExtension($organizationId, $action);
 
         if ($extension && $extension->isActive()) {
-            Log::info('VoiceRoutingManager: Found extension for business hours action', [
+            Log::debug('VoiceRoutingManager: Found extension for business hours action', [
                 'call_sid' => $callSid,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
@@ -683,7 +683,7 @@ class VoiceRoutingManager
         }
 
         // If not an extension, treat as a direct extension number for dialing
-        Log::info('VoiceRoutingManager: Treating action as direct extension number', [
+        Log::debug('VoiceRoutingManager: Treating action as direct extension number', [
             'call_sid' => $callSid,
             'action' => $action,
         ]);
@@ -714,7 +714,7 @@ class VoiceRoutingManager
             ->where('organization_id', $organizationId)
             ->get();
 
-        Log::info('VoiceRoutingManager: Checking outbound whitelist entries', [
+        Log::debug('VoiceRoutingManager: Checking outbound whitelist entries', [
             'organization_id' => $organizationId,
             'destination_number' => $destinationNumber,
             'whitelist_entries_count' => $whitelistEntries->count(),
@@ -724,7 +724,7 @@ class VoiceRoutingManager
         $callingCode = $this->phoneNumberService->extractCallingCode($destinationNumber);
         $countryCode = $callingCode ? $this->phoneNumberService->callingCodeToCountryCode($callingCode) : null;
 
-        Log::info('VoiceRoutingManager: Extracted calling code and country code', [
+        Log::debug('VoiceRoutingManager: Extracted calling code and country code', [
             'destination_number' => $destinationNumber,
             'calling_code' => $callingCode,
             'country_code' => $countryCode,

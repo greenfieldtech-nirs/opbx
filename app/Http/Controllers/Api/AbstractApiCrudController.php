@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Controllers\Traits\HandlesApiErrors;
 use App\Http\Controllers\Traits\LogsOperations;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -23,7 +24,7 @@ use Illuminate\Support\Str;
  */
 abstract class AbstractApiCrudController extends Controller
 {
-    use ApiRequestHandler, LogsOperations;
+    use ApiRequestHandler, HandlesApiErrors, LogsOperations;
 
     // ============================================================================
     // CONTROLLER CONSTANTS
@@ -660,10 +661,12 @@ abstract class AbstractApiCrudController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => $this->getCreateErrorMessage(),
-                'message' => $this->getCreateUserErrorMessage(),
-            ], 500);
+            return $this->errorResponse(
+                $this->getCreateUserErrorMessage(),
+                500,
+                'CREATION_ERROR',
+                ['resource' => $this->getResourceKey()]
+            );
         }
     }
 
@@ -800,10 +803,12 @@ abstract class AbstractApiCrudController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => $this->getUpdateErrorMessage(),
-                'message' => $this->getUpdateUserErrorMessage(),
-            ], 500);
+            return $this->errorResponse(
+                $this->getUpdateUserErrorMessage(),
+                500,
+                'UPDATE_ERROR',
+                ['resource' => $this->getResourceKey()]
+            );
         } finally {
             // Always release the lock if acquired
             $this->releaseUpdateLock($lock ?? null, $model, $request);
@@ -881,10 +886,12 @@ abstract class AbstractApiCrudController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'error' => $this->getDeleteErrorMessage(),
-                'message' => $this->getDeleteUserErrorMessage(),
-            ], 500);
+            return $this->errorResponse(
+                $this->getDeleteUserErrorMessage(),
+                500,
+                'DELETE_ERROR',
+                ['resource' => $this->getResourceKey()]
+            );
         }
     }
 }

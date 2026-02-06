@@ -126,7 +126,7 @@ class IvrRoutingStrategy implements RoutingStrategy
     }
 
     /**
-     * Resolve audio file path to a full URL that Cloudonix can fetch.
+     * Resolve audio file path to a signed URL that Cloudonix can fetch.
      */
     private function resolveAudioUrl(Request $request, string $audioPath, string $baseUrl): string
     {
@@ -135,8 +135,14 @@ class IvrRoutingStrategy implements RoutingStrategy
             return $audioPath;
         }
 
-        // For MinIO-stored files, use the public proxy route
+        // For MinIO-stored files, generate a signed URL with 1-hour expiry
         $orgId = (int) $request->input('_organization_id');
-        return $baseUrl . '/api/storage/recordings/' . $orgId . '/' . urlencode($audioPath);
+
+        return \App\Http\Controllers\Api\RecordingsController::generateSignedRecordingUrl(
+            $baseUrl,
+            $orgId,
+            $audioPath,
+            3600
+        );
     }
 }

@@ -205,6 +205,7 @@ Route::prefix('v1')->group(function (): void {
         // Extensions - Password operations (using ExtensionPasswordController)
         Route::prefix('extensions/{extension}')->group(function (): void {
             Route::get('password', [ExtensionPasswordController::class, 'getPassword'])
+                ->middleware(['sensitive-operations'])
                 ->name('extensions.password');
             Route::put('reset-password', [ExtensionPasswordController::class, 'resetPassword'])
                 ->middleware(['auth:sanctum', 'sensitive-operations'])
@@ -276,6 +277,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
+            Route::post('cloudonix/reveal-keys', [SettingsController::class, 'revealKeys'])
+                ->middleware('sensitive-operations')
+                ->name('settings.cloudonix.reveal-keys');
         });
 
     });
