@@ -541,8 +541,7 @@ class CloudonixWebhookController extends Controller
 
             return response()->json([
                 'error' => 'Session update processing failed',
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'message' => 'An internal error occurred.',
             ], 500);
         }
     }
