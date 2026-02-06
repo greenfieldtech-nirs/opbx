@@ -61,18 +61,19 @@ class SessionUpdateController extends Controller
                 // This ensures we get the most recent status for each session
                 // We also exclude sessions that have ever been deleted or finalized,
                 // even if there are stale records after the deletion
+                $subquery = DB::table('session_updates')
+                    ->select('session_id', DB::raw('MAX(id) as max_id'))
+                    ->where('organization_id', $organizationId)
+                    ->whereIn('status', ['processing', 'ringing', 'connected', 'answer'])
+                    ->where('updated_at', '>=', now()->subHours(24))
+                    ->groupBy('session_id');
+
                 $activeCalls = DB::table('session_updates as su1')
                     ->select('su1.*')
-                    ->join(DB::raw('(SELECT session_id, MAX(id) as max_id 
-                                     FROM session_updates 
-                                     WHERE organization_id = '.$organizationId.'
-                                     AND status IN ("processing", "ringing", "connected", "answer")
-                                     AND updated_at >= "'.now()->subHours(24)->toDateTimeString().'"
-                                     GROUP BY session_id) as su2'),
-                        function ($join) {
-                            $join->on('su1.session_id', '=', 'su2.session_id')
-                                ->on('su1.id', '=', 'su2.max_id');
-                        })
+                    ->joinSub($subquery, 'su2', function ($join) {
+                        $join->on('su1.session_id', '=', 'su2.session_id')
+                            ->on('su1.id', '=', 'su2.max_id');
+                    })
                     ->where('su1.organization_id', $organizationId)
                     ->whereNotIn('su1.session_id', $completedSessionIds)
                     ->whereNotIn('su1.action', ['deleted', 'cdr_final_status'])
