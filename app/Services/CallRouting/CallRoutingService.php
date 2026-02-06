@@ -223,17 +223,30 @@ class CallRoutingService
         $cxml = $this->resilientCache->lock(
             $lockKey,
             function () use ($ringGroup, $didId) {
+                // Use database lock to prevent stale reads
+                $freshGroup = \App\Models\RingGroup::where('id', $ringGroup->id)
+                    ->lockForUpdate()
+                    ->with('members.extension')
+                    ->first();
+
+                if (! $freshGroup) {
+                    Log::error('Ring group not found during routing', [
+                        'ring_group_id' => $ringGroup->id,
+                    ]);
+
+                    return $this->generateErrorCxml('Ring group not found');
+                }
+
                 // Get fresh member list with lock held
-                $ringGroup->refresh();
-                $members = $ringGroup->getMembers();
+                $members = $freshGroup->getMembers();
 
                 if ($members->isEmpty()) {
                     Log::error('Ring group has no active members', [
                         'did_id' => $didId,
-                        'ring_group_id' => $ringGroup->id,
+                        'ring_group_id' => $freshGroup->id,
                     ]);
 
-                    return $this->handleRingGroupFallback($ringGroup);
+                    return $this->handleRingGroupFallback($freshGroup);
                 }
 
                 $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())
@@ -244,27 +257,27 @@ class CallRoutingService
                 if (empty($sipUris)) {
                     Log::error('Ring group members have no SIP URIs', [
                         'did_id' => $didId,
-                        'ring_group_id' => $ringGroup->id,
+                        'ring_group_id' => $freshGroup->id,
                     ]);
 
-                    return $this->handleRingGroupFallback($ringGroup);
+                    return $this->handleRingGroupFallback($freshGroup);
                 }
 
                 Log::info('Routing call to ring group', [
                     'did_id' => $didId,
-                    'ring_group_id' => $ringGroup->id,
-                    'strategy' => $ringGroup->strategy->value,
+                    'ring_group_id' => $freshGroup->id,
+                    'strategy' => $freshGroup->strategy->value,
                     'member_count' => count($sipUris),
                 ]);
 
                 // For v1, we'll support simultaneous ringing
                 // Round-robin and sequential would require additional state management
-                if ($ringGroup->strategy === RingGroupStrategy::SIMULTANEOUS) {
-                    return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+                if ($freshGroup->strategy === RingGroupStrategy::SIMULTANEOUS) {
+                    return CxmlBuilder::dialRingGroup($sipUris, $freshGroup->timeout);
                 }
 
                 // NOTE: Currently only supports simultaneous ringing. Round-robin and sequential strategies planned for Phase 4.
-                return CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
+                return CxmlBuilder::dialRingGroup($sipUris, $freshGroup->timeout);
             },
             5,  // Lock duration in seconds
             3   // Wait timeout in seconds
