@@ -21,14 +21,20 @@ use Illuminate\Support\Facades\Log;
 class VoiceRoutingCacheService
 {
     /**
-     * TTL for extension cache entries (30 minutes)
+     * Get TTL for extension cache entries
      */
-    private const EXTENSION_CACHE_TTL = 1800;
+    private function getExtensionCacheTtl(): int
+    {
+        return config('voice_routing.cache.extension_ttl', 1800);
+    }
 
     /**
-     * TTL for business hours schedule cache entries (15 minutes)
+     * Get TTL for business hours schedule cache entries
      */
-    private const BUSINESS_HOURS_CACHE_TTL = 900;
+    private function getBusinessHoursCacheTtl(): int
+    {
+        return config('voice_routing.cache.business_hours_ttl', 900);
+    }
 
     /**
      * Cache key prefix for extensions
@@ -57,14 +63,14 @@ class VoiceRoutingCacheService
             // Try to get from cache
             $extension = Cache::remember(
                 $cacheKey,
-                self::EXTENSION_CACHE_TTL,
+                $this->getExtensionCacheTtl(),
                 function () use ($organizationId, $extensionNumber) {
-                    Log::info('Voice routing cache: Extension cache miss, loading from database', [
+                    Log::debug('Voice routing cache: Extension cache miss', [
                         'organization_id' => $organizationId,
                         'extension_number' => $extensionNumber,
                     ]);
 
-                    $query = Extension::withoutGlobalScope(OrganizationScope::class)
+                    return Extension::withoutGlobalScope(OrganizationScope::class)
                         ->with([
                             'user',
                             'aiAssistant' => function ($query) use ($organizationId) {
@@ -73,54 +79,10 @@ class VoiceRoutingCacheService
                             },
                         ])
                         ->where('organization_id', $organizationId)
-                        ->where('extension_number', $extensionNumber);
-
-                    Log::info('Voice routing cache: Executing extension query', [
-                        'sql' => $query->toSql(),
-                        'bindings' => $query->getBindings(),
-                    ]);
-
-                    $extension = $query->first();
-
-                    Log::info('Voice routing cache: Extension database query result', [
-                        'organization_id' => $organizationId,
-                        'extension_number' => $extensionNumber,
-                        'extension_found' => $extension !== null,
-                        'extension_id' => $extension?->id,
-                        'extension_type' => $extension?->type,
-                        'extension_status' => $extension?->status,
-                    ]);
-
-                    // Debug: Show all extensions in the database
-                    $allExtensions = Extension::withoutGlobalScope(OrganizationScope::class)
-                        ->select('id', 'organization_id', 'extension_number', 'type', 'status')
-                        ->get();
-
-                    Log::info('Voice routing cache: All extensions in database', [
-                        'total_count' => $allExtensions->count(),
-                        'extensions' => $allExtensions->map(function ($ext) {
-                            return [
-                                'id' => $ext->id,
-                                'org_id' => $ext->organization_id,
-                                'number' => $ext->extension_number,
-                                'type' => $ext->type,
-                                'status' => $ext->status,
-                            ];
-                        })->toArray(),
-                    ]);
-
-                    return $extension;
+                        ->where('extension_number', $extensionNumber)
+                        ->first();
                 }
             );
-
-            if ($extension) {
-                Log::info('Voice routing cache: Extension retrieved', [
-                    'organization_id' => $organizationId,
-                    'extension_number' => $extensionNumber,
-                    'extension_id' => $extension->id,
-                    'from_cache' => Cache::has($cacheKey),
-                ]);
-            }
 
             return $extension;
         } catch (\Exception $e) {
@@ -151,7 +113,7 @@ class VoiceRoutingCacheService
             // Try to get from cache
             $schedule = Cache::remember(
                 $cacheKey,
-                self::BUSINESS_HOURS_CACHE_TTL,
+                $this->getBusinessHoursCacheTtl(),
                 function () use ($organizationId) {
                     Log::debug('Voice routing cache: Business hours cache miss, loading from database', [
                         'organization_id' => $organizationId,
