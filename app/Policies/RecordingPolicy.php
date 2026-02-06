@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Recording;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class RecordingPolicy
 {
@@ -13,7 +12,7 @@ class RecordingPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(['owner', 'admin']) &&
+        return ($user->isOwner() || $user->isPBXAdmin()) &&
                $user->organization_id !== null;
     }
 
@@ -22,7 +21,7 @@ class RecordingPolicy
      */
     public function view(User $user, Recording $recording): bool
     {
-        return $user->hasRole(['owner', 'admin']) &&
+        return ($user->isOwner() || $user->isPBXAdmin()) &&
                $user->organization_id === $recording->organization_id;
     }
 
@@ -31,7 +30,7 @@ class RecordingPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['owner', 'admin']) &&
+        return ($user->isOwner() || $user->isPBXAdmin()) &&
                $user->organization_id !== null;
     }
 
@@ -40,7 +39,7 @@ class RecordingPolicy
      */
     public function update(User $user, Recording $recording): bool
     {
-        return $user->hasRole(['owner', 'admin']) &&
+        return ($user->isOwner() || $user->isPBXAdmin()) &&
                $user->organization_id === $recording->organization_id;
     }
 
@@ -49,7 +48,7 @@ class RecordingPolicy
      */
     public function delete(User $user, Recording $recording): bool
     {
-        return $user->hasRole(['owner', 'admin']) &&
+        return ($user->isOwner() || $user->isPBXAdmin()) &&
                $user->organization_id === $recording->organization_id;
     }
 
