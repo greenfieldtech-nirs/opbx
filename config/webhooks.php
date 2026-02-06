@@ -63,4 +63,16 @@ return [
         */
         'max_age' => env('WEBHOOK_REPLAY_MAX_AGE', 300),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | CDR Webhook Authentication
+    |--------------------------------------------------------------------------
+    |
+    | Optional authentication key for CDR webhooks. When set, CDR webhooks
+    | must include this key in the X-CDR-Auth-Key header or as a Bearer token.
+    | Leave empty to disable CDR auth key verification (domain UUID only).
+    |
+    */
+    'cdr_auth_key' => env('CLOUDONIX_CDR_AUTH_KEY'),
 ];

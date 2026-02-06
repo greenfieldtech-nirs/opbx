@@ -58,9 +58,26 @@ class VerifyCloudonixSignature
      *
      * CDR webhooks from Cloudonix do not include Authorization headers.
      * We identify the organization by the domain UUID or Name in the payload.
+     * Additional verification via CDR auth key if configured.
      */
     private function handleCdrAuthentication(Request $request, Closure $next): Response
     {
+        // Verify CDR auth key if configured
+        $expectedKey = config('webhooks.cdr_auth_key');
+        if ($expectedKey) {
+            $authKey = $request->header('X-CDR-Auth-Key') ?? $request->bearerToken();
+            if (! hash_equals($expectedKey, $authKey ?? '')) {
+                Log::warning('CDR webhook auth key mismatch', [
+                    'ip' => $request->ip(),
+                    'path' => $request->path(),
+                ]);
+
+                return response()->json([
+                    'error' => 'Unauthorized - Invalid auth key',
+                ], Response::HTTP_UNAUTHORIZED);
+            }
+        }
+
         $payload = $request->json()->all();
         $settings = null;
 
@@ -71,7 +88,7 @@ class VerifyCloudonixSignature
         }
 
         // 2. Try owner.domain.name -> domain_name
-        if (!$settings) {
+        if (! $settings) {
             $domainName = $payload['owner']['domain']['name'] ?? null;
             if ($domainName) {
                 $settings = CloudonixSettings::where('domain_name', $domainName)->first();
@@ -79,11 +96,11 @@ class VerifyCloudonixSignature
         }
 
         // 3. Try top-level domain -> domain_name
-        if (!$settings && isset($payload['domain'])) {
+        if (! $settings && isset($payload['domain'])) {
             $settings = CloudonixSettings::where('domain_name', $payload['domain'])->first();
         }
 
-        if (!$settings) {
+        if (! $settings) {
             Log::warning('CDR webhook for unknown domain', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -137,7 +154,7 @@ class VerifyCloudonixSignature
         }
 
         // Extract Bearer token
-        if (!str_starts_with($authHeader, 'Bearer ')) {
+        if (! str_starts_with($authHeader, 'Bearer ')) {
             Log::warning('Webhook Authorization header not Bearer format', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -161,7 +178,7 @@ class VerifyCloudonixSignature
 
         // Check for 'domain' in payload (maps to domain_name)
         // Cloudonix session updates often send 'domain' instead of 'domain_uuid'
-        if (!$settings && isset($payload['domain'])) {
+        if (! $settings && isset($payload['domain'])) {
             $settings = CloudonixSettings::where('domain_name', $payload['domain'])->first();
         }
 
@@ -169,7 +186,7 @@ class VerifyCloudonixSignature
         // and Laravel's encrypted cast is non-deterministic. We must rely on
         // domain_uuid or domain_name to identify the organization first.
 
-        if (!$settings) {
+        if (! $settings) {
             Log::warning('Webhook: Organization not found for Bearer token', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -182,8 +199,8 @@ class VerifyCloudonixSignature
 
         // Verify token matches (redundant check since we already searched by token, but safe)
         if (
-            !empty($settings->domain_requests_api_key) &&
-            !hash_equals($settings->domain_requests_api_key, $providedToken)
+            ! empty($settings->domain_requests_api_key) &&
+            ! hash_equals($settings->domain_requests_api_key, $providedToken)
         ) {
             Log::warning('Webhook: Token mismatch', [
                 'ip' => $request->ip(),
