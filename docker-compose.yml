@@ -134,8 +134,11 @@ services:
   mysql:
     image: mysql:8.0
     container_name: opbx_mysql
+    # SECURITY: MySQL port exposure is disabled by default for security
+    # Set DB_EXPOSE_PORT in .env to enable external access (not recommended for production)
+    # MySQL remains accessible within the Docker network at port 3306
     ports:
-      - "${DB_PORT:-3306}:3306"
+      - "${DB_EXPOSE_PORT:-}:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootsecret}
       - MYSQL_DATABASE=${DB_DATABASE:-opbx}
@@ -178,9 +181,12 @@ services:
   minio:
     image: minio/minio:latest
     container_name: opbx_minio
+    # SECURITY: MinIO ports are disabled by default for security
+    # Set MINIO_EXPOSE_PORT and MINIO_CONSOLE_EXPOSE_PORT in .env to enable external access
+    # MinIO remains accessible within the Docker network
     ports:
-      - "9000:9000"  # MinIO API
-      - "9001:9001"  # MinIO Console (Web UI)
+      - "${MINIO_EXPOSE_PORT:-}:9000"  # MinIO API
+      - "${MINIO_CONSOLE_EXPOSE_PORT:-}:9001"  # MinIO Console (Web UI)
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
