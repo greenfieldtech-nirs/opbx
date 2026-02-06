@@ -58,11 +58,11 @@ services:
       - DB_HOST=mysql
       - DB_DATABASE=${DB_DATABASE:-opbx}
       - DB_USERNAME=${DB_USERNAME:-opbx}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set in .env}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set in .env}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set in .env}
       - MINIO_REGION=us-east-1
       - MINIO_BUCKET=recordings
       - MINIO_ENDPOINT=http://minio:9000
@@ -121,7 +121,7 @@ services:
       - DB_HOST=mysql
       - DB_DATABASE=${DB_DATABASE:-opbx}
       - DB_USERNAME=${DB_USERNAME:-opbx}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set in .env}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
@@ -140,10 +140,10 @@ services:
     ports:
       - "${DB_EXPOSE_PORT:-}:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootsecret}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set in .env}
       - MYSQL_DATABASE=${DB_DATABASE:-opbx}
       - MYSQL_USER=${DB_USERNAME:-opbx}
-      - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
+      - MYSQL_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     volumes:
       - ./volumes/mysql:/var/lib/mysql
     networks:
@@ -188,8 +188,8 @@ services:
       - "${MINIO_EXPOSE_PORT:-}:9000"  # MinIO API
       - "${MINIO_CONSOLE_EXPOSE_PORT:-}:9001"  # MinIO Console (Web UI)
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set in .env}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
       MINIO_SCANNER: "off"  # Disable scanner to reduce memory usage
     volumes:
