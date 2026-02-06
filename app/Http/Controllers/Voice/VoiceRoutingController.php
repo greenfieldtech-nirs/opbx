@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Voice;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Voice\VoiceRoutingRequest;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -16,8 +16,7 @@ class VoiceRoutingController extends Controller
 {
     public function __construct(
         private readonly VoiceRoutingManager $manager
-    ) {
-    }
+    ) {}
 
     /**
      * Get or generate a unique request ID for logging.
@@ -31,7 +30,7 @@ class VoiceRoutingController extends Controller
      * Handle inbound call routing.
      * Delegates to VoiceRoutingManager.
      */
-    public function handleInbound(Request $request): Response
+    public function handleInbound(VoiceRoutingRequest $request): Response
     {
         $orgId = $request->input('_organization_id');
 
@@ -50,7 +49,7 @@ class VoiceRoutingController extends Controller
      * Handle ring group callback.
      * Delegates to VoiceRoutingManager.
      */
-    public function handleRingGroupCallback(Request $request): Response
+    public function handleRingGroupCallback(RingGroupCallbackRequest $request): Response
     {
         $requestId = $this->getRequestId();
 
@@ -76,7 +75,7 @@ class VoiceRoutingController extends Controller
      * Handle IVR input.
      * Delegates to VoiceRoutingManager.
      */
-    public function handleIvrInput(Request $request): Response
+    public function handleIvrInput(IvrInputRequest $request): Response
     {
         return $this->manager->handleIvrInput($request);
     }
