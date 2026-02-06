@@ -15,6 +15,7 @@ use App\Models\DidNumber;
 use App\Models\SessionUpdate;
 use App\Services\CallRouting\CallRoutingService;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -41,6 +42,7 @@ class CloudonixWebhookController extends Controller
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $from = $request->input('From') ?? $request->input('from');
         $to = $request->input('To') ?? $request->input('to');
+        $cacheKey = "idem:call-initiated:{$callId}";
 
         Log::info('Received call-initiated webhook', [
             'call_id' => $callId,
@@ -49,114 +51,161 @@ class CloudonixWebhookController extends Controller
             'payload' => $request->all(),
         ]);
 
-        // Normalize phone numbers
-        $fromNumber = $this->normalizePhoneNumber($from);
-        $toNumber = $this->normalizePhoneNumber($to);
-
-        // Determine call direction and find organization
-        $direction = $request->input('Direction') ?? 'unknown';
-        $organizationId = null;
-        $organization = null;
-
-        // For internal calls (subscriber direction), check extensions first
-        if ($direction === 'subscriber') {
-            // Find organization by checking if extension exists within any organization
-            $extension = \App\Models\Extension::with('organization:id,name,status')
-                ->where('extension_number', $toNumber)
-                ->where('status', 'active')
-                ->first();
-
-            if ($extension && $extension->organization) {
-                $organization = $extension->organization;
-                $organizationId = $organization->id;
-
-                Log::info('Found organization via extension for internal call', [
-                    'call_id' => $callId,
-                    'to_number' => $toNumber,
-                    'organization_id' => $organizationId,
-                    'extension_id' => $extension->id,
-                    'extension_type' => $extension->type->value,
-                ]);
-            }
-        }
-
-        // If no organization found via extension, try DID-based lookup (external calls)
-        if (! $organizationId) {
-            $didNumber = DidNumber::with('organization:id,name,status')
-                ->where('phone_number', $toNumber)
-                ->where('status', 'active')
-                ->first();
-
-            if ($didNumber && $didNumber->organization) {
-                $organization = $didNumber->organization;
-                $organizationId = $organization->id;
-
-                Log::info('Found organization via DID for external call', [
-                    'call_id' => $callId,
-                    'to_number' => $toNumber,
-                    'organization_id' => $organizationId,
-                    'did_id' => $didNumber->id,
-                ]);
-            }
-        }
-
-        // Validate organization was found
-        if (! $organizationId || ! $organization) {
-            Log::warning('No organization found for call (neither extension nor DID)', [
+        // Check for cached response (controller-level idempotency)
+        $cachedCxml = Cache::get($cacheKey);
+        if ($cachedCxml) {
+            Log::info('Returning cached CXML for duplicate call-initiated', [
                 'call_id' => $callId,
+            ]);
+
+            return response($cachedCxml, 200)
+                ->header('Content-Type', 'application/xml');
+        }
+
+        // Acquire lock to prevent concurrent processing of the same call
+        $lock = Cache::lock("lock:call-initiated:{$callId}", 30);
+        if (! $lock->get()) {
+            // Another request is processing this call - wait briefly then return cached response
+            Log::info('Call-initiated lock contention, waiting for cached response', [
+                'call_id' => $callId,
+            ]);
+
+            sleep(1);
+            $cachedCxml = Cache::get($cacheKey);
+            if ($cachedCxml) {
+                return response($cachedCxml, 200)
+                    ->header('Content-Type', 'application/xml');
+            }
+
+            // Lock held but no cached response - return safe fallback
+            return response(
+                '<Response><Say>Please wait while we connect your call.</Say></Response>',
+                200
+            )->header('Content-Type', 'application/xml');
+        }
+
+        try {
+            // Normalize phone numbers
+            $fromNumber = $this->normalizePhoneNumber($from);
+            $toNumber = $this->normalizePhoneNumber($to);
+
+            // Determine call direction and find organization
+            $direction = $request->input('Direction') ?? 'unknown';
+            $organizationId = null;
+            $organization = null;
+
+            // For internal calls (subscriber direction), check extensions first
+            if ($direction === 'subscriber') {
+                // Find organization by checking if extension exists within any organization
+                $extension = \App\Models\Extension::with('organization:id,name,status')
+                    ->where('extension_number', $toNumber)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($extension && $extension->organization) {
+                    $organization = $extension->organization;
+                    $organizationId = $organization->id;
+
+                    Log::info('Found organization via extension for internal call', [
+                        'call_id' => $callId,
+                        'to_number' => $toNumber,
+                        'organization_id' => $organizationId,
+                        'extension_id' => $extension->id,
+                        'extension_type' => $extension->type->value,
+                    ]);
+                }
+            }
+
+            // If no organization found via extension, try DID-based lookup (external calls)
+            if (! $organizationId) {
+                $didNumber = DidNumber::with('organization:id,name,status')
+                    ->where('phone_number', $toNumber)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($didNumber && $didNumber->organization) {
+                    $organization = $didNumber->organization;
+                    $organizationId = $organization->id;
+
+                    Log::info('Found organization via DID for external call', [
+                        'call_id' => $callId,
+                        'to_number' => $toNumber,
+                        'organization_id' => $organizationId,
+                        'did_id' => $didNumber->id,
+                    ]);
+                }
+            }
+
+            // Validate organization was found
+            if (! $organizationId || ! $organization) {
+                Log::warning('No organization found for call (neither extension nor DID)', [
+                    'call_id' => $callId,
+                    'to_number' => $toNumber,
+                    'from' => $fromNumber,
+                    'direction' => $direction,
+                ]);
+
+                return response(
+                    '<Response><Say>This number is not configured.</Say><Hangup/></Response>',
+                    200
+                )->header('Content-Type', 'application/xml');
+            }
+
+            // Validate organization is active
+            if ($organization->status !== 'active') {
+                Log::error('Organization is not active', [
+                    'call_id' => $callId,
+                    'organization_id' => $organizationId,
+                    'organization_status' => $organization->status,
+                ]);
+
+                return response(
+                    '<Response><Say>Service temporarily unavailable.</Say><Hangup/></Response>',
+                    200
+                )->header('Content-Type', 'application/xml');
+            }
+
+            Log::info('Webhook validated for organization', [
+                'call_id' => $callId,
+                'organization_id' => $organizationId,
+                'organization_name' => $organization->name,
                 'to_number' => $toNumber,
-                'from' => $fromNumber,
                 'direction' => $direction,
             ]);
 
-            return response(
-                '<Response><Say>This number is not configured.</Say><Hangup/></Response>',
-                200
-            )->header('Content-Type', 'application/xml');
-        }
+            // Handle routing based on call type
+            if ($direction === 'subscriber') {
+                // Internal call - check if it's a direct extension dial
+                $extension = \App\Models\Extension::where('organization_id', $organizationId)
+                    ->where('extension_number', $toNumber)
+                    ->where('status', 'active')
+                    ->first();
 
-        // Validate organization is active
-        if ($organization->status !== 'active') {
-            Log::error('Organization is not active', [
-                'call_id' => $callId,
-                'organization_id' => $organizationId,
-                'organization_status' => $organization->status,
-            ]);
+                if ($extension) {
+                    // Direct extension routing
+                    Log::info('Routing internal call to extension', [
+                        'call_id' => $callId,
+                        'extension_id' => $extension->id,
+                        'extension_type' => $extension->type->value,
+                    ]);
 
-            return response(
-                '<Response><Say>Service temporarily unavailable.</Say><Hangup/></Response>',
-                200
-            )->header('Content-Type', 'application/xml');
-        }
+                    $cxml = $this->routeExtensionDirectly($extension, $request, $organizationId);
+                } else {
+                    // No direct extension found, fall back to DID routing
+                    Log::info('No direct extension found, falling back to DID routing', [
+                        'call_id' => $callId,
+                        'to_number' => $toNumber,
+                    ]);
 
-        Log::info('Webhook validated for organization', [
-            'call_id' => $callId,
-            'organization_id' => $organizationId,
-            'organization_name' => $organization->name,
-            'to_number' => $toNumber,
-            'direction' => $direction,
-        ]);
-
-        // Handle routing based on call type
-        if ($direction === 'subscriber') {
-            // Internal call - check if it's a direct extension dial
-            $extension = \App\Models\Extension::where('organization_id', $organizationId)
-                ->where('extension_number', $toNumber)
-                ->where('status', 'active')
-                ->first();
-
-            if ($extension) {
-                // Direct extension routing
-                Log::info('Routing internal call to extension', [
-                    'call_id' => $callId,
-                    'extension_id' => $extension->id,
-                    'extension_type' => $extension->type->value,
-                ]);
-
-                $cxml = $this->routeExtensionDirectly($extension, $request, $organizationId);
+                    $cxml = $this->routingService->routeInboundCall(
+                        $toNumber,
+                        $fromNumber,
+                        $organizationId
+                    );
+                }
             } else {
-                // No direct extension found, fall back to DID routing
-                Log::info('No direct extension found, falling back to DID routing', [
+                // External call - use DID-based routing
+                Log::info('Routing external call via DID', [
                     'call_id' => $callId,
                     'to_number' => $toNumber,
                 ]);
@@ -167,35 +216,28 @@ class CloudonixWebhookController extends Controller
                     $organizationId
                 );
             }
-        } else {
-            // External call - use DID-based routing
-            Log::info('Routing external call via DID', [
+
+            // Cache the CXML response for idempotency (1 hour TTL)
+            Cache::put($cacheKey, $cxml, 3600);
+
+            // Dispatch job to process webhook asynchronously (CDR creation)
+            ProcessInboundCallJob::dispatch([
                 'call_id' => $callId,
+                'from_number' => $fromNumber,
                 'to_number' => $toNumber,
+                'webhook_data' => $request->all(),
             ]);
 
-            $cxml = $this->routingService->routeInboundCall(
-                $toNumber,
-                $fromNumber,
-                $organizationId
-            );
+            Log::info('Returning CXML response', [
+                'call_id' => $callId,
+                'cxml_length' => strlen($cxml),
+            ]);
+
+            return response($cxml, 200)
+                ->header('Content-Type', 'application/xml');
+        } finally {
+            $lock->release();
         }
-
-        // Dispatch job to process webhook asynchronously (CDR creation)
-        ProcessInboundCallJob::dispatch([
-            'call_id' => $callId,
-            'from_number' => $fromNumber,
-            'to_number' => $toNumber,
-            'webhook_data' => $request->all(),
-        ]);
-
-        Log::info('Returning CXML response', [
-            'call_id' => $callId,
-            'cxml_length' => strlen($cxml),
-        ]);
-
-        return response($cxml, 200)
-            ->header('Content-Type', 'application/xml');
     }
 
     /**

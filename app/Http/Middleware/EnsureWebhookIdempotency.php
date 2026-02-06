@@ -209,14 +209,20 @@ class EnsureWebhookIdempotency
         // Priority 2: Cloudonix webhook standard fields
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $eventType = $request->input('CallStatus') ?? $request->input('event_type');
-        $timestamp = $request->input('timestamp') ?? $request->input('CallTimestamp');
+
+        // Use route name as fallback event type - the event type is implicit in the
+        // route for webhooks like call-initiated that don't carry a status field
+        if ($callId && !$eventType) {
+            $eventType = $request->route()?->getName();
+        }
 
         if ($callId && $eventType) {
-            // Include timestamp to prevent replay attacks and ensure uniqueness
+            // Use call_id + event_type for a stable idempotency key.
+            // Deliberately excludes timestamp so retries of the same event
+            // produce the same key and are correctly deduplicated.
             $keyComponents = [
                 'call_id' => $callId,
                 'event_type' => $eventType,
-                'timestamp' => $timestamp ?? time(),
             ];
 
             return hash('sha256', json_encode($keyComponents, JSON_PRESERVE_ZERO_FRACTION));
