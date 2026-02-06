@@ -77,15 +77,14 @@ class ExtensionPasswordController extends Controller
             'security_event' => true,
         ]);
 
-        return response()->json([
+        return $this->sensitiveResponse([
             'data' => [
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
                 'password' => $extension->password,
                 'warning' => 'This password is only shown once. Store it securely.',
             ],
-        ])->header('X-Security-Warning', 'Password exposed in response - handle securely')
-            ->header('X-Password-Expires', 'Once retrieved, regenerate if needed');
+        ]);
     }
 
     /**
@@ -140,7 +139,7 @@ class ExtensionPasswordController extends Controller
                 'security_event' => true,
             ]);
 
-            return response()->json([
+            return $this->sensitiveResponse([
                 'message' => 'Password reset successfully.',
                 'data' => [
                     'extension_id' => $extension->id,
@@ -148,8 +147,7 @@ class ExtensionPasswordController extends Controller
                     'new_password' => $newPassword,
                     'warning' => 'This is the only time the password will be shown. Store it securely.',
                 ],
-            ])->header('X-Security-Warning', 'Password exposed in response - handle securely')
-                ->header('X-Password-Expires', 'Once retrieved, regenerate if needed');
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to reset extension password', [
                 'request_id' => $requestId,
@@ -165,5 +163,16 @@ class ExtensionPasswordController extends Controller
                 'message' => 'An error occurred while resetting the password.',
             ], 500);
         }
+    }
+
+    /**
+     * Return a JSON response with security headers that prevent caching.
+     */
+    private function sensitiveResponse(array $data, int $status = 200): JsonResponse
+    {
+        return response()->json($data, $status)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('X-Content-Type-Options', 'nosniff');
     }
 }

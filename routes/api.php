@@ -205,6 +205,7 @@ Route::prefix('v1')->group(function (): void {
         // Extensions - Password operations (using ExtensionPasswordController)
         Route::prefix('extensions/{extension}')->group(function (): void {
             Route::get('password', [ExtensionPasswordController::class, 'getPassword'])
+                ->middleware(['sensitive-operations'])
                 ->name('extensions.password');
             Route::put('reset-password', [ExtensionPasswordController::class, 'resetPassword'])
                 ->middleware(['auth:sanctum', 'sensitive-operations'])

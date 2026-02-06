@@ -21,52 +21,39 @@ class RateLimitSensitiveOperations
     /**
      * Handle incoming request.
      */
-    public function handle(Request $request, Closure $next): Response
-    {
-        // Skip rate limiting for authenticated admin users
-        if ($request->user()?->isAdmin()) {
-            return $next($request);
-        }
-
-        // Define sensitive operations
-        $sensitiveRoutes = [
-            'extensions/password/reset',
-            'extensions/settings',
-            'users/settings',
-            'users/profile',
-        ];
-
-        // Check if current route is sensitive
-        $currentRoute = $request->route() ? $request->route()->getName() : null;
-        $isSensitiveRoute = $currentRoute && in_array($currentRoute, $sensitiveRoutes);
-
-        if ($isSensitiveRoute) {
-            // Rate limit to 5 requests per minute
-            $key = 'sensitive-operation:' . ($request->user() ? $request->user()->id : 'anonymous') . ':' . $request->ip();
-
-            if (RateLimiter::tooManyAttempts($key, $maxAttempts = 5, $decayMinutes = 1)) {
-                Log::warning('Rate limit exceeded for sensitive operation', [
-                    'route' => $currentRoute,
-                    'user_id' => $request->user()?->id,
-                    'ip' => $request->ip(),
-                    'attempts' => RateLimiter::attempts($key),
-                ]);
-
-                return response()->json([
-                    'error' => 'Too many requests',
-                    'message' => 'Please wait before trying again. Rate limit: 5 requests per minute.',
-                ], 429);
-            }
-        }
-
-        return $next($request);
-    }
+    /**
+     * Maximum attempts per minute for sensitive operations.
+     */
+    private const MAX_ATTEMPTS = 5;
 
     /**
-     * Get maximum number of attempts.
+     * Decay period in seconds.
      */
-    protected function getMaxAttempts(int $maxAttempts): int
+    private const DECAY_SECONDS = 60;
+
+    public function handle(Request $request, Closure $next): Response
     {
-        return $maxAttempts;
+        // Rate limit by user + IP combination
+        $userId = $request->user()?->id ?? 'anonymous';
+        $key = "sensitive-operation:{$userId}:{$request->ip()}";
+
+        if (RateLimiter::tooManyAttempts($key, self::MAX_ATTEMPTS)) {
+            Log::warning('Rate limit exceeded for sensitive operation', [
+                'route' => $request->route()?->getName(),
+                'user_id' => $request->user()?->id,
+                'ip' => $request->ip(),
+                'attempts' => RateLimiter::attempts($key),
+            ]);
+
+            return response()->json([
+                'error' => 'Too many requests',
+                'message' => 'Please wait before trying again.',
+                'retry_after' => RateLimiter::availableIn($key),
+            ], 429)->header('Retry-After', (string) RateLimiter::availableIn($key));
+        }
+
+        RateLimiter::hit($key, self::DECAY_SECONDS);
+
+        return $next($request);
     }
 }

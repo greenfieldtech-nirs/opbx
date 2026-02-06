@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhook.idempotency' => \App\Http\Middleware\EnsureWebhookIdempotency::class,
             'voice.webhook.auth' => \App\Http\Middleware\VerifyVoiceWebhookAuth::class,
             'rate_limit_org' => \App\Http\Middleware\RateLimitPerOrganization::class,
+            'sensitive-operations' => \App\Http\Middleware\RateLimitSensitiveOperations::class,
         ]);
 
         // Configure authentication to return JSON for API routes instead of redirecting
