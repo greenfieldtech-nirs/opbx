@@ -18,26 +18,18 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class RateLimitSensitiveOperations
 {
-    /**
-     * Handle incoming request.
-     */
-    /**
-     * Maximum attempts per minute for sensitive operations.
-     */
-    private const MAX_ATTEMPTS = 5;
-
-    /**
-     * Decay period in seconds.
-     */
-    private const DECAY_SECONDS = 60;
-
     public function handle(Request $request, Closure $next): Response
     {
         // Rate limit by user + IP combination
         $userId = $request->user()?->id ?? 'anonymous';
         $key = "sensitive-operation:{$userId}:{$request->ip()}";
 
-        if (RateLimiter::tooManyAttempts($key, self::MAX_ATTEMPTS)) {
+        // Admins get elevated limits instead of bypass
+        $maxAttempts = $request->user()?->isAdmin()
+            ? (int) config('rate_limiting.sensitive_admin', 60)
+            : (int) config('rate_limiting.sensitive', 10);
+
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
             Log::warning('Rate limit exceeded for sensitive operation', [
                 'route' => $request->route()?->getName(),
                 'user_id' => $request->user()?->id,
@@ -52,7 +44,7 @@ class RateLimitSensitiveOperations
             ], 429)->header('Retry-After', (string) RateLimiter::availableIn($key));
         }
 
-        RateLimiter::hit($key, self::DECAY_SECONDS);
+        RateLimiter::hit($key, config('rate_limiting.decay_seconds', 60));
 
         return $next($request);
     }

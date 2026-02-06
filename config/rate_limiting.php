@@ -25,6 +25,12 @@ return [
     // Sensitive operations - password changes, role updates, etc.
     'sensitive' => env('RATE_LIMIT_SENSITIVE', 10),
 
+    // Sensitive operations for admins - elevated limits
+    'sensitive_admin' => env('RATE_LIMIT_SENSITIVE_ADMIN', 60),
+
     // Authentication routes - login/logout attempts per IP
     'auth' => env('RATE_LIMIT_AUTH', 5),
+
+    // Decay period in seconds for sensitive operations
+    'decay_seconds' => env('RATE_LIMIT_SENSITIVE_DECAY', 60),
 ];
