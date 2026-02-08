@@ -8,6 +8,7 @@ import type {
   DIDNumber,
   BusinessHours,
   OutboundWhitelist,
+  AiAssistantLoadBalancer,
 } from '@/types';
 import type {
   IvrMenu,
@@ -85,6 +86,7 @@ export const conferenceRoomsService = createResourceService<ConferenceRoom>('con
 export const callLogsService = createResourceService<CallLog>('call-logs');
 
 export const ringGroupsService = createResourceService<RingGroup>('ring-groups');
+export const aiAssistantLoadBalancersService = createResourceService<AiAssistantLoadBalancer>('ai-assistant-load-balancers');
 export const callDetailRecordsService = createResourceService<CallDetailRecord>('call-detail-records');
 export const phoneNumbersService = createResourceService<DIDNumber>('phone-numbers');
 export const ivrMenusService = createResourceService<IvrMenu>('ivr-menus');

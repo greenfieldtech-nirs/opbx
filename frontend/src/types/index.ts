@@ -72,6 +72,9 @@ export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 // Ring Group Fallback Action
 export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
 
+// AI Assistant Load Balancer Strategy
+export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
+
 // Routing Type
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
 
@@ -202,6 +205,53 @@ export interface RingGroup {
   fallback_extension_id?: string;
   fallback_extension_number?: string;
   status: Status;
+  created_at: string;
+  updated_at: string;
+}
+
+// AI Assistant Load Balancer Member
+export interface AiAssistantLoadBalancerMember {
+  id: string;
+  ai_assistant_id: string;
+  ai_assistant_name: string;
+  priority: number;
+  weight: number;
+  position: number;
+  status: Status;
+}
+
+// AI Assistant Load Balancer
+export interface AiAssistantLoadBalancer {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  strategy: AlbsStrategy;
+  status: Status;
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  fallback_extension?: {
+    id: string;
+    extension_number: string;
+  } | null;
+  fallback_ring_group?: {
+    id: string;
+    name: string;
+  } | null;
+  fallback_ivr_menu?: {
+    id: string;
+    name: string;
+  } | null;
+  fallback_ai_assistant?: {
+    id: string;
+    name: string;
+  } | null;
+  members: AiAssistantLoadBalancerMember[];
+  members_count: number;
+  active_members_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -513,6 +563,54 @@ export interface UpdateRingGroupRequest {
 
 export interface RingGroupsFilterParams extends PaginationParams {
   search?: string;
+}
+
+// ============================================================================
+// Request Types - AI Assistant Load Balancers
+// ============================================================================
+
+export interface CreateAiAssistantLoadBalancerRequest {
+  name: string;
+  description?: string;
+  strategy: AlbsStrategy;
+  members: Array<{
+    ai_assistant_id: string;
+    priority?: number;
+    weight?: number;
+    position?: number;
+    status?: Status;
+  }>;
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  status?: Status;
+}
+
+export interface UpdateAiAssistantLoadBalancerRequest {
+  name?: string;
+  description?: string;
+  strategy?: AlbsStrategy;
+  members?: Array<{
+    ai_assistant_id: string;
+    priority?: number;
+    weight?: number;
+    position?: number;
+    status?: Status;
+  }>;
+  fallback_action?: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  status?: Status;
+}
+
+export interface AiAssistantLoadBalancersFilterParams extends PaginationParams {
+  search?: string;
+  strategy?: AlbsStrategy;
+  status?: Status;
 }
 
 // ============================================================================
