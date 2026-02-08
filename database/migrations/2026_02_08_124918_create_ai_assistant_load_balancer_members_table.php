@@ -24,10 +24,10 @@ return new class extends Migration
                 $table->enum('status', ['active', 'inactive'])->default('active');
                 $table->timestamps();
 
-                $table->index(['load_balancer_id', 'status']);
-                $table->index(['load_balancer_id', 'priority']);
-                $table->index(['load_balancer_id', 'position']);
-                $table->unique(['load_balancer_id', 'ai_assistant_id']);
+                $table->index(['load_balancer_id', 'status'], 'albs_members_lb_status_idx');
+                $table->index(['load_balancer_id', 'priority'], 'albs_members_lb_priority_idx');
+                $table->index(['load_balancer_id', 'position'], 'albs_members_lb_position_idx');
+                $table->unique(['load_balancer_id', 'ai_assistant_id'], 'albs_members_unique');
             });
         }
     }
