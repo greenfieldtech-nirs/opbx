@@ -5,6 +5,73 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  Bot,
+  Scale,
+  RotateCw,
+  Target,
+  ChevronDown,
+  RefreshCw,
+  Eye,
+  GripVertical,
+  X,
+  PhoneForwarded,
+  PhoneOff,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -20,73 +87,11 @@ import type {
   AiAssistantLoadBalancer,
   AlbsStrategy,
   Status,
-  AiAssistantLoadBalancerMember,
 } from '@/types';
 import type {
   RingGroupFallbackAction,
 } from '@/types/api.types';
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
-import {
-  AlertCircle,
-  Plus,
-  Search,
-  Filter,
-  Users,
-  Bot,
-  RotateCw,
-  List,
-  PhoneForwarded,
-  PhoneOff,
-  Edit,
-  Trash2,
-  Eye,
-  ChevronUp,
-  ChevronDown,
-  X,
-  Info,
-  RefreshCw,
-  GripVertical,
-  Scale,
-  Target,
-  LayoutList,
-} from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -168,7 +173,7 @@ function getStrategyIcon(strategy: AlbsStrategy) {
     case 'percentage':
       return <Scale className="h-4 w-4" />;
     default:
-      return <List className="h-4 w-4" />;
+      return <Bot className="h-4 w-4" />;
   }
 }
 
@@ -199,6 +204,39 @@ interface ExtendedAiAssistantLoadBalancer extends AiAssistantLoadBalancer {
   fallback_ai_assistant_id?: string;
 }
 
+// Member form data type
+interface MemberFormData {
+  ai_assistant_id: string;
+  ai_assistant_name: string;
+  priority: number;
+  weight: number;
+  position: number;
+  status: Status;
+}
+
+// Form data type
+interface FormData {
+  name: string;
+  description: string;
+  strategy: AlbsStrategy;
+  status: Status;
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  members: MemberFormData[];
+}
+
+const emptyFormData: FormData = {
+  name: '',
+  description: '',
+  strategy: 'round_robin',
+  status: 'active',
+  fallback_action: 'hangup',
+  members: [],
+};
+
 export default function AiAssistantLoadBalancers() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -212,15 +250,27 @@ export default function AiAssistantLoadBalancers() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<AlbsStrategy | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
-  const [sortField, setSortField] = useState<string>('name');
+  const [sortField, setSortField] = useState<'name' | 'strategy' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
+
+  // Dialog states
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+
+  // Form data
+  const [formData, setFormData] = useState<FormData>(emptyFormData);
+  const [selectedLoadBalancer, setSelectedLoadBalancer] = useState<AiAssistantLoadBalancer | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -253,27 +303,8 @@ export default function AiAssistantLoadBalancers() {
     }
   };
 
-  // Dialog states
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
-
-  // Form data
-  const [formData, setFormData] = useState<Partial<ExtendedAiAssistantLoadBalancer>>({
-    name: '',
-    description: '',
-    strategy: 'round_robin',
-    fallback_action: 'hangup',
-    status: 'active',
-    members: [],
-  });
-
-  const [selectedLoadBalancer, setSelectedLoadBalancer] = useState<AiAssistantLoadBalancer | null>(null);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
   // Fetch load balancers with React Query
-  const { data: loadBalancersData, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['ai-assistant-load-balancers', {
       page: currentPage,
       per_page: perPage,
@@ -281,7 +312,7 @@ export default function AiAssistantLoadBalancers() {
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       sort_by: sortField,
-      sort_direction: sortDirection,
+      sort_order: sortDirection,
     }],
     queryFn: () => aiAssistantLoadBalancersService.getAll({
       page: currentPage,
@@ -290,15 +321,13 @@ export default function AiAssistantLoadBalancers() {
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       sort_by: sortField,
-      sort_direction: sortDirection,
+      sort_order: sortDirection,
     }),
   });
 
-  const loadBalancers = (loadBalancersData?.data || []).map(lb => ({
-    ...lb,
-    id: lb.id
-  }));
-  const totalPages = loadBalancersData?.meta?.last_page || 1;
+  const loadBalancers = data?.data || [];
+  const totalLoadBalancers = data?.meta?.total || 0;
+  const totalPages = data?.meta?.last_page || 1;
 
   // Fetch available AI Assistants
   const { data: aiAssistantsData } = useQuery({
@@ -337,16 +366,16 @@ export default function AiAssistantLoadBalancers() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: any) =>
-      aiAssistantLoadBalancersService.create(data),
+    mutationFn: (data: any) => aiAssistantLoadBalancersService.create(data),
     onSuccess: () => {
       toast.success('Load balancer created successfully');
       setIsCreateDialogOpen(false);
-      resetForm();
+      setFormData(emptyFormData);
       queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to create load balancer');
+      const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to create load balancer';
+      toast.error(message);
     },
   });
 
@@ -357,11 +386,13 @@ export default function AiAssistantLoadBalancers() {
     onSuccess: () => {
       toast.success('Load balancer updated successfully');
       setIsEditDialogOpen(false);
-      resetForm();
+      setSelectedLoadBalancer(null);
+      setFormData(emptyFormData);
       queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to update load balancer');
+      const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to update load balancer';
+      toast.error(message);
     },
   });
 
@@ -375,40 +406,26 @@ export default function AiAssistantLoadBalancers() {
       queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to delete load balancer');
+      const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete load balancer';
+      toast.error(message);
     },
   });
 
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      strategy: 'round_robin',
-      fallback_action: 'hangup',
-      status: 'active',
-      members: [],
-    });
-    setFormErrors({});
-    setSelectedLoadBalancer(null);
-  };
+  // Handlers
+  const handleCreate = () => {
+    if (!validateForm()) return;
 
-  // Open create dialog
-  const openCreateDialog = () => {
-    resetForm();
-    setIsCreateDialogOpen(true);
-  };
-
-  // Open edit dialog
-  const openEditDialog = (loadBalancer: AiAssistantLoadBalancer) => {
-    setSelectedLoadBalancer(loadBalancer);
-    setFormData({
-      ...loadBalancer,
-      fallback_ring_group_id: loadBalancer.fallback_ring_group_id,
-      fallback_ivr_menu_id: loadBalancer.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: loadBalancer.fallback_ai_assistant_id,
-      members: loadBalancer.members.map(m => ({
-        ...m,
+    createMutation.mutate({
+      name: formData.name,
+      description: formData.description,
+      strategy: formData.strategy,
+      status: formData.status,
+      fallback_action: formData.fallback_action,
+      fallback_extension_id: formData.fallback_extension_id,
+      fallback_ring_group_id: formData.fallback_ring_group_id,
+      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
+      members: formData.members.map(m => ({
         ai_assistant_id: m.ai_assistant_id,
         priority: m.priority,
         weight: m.weight,
@@ -416,16 +433,84 @@ export default function AiAssistantLoadBalancers() {
         status: m.status,
       })),
     });
+  };
+
+  const handleUpdate = () => {
+    if (!selectedLoadBalancer || !validateForm()) return;
+
+    updateMutation.mutate({
+      id: selectedLoadBalancer.id,
+      data: {
+        name: formData.name,
+        description: formData.description,
+        strategy: formData.strategy,
+        status: formData.status,
+        fallback_action: formData.fallback_action,
+        fallback_extension_id: formData.fallback_extension_id,
+        fallback_ring_group_id: formData.fallback_ring_group_id,
+        fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
+        fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
+        members: formData.members.map(m => ({
+          ai_assistant_id: m.ai_assistant_id,
+          priority: m.priority,
+          weight: m.weight,
+          position: m.position,
+          status: m.status,
+        })),
+      },
+    });
+  };
+
+  const handleDelete = () => {
+    if (!selectedLoadBalancer) return;
+    deleteMutation.mutate(selectedLoadBalancer.id);
+  };
+
+  const handleToggleStatus = (loadBalancer: AiAssistantLoadBalancer) => {
+    if (updateMutation.isPending) return;
+    const newStatus = loadBalancer.status === 'active' ? 'inactive' : 'active';
+    updateMutation.mutate({
+      id: loadBalancer.id,
+      data: { status: newStatus }
+    });
+  };
+
+  const openCreateDialog = () => {
+    setFormData(emptyFormData);
+    setFormErrors({});
+    setIsCreateDialogOpen(true);
+  };
+
+  const openEditDialog = (loadBalancer: AiAssistantLoadBalancer) => {
+    setSelectedLoadBalancer(loadBalancer);
+    setFormData({
+      name: loadBalancer.name,
+      description: loadBalancer.description || '',
+      strategy: loadBalancer.strategy,
+      status: loadBalancer.status,
+      fallback_action: loadBalancer.fallback_action,
+      fallback_extension_id: loadBalancer.fallback_extension_id,
+      fallback_ring_group_id: loadBalancer.fallback_ring_group_id,
+      fallback_ivr_menu_id: loadBalancer.fallback_ivr_menu_id,
+      fallback_ai_assistant_id: loadBalancer.fallback_ai_assistant_id,
+      members: loadBalancer.members.map(m => ({
+        ai_assistant_id: m.ai_assistant_id,
+        ai_assistant_name: m.ai_assistant_name,
+        priority: m.priority,
+        weight: m.weight,
+        position: m.position,
+        status: m.status,
+      })),
+    });
+    setFormErrors({});
     setIsEditDialogOpen(true);
   };
 
-  // Open delete dialog
   const openDeleteDialog = (loadBalancer: AiAssistantLoadBalancer) => {
     setSelectedLoadBalancer(loadBalancer);
     setIsDeleteDialogOpen(true);
   };
 
-  // Open detail sheet
   const openDetailSheet = (loadBalancer: AiAssistantLoadBalancer) => {
     setSelectedLoadBalancer(loadBalancer);
     setIsDetailSheetOpen(true);
@@ -439,7 +524,7 @@ export default function AiAssistantLoadBalancers() {
       errors.name = 'Name is required and must be at least 2 characters';
     }
 
-    if (!formData.members || formData.members.length === 0) {
+    if (formData.members.length === 0) {
       errors.members = 'At least one AI assistant member is required';
     }
 
@@ -463,45 +548,6 @@ export default function AiAssistantLoadBalancers() {
     return Object.keys(errors).length === 0;
   };
 
-  // Handle form submit
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
-    const submitData = {
-      name: formData.name!,
-      description: formData.description,
-      strategy: formData.strategy!,
-      status: formData.status!,
-      fallback_action: formData.fallback_action!,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-      members: formData.members!.map(m => ({
-        ai_assistant_id: m.ai_assistant_id,
-        priority: m.priority ?? 0,
-        weight: m.weight ?? 100,
-        position: m.position ?? 0,
-        status: m.status ?? 'active',
-      })),
-    };
-
-    if (isEditDialogOpen && selectedLoadBalancer) {
-      updateMutation.mutate({ id: selectedLoadBalancer.id, data: submitData });
-    } else {
-      createMutation.mutate(submitData);
-    }
-  };
-
-  // Handle delete
-  const handleDelete = () => {
-    if (selectedLoadBalancer) {
-      deleteMutation.mutate(selectedLoadBalancer.id);
-    }
-  };
-
   // Add member
   const addMember = (aiAssistantId: string) => {
     const aiAssistant = availableAiAssistants.find(a => String(a.id) === aiAssistantId);
@@ -510,7 +556,7 @@ export default function AiAssistantLoadBalancers() {
     const currentMembers = formData.members || [];
     const newPosition = currentMembers.length;
 
-    const newMember: Partial<AiAssistantLoadBalancerMember> = {
+    const newMember: MemberFormData = {
       ai_assistant_id: aiAssistantId,
       ai_assistant_name: aiAssistant.name,
       priority: newPosition,
@@ -519,10 +565,7 @@ export default function AiAssistantLoadBalancers() {
       status: 'active',
     };
 
-    setFormData({
-      ...formData,
-      members: [...currentMembers, newMember as AiAssistantLoadBalancerMember],
-    });
+    setFormData({ ...formData, members: [...currentMembers, newMember] });
   };
 
   // Remove member
@@ -536,10 +579,7 @@ export default function AiAssistantLoadBalancers() {
         priority: index,
       }));
 
-    setFormData({
-      ...formData,
-      members: updatedMembers,
-    });
+    setFormData({ ...formData, members: updatedMembers });
   };
 
   // Update member weight
@@ -549,10 +589,7 @@ export default function AiAssistantLoadBalancers() {
       m.ai_assistant_id === aiAssistantId ? { ...m, weight } : m
     );
 
-    setFormData({
-      ...formData,
-      members: updatedMembers,
-    });
+    setFormData({ ...formData, members: updatedMembers });
   };
 
   // Update member priority
@@ -562,10 +599,7 @@ export default function AiAssistantLoadBalancers() {
       m.ai_assistant_id === aiAssistantId ? { ...m, priority } : m
     );
 
-    setFormData({
-      ...formData,
-      members: updatedMembers,
-    });
+    setFormData({ ...formData, members: updatedMembers });
   };
 
   // Toggle member status
@@ -577,37 +611,46 @@ export default function AiAssistantLoadBalancers() {
         : m
     );
 
-    setFormData({
-      ...formData,
-      members: updatedMembers,
-    });
+    setFormData({ ...formData, members: updatedMembers });
   };
 
   // Calculate total weight for percentage strategy
   const totalWeight = useMemo(() => {
-    return (formData.members || []).reduce((sum, m) => sum + (m.weight || 0), 0);
+    return formData.members.reduce((sum, m) => sum + (m.weight || 0), 0);
   }, [formData.members]);
 
   // Get available AI assistants not already in members
   const availableAiAssistantsForMembers = useMemo(() => {
-    const currentMemberIds = new Set((formData.members || []).map(m => m.ai_assistant_id));
+    const currentMemberIds = new Set(formData.members.map(m => m.ai_assistant_id));
     return availableAiAssistants.filter(a => !currentMemberIds.has(String(a.id)));
   }, [availableAiAssistants, formData.members]);
 
-  // Table columns for StandardDataTable
+  // Handle sort
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field as 'name' | 'strategy' | 'created_at');
+      setSortDirection('asc');
+    }
+  };
+
+  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all';
+
+  // Define columns for StandardDataTable
   const columns: Column<AiAssistantLoadBalancer>[] = [
     {
       header: 'Strategy',
       sortKey: 'strategy',
       cell: (loadBalancer) => (
         <Badge variant="outline" className="capitalize">
-          {loadBalancer.strategy.replace('_', ' ')}
+          {getStrategyIcon(loadBalancer.strategy)}
+          <span className="ml-1">{loadBalancer.strategy.replace('_', ' ')}</span>
         </Badge>
       )
     },
     {
       header: 'Members',
-      sortKey: 'members',
       cell: (loadBalancer) => (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Bot className="h-4 w-4" />
@@ -624,6 +667,15 @@ export default function AiAssistantLoadBalancers() {
       )
     },
     {
+      header: 'Updated',
+      sortKey: 'updated_at',
+      cell: (loadBalancer) => (
+        <div className="text-sm text-muted-foreground">
+          {new Date(loadBalancer.updated_at).toLocaleDateString()}
+        </div>
+      )
+    },
+    {
       header: 'Status',
       sortKey: 'status',
       cell: (loadBalancer) => (
@@ -631,79 +683,118 @@ export default function AiAssistantLoadBalancers() {
           variant={loadBalancer.status === 'active' ? 'default' : 'secondary'}
           className={cn(
             "text-xs",
+            !isReadOnly && (
+              updateMutation.isPending && updateMutation.variables?.id === loadBalancer.id
+                ? 'opacity-50 cursor-wait'
+                : 'cursor-pointer transition-all hover:scale-105'
+            ),
             loadBalancer.status === 'active'
-              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
           )}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isReadOnly && !updateMutation.isPending) {
+              handleToggleStatus(loadBalancer);
+            }
+          }}
         >
-          {loadBalancer.status === 'active' ? 'Active' : 'Inactive'}
+          {updateMutation.isPending && updateMutation.variables?.id === loadBalancer.id ? (
+            <span className="flex items-center gap-1">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              {loadBalancer.status === 'active' ? 'Active' : 'Inactive'}
+            </span>
+          ) : (
+            loadBalancer.status === 'active' ? 'Active' : 'Inactive'
+          )}
         </Badge>
       )
-    },
+    }
   ];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">AI Assistant Load Balancers</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Scale className="h-8 w-8" />
+              AI Load Balancers
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
             Distribute calls intelligently across multiple AI assistants
           </p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">AI Load Balancers</span>
+          </div>
         </div>
         {canManage && (
-          <Button onClick={openCreateDialog} className="sm:w-auto w-full">
+          <Button onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
             Create Load Balancer
           </Button>
         )}
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search load balancers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-9"
+                autoComplete="off"
               />
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Select
-                value={strategyFilter}
-                onValueChange={(value) => setStrategyFilter(value as AlbsStrategy | 'all')}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="All Strategies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Strategies</SelectItem>
-                  <SelectItem value="round_robin">Round Robin</SelectItem>
-                  <SelectItem value="priority">Priority Based</SelectItem>
-                  <SelectItem value="percentage">Percentage Based</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as Status | 'all')}
-              >
-                <SelectTrigger className="w-[150px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
+
+            {/* Filter dropdowns */}
+            <Select value={strategyFilter} onValueChange={(val: any) => setStrategyFilter(val)}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Strategies</SelectItem>
+                <SelectItem value="round_robin">Round Robin</SelectItem>
+                <SelectItem value="priority">Priority Based</SelectItem>
+                <SelectItem value="percentage">Percentage Based</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -714,25 +805,18 @@ export default function AiAssistantLoadBalancers() {
           <StandardDataTable<AiAssistantLoadBalancer>
             data={loadBalancers}
             isLoading={isLoading}
-            onRowClick={canManage ? openDetailSheet : undefined}
+            onRowClick={openDetailSheet}
             identityIcon={Scale}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(lb) => lb.name}
             getIdentitySecondary={(lb) => lb.description || 'AI Assistant Load Balancer'}
-            onIdentityClick={canManage ? openDetailSheet : undefined}
+            onIdentityClick={openDetailSheet}
             sortField={sortField}
             sortDirection={sortDirection}
-            onSort={(field) => {
-              if (field === sortField) {
-                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortField(field);
-                setSortDirection('asc');
-              }
-            }}
-            onView={canManage ? openDetailSheet : undefined}
-            onEdit={canManage ? ((lb) => openEditDialog(lb as ExtendedAiAssistantLoadBalancer)) : undefined}
+            onSort={handleSort}
+            onView={openDetailSheet}
+            onEdit={canManage ? openEditDialog : undefined}
             onDelete={canManage ? openDeleteDialog : undefined}
             canEdit={canManage}
             canDelete={canManage}
@@ -742,11 +826,11 @@ export default function AiAssistantLoadBalancers() {
                 <Scale className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No load balancers found</h3>
                 <p className="text-muted-foreground mb-4">
-                  {searchQuery || strategyFilter !== 'all' || statusFilter !== 'all'
+                  {hasActiveFilters
                     ? 'Try adjusting your filters'
-                    : 'Get started by creating your first AI Assistant Load Balancer'}
+                    : 'Get started by creating your first AI Load Balancer'}
                 </p>
-                {canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' && (
+                {canManage && !hasActiveFilters && (
                   <Button onClick={openCreateDialog}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create Load Balancer
@@ -755,65 +839,56 @@ export default function AiAssistantLoadBalancers() {
               </div>
             }
           />
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalLoadBalancers)} of {totalLoadBalancers} load balancers
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          <span className="py-2 px-4">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </Button>
-        </div>
-      )}
-
-      {/* Create/Edit Dialog */}
-      <Dialog
-        open={isCreateDialogOpen || isEditDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsCreateDialogOpen(false);
-            setIsEditDialogOpen(false);
-            resetForm();
-          }
-        }}
-      >
+      {/* Create Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {isEditDialogOpen ? 'Edit Load Balancer' : 'Create Load Balancer'}
-            </DialogTitle>
+            <DialogTitle>Create AI Load Balancer</DialogTitle>
             <DialogDescription>
               Configure how calls are distributed across AI assistants
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-6">
             {/* Basic Info */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">
-                    Name <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="create-name">Name *</Label>
                   <Input
-                    id="name"
-                    value={formData.name || ''}
+                    id="create-name"
+                    value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g., Customer Support AI Pool"
                   />
@@ -822,68 +897,36 @@ export default function AiAssistantLoadBalancers() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="strategy">
-                    Strategy <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="create-strategy">Strategy *</Label>
                   <Select
                     value={formData.strategy}
                     onValueChange={(value) =>
                       setFormData({ ...formData, strategy: value as AlbsStrategy })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="create-strategy">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="round_robin">
-                        <div className="flex items-center gap-2">
-                          <RotateCw className="h-4 w-4" />
-                          Round Robin
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="priority">
-                        <div className="flex items-center gap-2">
-                          <Target className="h-4 w-4" />
-                          Priority Based
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="percentage">
-                        <div className="flex items-center gap-2">
-                          <Scale className="h-4 w-4" />
-                          Percentage Based
-                        </div>
-                      </SelectItem>
+                      <SelectItem value="round_robin">Round Robin</SelectItem>
+                      <SelectItem value="priority">Priority Based</SelectItem>
+                      <SelectItem value="percentage">Percentage Based</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500">
-                    {formData.strategy && getStrategyDescription(formData.strategy)}
+                  <p className="text-xs text-muted-foreground">
+                    {getStrategyDescription(formData.strategy)}
                   </p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="create-description">Description</Label>
                 <Input
-                  id="description"
-                  value={formData.description || ''}
+                  id="create-description"
+                  value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional description of this load balancer"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <div className="flex items-center gap-4">
-                  <Switch
-                    checked={formData.status === 'active'}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
-                    }
-                  />
-                  <span className={formData.status === 'active' ? 'text-green-600' : 'text-gray-500'}>
-                    {formData.status === 'active' ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -891,56 +934,51 @@ export default function AiAssistantLoadBalancers() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">AI Assistant Members</h3>
-                <span className="text-sm text-gray-500">
-                  {(formData.members || []).length} member{(formData.members || []).length !== 1 ? 's' : ''}
+                <span className="text-sm text-muted-foreground">
+                  {formData.members.length} member{formData.members.length !== 1 ? 's' : ''}
                 </span>
               </div>
 
               {formErrors.members && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{formErrors.members}</AlertDescription>
-                </Alert>
+                <div className="text-sm text-red-500">{formErrors.members}</div>
               )}
 
               {/* Add Member */}
               {availableAiAssistantsForMembers.length > 0 && (
-                <div className="flex gap-2">
-                  <Select
-                    onValueChange={(value) => {
-                      addMember(value);
-                    }}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Add AI Assistant..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableAiAssistantsForMembers.map((ai) => (
-                        <SelectItem key={ai.id} value={String(ai.id)}>
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4" />
-                            {ai.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select
+                  onValueChange={(value) => {
+                    addMember(value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add AI Assistant..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableAiAssistantsForMembers.map((ai) => (
+                      <SelectItem key={ai.id} value={String(ai.id)}>
+                        <div className="flex items-center gap-2">
+                          <Bot className="h-4 w-4" />
+                          {ai.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
 
               {/* Members List */}
-              {(formData.members || []).length > 0 ? (
+              {formData.members.length > 0 ? (
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
-                    items={(formData.members || []).map((m) => m.ai_assistant_id)}
+                    items={formData.members.map((m) => m.ai_assistant_id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-2">
-                      {(formData.members || []).map((member, index) => (
+                      {formData.members.map((member) => (
                         <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
                           {(dragHandleProps) => (
                             <div
@@ -996,14 +1034,14 @@ export default function AiAssistantLoadBalancers() {
                                     }
                                     className="w-20 h-8"
                                   />
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-muted-foreground">
                                     {totalWeight > 0 ? Math.round(((member.weight || 0) / totalWeight) * 100) : 0}%
                                   </span>
                                 </div>
                               )}
 
                               {formData.strategy === 'round_robin' && (
-                                <span className="text-sm text-gray-500">Position: {member.position + 1}</span>
+                                <span className="text-sm text-muted-foreground">Pos: {member.position + 1}</span>
                               )}
 
                               <div className="flex items-center gap-2">
@@ -1038,7 +1076,7 @@ export default function AiAssistantLoadBalancers() {
               )}
 
               {formData.strategy === 'percentage' && totalWeight > 0 && (
-                <div className="text-sm text-gray-500 text-right">
+                <div className="text-sm text-muted-foreground text-right">
                   Total Weight: {totalWeight}
                 </div>
               )}
@@ -1047,7 +1085,7 @@ export default function AiAssistantLoadBalancers() {
             {/* Fallback Section */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Fallback Configuration</h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 What happens when all AI assistants are unavailable
               </p>
 
@@ -1182,31 +1220,359 @@ export default function AiAssistantLoadBalancers() {
                 )}
               </div>
             </div>
+          </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsCreateDialogOpen(false);
-                  setIsEditDialogOpen(false);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                {createMutation.isPending || updateMutation.isPending
-                  ? 'Saving...'
-                  : isEditDialogOpen
-                  ? 'Update'
-                  : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Creating...' : 'Create Load Balancer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit AI Load Balancer</DialogTitle>
+            <DialogDescription>
+              Update load balancer configuration
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Name *</Label>
+                  <Input
+                    id="edit-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                  {formErrors.name && (
+                    <p className="text-sm text-red-500">{formErrors.name}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-strategy">Strategy *</Label>
+                  <Select
+                    value={formData.strategy}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, strategy: value as AlbsStrategy })
+                    }
+                  >
+                    <SelectTrigger id="edit-strategy">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="round_robin">Round Robin</SelectItem>
+                      <SelectItem value="priority">Priority Based</SelectItem>
+                      <SelectItem value="percentage">Percentage Based</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {getStrategyDescription(formData.strategy)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Input
+                  id="edit-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Members Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">AI Assistant Members</h3>
+                <span className="text-sm text-muted-foreground">
+                  {formData.members.length} member{formData.members.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {formErrors.members && (
+                <div className="text-sm text-red-500">{formErrors.members}</div>
+              )}
+
+              {/* Add Member */}
+              {availableAiAssistantsForMembers.length > 0 && (
+                <Select
+                  onValueChange={(value) => {
+                    addMember(value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Add AI Assistant..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableAiAssistantsForMembers.map((ai) => (
+                      <SelectItem key={ai.id} value={String(ai.id)}>
+                        <div className="flex items-center gap-2">
+                          <Bot className="h-4 w-4" />
+                          {ai.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Members List */}
+              {formData.members.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={formData.members.map((m) => m.ai_assistant_id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {formData.members.map((member) => (
+                        <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
+                          {(dragHandleProps) => (
+                            <div
+                              className={cn(
+                                'flex items-center gap-3 p-3 border rounded-lg',
+                                member.status === 'inactive' && 'opacity-50 bg-gray-50'
+                              )}
+                            >
+                              <button
+                                type="button"
+                                {...dragHandleProps}
+                                className="p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing"
+                              >
+                                <GripVertical className="h-4 w-4 text-gray-400" />
+                              </button>
+
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <Bot className="h-4 w-4 text-blue-500" />
+                                  <span className="font-medium">{member.ai_assistant_name}</span>
+                                  {member.status === 'inactive' && (
+                                    <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Strategy-specific controls */}
+                              {formData.strategy === 'priority' && (
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-xs">Priority:</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={member.priority}
+                                    onChange={(e) =>
+                                      updateMemberPriority(member.ai_assistant_id, parseInt(e.target.value) || 0)
+                                    }
+                                    className="w-20 h-8"
+                                  />
+                                </div>
+                              )}
+
+                              {formData.strategy === 'percentage' && (
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-xs">Weight:</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={member.weight}
+                                    onChange={(e) =>
+                                      updateMemberWeight(member.ai_assistant_id, parseInt(e.target.value) || 0)
+                                    }
+                                    className="w-20 h-8"
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {totalWeight > 0 ? Math.round(((member.weight || 0) / totalWeight) * 100) : 0}%
+                                  </span>
+                                </div>
+                              )}
+
+                              {formData.strategy === 'round_robin' && (
+                                <span className="text-sm text-muted-foreground">Pos: {member.position + 1}</span>
+                              )}
+
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={member.status === 'active'}
+                                  onCheckedChange={() => toggleMemberStatus(member.ai_assistant_id)}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeMember(member.ai_assistant_id)}
+                                >
+                                  <X className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </SortableItem>
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                  <Bot className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500">No AI assistants added yet</p>
+                </div>
+              )}
+
+              {formData.strategy === 'percentage' && totalWeight > 0 && (
+                <div className="text-sm text-muted-foreground text-right">
+                  Total Weight: {totalWeight}
+                </div>
+              )}
+            </div>
+
+            {/* Fallback Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Fallback Configuration</h3>
+              <div className="space-y-4">
+                <Select
+                  value={formData.fallback_action}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      fallback_action: value as RingGroupFallbackAction,
+                      fallback_extension_id: undefined,
+                      fallback_ring_group_id: undefined,
+                      fallback_ivr_menu_id: undefined,
+                      fallback_ai_assistant_id: undefined,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select fallback action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hangup">Hangup</SelectItem>
+                    <SelectItem value="extension">Forward to Extension</SelectItem>
+                    <SelectItem value="ring_group">Forward to Ring Group</SelectItem>
+                    <SelectItem value="ivr_menu">Forward to IVR Menu</SelectItem>
+                    <SelectItem value="ai_assistant">Forward to AI Assistant</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {formData.fallback_action === 'extension' && (
+                  <div className="space-y-2">
+                    <Label>Select Extension</Label>
+                    <Select
+                      value={formData.fallback_extension_id}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_extension_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an extension" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableExtensions.map((ext) => (
+                          <SelectItem key={ext.id} value={ext.id}>
+                            {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {formData.fallback_action === 'ring_group' && (
+                  <div className="space-y-2">
+                    <Label>Select Ring Group</Label>
+                    <Select
+                      value={formData.fallback_ring_group_id}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ring_group_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a ring group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableFallbackRingGroups.map((rg) => (
+                          <SelectItem key={rg.id} value={rg.id}>
+                            {rg.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {formData.fallback_action === 'ivr_menu' && (
+                  <div className="space-y-2">
+                    <Label>Select IVR Menu</Label>
+                    <Select
+                      value={formData.fallback_ivr_menu_id}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ivr_menu_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an IVR menu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableIvrMenus.map((ivr) => (
+                          <SelectItem key={ivr.id} value={ivr.id}>
+                            {ivr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {formData.fallback_action === 'ai_assistant' && (
+                  <div className="space-y-2">
+                    <Label>Select AI Assistant</Label>
+                    <Select
+                      value={formData.fallback_ai_assistant_id}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, fallback_ai_assistant_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an AI assistant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableAiAssistants.map((ai) => (
+                          <SelectItem key={ai.id} value={String(ai.id)}>
+                            {ai.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? 'Updating...' : 'Update Load Balancer'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1241,14 +1607,14 @@ export default function AiAssistantLoadBalancers() {
           <SheetHeader>
             <SheetTitle>{selectedLoadBalancer?.name}</SheetTitle>
             <SheetDescription>
-              AI Assistant Load Balancer Details
+              AI Load Balancer Details
             </SheetDescription>
           </SheetHeader>
 
           {selectedLoadBalancer && (
             <div className="mt-6 space-y-6">
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-1">Description</h4>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">Description</h4>
                 <p className="text-sm">
                   {selectedLoadBalancer.description || 'No description provided'}
                 </p>
@@ -1256,7 +1622,7 @@ export default function AiAssistantLoadBalancers() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-1">Strategy</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Strategy</h4>
                   <div className="flex items-center gap-2">
                     {getStrategyIcon(selectedLoadBalancer.strategy)}
                     <span className="text-sm">
@@ -1265,7 +1631,7 @@ export default function AiAssistantLoadBalancers() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-1">Status</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Status</h4>
                   <Badge
                     variant={selectedLoadBalancer.status === 'active' ? 'default' : 'secondary'}
                   >
@@ -1275,7 +1641,7 @@ export default function AiAssistantLoadBalancers() {
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">
                   AI Assistant Members ({selectedLoadBalancer.active_members_count} active)
                 </h4>
                 <div className="space-y-2">
@@ -1294,7 +1660,7 @@ export default function AiAssistantLoadBalancers() {
                           <Badge variant="secondary" className="text-xs">Inactive</Badge>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         {selectedLoadBalancer.strategy === 'priority' && `Priority: ${member.priority}`}
                         {selectedLoadBalancer.strategy === 'percentage' && `Weight: ${member.weight}`}
                         {selectedLoadBalancer.strategy === 'round_robin' && `Pos: ${member.position + 1}`}
@@ -1305,7 +1671,7 @@ export default function AiAssistantLoadBalancers() {
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-1">Fallback Action</h4>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">Fallback Action</h4>
                 <div className="flex items-center gap-2">
                   {selectedLoadBalancer.fallback_action === 'hangup' ? (
                     <PhoneOff className="h-4 w-4 text-red-500" />
@@ -1322,7 +1688,7 @@ export default function AiAssistantLoadBalancers() {
               </div>
 
               <div className="pt-4 border-t">
-                <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+                <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
                   <div>
                     <span className="font-medium">Created:</span>
                     <br />
@@ -1346,7 +1712,7 @@ export default function AiAssistantLoadBalancers() {
                       openEditDialog(selectedLoadBalancer);
                     }}
                   >
-                    <Edit className="mr-2 h-4 w-4" />
+                    <Edit2 className="mr-2 h-4 w-4" />
                     Edit
                   </Button>
                   <Button
