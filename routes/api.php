@@ -231,6 +231,9 @@ Route::prefix('v1')->group(function (): void {
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
 
+        // AI Assistant Load Balancers
+        Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);
+
         // IVR Menus
         Route::get('ivr-menus/voices', [IvrMenuController::class, 'getVoices'])->name('ivr-menus.voices');
         Route::apiResource('ivr-menus', IvrMenuController::class);
