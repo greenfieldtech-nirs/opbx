@@ -1235,6 +1235,7 @@ export default function ExtensionsComplete() {
                 <SelectItem value="ring_group">Ring Group</SelectItem>
                 <SelectItem value="ivr">IVR Menu</SelectItem>
                 <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                 <SelectItem value="forward">Forward</SelectItem>
               </SelectContent>
             </Select>
@@ -1498,6 +1499,7 @@ export default function ExtensionsComplete() {
                     <SelectItem value="ring_group">Ring Group</SelectItem>
                     <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
                     <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                    <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                     <SelectItem value="forward">Forward</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1595,6 +1597,7 @@ export default function ExtensionsComplete() {
                     <SelectItem value="ring_group">Ring Group</SelectItem>
                     <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
                     <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                    <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                     <SelectItem value="forward">Forward</SelectItem>
                   </SelectContent>
                 </Select>
