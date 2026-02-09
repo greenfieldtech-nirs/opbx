@@ -239,7 +239,8 @@ class AlbsDistributionService
         return $albs->members()
             ->where('status', 'active')
             ->whereHas('aiAssistant', function ($query) {
-                $query->where('status', UserStatus::ACTIVE->value);
+                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('status', UserStatus::ACTIVE->value);
             })
             ->with('aiAssistant')
             ->get();
@@ -259,7 +260,8 @@ class AlbsDistributionService
         return $albs->members()
             ->where('status', 'active')
             ->whereHas('aiAssistant', function ($query) {
-                $query->where('status', UserStatus::ACTIVE->value);
+                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('status', UserStatus::ACTIVE->value);
             })
             ->with('aiAssistant')
             ->orderBy($orderBy, $direction)
