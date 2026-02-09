@@ -41,6 +41,7 @@ import {
   RefreshCw,
   Key,
   Wifi,
+  Scale,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -495,6 +496,7 @@ export default function ExtensionsComplete() {
       ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
       ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
       ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+      ai_load_balancer: { label: 'AI Load Balancer', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
       forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
     };
 
@@ -518,6 +520,7 @@ export default function ExtensionsComplete() {
         ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
         ivr: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
         ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+        ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
         forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
       };
       return configs[type] || configs.user;
@@ -564,6 +567,13 @@ export default function ExtensionsComplete() {
           }
           const assistantId = extension.configuration?.ai_assistant_id || extension.ai_assistant_id;
           return assistantId ? `AI Assistant #${assistantId}` : 'Not configured';
+        }
+        case 'ai_load_balancer': {
+          if (extension.ai_load_balancer) {
+            return extension.ai_load_balancer.name;
+          }
+          const loadBalancerId = extension.configuration?.ai_load_balancer_id;
+          return loadBalancerId ? `AI Load Balancer #${loadBalancerId}` : 'Not configured';
         }
         case 'forward': {
           return extension.configuration?.forward_to || 'Not configured';
