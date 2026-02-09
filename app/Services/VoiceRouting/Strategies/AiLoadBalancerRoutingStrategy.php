@@ -6,43 +6,34 @@ namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
+use App\Enums\UserStatus;
+use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
+use App\Services\AiAssistant\ProviderRegistry;
+use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\AlbsDistributionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Routing strategy for AI Load Balancer extension type.
- *
- * Routes calls to an AI Assistant Load Balancer, which uses distribution
- * algorithms (Round Robin, Priority, Percentage) to select an AI Assistant.
- */
 class AiLoadBalancerRoutingStrategy implements RoutingStrategy
 {
     public function __construct(
-        private readonly AlbsDistributionService $distributionService
+        private readonly AlbsDistributionService $distributionService,
+        private readonly ProviderRegistry $providerRegistry,
+        private readonly WebSocketUrlBuilder $urlBuilder
     ) {}
 
-    /**
-     * Check if this strategy can handle the given extension type.
-     */
     public function canHandle(ExtensionType $type): bool
     {
         return $type === ExtensionType::AI_LOAD_BALANCER;
     }
 
-    /**
-     * Route the call to an AI Load Balancer.
-     *
-     * Uses the distribution service to select an AI Assistant, then
-     * delegates to AiAgentRoutingStrategy to generate connection CXML.
-     */
     public function route(Request $request, DidNumber $did, array $destination): Response
     {
         $extension = $destination['extension'] ?? null;
@@ -59,7 +50,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             );
         }
 
-        // Load AI Load Balancer from extension configuration
         $config = $extension->configuration ?? [];
         $aiLoadBalancerId = $config['ai_load_balancer_id'] ?? null;
 
@@ -76,8 +66,17 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             );
         }
 
-        // Load the AI Load Balancer
         $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->with(['members' => function ($query) {
+                $query->where('status', 'active')
+                    ->whereHas('aiAssistant', function ($q) {
+                        $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('status', UserStatus::ACTIVE->value);
+                    })
+                    ->with(['aiAssistant' => function ($q) {
+                        $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
+                    }]);
+            }])
             ->where('id', $aiLoadBalancerId)
             ->where('organization_id', $extension->organization_id)
             ->first();
@@ -95,7 +94,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             );
         }
 
-        // Check if load balancer is active
         if ($aiLoadBalancer->status->value !== 'active') {
             Log::warning('AiLoadBalancerRoutingStrategy: AI Load Balancer is inactive', [
                 'extension_id' => $extension->id,
@@ -114,7 +112,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             'strategy' => $aiLoadBalancer->strategy->value,
         ]);
 
-        // Use distribution service to select an AI Assistant
         $selectedAiAssistant = $this->distributionService->selectAssistant($aiLoadBalancer);
 
         if (! $selectedAiAssistant) {
@@ -127,47 +124,134 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->handleFallback($aiLoadBalancer, $request);
         }
 
-        // Find the extension for the selected AI Assistant
-        $aiExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('ai_assistant_id', $selectedAiAssistant->id)
-            ->where('organization_id', $extension->organization_id)
-            ->where('status', 'active')
-            ->first();
-
-        if (! $aiExtension) {
-            Log::warning('AiLoadBalancerRoutingStrategy: Selected AI Assistant extension not found or inactive', [
-                'extension_id' => $extension->id,
-                'ai_load_balancer_id' => $aiLoadBalancer->id,
-                'ai_assistant_id' => $selectedAiAssistant->id,
-            ]);
-
-            return $this->handleFallback($aiLoadBalancer, $request);
-        }
-
-        Log::info('AiLoadBalancerRoutingStrategy: Selected AI Assistant, delegating to AiAgentRoutingStrategy', [
+        Log::info('AiLoadBalancerRoutingStrategy: Selected AI Assistant', [
             'extension_id' => $extension->id,
             'ai_load_balancer_id' => $aiLoadBalancer->id,
             'selected_ai_assistant_id' => $selectedAiAssistant->id,
             'selected_ai_assistant_name' => $selectedAiAssistant->name,
-            'ai_extension_id' => $aiExtension->id,
         ]);
 
-        // Delegate to AiAgentRoutingStrategy
-        $destination = ['extension' => $aiExtension];
+        return $this->routeToAiAssistant($selectedAiAssistant, $request);
+    }
 
-        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+    private function routeToAiAssistant(AiAssistant $aiAssistant, Request $request): Response
+    {
+        $config = $aiAssistant->configuration ?? [];
+        $protocol = $aiAssistant->protocol;
+        $provider = $aiAssistant->provider;
 
-        return $voiceRoutingManager->executeStrategy(
-            ExtensionType::AI_ASSISTANT,
-            $request,
-            $did,
-            $destination
+        if ($protocol === 'websocket') {
+            return $this->routeWebSocket($aiAssistant, $config, $provider, $request);
+        }
+
+        return $this->routeSip($aiAssistant, $config, $provider);
+    }
+
+    private function routeWebSocket(AiAssistant $aiAssistant, array $config, ?string $provider, Request $request): Response
+    {
+        if (! $provider) {
+            Log::error('AiLoadBalancerRoutingStrategy: WebSocket AI Assistant missing provider', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('AI Assistant provider not configured'),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        $providerDef = $this->providerRegistry->getProvider($provider);
+
+        if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
+            Log::error('AiLoadBalancerRoutingStrategy: Invalid WebSocket provider', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+                'provider' => $provider,
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('Invalid AI Assistant provider configuration'),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        $cloudonixParams = [
+            'session' => $request->input('CallSid', ''),
+            'from' => $request->input('From', ''),
+            'to' => $request->input('To', ''),
+        ];
+
+        try {
+            $websocketUrl = $this->urlBuilder->buildUrl(
+                $providerDef->urlTemplate,
+                $config,
+                $cloudonixParams
+            );
+
+            Log::info('AiLoadBalancerRoutingStrategy: Routing to WebSocket AI provider', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+                'provider' => $provider,
+                'call_sid' => $cloudonixParams['session'],
+            ]);
+
+            return response(
+                CxmlBuilder::streamToWebSocket($websocketUrl),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        } catch (\InvalidArgumentException $e) {
+            Log::error('AiLoadBalancerRoutingStrategy: Failed to build WebSocket URL', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+                'provider' => $provider,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('AI Assistant configuration error'),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+    }
+
+    private function routeSip(AiAssistant $aiAssistant, array $config, ?string $provider): Response
+    {
+        $phoneNumber = $config['phone_number'] ?? null;
+
+        if (! $provider || ! $phoneNumber) {
+            Log::error('AiLoadBalancerRoutingStrategy: SIP AI Assistant missing provider or phone number', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+                'has_provider' => $provider !== null,
+                'has_phone_number' => $phoneNumber !== null,
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('AI Agent provider or phone number not configured'),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        Log::info('AiLoadBalancerRoutingStrategy: Routing to SIP AI provider', [
+            'ai_assistant_id' => $aiAssistant->id,
+            'ai_assistant_name' => $aiAssistant->name,
+            'provider' => $provider,
+            'phone_number' => $phoneNumber,
+        ]);
+
+        return response(
+            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
+            200,
+            ['Content-Type' => 'text/xml']
         );
     }
 
-    /**
-     * Handle fallback action when no AI Assistant can be selected.
-     */
     private function handleFallback(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackAction = $aiLoadBalancer->fallback_action;
@@ -188,9 +272,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         };
     }
 
-    /**
-     * Handle fallback to an extension.
-     */
     private function handleFallbackExtension(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackExtensionId = $aiLoadBalancer->fallback_extension_id;
@@ -235,9 +316,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         );
     }
 
-    /**
-     * Handle fallback to a ring group.
-     */
     private function handleFallbackRingGroup(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackRingGroupId = $aiLoadBalancer->fallback_ring_group_id;
@@ -282,9 +360,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         );
     }
 
-    /**
-     * Handle fallback to an IVR menu.
-     */
     private function handleFallbackIvrMenu(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackIvrMenuId = $aiLoadBalancer->fallback_ivr_menu_id;
@@ -329,9 +404,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         );
     }
 
-    /**
-     * Handle fallback to an AI Assistant.
-     */
     private function handleFallbackAiAssistant(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackAiAssistantId = $aiLoadBalancer->fallback_ai_assistant_id;
@@ -344,13 +416,12 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->handleFallbackHangup($aiLoadBalancer);
         }
 
-        $fallbackAiAssistant = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $fallbackAiAssistant = AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('id', $fallbackAiAssistantId)
             ->where('organization_id', $aiLoadBalancer->organization_id)
-            ->where('type', ExtensionType::AI_ASSISTANT)
             ->first();
 
-        if (! $fallbackAiAssistant || ! $fallbackAiAssistant->isActive()) {
+        if (! $fallbackAiAssistant || $fallbackAiAssistant->status->value !== 'active') {
             Log::warning('AiLoadBalancerRoutingStrategy: Fallback AI Assistant not found or inactive', [
                 'ai_load_balancer_id' => $aiLoadBalancer->id,
                 'fallback_ai_assistant_id' => $fallbackAiAssistantId,
@@ -362,24 +433,12 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         Log::info('AiLoadBalancerRoutingStrategy: Routing to fallback AI Assistant', [
             'ai_load_balancer_id' => $aiLoadBalancer->id,
             'fallback_ai_assistant_id' => $fallbackAiAssistant->id,
-            'fallback_ai_assistant_number' => $fallbackAiAssistant->extension_number,
+            'fallback_ai_assistant_name' => $fallbackAiAssistant->name,
         ]);
 
-        $destination = ['extension' => $fallbackAiAssistant];
-
-        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
-
-        return $voiceRoutingManager->executeStrategy(
-            $fallbackAiAssistant->type,
-            $request,
-            new DidNumber,
-            $destination
-        );
+        return $this->routeToAiAssistant($fallbackAiAssistant, $request);
     }
 
-    /**
-     * Handle fallback hangup.
-     */
     private function handleFallbackHangup(AiAssistantLoadBalancer $aiLoadBalancer): Response
     {
         Log::info('AiLoadBalancerRoutingStrategy: Hanging up call', [
