@@ -630,6 +630,12 @@ export default function ExtensionsComplete() {
       }
     }
 
+    if (formData.type === 'ai_load_balancer') {
+      if (!formData.ai_load_balancer_id) {
+        errors.ai_load_balancer_id = 'AI Load Balancer selection is required';
+      }
+    }
+
     if (formData.type === 'forward') {
       if (!formData.forward_to) {
         errors.forward_to = 'Forward destination is required';
