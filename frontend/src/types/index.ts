@@ -149,6 +149,7 @@ export interface Extension {
   ai_load_balancer?: {
     id: number;
     name: string;
+    strategy: AlbsStrategy;
   } | null;
   created_at: string;
   updated_at: string;

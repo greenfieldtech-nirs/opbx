@@ -2165,6 +2165,40 @@ export default function ExtensionsComplete() {
                           </>
                         );
                       })()}
+                      {selectedExtension.type === 'ai_load_balancer' && (
+                        <>
+                          {(() => {
+                            const loadBalancer = selectedExtension.ai_load_balancer;
+                            const config = selectedExtension.configuration;
+                            const loadBalancerId = config?.ai_load_balancer_id;
+
+                            if (!loadBalancer && !loadBalancerId) {
+                              return (
+                                <div className="text-sm text-muted-foreground">
+                                  AI Load Balancer not configured
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">AI Load Balancer:</span>
+                                  <span className="text-sm font-medium">{loadBalancer?.name || `ID: ${loadBalancerId}`}</span>
+                                </div>
+                                {loadBalancer && (
+                                  <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Strategy:</span>
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {loadBalancer.strategy.replace('_', ' ')}
+                                    </Badge>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
                       {selectedExtension.type === 'ivr' && (
                         <>
                           {(() => {
