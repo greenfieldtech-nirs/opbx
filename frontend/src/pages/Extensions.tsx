@@ -13,7 +13,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService } from '@/services/createResourceService';
+import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -285,6 +285,14 @@ export default function ExtensionsComplete() {
   });
 
   const aiAssistants = aiAssistantsData?.data || [];
+
+  // Fetch AI Load Balancers for dropdown
+  const { data: aiLoadBalancersData } = useQuery({
+    queryKey: ['ai-assistant-load-balancers', { per_page: 100, status: 'active' }],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
+  });
+
+  const aiLoadBalancers = aiLoadBalancersData?.data || [];
 
   // Fetch AI Assistant providers for detail view
   const { data: aiProvidersData } = useQuery({
@@ -1065,6 +1073,42 @@ export default function ExtensionsComplete() {
             </p>
             {formErrors.ai_assistant_id && (
               <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>
+            )}
+          </div>
+        );
+
+      case 'ai_load_balancer':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="ai_load_balancer_id">
+              AI Load Balancer <span className="text-destructive">*</span>
+            </Label>
+            {aiLoadBalancers.length === 0 ? (
+              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                No AI Load Balancers Available
+              </div>
+            ) : (
+              <Select
+                value={formData.ai_load_balancer_id}
+                onValueChange={(value) => setFormData({ ...formData, ai_load_balancer_id: value })}
+              >
+                <SelectTrigger id="ai_load_balancer_id">
+                  <SelectValue placeholder="Select an AI Load Balancer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {aiLoadBalancers.map((loadBalancer) => (
+                    <SelectItem key={loadBalancer.id} value={loadBalancer.id.toString()}>
+                      {loadBalancer.name} ({loadBalancer.strategy.replace('_', ' ')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-xs text-muted-foreground">
+              AI Load Balancers are managed in a separate page
+            </p>
+            {formErrors.ai_load_balancer_id && (
+              <p className="text-sm text-destructive">{formErrors.ai_load_balancer_id}</p>
             )}
           </div>
         );
