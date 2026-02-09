@@ -34,6 +34,10 @@ class ExtensionResource extends JsonResource
             'configuration' => $this->configuration ?? [],
             'user' => $this->whenLoaded('user', fn () => new UserResource($this->user)),
             'ai_assistant' => $this->whenLoaded('aiAssistant', fn () => $this->aiAssistant ? new AiAssistantResource($this->aiAssistant) : null),
+            'ai_load_balancer' => $this->whenLoaded('aiLoadBalancer', fn () => $this->aiLoadBalancer ? [
+                'id' => $this->aiLoadBalancer->id,
+                'name' => $this->aiLoadBalancer->name,
+            ] : null),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
