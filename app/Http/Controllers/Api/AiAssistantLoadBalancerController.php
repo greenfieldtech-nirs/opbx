@@ -258,9 +258,17 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
 
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        // Extract members data
-        $this->tempMembersData = $validated['members'] ?? [];
-        unset($validated['members']);
+        // Check if members data is being updated
+        $hasMembersUpdate = isset($validated['members']) && is_array($validated['members']);
+
+        // Only extract members if they are being updated
+        if ($hasMembersUpdate) {
+            $this->tempMembersData = $validated['members'];
+            unset($validated['members']);
+        } else {
+            // Preserve existing members by not including them in the update
+            $this->tempMembersData = [];
+        }
 
         // Normalize fallback fields based on action
         $validated = $this->normalizeFallbackFields($validated, $model);
@@ -270,19 +278,22 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
 
     protected function afterUpdate(Model $model, Request $request): void
     {
-        // Delete existing members
-        AiAssistantLoadBalancerMember::where('load_balancer_id', $model->id)->delete();
+        // Only update members if they were included in the request
+        if (! empty($this->tempMembersData)) {
+            // Delete existing members
+            AiAssistantLoadBalancerMember::where('load_balancer_id', $model->id)->delete();
 
-        // Create new members
-        foreach ($this->tempMembersData as $memberData) {
-            AiAssistantLoadBalancerMember::create([
-                'load_balancer_id' => $model->id,
-                'ai_assistant_id' => $memberData['ai_assistant_id'],
-                'priority' => $memberData['priority'] ?? 0,
-                'weight' => $memberData['weight'] ?? 100,
-                'position' => $memberData['position'] ?? 0,
-                'status' => $memberData['status'] ?? 'active',
-            ]);
+            // Create new members
+            foreach ($this->tempMembersData as $memberData) {
+                AiAssistantLoadBalancerMember::create([
+                    'load_balancer_id' => $model->id,
+                    'ai_assistant_id' => $memberData['ai_assistant_id'],
+                    'priority' => $memberData['priority'] ?? 0,
+                    'weight' => $memberData['weight'] ?? 100,
+                    'position' => $memberData['position'] ?? 0,
+                    'status' => $memberData['status'] ?? 'active',
+                ]);
+            }
         }
 
         // Clear cache for this load balancer
