@@ -51,7 +51,7 @@ export type Status = 'active' | 'inactive';
 export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
 
 // Extension Types
-export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward';
+export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward' | 'ai_load_balancer';
 
 // Call Status
 export type CallStatus =
@@ -145,6 +145,10 @@ export interface Extension {
     provider: string;
     protocol: 'sip' | 'websocket';
     status: 'active' | 'inactive';
+  } | null;
+  ai_load_balancer?: {
+    id: number;
+    name: string;
   } | null;
   created_at: string;
   updated_at: string;
