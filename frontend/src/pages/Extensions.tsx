@@ -694,6 +694,14 @@ export default function ExtensionsComplete() {
           }
         }
         break;
+      case 'ai_load_balancer':
+        if (formData.ai_load_balancer_id) {
+          const parsed = parseInt(formData.ai_load_balancer_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_load_balancer_id = parsed;
+          }
+        }
+        break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
         break;
@@ -769,6 +777,14 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ai_assistant_id, 10);
           if (!isNaN(parsed)) {
             configuration.ai_assistant_id = parsed;
+          }
+        }
+        break;
+      case 'ai_load_balancer':
+        if (formData.ai_load_balancer_id) {
+          const parsed = parseInt(formData.ai_load_balancer_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_load_balancer_id = parsed;
           }
         }
         break;
