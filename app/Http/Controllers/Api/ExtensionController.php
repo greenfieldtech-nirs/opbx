@@ -77,7 +77,7 @@ class ExtensionController extends Controller
         $query = Extension::query()
             ->forOrganization($user->organization_id)
             ->with(Extension::DEFAULT_USER_FIELDS)
-            ->with(['aiLoadBalancer:id,name,organization_id']);
+            ->with(['aiLoadBalancer:id,name,organization_id,strategy', 'aiLoadBalancer.members']);
 
         // Apply filters
         $query = $this->applyFilters($query, $request, $this->getFilterConfig());

@@ -2187,12 +2187,41 @@ export default function ExtensionsComplete() {
                                   <span className="text-sm font-medium">{loadBalancer?.name || `ID: ${loadBalancerId}`}</span>
                                 </div>
                                 {loadBalancer && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Strategy:</span>
-                                    <Badge variant="outline" className="text-xs capitalize">
-                                      {loadBalancer.strategy.replace('_', ' ')}
-                                    </Badge>
-                                  </div>
+                                  <>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Strategy:</span>
+                                      <Badge variant="outline" className="text-xs capitalize">
+                                        {loadBalancer.strategy.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+                                    {loadBalancer.members && loadBalancer.members.length > 0 && (
+                                      <div className="mt-4 pt-4 border-t">
+                                        <span className="text-sm text-muted-foreground block mb-2">Members ({loadBalancer.members.length}):</span>
+                                        <div className="space-y-2">
+                                          {loadBalancer.members.map((member, index) => (
+                                            <div key={member.ai_assistant_id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                                                <Bot className="h-4 w-4 text-cyan-500" />
+                                                <span className="text-sm font-medium">{member.ai_assistant_name}</span>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {loadBalancer.strategy === 'percentage' && (
+                                                  <Badge variant="secondary" className="text-xs">{member.weight}%</Badge>
+                                                )}
+                                                {loadBalancer.strategy === 'priority' && (
+                                                  <Badge variant="secondary" className="text-xs">Priority: {member.priority}</Badge>
+                                                )}
+                                                <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                                                  {member.status}
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </>
                             );

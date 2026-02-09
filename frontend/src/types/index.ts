@@ -150,6 +150,14 @@ export interface Extension {
     id: number;
     name: string;
     strategy: AlbsStrategy;
+    members: {
+      ai_assistant_id: string;
+      ai_assistant_name: string;
+      priority: number;
+      weight: number;
+      position: number;
+      status: Status;
+    }[];
   } | null;
   created_at: string;
   updated_at: string;
