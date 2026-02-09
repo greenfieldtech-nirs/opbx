@@ -126,6 +126,8 @@ interface ExtensionFormData {
   ai_api_key: string;
   ai_assistant_id: string;
   ai_session_id: string;
+  // AI Load Balancer - select from pre-defined
+  ai_load_balancer_id: string;
   // Custom Logic - Cloudonix Container Application
   container_application_name: string;
   container_block_name: string;
@@ -241,6 +243,7 @@ export default function ExtensionsComplete() {
     ai_api_key: '',
     ai_assistant_id: '',
     ai_session_id: '',
+    ai_load_balancer_id: '',
     container_application_name: '',
     container_block_name: '',
     forward_to: '',
@@ -823,6 +826,7 @@ export default function ExtensionsComplete() {
       ai_api_key: '',
       ai_assistant_id: '',
       ai_session_id: '',
+      ai_load_balancer_id: '',
       container_application_name: '',
       container_block_name: '',
       forward_to: '',
@@ -889,6 +893,7 @@ export default function ExtensionsComplete() {
       ai_api_key: (typeof config === 'object' && config?.api_key) ? config.api_key : '',
       ai_assistant_id: (typeof config === 'object' && config?.assistant_id) ? config.assistant_id : '',
       ai_session_id: (typeof config === 'object' && config?.session_id) ? config.session_id : '',
+      ai_load_balancer_id: (typeof config === 'object' && config?.ai_load_balancer_id) ? config.ai_load_balancer_id.toString() : '',
       container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
       container_block_name: (typeof config === 'object' && config?.container_block_name) ? config.container_block_name : '',
       forward_to: (typeof config === 'object' && config?.forward_to) ? config.forward_to : '',
