@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
+use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
@@ -294,5 +295,17 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
         Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
         Route::delete('/{sessionId}/disconnect', [SessionUpdateController::class, 'disconnectSession'])->name('session-updates.disconnect');
+    });
+
+    // Call Notifications Settings
+    Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->prefix('call-notifications')->group(function (): void {
+        Route::get('/settings', [CallNotificationsSettingsController::class, 'show'])->name('call-notifications.settings.show');
+        Route::post('/settings', [CallNotificationsSettingsController::class, 'store'])->name('call-notifications.settings.store');
+        Route::put('/settings', [CallNotificationsSettingsController::class, 'update'])->name('call-notifications.settings.update');
+        Route::delete('/settings', [CallNotificationsSettingsController::class, 'destroy'])->name('call-notifications.settings.destroy');
+        Route::post('/settings/test', [CallNotificationsSettingsController::class, 'test'])->name('call-notifications.settings.test');
+        Route::get('/logs', [CallNotificationsSettingsController::class, 'logs'])->name('call-notifications.logs');
+        Route::get('/logs/{sessionToken}', [CallNotificationsSettingsController::class, 'sessionLogs'])->name('call-notifications.session-logs');
+        Route::get('/rate-limit', [CallNotificationsSettingsController::class, 'rateLimit'])->name('call-notifications.rate-limit');
     });
 });

@@ -5,19 +5,27 @@ interface JsonViewerProps {
   data: any;
   collapsed?: boolean;
   className?: string;
+  light?: boolean;
 }
 
-export function JsonViewer({ data, collapsed = false, className = '' }: JsonViewerProps) {
+export function JsonViewer({ data, collapsed = false, className = '', light = false }: JsonViewerProps) {
+  const bgColor = light ? '#f8fafc' : '#0f172a';
+  const textColor = light ? '#1e293b' : '#e2e8f0';
+
   return (
-    <div className={`bg-slate-900 p-3 rounded border ${className}`}>
+    <div className={`rounded border overflow-x-auto ${className}`} style={{ backgroundColor: bgColor }}>
       <JsonView
         src={data}
         collapseStringsAfterLength={100}
         collapsed={collapsed}
+        theme={light ? 'rjv-default' : 'monokai'}
         style={{
           fontSize: '12px',
-          backgroundColor: '#0f172a', // slate-900
+          backgroundColor: bgColor,
+          color: textColor,
         }}
+        displayDataTypes={false}
+        enableClipboard={true}
       />
     </div>
   );
