@@ -31,6 +31,7 @@ const Recordings = lazy(() => import('@/pages/Recordings'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
+const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
 
 
 // Unified router - NO basename, handles all routes
@@ -126,15 +127,19 @@ export const router = createBrowserRouter([
          path: 'profile',
          element: <Profile />,
        },
-       {
-         path: 'settings',
-         element: (
-           <OwnerRoute>
-             <Settings />
-           </OwnerRoute>
-         ),
-       },
+        {
+          path: 'settings',
+          element: (
+            <OwnerRoute>
+              <Settings />
+            </OwnerRoute>
+          ),
+        },
+        {
+          path: 'call-notifications',
+          element: <CallNotificationsSettings />,
+        },
 
-     ],
-  },
+      ],
+   },
 ]);

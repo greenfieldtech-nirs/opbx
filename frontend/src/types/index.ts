@@ -1002,3 +1002,78 @@ export interface VoiceTrunksResponse {
     total: number;
   };
 }
+
+// ============================================================================
+// Call Notifications Types
+// ============================================================================
+
+export type CallNotificationAuthMethod = 'hmac_sha256' | 'bearer_token' | 'basic_auth' | 'none';
+export type CallNotificationEvent = 'new' | 'ringing' | 'connected' | 'answered' | 'busy' | 'cancel' | 'failed' | 'congestion';
+
+export interface CallNotificationsSettings {
+  id: string;
+  organization_id: string;
+  webhook_url: string;
+  auth_method: CallNotificationAuthMethod;
+  auth_username?: string;
+  has_auth_secret: boolean;
+  retry_attempts: number;
+  retry_backoff_seconds: number;
+  request_timeout_seconds: number;
+  enabled_events: CallNotificationEvent[];
+  rate_limit_per_minute: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CallNotificationLog {
+  id: string;
+  organization_id: string;
+  call_session_token: string;
+  event_id: string;
+  event_type: string;
+  status: string;
+  webhook_url: string;
+  request_payload: Record<string, unknown>;
+  response_status_code?: number;
+  response_body?: string;
+  response_time_ms?: number;
+  attempt_number: number;
+  is_success: boolean;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface CreateCallNotificationsSettingsRequest {
+  webhook_url: string;
+  auth_method: CallNotificationAuthMethod;
+  auth_secret?: string;
+  auth_username?: string;
+  retry_attempts?: number;
+  retry_backoff_seconds?: number;
+  request_timeout_seconds?: number;
+  enabled_events: CallNotificationEvent[];
+  rate_limit_per_minute?: number;
+  is_active?: boolean;
+}
+
+export interface UpdateCallNotificationsSettingsRequest {
+  webhook_url?: string;
+  auth_method?: CallNotificationAuthMethod;
+  auth_secret?: string;
+  auth_username?: string;
+  retry_attempts?: number;
+  retry_backoff_seconds?: number;
+  request_timeout_seconds?: number;
+  enabled_events?: CallNotificationEvent[];
+  rate_limit_per_minute?: number;
+  is_active?: boolean;
+}
+
+export interface CallNotificationsRateLimitStatus {
+  limit: number;
+  current: number;
+  remaining: number;
+  reset_in_seconds: number;
+}

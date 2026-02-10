@@ -22,6 +22,7 @@ import {
   Shield,
   Bot,
   Scale,
+  Bell,
 } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -47,6 +48,7 @@ const navigation: NavItem[] = [
   { name: 'Call Logs', href: '/ui/call-logs', icon: FileText, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
   { name: 'Recordings', href: '/ui/recordings', icon: Volume2, roles: ['owner', 'pbx_admin'] },
   { name: 'Live Calls', href: '/ui/live-calls', icon: Activity, roles: ['owner', 'pbx_admin', 'reporter'] },
+  { name: 'Call Notifications', href: '/ui/call-notifications', icon: Bell, roles: ['owner', 'pbx_admin'] },
 ];
 
 export function Sidebar() {
