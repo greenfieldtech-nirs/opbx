@@ -129,13 +129,14 @@ export default function CallNotificationsSettingsPage() {
   });
 
   // Fetch logs
-  const { data: logsData, isLoading: isLoadingLogs } = useQuery({
+  const { data: logsData, isLoading: isLoadingLogs, refetch: refetchLogs } = useQuery({
     queryKey: ['call-notifications-logs'],
     queryFn: async () => {
       const response = await api.get('/call-notifications/logs');
       return response.data.data as CallNotificationLog[];
     },
     enabled: activeTab === 'logs',
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
   });
 
   // Fetch rate limit status
@@ -632,13 +633,26 @@ export default function CallNotificationsSettingsPage() {
         <TabsContent value="logs">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Delivery Logs
-              </CardTitle>
-              <CardDescription>
-                Recent webhook delivery attempts
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Delivery Logs
+                  </CardTitle>
+                  <CardDescription>
+                    Recent webhook delivery attempts
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchLogs()}
+                  disabled={isLoadingLogs}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingLogs ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {isLoadingLogs ? (
