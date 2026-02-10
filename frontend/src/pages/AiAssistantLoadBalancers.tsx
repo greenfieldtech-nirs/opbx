@@ -6,72 +6,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  Bot,
-  Scale,
-  RotateCw,
-  Target,
-  ChevronDown,
-  RefreshCw,
-  Eye,
-  GripVertical,
-  X,
-  PhoneForwarded,
-  PhoneOff,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -82,16 +20,84 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   StandardDataTable,
   Column,
+  EmptyState
 } from '@/components/design-system';
 import type {
   AiAssistantLoadBalancer,
   AlbsStrategy,
   Status,
+  CreateAiAssistantLoadBalancerRequest,
+  UpdateAiAssistantLoadBalancerRequest,
 } from '@/types';
 import type {
   RingGroupFallbackAction,
-} from '@/types/api.types';
+} from '@/types';
+import type { Extension, AiAssistantLoadBalancerMember } from '@/types';
+
 import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import {
+  AlertCircle,
+  Plus,
+  Search,
+  Filter,
+  Users,
+  RotateCw,
+  List,
+  PhoneForwarded,
+  PhoneOff,
+  Edit,
+  Trash2,
+  Eye,
+  X,
+  Info,
+  ArrowUpDown,
+  RefreshCw,
+  GripVertical,
+  Menu,
+  Bot,
+  UserCheck,
+  Phone,
+  ArrowRight,
+  Scale,
+  Target,
+} from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -152,18 +158,19 @@ function getStrategyDisplayName(strategy: AlbsStrategy): string {
     priority: 'Priority Based',
     percentage: 'Percentage Based',
   };
-  return names[strategy];
+  return names[strategy] || strategy;
 }
 
 function getStrategyDescription(strategy: AlbsStrategy): string {
   const descriptions: Record<AlbsStrategy, string> = {
     round_robin: 'Distribute calls evenly across AI assistants in sequential order.',
-    priority: 'Always route to the highest priority (lowest number) AI assistant.',
+    priority: 'Route calls to AI assistants in priority order using drag and drop.',
     percentage: 'Route calls based on configured weight percentages.',
   };
-  return descriptions[strategy];
+  return descriptions[strategy] || '';
 }
 
+// Strategy icon mapping
 function getStrategyIcon(strategy: AlbsStrategy) {
   switch (strategy) {
     case 'round_robin':
@@ -177,27 +184,26 @@ function getStrategyIcon(strategy: AlbsStrategy) {
   }
 }
 
-function getFallbackDisplayText(
-  fallbackAction: RingGroupFallbackAction,
-  fallbackName?: string
-): string {
-  switch (fallbackAction) {
+// Fallback icon mapping
+function getFallbackIcon(action: RingGroupFallbackAction) {
+  switch (action) {
     case 'extension':
-      return fallbackName ? `→ Ext ${fallbackName}` : '→ Extension';
+      return <PhoneForwarded className="h-4 w-4" />;
     case 'ring_group':
-      return '→ Ring Group';
+      return <ArrowRight className="h-4 w-4" />;
     case 'ivr_menu':
-      return '→ IVR Menu';
+      return <Menu className="h-4 w-4" />;
     case 'ai_assistant':
-      return '→ AI Assistant';
+      return <Bot className="h-4 w-4" />;
     case 'hangup':
-      return 'Hangup';
+      return <PhoneOff className="h-4 w-4" />;
     default:
-      return 'Unknown';
+      return <AlertCircle className="h-4 w-4" />;
   }
 }
 
 // Extended AiAssistantLoadBalancer type with additional fallback fields
+// Note: follow_through is inherited from base AiAssistantLoadBalancer interface
 interface ExtendedAiAssistantLoadBalancer extends AiAssistantLoadBalancer {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
@@ -208,17 +214,19 @@ interface ExtendedAiAssistantLoadBalancer extends AiAssistantLoadBalancer {
 interface MemberFormData {
   ai_assistant_id: string;
   ai_assistant_name: string;
-  priority: number;
   weight: number;
   position: number;
-  status: Status;
 }
+
+// Generate weight options for percentage strategy (0% to 100% in 5% increments)
+const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5); // [0, 5, 10, ..., 100]
 
 // Form data type
 interface FormData {
   name: string;
   description: string;
   strategy: AlbsStrategy;
+  follow_through: boolean;
   status: Status;
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
@@ -232,6 +240,7 @@ const emptyFormData: FormData = {
   name: '',
   description: '',
   strategy: 'round_robin',
+  follow_through: false,
   status: 'active',
   fallback_action: 'hangup',
   members: [],
@@ -255,22 +264,10 @@ export default function AiAssistantLoadBalancers() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  // Dialog states
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
-
-  // Form data
-  const [formData, setFormData] = useState<FormData>(emptyFormData);
-  const [selectedLoadBalancer, setSelectedLoadBalancer] = useState<AiAssistantLoadBalancer | null>(null);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -303,6 +300,17 @@ export default function AiAssistantLoadBalancers() {
     }
   };
 
+  // Dialog states
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+
+  // Form data
+  const [formData, setFormData] = useState<FormData>(emptyFormData);
+  const [selectedLoadBalancer, setSelectedLoadBalancer] = useState<AiAssistantLoadBalancer | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Fetch load balancers with React Query
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['ai-assistant-load-balancers', {
@@ -312,7 +320,7 @@ export default function AiAssistantLoadBalancers() {
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       sort_by: sortField,
-      sort_order: sortDirection,
+      sort_direction: sortDirection,
     }],
     queryFn: () => aiAssistantLoadBalancersService.getAll({
       page: currentPage,
@@ -321,13 +329,16 @@ export default function AiAssistantLoadBalancers() {
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       sort_by: sortField,
-      sort_order: sortDirection,
+      sort_direction: sortDirection,
     }),
   });
 
-  const loadBalancers = data?.data || [];
-  const totalLoadBalancers = data?.meta?.total || 0;
+  const loadBalancers = (data?.data || []).map(lb => ({
+    ...lb,
+    id: lb.id
+  }));
   const totalPages = data?.meta?.last_page || 1;
+  const totalLoadBalancers = data?.meta?.total || 0;
 
   // Fetch available AI Assistants
   const { data: aiAssistantsData } = useQuery({
@@ -337,61 +348,65 @@ export default function AiAssistantLoadBalancers() {
 
   const availableAiAssistants = aiAssistantsData?.data || [];
 
-  // Fetch fallback options
+  // Fetch available extensions
   const { data: extensionsData } = useQuery({
     queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
-  const { data: ringGroupsData } = useQuery({
+  // Fetch all ring groups for fallback destinations
+  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
     queryKey: ['ring-groups-all'],
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }),
     staleTime: 60000,
   });
 
+  // Filter out current load balancer when editing
+  const allRingGroups = useMemo(() => {
+    const groups = allRingGroupsData?.data || [];
+    if (selectedLoadBalancer) {
+      return groups.filter(g => g.id !== selectedLoadBalancer.id);
+    }
+    return groups;
+  }, [allRingGroupsData, selectedLoadBalancer]);
+
+  // Fetch available IVR menus
   const { data: ivrMenusData } = useQuery({
     queryKey: ['ivr-menus', { status: 'active', per_page: 100 }],
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
   const availableExtensions = extensionsData?.data || [];
-  const allRingGroups = ringGroupsData?.data || [];
   const availableIvrMenus = ivrMenusData?.data || [];
-
-  // Filter out current load balancer when editing
-  const availableFallbackRingGroups = useMemo(() => {
-    if (!selectedLoadBalancer) return allRingGroups;
-    return allRingGroups.filter(rg => rg.id !== selectedLoadBalancer.id);
-  }, [allRingGroups, selectedLoadBalancer]);
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: any) => aiAssistantLoadBalancersService.create(data),
+    mutationFn: (data: CreateAiAssistantLoadBalancerRequest) => aiAssistantLoadBalancersService.create(data as any),
     onSuccess: () => {
-      toast.success('Load balancer created successfully');
+      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      toast.success('AI Load Balancer created successfully');
     },
     onError: (error: any) => {
-      const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to create load balancer';
+      const message = error.response?.data?.message || 'Failed to create AI Load Balancer';
       toast.error(message);
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      aiAssistantLoadBalancersService.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateAiAssistantLoadBalancerRequest }) =>
+      aiAssistantLoadBalancersService.update(id, data as any),
     onSuccess: () => {
-      toast.success('Load balancer updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
       setIsEditDialogOpen(false);
       setSelectedLoadBalancer(null);
       setFormData(emptyFormData);
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      toast.success('AI Load Balancer updated successfully');
     },
     onError: (error: any) => {
-      const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to update load balancer';
+      const message = error.response?.data?.message || 'Failed to update AI Load Balancer';
       toast.error(message);
     },
   });
@@ -400,218 +415,294 @@ export default function AiAssistantLoadBalancers() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => aiAssistantLoadBalancersService.delete(id),
     onSuccess: () => {
-      toast.success('Load balancer deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
       setIsDeleteDialogOpen(false);
       setSelectedLoadBalancer(null);
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      toast.success('AI Load Balancer deleted successfully');
     },
     onError: (error: any) => {
-      const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete load balancer';
+      const message = error.response?.data?.message || 'Failed to delete AI Load Balancer';
       toast.error(message);
     },
   });
 
-  // Handlers
-  const handleCreate = () => {
-    if (!validateForm()) return;
-
-    createMutation.mutate({
-      name: formData.name,
-      description: formData.description,
-      strategy: formData.strategy,
-      status: formData.status,
-      fallback_action: formData.fallback_action,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-      members: formData.members.map(m => ({
-        ai_assistant_id: m.ai_assistant_id,
-        priority: m.priority,
-        weight: m.weight,
-        position: m.position,
-        status: m.status,
-      })),
-    });
-  };
-
-  const handleUpdate = () => {
-    if (!selectedLoadBalancer || !validateForm()) return;
-
-    updateMutation.mutate({
-      id: selectedLoadBalancer.id,
-      data: {
-        name: formData.name,
-        description: formData.description,
-        strategy: formData.strategy,
-        status: formData.status,
-        fallback_action: formData.fallback_action,
-        fallback_extension_id: formData.fallback_extension_id,
-        fallback_ring_group_id: formData.fallback_ring_group_id,
-        fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-        fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-        members: formData.members.map(m => ({
-          ai_assistant_id: m.ai_assistant_id,
-          priority: m.priority,
-          weight: m.weight,
-          position: m.position,
-          status: m.status,
-        })),
-      },
-    });
-  };
-
-  const handleDelete = () => {
-    if (!selectedLoadBalancer) return;
-    deleteMutation.mutate(selectedLoadBalancer.id);
-  };
-
-  const handleToggleStatus = (loadBalancer: AiAssistantLoadBalancer) => {
+  // Handle status toggle
+  const handleToggleStatus = async (lb: AiAssistantLoadBalancer) => {
     if (updateMutation.isPending) return;
-    const newStatus = loadBalancer.status === 'active' ? 'inactive' : 'active';
+    const newStatus: Status = lb.status === 'active' ? 'inactive' : 'active';
+
     updateMutation.mutate({
-      id: loadBalancer.id,
-      data: { status: newStatus }
+      id: lb.id,
+      data: { status: newStatus } as any
     });
   };
 
-  const openCreateDialog = () => {
-    setFormData(emptyFormData);
-    setFormErrors({});
-    setIsCreateDialogOpen(true);
+  // Toggle sort
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
   };
 
-  const openEditDialog = (loadBalancer: AiAssistantLoadBalancer) => {
-    setSelectedLoadBalancer(loadBalancer);
-    setFormData({
-      name: loadBalancer.name,
-      description: loadBalancer.description || '',
-      strategy: loadBalancer.strategy,
-      status: loadBalancer.status,
-      fallback_action: loadBalancer.fallback_action,
-      fallback_extension_id: loadBalancer.fallback_extension_id,
-      fallback_ring_group_id: loadBalancer.fallback_ring_group_id,
-      fallback_ivr_menu_id: loadBalancer.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: loadBalancer.fallback_ai_assistant_id,
-      members: loadBalancer.members.map(m => ({
-        ai_assistant_id: m.ai_assistant_id,
-        ai_assistant_name: m.ai_assistant_name,
-        priority: m.priority,
-        weight: m.weight,
-        position: m.position,
-        status: m.status,
-      })),
-    });
-    setFormErrors({});
-    setIsEditDialogOpen(true);
-  };
-
-  const openDeleteDialog = (loadBalancer: AiAssistantLoadBalancer) => {
-    setSelectedLoadBalancer(loadBalancer);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const openDetailSheet = (loadBalancer: AiAssistantLoadBalancer) => {
-    setSelectedLoadBalancer(loadBalancer);
-    setIsDetailSheetOpen(true);
-  };
-
-  // Validate form
+  // Validation
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
     if (!formData.name || formData.name.trim().length < 2) {
-      errors.name = 'Name is required and must be at least 2 characters';
+      errors.name = 'Name must be at least 2 characters';
     }
 
-    if (formData.members.length === 0) {
-      errors.members = 'At least one AI assistant member is required';
+    if (!formData.members || formData.members.length === 0) {
+      errors.members = 'At least one AI Assistant member is required';
+    }
+
+    // Validate percentage distribution totals 100%
+    if (formData.strategy === 'percentage' && formData.members && formData.members.length > 0) {
+      const totalWeight = formData.members.reduce((sum, m) => sum + m.weight, 0);
+      if (totalWeight !== 100) {
+        errors.members = `Percentage distribution must equal 100% (currently: ${totalWeight}%). Please adjust the weights.`;
+      }
     }
 
     if (formData.fallback_action === 'extension' && !formData.fallback_extension_id) {
-      errors.fallback_extension_id = 'Fallback extension is required';
+      errors.fallback_extension = 'Fallback extension is required';
     }
 
     if (formData.fallback_action === 'ring_group' && !formData.fallback_ring_group_id) {
-      errors.fallback_ring_group_id = 'Fallback ring group is required';
+      errors.fallback_ring_group = 'Fallback ring group is required';
     }
 
     if (formData.fallback_action === 'ivr_menu' && !formData.fallback_ivr_menu_id) {
-      errors.fallback_ivr_menu_id = 'Fallback IVR menu is required';
+      errors.fallback_ivr_menu = 'Fallback IVR menu is required';
     }
 
     if (formData.fallback_action === 'ai_assistant' && !formData.fallback_ai_assistant_id) {
-      errors.fallback_ai_assistant_id = 'Fallback AI assistant is required';
+      errors.fallback_ai_assistant = 'Fallback AI Assistant is required';
     }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Add member
-  const addMember = (aiAssistantId: string) => {
-    const aiAssistant = availableAiAssistants.find(a => String(a.id) === aiAssistantId);
-    if (!aiAssistant) return;
+  // Reset form
+  const resetForm = () => {
+    setFormData(emptyFormData);
+    setFormErrors({});
+  };
 
-    const currentMembers = formData.members || [];
-    const newPosition = currentMembers.length;
+  // Handle create
+  const handleCreate = () => {
+    if (!validateForm()) return;
 
-    const newMember: MemberFormData = {
-      ai_assistant_id: aiAssistantId,
-      ai_assistant_name: aiAssistant.name,
-      priority: newPosition,
-      weight: 100,
-      position: newPosition,
-      status: 'active',
+    const members = formData.members.map((member) => ({
+      ai_assistant_id: member.ai_assistant_id,
+      weight: member.weight,
+      position: member.position,
+    }));
+
+    const requestData: any = {
+      name: formData.name,
+      description: formData.description,
+      strategy: formData.strategy,
+      follow_through: formData.follow_through,
+      fallback_action: formData.fallback_action,
+      status: formData.status,
+      members,
     };
 
-    setFormData({ ...formData, members: [...currentMembers, newMember] });
+    // Only include the relevant fallback ID based on fallback_action
+    switch (formData.fallback_action) {
+      case 'extension':
+        requestData.fallback_extension_id = formData.fallback_extension_id;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ring_group':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ivr_menu':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ai_assistant':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        break;
+      case 'hangup':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+    }
+
+    createMutation.mutate(requestData as any);
   };
 
-  // Remove member
-  const removeMember = (aiAssistantId: string) => {
-    const currentMembers = formData.members || [];
-    const updatedMembers = currentMembers
-      .filter(m => m.ai_assistant_id !== aiAssistantId)
-      .map((m, index) => ({
-        ...m,
-        position: index,
-        priority: index,
-      }));
+  // Handle update
+  const handleUpdate = () => {
+    if (!validateForm() || !selectedLoadBalancer) return;
 
-    setFormData({ ...formData, members: updatedMembers });
+    const members = formData.members.map((member) => ({
+      ai_assistant_id: member.ai_assistant_id,
+      weight: member.weight,
+      position: member.position,
+    }));
+
+    const requestData: any = {
+      name: formData.name,
+      description: formData.description,
+      strategy: formData.strategy,
+      follow_through: formData.follow_through,
+      fallback_action: formData.fallback_action,
+      status: formData.status,
+      members,
+    };
+
+    // Only include the relevant fallback ID based on fallback_action
+    switch (formData.fallback_action) {
+      case 'extension':
+        requestData.fallback_extension_id = formData.fallback_extension_id;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ring_group':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ivr_menu':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+      case 'ai_assistant':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        break;
+      case 'hangup':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        break;
+    }
+
+    updateMutation.mutate({ id: selectedLoadBalancer.id, data: requestData as any });
   };
 
-  // Update member weight
-  const updateMemberWeight = (aiAssistantId: string, weight: number) => {
+  // Handle delete
+  const handleDelete = () => {
+    if (!selectedLoadBalancer) return;
+    deleteMutation.mutate(selectedLoadBalancer.id);
+  };
+
+  // Open create dialog
+  const openCreateDialog = () => {
+    resetForm();
+    setIsCreateDialogOpen(true);
+  };
+
+  // Open edit dialog
+  const openEditDialog = (lb: ExtendedAiAssistantLoadBalancer) => {
+    setSelectedLoadBalancer(lb);
+
+    const newFormData = {
+      name: lb.name,
+      description: lb.description,
+      strategy: lb.strategy,
+      follow_through: lb.follow_through ?? false,
+      fallback_action: lb.fallback_action,
+      fallback_extension_id: lb.fallback_extension_id?.toString(),
+      fallback_ring_group_id: lb.fallback_ring_group_id?.toString(),
+      fallback_ivr_menu_id: lb.fallback_ivr_menu_id?.toString(),
+      fallback_ai_assistant_id: lb.fallback_ai_assistant_id?.toString(),
+      status: lb.status,
+      members: lb.members.map(m => ({
+        ai_assistant_id: m.ai_assistant_id,
+        ai_assistant_name: m.ai_assistant_name,
+        weight: m.weight,
+        position: m.position,
+      })),
+    };
+    setFormData(newFormData);
+    setIsEditDialogOpen(true);
+  };
+
+  // Open delete dialog
+  const openDeleteDialog = (lb: AiAssistantLoadBalancer) => {
+    setSelectedLoadBalancer(lb);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Open detail sheet
+  const openDetailSheet = (lb: AiAssistantLoadBalancer) => {
+    setSelectedLoadBalancer(lb);
+    setIsDetailSheetOpen(true);
+  };
+
+  // Member management functions
+  const addMember = () => {
     const currentMembers = formData.members || [];
-    const updatedMembers = currentMembers.map(m =>
-      m.ai_assistant_id === aiAssistantId ? { ...m, weight } : m
+    const usedAssistantIds = currentMembers.map((m) => m.ai_assistant_id);
+    const unusedAssistants = availableAiAssistants.filter(
+      (a) => !usedAssistantIds.includes(String(a.id))
     );
 
-    setFormData({ ...formData, members: updatedMembers });
+    if (unusedAssistants.length === 0) return;
+
+    const firstAvailable = unusedAssistants[0];
+    const newMember: MemberFormData = {
+      ai_assistant_id: String(firstAvailable.id),
+      ai_assistant_name: firstAvailable.name,
+      weight: 100,
+      position: currentMembers.length,
+    };
+
+    setFormData({
+      ...formData,
+      members: [...currentMembers, newMember],
+    });
   };
 
-  // Update member priority
-  const updateMemberPriority = (aiAssistantId: string, priority: number) => {
+  const removeMember = (assistantId: string) => {
     const currentMembers = formData.members || [];
-    const updatedMembers = currentMembers.map(m =>
-      m.ai_assistant_id === aiAssistantId ? { ...m, priority } : m
-    );
+    const newMembers = currentMembers.filter((m) => m.ai_assistant_id !== assistantId);
 
-    setFormData({ ...formData, members: updatedMembers });
+    // Recalculate positions
+    const reorderedMembers = newMembers.map((member, i) => ({
+      ...member,
+      position: i,
+    }));
+
+    setFormData({
+      ...formData,
+      members: reorderedMembers,
+    });
   };
 
-  // Toggle member status
-  const toggleMemberStatus = (aiAssistantId: string) => {
+  const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
     const currentMembers = formData.members || [];
-    const updatedMembers = currentMembers.map(m =>
-      m.ai_assistant_id === aiAssistantId
-        ? { ...m, status: m.status === 'active' ? 'inactive' : 'active' as Status }
-        : m
-    );
-
-    setFormData({ ...formData, members: updatedMembers });
+    const usedAssistantIds = currentMembers
+      .map((m) => m.ai_assistant_id)
+      .filter((id) => id !== currentMemberAssistantId);
+    return availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
   };
 
   // Calculate total weight for percentage strategy
@@ -625,92 +716,507 @@ export default function AiAssistantLoadBalancers() {
     return availableAiAssistants.filter(a => !currentMemberIds.has(String(a.id)));
   }, [availableAiAssistants, formData.members]);
 
-  // Handle sort
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field as 'name' | 'strategy' | 'created_at');
-      setSortDirection('asc');
+  // Enhanced fallback display text with actual destination names
+  const getFallbackDisplayText = (
+    lb: ExtendedAiAssistantLoadBalancer,
+    ringGroups: any[],
+    ivrMenus: any[]
+  ): string => {
+    switch (lb.fallback_action) {
+      case 'extension':
+        return lb.fallback_extension_id
+          ? `→ Extension: ${lb.fallback_extension_id}`
+          : '→ Extension';
+
+      case 'ring_group':
+        if (lb.fallback_ring_group_id) {
+          const targetGroup = ringGroups.find(rg => rg.id.toString() === lb.fallback_ring_group_id);
+          return targetGroup ? `→ Ring Group: ${targetGroup.name}` : '→ Ring Group';
+        }
+        return '→ Ring Group';
+
+      case 'ivr_menu':
+        if (lb.fallback_ivr_menu_id) {
+          const targetIvr = ivrMenus.find(ivr => ivr.id.toString() === lb.fallback_ivr_menu_id);
+          return targetIvr ? `→ IVR Menu: ${targetIvr.name}` : '→ IVR Menu';
+        }
+        return '→ IVR Menu';
+
+      case 'ai_assistant':
+        if (lb.fallback_ai_assistant_id) {
+          const targetAi = availableAiAssistants.find(a => String(a.id) === lb.fallback_ai_assistant_id);
+          return targetAi ? `→ AI Assistant: ${targetAi.name}` : '→ AI Assistant';
+        }
+        return '→ AI Assistant';
+
+      case 'hangup':
+        return 'Hangup';
+
+      default:
+        return 'Unknown';
     }
   };
 
-  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all';
+  // Render form dialog content
+  const renderFormDialog = (isEdit: boolean) => {
+    const title = isEdit ? 'Edit AI Load Balancer' : 'Create AI Load Balancer';
+    const description = isEdit
+      ? 'Update AI Load Balancer settings and members'
+      : 'Configure a new AI Load Balancer with AI Assistant members';
 
-  // Define columns for StandardDataTable
-  const columns: Column<AiAssistantLoadBalancer>[] = [
-    {
-      header: 'Strategy',
-      sortKey: 'strategy',
-      cell: (loadBalancer) => (
-        <Badge variant="outline" className="capitalize">
-          {getStrategyIcon(loadBalancer.strategy)}
-          <span className="ml-1">{loadBalancer.strategy.replace('_', ' ')}</span>
-        </Badge>
-      )
-    },
-    {
-      header: 'Members',
-      cell: (loadBalancer) => (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Bot className="h-4 w-4" />
-          {loadBalancer.active_members_count} / {loadBalancer.members_count} active
+    return (
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Only active AI Assistants can be added to load balancers.
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-4 py-4">
+          {/* Name and Strategy side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="name"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Support AI Pool"
+                className={formErrors.name ? 'border-red-500' : ''}
+              />
+              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="strategy">
+                Strategy <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.strategy}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, strategy: value as AlbsStrategy })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="round_robin">
+                    <div className="flex items-center gap-2">
+                      <RotateCw className="h-4 w-4" />
+                      <span>Round Robin</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="priority">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      <span>Priority Based</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="percentage">
+                    <div className="flex items-center gap-2">
+                      <Scale className="h-4 w-4" />
+                      <span>Percentage Based</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {getStrategyDescription(formData.strategy)}
+            </p>
+          </div>
+
+          {/* Members */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>
+                AI Assistant Members <span className="text-red-500">*</span>
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addMember}
+                disabled={
+                  (formData.members || []).length >= 50 ||
+                  availableAiAssistantsForMembers.length === 0
+                }
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Member
+              </Button>
+            </div>
+
+            {formErrors.members && <p className="text-sm text-red-500">{formErrors.members}</p>}
+
+            {(!formData.members || formData.members.length === 0) && (
+              <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No AI Assistants added yet</p>
+                <p className="text-xs">Click "Add Member" to add AI Assistants</p>
+              </div>
+            )}
+
+            {formData.members && formData.members.length > 0 && formData.strategy === 'priority' && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={formData.members.map(m => m.ai_assistant_id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="border rounded-lg divide-y">
+                    {formData.members.map((member, index) => (
+                      <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
+                        {(dragHandleProps) => (
+                          <div className="p-3 flex items-center gap-3">
+                            {/* Drag handle */}
+                            <div {...dragHandleProps} className="cursor-grab hover:cursor-grabbing">
+                              <GripVertical className="h-5 w-5 text-muted-foreground" />
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-cyan-500" />
+                                <span className="font-medium">{member.ai_assistant_name}</span>
+                              </div>
+                            </div>
+
+                            {/* Remove button */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeMember(member.ai_assistant_id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </SortableItem>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+
+            {formData.members && formData.members.length > 0 && formData.strategy !== 'priority' && (
+              <div className="border rounded-lg divide-y">
+                {formData.members.map((member) => (
+                  <div key={member.ai_assistant_id} className="p-3 flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4 text-cyan-500" />
+                        <span className="font-medium">{member.ai_assistant_name}</span>
+                      </div>
+                    </div>
+
+                    {/* Weight selector for percentage strategy */}
+                    {formData.strategy === 'percentage' && (
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Weight:</Label>
+                        <Select
+                          value={member.weight.toString()}
+                          onValueChange={(value) => {
+                            const newMembers = [...formData.members];
+                            const memberIndex = newMembers.findIndex(m => m.ai_assistant_id === member.ai_assistant_id);
+                            newMembers[memberIndex] = { ...member, weight: parseInt(value) };
+                            setFormData({ ...formData, members: newMembers });
+                          }}
+                        >
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WEIGHT_OPTIONS.map(weight => (
+                              <SelectItem key={weight} value={weight.toString()}>
+                                {weight}%
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* Remove button */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeMember(member.ai_assistant_id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {formData.strategy === 'percentage' && totalWeight > 0 && (
+              <div className="text-sm text-muted-foreground">
+                Total Distribution: {totalWeight}%
+              </div>
+            )}
+          </div>
+
+          {/* Follow Through Toggle */}
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Follow Through</Label>
+                <p className="text-sm text-muted-foreground">
+                  Try next AI Assistant if current one fails
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="follow_through" className="text-sm text-muted-foreground">
+                  {formData.follow_through ? 'Enabled' : 'Disabled'}
+                </Label>
+                <Switch
+                  id="follow_through"
+                  checked={formData.follow_through}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, follow_through: checked })
+                  }
+                />
+              </div>
+            </div>
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                When enabled, if an AI Assistant call fails, the load balancer will
+                automatically try the next available assistant before executing the
+                fallback action. When disabled, the fallback action is executed immediately
+                when the first assistant fails.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          {/* Fallback Action */}
+          <div className="space-y-2">
+            <Label>
+              Fallback Action <span className="text-red-500">*</span>
+            </Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fallback_action" className="text-sm text-muted-foreground">Action</Label>
+                <Select
+                  value={formData.fallback_action}
+                  onValueChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      fallback_action: value as RingGroupFallbackAction,
+                      fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
+                      fallback_ring_group_id: value === 'ring_group' ? formData.fallback_ring_group_id : undefined,
+                      fallback_ivr_menu_id: value === 'ivr_menu' ? formData.fallback_ivr_menu_id : undefined,
+                      fallback_ai_assistant_id: value === 'ai_assistant' ? formData.fallback_ai_assistant_id : undefined,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="extension">
+                      <div className="flex items-center gap-2">
+                        <PhoneForwarded className="h-4 w-4" />
+                        <span>Extension</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ring_group">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span>Ring Group</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ivr_menu">
+                      <div className="flex items-center gap-2">
+                        <Menu className="h-4 w-4" />
+                        <span>IVR Menu</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ai_assistant">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        <span>AI Assistant</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hangup">
+                      <div className="flex items-center gap-2">
+                        <PhoneOff className="h-4 w-4" />
+                        <span>Hangup</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Destination</Label>
+                {formData.fallback_action === 'extension' && (
+                  <Select
+                    value={formData.fallback_extension_id || ''}
+                    onValueChange={(value) => {
+                      setFormData({
+                        ...formData,
+                        fallback_extension_id: value,
+                      });
+                    }}
+                    disabled={availableExtensions.length === 0}
+                  >
+                    <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
+                      <SelectValue placeholder={availableExtensions.length === 0 ? "No Available Options for Extension" : "Select extension"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableExtensions.map((ext) => (
+                        <SelectItem key={ext.id} value={ext.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-blue-100 text-blue-800 border-blue-200">
+                              <Phone className="h-3.5 w-3.5" />
+                              {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ring_group' && (
+                  <Select
+                    value={formData.fallback_ring_group_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ring_group_id: value })
+                    }
+                    disabled={allRingGroups.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={allRingGroups.length === 0 ? "No Available Options for Ring Group" : "Select ring group"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allRingGroups.map((group) => (
+                        <SelectItem key={group.id} value={group.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
+                              <Users className="h-3.5 w-3.5" />
+                              {group.name}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ivr_menu' && (
+                  <Select
+                    value={formData.fallback_ivr_menu_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ivr_menu_id: value })
+                    }
+                    disabled={availableIvrMenus.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={availableIvrMenus.length === 0 ? "No Available Options for IVR Menu" : "Select IVR menu"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableIvrMenus.map((menu) => (
+                        <SelectItem key={menu.id} value={menu.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200">
+                              <Menu className="h-3.5 w-3.5" />
+                              {menu.name}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {formData.fallback_action === 'ai_assistant' && (
+                  <Select
+                    value={formData.fallback_ai_assistant_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ai_assistant_id: value })
+                    }
+                    disabled={availableAiAssistants.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={availableAiAssistants.length === 0 ? "No Available Options for AI Assistant" : "Select AI assistant"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAiAssistants.map((assistant) => (
+                        <SelectItem key={assistant.id} value={String(assistant.id)}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
+                              <Bot className="h-3.5 w-3.5" />
+                              {assistant.name}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {formData.fallback_action === 'hangup' && (
+                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+                    No destination needed
+                  </div>
+                )}
+                {formErrors.fallback_extension && formData.fallback_action === 'extension' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
+                )}
+                {formErrors.fallback_ring_group && formData.fallback_action === 'ring_group' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_ring_group}</p>
+                )}
+                {formErrors.fallback_ivr_menu && formData.fallback_action === 'ivr_menu' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_ivr_menu}</p>
+                )}
+                {formErrors.fallback_ai_assistant && formData.fallback_action === 'ai_assistant' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_ai_assistant}</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      )
-    },
-    {
-      header: 'Fallback',
-      cell: (loadBalancer) => (
-        <Badge variant="secondary" className="text-[10px] py-0">
-          {loadBalancer.fallback_action.replace('_', ' ')}
-        </Badge>
-      )
-    },
-    {
-      header: 'Updated',
-      sortKey: 'updated_at',
-      cell: (loadBalancer) => (
-        <div className="text-sm text-muted-foreground">
-          {new Date(loadBalancer.updated_at).toLocaleDateString()}
-        </div>
-      )
-    },
-    {
-      header: 'Status',
-      sortKey: 'status',
-      cell: (loadBalancer) => (
-        <Badge
-          variant={loadBalancer.status === 'active' ? 'default' : 'secondary'}
-          className={cn(
-            "text-xs",
-            !isReadOnly && (
-              updateMutation.isPending && updateMutation.variables?.id === loadBalancer.id
-                ? 'opacity-50 cursor-wait'
-                : 'cursor-pointer transition-all hover:scale-105'
-            ),
-            loadBalancer.status === 'active'
-              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!isReadOnly && !updateMutation.isPending) {
-              handleToggleStatus(loadBalancer);
-            }
-          }}
-        >
-          {updateMutation.isPending && updateMutation.variables?.id === loadBalancer.id ? (
-            <span className="flex items-center gap-1">
-              <RefreshCw className="h-3 w-3 animate-spin" />
-              {loadBalancer.status === 'active' ? 'Active' : 'Inactive'}
-            </span>
-          ) : (
-            loadBalancer.status === 'active' ? 'Active' : 'Inactive'
-          )}
-        </Badge>
-      )
-    }
-  ];
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (isEdit) {
+                setIsEditDialogOpen(false);
+                setSelectedLoadBalancer(null);
+              } else {
+                setIsCreateDialogOpen(false);
+              }
+              resetForm();
+            }}
+          >
+            Cancel
+          </Button>
+          <Button onClick={isEdit ? handleUpdate : handleCreate}>
+            {isEdit ? 'Save Changes' : 'Create AI Load Balancer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    );
+  };
+
+  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all';
 
   return (
     <div className="space-y-6">
@@ -728,9 +1234,7 @@ export default function AiAssistantLoadBalancers() {
               </Badge>
             )}
           </div>
-          <p className="text-muted-foreground mt-1">
-            Distribute calls intelligently across multiple AI assistants
-          </p>
+          <p className="text-muted-foreground mt-1">Manage AI Assistant load balancers and routing strategies</p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
             <span>/</span>
@@ -739,28 +1243,27 @@ export default function AiAssistantLoadBalancers() {
         </div>
         {canManage && (
           <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Load Balancer
+            <Plus className="h-4 w-4 mr-2" />
+            Create AI Load Balancer
           </Button>
         )}
       </div>
 
-      {/* Filters Section */}
+      {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[250px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search load balancers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                autoComplete="off"
-              />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search AI Load Balancers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
-
             <Button
               variant="outline"
               size="icon"
@@ -770,10 +1273,8 @@ export default function AiAssistantLoadBalancers() {
             >
               <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
             </Button>
-
-            {/* Filter dropdowns */}
-            <Select value={strategyFilter} onValueChange={(val: any) => setStrategyFilter(val)}>
-              <SelectTrigger className="w-[180px]">
+            <Select value={strategyFilter} onValueChange={(value: any) => setStrategyFilter(value)}>
+              <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Strategy" />
               </SelectTrigger>
@@ -784,67 +1285,123 @@ export default function AiAssistantLoadBalancers() {
                 <SelectItem value="percentage">Percentage Based</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
-              <SelectTrigger className="w-[180px]">
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="w-full md:w-48">
+                <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Data Table */}
+      {/* Table */}
       <Card>
         <CardContent className="pt-6">
           <StandardDataTable<AiAssistantLoadBalancer>
             data={loadBalancers}
             isLoading={isLoading}
-            onRowClick={openDetailSheet}
+            onRowClick={canManage ? setSelectedLoadBalancer : undefined}
             identityIcon={Scale}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(lb) => lb.name}
-            getIdentitySecondary={(lb) => lb.description || 'AI Assistant Load Balancer'}
-            onIdentityClick={openDetailSheet}
+            getIdentitySecondary={() => 'AI Load Balancer'}
+            onIdentityClick={canManage ? setSelectedLoadBalancer : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
-            onSort={handleSort}
-            onView={openDetailSheet}
-            onEdit={canManage ? openEditDialog : undefined}
+            onSort={toggleSort}
+            onView={canManage ? openDetailSheet : undefined}
+            onEdit={canManage ? ((lb) => openEditDialog(lb as ExtendedAiAssistantLoadBalancer)) : undefined}
             onDelete={canManage ? openDeleteDialog : undefined}
             canEdit={canManage}
             canDelete={canManage}
-            columns={columns}
+            columns={[
+              {
+                header: 'Strategy',
+                sortKey: 'strategy',
+                cell: (lb) => (
+                  <Badge variant="outline" className="capitalize">
+                    {getStrategyIcon(lb.strategy)}
+                    <span className="ml-1">{lb.strategy.replace('_', ' ')}</span>
+                  </Badge>
+                )
+              },
+              {
+                header: 'Members',
+                cell: (lb) => (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Bot className="h-4 w-4" />
+                    {lb.active_members_count} / {lb.members_count} active
+                  </div>
+                )
+              },
+              {
+                header: 'Fallback',
+                cell: (lb) => (
+                  <Badge variant="secondary" className="text-[10px] py-0">
+                    {lb.fallback_action.replace('_', ' ')}
+                  </Badge>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (lb) => (
+                  <Badge
+                    variant={lb.status === 'active' ? 'default' : 'secondary'}
+                    className={cn(
+                      "text-xs",
+                      !isReadOnly && (
+                        updateMutation.isPending && updateMutation.variables?.id === lb.id
+                          ? 'opacity-50 cursor-wait'
+                          : 'cursor-pointer transition-all hover:scale-105'
+                      ),
+                      lb.status === 'active'
+                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly && !updateMutation.isPending) {
+                        handleToggleStatus(lb);
+                      }
+                    }}
+                  >
+                    {updateMutation.isPending && updateMutation.variables?.id === lb.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        {lb.status === 'active' ? 'Active' : 'Disabled'}
+                      </span>
+                    ) : (
+                      lb.status === 'active' ? 'Active' : 'Disabled'
+                    )}
+                  </Badge>
+                )
+              }
+            ]}
             emptyState={
-              <div className="text-center py-12">
-                <Scale className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No load balancers found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {hasActiveFilters
-                    ? 'Try adjusting your filters'
-                    : 'Get started by creating your first AI Load Balancer'}
-                </p>
-                {canManage && !hasActiveFilters && (
-                  <Button onClick={openCreateDialog}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Load Balancer
-                  </Button>
-                )}
-              </div>
+              <EmptyState
+                icon={Scale}
+                title="No AI Load Balancers found"
+                description={hasActiveFilters ? 'Try adjusting your filters' : 'Get started by creating your first AI Load Balancer'}
+                action={canManage && !hasActiveFilters ? {
+                  label: "Create AI Load Balancer",
+                  onClick: openCreateDialog
+                } : undefined}
+              />
             }
           />
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
-                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalLoadBalancers)} of {totalLoadBalancers} load balancers
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalLoadBalancers)} of {totalLoadBalancers} AI Load Balancers
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -855,6 +1412,9 @@ export default function AiAssistantLoadBalancers() {
                 >
                   Previous
                 </Button>
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -871,731 +1431,29 @@ export default function AiAssistantLoadBalancers() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create AI Load Balancer</DialogTitle>
-            <DialogDescription>
-              Configure how calls are distributed across AI assistants
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="create-name">Name *</Label>
-                  <Input
-                    id="create-name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Customer Support AI Pool"
-                  />
-                  {formErrors.name && (
-                    <p className="text-sm text-red-500">{formErrors.name}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-strategy">Strategy *</Label>
-                  <Select
-                    value={formData.strategy}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, strategy: value as AlbsStrategy })
-                    }
-                  >
-                    <SelectTrigger id="create-strategy">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="round_robin">Round Robin</SelectItem>
-                      <SelectItem value="priority">Priority Based</SelectItem>
-                      <SelectItem value="percentage">Percentage Based</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {getStrategyDescription(formData.strategy)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="create-description">Description</Label>
-                <Input
-                  id="create-description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description of this load balancer"
-                />
-              </div>
-            </div>
-
-            {/* Members Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">AI Assistant Members</h3>
-                <span className="text-sm text-muted-foreground">
-                  {formData.members.length} member{formData.members.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-
-              {formErrors.members && (
-                <div className="text-sm text-red-500">{formErrors.members}</div>
-              )}
-
-              {/* Add Member */}
-              {availableAiAssistantsForMembers.length > 0 && (
-                <Select
-                  onValueChange={(value) => {
-                    addMember(value);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Add AI Assistant..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableAiAssistantsForMembers.map((ai) => (
-                      <SelectItem key={ai.id} value={String(ai.id)}>
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-4 w-4" />
-                          {ai.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {/* Members List */}
-              {formData.members.length > 0 ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={formData.members.map((m) => m.ai_assistant_id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="space-y-2">
-                      {formData.members.map((member) => (
-                        <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
-                          {(dragHandleProps) => (
-                            <div
-                              className={cn(
-                                'flex items-center gap-3 p-3 border rounded-lg',
-                                member.status === 'inactive' && 'opacity-50 bg-gray-50'
-                              )}
-                            >
-                              <button
-                                type="button"
-                                {...dragHandleProps}
-                                className="p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing"
-                              >
-                                <GripVertical className="h-4 w-4 text-gray-400" />
-                              </button>
-
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <Bot className="h-4 w-4 text-blue-500" />
-                                  <span className="font-medium">{member.ai_assistant_name}</span>
-                                  {member.status === 'inactive' && (
-                                    <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Strategy-specific controls */}
-                              {formData.strategy === 'priority' && (
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-xs">Priority:</Label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    value={member.priority}
-                                    onChange={(e) =>
-                                      updateMemberPriority(member.ai_assistant_id, parseInt(e.target.value) || 0)
-                                    }
-                                    className="w-20 h-8"
-                                  />
-                                </div>
-                              )}
-
-                              {formData.strategy === 'percentage' && (
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-xs">Weight:</Label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={member.weight}
-                                    onChange={(e) =>
-                                      updateMemberWeight(member.ai_assistant_id, parseInt(e.target.value) || 0)
-                                    }
-                                    className="w-20 h-8"
-                                  />
-                                  <span className="text-xs text-muted-foreground">
-                                    {totalWeight > 0 ? Math.round(((member.weight || 0) / totalWeight) * 100) : 0}%
-                                  </span>
-                                </div>
-                              )}
-
-                              {formData.strategy === 'round_robin' && (
-                                <span className="text-sm text-muted-foreground">Pos: {member.position + 1}</span>
-                              )}
-
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={member.status === 'active'}
-                                  onCheckedChange={() => toggleMemberStatus(member.ai_assistant_id)}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeMember(member.ai_assistant_id)}
-                                >
-                                  <X className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </SortableItem>
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              ) : (
-                <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                  <Bot className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                  <p className="text-gray-500">No AI assistants added yet</p>
-                  <p className="text-sm text-gray-400">
-                    Add at least one AI assistant to this load balancer
-                  </p>
-                </div>
-              )}
-
-              {formData.strategy === 'percentage' && totalWeight > 0 && (
-                <div className="text-sm text-muted-foreground text-right">
-                  Total Weight: {totalWeight}
-                </div>
-              )}
-            </div>
-
-            {/* Fallback Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Fallback Configuration</h3>
-              <p className="text-sm text-muted-foreground">
-                What happens when all AI assistants are unavailable
-              </p>
-
-              <div className="space-y-4">
-                <Select
-                  value={formData.fallback_action}
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      fallback_action: value as RingGroupFallbackAction,
-                      fallback_extension_id: undefined,
-                      fallback_ring_group_id: undefined,
-                      fallback_ivr_menu_id: undefined,
-                      fallback_ai_assistant_id: undefined,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select fallback action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hangup">Hangup</SelectItem>
-                    <SelectItem value="extension">Forward to Extension</SelectItem>
-                    <SelectItem value="ring_group">Forward to Ring Group</SelectItem>
-                    <SelectItem value="ivr_menu">Forward to IVR Menu</SelectItem>
-                    <SelectItem value="ai_assistant">Forward to AI Assistant</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {formData.fallback_action === 'extension' && (
-                  <div className="space-y-2">
-                    <Label>Select Extension</Label>
-                    <Select
-                      value={formData.fallback_extension_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_extension_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an extension" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableExtensions.map((ext) => (
-                          <SelectItem key={ext.id} value={ext.id}>
-                            {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.fallback_extension_id && (
-                      <p className="text-sm text-red-500">{formErrors.fallback_extension_id}</p>
-                    )}
-                  </div>
-                )}
-
-                {formData.fallback_action === 'ring_group' && (
-                  <div className="space-y-2">
-                    <Label>Select Ring Group</Label>
-                    <Select
-                      value={formData.fallback_ring_group_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ring_group_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a ring group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableFallbackRingGroups.map((rg) => (
-                          <SelectItem key={rg.id} value={rg.id}>
-                            {rg.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.fallback_ring_group_id && (
-                      <p className="text-sm text-red-500">{formErrors.fallback_ring_group_id}</p>
-                    )}
-                  </div>
-                )}
-
-                {formData.fallback_action === 'ivr_menu' && (
-                  <div className="space-y-2">
-                    <Label>Select IVR Menu</Label>
-                    <Select
-                      value={formData.fallback_ivr_menu_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ivr_menu_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an IVR menu" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableIvrMenus.map((ivr) => (
-                          <SelectItem key={ivr.id} value={ivr.id}>
-                            {ivr.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.fallback_ivr_menu_id && (
-                      <p className="text-sm text-red-500">{formErrors.fallback_ivr_menu_id}</p>
-                    )}
-                  </div>
-                )}
-
-                {formData.fallback_action === 'ai_assistant' && (
-                  <div className="space-y-2">
-                    <Label>Select AI Assistant</Label>
-                    <Select
-                      value={formData.fallback_ai_assistant_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ai_assistant_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an AI assistant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableAiAssistants.map((ai) => (
-                          <SelectItem key={ai.id} value={String(ai.id)}>
-                            {ai.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.fallback_ai_assistant_id && (
-                      <p className="text-sm text-red-500">{formErrors.fallback_ai_assistant_id}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creating...' : 'Create Load Balancer'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {renderFormDialog(false)}
       </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit AI Load Balancer</DialogTitle>
-            <DialogDescription>
-              Update load balancer configuration
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Name *</Label>
-                  <Input
-                    id="edit-name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                  {formErrors.name && (
-                    <p className="text-sm text-red-500">{formErrors.name}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-strategy">Strategy *</Label>
-                  <Select
-                    value={formData.strategy}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, strategy: value as AlbsStrategy })
-                    }
-                  >
-                    <SelectTrigger id="edit-strategy">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="round_robin">Round Robin</SelectItem>
-                      <SelectItem value="priority">Priority Based</SelectItem>
-                      <SelectItem value="percentage">Percentage Based</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {getStrategyDescription(formData.strategy)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-description">Description</Label>
-                <Input
-                  id="edit-description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {/* Members Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">AI Assistant Members</h3>
-                <span className="text-sm text-muted-foreground">
-                  {formData.members.length} member{formData.members.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-
-              {formErrors.members && (
-                <div className="text-sm text-red-500">{formErrors.members}</div>
-              )}
-
-              {/* Add Member */}
-              {availableAiAssistantsForMembers.length > 0 && (
-                <Select
-                  onValueChange={(value) => {
-                    addMember(value);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Add AI Assistant..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableAiAssistantsForMembers.map((ai) => (
-                      <SelectItem key={ai.id} value={String(ai.id)}>
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-4 w-4" />
-                          {ai.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {/* Members List */}
-              {formData.members.length > 0 ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={formData.members.map((m) => m.ai_assistant_id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="space-y-2">
-                      {formData.members.map((member) => (
-                        <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
-                          {(dragHandleProps) => (
-                            <div
-                              className={cn(
-                                'flex items-center gap-3 p-3 border rounded-lg',
-                                member.status === 'inactive' && 'opacity-50 bg-gray-50'
-                              )}
-                            >
-                              <button
-                                type="button"
-                                {...dragHandleProps}
-                                className="p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing"
-                              >
-                                <GripVertical className="h-4 w-4 text-gray-400" />
-                              </button>
-
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <Bot className="h-4 w-4 text-blue-500" />
-                                  <span className="font-medium">{member.ai_assistant_name}</span>
-                                  {member.status === 'inactive' && (
-                                    <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Strategy-specific controls */}
-                              {formData.strategy === 'priority' && (
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-xs">Priority:</Label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    value={member.priority}
-                                    onChange={(e) =>
-                                      updateMemberPriority(member.ai_assistant_id, parseInt(e.target.value) || 0)
-                                    }
-                                    className="w-20 h-8"
-                                  />
-                                </div>
-                              )}
-
-                              {formData.strategy === 'percentage' && (
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-xs">Weight:</Label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={member.weight}
-                                    onChange={(e) =>
-                                      updateMemberWeight(member.ai_assistant_id, parseInt(e.target.value) || 0)
-                                    }
-                                    className="w-20 h-8"
-                                  />
-                                  <span className="text-xs text-muted-foreground">
-                                    {totalWeight > 0 ? Math.round(((member.weight || 0) / totalWeight) * 100) : 0}%
-                                  </span>
-                                </div>
-                              )}
-
-                              {formData.strategy === 'round_robin' && (
-                                <span className="text-sm text-muted-foreground">Pos: {member.position + 1}</span>
-                              )}
-
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={member.status === 'active'}
-                                  onCheckedChange={() => toggleMemberStatus(member.ai_assistant_id)}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeMember(member.ai_assistant_id)}
-                                >
-                                  <X className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </SortableItem>
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              ) : (
-                <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                  <Bot className="h-12 w-12 mx-auto text-gray-300 mb-2" />
-                  <p className="text-gray-500">No AI assistants added yet</p>
-                </div>
-              )}
-
-              {formData.strategy === 'percentage' && totalWeight > 0 && (
-                <div className="text-sm text-muted-foreground text-right">
-                  Total Weight: {totalWeight}
-                </div>
-              )}
-            </div>
-
-            {/* Fallback Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Fallback Configuration</h3>
-              <div className="space-y-4">
-                <Select
-                  value={formData.fallback_action}
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      fallback_action: value as RingGroupFallbackAction,
-                      fallback_extension_id: undefined,
-                      fallback_ring_group_id: undefined,
-                      fallback_ivr_menu_id: undefined,
-                      fallback_ai_assistant_id: undefined,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select fallback action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hangup">Hangup</SelectItem>
-                    <SelectItem value="extension">Forward to Extension</SelectItem>
-                    <SelectItem value="ring_group">Forward to Ring Group</SelectItem>
-                    <SelectItem value="ivr_menu">Forward to IVR Menu</SelectItem>
-                    <SelectItem value="ai_assistant">Forward to AI Assistant</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {formData.fallback_action === 'extension' && (
-                  <div className="space-y-2">
-                    <Label>Select Extension</Label>
-                    <Select
-                      value={formData.fallback_extension_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_extension_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an extension" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableExtensions.map((ext) => (
-                          <SelectItem key={ext.id} value={ext.id}>
-                            {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {formData.fallback_action === 'ring_group' && (
-                  <div className="space-y-2">
-                    <Label>Select Ring Group</Label>
-                    <Select
-                      value={formData.fallback_ring_group_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ring_group_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a ring group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableFallbackRingGroups.map((rg) => (
-                          <SelectItem key={rg.id} value={rg.id}>
-                            {rg.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {formData.fallback_action === 'ivr_menu' && (
-                  <div className="space-y-2">
-                    <Label>Select IVR Menu</Label>
-                    <Select
-                      value={formData.fallback_ivr_menu_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ivr_menu_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an IVR menu" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableIvrMenus.map((ivr) => (
-                          <SelectItem key={ivr.id} value={ivr.id}>
-                            {ivr.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {formData.fallback_action === 'ai_assistant' && (
-                  <div className="space-y-2">
-                    <Label>Select AI Assistant</Label>
-                    <Select
-                      value={formData.fallback_ai_assistant_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, fallback_ai_assistant_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an AI assistant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableAiAssistants.map((ai) => (
-                          <SelectItem key={ai.id} value={String(ai.id)}>
-                            {ai.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Updating...' : 'Update Load Balancer'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {renderFormDialog(true)}
       </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Load Balancer</DialogTitle>
+            <DialogTitle>Delete AI Load Balancer</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{selectedLoadBalancer?.name}</strong>?
-              This action cannot be undone.
+              Are you sure you want to delete "{selectedLoadBalancer?.name}"? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1603,132 +1461,87 @@ export default function AiAssistantLoadBalancers() {
 
       {/* Detail Sheet */}
       <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>{selectedLoadBalancer?.name}</SheetTitle>
-            <SheetDescription>
-              AI Load Balancer Details
-            </SheetDescription>
-          </SheetHeader>
-
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selectedLoadBalancer && (
-            <div className="mt-6 space-y-6">
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Description</h4>
-                <p className="text-sm">
+            <>
+              <SheetHeader>
+                <SheetTitle>{selectedLoadBalancer.name}</SheetTitle>
+                <SheetDescription>
                   {selectedLoadBalancer.description || 'No description provided'}
-                </p>
-              </div>
+                </SheetDescription>
+              </SheetHeader>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-6 mt-6">
+                {/* Strategy */}
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Strategy</h4>
+                  <h3 className="text-sm font-medium mb-2">Load Balancing Strategy</h3>
                   <div className="flex items-center gap-2">
                     {getStrategyIcon(selectedLoadBalancer.strategy)}
+                    <Badge variant="outline">{getStrategyDisplayName(selectedLoadBalancer.strategy)}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {getStrategyDescription(selectedLoadBalancer.strategy)}
+                  </p>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Status</h3>
+                  <Badge variant={selectedLoadBalancer.status === 'active' ? 'default' : 'secondary'}>
+                    {selectedLoadBalancer.status === 'active' ? 'Active' : 'Disabled'}
+                  </Badge>
+                </div>
+
+                {/* Fallback Action */}
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Fallback Action</h3>
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon(selectedLoadBalancer.fallback_action)}
                     <span className="text-sm">
-                      {getStrategyDisplayName(selectedLoadBalancer.strategy)}
+                      {getFallbackDisplayText(
+                        selectedLoadBalancer as ExtendedAiAssistantLoadBalancer,
+                        loadBalancers || [],
+                        availableIvrMenus || []
+                      )}
                     </span>
                   </div>
                 </div>
+
+                {/* Members */}
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Status</h4>
-                  <Badge
-                    variant={selectedLoadBalancer.status === 'active' ? 'default' : 'secondary'}
-                  >
-                    {selectedLoadBalancer.status === 'active' ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                  AI Assistant Members ({selectedLoadBalancer.active_members_count} active)
-                </h4>
-                <div className="space-y-2">
-                  {selectedLoadBalancer.members.map((member) => (
-                    <div
-                      key={member.id}
-                      className={cn(
-                        'flex items-center justify-between p-2 rounded-lg border',
-                        member.status === 'inactive' && 'opacity-50 bg-gray-50'
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Bot className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm">{member.ai_assistant_name}</span>
-                        {member.status === 'inactive' && (
-                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                        )}
+                  <h3 className="text-sm font-medium mb-2">
+                    AI Assistant Members ({selectedLoadBalancer.members.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedLoadBalancer.members.map((member, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-cyan-500" />
+                            <p className="font-medium">
+                              {member.ai_assistant_name}
+                            </p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Position: {member.position} | Priority: {member.priority} | Weight: {member.weight}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{member.status}</Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {selectedLoadBalancer.strategy === 'priority' && `Priority: ${member.priority}`}
-                        {selectedLoadBalancer.strategy === 'percentage' && `Weight: ${member.weight}`}
-                        {selectedLoadBalancer.strategy === 'round_robin' && `Pos: ${member.position + 1}`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Fallback Action</h4>
-                <div className="flex items-center gap-2">
-                  {selectedLoadBalancer.fallback_action === 'hangup' ? (
-                    <PhoneOff className="h-4 w-4 text-red-500" />
-                  ) : (
-                    <PhoneForwarded className="h-4 w-4 text-blue-500" />
-                  )}
-                  <span className="text-sm">
-                    {getFallbackDisplayText(
-                      selectedLoadBalancer.fallback_action,
-                      selectedLoadBalancer.fallback_extension?.extension_number
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
-                  <div>
-                    <span className="font-medium">Created:</span>
-                    <br />
-                    {new Date(selectedLoadBalancer.created_at).toLocaleString()}
-                  </div>
-                  <div>
-                    <span className="font-medium">Updated:</span>
-                    <br />
-                    {new Date(selectedLoadBalancer.updated_at).toLocaleString()}
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              {canManage && (
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIsDetailSheetOpen(false);
-                      openEditDialog(selectedLoadBalancer);
-                    }}
-                  >
-                    <Edit2 className="mr-2 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => {
-                      setIsDetailSheetOpen(false);
-                      openDeleteDialog(selectedLoadBalancer);
-                    }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
+                {/* Timestamps */}
+                <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
+                  <p>Created: {new Date(selectedLoadBalancer.created_at).toLocaleString()}</p>
+                  <p>Updated: {new Date(selectedLoadBalancer.updated_at).toLocaleString()}</p>
                 </div>
-              )}
-            </div>
+              </div>
+            </>
           )}
         </SheetContent>
       </Sheet>
