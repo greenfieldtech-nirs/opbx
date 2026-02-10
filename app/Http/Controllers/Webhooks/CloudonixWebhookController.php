@@ -28,7 +28,9 @@ class CloudonixWebhookController extends Controller
     use HandlesWebhookErrors;
 
     public function __construct(
-        private readonly CallRoutingService $routingService
+        private readonly CallRoutingService $routingService,
+        private readonly WebhookDispatcher $webhookDispatcher,
+        private readonly NotificationPayloadBuilder $payloadBuilder
     ) {}
 
     /**
@@ -576,6 +578,9 @@ class CloudonixWebhookController extends Controller
                 'organization_id' => $organizationId,
             ]);
 
+            // Trigger call notification webhook if enabled for this organization
+            $this->triggerCallNotification($sessionUpdate, $organizationId);
+
             return response()->json(['message' => 'Session record updated successfully'], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Session update validation failed', [
@@ -813,5 +818,98 @@ class CloudonixWebhookController extends Controller
         }
 
         return $number;
+    }
+
+    /**
+     * Trigger call notification webhook for the session update.
+     */
+    private function triggerCallNotification(SessionUpdate $sessionUpdate, int $organizationId): void
+    {
+        try {
+            // Get notification settings for organization
+            $settings = CallNotificationsSettings::forOrganization($organizationId)
+                ->active()
+                ->first();
+
+            if (! $settings || ! $settings->isConfigured()) {
+                // No notification settings configured
+                return;
+            }
+
+            // Check if this status should trigger a notification
+            $normalizedStatus = $this->normalizeNotificationStatus($sessionUpdate->status ?? 'unknown');
+            if (! $settings->isEventEnabled($normalizedStatus)) {
+                Log::debug('Call notification skipped - event not enabled', [
+                    'organization_id' => $organizationId,
+                    'session_id' => $sessionUpdate->session_id,
+                    'status' => $normalizedStatus,
+                    'enabled_events' => $settings->enabled_events,
+                ]);
+
+                return;
+            }
+
+            // Get previous status from database
+            $previousStatus = SessionUpdate::where('organization_id', $organizationId)
+                ->where('session_id', $sessionUpdate->session_id)
+                ->where('id', '<', $sessionUpdate->id)
+                ->orderBy('id', 'desc')
+                ->value('status') ?? 'unknown';
+
+            // Build notification payload
+            $payload = $this->payloadBuilder->build($sessionUpdate, $previousStatus);
+
+            // Dispatch webhook
+            $this->webhookDispatcher->dispatch(
+                $settings,
+                $payload,
+                $payload['event_id'],
+                $sessionUpdate->session_token ?? (string) $sessionUpdate->session_id
+            );
+
+            Log::info('Call notification triggered', [
+                'organization_id' => $organizationId,
+                'session_id' => $sessionUpdate->session_id,
+                'event_id' => $payload['event_id'],
+                'status' => $normalizedStatus,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to trigger call notification', [
+                'organization_id' => $organizationId,
+                'session_id' => $sessionUpdate->session_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Normalize status for notification event checking.
+     */
+    private function normalizeNotificationStatus(string $status): string
+    {
+        $statusMap = [
+            'new' => 'new',
+            'initiated' => 'new',
+            'created' => 'new',
+            'ringing' => 'ringing',
+            'ring' => 'ringing',
+            'progress' => 'ringing',
+            'connected' => 'connected',
+            'connect' => 'connected',
+            'answer' => 'answered',
+            'answered' => 'answered',
+            'active' => 'answered',
+            'busy' => 'busy',
+            'cancel' => 'cancel',
+            'cancelled' => 'cancel',
+            'canceled' => 'cancel',
+            'failed' => 'failed',
+            'fail' => 'failed',
+            'error' => 'failed',
+            'congestion' => 'congestion',
+            'congested' => 'congestion',
+        ];
+
+        return $statusMap[strtolower($status)] ?? strtolower($status);
     }
 }
