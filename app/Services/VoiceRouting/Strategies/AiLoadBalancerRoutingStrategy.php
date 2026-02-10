@@ -29,6 +29,37 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         private readonly WebSocketUrlBuilder $urlBuilder
     ) {}
 
+    /**
+     * Generate follow-through callback URL for ALB failover.
+     *
+     * This URL is used when an AI Assistant call fails (busy, no-answer, failed, etc.)
+     * and we need to try the next assistant in the load balancer.
+     *
+     * @param  AiAssistantLoadBalancer  $aiLoadBalancer  The load balancer
+     * @param  AiAssistant  $currentAssistant  The assistant that just failed
+     * @param  Request  $request  The incoming request
+     * @return string The callback URL
+     */
+    private function getFollowThroughCallbackUrl(
+        AiAssistantLoadBalancer $aiLoadBalancer,
+        AiAssistant $currentAssistant,
+        Request $request
+    ): string {
+        $organizationId = $request->input('_organization_id');
+        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $organizationId)->first();
+
+        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
+            ? rtrim($cloudonixSettings->webhook_base_url, '/')
+            : $request->getSchemeAndHttpHost();
+
+        $relativeUrl = route('voice.albs-follow-through', [
+            'albs_id' => $aiLoadBalancer->id,
+            'current_assistant_id' => $currentAssistant->id,
+        ], false);
+
+        return $baseUrl.$relativeUrl;
+    }
+
     public function canHandle(ExtensionType $type): bool
     {
         return $type === ExtensionType::AI_LOAD_BALANCER;
@@ -131,23 +162,23 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             'selected_ai_assistant_name' => $selectedAiAssistant->name,
         ]);
 
-        return $this->routeToAiAssistant($selectedAiAssistant, $request);
+        return $this->routeToAiAssistant($selectedAiAssistant, $aiLoadBalancer, $request);
     }
 
-    private function routeToAiAssistant(AiAssistant $aiAssistant, Request $request): Response
+    private function routeToAiAssistant(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;
         $provider = $aiAssistant->provider;
 
         if ($protocol === 'websocket') {
-            return $this->routeWebSocket($aiAssistant, $config, $provider, $request);
+            return $this->routeWebSocket($aiAssistant, $aiLoadBalancer, $config, $provider, $request);
         }
 
-        return $this->routeSip($aiAssistant, $config, $provider);
+        return $this->routeSip($aiAssistant, $aiLoadBalancer, $config, $provider, $request);
     }
 
-    private function routeWebSocket(AiAssistant $aiAssistant, array $config, ?string $provider, Request $request): Response
+    private function routeWebSocket(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, array $config, ?string $provider, Request $request): Response
     {
         if (! $provider) {
             Log::error('AiLoadBalancerRoutingStrategy: WebSocket AI Assistant missing provider', [
@@ -198,8 +229,12 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
                 'call_sid' => $cloudonixParams['session'],
             ]);
 
+            // Generate callback URL for follow-through when call fails
+            // Using action parameter on Connect verb for callback
+            $callbackUrl = $this->getFollowThroughCallbackUrl($aiLoadBalancer, $aiAssistant, $request);
+
             return response(
-                CxmlBuilder::streamToWebSocket($websocketUrl),
+                CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl),
                 200,
                 ['Content-Type' => 'text/xml']
             );
@@ -219,7 +254,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         }
     }
 
-    private function routeSip(AiAssistant $aiAssistant, array $config, ?string $provider): Response
+    private function routeSip(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, array $config, ?string $provider, Request $request): Response
     {
         $phoneNumber = $config['phone_number'] ?? null;
 
@@ -245,8 +280,11 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             'phone_number' => $phoneNumber,
         ]);
 
+        // Generate callback URL for follow-through when call fails
+        $callbackUrl = $this->getFollowThroughCallbackUrl($aiLoadBalancer, $aiAssistant, $request);
+
         return response(
-            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
+            CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl),
             200,
             ['Content-Type' => 'text/xml']
         );
@@ -436,7 +474,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             'fallback_ai_assistant_name' => $fallbackAiAssistant->name,
         ]);
 
-        return $this->routeToAiAssistant($fallbackAiAssistant, $request);
+        return $this->routeToAiAssistant($fallbackAiAssistant, $aiLoadBalancer, $request);
     }
 
     private function handleFallbackHangup(AiAssistantLoadBalancer $aiLoadBalancer): Response
