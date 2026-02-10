@@ -44,6 +44,7 @@ class AiAssistantLoadBalancer extends Model
         'name',
         'description',
         'strategy',
+        'follow_through',
         'status',
         'fallback_action',
         'fallback_extension_id',
@@ -63,6 +64,7 @@ class AiAssistantLoadBalancer extends Model
     {
         return [
             'strategy' => AlbsStrategy::class,
+            'follow_through' => 'boolean',
             'fallback_action' => RingGroupFallbackAction::class,
             'status' => AlbsStatus::class,
         ];
