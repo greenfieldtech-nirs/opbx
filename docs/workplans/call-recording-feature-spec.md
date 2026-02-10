@@ -3105,51 +3105,403 @@ docker compose exec app php artisan migrate:rollback --step=2
 
 ---
 
-## 17. Open Questions
+## 17. Approved Decisions & Requirements
 
-### 17.1 Technical Decisions Needed
+### 17.1 Audio Format & Transcoding ✅
 
-1. **Audio Format**:
-   - MVP: WAV (uncompressed, simple)
-   - Future: MP3 (compressed, smaller files)
-   - **Decision needed**: Implement transcoding in stream receiver or post-processing job?
+**Decision**: 
+- **MVP**: WAV (uncompressed, simple)
+- **Future**: MP3 (compressed, smaller files)
+- **Transcoding Strategy**: Implement as Laravel queue post-processing job
 
-2. **Storage Lifecycle**:
-   - **Decision needed**: Should we implement tiered storage (hot/cold)?
-   - **Decision needed**: Should we support archival to S3 Glacier for long-term retention?
-
-3. **Selective Recording**:
-   - **Decision needed**: Should we support per-extension recording settings? (e.g., record only sales team calls)
-   - **Decision needed**: Should we support per-DID recording settings?
-
-4. **Legal Compliance**:
-   - **Decision needed**: Do we need "beep" tone or announcement before recording?
-   - **Decision needed**: What retention policies are required for GDPR/CCPA compliance?
-   - **Decision needed**: Should we support recording consent tracking?
-
-### 17.2 Feature Scope Clarifications
-
-1. **Outbound Calls**: This spec covers inbound calls only. Outbound recording implementation TBD.
-
-2. **Conference Recording**: How should we handle conference rooms with multiple participants?
-
-3. **Call Transfer**: If a call is transferred, should we create separate recordings or one continuous recording?
-
-4. **Voicemail Recording**: Should voicemails be stored in the same system as call recordings?
-
-### 17.3 Integration Questions
-
-1. **Cloudonix Stream Format**: Confirm mu-law codec is used in `<Connect><Stream>` (vs G.711, Opus, etc.)
-
-2. **Cloudonix Webhook Retries**: What is Cloudonix's retry policy for failed stream connections?
-
-3. **Cloudonix Stream Metadata**: Does the WebSocket stream include metadata (timestamps, packet sequence)?
+**Implementation**:
+- Stream receiver writes WAV files directly
+- After recording completion, queue job `TranscodeRecordingToMp3` runs asynchronously
+- Keep both WAV (archival) and MP3 (playback) versions
+- MP3 transcoding uses FFmpeg in a separate worker container
 
 ---
 
-## 18. Appendix
+### 17.2 Storage Lifecycle & Tiering ✅
 
-### 18.1 Cloudonix CXML Example
+**Hot/Cold Storage**: **YES** - Implement tiered storage
+
+**Policy**:
+1. **Hot Storage** (0-6 months): Recordings stored in MinIO primary bucket
+   - Path: `recordings/{org_id}/{year}/{month}/{call_id}.wav`
+   - Fast retrieval, SSD-backed
+
+2. **Cold Storage** (6+ months): Automatically moved to cold tier
+   - Path: `recordings-archive/{org_id}/{year}/{month}/{call_id}.wav`
+   - Slower retrieval, HDD-backed or external S3
+
+**Implementation**:
+- Cron job runs daily: `php artisan recordings:archive-old`
+- Moves recordings older than 6 months to cold storage
+- Updates `recordings.storage_tier` column: `hot` → `cold`
+- Playback URLs adapt based on tier (pre-signed URL expiration varies)
+
+**Glacier/Long-Term Archival**: **NOT NOW**
+- Leave interface abstraction for future storage backends
+- Design `StorageDriverInterface` to support S3 Glacier later
+
+---
+
+### 17.3 Selective Recording Configuration ✅
+
+**Recording can be enabled at multiple levels** (priority order):
+
+1. **Phone Numbers** (DID) - **HIGHEST PRIORITY**
+   - Table: `recording_settings` (polymorphic: `recordable_type` = `DidNumber`)
+   - If DID has recording enabled, it supersedes all other settings
+
+2. **Extensions**
+   - Table: `recording_settings` (polymorphic: `recordable_type` = `Extension`)
+
+3. **Ring Groups**
+   - Table: `recording_settings` (polymorphic: `recordable_type` = `RingGroup`)
+
+4. **AI Assistants**
+   - Table: `recording_settings` (polymorphic: `recordable_type` = `AiAssistant`)
+
+5. **Conference Rooms**
+   - Table: `recording_settings` (polymorphic: `recordable_type` = `ConferenceRoom`)
+
+**Call Types Supported**:
+- ✅ Inbound calls to phone numbers
+- ✅ Inbound calls to extensions
+- ✅ Inbound calls to ring groups
+- ✅ Inbound calls to AI Assistants
+- ✅ Inbound calls to Conference Rooms
+- ✅ Outbound calls from extensions
+
+**Resolution Logic**:
+```php
+// Voice routing determines if recording should start
+function shouldRecordCall(SessionUpdate $session): bool {
+    // 1. Check DID (highest priority)
+    if ($did = $session->didNumber) {
+        $settings = RecordingSettings::forEntity($did)->first();
+        if ($settings && $settings->enabled) {
+            return true; // DID recording supersedes all
+        }
+    }
+    
+    // 2. Check extension
+    if ($extension = $session->extension) {
+        $settings = RecordingSettings::forEntity($extension)->first();
+        if ($settings && $settings->enabled) {
+            return true;
+        }
+    }
+    
+    // 3. Check ring group (if call routed to ring group)
+    // ... similar logic
+    
+    return false; // No recording configured
+}
+```
+
+---
+
+### 17.4 Legal Compliance ✅
+
+**Recording Announcement**: **NO**
+- No automated "beep" tone or announcement required
+- Handled by inbound IVR (customer configures their own announcement)
+
+**Retention Policies**: **NOT NOW**
+- GDPR/CCPA compliance requirements TBD
+- Will be defined in future phase
+- Storage lifecycle (hot/cold) serves as interim retention mechanism
+
+**Consent Tracking**: **NOT NOW**
+- Not implemented in MVP
+- Future enhancement may track consent per-call
+
+---
+
+### 17.5 Call Scenarios ✅
+
+**Outbound Calls**: **INCLUDED IN SCOPE**
+- Outbound calls from extensions can be recorded
+- Same recording settings apply (check extension config)
+
+**Conference Recording**: **CONTINUOUS RECORDING**
+- Conference rooms support recording (enabled per-room)
+- Single WAV file captures all participants (mixed audio)
+
+**Call Transfer**: **SINGLE CONTINUOUS RECORDING**
+- If call is transferred (blind/attended), recording continues
+- One WAV file spans entire call lifecycle (initial + transfer)
+- Stream receiver tracks same `streamSid` through transfer
+
+**Voicemail Recording**: **NOT APPLICABLE**
+- OpBX does not support voicemail functionality (yet)
+
+---
+
+### 17.6 Cloudonix Integration Confirmations ✅
+
+**Stream Format**: **CONFIRMED**
+- Codec: `audio/x-mulaw` (μ-law, G.711)
+- Sample Rate: `8000 Hz`
+- Channels: `1` (mono)
+
+**Retry Policy**: **FAIL-FAST**
+- If WebSocket connection to stream receiver fails, **Cloudonix will fail the call**
+- Stream receiver MUST be highly available
+- Implement health checks and auto-restart (Docker/Podman)
+
+**Stream Metadata**: **YES - INCLUDES TIMESTAMPS & SEQUENCE**
+From Cloudonix documentation:
+- Each `media` message includes:
+  - `sequenceNumber`: Monotonically increasing per message
+  - `chunk`: Per-track chunk sequence (starts at 1)
+  - `timestamp`: Presentation timestamp in milliseconds from stream start
+- Use `timestamp` for accurate WAV frame timing
+- Use `sequenceNumber` to detect dropped packets
+
+---
+
+## 18. Revised Implementation Plan
+
+Based on approved decisions, the implementation is split into **6 focused phases**:
+
+---
+
+### Phase 1: Database Schema & Core Models (3-4 days)
+
+**Scope**: Foundation for multi-entity recording configuration
+
+**Tasks**:
+1. Create `call_recordings` table migration
+2. Create `recording_settings` table migration (polymorphic)
+3. Add `storage_tier` enum to `recordings` table
+4. Create `CallRecording` model with policies
+5. Create `RecordingSettings` model with polymorphic relationships
+6. Write unit tests for models
+
+**Deliverables**:
+- ✅ Migrations run successfully
+- ✅ Polymorphic relationships work (DID, Extension, RingGroup, AiAssistant, ConferenceRoom)
+- ✅ Multi-tenant isolation via global scopes
+- ✅ Policy enforcement for RBAC
+
+**Git Commits**:
+```
+feat(recording): add call_recordings table with storage_tier
+feat(recording): add recording_settings polymorphic table
+feat(recording): add CallRecording model with organization scope
+feat(recording): add RecordingSettings model with polymorphic support
+test(recording): add model unit tests with multi-tenant validation
+```
+
+---
+
+### Phase 2: Stream Receiver Service - Core (5-7 days)
+
+**Scope**: Standalone Node.js WebSocket server
+
+**Tasks**:
+1. Initialize TypeScript project with dependencies
+2. Implement WebSocket server (port 6001)
+3. Implement Cloudonix protocol handler (connected/start/media/stop/dtmf)
+4. Implement mulaw → PCM decoder
+5. Implement WAV file writer (chunked I/O)
+6. Implement session manager (track active streams)
+7. Implement MinIO S3 uploader
+8. Write unit tests for audio processing
+
+**Deliverables**:
+- ✅ WebSocket server accepts connections
+- ✅ Audio frames decoded and written to WAV
+- ✅ Metadata (timestamp, sequenceNumber) tracked
+- ✅ MinIO uploads work
+- ✅ Unit tests pass
+
+**Git Commits**:
+```
+feat(recording): initialize stream-receiver TypeScript project
+feat(recording): add WebSocket server with Cloudonix protocol
+feat(recording): add mulaw to PCM audio decoder
+feat(recording): add WAV file writer with chunked I/O
+feat(recording): add session manager for active recordings
+feat(recording): add MinIO S3 uploader service
+test(recording): add audio processor unit tests
+```
+
+---
+
+### Phase 3: Stream Receiver - Laravel Integration (4-5 days)
+
+**Scope**: Connect stream receiver to Laravel backend
+
+**Tasks**:
+1. Create internal API endpoints (create/update/finalize recording)
+2. Create `VerifyInternalApiToken` middleware
+3. Implement Laravel API client in stream receiver
+4. Implement Redis locks for race condition prevention
+5. Add WebSocket authentication (validate org_id from JWT)
+6. Docker/Podman configuration (docker-compose, Nginx proxy)
+7. Write integration tests (mock WebSocket flow)
+
+**Deliverables**:
+- ✅ Stream receiver calls Laravel internal API
+- ✅ JWT tokens validated (org_id verified)
+- ✅ Redis locks prevent concurrent write conflicts
+- ✅ Docker containers communicate correctly
+- ✅ Integration tests pass
+
+**Git Commits**:
+```
+feat(recording): add Laravel internal API controller
+feat(recording): add VerifyInternalApiToken middleware
+feat(recording): add Laravel API client in stream receiver
+feat(recording): add Redis distributed locks
+feat(recording): add JWT authentication for WebSocket
+chore(recording): add stream-receiver to docker-compose
+chore(recording): add Nginx WebSocket proxy configuration
+test(recording): add stream receiver integration tests
+```
+
+---
+
+### Phase 4: Voice Routing & CXML Integration (4-5 days)
+
+**Scope**: Inject `<Start><Stream>` into call flow
+
+**Tasks**:
+1. Create `RecordingService` with resolution logic (DID > Extension > RingGroup...)
+2. Update `VoiceRoutingService` to check recording settings
+3. Create CXML builder for `<Start><Stream>` directive
+4. Generate JWT tokens for WebSocket authentication
+5. Handle recording for outbound calls
+6. Add recording status to `SessionUpdate` model
+7. Write end-to-end tests (with Cloudonix mock)
+
+**Deliverables**:
+- ✅ CXML includes `<Start><Stream>` when recording enabled
+- ✅ Priority resolution works (DID supersedes extension)
+- ✅ JWT tokens include org_id and call metadata
+- ✅ Outbound calls recorded correctly
+- ✅ End-to-end tests pass
+
+**Git Commits**:
+```
+feat(recording): add RecordingService with priority resolution
+feat(recording): inject Stream directive in voice routing CXML
+feat(recording): add CXML builder for Stream directive
+feat(recording): generate JWT tokens for WebSocket auth
+feat(recording): support outbound call recording
+feat(recording): add recording status to SessionUpdate
+test(recording): add voice routing integration tests
+```
+
+---
+
+### Phase 5: Frontend UI & Playback (5-6 days)
+
+**Scope**: User-facing recording management
+
+**Tasks**:
+1. Add recording toggle to DID form
+2. Add recording toggle to Extension form
+3. Add recording toggle to RingGroup form
+4. Add recording toggle to AiAssistant form
+5. Add recording toggle to ConferenceRoom form
+6. Create `CallRecordingsPage` (list, filter, search)
+7. Create `AudioPlayer` component with waveform
+8. Update `CallLogs` page to show recording links
+9. Add real-time recording indicator (Live Calls)
+10. Write frontend component tests
+
+**Deliverables**:
+- ✅ Recording can be enabled/disabled per entity
+- ✅ Call logs show playback button
+- ✅ Audio playback works (pre-signed URLs)
+- ✅ Real-time recording status visible
+- ✅ Frontend tests pass
+
+**Git Commits**:
+```
+feat(recording): add recording toggle to DID form
+feat(recording): add recording toggle to Extension form
+feat(recording): add recording toggle to RingGroup form
+feat(recording): add recording toggle to AiAssistant form
+feat(recording): add recording toggle to ConferenceRoom form
+feat(recording): create CallRecordingsPage with filters
+feat(recording): add AudioPlayer component with waveform
+feat(recording): integrate recordings into CallLogs page
+feat(recording): add real-time recording indicators
+test(recording): add frontend component tests
+```
+
+---
+
+### Phase 6: Post-Processing & Storage Lifecycle (4-5 days)
+
+**Scope**: MP3 transcoding and hot/cold storage tiering
+
+**Tasks**:
+1. Create `TranscodeRecordingToMp3` queue job (uses FFmpeg)
+2. Add FFmpeg to Docker image
+3. Create `ArchiveOldRecordingsCommand` (moves to cold storage)
+4. Update playback URLs to handle hot/cold tiers
+5. Add `storage_tier` column to `recordings` table
+6. Create `StorageDriverInterface` abstraction
+7. Write tests for transcoding and archival
+
+**Deliverables**:
+- ✅ WAV files auto-transcoded to MP3 after upload
+- ✅ Recordings > 6 months moved to cold storage
+- ✅ Playback adapts to storage tier
+- ✅ Storage driver abstraction ready for future backends
+- ✅ All tests pass
+
+**Git Commits**:
+```
+feat(recording): add TranscodeRecordingToMp3 queue job
+chore(recording): add FFmpeg to Docker image
+feat(recording): add ArchiveOldRecordingsCommand for cold storage
+feat(recording): update playback URLs for tiered storage
+feat(recording): add StorageDriverInterface abstraction
+test(recording): add transcoding and archival tests
+docs(recording): add deployment and operations guide
+```
+
+---
+
+## 19. Updated Timeline
+
+| Phase | Duration | Dependencies |
+|-------|----------|--------------|
+| Phase 1: Database | 3-4 days | None |
+| Phase 2: Stream Core | 5-7 days | Phase 1 |
+| Phase 3: Integration | 4-5 days | Phase 2 |
+| Phase 4: Voice Routing | 4-5 days | Phase 3 |
+| Phase 5: Frontend | 5-6 days | Phase 4 |
+| Phase 6: Post-Processing | 4-5 days | Phase 5 |
+| **Total** | **25-32 days** | **(~5-6 weeks)** |
+
+---
+
+## 20. Success Criteria
+
+**Phase 1**: ✅ Migrations run, models work, policies enforce RBAC  
+**Phase 2**: ✅ Audio streams captured and written to WAV  
+**Phase 3**: ✅ Laravel and stream receiver communicate  
+**Phase 4**: ✅ Calls automatically recorded based on settings  
+**Phase 5**: ✅ Users can enable/disable recording and play back files  
+**Phase 6**: ✅ MP3 transcoding works, old recordings archived  
+
+**Production Ready**: All 6 phases complete, tested, and documented.
+
+---
+
+## 21. Appendix
+
+### 21.1 Cloudonix CXML Example
 
 **Reference**: https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect/stream
 
@@ -3170,7 +3522,7 @@ docker compose exec app php artisan migrate:rollback --step=2
 - `url`: WebSocket URL (must use WSS in production)
 - `track`: `inbound`, `outbound`, or `both` (we use `both`)
 
-### 18.2 Storage Path Examples
+### 21.2 Storage Path Examples
 
 ```
 MinIO Bucket: recordings/
@@ -3188,7 +3540,7 @@ Benefits:
 - Easy to bulk delete old recordings
 ```
 
-### 18.3 Performance Estimates
+### 21.3 Performance Estimates
 
 **Storage Size Estimation**:
 - 1 minute of WAV (8kHz, 16-bit mono): ~960 KB
@@ -3212,8 +3564,8 @@ Benefits:
 
 **Next Steps**:
 1. Review this workplan with the team
-2. Address open questions (Section 17)
-3. Begin Phase 1 implementation
+2. Review approved decisions (Section 17)
+3. Begin Phase 1 implementation (Database Schema & Core Models)
 4. Schedule daily standups during implementation
 5. Create GitHub issues/tickets for each task
 
