@@ -69,6 +69,10 @@ class UpdateAlbsRequest extends FormRequest
                 'required',
                 new Enum(AlbsStrategy::class),
             ],
+            'follow_through' => [
+                'nullable',
+                'boolean',
+            ],
             'fallback_action' => [
                 'required',
                 new Enum(RingGroupFallbackAction::class),
