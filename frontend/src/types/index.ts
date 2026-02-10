@@ -240,6 +240,7 @@ export interface AiAssistantLoadBalancer {
   name: string;
   description?: string;
   strategy: AlbsStrategy;
+  follow_through: boolean;
   status: Status;
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
@@ -586,6 +587,7 @@ export interface CreateAiAssistantLoadBalancerRequest {
   name: string;
   description?: string;
   strategy: AlbsStrategy;
+  follow_through?: boolean;
   members: Array<{
     ai_assistant_id: string;
     priority?: number;
@@ -605,6 +607,7 @@ export interface UpdateAiAssistantLoadBalancerRequest {
   name?: string;
   description?: string;
   strategy?: AlbsStrategy;
+  follow_through?: boolean;
   members?: Array<{
     ai_assistant_id: string;
     priority?: number;
