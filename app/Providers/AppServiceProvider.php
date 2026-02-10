@@ -66,6 +66,7 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class,
+            \App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy::class,
         ], 'voice_routing.strategies');
 
@@ -117,6 +118,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\Recording::class, \App\Policies\RecordingPolicy::class);
         Gate::policy(\App\Models\CallDetailRecord::class, \App\Policies\CallDetailRecordPolicy::class);
         Gate::policy(\App\Models\AiAssistant::class, \App\Policies\AiAssistantPolicy::class);
+        Gate::policy(\App\Models\AiAssistantLoadBalancer::class, \App\Policies\AiAssistantLoadBalancerPolicy::class);
 
         // Configure rate limiting
         $this->configureRateLimiting();

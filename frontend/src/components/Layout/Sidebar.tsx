@@ -21,6 +21,7 @@ import {
   Menu,
   Shield,
   Bot,
+  Scale,
 } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -37,6 +38,7 @@ const navigation: NavItem[] = [
   { name: 'Extensions', href: '/ui/extensions', icon: Phone, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
   { name: 'Conference Rooms', href: '/ui/conference-rooms', icon: Video, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
   { name: 'AI Assistants', href: '/ui/ai-assistants', icon: Bot, roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+  { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: Scale, roles: ['owner', 'pbx_admin', 'reporter'] },
   { name: 'Phone Numbers', href: '/ui/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin', 'reporter'] },
   { name: 'Ring Groups', href: '/ui/ring-groups', icon: UserPlus, roles: ['owner', 'pbx_admin', 'reporter'] },
   { name: 'IVR Menus', href: '/ui/ivr-menus', icon: Menu, roles: ['owner', 'pbx_admin'] },

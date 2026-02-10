@@ -101,6 +101,14 @@ class Extension extends Model
     }
 
     /**
+     * Get the AI Load Balancer assigned to this extension.
+     */
+    public function aiLoadBalancer(): BelongsTo
+    {
+        return $this->belongsTo(AiAssistantLoadBalancer::class, 'configuration->ai_load_balancer_id');
+    }
+
+    /**
      * Check if the extension is active.
      */
     public function isActive(): bool

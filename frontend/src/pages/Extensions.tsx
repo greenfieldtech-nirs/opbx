@@ -13,7 +13,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService } from '@/services/createResourceService';
+import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,6 +41,7 @@ import {
   RefreshCw,
   Key,
   Wifi,
+  Scale,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -126,6 +127,8 @@ interface ExtensionFormData {
   ai_api_key: string;
   ai_assistant_id: string;
   ai_session_id: string;
+  // AI Load Balancer - select from pre-defined
+  ai_load_balancer_id: string;
   // Custom Logic - Cloudonix Container Application
   container_application_name: string;
   container_block_name: string;
@@ -241,6 +244,7 @@ export default function ExtensionsComplete() {
     ai_api_key: '',
     ai_assistant_id: '',
     ai_session_id: '',
+    ai_load_balancer_id: '',
     container_application_name: '',
     container_block_name: '',
     forward_to: '',
@@ -281,6 +285,14 @@ export default function ExtensionsComplete() {
   });
 
   const aiAssistants = aiAssistantsData?.data || [];
+
+  // Fetch AI Load Balancers for dropdown
+  const { data: aiLoadBalancersData } = useQuery({
+    queryKey: ['ai-assistant-load-balancers', { per_page: 100, status: 'active' }],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
+  });
+
+  const aiLoadBalancers = aiLoadBalancersData?.data || [];
 
   // Fetch AI Assistant providers for detail view
   const { data: aiProvidersData } = useQuery({
@@ -492,6 +504,7 @@ export default function ExtensionsComplete() {
       ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
       ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
       ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+      ai_load_balancer: { label: 'AI Load Balancer', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
       forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
     };
 
@@ -515,6 +528,7 @@ export default function ExtensionsComplete() {
         ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
         ivr: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
         ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+        ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
         forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
       };
       return configs[type] || configs.user;
@@ -561,6 +575,13 @@ export default function ExtensionsComplete() {
           }
           const assistantId = extension.configuration?.ai_assistant_id || extension.ai_assistant_id;
           return assistantId ? `AI Assistant #${assistantId}` : 'Not configured';
+        }
+        case 'ai_load_balancer': {
+          if (extension.ai_load_balancer) {
+            return extension.ai_load_balancer.name;
+          }
+          const loadBalancerId = extension.configuration?.ai_load_balancer_id;
+          return loadBalancerId ? `AI Load Balancer #${loadBalancerId}` : 'Not configured';
         }
         case 'forward': {
           return extension.configuration?.forward_to || 'Not configured';
@@ -614,6 +635,12 @@ export default function ExtensionsComplete() {
     if (formData.type === 'ai_assistant') {
       if (!formData.ai_assistant_id) {
         errors.ai_assistant_id = 'AI assistant selection is required';
+      }
+    }
+
+    if (formData.type === 'ai_load_balancer') {
+      if (!formData.ai_load_balancer_id) {
+        errors.ai_load_balancer_id = 'AI Load Balancer selection is required';
       }
     }
 
@@ -672,6 +699,14 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ai_assistant_id, 10);
           if (!isNaN(parsed)) {
             configuration.ai_assistant_id = parsed;
+          }
+        }
+        break;
+      case 'ai_load_balancer':
+        if (formData.ai_load_balancer_id) {
+          const parsed = parseInt(formData.ai_load_balancer_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_load_balancer_id = parsed;
           }
         }
         break;
@@ -753,6 +788,14 @@ export default function ExtensionsComplete() {
           }
         }
         break;
+      case 'ai_load_balancer':
+        if (formData.ai_load_balancer_id) {
+          const parsed = parseInt(formData.ai_load_balancer_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_load_balancer_id = parsed;
+          }
+        }
+        break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
         break;
@@ -823,6 +866,7 @@ export default function ExtensionsComplete() {
       ai_api_key: '',
       ai_assistant_id: '',
       ai_session_id: '',
+      ai_load_balancer_id: '',
       container_application_name: '',
       container_block_name: '',
       forward_to: '',
@@ -889,6 +933,7 @@ export default function ExtensionsComplete() {
       ai_api_key: (typeof config === 'object' && config?.api_key) ? config.api_key : '',
       ai_assistant_id: (typeof config === 'object' && config?.assistant_id) ? config.assistant_id : '',
       ai_session_id: (typeof config === 'object' && config?.session_id) ? config.session_id : '',
+      ai_load_balancer_id: (typeof config === 'object' && config?.ai_load_balancer_id) ? config.ai_load_balancer_id.toString() : '',
       container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
       container_block_name: (typeof config === 'object' && config?.container_block_name) ? config.container_block_name : '',
       forward_to: (typeof config === 'object' && config?.forward_to) ? config.forward_to : '',
@@ -1028,6 +1073,42 @@ export default function ExtensionsComplete() {
             </p>
             {formErrors.ai_assistant_id && (
               <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>
+            )}
+          </div>
+        );
+
+      case 'ai_load_balancer':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="ai_load_balancer_id">
+              AI Load Balancer <span className="text-destructive">*</span>
+            </Label>
+            {aiLoadBalancers.length === 0 ? (
+              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                No AI Load Balancers Available
+              </div>
+            ) : (
+              <Select
+                value={formData.ai_load_balancer_id}
+                onValueChange={(value) => setFormData({ ...formData, ai_load_balancer_id: value })}
+              >
+                <SelectTrigger id="ai_load_balancer_id">
+                  <SelectValue placeholder="Select an AI Load Balancer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {aiLoadBalancers.map((loadBalancer) => (
+                    <SelectItem key={loadBalancer.id} value={loadBalancer.id.toString()}>
+                      {loadBalancer.name} ({loadBalancer.strategy.replace('_', ' ')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-xs text-muted-foreground">
+              AI Load Balancers are managed in a separate page
+            </p>
+            {formErrors.ai_load_balancer_id && (
+              <p className="text-sm text-destructive">{formErrors.ai_load_balancer_id}</p>
             )}
           </div>
         );
@@ -1198,6 +1279,7 @@ export default function ExtensionsComplete() {
                 <SelectItem value="ring_group">Ring Group</SelectItem>
                 <SelectItem value="ivr">IVR Menu</SelectItem>
                 <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                 <SelectItem value="forward">Forward</SelectItem>
               </SelectContent>
             </Select>
@@ -1461,6 +1543,7 @@ export default function ExtensionsComplete() {
                     <SelectItem value="ring_group">Ring Group</SelectItem>
                     <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
                     <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                    <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                     <SelectItem value="forward">Forward</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1558,6 +1641,7 @@ export default function ExtensionsComplete() {
                     <SelectItem value="ring_group">Ring Group</SelectItem>
                     <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
                     <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                    <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                     <SelectItem value="forward">Forward</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2081,6 +2165,69 @@ export default function ExtensionsComplete() {
                           </>
                         );
                       })()}
+                      {selectedExtension.type === 'ai_load_balancer' && (
+                        <>
+                          {(() => {
+                            const loadBalancer = selectedExtension.ai_load_balancer;
+                            const config = selectedExtension.configuration;
+                            const loadBalancerId = config?.ai_load_balancer_id;
+
+                            if (!loadBalancer && !loadBalancerId) {
+                              return (
+                                <div className="text-sm text-muted-foreground">
+                                  AI Load Balancer not configured
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">AI Load Balancer:</span>
+                                  <span className="text-sm font-medium">{loadBalancer?.name || `ID: ${loadBalancerId}`}</span>
+                                </div>
+                                {loadBalancer && (
+                                  <>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Strategy:</span>
+                                      <Badge variant="outline" className="text-xs capitalize">
+                                        {loadBalancer.strategy.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+                                    {loadBalancer.members && loadBalancer.members.length > 0 && (
+                                      <div className="mt-4 pt-4 border-t">
+                                        <span className="text-sm text-muted-foreground block mb-2">Members ({loadBalancer.members.length}):</span>
+                                        <div className="space-y-2">
+                                          {loadBalancer.members.map((member, index) => (
+                                            <div key={member.ai_assistant_id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                                                <Bot className="h-4 w-4 text-cyan-500" />
+                                                <span className="text-sm font-medium">{member.ai_assistant_name}</span>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {loadBalancer.strategy === 'percentage' && (
+                                                  <Badge variant="secondary" className="text-xs">{member.weight}%</Badge>
+                                                )}
+                                                {loadBalancer.strategy === 'priority' && (
+                                                  <Badge variant="secondary" className="text-xs">Priority: {member.priority}</Badge>
+                                                )}
+                                                <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                                                  {member.status}
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
                       {selectedExtension.type === 'ivr' && (
                         <>
                           {(() => {

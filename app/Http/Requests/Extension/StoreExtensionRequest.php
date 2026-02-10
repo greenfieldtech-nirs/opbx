@@ -91,6 +91,12 @@ class StoreExtensionRequest extends FormRequest
                 'integer',
                 'exists:ai_assistants,id',
             ],
+            'configuration.ai_load_balancer_id' => [
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_LOAD_BALANCER->value),
+                'nullable',
+                'integer',
+                'exists:ai_assistant_load_balancers,id',
+            ],
             'configuration.container_application_name' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
                 'nullable',
@@ -133,6 +139,8 @@ class StoreExtensionRequest extends FormRequest
             'configuration.ivr_id.required_if' => 'IVR ID is required for IVR extensions.',
             'configuration.ai_assistant_id.required_if' => 'AI assistant selection is required for AI assistant extensions.',
             'configuration.ai_assistant_id.exists' => 'The selected AI assistant does not exist.',
+            'configuration.ai_load_balancer_id.required_if' => 'AI Load Balancer selection is required for AI Load Balancer extensions.',
+            'configuration.ai_load_balancer_id.exists' => 'The selected AI Load Balancer does not exist.',
             'configuration.container_application_name.required_if' => 'Container application name is required for custom logic extensions.',
             'configuration.container_block_name.required_if' => 'Container block name is required for custom logic extensions.',
             'configuration.forward_to.required_if' => 'Forward to destination is required for forward extensions.',
@@ -214,6 +222,20 @@ class StoreExtensionRequest extends FormRequest
                         $validator->errors()->add(
                             'configuration.ai_assistant_id',
                             'The selected AI assistant does not belong to your organization.'
+                        );
+                    }
+                }
+            }
+
+            // Validate AI Load Balancer belongs to same organization
+            if ($type === ExtensionType::AI_LOAD_BALANCER->value) {
+                $aiLoadBalancerId = $this->input('configuration.ai_load_balancer_id');
+                if ($aiLoadBalancerId) {
+                    $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::find($aiLoadBalancerId);
+                    if ($aiLoadBalancer && $aiLoadBalancer->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'configuration.ai_load_balancer_id',
+                            'The selected AI Load Balancer does not belong to your organization.'
                         );
                     }
                 }

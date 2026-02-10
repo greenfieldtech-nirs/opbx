@@ -25,6 +25,7 @@ class CxmlBuilder
 
     /**
      * XML encoding constant for security - prevents XSS in CXML responses.
+     * Encodes: < > & " '
      */
     private const XML_ENCODING = ENT_XML1 | ENT_QUOTES;
 
@@ -411,8 +412,36 @@ class CxmlBuilder
     {
         $builder = new self;
         $dial = $builder->document->createElement('Dial');
-        $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, self::XML_ENCODING, 'UTF-8'));
         $service->setAttribute('provider', $provider);
+        $dial->appendChild($service);
+        $builder->response->appendChild($dial);
+
+        return $builder->build();
+    }
+
+    /**
+     * Build service provider dialing response with action callback for follow-through.
+     *
+     * Used when we need Cloudonix to callback after the dial completes
+     * (busy, no-answer, failed, etc.) so we can try the next assistant.
+     *
+     * @param  string  $provider  The service provider name (e.g., 'retell', 'vapi')
+     * @param  string  $phoneNumber  The service provider phone number
+     * @param  string  $actionUrl  Callback URL when dial completes
+     */
+    public static function dialServiceProviderWithAction(string $provider, string $phoneNumber, string $actionUrl): string
+    {
+        $builder = new self;
+        $dial = $builder->document->createElement('Dial');
+
+        // Add action attribute for callback
+        // DOMDocument handles XML encoding automatically - & becomes &amp;
+        $dial->setAttribute('action', $actionUrl);
+
+        $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, self::XML_ENCODING, 'UTF-8'));
+        $service->setAttribute('provider', $provider);
+
         $dial->appendChild($service);
         $builder->response->appendChild($dial);
 
@@ -563,6 +592,74 @@ class CxmlBuilder
         $this->response->appendChild($connect);
 
         return $this;
+    }
+
+    /**
+     * Add Connect verb with Stream noun for WebSocket audio streaming with action callback.
+     *
+     * This enables bi-directional audio streaming and notifies us when the connect
+     * completes (busy, no-answer, failed, etc.) via the action parameter.
+     *
+     * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  string|null  $actionUrl  Callback URL when connect completes
+     *
+     * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect
+     */
+    public function connectStreamWithAction(string $websocketUrl, ?string $actionUrl = null): self
+    {
+        // Validate WebSocket URL format
+        if (! str_starts_with($websocketUrl, 'wss://')) {
+            throw new \InvalidArgumentException('WebSocket URL must start with wss://');
+        }
+
+        $connect = $this->document->createElement('Connect');
+
+        // Add action attribute on Connect verb for callback when connect completes
+        // DOMDocument handles XML encoding automatically - & becomes &amp;
+        if ($actionUrl !== null) {
+            $connect->setAttribute('action', $actionUrl);
+        }
+
+        $stream = $this->document->createElement('Stream');
+        $stream->setAttribute('url', $websocketUrl);
+
+        $connect->appendChild($stream);
+        $this->response->appendChild($connect);
+
+        return $this;
+    }
+
+    /**
+     * Build a Connect Stream response with action callback.
+     *
+     * Static factory method for creating WebSocket streaming responses with action callback.
+     *
+     * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  string|null  $actionUrl  Callback URL when connect completes
+     * @return string CXML response
+     */
+    public static function streamToWebSocketWithAction(string $websocketUrl, ?string $actionUrl = null): string
+    {
+        $builder = new self;
+        $builder->connectStreamWithAction($websocketUrl, $actionUrl);
+
+        return $builder->build();
+    }
+
+    /**
+     * Build a Connect Stream response with action callback.
+     *
+     * Static factory method for creating WebSocket streaming responses with action callback.
+     *
+     * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  string|null  $actionUrl  Callback URL when connect completes
+     * @return string CXML response
+     *
+     * @deprecated Use streamToWebSocketWithAction() instead
+     */
+    public static function streamToWebSocketWithCallback(string $websocketUrl, ?string $actionUrl = null): string
+    {
+        return self::streamToWebSocketWithAction($websocketUrl, $actionUrl);
     }
 
     /**

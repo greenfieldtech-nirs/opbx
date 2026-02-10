@@ -14,7 +14,7 @@ enum RingGroupFallbackAction: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::EXTENSION => 'Forward to Extension',
             self::RING_GROUP => 'Forward to Ring Group',
             self::IVR_MENU => 'Forward to IVR Menu',
@@ -25,7 +25,7 @@ enum RingGroupFallbackAction: string
 
     public function description(): string
     {
-        return match($this) {
+        return match ($this) {
             self::EXTENSION => 'Forward call to a specific extension',
             self::RING_GROUP => 'Forward call to another ring group',
             self::IVR_MENU => 'Forward call to an IVR menu',

@@ -20,6 +20,7 @@ const Users = lazy(() => import('@/pages/UsersComplete'));
 const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
 const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
+const AiAssistantLoadBalancers = lazy(() => import('@/pages/AiAssistantLoadBalancers'));
 const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = lazy(() => import('@/pages/RingGroups'));
 const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
@@ -80,6 +81,10 @@ export const router = createBrowserRouter([
       {
         path: 'ai-assistants',
         element: <AiAssistants />,
+      },
+      {
+        path: 'ai-assistant-load-balancers',
+        element: <AiAssistantLoadBalancers />,
       },
       {
         path: 'phone-numbers',

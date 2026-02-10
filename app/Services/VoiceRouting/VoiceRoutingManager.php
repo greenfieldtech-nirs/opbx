@@ -1481,6 +1481,9 @@ class VoiceRoutingManager
             ExtensionType::AI_ASSISTANT => [
                 'extension' => $extension, // AI assistant logic handled in strategy
             ],
+            ExtensionType::AI_LOAD_BALANCER => [
+                'extension' => $extension, // AI load balancer logic handled in strategy
+            ],
             ExtensionType::FORWARD => [
                 'extension' => $extension, // Forwarding logic handled in strategy
             ],
