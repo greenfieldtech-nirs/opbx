@@ -255,6 +255,16 @@ export default function CallNotificationsSettingsPage() {
 
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
 
+  // Helper to safely parse JSON
+  const safeParseJson = (jsonString: string | undefined): { data: unknown | null; error: boolean } => {
+    if (!jsonString) return { data: null, error: false };
+    try {
+      return { data: JSON.parse(jsonString), error: false };
+    } catch (e) {
+      return { data: jsonString, error: true };
+    }
+  };
+
   if (isLoadingSettings) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -769,7 +779,17 @@ export default function CallNotificationsSettingsPage() {
                     <div>
                       <span className="font-semibold">Body:</span>
                       <div className="mt-1">
-                        <JsonViewer data={JSON.parse(selectedLog.request_body)} />
+                        {(() => {
+                          const { data, error } = safeParseJson(selectedLog.request_body);
+                          if (error) {
+                            return (
+                              <pre className="p-2 bg-muted rounded overflow-x-auto text-xs">
+                                {selectedLog.request_body}
+                              </pre>
+                            );
+                          }
+                          return <JsonViewer data={data} />;
+                        })()}
                       </div>
                     </div>
                   )}
@@ -818,7 +838,17 @@ export default function CallNotificationsSettingsPage() {
                     <div>
                       <span className="font-semibold">Body:</span>
                       <div className="mt-1">
-                        <JsonViewer data={JSON.parse(selectedLog.response_body)} />
+                        {(() => {
+                          const { data, error } = safeParseJson(selectedLog.response_body);
+                          if (error) {
+                            return (
+                              <pre className="p-2 bg-muted rounded overflow-x-auto text-xs">
+                                {selectedLog.response_body}
+                              </pre>
+                            );
+                          }
+                          return <JsonViewer data={data} />;
+                        })()}
                       </div>
                     </div>
                   )}
