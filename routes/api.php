@@ -305,6 +305,7 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/settings', [CallNotificationsSettingsController::class, 'destroy'])->name('call-notifications.settings.destroy');
         Route::post('/settings/test', [CallNotificationsSettingsController::class, 'test'])->name('call-notifications.settings.test');
         Route::get('/logs', [CallNotificationsSettingsController::class, 'logs'])->name('call-notifications.logs');
+        Route::get('/logs/{sessionToken}', [CallNotificationsSettingsController::class, 'sessionLogs'])->name('call-notifications.session-logs');
         Route::get('/rate-limit', [CallNotificationsSettingsController::class, 'rateLimit'])->name('call-notifications.rate-limit');
     });
 });

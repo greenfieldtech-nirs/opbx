@@ -208,47 +208,103 @@ class CallNotificationsSettingsController extends Controller
     public function logs(Request $request): JsonResponse
     {
         $user = $request->user();
+        $showAll = $request->boolean('show_all', false);
 
-        $query = CallNotificationLog::forOrganization($user->organization_id)
-            ->orderBy('created_at', 'desc');
+        if ($showAll) {
+            // Return all logs (original behavior)
+            $query = CallNotificationLog::forOrganization($user->organization_id)
+                ->orderBy('created_at', 'desc');
 
-        // Filter by session token
-        if ($request->has('session_token')) {
-            $query->forSession($request->input('session_token'));
-        }
-
-        // Filter by status
-        if ($request->has('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        // Filter by success/failure
-        if ($request->has('success')) {
-            if ($request->boolean('success')) {
-                $query->successful();
-            } else {
-                $query->failed();
+            // Apply filters
+            if ($request->has('session_token')) {
+                $query->forSession($request->input('session_token'));
             }
+            if ($request->has('status')) {
+                $query->where('status', $request->input('status'));
+            }
+            if ($request->has('success')) {
+                if ($request->boolean('success')) {
+                    $query->successful();
+                } else {
+                    $query->failed();
+                }
+            }
+            if ($request->has('from')) {
+                $query->where('created_at', '>=', $request->input('from'));
+            }
+            if ($request->has('to')) {
+                $query->where('created_at', '<=', $request->input('to'));
+            }
+
+            $logs = $query->paginate($request->input('per_page', 50));
+
+            return response()->json([
+                'data' => $logs->items(),
+                'meta' => [
+                    'current_page' => $logs->currentPage(),
+                    'last_page' => $logs->lastPage(),
+                    'per_page' => $logs->perPage(),
+                    'total' => $logs->total(),
+                ],
+            ]);
         }
 
-        // Filter by date range
-        if ($request->has('from')) {
-            $query->where('created_at', '>=', $request->input('from'));
-        }
-        if ($request->has('to')) {
-            $query->where('created_at', '<=', $request->input('to'));
-        }
+        // Get latest status per session (default behavior)
+        // Use subquery to get the latest log entry for each session
+        $subquery = CallNotificationLog::forOrganization($user->organization_id)
+            ->selectRaw('MAX(id) as latest_id')
+            ->groupBy('call_session_token');
 
-        $logs = $query->paginate($request->input('per_page', 50));
+        $latestLogs = CallNotificationLog::forOrganization($user->organization_id)
+            ->whereIn('id', $subquery)
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->input('per_page', 50));
+
+        // Apply filters if provided
+        if ($request->has('status')) {
+            // For filtered view, we need to refetch with the filter
+            $filteredLogs = CallNotificationLog::forOrganization($user->organization_id)
+                ->whereIn('id', $subquery)
+                ->where('status', $request->input('status'))
+                ->orderBy('created_at', 'desc')
+                ->paginate($request->input('per_page', 50));
+
+            return response()->json([
+                'data' => $filteredLogs->items(),
+                'meta' => [
+                    'current_page' => $filteredLogs->currentPage(),
+                    'last_page' => $filteredLogs->lastPage(),
+                    'per_page' => $filteredLogs->perPage(),
+                    'total' => $filteredLogs->total(),
+                ],
+            ]);
+        }
 
         return response()->json([
-            'data' => $logs->items(),
+            'data' => $latestLogs->items(),
             'meta' => [
-                'current_page' => $logs->currentPage(),
-                'last_page' => $logs->lastPage(),
-                'per_page' => $logs->perPage(),
-                'total' => $logs->total(),
+                'current_page' => $latestLogs->currentPage(),
+                'last_page' => $latestLogs->lastPage(),
+                'per_page' => $latestLogs->perPage(),
+                'total' => $latestLogs->total(),
             ],
+        ]);
+    }
+
+    /**
+     * Get all notifications for a specific session.
+     */
+    public function sessionLogs(Request $request, string $sessionToken): JsonResponse
+    {
+        $user = $request->user();
+
+        $logs = CallNotificationLog::forOrganization($user->organization_id)
+            ->forSession($sessionToken)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return response()->json([
+            'data' => $logs,
         ]);
     }
 
