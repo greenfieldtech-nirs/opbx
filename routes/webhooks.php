@@ -68,6 +68,11 @@ Route::prefix('callbacks')->group(function (): void {
     Route::post('/voice/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
         ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
         ->name('voice.ring-group-callback');
+
+    // ALB follow-through callback for failover routing
+    Route::post('/voice/albs-follow-through', [\App\Http\Controllers\Voice\AlbsFollowThroughController::class, 'handle'])
+        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
+        ->name('voice.albs-follow-through');
 });
 
 // Health check endpoint
