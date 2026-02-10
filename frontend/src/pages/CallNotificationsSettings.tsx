@@ -770,7 +770,7 @@ export default function CallNotificationsSettingsPage() {
                   {selectedLog.request_headers && (
                     <div>
                       <span className="font-semibold">Headers:</span>
-                      <pre className="mt-1 p-2 bg-muted rounded overflow-x-auto">
+                      <pre className="mt-1 p-3 rounded border bg-muted text-foreground overflow-x-auto text-xs">
                         {JSON.stringify(selectedLog.request_headers, null, 2)}
                       </pre>
                     </div>
@@ -783,12 +783,12 @@ export default function CallNotificationsSettingsPage() {
                           const { data, error } = safeParseJson(selectedLog.request_body);
                           if (error) {
                             return (
-                              <pre className="p-2 bg-muted rounded overflow-x-auto text-xs">
+                              <pre className="p-3 rounded border bg-muted text-foreground overflow-x-auto text-xs">
                                 {selectedLog.request_body}
                               </pre>
                             );
                           }
-                          return <JsonViewer data={data} />;
+                          return <JsonViewer data={data} light className="p-2" />;
                         })()}
                       </div>
                     </div>
@@ -829,7 +829,7 @@ export default function CallNotificationsSettingsPage() {
                   {selectedLog.response_headers && (
                     <div>
                       <span className="font-semibold">Headers:</span>
-                      <pre className="mt-1 p-2 bg-muted rounded overflow-x-auto">
+                      <pre className="mt-1 p-3 rounded border bg-muted text-foreground overflow-x-auto text-xs">
                         {JSON.stringify(selectedLog.response_headers, null, 2)}
                       </pre>
                     </div>
@@ -842,12 +842,12 @@ export default function CallNotificationsSettingsPage() {
                           const { data, error } = safeParseJson(selectedLog.response_body);
                           if (error) {
                             return (
-                              <pre className="p-2 bg-muted rounded overflow-x-auto text-xs">
+                              <pre className="p-3 rounded border bg-muted text-foreground overflow-x-auto text-xs">
                                 {selectedLog.response_body}
                               </pre>
                             );
                           }
-                          return <JsonViewer data={data} />;
+                          return <JsonViewer data={data} light className="p-2" />;
                         })()}
                       </div>
                     </div>
