@@ -88,7 +88,7 @@ const EVENT_OPTIONS: { value: CallNotificationEvent; label: string }[] = [
 export default function CallNotificationsSettingsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('settings');
+  const [activeTab, setActiveTab] = useState('logs');
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -334,13 +334,13 @@ export default function CallNotificationsSettingsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Settings
-          </TabsTrigger>
           <TabsTrigger value="logs" className="flex items-center gap-2">
             <History className="h-4 w-4" />
             Delivery Logs
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
