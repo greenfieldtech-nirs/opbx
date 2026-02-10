@@ -1036,8 +1036,11 @@ export interface CallNotificationLog {
   status: string;
   webhook_url: string;
   request_payload: Record<string, unknown>;
+  request_headers?: Record<string, string>;
+  request_body?: string;
   response_status_code?: number;
   response_body?: string;
+  response_headers?: Record<string, string>;
   response_time_ms?: number;
   attempt_number: number;
   is_success: boolean;

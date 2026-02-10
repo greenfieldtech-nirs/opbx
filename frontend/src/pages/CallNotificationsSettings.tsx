@@ -24,6 +24,15 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { JsonViewer } from '@/components/ui/JsonViewer';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,6 +56,7 @@ import {
   X,
   AlertCircle,
   Settings,
+  Bug,
 } from 'lucide-react';
 import api from '@/services/api';
 import type {
@@ -104,6 +114,10 @@ export default function CallNotificationsSettingsPage() {
     rate_limit_per_minute: 500,
     is_active: true,
   });
+
+  // Debug dialog state
+  const [selectedLog, setSelectedLog] = useState<CallNotificationLog | null>(null);
+  const [isDebugDialogOpen, setIsDebugDialogOpen] = useState(false);
 
   // Fetch settings
   const { data: settingsData, isLoading: isLoadingSettings } = useQuery({
@@ -630,6 +644,7 @@ export default function CallNotificationsSettingsPage() {
                       <TableHead>Status</TableHead>
                       <TableHead>Response</TableHead>
                       <TableHead>Attempt</TableHead>
+                      <TableHead>Debug</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -682,6 +697,20 @@ export default function CallNotificationsSettingsPage() {
                           )}
                         </TableCell>
                         <TableCell>{log.attempt_number}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedLog(log);
+                              setIsDebugDialogOpen(true);
+                            }}
+                            className="h-8 w-8 p-0"
+                            title="View debug info"
+                          >
+                            <Bug className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -699,6 +728,125 @@ export default function CallNotificationsSettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Debug Dialog */}
+      <Dialog open={isDebugDialogOpen} onOpenChange={setIsDebugDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bug className="h-5 w-5" />
+              Debug Information
+            </DialogTitle>
+            <DialogDescription>
+              Full request and response details for this webhook delivery
+            </DialogDescription>
+          </DialogHeader>
+          {selectedLog && (
+            <div className="space-y-4 overflow-auto max-h-[70vh]">
+              {/* Request Section */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Request</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs">
+                  <div>
+                    <span className="font-semibold">URL: </span>
+                    <span className="font-mono break-all">{selectedLog.webhook_url}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Method: </span>
+                    <span className="font-mono">POST</span>
+                  </div>
+                  {selectedLog.request_headers && (
+                    <div>
+                      <span className="font-semibold">Headers:</span>
+                      <pre className="mt-1 p-2 bg-muted rounded overflow-x-auto">
+                        {JSON.stringify(selectedLog.request_headers, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {selectedLog.request_body && (
+                    <div>
+                      <span className="font-semibold">Body:</span>
+                      <div className="mt-1">
+                        <JsonViewer data={JSON.parse(selectedLog.request_body)} />
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Response Section */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Response</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <span className="font-semibold">Status: </span>
+                      <span
+                        className={`font-mono ${
+                          selectedLog.response_status_code &&
+                          selectedLog.response_status_code >= 200 &&
+                          selectedLog.response_status_code < 300
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {selectedLog.response_status_code || 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-semibold">Time: </span>
+                      <span className="font-mono">
+                        {selectedLog.response_time_ms
+                          ? `${selectedLog.response_time_ms}ms`
+                          : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedLog.response_headers && (
+                    <div>
+                      <span className="font-semibold">Headers:</span>
+                      <pre className="mt-1 p-2 bg-muted rounded overflow-x-auto">
+                        {JSON.stringify(selectedLog.response_headers, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {selectedLog.response_body && (
+                    <div>
+                      <span className="font-semibold">Body:</span>
+                      <div className="mt-1">
+                        <JsonViewer data={JSON.parse(selectedLog.response_body)} />
+                      </div>
+                    </div>
+                  )}
+                  {!selectedLog.response_body && !selectedLog.response_headers && (
+                    <p className="text-muted-foreground italic">No response received</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Error Section */}
+              {selectedLog.error_message && (
+                <Card className="border-red-200 bg-red-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-red-800">
+                      Error
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-red-700 font-mono">
+                      {selectedLog.error_message}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

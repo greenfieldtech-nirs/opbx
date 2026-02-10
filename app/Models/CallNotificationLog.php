@@ -40,8 +40,11 @@ class CallNotificationLog extends Model
         'status',
         'webhook_url',
         'request_payload',
+        'request_headers',
+        'request_body',
         'response_status_code',
         'response_body',
+        'response_headers',
         'response_time_ms',
         'attempt_number',
         'is_success',
@@ -56,6 +59,8 @@ class CallNotificationLog extends Model
      */
     protected $casts = [
         'request_payload' => 'array',
+        'request_headers' => 'array',
+        'response_headers' => 'array',
         'response_status_code' => 'integer',
         'response_time_ms' => 'integer',
         'attempt_number' => 'integer',
@@ -114,20 +119,23 @@ class CallNotificationLog extends Model
     /**
      * Mark this log entry as successful.
      */
-    public function markAsSuccess(int $statusCode, ?string $responseBody, int $responseTimeMs): void
+    public function markAsSuccess(int $statusCode, ?string $responseBody, int $responseTimeMs, array $debugInfo = []): void
     {
         $this->update([
             'is_success' => true,
             'response_status_code' => $statusCode,
             'response_body' => $responseBody,
             'response_time_ms' => $responseTimeMs,
+            'request_headers' => $debugInfo['request_headers'] ?? null,
+            'request_body' => $debugInfo['request_body'] ?? null,
+            'response_headers' => $debugInfo['response_headers'] ?? null,
         ]);
     }
 
     /**
      * Mark this log entry as failed.
      */
-    public function markAsFailed(int $statusCode, ?string $responseBody, string $errorMessage, int $responseTimeMs): void
+    public function markAsFailed(int $statusCode, ?string $responseBody, string $errorMessage, int $responseTimeMs, array $debugInfo = []): void
     {
         $this->update([
             'is_success' => false,
@@ -135,6 +143,9 @@ class CallNotificationLog extends Model
             'response_body' => $responseBody,
             'error_message' => $errorMessage,
             'response_time_ms' => $responseTimeMs,
+            'request_headers' => $debugInfo['request_headers'] ?? null,
+            'request_body' => $debugInfo['request_body'] ?? null,
+            'response_headers' => $debugInfo['response_headers'] ?? null,
         ]);
     }
 }

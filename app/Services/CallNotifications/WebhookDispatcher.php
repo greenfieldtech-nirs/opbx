@@ -109,24 +109,34 @@ class WebhookDispatcher
         $startTime = microtime(true);
         $timeout = $settings->request_timeout_seconds ?? 30;
 
-        try {
-            // Get authentication headers
-            $headers = $settings->getAuthHeaders($payload);
-            $headers['Content-Type'] = 'application/json';
-            $headers['Accept'] = 'application/json';
-            $headers['User-Agent'] = 'Cloudonix-PBX-Webhook/1.0';
+        // Prepare request details for debug logging
+        $headers = $settings->getAuthHeaders($payload);
+        $headers['Content-Type'] = 'application/json';
+        $headers['Accept'] = 'application/json';
+        $headers['User-Agent'] = 'Cloudonix-PBX-Webhook/1.0';
 
+        $requestBody = json_encode($payload);
+
+        try {
             $response = Http::timeout($timeout)
                 ->withHeaders($headers)
                 ->post($settings->webhook_url, $payload);
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
+            // Capture debug info
+            $debugInfo = [
+                'request_headers' => $headers,
+                'request_body' => $requestBody,
+                'response_headers' => $response->headers(),
+            ];
+
             if ($response->successful()) {
                 $log->markAsSuccess(
                     $response->status(),
                     $response->body(),
-                    $responseTimeMs
+                    $responseTimeMs,
+                    $debugInfo
                 );
 
                 Log::info('Call notification webhook delivered successfully', [
@@ -142,11 +152,13 @@ class WebhookDispatcher
             }
 
             // Non-successful response
+            $debugInfo['response_headers'] = $response->headers();
             $log->markAsFailed(
                 $response->status(),
                 $response->body(),
                 'HTTP error: '.$response->status(),
-                $responseTimeMs
+                $responseTimeMs,
+                $debugInfo
             );
 
             Log::warning('Call notification webhook returned non-success status', [
@@ -168,7 +180,12 @@ class WebhookDispatcher
                 0,
                 null,
                 'Connection error: '.$e->getMessage(),
-                $responseTimeMs
+                $responseTimeMs,
+                [
+                    'request_headers' => $headers,
+                    'request_body' => $requestBody,
+                    'response_headers' => null,
+                ]
             );
 
             Log::error('Call notification webhook connection failed', [
@@ -189,7 +206,12 @@ class WebhookDispatcher
                 0,
                 null,
                 'Exception: '.$e->getMessage(),
-                $responseTimeMs
+                $responseTimeMs,
+                [
+                    'request_headers' => $headers,
+                    'request_body' => $requestBody,
+                    'response_headers' => null,
+                ]
             );
 
             Log::error('Call notification webhook delivery failed', [
