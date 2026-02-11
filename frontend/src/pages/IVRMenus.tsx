@@ -825,6 +825,7 @@ export default function IVRMenus() {
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
+            canView={false}
             onEdit={openEditDialog}
             onDelete={openDeleteDialog}
             columns={[
