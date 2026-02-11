@@ -933,7 +933,7 @@ export default function IVRMenus() {
         }
         }
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create IVR Menu</DialogTitle>
             <DialogDescription>
@@ -1421,7 +1421,7 @@ export default function IVRMenus() {
 
       {/* Edit Dialog - Full tabbed interface */}
       < Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit IVR Menu</DialogTitle>
             <DialogDescription>
