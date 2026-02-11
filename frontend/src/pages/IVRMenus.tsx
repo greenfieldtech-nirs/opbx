@@ -1239,7 +1239,7 @@ export default function IVRMenus() {
                               <button
                                 type="button"
                                 onClick={() => removeMenuOption(index)}
-                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
                                 aria-label="Delete option"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1714,7 +1714,7 @@ export default function IVRMenus() {
                               <button
                                 type="button"
                                 onClick={() => removeMenuOption(index)}
-                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
                                 aria-label="Delete option"
                               >
                                 <Trash2 className="h-4 w-4" />
