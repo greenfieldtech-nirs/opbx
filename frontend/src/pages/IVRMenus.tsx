@@ -1116,10 +1116,9 @@ export default function IVRMenus() {
                     {(formData.options || []).map((option, index) => (
                       <Card key={index}>
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-12 gap-4 items-end">
+                          <div className="grid grid-cols-12 gap-4 items-center">
                             <div className="col-span-1">
                               <Label>Digits *</Label>
-                              <div>
                                 <Input
                                   value={option.input_digits}
                                   onChange={(e) => {
@@ -1133,12 +1132,6 @@ export default function IVRMenus() {
                                   maxLength={10}
                                   className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
                                 />
-                                {option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) && (
-                                  <p className="text-sm text-red-500 mt-1">
-                                    Only digits (0-9), asterisk (*), and pound (#) are allowed
-                                  </p>
-                                )}
-                              </div>
                             </div>
                             <div className="col-span-2">
                               <Label>Type</Label>
@@ -1242,16 +1235,15 @@ export default function IVRMenus() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-1">
-                              <Button
+                            <div className="col-span-1 flex items-center justify-center">
+                              <button
                                 type="button"
-                                variant="outline"
-                                size="sm"
                                 onClick={() => removeMenuOption(index)}
-                                className="w-full"
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                aria-label="Delete option"
                               >
-                                <X className="h-4 w-4" />
-                              </Button>
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                         </CardContent>
@@ -1598,10 +1590,9 @@ export default function IVRMenus() {
                     {(formData.options || []).map((option, index) => (
                       <Card key={index}>
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-12 gap-4 items-end">
+                          <div className="grid grid-cols-12 gap-4 items-center">
                             <div className="col-span-1">
                               <Label>Digits *</Label>
-                              <div>
                                 <Input
                                   value={option.input_digits}
                                   onChange={(e) => {
@@ -1615,12 +1606,6 @@ export default function IVRMenus() {
                                   maxLength={10}
                                   className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
                                 />
-                                {option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) && (
-                                  <p className="text-sm text-red-500 mt-1">
-                                    Only digits (0-9), asterisk (*), and pound (#) are allowed
-                                  </p>
-                                )}
-                              </div>
                             </div>
                             <div className="col-span-2">
                               <Label>Type</Label>
@@ -1724,16 +1709,15 @@ export default function IVRMenus() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-1">
-                              <Button
+                            <div className="col-span-1 flex items-center justify-center">
+                              <button
                                 type="button"
-                                variant="outline"
-                                size="sm"
                                 onClick={() => removeMenuOption(index)}
-                                className="w-full"
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                aria-label="Delete option"
                               >
-                                <X className="h-4 w-4" />
-                              </Button>
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                         </CardContent>
