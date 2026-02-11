@@ -1140,7 +1140,7 @@ export default function IVRMenus() {
                                 )}
                               </div>
                             </div>
-                            <div className="col-span-3">
+                            <div className="col-span-2">
                               <Label>Type</Label>
                               <Select
                                 value={option.destination_type}
@@ -1168,7 +1168,7 @@ export default function IVRMenus() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-4">
+                            <div className="col-span-8">
                               <Label>Destination</Label>
                               <Select
                                 key={`destination-${index}-${option.destination_type}`}
@@ -1622,7 +1622,7 @@ export default function IVRMenus() {
                                 )}
                               </div>
                             </div>
-                            <div className="col-span-3">
+                            <div className="col-span-2">
                               <Label>Type</Label>
                               <Select
                                 value={option.destination_type}
@@ -1650,7 +1650,7 @@ export default function IVRMenus() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-4">
+                            <div className="col-span-8">
                               <Label>Destination</Label>
                               <Select
                                 key={`destination-${index}-${option.destination_type}`}
