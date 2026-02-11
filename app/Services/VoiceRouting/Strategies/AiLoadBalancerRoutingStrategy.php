@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting\Strategies;
 
+use App\Enums\AlbsStatus;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
