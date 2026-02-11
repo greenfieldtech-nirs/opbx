@@ -9,7 +9,6 @@ use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateIvrMenuRequest extends FormRequest
 {
@@ -37,7 +36,7 @@ class UpdateIvrMenuRequest extends FormRequest
                     // Accept either a string URL or an integer recording ID
                     if (is_string($value) && strlen($value) > 500) {
                         $fail('The audio file path may not be greater than 500 characters.');
-                    } elseif (!is_string($value) && !is_int($value) && $value !== null) {
+                    } elseif (! is_string($value) && ! is_int($value) && $value !== null) {
                         $fail('The audio file path must be a string URL or a recording ID.');
                     }
 
@@ -45,7 +44,7 @@ class UpdateIvrMenuRequest extends FormRequest
                     if (is_int($value) || (is_string($value) && ctype_digit($value))) {
                         $recordingId = (int) $value;
                         $exists = \App\Models\Recording::where('id', $recordingId)->exists();
-                        if (!$exists) {
+                        if (! $exists) {
                             $fail('The selected recording does not exist.');
                         }
                     }
@@ -57,7 +56,7 @@ class UpdateIvrMenuRequest extends FormRequest
             'max_timeout' => 'required|integer|min:1|max:30',
             'inter_digit_timeout' => 'required|integer|min:1|max:30',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,hangup',
+            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,hangup',
             'failover_destination_id' => [
                 'nullable',
                 'integer',
@@ -65,12 +64,13 @@ class UpdateIvrMenuRequest extends FormRequest
                     if ($value && $this->input('failover_destination_type') !== 'hangup') {
                         // Prevent self-referencing for IVR menu failover
                         if ($this->input('failover_destination_type') === 'ivr_menu' && $value == $this->route('ivr_menu')->id) {
-                            $fail("An IVR menu cannot reference itself as a failover destination.");
+                            $fail('An IVR menu cannot reference itself as a failover destination.');
+
                             return;
                         }
 
-                        if (!$this->destinationExists($this->input('failover_destination_type'), $value)) {
-                            $fail("The selected failover destination does not exist.");
+                        if (! $this->destinationExists($this->input('failover_destination_type'), $value)) {
+                            $fail('The selected failover destination does not exist.');
                         }
                     }
                 },
@@ -79,29 +79,31 @@ class UpdateIvrMenuRequest extends FormRequest
             'options' => 'required|array|min:1|max:20',
             'options.*.input_digits' => 'required|string|max:10',
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu',
+            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer',
             'options.*.destination_id' => [
                 'required',
                 function ($attribute, $value, $fail) {
                     // Extract the index from the attribute (e.g., "options.0.destination_id" -> 0)
                     preg_match('/options\.(\d+)\.destination_id/', $attribute, $matches);
-                    if (!empty($matches[1])) {
+                    if (! empty($matches[1])) {
                         $index = (int) $matches[1];
                         $options = $this->input('options', []);
                         if (isset($options[$index]['destination_type'])) {
                             $destinationType = $options[$index]['destination_type'];
 
                             // Validate data type based on destination type
-                            if ($destinationType === 'extension') {
-                                // For extensions, destination_id should be a string (extension number)
-                                if (!is_string($value) && !is_numeric($value)) {
-                                    $fail("Extension destination must be a valid extension number.");
+                            if ($destinationType === 'extension' || $destinationType === 'ai_assistant') {
+                                // For extensions and AI assistants, destination_id should be a string (extension number)
+                                if (! is_string($value) && ! is_numeric($value)) {
+                                    $fail('Extension/AI Assistant destination must be a valid extension number.');
+
                                     return;
                                 }
                             } else {
                                 // For other types, destination_id should be an integer (model ID)
-                                if (!is_int($value) && !ctype_digit((string) $value)) {
-                                    $fail("Destination ID must be a valid integer.");
+                                if (! is_int($value) && ! ctype_digit((string) $value)) {
+                                    $fail('Destination ID must be a valid integer.');
+
                                     return;
                                 }
                                 $value = (int) $value;
@@ -109,12 +111,13 @@ class UpdateIvrMenuRequest extends FormRequest
 
                             // Prevent self-referencing for IVR menu options
                             if ($destinationType === 'ivr_menu' && $value == $this->route('ivr_menu')->id) {
-                                $fail("An IVR menu cannot reference itself in its options.");
+                                $fail('An IVR menu cannot reference itself in its options.');
+
                                 return;
                             }
 
-                            if (!$this->destinationExists($destinationType, $value)) {
-                                $fail("The selected destination does not exist.");
+                            if (! $this->destinationExists($destinationType, $value)) {
+                                $fail('The selected destination does not exist.');
                             }
                         }
                     }
@@ -159,7 +162,7 @@ class UpdateIvrMenuRequest extends FormRequest
             }
 
             // Must have at least one audio source
-            if (!$recordingId && !$audioFilePath && !$ttsText) {
+            if (! $recordingId && ! $audioFilePath && ! $ttsText) {
                 $validator->errors()->add(
                     'audio_configuration',
                     'An IVR menu must have either a recording, direct audio URL, or Text-to-Speech text configured.'
@@ -174,7 +177,7 @@ class UpdateIvrMenuRequest extends FormRequest
     protected function destinationExists(string $type, string|int $id): bool
     {
         $user = $this->user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -191,6 +194,13 @@ class UpdateIvrMenuRequest extends FormRequest
                 ->where('organization_id', $organizationId)
                 ->exists(),
             'ivr_menu' => IvrMenu::where('id', (int) $id)
+                ->where('organization_id', $organizationId)
+                ->exists(),
+            'ai_assistant' => Extension::where('extension_number', (string) $id)
+                ->where('type', 'ai_assistant')
+                ->where('organization_id', $organizationId)
+                ->exists(),
+            'ai_load_balancer' => \App\Models\AiAssistantLoadBalancer::where('id', (int) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
             default => false,
