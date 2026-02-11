@@ -75,6 +75,12 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  ArrowRight,
+  Users,
+  Menu,
+  Bot,
+  Scale,
+  UserCheck,
 } from 'lucide-react';
 import {
   StandardDataTable,
@@ -343,11 +349,16 @@ export default function IVRMenus() {
 
   // Combine all destinations
   const availableDestinations = {
-    extensions: extensionsData?.data?.map(ext => ({
-      id: String(ext.id),
-      extension_number: ext.extension_number,
-      label: `Ext ${ext.extension_number} - ${getExtensionDisplayLabel(ext)}`
-    })) || [],
+    // Only show 'user' and 'forward' type extensions (matching Ring Groups behavior)
+    extensions: extensionsData?.data
+      ?.filter(ext => ext.type === 'user' || ext.type === 'forward')
+      ?.map(ext => ({
+        id: String(ext.id),
+        extension_number: ext.extension_number,
+        type: ext.type,
+        label: `Ext ${ext.extension_number} - ${getExtensionDisplayLabel(ext)}`,
+        displayLabel: getExtensionDisplayLabel(ext)
+      })) || [],
     ring_groups: ringGroupsData?.data?.map(rg => ({
       id: String(rg.id),
       label: `Ring Group: ${rg.name}`
@@ -365,7 +376,35 @@ export default function IVRMenus() {
   const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading;
   const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError;
 
+  // Helper to render destination badge (matches Extensions page format)
+  const renderDestinationBadge = (type: string, label: string, extType?: string) => {
+    const configs: Record<string, { color: string; icon: any }> = {
+      user: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
+      forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
+      ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+      conference: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
+      ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+    };
 
+    // For extensions, use the extension type; otherwise use the destination type
+    const configKey = type === 'extension' && extType ? extType : type === 'conference_room' ? 'conference' : type;
+    const config = configs[configKey] || configs.user;
+    const Icon = config.icon;
+
+    return (
+      <div className="flex items-center gap-1.5">
+        <Badge variant="outline" className={cn('flex items-center gap-1 px-1.5 py-0.5 text-xs', config.color)}>
+          <Icon className="h-3 w-3" />
+          {type === 'extension' && extType === 'user' && 'User'}
+          {type === 'extension' && extType === 'forward' && 'Forward'}
+          {type === 'ring_group' && 'Ring Group'}
+          {type === 'conference_room' && 'Conference'}
+          {type === 'ivr_menu' && 'IVR'}
+        </Badge>
+        <span className="text-sm">{label}</span>
+      </div>
+    );
+  };
 
   // Available recordings for audio selection
   const { data: recordingsData } = useQuery({
@@ -1134,22 +1173,22 @@ export default function IVRMenus() {
                                     <>
                                       {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
                                         <SelectItem key={ext.id} value={ext.extension_number}>
-                                          {ext.label}
+                                          {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
                                         </SelectItem>
                                       ))}
                                       {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
                                         <SelectItem key={rg.id} value={rg.id}>
-                                          {rg.label}
+                                          {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
                                         </SelectItem>
                                       ))}
                                       {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
                                         <SelectItem key={cr.id} value={cr.id}>
-                                          {cr.label}
+                                          {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
                                         </SelectItem>
                                       ))}
                                       {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
                                         <SelectItem key={menu.id} value={menu.id}>
-                                          {menu.label}
+                                          {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
                                         </SelectItem>
                                       ))}
                                       {(() => {
@@ -1305,25 +1344,25 @@ export default function IVRMenus() {
                             {formData.failover_destination_type === 'extension' &&
                               availableDestinations?.extensions?.map((ext) => (
                                 <SelectItem key={ext.id} value={ext.id}>
-                                  {ext.label}
+                                  {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
                                 </SelectItem>
                               ))}
                             {formData.failover_destination_type === 'ring_group' &&
                               availableDestinations?.ring_groups?.map((rg) => (
                                 <SelectItem key={rg.id} value={rg.id}>
-                                  {rg.label}
+                                  {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
                                 </SelectItem>
                               ))}
                             {formData.failover_destination_type === 'conference_room' &&
                               availableDestinations?.conference_rooms?.map((cr) => (
                                 <SelectItem key={cr.id} value={cr.id}>
-                                  {cr.label}
+                                  {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
                                 </SelectItem>
                               ))}
                             {formData.failover_destination_type === 'ivr_menu' &&
                               availableDestinations?.ivr_menus?.map((menu) => (
                                 <SelectItem key={menu.id} value={menu.id}>
-                                  {menu.label}
+                                  {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
                                 </SelectItem>
                               ))}
                           </SelectContent>
@@ -1608,22 +1647,22 @@ export default function IVRMenus() {
                                     <>
                                       {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
                                         <SelectItem key={ext.id} value={ext.extension_number}>
-                                          {ext.label}
+                                          {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
                                         </SelectItem>
                                       ))}
                                       {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
                                         <SelectItem key={rg.id} value={rg.id}>
-                                          {rg.label}
+                                          {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
                                         </SelectItem>
                                       ))}
                                       {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
                                         <SelectItem key={cr.id} value={cr.id}>
-                                          {cr.label}
+                                          {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
                                         </SelectItem>
                                       ))}
                                       {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
                                         <SelectItem key={menu.id} value={menu.id}>
-                                          {menu.label}
+                                          {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
                                         </SelectItem>
                                       ))}
                                       {(() => {
@@ -1779,25 +1818,25 @@ export default function IVRMenus() {
                             {formData.failover_destination_type === 'extension' &&
                               availableDestinations?.extensions?.map((ext) => (
                                 <SelectItem key={ext.id} value={ext.id}>
-                                  {ext.label}
+                                  {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
                                 </SelectItem>
                               ))}
                             {formData.failover_destination_type === 'ring_group' &&
                               availableDestinations?.ring_groups?.map((rg) => (
                                 <SelectItem key={rg.id} value={rg.id}>
-                                  {rg.label}
+                                  {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
                                 </SelectItem>
                               ))}
                             {formData.failover_destination_type === 'conference_room' &&
                               availableDestinations?.conference_rooms?.map((cr) => (
                                 <SelectItem key={cr.id} value={cr.id}>
-                                  {cr.label}
+                                  {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
                                 </SelectItem>
                               ))}
                             {formData.failover_destination_type === 'ivr_menu' &&
                               availableDestinations?.ivr_menus?.map((menu) => (
                                 <SelectItem key={menu.id} value={menu.id}>
-                                  {menu.label}
+                                  {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
                                 </SelectItem>
                               ))}
                           </SelectContent>
