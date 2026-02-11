@@ -29,11 +29,11 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         /** @var RingGroup $ringGroup */
         $ringGroup = $destination['ring_group'] ?? null;
 
-        if (!$ringGroup) {
+        if (! $ringGroup) {
             return response(CxmlBuilder::unavailable('Ring group not found'), 200, ['Content-Type' => 'text/xml']);
         }
 
-        if (!$ringGroup->isActive()) {
+        if (! $ringGroup->isActive()) {
             return response(CxmlBuilder::unavailable('Ring group is inactive'), 200, ['Content-Type' => 'text/xml']);
         }
 
@@ -69,7 +69,29 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         $targets = [];
         foreach ($members as $member) {
+            // Skip forward extensions - they should not be dialed directly as extension numbers
+            // Forward extensions route to their configured destination, not the extension itself
+            if ($member->type === ExtensionType::FORWARD) {
+                Log::info('RingGroupRoutingStrategy: Skipping forward extension in simultaneous ring group', [
+                    'ring_group_id' => $ringGroup->id,
+                    'member_extension_number' => $member->extension_number,
+                    'forward_to' => $member->configuration['forward_to'] ?? 'not configured',
+                ]);
+
+                continue;
+            }
+
             $targets[] = $member->extension_number;
+        }
+
+        // If no valid targets after filtering, fallback
+        if (empty($targets)) {
+            Log::warning('RingGroupRoutingStrategy: No valid targets after filtering forward extensions', [
+                'ring_group_id' => $ringGroup->id,
+                'original_member_count' => $members->count(),
+            ]);
+
+            return $this->handleFallback($ringGroup, $request);
         }
 
         return response(
@@ -105,6 +127,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
                 'final_attempt' => $attempt,
                 'fallback_action' => $ringGroup->fallback_action->value,
             ]);
+
             return $this->handleFallback($ringGroup, $request);
         }
 
@@ -115,8 +138,13 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Get the specific member
         $member = $members->values()->get($memberIndex);
 
-        if (!$member) {
+        if (! $member) {
             return $this->handleFallback($ringGroup, $request);
+        }
+
+        // Check if member is a forward extension
+        if ($member->type === ExtensionType::FORWARD) {
+            return $this->handleMemberForwardExtension($ringGroup, $member, $request, $attempt);
         }
 
         $sipUri = $member->extension_number;
@@ -144,14 +172,14 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
             // Pass necessary context
-            'session_data' => json_encode(['ring_group_id' => $ringGroup->id, 'attempt_number' => $nextAttempt])
+            'session_data' => json_encode(['ring_group_id' => $ringGroup->id, 'attempt_number' => $nextAttempt]),
         ], false); // Get relative URL
-        $callbackUrl = $baseUrl . $relativeUrl;
+        $callbackUrl = $baseUrl.$relativeUrl;
 
-        // Also need to construct SessionData xml element if strictly required, 
-        // but CxmlBuilder -> dial(...) takes 'action'. 
+        // Also need to construct SessionData xml element if strictly required,
+        // but CxmlBuilder -> dial(...) takes 'action'.
 
-        $builder = new CxmlBuilder();
+        $builder = new CxmlBuilder;
         $builder->dial(
             $sipUri,
             $ringGroup->timeout ?? 20,
@@ -159,6 +187,108 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         );
 
         return $builder->toResponse();
+    }
+
+    /**
+     * Handle a forward extension member in sequential ring group.
+     *
+     * For forward extensions, we need to route to the configured forward destination
+     * rather than trying to dial the extension number itself.
+     */
+    private function handleMemberForwardExtension(RingGroup $ringGroup, Extension $member, Request $request, int $attempt): Response
+    {
+        $config = $member->configuration ?? [];
+        $forwardTo = $config['forward_to'] ?? null;
+
+        Log::info('RingGroupRoutingStrategy: Handling forward extension member', [
+            'ring_group_id' => $ringGroup->id,
+            'member_extension_number' => $member->extension_number,
+            'forward_to' => $forwardTo,
+            'attempt' => $attempt,
+        ]);
+
+        if (! $forwardTo) {
+            Log::warning('RingGroupRoutingStrategy: Forward extension has no forward destination configured', [
+                'ring_group_id' => $ringGroup->id,
+                'member_extension_number' => $member->extension_number,
+            ]);
+
+            // Try next member or fallback
+            return $this->tryNextMemberOrFallback($ringGroup, $request, $attempt);
+        }
+
+        // Check if forwardTo is a SIP URI
+        if (str_starts_with(strtolower($forwardTo), 'sip:')) {
+            // Dial the SIP URI directly
+            $builder = new CxmlBuilder;
+            $builder->dial($forwardTo, $ringGroup->timeout ?? 20);
+
+            return $builder->toResponse();
+        }
+
+        // Check if forwardTo is an E.164 phone number
+        if (preg_match('/^\+[1-9]\d{1,14}$/', $forwardTo)) {
+            // Dial the phone number directly
+            $builder = new CxmlBuilder;
+            $builder->simpleDial($forwardTo);
+
+            return $builder->toResponse();
+        }
+
+        // Assume forwardTo is an internal extension number - route to it
+        $targetExtension = Extension::where('organization_id', $ringGroup->organization_id)
+            ->where('extension_number', $forwardTo)
+            ->first();
+
+        if (! $targetExtension) {
+            Log::warning('RingGroupRoutingStrategy: Forward destination extension not found', [
+                'ring_group_id' => $ringGroup->id,
+                'member_extension_number' => $member->extension_number,
+                'forward_to' => $forwardTo,
+            ]);
+
+            return $this->tryNextMemberOrFallback($ringGroup, $request, $attempt);
+        }
+
+        if (! $targetExtension->isActive()) {
+            Log::warning('RingGroupRoutingStrategy: Forward destination extension is inactive', [
+                'ring_group_id' => $ringGroup->id,
+                'member_extension_number' => $member->extension_number,
+                'forward_to' => $forwardTo,
+            ]);
+
+            return $this->tryNextMemberOrFallback($ringGroup, $request, $attempt);
+        }
+
+        // Route to the target extension using proper routing strategy
+        $destination = ['extension' => $targetExtension];
+        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+
+        return $voiceRoutingManager->executeStrategy($targetExtension->type, $request, new \App\Models\DidNumber, $destination);
+    }
+
+    /**
+     * Try the next member in sequential routing or fallback if no more members.
+     */
+    private function tryNextMemberOrFallback(RingGroup $ringGroup, Request $request, int $attempt): Response
+    {
+        $members = $ringGroup->getMembers();
+        $memberCount = $members->count();
+        $nextAttempt = $attempt + 1;
+
+        if ($nextAttempt >= $memberCount) {
+            Log::info('RingGroupRoutingStrategy: No more members to try, falling back', [
+                'ring_group_id' => $ringGroup->id,
+                'current_attempt' => $attempt,
+                'next_attempt' => $nextAttempt,
+                'member_count' => $memberCount,
+            ]);
+
+            return $this->handleFallback($ringGroup, $request);
+        }
+
+        // Continue to next member
+        return $this->handleSequential($ringGroup, $request, $nextAttempt);
     }
 
     private function handleFallback(RingGroup $ringGroup, Request $request): Response
@@ -176,6 +306,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             RingGroupFallbackAction::RING_GROUP => $this->handleFallbackRingGroup($ringGroup, $request),
             RingGroupFallbackAction::IVR_MENU => $this->handleFallbackIvrMenu($ringGroup, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->handleFallbackAiAssistant($ringGroup, $request),
+            RingGroupFallbackAction::AI_LOAD_BALANCER => $this->handleFallbackAiLoadBalancer($ringGroup, $request),
             RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($ringGroup),
             default => $this->handleFallbackHangup($ringGroup), // Default to hangup for unknown actions
         };
@@ -191,11 +322,12 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             'fallback_extension_id' => $fallbackExtensionId,
         ]);
 
-        if (!$fallbackExtensionId) {
+        if (! $fallbackExtensionId) {
             Log::warning('RingGroupRoutingStrategy: No fallback extension configured, using hangup', [
                 'ring_group_id' => $ringGroup->id,
                 'ring_group_name' => $ringGroup->name,
             ]);
+
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -206,16 +338,17 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             ->where('organization_id', $ringGroup->organization_id)
             ->first();
 
-        if (!$fallbackExtension) {
+        if (! $fallbackExtension) {
             Log::warning('RingGroupRoutingStrategy: Fallback extension not found', [
                 'ring_group_id' => $ringGroup->id,
                 'ring_group_name' => $ringGroup->name,
                 'fallback_extension_id' => $fallbackExtensionId,
             ]);
+
             return $this->handleFallbackHangup($ringGroup);
         }
 
-        if (!$fallbackExtension->isActive()) {
+        if (! $fallbackExtension->isActive()) {
             Log::warning('RingGroupRoutingStrategy: Fallback extension is not active', [
                 'ring_group_id' => $ringGroup->id,
                 'ring_group_name' => $ringGroup->name,
@@ -223,6 +356,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
                 'extension_number' => $fallbackExtension->extension_number,
                 'extension_status' => $fallbackExtension->status->value,
             ]);
+
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -240,14 +374,14 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Get the VoiceRoutingManager instance and delegate to it
         $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
 
-        return $voiceRoutingManager->executeStrategy($fallbackExtension->type, $request, new \App\Models\DidNumber(), $destination);
+        return $voiceRoutingManager->executeStrategy($fallbackExtension->type, $request, new \App\Models\DidNumber, $destination);
     }
 
     private function handleFallbackRingGroup(RingGroup $ringGroup, Request $request): Response
     {
         $fallbackRingGroupId = $ringGroup->fallback_ring_group_id;
 
-        if (!$fallbackRingGroupId) {
+        if (! $fallbackRingGroupId) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -256,7 +390,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             ->where('organization_id', $ringGroup->organization_id)
             ->first();
 
-        if (!$fallbackRingGroup || !$fallbackRingGroup->isActive()) {
+        if (! $fallbackRingGroup || ! $fallbackRingGroup->isActive()) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -266,14 +400,14 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Get the VoiceRoutingManager instance and delegate to it
         $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
 
-        return $voiceRoutingManager->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new \App\Models\DidNumber(), $destination);
+        return $voiceRoutingManager->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new \App\Models\DidNumber, $destination);
     }
 
     private function handleFallbackIvrMenu(RingGroup $ringGroup, Request $request): Response
     {
         $fallbackIvrMenuId = $ringGroup->fallback_ivr_menu_id;
 
-        if (!$fallbackIvrMenuId) {
+        if (! $fallbackIvrMenuId) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -282,7 +416,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             ->where('organization_id', $ringGroup->organization_id)
             ->first();
 
-        if (!$fallbackIvrMenu || !$fallbackIvrMenu->isActive()) {
+        if (! $fallbackIvrMenu || ! $fallbackIvrMenu->isActive()) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -292,14 +426,14 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Get the VoiceRoutingManager instance and delegate to it
         $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
 
-        return $voiceRoutingManager->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new \App\Models\DidNumber(), $destination);
+        return $voiceRoutingManager->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new \App\Models\DidNumber, $destination);
     }
 
     private function handleFallbackAiAssistant(RingGroup $ringGroup, Request $request): Response
     {
         $fallbackAiAssistantId = $ringGroup->fallback_ai_assistant_id;
 
-        if (!$fallbackAiAssistantId) {
+        if (! $fallbackAiAssistantId) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -309,7 +443,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             ->where('type', ExtensionType::AI_ASSISTANT)
             ->first();
 
-        if (!$fallbackAiAssistant || !$fallbackAiAssistant->isActive()) {
+        if (! $fallbackAiAssistant || ! $fallbackAiAssistant->isActive()) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
@@ -319,7 +453,34 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Get the VoiceRoutingManager instance and delegate to it
         $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
 
-        return $voiceRoutingManager->executeStrategy($fallbackAiAssistant->type, $request, new \App\Models\DidNumber(), $destination);
+        return $voiceRoutingManager->executeStrategy($fallbackAiAssistant->type, $request, new \App\Models\DidNumber, $destination);
+    }
+
+    private function handleFallbackAiLoadBalancer(RingGroup $ringGroup, Request $request): Response
+    {
+        $fallbackAiLoadBalancerId = $ringGroup->fallback_ai_load_balancer_id;
+
+        if (! $fallbackAiLoadBalancerId) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        $aiLoadBalancer = \App\Models\AI\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $fallbackAiLoadBalancerId)
+            ->where('organization_id', $ringGroup->organization_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $aiLoadBalancer) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        // Use the same routing logic as normal ALBS routing
+        $destination = ['ai_load_balancer' => $aiLoadBalancer];
+
+        // Get the VoiceRoutingManager instance and delegate to it
+        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+
+        return $voiceRoutingManager->executeStrategy(\App\Enums\ExtensionType::AI_LOAD_BALANCER, $request, new \App\Models\DidNumber, $destination);
     }
 
     private function handleFallbackHangup(RingGroup $ringGroup): Response
