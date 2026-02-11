@@ -332,12 +332,21 @@ export default function IVRMenus() {
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
+  // Helper to get display label for an extension (matches Ring Groups format)
+  const getExtensionDisplayLabel = (ext: any) => {
+    if (ext.type === 'forward') {
+      const forwardTo = ext.configuration?.forward_to;
+      return forwardTo ? `Forward to ${forwardTo}` : 'Forward Extension';
+    }
+    return ext.user?.name || 'Unassigned User';
+  };
+
   // Combine all destinations
   const availableDestinations = {
     extensions: extensionsData?.data?.map(ext => ({
       id: String(ext.id),
       extension_number: ext.extension_number,
-      label: `Ext ${ext.extension_number} - ${ext.user?.name || 'Unassigned'}`
+      label: `Ext ${ext.extension_number} - ${getExtensionDisplayLabel(ext)}`
     })) || [],
     ring_groups: ringGroupsData?.data?.map(rg => ({
       id: String(rg.id),
