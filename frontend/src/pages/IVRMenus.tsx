@@ -11,6 +11,8 @@ import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService } from '@/services/createResourceService';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
+import aiAssistantsService from '@/services/aiAssistants.service';
+import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -338,6 +340,16 @@ export default function IVRMenus() {
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
+  const { data: aiAssistantsData, isLoading: aiAssistantsLoading, error: aiAssistantsError } = useQuery({
+    queryKey: ['ivr-ai-assistants'],
+    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
+  });
+
+  const { data: aiLoadBalancersData, isLoading: aiLoadBalancersLoading, error: aiLoadBalancersError } = useQuery({
+    queryKey: ['ivr-ai-load-balancers'],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
+  });
+
   // Helper to get display label for an extension (matches Ring Groups format)
   const getExtensionDisplayLabel = (ext: any) => {
     if (ext.type === 'forward') {
@@ -370,11 +382,20 @@ export default function IVRMenus() {
     ivr_menus: ivrMenusList?.data?.map(menu => ({
       id: String(menu.id),
       label: `IVR Menu: ${menu.name}`
+    })) || [],
+    ai_assistants: aiAssistantsData?.data?.filter(ext => ext.type === 'ai_assistant')?.map(ext => ({
+      id: String(ext.id),
+      extension_number: ext.extension_number,
+      label: `Ext ${ext.extension_number} - ${ext.ai_assistant?.name || 'AI Assistant'}`
+    })) || [],
+    ai_load_balancers: aiLoadBalancersData?.data?.map(alb => ({
+      id: String(alb.id),
+      label: `${alb.name}`
     })) || []
   };
 
-  const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading;
-  const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError;
+  const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading || aiAssistantsLoading || aiLoadBalancersLoading;
+  const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError || aiAssistantsError || aiLoadBalancersError;
 
   // Helper to render destination badge (matches Extensions page format)
   const renderDestinationBadge = (type: string, label: string, extType?: string) => {
@@ -384,6 +405,8 @@ export default function IVRMenus() {
       ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
       conference: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
       ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+      ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+      ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
     };
 
     // For extensions, use the extension type; otherwise use the destination type
@@ -400,6 +423,8 @@ export default function IVRMenus() {
           {type === 'ring_group' && 'Ring Group'}
           {type === 'conference_room' && 'Conference'}
           {type === 'ivr_menu' && 'IVR'}
+          {type === 'ai_assistant' && 'AI Assistant'}
+          {type === 'ai_load_balancer' && 'AI Load Balancer'}
         </Badge>
         <span className="text-sm">{label}</span>
       </div>
@@ -1146,6 +1171,8 @@ export default function IVRMenus() {
                                   <SelectItem value="ring_group">Ring Group</SelectItem>
                                   <SelectItem value="conference_room">Conference</SelectItem>
                                   <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                                <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1191,11 +1218,23 @@ export default function IVRMenus() {
                                           {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
                                         </SelectItem>
                                       ))}
+                                      {option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.map((assistant) => (
+                                        <SelectItem key={assistant.id} value={assistant.extension_number}>
+                                          {renderDestinationBadge('ai_assistant', assistant.label)}
+                                        </SelectItem>
+                                      ))}
+                                      {option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.map((alb) => (
+                                        <SelectItem key={alb.id} value={alb.id}>
+                                          {renderDestinationBadge('ai_load_balancer', alb.label)}
+                                        </SelectItem>
+                                      ))}
                                       {(() => {
                                         const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
                                           option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
                                           option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
-                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0;
+                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0 ||
+                                          option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.length > 0 ||
+                                          option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.length > 0;
 
                                         if (!hasOptions && !destinationsLoading && !destinationsError) {
                                           return (
@@ -1324,7 +1363,9 @@ export default function IVRMenus() {
                             <SelectItem value="ring_group">Ring Group</SelectItem>
                             <SelectItem value="conference_room">Conference Room</SelectItem>
                             <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                          </SelectContent>
+                          <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
+                                </SelectContent>
                         </Select>
                       </div>
                     </div>
@@ -1620,6 +1661,8 @@ export default function IVRMenus() {
                                   <SelectItem value="ring_group">Ring Group</SelectItem>
                                   <SelectItem value="conference_room">Conference</SelectItem>
                                   <SelectItem value="ivr_menu">IVR Menu</SelectItem>
+                                <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1665,11 +1708,23 @@ export default function IVRMenus() {
                                           {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
                                         </SelectItem>
                                       ))}
+                                      {option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.map((assistant) => (
+                                        <SelectItem key={assistant.id} value={assistant.extension_number}>
+                                          {renderDestinationBadge('ai_assistant', assistant.label)}
+                                        </SelectItem>
+                                      ))}
+                                      {option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.map((alb) => (
+                                        <SelectItem key={alb.id} value={alb.id}>
+                                          {renderDestinationBadge('ai_load_balancer', alb.label)}
+                                        </SelectItem>
+                                      ))}
                                       {(() => {
                                         const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
                                           option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
                                           option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
-                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0;
+                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0 ||
+                                          option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.length > 0 ||
+                                          option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.length > 0;
 
                                         if (!hasOptions && !destinationsLoading && !destinationsError) {
                                           return (
@@ -1798,7 +1853,9 @@ export default function IVRMenus() {
                             <SelectItem value="ring_group">Ring Group</SelectItem>
                             <SelectItem value="conference_room">Conference Room</SelectItem>
                             <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                          </SelectContent>
+                          <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
+                                </SelectContent>
                         </Select>
                       </div>
                     </div>
