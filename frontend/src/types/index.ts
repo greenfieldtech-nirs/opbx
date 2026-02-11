@@ -217,6 +217,14 @@ export interface RingGroup {
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
   fallback_extension_number?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  fallback_ai_load_balancer_id?: string;
+  fallback_ai_load_balancer?: {
+    id: string;
+    name: string;
+  } | null;
   status: Status;
   created_at: string;
   updated_at: string;
