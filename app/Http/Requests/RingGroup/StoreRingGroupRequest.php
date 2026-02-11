@@ -23,14 +23,12 @@ class StoreRingGroupRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
         $user = $this->user();
 
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -84,24 +82,29 @@ class StoreRingGroupRequest extends FormRequest
                 new Enum(RingGroupFallbackAction::class),
             ],
             'fallback_extension_id' => [
-                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
                 'nullable',
                 'exists:extensions,id',
             ],
             'fallback_ring_group_id' => [
-                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
                 'nullable',
                 'exists:ring_groups,id',
             ],
             'fallback_ivr_menu_id' => [
-                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
                 'nullable',
                 'exists:ivr_menus,id',
             ],
             'fallback_ai_assistant_id' => [
-                Rule::requiredIf(fn() => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
                 'exists:extensions,id',
+            ],
+            'fallback_ai_load_balancer_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
+                'nullable',
+                'exists:ai_assistant_load_balancers,id',
             ],
             'status' => [
                 'required',
@@ -156,6 +159,8 @@ class StoreRingGroupRequest extends FormRequest
             'fallback_ivr_menu_id.exists' => 'The selected fallback IVR menu does not exist.',
             'fallback_ai_assistant_id.required_if' => 'Fallback AI assistant is required when fallback action is "ai_assistant".',
             'fallback_ai_assistant_id.exists' => 'The selected fallback AI assistant does not exist.',
+            'fallback_ai_load_balancer_id.required_if' => 'Fallback AI load balancer is required when fallback action is "ai_load_balancer".',
+            'fallback_ai_load_balancer_id.exists' => 'The selected fallback AI load balancer does not exist.',
             'status.required' => 'Status is required.',
             'members.required' => 'At least one member is required.',
             'members.min' => 'At least one member is required.',
@@ -171,41 +176,39 @@ class StoreRingGroupRequest extends FormRequest
 
     /**
      * Prepare the data for validation.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {
         // Set default status if not provided
-        if (!$this->has('status')) {
+        if (! $this->has('status')) {
             $this->merge([
                 'status' => RingGroupStatus::ACTIVE->value,
             ]);
         }
 
         // Set default timeout if not provided
-        if (!$this->has('timeout')) {
+        if (! $this->has('timeout')) {
             $this->merge([
                 'timeout' => 30,
             ]);
         }
 
         // Set default ring_turns if not provided
-        if (!$this->has('ring_turns')) {
+        if (! $this->has('ring_turns')) {
             $this->merge([
                 'ring_turns' => 2,
             ]);
         }
 
         // Set default strategy if not provided
-        if (!$this->has('strategy')) {
+        if (! $this->has('strategy')) {
             $this->merge([
                 'strategy' => RingGroupStrategy::SIMULTANEOUS->value,
             ]);
         }
 
         // Set default fallback_action if not provided
-        if (!$this->has('fallback_action')) {
+        if (! $this->has('fallback_action')) {
             $this->merge([
                 'fallback_action' => RingGroupFallbackAction::VOICEMAIL->value,
             ]);
@@ -215,8 +218,7 @@ class StoreRingGroupRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -228,9 +230,10 @@ class StoreRingGroupRequest extends FormRequest
             $fallbackRingGroupId = $this->input('fallback_ring_group_id');
             $fallbackIvrMenuId = $this->input('fallback_ivr_menu_id');
             $fallbackAiAssistantId = $this->input('fallback_ai_assistant_id');
+            $fallbackAiLoadBalancerId = $this->input('fallback_ai_load_balancer_id');
 
             // Validate that all extensions belong to the same organization
-            if (!empty($members)) {
+            if (! empty($members)) {
                 $extensionIds = array_column($members, 'extension_id');
                 $validExtensions = Extension::whereIn('id', $extensionIds)
                     ->where('organization_id', $user->organization_id)
@@ -248,7 +251,7 @@ class StoreRingGroupRequest extends FormRequest
                     if ($extension->type !== ExtensionType::USER) {
                         $validator->errors()->add(
                             'members',
-                            'Only user extensions (PBX User type) can be added to ring groups. Extension ' . $extension->extension_number . ' is not a user extension.'
+                            'Only user extensions (PBX User type) can be added to ring groups. Extension '.$extension->extension_number.' is not a user extension.'
                         );
                         break;
                     }
@@ -259,7 +262,7 @@ class StoreRingGroupRequest extends FormRequest
                     if ($extension->status !== UserStatus::ACTIVE) {
                         $validator->errors()->add(
                             'members',
-                            'Only active extensions can be added to ring groups. Extension ' . $extension->extension_number . ' is not active.'
+                            'Only active extensions can be added to ring groups. Extension '.$extension->extension_number.' is not active.'
                         );
                         break;
                     }
@@ -297,7 +300,7 @@ class StoreRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if (!$fallbackRingGroup->isActive()) {
+                    if (! $fallbackRingGroup->isActive()) {
                         $validator->errors()->add(
                             'fallback_ring_group_id',
                             'Fallback ring group must be active.'
@@ -317,7 +320,7 @@ class StoreRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if (!$fallbackIvrMenu->isActive()) {
+                    if (! $fallbackIvrMenu->isActive()) {
                         $validator->errors()->add(
                             'fallback_ivr_menu_id',
                             'Fallback IVR menu must be active.'
@@ -348,6 +351,26 @@ class StoreRingGroupRequest extends FormRequest
                         $validator->errors()->add(
                             'fallback_ai_assistant_id',
                             'The selected extension is not an AI assistant.'
+                        );
+                    }
+                }
+            }
+
+            // Validate fallback AI load balancer belongs to organization and is active
+            if ($fallbackAction === RingGroupFallbackAction::AI_LOAD_BALANCER->value && $fallbackAiLoadBalancerId) {
+                $fallbackAiLoadBalancer = AiAssistantLoadBalancer::find($fallbackAiLoadBalancerId);
+                if ($fallbackAiLoadBalancer) {
+                    if ($fallbackAiLoadBalancer->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'fallback_ai_load_balancer_id',
+                            'Fallback AI load balancer must belong to your organization.'
+                        );
+                    }
+
+                    if ($fallbackAiLoadBalancer->status !== UserStatus::ACTIVE) {
+                        $validator->errors()->add(
+                            'fallback_ai_load_balancer_id',
+                            'Fallback AI load balancer must be active.'
                         );
                     }
                 }
