@@ -1117,7 +1117,7 @@ export default function IVRMenus() {
                       <Card key={index}>
                         <CardContent className="p-4">
                           <div className="grid grid-cols-12 gap-4 items-end">
-                            <div className="col-span-2">
+                            <div className="col-span-1">
                               <Label>Digits *</Label>
                               <div>
                                 <Input
@@ -1141,14 +1141,6 @@ export default function IVRMenus() {
                               </div>
                             </div>
                             <div className="col-span-3">
-                              <Label>Description</Label>
-                              <Input
-                                value={option.description || ''}
-                                onChange={(e) => updateMenuOption(index, 'description', e.target.value)}
-                                placeholder="Press 1 for sales"
-                              />
-                            </div>
-                            <div className="col-span-2">
                               <Label>Type</Label>
                               <Select
                                 value={option.destination_type}
@@ -1607,7 +1599,7 @@ export default function IVRMenus() {
                       <Card key={index}>
                         <CardContent className="p-4">
                           <div className="grid grid-cols-12 gap-4 items-end">
-                            <div className="col-span-2">
+                            <div className="col-span-1">
                               <Label>Digits *</Label>
                               <div>
                                 <Input
@@ -1631,14 +1623,6 @@ export default function IVRMenus() {
                               </div>
                             </div>
                             <div className="col-span-3">
-                              <Label>Description</Label>
-                              <Input
-                                value={option.description || ''}
-                                onChange={(e) => updateMenuOption(index, 'description', e.target.value)}
-                                placeholder="Press 1 for sales"
-                              />
-                            </div>
-                            <div className="col-span-2">
                               <Label>Type</Label>
                               <Select
                                 value={option.destination_type}
