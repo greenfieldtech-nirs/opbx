@@ -19,6 +19,43 @@ use Illuminate\Support\Facades\Log;
 
 class RingGroupRoutingStrategy implements RoutingStrategy
 {
+    /**
+     * Generate a callback URL for ring group follow-through/fallback.
+     *
+     * When all ring group members fail or don't answer, Cloudonix will call this URL
+     * which will trigger the fallback action configured for the ring group.
+     *
+     * @param  RingGroup  $ringGroup  The ring group
+     * @param  Request  $request  The original request
+     * @param  int  $attemptNumber  The attempt number (for sequential routing)
+     * @return string The full callback URL
+     */
+    private function getRingGroupCallbackUrl(RingGroup $ringGroup, Request $request, int $attemptNumber = 0): string
+    {
+        $organizationId = $request->input('_organization_id');
+        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
+
+        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
+            ? rtrim($cloudonixSettings->webhook_base_url, '/')
+            : $request->getSchemeAndHttpHost();
+
+        // Build session data with ring group context
+        $sessionData = [
+            'ring_group_id' => $ringGroup->id,
+            'attempt_number' => $attemptNumber,
+            'organization_id' => $ringGroup->organization_id,
+            'callback_type' => 'ring_group_fallback',
+        ];
+
+        $relativeUrl = route('voice.ring-group-callback', [
+            'ring_group_id' => $ringGroup->id,
+            'attempt_number' => $attemptNumber,
+            'session_data' => json_encode($sessionData),
+        ], false);
+
+        return $baseUrl.$relativeUrl;
+    }
+
     public function canHandle(ExtensionType $type): bool
     {
         return $type === ExtensionType::RING_GROUP;
@@ -39,6 +76,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         // Check if this is a callback (subsequent attempt) or initial call
         $attempt = (int) $request->input('SessionData.attempt_number', 0);
+        $callbackType = $request->input('SessionData.callback_type');
 
         // If attempt number is not in SessionData, try to get it from query params or session_data
         if ($attempt === 0) {
@@ -49,8 +87,21 @@ class RingGroupRoutingStrategy implements RoutingStrategy
                 if ($sessionDataJson) {
                     $sessionData = json_decode($sessionDataJson, true);
                     $attempt = (int) ($sessionData['attempt_number'] ?? 0);
+                    $callbackType = $sessionData['callback_type'] ?? $callbackType;
                 }
             }
+        }
+
+        // For simultaneous ring groups, if this is a callback (all targets failed),
+        // immediately trigger fallback instead of re-dialing
+        if ($ringGroup->strategy === StrategyEnum::SIMULTANEOUS && $callbackType === 'ring_group_fallback') {
+            Log::info('RingGroupRoutingStrategy: Simultaneous ring callback received, triggering fallback', [
+                'ring_group_id' => $ringGroup->id,
+                'ring_group_name' => $ringGroup->name,
+                'attempt' => $attempt,
+            ]);
+
+            return $this->handleFallback($ringGroup, $request);
         }
 
         if ($ringGroup->strategy === StrategyEnum::SIMULTANEOUS) {
@@ -69,13 +120,26 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         $targets = [];
         foreach ($members as $member) {
-            // Skip forward extensions - they should not be dialed directly as extension numbers
-            // Forward extensions route to their configured destination, not the extension itself
+            // Handle forward extensions by routing to their configured destination
             if ($member->type === ExtensionType::FORWARD) {
-                Log::info('RingGroupRoutingStrategy: Skipping forward extension in simultaneous ring group', [
+                $forwardTo = $member->configuration['forward_to'] ?? null;
+
+                if (! $forwardTo) {
+                    Log::warning('RingGroupRoutingStrategy: Forward extension has no destination configured', [
+                        'ring_group_id' => $ringGroup->id,
+                        'member_extension_number' => $member->extension_number,
+                    ]);
+
+                    continue;
+                }
+
+                // Route to the forward destination (phone number, SIP URI, or extension)
+                $targets[] = $forwardTo;
+
+                Log::info('RingGroupRoutingStrategy: Including forward extension destination in simultaneous ring group', [
                     'ring_group_id' => $ringGroup->id,
                     'member_extension_number' => $member->extension_number,
-                    'forward_to' => $member->configuration['forward_to'] ?? 'not configured',
+                    'forward_to' => $forwardTo,
                 ]);
 
                 continue;
@@ -84,18 +148,31 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             $targets[] = $member->extension_number;
         }
 
-        // If no valid targets after filtering, fallback
+        // If no valid targets found, fallback
         if (empty($targets)) {
-            Log::warning('RingGroupRoutingStrategy: No valid targets after filtering forward extensions', [
+            Log::warning('RingGroupRoutingStrategy: No valid targets found for simultaneous ring group', [
                 'ring_group_id' => $ringGroup->id,
                 'original_member_count' => $members->count(),
+                'forward_extensions_count' => $members->where('type', ExtensionType::FORWARD)->count(),
             ]);
 
             return $this->handleFallback($ringGroup, $request);
         }
 
+        // Generate callback URL for fallback handling
+        // When all targets fail, Cloudonix will call this URL to trigger fallback
+        $callbackUrl = $this->getRingGroupCallbackUrl($ringGroup, $request, 0);
+
+        Log::info('RingGroupRoutingStrategy: Initiating simultaneous ring with fallback callback', [
+            'ring_group_id' => $ringGroup->id,
+            'ring_group_name' => $ringGroup->name,
+            'target_count' => count($targets),
+            'timeout' => $ringGroup->timeout ?? 30,
+            'callback_url' => $callbackUrl,
+        ]);
+
         return response(
-            CxmlBuilder::dialRingGroup($targets, $ringGroup->timeout ?? 30),
+            CxmlBuilder::dialRingGroup($targets, $ringGroup->timeout ?? 30, $callbackUrl),
             200,
             ['Content-Type' => 'text/xml']
         );
@@ -217,20 +294,24 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             return $this->tryNextMemberOrFallback($ringGroup, $request, $attempt);
         }
 
+        // Generate callback URL for fallback/next attempt handling
+        $nextAttempt = $attempt + 1;
+        $callbackUrl = $this->getRingGroupCallbackUrl($ringGroup, $request, $nextAttempt);
+
         // Check if forwardTo is a SIP URI
         if (str_starts_with(strtolower($forwardTo), 'sip:')) {
-            // Dial the SIP URI directly
+            // Dial the SIP URI directly with action callback
             $builder = new CxmlBuilder;
-            $builder->dial($forwardTo, $ringGroup->timeout ?? 20);
+            $builder->dial($forwardTo, $ringGroup->timeout ?? 20, $callbackUrl);
 
             return $builder->toResponse();
         }
 
         // Check if forwardTo is an E.164 phone number
         if (preg_match('/^\+[1-9]\d{1,14}$/', $forwardTo)) {
-            // Dial the phone number directly
+            // Dial the phone number directly with action callback
             $builder = new CxmlBuilder;
-            $builder->simpleDial($forwardTo);
+            $builder->dial($forwardTo, $ringGroup->timeout ?? 20, $callbackUrl);
 
             return $builder->toResponse();
         }
@@ -438,6 +519,9 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         }
 
         $fallbackAiAssistant = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->with(['aiAssistant' => function ($query) {
+                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
+            }])
             ->where('id', $fallbackAiAssistantId)
             ->where('organization_id', $ringGroup->organization_id)
             ->where('type', ExtensionType::AI_ASSISTANT)
@@ -464,7 +548,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             return $this->handleFallbackHangup($ringGroup);
         }
 
-        $aiLoadBalancer = \App\Models\AI\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('id', $fallbackAiLoadBalancerId)
             ->where('organization_id', $ringGroup->organization_id)
             ->where('status', 'active')
