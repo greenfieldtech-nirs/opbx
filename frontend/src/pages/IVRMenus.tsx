@@ -825,7 +825,6 @@ export default function IVRMenus() {
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
-            onView={openEditDialog}
             onEdit={openEditDialog}
             onDelete={openDeleteDialog}
             columns={[
@@ -1235,7 +1234,8 @@ export default function IVRMenus() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-1 flex items-center justify-center">
+                            <div className="col-span-1">
+                              <Label className="invisible">Delete</Label>
                               <button
                                 type="button"
                                 onClick={() => removeMenuOption(index)}
@@ -1709,7 +1709,8 @@ export default function IVRMenus() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-1 flex items-center justify-center">
+                            <div className="col-span-1">
+                              <Label className="invisible">Delete</Label>
                               <button
                                 type="button"
                                 onClick={() => removeMenuOption(index)}
