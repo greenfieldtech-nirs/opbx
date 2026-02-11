@@ -18,7 +18,6 @@ class RingGroupResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -36,6 +35,7 @@ class RingGroupResource extends JsonResource
             'fallback_ring_group_id' => $this->fallback_ring_group_id,
             'fallback_ivr_menu_id' => $this->fallback_ivr_menu_id,
             'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
+            'fallback_ai_load_balancer_id' => $this->fallback_ai_load_balancer_id,
             'status' => $this->status->value,
             'members' => $this->whenLoaded('members', function () {
                 return $this->members->map(function ($member) {
@@ -54,6 +54,12 @@ class RingGroupResource extends JsonResource
                 return [
                     'id' => $this->fallbackExtension->id,
                     'extension_number' => $this->fallbackExtension->extension_number,
+                ];
+            }),
+            'fallback_ai_load_balancer' => $this->whenLoaded('fallbackAiLoadBalancer', function () {
+                return [
+                    'id' => $this->fallbackAiLoadBalancer->id,
+                    'name' => $this->fallbackAiLoadBalancer->name,
                 ];
             }),
             'created_at' => $this->created_at?->toIso8601String(),
