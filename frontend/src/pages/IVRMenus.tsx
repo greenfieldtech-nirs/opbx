@@ -59,6 +59,11 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import {
+  DestinationTypeAndSelector,
+  DestinationBadge,
+  useDestinations,
+} from '@/components/destinations';
 import { Combobox } from '@/components/ui/combobox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -1133,107 +1138,25 @@ export default function IVRMenus() {
                                   className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
                                 />
                             </div>
-                            <div className="col-span-2">
-                              <Label>Type</Label>
-                              <Select
-                                value={option.destination_type}
-                                onValueChange={(value) => {
-                                  // Update both destination_type and reset destination_id in a single state update
+                            <div className="col-span-10">
+                              <DestinationTypeAndSelector
+                                typeValue={option.destination_type}
+                                destinationValue={option.destination_id}
+                                onChange={(type, destId) => {
                                   const updatedOptions = [...formData.options];
                                   updatedOptions[index] = {
                                     ...updatedOptions[index],
-                                    destination_type: value as IvrDestinationType,
-                                    destination_id: ''
+                                    destination_type: type,
+                                    destination_id: destId
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
                                 }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="extension">Extension</SelectItem>
-                                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                                  <SelectItem value="conference_room">Conference</SelectItem>
-                                  <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                                <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="col-span-8">
-                              <Label>Destination</Label>
-                              <Select
-                                key={`destination-${index}-${option.destination_type}`}
-                                value={option.destination_id?.toString() || ''}
-                                onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
-                                disabled={!option.destination_type}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select destination" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {destinationsLoading ? (
-                                    <div className="px-2 py-1 text-sm text-muted-foreground">
-                                      Loading destinations...
-                                    </div>
-                                  ) : destinationsError ? (
-                                    <div className="px-2 py-1 text-sm text-destructive">
-                                      Error loading destinations
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                        <SelectItem key={ext.id} value={ext.extension_number}>
-                                          {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
-                                        <SelectItem key={rg.id} value={rg.id}>
-                                          {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
-                                        <SelectItem key={cr.id} value={cr.id}>
-                                          {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
-                                        <SelectItem key={menu.id} value={menu.id}>
-                                          {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.map((assistant) => (
-                                        <SelectItem key={assistant.id} value={assistant.extension_number}>
-                                          {renderDestinationBadge('ai_assistant', assistant.label)}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.map((alb) => (
-                                        <SelectItem key={alb.id} value={alb.id}>
-                                          {renderDestinationBadge('ai_load_balancer', alb.label)}
-                                        </SelectItem>
-                                      ))}
-                                      {(() => {
-                                        const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
-                                          option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
-                                          option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
-                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0 ||
-                                          option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.length > 0 ||
-                                          option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.length > 0;
-
-                                        if (!hasOptions && !destinationsLoading && !destinationsError) {
-                                          return (
-                                            <div className="px-2 py-1 text-sm text-muted-foreground">
-                                              No {option.destination_type?.replace('_', ' ')}s available
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
+                                layout="grid"
+                                gridColumns={{ type: 3, destination: 9 }}
+                                extensionTypes={['user', 'forward']}
+                                typeLabel="Type"
+                                destinationLabel="Destination"
+                              />
                             </div>
                             <div className="col-span-1">
                               <Label className="invisible">Delete</Label>
@@ -1329,72 +1252,22 @@ export default function IVRMenus() {
                         </p>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="failover-type">Failover Destination</Label>
-                        <Select
-                          value={formData.failover_destination_type}
-                          onValueChange={(value) => setFormData({
+                      <DestinationTypeAndSelector
+                        typeValue={formData.failover_destination_type}
+                        destinationValue={formData.failover_destination_id || ''}
+                        onChange={(type, destId) => {
+                          setFormData({
                             ...formData,
-                            failover_destination_type: value as IvrDestinationType,
-                            failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hangup">Hang Up</SelectItem>
-                            <SelectItem value="extension">Extension</SelectItem>
-                            <SelectItem value="ring_group">Ring Group</SelectItem>
-                            <SelectItem value="conference_room">Conference Room</SelectItem>
-                            <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                          <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                                </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
-                      <div className="space-y-2">
-                        <Label>Failover Destination</Label>
-                        <Select
-                          key={`failover-${formData.failover_destination_type}`}
-                          value={formData.failover_destination_id || ''}
-                          onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select failover destination" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formData.failover_destination_type === 'extension' &&
-                              availableDestinations?.extensions?.map((ext) => (
-                                <SelectItem key={ext.id} value={ext.id}>
-                                  {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ring_group' &&
-                              availableDestinations?.ring_groups?.map((rg) => (
-                                <SelectItem key={rg.id} value={rg.id}>
-                                  {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'conference_room' &&
-                              availableDestinations?.conference_rooms?.map((cr) => (
-                                <SelectItem key={cr.id} value={cr.id}>
-                                  {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ivr_menu' &&
-                              availableDestinations?.ivr_menus?.map((menu) => (
-                                <SelectItem key={menu.id} value={menu.id}>
-                                  {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                            failover_destination_type: type,
+                            failover_destination_id: destId || undefined
+                          });
+                        }}
+                        layout="vertical"
+                        includeHangup={true}
+                        extensionTypes={['user', 'forward']}
+                        typeLabel="Failover Action"
+                        destinationLabel="Failover Destination"
+                      />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -1608,107 +1481,25 @@ export default function IVRMenus() {
                                   className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
                                 />
                             </div>
-                            <div className="col-span-2">
-                              <Label>Type</Label>
-                              <Select
-                                value={option.destination_type}
-                                onValueChange={(value) => {
-                                  // Update both destination_type and reset destination_id in a single state update
+                            <div className="col-span-10">
+                              <DestinationTypeAndSelector
+                                typeValue={option.destination_type}
+                                destinationValue={option.destination_id}
+                                onChange={(type, destId) => {
                                   const updatedOptions = [...formData.options];
                                   updatedOptions[index] = {
                                     ...updatedOptions[index],
-                                    destination_type: value as IvrDestinationType,
-                                    destination_id: ''
+                                    destination_type: type,
+                                    destination_id: destId
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
                                 }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="extension">Extension</SelectItem>
-                                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                                  <SelectItem value="conference_room">Conference</SelectItem>
-                                  <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                                <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="col-span-8">
-                              <Label>Destination</Label>
-                              <Select
-                                key={`destination-${index}-${option.destination_type}`}
-                                value={option.destination_id?.toString() || ''}
-                                onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
-                                disabled={!option.destination_type}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select destination" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {destinationsLoading ? (
-                                    <div className="px-2 py-1 text-sm text-muted-foreground">
-                                      Loading destinations...
-                                    </div>
-                                  ) : destinationsError ? (
-                                    <div className="px-2 py-1 text-sm text-destructive">
-                                      Error loading destinations
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                        <SelectItem key={ext.id} value={ext.extension_number}>
-                                          {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
-                                        <SelectItem key={rg.id} value={rg.id}>
-                                          {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
-                                        <SelectItem key={cr.id} value={cr.id}>
-                                          {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
-                                        <SelectItem key={menu.id} value={menu.id}>
-                                          {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.map((assistant) => (
-                                        <SelectItem key={assistant.id} value={assistant.extension_number}>
-                                          {renderDestinationBadge('ai_assistant', assistant.label)}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.map((alb) => (
-                                        <SelectItem key={alb.id} value={alb.id}>
-                                          {renderDestinationBadge('ai_load_balancer', alb.label)}
-                                        </SelectItem>
-                                      ))}
-                                      {(() => {
-                                        const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
-                                          option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
-                                          option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
-                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0 ||
-                                          option.destination_type === 'ai_assistant' && availableDestinations?.ai_assistants?.length > 0 ||
-                                          option.destination_type === 'ai_load_balancer' && availableDestinations?.ai_load_balancers?.length > 0;
-
-                                        if (!hasOptions && !destinationsLoading && !destinationsError) {
-                                          return (
-                                            <div className="px-2 py-1 text-sm text-muted-foreground">
-                                              No {option.destination_type?.replace('_', ' ')}s available
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
+                                layout="grid"
+                                gridColumns={{ type: 3, destination: 9 }}
+                                extensionTypes={['user', 'forward']}
+                                typeLabel="Type"
+                                destinationLabel="Destination"
+                              />
                             </div>
                             <div className="col-span-1">
                               <Label className="invisible">Delete</Label>
@@ -1804,72 +1595,22 @@ export default function IVRMenus() {
                         </p>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-failover-type">Failover Destination</Label>
-                        <Select
-                          value={formData.failover_destination_type}
-                          onValueChange={(value) => setFormData({
+                      <DestinationTypeAndSelector
+                        typeValue={formData.failover_destination_type}
+                        destinationValue={formData.failover_destination_id || ''}
+                        onChange={(type, destId) => {
+                          setFormData({
                             ...formData,
-                            failover_destination_type: value as IvrDestinationType,
-                            failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hangup">Hang Up</SelectItem>
-                            <SelectItem value="extension">Extension</SelectItem>
-                            <SelectItem value="ring_group">Ring Group</SelectItem>
-                            <SelectItem value="conference_room">Conference Room</SelectItem>
-                            <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                          <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                                  <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                                </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
-                      <div className="space-y-2">
-                        <Label>Failover Destination</Label>
-                        <Select
-                          key={`failover-${formData.failover_destination_type}`}
-                          value={formData.failover_destination_id || ''}
-                          onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select failover destination" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formData.failover_destination_type === 'extension' &&
-                              availableDestinations?.extensions?.map((ext) => (
-                                <SelectItem key={ext.id} value={ext.id}>
-                                  {renderDestinationBadge('extension', `Ext ${ext.extension_number} - ${ext.displayLabel}`, ext.type)}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ring_group' &&
-                              availableDestinations?.ring_groups?.map((rg) => (
-                                <SelectItem key={rg.id} value={rg.id}>
-                                  {renderDestinationBadge('ring_group', rg.label.replace('Ring Group: ', ''))}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'conference_room' &&
-                              availableDestinations?.conference_rooms?.map((cr) => (
-                                <SelectItem key={cr.id} value={cr.id}>
-                                  {renderDestinationBadge('conference_room', cr.label.replace('Conference: ', ''))}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ivr_menu' &&
-                              availableDestinations?.ivr_menus?.map((menu) => (
-                                <SelectItem key={menu.id} value={menu.id}>
-                                  {renderDestinationBadge('ivr_menu', menu.label.replace('IVR Menu: ', ''))}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                            failover_destination_type: type,
+                            failover_destination_id: destId || undefined
+                          });
+                        }}
+                        layout="vertical"
+                        includeHangup={true}
+                        extensionTypes={['user', 'forward']}
+                        typeLabel="Failover Action"
+                        destinationLabel="Failover Destination"
+                      />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
