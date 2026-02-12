@@ -283,9 +283,54 @@ export function useDestinationOptions(
     }
   })();
 
+  // Get specific loading state based on type
+  const isLoadingForType = (() => {
+    switch (type) {
+      case 'extension':
+      case 'ai_assistant':
+        return isLoading.extensions;
+      case 'ring_group':
+        return isLoading.ringGroups;
+      case 'conference_room':
+        return isLoading.conferenceRooms;
+      case 'ivr_menu':
+        return isLoading.ivrMenus;
+      case 'business_hours':
+        return isLoading.businessHours;
+      case 'ai_load_balancer':
+        return isLoading.aiLoadBalancers;
+      case 'hangup':
+        return false;
+      default:
+        return false;
+    }
+  })();
+
+  const isErrorForType = (() => {
+    switch (type) {
+      case 'extension':
+      case 'ai_assistant':
+        return isError.extensions;
+      case 'ring_group':
+        return isError.ringGroups;
+      case 'conference_room':
+        return isError.conferenceRooms;
+      case 'ivr_menu':
+        return isError.ivrMenus;
+      case 'business_hours':
+        return isError.businessHours;
+      case 'ai_load_balancer':
+        return isError.aiLoadBalancers;
+      case 'hangup':
+        return null;
+      default:
+        return null;
+    }
+  })();
+
   return {
     options,
-    isLoading,
-    isError,
+    isLoading: isLoadingForType,
+    isError: isErrorForType,
   };
 }
