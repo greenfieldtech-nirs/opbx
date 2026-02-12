@@ -1146,7 +1146,7 @@ export default function IVRMenus() {
                                   const updatedOptions = [...formData.options];
                                   updatedOptions[index] = {
                                     ...updatedOptions[index],
-                                    destination_type: type,
+                                    destination_type: type as IvrDestinationType,
                                     destination_id: destId
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
@@ -1251,23 +1251,24 @@ export default function IVRMenus() {
                           How many times to replay the menu on invalid input
                         </p>
                       </div>
+                    </div>
 
-                      <DestinationTypeAndSelector
-                        typeValue={formData.failover_destination_type}
-                        destinationValue={formData.failover_destination_id || ''}
-                        onChange={(type, destId) => {
-                          setFormData({
-                            ...formData,
-                            failover_destination_type: type,
-                            failover_destination_id: destId || undefined
-                          });
-                        }}
-                        layout="vertical"
-                        includeHangup={true}
-                        extensionTypes={['user', 'forward']}
-                        typeLabel="Failover Action"
-                        destinationLabel="Failover Destination"
-                      />
+                    <DestinationTypeAndSelector
+                      typeValue={formData.failover_destination_type}
+                      destinationValue={formData.failover_destination_id || ''}
+                      onChange={(type, destId) => {
+                        setFormData({
+                          ...formData,
+                          failover_destination_type: type as IvrDestinationType,
+                          failover_destination_id: destId || undefined
+                        });
+                      }}
+                      layout="vertical"
+                      includeHangup={true}
+                      extensionTypes={['user', 'forward']}
+                      typeLabel="Failover Action"
+                      destinationLabel="Failover Destination"
+                    />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -1489,7 +1490,7 @@ export default function IVRMenus() {
                                   const updatedOptions = [...formData.options];
                                   updatedOptions[index] = {
                                     ...updatedOptions[index],
-                                    destination_type: type,
+                                    destination_type: type as IvrDestinationType,
                                     destination_id: destId
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
@@ -1594,23 +1595,24 @@ export default function IVRMenus() {
                           How many times to replay the menu on invalid input
                         </p>
                       </div>
+                    </div>
 
-                      <DestinationTypeAndSelector
-                        typeValue={formData.failover_destination_type}
-                        destinationValue={formData.failover_destination_id || ''}
-                        onChange={(type, destId) => {
-                          setFormData({
-                            ...formData,
-                            failover_destination_type: type,
-                            failover_destination_id: destId || undefined
-                          });
-                        }}
-                        layout="vertical"
-                        includeHangup={true}
-                        extensionTypes={['user', 'forward']}
-                        typeLabel="Failover Action"
-                        destinationLabel="Failover Destination"
-                      />
+                    <DestinationTypeAndSelector
+                      typeValue={formData.failover_destination_type}
+                      destinationValue={formData.failover_destination_id || ''}
+                      onChange={(type, destId) => {
+                        setFormData({
+                          ...formData,
+                          failover_destination_type: type as IvrDestinationType,
+                          failover_destination_id: destId || undefined
+                        });
+                      }}
+                      layout="vertical"
+                      includeHangup={true}
+                      extensionTypes={['user', 'forward']}
+                      typeLabel="Failover Action"
+                      destinationLabel="Failover Destination"
+                    />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
