@@ -57,7 +57,6 @@ export function transformExtensionsToOptions(
   }>,
   allowedTypes: ExtensionType[] = DEFAULT_EXTENSION_TYPES
 ): DestinationOption[] {
-  console.log('[transformExtensionsToOptions] Input:', { 
     extensionsCount: extensions.length, 
     allowedTypes,
     extensionTypes: extensions.map(e => ({ id: e.id, type: e.type, number: e.extension_number }))
@@ -84,7 +83,6 @@ export function transformExtensionsToOptions(
       };
     });
 
-  console.log('[transformExtensionsToOptions] Output:', { 
     resultCount: result.length,
     result 
   });
@@ -170,7 +168,6 @@ export function transformAiAssistantsToOptions(
     name?: string;
   }>
 ): DestinationOption[] {
-  console.log('[transformAiAssistantsToOptions] Input:', { 
     aiAssistantsCount: aiAssistants.length,
     aiAssistants: aiAssistants.map(a => ({ 
       id: a.id, 
@@ -193,7 +190,6 @@ export function transformAiAssistantsToOptions(
       },
     }));
 
-  console.log('[transformAiAssistantsToOptions] Output:', { 
     resultCount: result.length,
     result 
   });

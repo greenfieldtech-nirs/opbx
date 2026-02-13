@@ -44,24 +44,19 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
   const { user } = useAuth();
   const orgId = organizationId || user?.organization_id;
 
-  console.log('[useDestinations] Hook called:', { orgId, hasUser: !!user });
 
   const extensionsQuery = useQuery({
     queryKey: destinationQueryKeys.extensions(orgId),
     queryFn: async () => {
-      console.log('[useDestinations] Fetching extensions...', { orgId });
       try {
         const response = await extensionsService.getAll({
           organization_id: orgId,
           status: 'active',
           per_page: 1000,
         });
-        console.log('[useDestinations] Raw response:', response);
         const data = (response as any)?.data || [];
-        console.log('[useDestinations] Extensions fetched:', { count: data.length, sample: data[0] });
         return data;
       } catch (error) {
-        console.error('[useDestinations] Error fetching extensions:', error);
         throw error;
       }
     },
@@ -147,13 +142,11 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     aiLoadBalancers: aiLoadBalancersQuery.data || [],
   };
 
-  console.log('[useDestinations] Query states:', {
     extensions: { isLoading: extensionsQuery.isLoading, isError: !!extensionsQuery.error, dataLength: extensionsQuery.data?.length },
     ringGroups: { isLoading: ringGroupsQuery.isLoading, isError: !!ringGroupsQuery.error, dataLength: ringGroupsQuery.data?.length },
     aiLoadBalancers: { isLoading: aiLoadBalancersQuery.isLoading, isError: !!aiLoadBalancersQuery.error, dataLength: aiLoadBalancersQuery.data?.length },
   });
 
-  console.log('[useDestinations] Data transformed:', {
     extensionsCount: data.extensions.length,
     aiAssistantsCount: data.aiAssistants.length,
     ringGroupsCount: data.ringGroups.length,
@@ -235,7 +228,6 @@ export function useDestinationOptions(
   extensionTypes?: ('user' | 'forward' | 'ai_assistant')[],
   skip?: boolean
 ) {
-  console.log('[useDestinationOptions] Hook called:', { type, extensionTypes, skip });
 
   const { data, isLoading, isError } = useDestinations();
 
@@ -266,7 +258,6 @@ export function useDestinationOptions(
     }
   })();
 
-  console.log('[useDestinationOptions] Options computed:', {
     type,
     extensionTypes,
     optionsCount: options.length,
