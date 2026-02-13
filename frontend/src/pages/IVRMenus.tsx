@@ -64,6 +64,7 @@ import {
   DestinationBadge,
   useDestinations,
 } from '@/components/destinations';
+import { useDestinationsDebug } from '@/components/destinations/hooks/useDestinationsDebug';
 import { Combobox } from '@/components/ui/combobox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -272,6 +273,9 @@ export default function IVRMenus() {
 
   // Permission check
   const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
+
+  // Debug: Check if destinations are loading properly
+  useDestinationsDebug();
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
