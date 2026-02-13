@@ -57,12 +57,7 @@ export function transformExtensionsToOptions(
   }>,
   allowedTypes: ExtensionType[] = DEFAULT_EXTENSION_TYPES
 ): DestinationOption[] {
-    extensionsCount: extensions.length, 
-    allowedTypes,
-    extensionTypes: extensions.map(e => ({ id: e.id, type: e.type, number: e.extension_number }))
-  });
-
-  const result = extensions
+  return extensions
     .filter((ext) => allowedTypes.includes(ext.type as ExtensionType))
     .map((ext) => {
       const displayLabel = getExtensionDisplayLabel(ext);
@@ -82,12 +77,6 @@ export function transformExtensionsToOptions(
         },
       };
     });
-
-    resultCount: result.length,
-    result 
-  });
-
-  return result;
 }
 
 export function transformRingGroupsToOptions(
@@ -168,16 +157,7 @@ export function transformAiAssistantsToOptions(
     name?: string;
   }>
 ): DestinationOption[] {
-    aiAssistantsCount: aiAssistants.length,
-    aiAssistants: aiAssistants.map(a => ({ 
-      id: a.id, 
-      type: a.type, 
-      number: a.extension_number,
-      ai_assistant_name: a.ai_assistant?.name 
-    }))
-  });
-
-  const result = aiAssistants
+  return aiAssistants
     .filter((ext) => !ext.type || ext.type === 'ai_assistant')
     .map((ext) => ({
       id: String(ext.id),
@@ -189,12 +169,6 @@ export function transformAiAssistantsToOptions(
         name: ext.ai_assistant?.name || ext.name,
       },
     }));
-
-    resultCount: result.length,
-    result 
-  });
-
-  return result;
 }
 
 export function transformAiLoadBalancersToOptions(
