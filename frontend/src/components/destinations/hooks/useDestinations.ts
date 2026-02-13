@@ -57,8 +57,8 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
           per_page: 1000,
         });
         console.log('[useDestinations] Raw response:', response);
-        const data = (response as any)?.data?.data || [];
-        console.log('[useDestinations] Extensions fetched:', { count: data.length });
+        const data = (response as any)?.data || [];
+        console.log('[useDestinations] Extensions fetched:', { count: data.length, sample: data[0] });
         return data;
       } catch (error) {
         console.error('[useDestinations] Error fetching extensions:', error);
@@ -66,7 +66,8 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
       }
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0, // Don't cache - always fetch fresh
+    refetchOnWindowFocus: true,
   });
 
   const ringGroupsQuery = useQuery({
@@ -76,7 +77,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         organization_id: orgId,
         per_page: 1000,
       });
-      return (response as any)?.data?.data || [];
+      return (response as any)?.data || [];
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -89,7 +90,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         organization_id: orgId,
         per_page: 1000,
       });
-      return (response as any)?.data?.data || [];
+      return (response as any)?.data || [];
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -102,7 +103,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         organization_id: orgId,
         per_page: 1000,
       });
-      return (response as any)?.data?.data || [];
+      return (response as any)?.data || [];
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -115,7 +116,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         organization_id: orgId,
         per_page: 1000,
       });
-      return (response as any)?.data?.data || [];
+      return (response as any)?.data || [];
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -128,7 +129,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         organization_id: orgId,
         per_page: 1000,
       });
-      return (response as any)?.data?.data || [];
+      return (response as any)?.data || [];
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
