@@ -29,26 +29,11 @@ export function DestinationSelector({
   loadingMessage = 'Loading destinations...',
   className,
 }: DestinationSelectorProps) {
-  console.log('[DestinationSelector] RENDER:', { 
-    type, 
-    value, 
-    extensionTypes,
-    timestamp: new Date().toISOString()
-  });
-
   // Get destination options for the selected type
   const { options, isLoading } = useDestinationOptions(type, extensionTypes);
 
-  console.log('[DestinationSelector] Data received:', {
-    type,
-    optionsCount: options.length,
-    isLoading,
-    firstOption: options[0]
-  });
-
   // Handle selection change
   const handleChange = (selectedValue: string) => {
-    console.log('[DestinationSelector] Selection changed:', { selectedValue });
     const option = options.find((o) => o.id === selectedValue);
     if (option) {
       onChange(selectedValue, option);
@@ -59,7 +44,7 @@ export function DestinationSelector({
   const emptyText = emptyMessage || (type ? getEmptyMessage(type) : 'No destinations available');
 
   return (
-    <div className={className}>
+    <div className={cn("min-w-0", className)}>
       {label && <Label className="mb-2 block">{label}</Label>}
       <Select
         value={value}
@@ -69,7 +54,7 @@ export function DestinationSelector({
         <SelectTrigger className="w-full">
           <SelectValue placeholder={isLoading ? loadingMessage : placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="min-w-[300px]">
           {isLoading ? (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">
               {loadingMessage}

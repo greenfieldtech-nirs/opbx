@@ -1,11 +1,3 @@
-/**
- * DestinationTypeAndSelector Component
- *
- * Combined component that renders both Type and Destination selectors
- * with various layout options.
- */
-
-import { useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { DestinationTypeAndSelectorProps } from './types/destination.types';
@@ -13,9 +5,6 @@ import { DestinationTypeSelector } from './DestinationTypeSelector';
 import { DestinationSelector } from './DestinationSelector';
 import { requiresDestination } from './utils/destination-config';
 
-/**
- * Destination Type And Selector Component
- */
 export function DestinationTypeAndSelector({
   typeValue,
   destinationValue,
@@ -31,35 +20,13 @@ export function DestinationTypeAndSelector({
   showDescriptions = false,
   className,
 }: DestinationTypeAndSelectorProps) {
-  console.log('[DestinationTypeAndSelector] RENDER:', {
-    typeValue,
-    destinationValue,
-    extensionTypes,
-    timestamp: new Date().toISOString()
-  });
-
-  // Handle type change - clear destination if type changes
   const handleTypeChange = (newType: typeof typeValue) => {
-    console.log('[DestinationTypeAndSelector] Type changed:', { 
-      oldType: typeValue, 
-      newType,
-      extensionTypes 
-    });
     if (newType) {
-      if (requiresDestination(newType)) {
-        onChange(newType, '');
-      } else {
-        onChange(newType, '');
-      }
+      onChange(newType, '');
     }
   };
 
-  // Handle destination change
   const handleDestinationChange = (newDestination: string) => {
-    console.log('[DestinationTypeAndSelector] Destination changed:', {
-      type: typeValue,
-      newDestination
-    });
     if (typeValue) {
       onChange(typeValue, newDestination);
     }
@@ -71,13 +38,10 @@ export function DestinationTypeAndSelector({
     grid: 'grid gap-4',
   };
 
-  const gridClass = layout === 'grid'
-    ? `grid-cols-12`
-    : '';
+  const gridClass = layout === 'grid' ? 'grid-cols-12' : '';
 
   return (
     <div className={cn(layoutClasses[layout], gridClass, className)}>
-      {/* Type Selector */}
       <div className={layout === 'grid' ? `col-span-${gridColumns.type}` : 'flex-1'}>
         <DestinationTypeSelector
           value={typeValue}
@@ -90,9 +54,8 @@ export function DestinationTypeAndSelector({
         />
       </div>
 
-      {/* Destination Selector - only show if type requires destination */}
       {typeValue && requiresDestination(typeValue) && (
-        <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3]'}>
+        <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3] min-w-0'}>
           <DestinationSelector
             type={typeValue}
             value={destinationValue}
@@ -105,7 +68,6 @@ export function DestinationTypeAndSelector({
         </div>
       )}
 
-      {/* Hangup label (when hangup is selected) */}
       {typeValue === 'hangup' && (
         <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3]'}>
           <Label className="mb-2 block">{destinationLabel}</Label>
