@@ -1157,7 +1157,7 @@ export default function IVRMenus() {
                                 }}
                                 layout="grid"
                                 gridColumns={{ type: 3, destination: 9 }}
-                                extensionTypes={['user', 'forward']}
+                                extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 typeLabel="Type"
                                 destinationLabel="Destination"
                               />
@@ -1501,7 +1501,7 @@ export default function IVRMenus() {
                                 }}
                                 layout="grid"
                                 gridColumns={{ type: 3, destination: 9 }}
-                                extensionTypes={['user', 'forward']}
+                                extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 typeLabel="Type"
                                 destinationLabel="Destination"
                               />
