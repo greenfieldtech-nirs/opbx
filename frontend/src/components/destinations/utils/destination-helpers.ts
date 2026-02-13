@@ -193,11 +193,12 @@ export function transformAiAssistantsToOptions(
     name?: string;
   }>
 ): DestinationOption[] {
-  return aiAssistants
+  console.log('[transformAiAssistantsToOptions] Input:', aiAssistants);
+  const result = aiAssistants
     .filter((ext) => !ext.type || ext.type === 'ai_assistant')
     .map((ext) => ({
       id: String(ext.id),
-      type: 'ai_assistant',
+      type: 'ai_assistant' as const,
       label: ext.label || `Ext ${ext.extension_number} - ${ext.ai_assistant?.name || ext.name || 'AI Assistant'}`,
       badge: getBadgeConfig('ai_assistant'),
       metadata: {
@@ -205,6 +206,8 @@ export function transformAiAssistantsToOptions(
         name: ext.ai_assistant?.name || ext.name,
       },
     }));
+  console.log('[transformAiAssistantsToOptions] Output:', result);
+  return result;
 }
 
 /**
