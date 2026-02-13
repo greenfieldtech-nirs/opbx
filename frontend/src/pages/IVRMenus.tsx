@@ -1267,7 +1267,7 @@ export default function IVRMenus() {
                       }}
                       layout="vertical"
                       includeHangup={true}
-                      extensionTypes={['user', 'forward']}
+                      extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                       typeLabel="Failover Action"
                       destinationLabel="Failover Destination"
                     />
@@ -1611,7 +1611,7 @@ export default function IVRMenus() {
                       }}
                       layout="vertical"
                       includeHangup={true}
-                      extensionTypes={['user', 'forward']}
+                      extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                       typeLabel="Failover Action"
                       destinationLabel="Failover Destination"
                     />
