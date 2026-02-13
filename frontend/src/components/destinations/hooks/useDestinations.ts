@@ -1,5 +1,8 @@
 /**
  * useDestinations Hook
+ *
+ * Custom React hook for fetching all destination data in parallel.
+ * Uses React Query for caching and state management.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -23,12 +26,21 @@ import {
   transformAiLoadBalancersToOptions,
 } from '../utils/destination-helpers';
 
+// Create resource services
 const ringGroupsService = createResourceService('ring-groups');
 const conferenceRoomsService = createResourceService('conference-rooms');
 const ivrMenusService = createResourceService('ivr-menus');
 const businessHoursService = createResourceService('business-hours');
 const aiLoadBalancersService = createResourceService('ai-assistant-load-balancers');
 
+/**
+ * Default extension types to fetch
+ */
+const DEFAULT_EXTENSION_TYPES = ['user', 'forward', 'ai_assistant'];
+
+/**
+ * Query keys for destination caching
+ */
 export const destinationQueryKeys = {
   all: ['destinations'] as const,
   extensions: (orgId?: string) => ['destinations', 'extensions', orgId] as const,
@@ -40,31 +52,44 @@ export const destinationQueryKeys = {
   aiLoadBalancers: (orgId?: string) => ['destinations', 'ai-load-balancers', orgId] as const,
 };
 
+/**
+ * Hook for fetching all destination data
+ *
+ * @param organizationId - Optional organization ID override
+ * @returns Destinations data, loading states, error states, and refetch functions
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading, isError } = useDestinations();
+ *
+ * // Access extensions
+ * const extensionOptions = data.extensions;
+ *
+ * // Check if any loading
+ * if (isLoadingAny) return <Loading />;
+ * ```
+ */
 export function useDestinations(organizationId?: string): UseDestinationsReturn {
   const { user } = useAuth();
   const orgId = organizationId || user?.organization_id;
 
-
+  // Fetch extensions (includes users, forwards, and AI assistants)
   const extensionsQuery = useQuery({
     queryKey: destinationQueryKeys.extensions(orgId),
     queryFn: async () => {
-      try {
-        const response = await extensionsService.getAll({
-          organization_id: orgId,
-          status: 'active',
-          per_page: 1000,
-        });
-        const data = (response as any)?.data || [];
-        return data;
-      } catch (error) {
-        throw error;
-      }
+      const response = await extensionsService.getAll({
+        organization_id: orgId,
+        status: 'active',
+        per_page: 1000,
+      });
+      return (response as any)?.data || [];
     },
     enabled: !!orgId,
-    staleTime: 0, // Don't cache - always fetch fresh
+    staleTime: 0,
     refetchOnWindowFocus: true,
   });
 
+  // Fetch ring groups
   const ringGroupsQuery = useQuery({
     queryKey: destinationQueryKeys.ringGroups(orgId),
     queryFn: async () => {
@@ -78,6 +103,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch conference rooms
   const conferenceRoomsQuery = useQuery({
     queryKey: destinationQueryKeys.conferenceRooms(orgId),
     queryFn: async () => {
@@ -91,6 +117,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch IVR menus
   const ivrMenusQuery = useQuery({
     queryKey: destinationQueryKeys.ivrMenus(orgId),
     queryFn: async () => {
@@ -104,6 +131,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch business hours schedules
   const businessHoursQuery = useQuery({
     queryKey: destinationQueryKeys.businessHours(orgId),
     queryFn: async () => {
@@ -117,6 +145,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch AI load balancers
   const aiLoadBalancersQuery = useQuery({
     queryKey: destinationQueryKeys.aiLoadBalancers(orgId),
     queryFn: async () => {
@@ -130,6 +159,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Transform data
   const data: DestinationsData = {
     extensions: extensionsQuery.data || [],
     ringGroups: ringGroupsQuery.data || [],
@@ -142,20 +172,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     aiLoadBalancers: aiLoadBalancersQuery.data || [],
   };
 
-    extensions: { isLoading: extensionsQuery.isLoading, isError: !!extensionsQuery.error, dataLength: extensionsQuery.data?.length },
-    ringGroups: { isLoading: ringGroupsQuery.isLoading, isError: !!ringGroupsQuery.error, dataLength: ringGroupsQuery.data?.length },
-    aiLoadBalancers: { isLoading: aiLoadBalancersQuery.isLoading, isError: !!aiLoadBalancersQuery.error, dataLength: aiLoadBalancersQuery.data?.length },
-  });
-
-    extensionsCount: data.extensions.length,
-    aiAssistantsCount: data.aiAssistants.length,
-    ringGroupsCount: data.ringGroups.length,
-    conferenceRoomsCount: data.conferenceRooms.length,
-    ivrMenusCount: data.ivrMenus.length,
-    businessHoursCount: data.businessHours.length,
-    aiLoadBalancersCount: data.aiLoadBalancers.length,
-  });
-
+  // Loading states
   const isLoading: DestinationsLoadingState = {
     extensions: extensionsQuery.isLoading,
     ringGroups: ringGroupsQuery.isLoading,
@@ -166,6 +183,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     aiLoadBalancers: aiLoadBalancersQuery.isLoading,
   };
 
+  // Error states
   const isError: DestinationsErrorState = {
     extensions: extensionsQuery.error as Error | null,
     ringGroups: ringGroupsQuery.error as Error | null,
@@ -176,9 +194,11 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     aiLoadBalancers: aiLoadBalancersQuery.error as Error | null,
   };
 
+  // Overall states
   const isLoadingAny = Object.values(isLoading).some(Boolean);
   const isErrorAny = Object.values(isError).some(Boolean);
 
+  // Refetch functions
   const refetch = () => {
     extensionsQuery.refetch();
     ringGroupsQuery.refetch();
@@ -223,17 +243,24 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
   };
 }
 
+/**
+ * Hook for getting destination options for a specific type
+ *
+ * @param type - The destination type
+ * @param extensionTypes - Optional filter for extension types
+ * @returns Array of destination options for the specified type
+ *
+ * @example
+ * ```tsx
+ * const extensionOptions = useDestinationOptions('extension', ['user', 'forward']);
+ * const ringGroupOptions = useDestinationOptions('ring_group');
+ * ```
+ */
 export function useDestinationOptions(
   type: DestinationType,
-  extensionTypes?: ('user' | 'forward' | 'ai_assistant')[],
-  skip?: boolean
+  extensionTypes?: ('user' | 'forward' | 'ai_assistant')[]
 ) {
-
   const { data, isLoading, isError } = useDestinations();
-
-  if (skip) {
-    return { options: [], isLoading: false, isError: null };
-  }
 
   const options = (() => {
     switch (type) {
@@ -258,12 +285,7 @@ export function useDestinationOptions(
     }
   })();
 
-    type,
-    extensionTypes,
-    optionsCount: options.length,
-    firstFewOptions: options.slice(0, 3)
-  });
-
+  // Get specific loading state based on type
   const isLoadingForType = (() => {
     switch (type) {
       case 'extension':
