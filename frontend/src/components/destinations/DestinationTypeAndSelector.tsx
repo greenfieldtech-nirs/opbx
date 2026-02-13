@@ -15,33 +15,6 @@ import { requiresDestination } from './utils/destination-config';
 
 /**
  * Destination Type And Selector Component
- *
- * A combined component that renders both type and destination selectors
- * with proper state synchronization.
- *
- * Layout options:
- * - horizontal: Side-by-side (Type | Destination)
- * - vertical: Stacked (Type above Destination)
- * - grid: Custom grid columns
- *
- * @example
- * ```tsx
- * // Horizontal layout (default)
- * <DestinationTypeAndSelector
- *   typeValue={type}
- *   destinationValue={destination}
- *   onChange={(t, d) => { setType(t); setDestination(d); }}
- * />
- *
- * // Grid layout
- * <DestinationTypeAndSelector
- *   typeValue={type}
- *   destinationValue={destination}
- *   onChange={(t, d) => { setType(t); setDestination(d); }}
- *   layout="grid"
- *   gridColumns={{ type: 3, destination: 9 }}
- * />
- * ```
  */
 export function DestinationTypeAndSelector({
   typeValue,
@@ -58,15 +31,24 @@ export function DestinationTypeAndSelector({
   showDescriptions = false,
   className,
 }: DestinationTypeAndSelectorProps) {
+  console.log('[DestinationTypeAndSelector] RENDER:', {
+    typeValue,
+    destinationValue,
+    extensionTypes,
+    timestamp: new Date().toISOString()
+  });
+
   // Handle type change - clear destination if type changes
   const handleTypeChange = (newType: typeof typeValue) => {
+    console.log('[DestinationTypeAndSelector] Type changed:', { 
+      oldType: typeValue, 
+      newType,
+      extensionTypes 
+    });
     if (newType) {
-      // Check if the new type requires a destination
       if (requiresDestination(newType)) {
-        // Clear destination when type changes
         onChange(newType, '');
       } else {
-        // For types that don't require destination (e.g., hangup)
         onChange(newType, '');
       }
     }
@@ -74,19 +56,21 @@ export function DestinationTypeAndSelector({
 
   // Handle destination change
   const handleDestinationChange = (newDestination: string) => {
+    console.log('[DestinationTypeAndSelector] Destination changed:', {
+      type: typeValue,
+      newDestination
+    });
     if (typeValue) {
       onChange(typeValue, newDestination);
     }
   };
 
-  // Layout classes
   const layoutClasses = {
     horizontal: 'flex flex-row gap-4',
     vertical: 'flex flex-col gap-4',
     grid: 'grid gap-4',
   };
 
-  // Grid column classes
   const gridClass = layout === 'grid'
     ? `grid-cols-12`
     : '';

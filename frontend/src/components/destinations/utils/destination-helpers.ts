@@ -1,8 +1,5 @@
 /**
  * Destination Helper Functions
- *
- * Utility functions for formatting, transforming, and working with
- * destination data throughout the application.
  */
 
 import type {
@@ -17,9 +14,6 @@ import {
   DEFAULT_EXTENSION_TYPES,
 } from './destination-config';
 
-/**
- * Format an extension label with extension number and display name
- */
 export function formatExtensionLabel(
   extensionNumber: string,
   displayName?: string,
@@ -31,9 +25,6 @@ export function formatExtensionLabel(
   return `Ext ${extensionNumber}`;
 }
 
-/**
- * Get display label for an extension based on its type
- */
 export function getExtensionDisplayLabel(ext: {
   type: string;
   extension_number: string;
@@ -55,9 +46,6 @@ export function getExtensionDisplayLabel(ext: {
   }
 }
 
-/**
- * Transform extensions data into destination options
- */
 export function transformExtensionsToOptions(
   extensions: Array<{
     id: string | number;
@@ -69,7 +57,13 @@ export function transformExtensionsToOptions(
   }>,
   allowedTypes: ExtensionType[] = DEFAULT_EXTENSION_TYPES
 ): DestinationOption[] {
-  return extensions
+  console.log('[transformExtensionsToOptions] Input:', { 
+    extensionsCount: extensions.length, 
+    allowedTypes,
+    extensionTypes: extensions.map(e => ({ id: e.id, type: e.type, number: e.extension_number }))
+  });
+
+  const result = extensions
     .filter((ext) => allowedTypes.includes(ext.type as ExtensionType))
     .map((ext) => {
       const displayLabel = getExtensionDisplayLabel(ext);
@@ -79,7 +73,7 @@ export function transformExtensionsToOptions(
 
       return {
         id: String(ext.id),
-        type: 'extension',
+        type: 'extension' as const,
         label: formatExtensionLabel(ext.extension_number, displayLabel, ext.type),
         subLabel,
         badge: getBadgeConfig('extension', ext.type as ExtensionType),
@@ -89,11 +83,15 @@ export function transformExtensionsToOptions(
         },
       };
     });
+
+  console.log('[transformExtensionsToOptions] Output:', { 
+    resultCount: result.length,
+    result 
+  });
+
+  return result;
 }
 
-/**
- * Transform ring groups data into destination options
- */
 export function transformRingGroupsToOptions(
   ringGroups: Array<{
     id: string | number;
@@ -107,15 +105,10 @@ export function transformRingGroupsToOptions(
     label: rg.name,
     subLabel: rg.description,
     badge: getBadgeConfig('ring_group'),
-    metadata: {
-      name: rg.name,
-    },
+    metadata: { name: rg.name },
   }));
 }
 
-/**
- * Transform conference rooms data into destination options
- */
 export function transformConferenceRoomsToOptions(
   conferenceRooms: Array<{
     id: string | number;
@@ -129,15 +122,10 @@ export function transformConferenceRoomsToOptions(
     label: cr.name,
     subLabel: cr.description,
     badge: getBadgeConfig('conference_room'),
-    metadata: {
-      name: cr.name,
-    },
+    metadata: { name: cr.name },
   }));
 }
 
-/**
- * Transform IVR menus data into destination options
- */
 export function transformIvrMenusToOptions(
   ivrMenus: Array<{
     id: string | number;
@@ -151,15 +139,10 @@ export function transformIvrMenusToOptions(
     label: menu.name,
     subLabel: menu.description,
     badge: getBadgeConfig('ivr_menu'),
-    metadata: {
-      name: menu.name,
-    },
+    metadata: { name: menu.name },
   }));
 }
 
-/**
- * Transform business hours data into destination options
- */
 export function transformBusinessHoursToOptions(
   businessHours: Array<{
     id: string | number;
@@ -173,16 +156,10 @@ export function transformBusinessHoursToOptions(
     label: bh.name,
     subLabel: bh.description,
     badge: getBadgeConfig('business_hours'),
-    metadata: {
-      name: bh.name,
-    },
+    metadata: { name: bh.name },
   }));
 }
 
-/**
- * Transform AI assistants data into destination options
- * Note: AI assistants are extensions with type 'ai_assistant'
- */
 export function transformAiAssistantsToOptions(
   aiAssistants: Array<{
     id: string | number;
@@ -193,7 +170,16 @@ export function transformAiAssistantsToOptions(
     name?: string;
   }>
 ): DestinationOption[] {
-  console.log('[transformAiAssistantsToOptions] Input:', aiAssistants);
+  console.log('[transformAiAssistantsToOptions] Input:', { 
+    aiAssistantsCount: aiAssistants.length,
+    aiAssistants: aiAssistants.map(a => ({ 
+      id: a.id, 
+      type: a.type, 
+      number: a.extension_number,
+      ai_assistant_name: a.ai_assistant?.name 
+    }))
+  });
+
   const result = aiAssistants
     .filter((ext) => !ext.type || ext.type === 'ai_assistant')
     .map((ext) => ({
@@ -206,13 +192,15 @@ export function transformAiAssistantsToOptions(
         name: ext.ai_assistant?.name || ext.name,
       },
     }));
-  console.log('[transformAiAssistantsToOptions] Output:', result);
+
+  console.log('[transformAiAssistantsToOptions] Output:', { 
+    resultCount: result.length,
+    result 
+  });
+
   return result;
 }
 
-/**
- * Transform AI load balancers data into destination options
- */
 export function transformAiLoadBalancersToOptions(
   aiLoadBalancers: Array<{
     id: string | number;
@@ -226,15 +214,10 @@ export function transformAiLoadBalancersToOptions(
     label: alb.name,
     subLabel: alb.description,
     badge: getBadgeConfig('ai_load_balancer'),
-    metadata: {
-      name: alb.name,
-    },
+    metadata: { name: alb.name },
   }));
 }
 
-/**
- * Get destination options for a specific type from all destinations data
- */
 export function getDestinationOptionsForType(
   type: DestinationType,
   data: DestinationsData,
@@ -262,9 +245,6 @@ export function getDestinationOptionsForType(
   }
 }
 
-/**
- * Check if there are any destination options for a type
- */
 export function hasDestinationOptions(
   type: DestinationType,
   data: DestinationsData,
@@ -273,32 +253,20 @@ export function hasDestinationOptions(
   return getDestinationOptionsForType(type, data, extensionTypes).length > 0;
 }
 
-/**
- * Format destination type for display
- */
 export function formatDestinationType(type: DestinationType): string {
   return getDestinationTypeLabel(type);
 }
 
-/**
- * Parse destination value based on type
- * Some types use extension_number (string), others use id (number)
- */
 export function parseDestinationValue(
   value: string,
   type: DestinationType
 ): string | number {
   if (type === 'extension' || type === 'ai_assistant') {
-    // Extensions use extension_number as string
     return value;
   }
-  // Other types use numeric ID
   return parseInt(value, 10);
 }
 
-/**
- * Get unique key for a destination option (for React keys)
- */
 export function getDestinationOptionKey(
   type: DestinationType,
   id: string
@@ -306,9 +274,6 @@ export function getDestinationOptionKey(
   return `${type}-${id}`;
 }
 
-/**
- * Filter destination options by search query
- */
 export function filterDestinationOptions(
   options: DestinationOption[],
   query: string

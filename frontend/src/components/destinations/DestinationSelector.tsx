@@ -1,8 +1,5 @@
 /**
  * DestinationSelector Component
- *
- * A dropdown component for selecting actual destinations based on type.
- * Dynamically shows relevant destinations with badges and filtering.
  */
 
 import { Label } from '@/components/ui/label';
@@ -19,35 +16,6 @@ import { useDestinationOptions } from './hooks/useDestinations';
 import { getEmptyMessage } from './utils/destination-config';
 import { cn } from '@/lib/utils';
 
-/**
- * Destination Selector Component
- *
- * Renders a dropdown with destinations for the selected type:
- * - Extensions (filtered by type: user, forward, ai_assistant)
- * - Ring Groups
- * - Conference Rooms
- * - IVR Menus
- * - Business Hours
- * - AI Assistants
- * - AI Load Balancers
- *
- * Features:
- * - Type badges (User, Forward, AI Assistant, etc.)
- * - Loading state
- * - Empty state messages
- * - Search/filter capability
- *
- * @example
- * ```tsx
- * <DestinationSelector
- *   type={destinationType}
- *   value={destinationId}
- *   onChange={(id, option) => setDestinationId(id)}
- *   label="Destination"
- *   extensionTypes={['user', 'forward']}
- * />
- * ```
- */
 export function DestinationSelector({
   type,
   value,
@@ -61,21 +29,33 @@ export function DestinationSelector({
   loadingMessage = 'Loading destinations...',
   className,
 }: DestinationSelectorProps) {
+  console.log('[DestinationSelector] RENDER:', { 
+    type, 
+    value, 
+    extensionTypes,
+    timestamp: new Date().toISOString()
+  });
+
   // Get destination options for the selected type
   const { options, isLoading } = useDestinationOptions(type, extensionTypes);
 
+  console.log('[DestinationSelector] Data received:', {
+    type,
+    optionsCount: options.length,
+    isLoading,
+    firstOption: options[0]
+  });
+
   // Handle selection change
   const handleChange = (selectedValue: string) => {
+    console.log('[DestinationSelector] Selection changed:', { selectedValue });
     const option = options.find((o) => o.id === selectedValue);
     if (option) {
       onChange(selectedValue, option);
     }
   };
 
-  // Determine if selector should be disabled
   const isDisabled = disabled || !type || isLoading;
-
-  // Get empty message
   const emptyText = emptyMessage || (type ? getEmptyMessage(type) : 'No destinations available');
 
   return (

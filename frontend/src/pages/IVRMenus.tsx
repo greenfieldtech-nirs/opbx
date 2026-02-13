@@ -712,12 +712,14 @@ export default function IVRMenus() {
 
   // Update menu option
   const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
+    console.log('[IVRMenus] updateMenuOption called:', { index, field, value });
     const updatedOptions = [...formData.options];
     // For extensions, destination_id is the extension number (string)
     // For other types, destination_id is the model ID (converted to number)
     const processedValue = field === 'destination_id' && value !== '' &&
       updatedOptions[index].destination_type !== 'extension' ? parseInt(value, 10) : value;
     updatedOptions[index] = { ...updatedOptions[index], [field]: processedValue };
+    console.log('[IVRMenus] Updated option:', updatedOptions[index]);
     setFormData({ ...formData, options: updatedOptions });
   };
 
