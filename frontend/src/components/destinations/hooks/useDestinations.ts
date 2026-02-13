@@ -30,7 +30,7 @@ import {
 const ringGroupsService = createResourceService('ring-groups');
 const conferenceRoomsService = createResourceService('conference-rooms');
 const ivrMenusService = createResourceService('ivr-menus');
-const businessHoursService = createResourceService('business-hours-schedules');
+const businessHoursService = createResourceService('business-hours');
 const aiLoadBalancersService = createResourceService('ai-assistant-load-balancers');
 
 /**
