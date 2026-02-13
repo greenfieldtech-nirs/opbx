@@ -49,15 +49,21 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
   const extensionsQuery = useQuery({
     queryKey: destinationQueryKeys.extensions(orgId),
     queryFn: async () => {
-      console.log('[useDestinations] Fetching extensions...');
-      const response = await extensionsService.getAll({
-        organization_id: orgId,
-        status: 'active',
-        per_page: 1000,
-      });
-      const data = (response as any)?.data?.data || [];
-      console.log('[useDestinations] Extensions fetched:', { count: data.length });
-      return data;
+      console.log('[useDestinations] Fetching extensions...', { orgId });
+      try {
+        const response = await extensionsService.getAll({
+          organization_id: orgId,
+          status: 'active',
+          per_page: 1000,
+        });
+        console.log('[useDestinations] Raw response:', response);
+        const data = (response as any)?.data?.data || [];
+        console.log('[useDestinations] Extensions fetched:', { count: data.length });
+        return data;
+      } catch (error) {
+        console.error('[useDestinations] Error fetching extensions:', error);
+        throw error;
+      }
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -139,6 +145,12 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     ) || [],
     aiLoadBalancers: aiLoadBalancersQuery.data || [],
   };
+
+  console.log('[useDestinations] Query states:', {
+    extensions: { isLoading: extensionsQuery.isLoading, isError: !!extensionsQuery.error, dataLength: extensionsQuery.data?.length },
+    ringGroups: { isLoading: ringGroupsQuery.isLoading, isError: !!ringGroupsQuery.error, dataLength: ringGroupsQuery.data?.length },
+    aiLoadBalancers: { isLoading: aiLoadBalancersQuery.isLoading, isError: !!aiLoadBalancersQuery.error, dataLength: aiLoadBalancersQuery.data?.length },
+  });
 
   console.log('[useDestinations] Data transformed:', {
     extensionsCount: data.extensions.length,
