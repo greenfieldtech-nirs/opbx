@@ -77,15 +77,12 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
   const extensionsQuery = useQuery({
     queryKey: destinationQueryKeys.extensions(orgId),
     queryFn: async () => {
-      console.log('[useDestinations] Fetching extensions...', { orgId });
       const response = await extensionsService.getAll({
         organization_id: orgId,
+        status: 'active',
         per_page: 1000,
       });
-      console.log('[useDestinations] Extensions response:', response);
-      const data = (response as any)?.data?.data || [];
-      console.log('[useDestinations] Extensions data:', data);
-      return data;
+      return (response as any)?.data?.data || [];
     },
     enabled: !!orgId,
     staleTime: 5 * 60 * 1000,
@@ -260,9 +257,15 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
  */
 export function useDestinationOptions(
   type: DestinationType,
-  extensionTypes?: ('user' | 'forward' | 'ai_assistant')[]
+  extensionTypes?: ('user' | 'forward' | 'ai_assistant')[],
+  skip?: boolean
 ) {
   const { data, isLoading, isError } = useDestinations();
+
+  // Return empty data if skip is true
+  if (skip) {
+    return { options: [], isLoading: false, isError: null };
+  }
 
   const options = (() => {
     switch (type) {
@@ -277,10 +280,7 @@ export function useDestinationOptions(
       case 'business_hours':
         return transformBusinessHoursToOptions(data.businessHours);
       case 'ai_assistant':
-        console.log('[useDestinationOptions] AI Assistants data:', data.aiAssistants);
-        const aiOptions = transformAiAssistantsToOptions(data.aiAssistants);
-        console.log('[useDestinationOptions] AI Assistants options:', aiOptions);
-        return aiOptions;
+        return transformAiAssistantsToOptions(data.aiAssistants);
       case 'ai_load_balancer':
         return transformAiLoadBalancersToOptions(data.aiLoadBalancers);
       case 'hangup':
