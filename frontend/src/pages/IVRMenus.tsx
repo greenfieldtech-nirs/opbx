@@ -1154,7 +1154,7 @@ export default function IVRMenus() {
                                 layout="horizontal"
                                 typeClassName="w-full md:w-[220px] flex-none"
                                 destinationClassName="flex-1 min-w-0"
-                                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
+                                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
                                 extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 typeLabel="Type"
                                 destinationLabel="Destination"
@@ -1266,7 +1266,7 @@ export default function IVRMenus() {
                       }}
                       layout="vertical"
                       includeHangup={true}
-                      allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
+                      allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
                       extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                       typeLabel="Failover Action"
                       destinationLabel="Failover Destination"
@@ -1500,7 +1500,7 @@ export default function IVRMenus() {
                                 layout="horizontal"
                                 typeClassName="w-full md:w-[220px] flex-none"
                                 destinationClassName="flex-1 min-w-0"
-                                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
+                                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
                                 extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 typeLabel="Type"
                                 destinationLabel="Destination"
@@ -1612,7 +1612,7 @@ export default function IVRMenus() {
                       }}
                       layout="vertical"
                       includeHangup={true}
-                      allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
+                      allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
                       extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                       typeLabel="Failover Action"
                       destinationLabel="Failover Destination"

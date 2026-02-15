@@ -79,7 +79,7 @@ export type RingGroupStatus = 'active' | 'inactive';
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
 
 // IVR Destination Type
-export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'hangup';
 
 // IVR Menu Status
 export type IvrMenuStatus = 'active' | 'inactive';

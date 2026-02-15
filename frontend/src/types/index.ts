@@ -726,7 +726,7 @@ export interface ExceptionDate {
 
 export type ScheduleStatus = 'active' | 'inactive';
 
-export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference' | 'ai_assistant' | 'forward';
+export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference_room' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'forward';
 
 export interface BusinessHoursAction {
   type: BusinessHoursActionType;
