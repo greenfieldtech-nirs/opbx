@@ -8,7 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { extensionsService } from '@/services/extensions.service';
-import { createResourceService } from '@/services/createResourceService';
+import { createResourceService, usersService } from '@/services/createResourceService';
 import type {
   DestinationType,
   DestinationsData,
@@ -24,6 +24,7 @@ import {
   transformBusinessHoursToOptions,
   transformAiAssistantsToOptions,
   transformAiLoadBalancersToOptions,
+  transformUsersToOptions,
 } from '../utils/destination-helpers';
 
 // Create resource services
@@ -159,6 +160,20 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch Users
+  const usersQuery = useQuery({
+    queryKey: ['destinations', 'users', orgId],
+    queryFn: async () => {
+      const response = await usersService.getAll({
+        organization_id: orgId,
+        per_page: 1000,
+      });
+      return (response as any)?.data || [];
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Transform data
   const data: DestinationsData = {
     extensions: extensionsQuery.data || [],
@@ -170,6 +185,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
       (ext: any) => ext.type === 'ai_assistant'
     ) || [],
     aiLoadBalancers: aiLoadBalancersQuery.data || [],
+    users: usersQuery.data || [],
   };
 
   // Loading states
@@ -181,6 +197,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     businessHours: businessHoursQuery.isLoading,
     aiAssistants: extensionsQuery.isLoading,
     aiLoadBalancers: aiLoadBalancersQuery.isLoading,
+    users: usersQuery.isLoading,
   };
 
   // Error states
@@ -192,6 +209,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     businessHours: businessHoursQuery.error as Error | null,
     aiAssistants: extensionsQuery.error as Error | null,
     aiLoadBalancers: aiLoadBalancersQuery.error as Error | null,
+    users: usersQuery.error as Error | null,
   };
 
   // Overall states
@@ -206,6 +224,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     ivrMenusQuery.refetch();
     businessHoursQuery.refetch();
     aiLoadBalancersQuery.refetch();
+    usersQuery.refetch();
   };
 
   const refetchType = (type: DestinationType) => {
@@ -228,6 +247,9 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         break;
       case 'ai_load_balancer':
         aiLoadBalancersQuery.refetch();
+        break;
+      case 'user':
+        usersQuery.refetch();
         break;
     }
   };
@@ -278,6 +300,8 @@ export function useDestinationOptions(
         return transformAiAssistantsToOptions(data.aiAssistants);
       case 'ai_load_balancer':
         return transformAiLoadBalancersToOptions(data.aiLoadBalancers);
+      case 'user':
+        return transformUsersToOptions(data.users);
       case 'hangup':
         return [];
       default:

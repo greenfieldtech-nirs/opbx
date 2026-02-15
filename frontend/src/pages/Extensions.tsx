@@ -102,6 +102,8 @@ import type {
   CreateExtensionRequest,
   UpdateExtensionRequest
 } from '@/types';
+import { DestinationTypeAndSelector } from '@/components/destinations';
+import type { DestinationType } from '@/components/destinations/types/destination.types';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -601,9 +603,92 @@ export default function ExtensionsComplete() {
         {content}
       </Badge>
     );
+    return (
+      <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
+        <Icon className="h-3.5 w-3.5" />
+        {content}
+      </Badge>
+    );
   };
 
-  // Validate form
+  // Handle destination change from unified selector
+  const handleDestinationChange = (type: DestinationType, value: string) => {
+    // Map the generic destination type back to extension type
+    // Most types map 1:1, but mapped to ExtensionType
+    const extType = (type === 'ivr_menu' ? 'ivr' :
+      type === 'conference_room' ? 'conference' :
+        type as ExtensionType);
+
+    const newFormData = {
+      ...formData,
+      type: extType,
+      // Clear all destination fields first
+      user_id: '',
+      conference_room_id: '',
+      ring_group_id: '',
+      ivr_id: '',
+      ai_assistant_id: '',
+      ai_load_balancer_id: '',
+      forward_to: '',
+    };
+
+    // Set the specific field based on type
+    switch (type) {
+      case 'user':
+        newFormData.user_id = value;
+        break;
+      case 'conference_room':
+        newFormData.conference_room_id = value;
+        break;
+      case 'ring_group':
+        newFormData.ring_group_id = value;
+        break;
+      case 'ivr_menu':
+        newFormData.ivr_id = value;
+        break;
+      case 'ai_assistant':
+        newFormData.ai_assistant_id = value;
+        break;
+      case 'ai_load_balancer':
+        newFormData.ai_load_balancer_id = value;
+        break;
+      case 'forward':
+        newFormData.forward_to = value;
+        break;
+    }
+
+    setFormData(newFormData);
+  };
+
+  // Get current destination value for selector
+  const getCurrentDestinationValue = () => {
+    switch (formData.type) {
+      case 'user': return formData.user_id;
+      case 'conference': return formData.conference_room_id;
+      case 'ring_group': return formData.ring_group_id;
+      case 'ivr': return formData.ivr_id;
+      case 'ai_assistant': return formData.ai_assistant_id;
+      case 'ai_load_balancer': return formData.ai_load_balancer_id;
+      case 'forward': return formData.forward_to;
+      default: return '';
+    }
+  };
+
+  // Get current type for selector
+  const getCurrentDestinationType = (): DestinationType => {
+    switch (formData.type) {
+      case 'user': return 'user';
+      case 'conference': return 'conference_room';
+      case 'ring_group': return 'ring_group';
+      case 'ivr': return 'ivr_menu';
+      case 'ai_assistant': return 'ai_assistant';
+      case 'ai_load_balancer': return 'ai_load_balancer';
+      case 'forward': return 'forward';
+      default: return 'user';
+    }
+  };
+
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -942,204 +1027,7 @@ export default function ExtensionsComplete() {
   };
 
   // Render type-specific form fields
-  const renderTypeSpecificFields = () => {
-    switch (formData.type) {
-      case 'user':
-        // No additional fields for PBX User Extension
-        return null;
 
-      case 'conference':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="conference_room_id">
-              Conference Room <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.conference_room_id}
-              onValueChange={(value) => setFormData({ ...formData, conference_room_id: value })}
-            >
-              <SelectTrigger id="conference_room_id">
-                <SelectValue placeholder="Select a conference room" />
-              </SelectTrigger>
-              <SelectContent>
-                {conferenceRooms.map((room) => (
-                  <SelectItem key={room.id} value={room.id.toString()}>
-                    {room.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Conference rooms are managed in a separate page
-            </p>
-            {formErrors.conference_room_id && (
-              <p className="text-sm text-destructive">{formErrors.conference_room_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ring_group':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ring_group_id">
-              Ring Group <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.ring_group_id}
-              onValueChange={(value) => setFormData({ ...formData, ring_group_id: value })}
-            >
-              <SelectTrigger id="ring_group_id">
-                <SelectValue placeholder="Select a ring group" />
-              </SelectTrigger>
-              <SelectContent>
-                {ringGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id.toString()}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Ring groups are managed in a separate page
-            </p>
-            {formErrors.ring_group_id && (
-              <p className="text-sm text-destructive">{formErrors.ring_group_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ivr':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ivr_id">
-              IVR Menu <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.ivr_id}
-              onValueChange={(value) => setFormData({ ...formData, ivr_id: value })}
-            >
-              <SelectTrigger id="ivr_id">
-                <SelectValue placeholder="Select an IVR menu" />
-              </SelectTrigger>
-              <SelectContent>
-                {ivrMenus.map((ivr) => (
-                  <SelectItem
-                    key={ivr.id}
-                    value={ivr.id.toString()}
-                  >
-                    {ivr.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              IVR menus are managed in a separate page
-            </p>
-            {formErrors.ivr_id && (
-              <p className="text-sm text-destructive">{formErrors.ivr_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ai_assistant':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ai_assistant_id">
-              AI Assistant <span className="text-destructive">*</span>
-            </Label>
-            {aiAssistants.length === 0 ? (
-              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
-                No AI Assistants Available
-              </div>
-            ) : (
-              <Select
-                value={formData.ai_assistant_id}
-                onValueChange={(value) => setFormData({ ...formData, ai_assistant_id: value })}
-              >
-                <SelectTrigger id="ai_assistant_id">
-                  <SelectValue placeholder="Select an AI assistant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {aiAssistants.map((assistant) => (
-                    <SelectItem key={assistant.id} value={assistant.id.toString()}>
-                      {assistant.name} ({assistant.provider})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <p className="text-xs text-muted-foreground">
-              AI assistants are managed in a separate page
-            </p>
-            {formErrors.ai_assistant_id && (
-              <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ai_load_balancer':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ai_load_balancer_id">
-              AI Load Balancer <span className="text-destructive">*</span>
-            </Label>
-            {aiLoadBalancers.length === 0 ? (
-              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
-                No AI Load Balancers Available
-              </div>
-            ) : (
-              <Select
-                value={formData.ai_load_balancer_id}
-                onValueChange={(value) => setFormData({ ...formData, ai_load_balancer_id: value })}
-              >
-                <SelectTrigger id="ai_load_balancer_id">
-                  <SelectValue placeholder="Select an AI Load Balancer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {aiLoadBalancers.map((loadBalancer) => (
-                    <SelectItem key={loadBalancer.id} value={loadBalancer.id.toString()}>
-                      {loadBalancer.name} ({loadBalancer.strategy.replace('_', ' ')})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <p className="text-xs text-muted-foreground">
-              AI Load Balancers are managed in a separate page
-            </p>
-            {formErrors.ai_load_balancer_id && (
-              <p className="text-sm text-destructive">{formErrors.ai_load_balancer_id}</p>
-            )}
-          </div>
-        );
-
-      case 'forward':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="forward_to">
-              Forward To <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="forward_to"
-              type="text"
-              value={formData.forward_to}
-              onChange={(e) => setFormData({ ...formData, forward_to: e.target.value })}
-              placeholder="+1234567890 or 1001"
-              autoComplete="off"
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter a phone number (+1234567890) or an existing extension number (1001)
-            </p>
-            {formErrors.forward_to && (
-              <p className="text-sm text-destructive">{formErrors.forward_to}</p>
-            )}
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
 
   // Loading state
   if (isLoading) {
@@ -1410,46 +1298,46 @@ export default function ExtensionsComplete() {
                   )
                 )
               }] as Column<Extension>[] : []),
-                {
-                  header: 'Type',
-                  sortKey: 'type',
-                  cell: (extension) => getTypeBadge(extension.type)
-                },
-                {
-                  header: 'Linked To',
-                  cell: (extension) => getDetailsBadge(extension)
-                },
-                {
-                  header: 'Created',
-                  sortKey: 'created_at',
-                  cell: (extension) => (
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(extension.created_at).toLocaleDateString()}
-                    </span>
-                  )
-                },
-                {
-                  header: 'Status',
-                  sortKey: 'status',
-                  cell: (extension) => (
-                    <Badge
-                      className={cn(
-                        getStatusColor(extension.status),
-                        "text-xs",
-                        !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isReadOnly) {
-                          handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
-                        }
-                      }}
-                    >
-                      {extension.status}
-                    </Badge>
-                  )
-                }
-              ]}
+              {
+                header: 'Type',
+                sortKey: 'type',
+                cell: (extension) => getTypeBadge(extension.type)
+              },
+              {
+                header: 'Linked To',
+                cell: (extension) => getDetailsBadge(extension)
+              },
+              {
+                header: 'Created',
+                sortKey: 'created_at',
+                cell: (extension) => (
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(extension.created_at).toLocaleDateString()}
+                  </span>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (extension) => (
+                  <Badge
+                    className={cn(
+                      getStatusColor(extension.status),
+                      "text-xs",
+                      !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) {
+                        handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
+                      }
+                    }}
+                  >
+                    {extension.status}
+                  </Badge>
+                )
+              }
+            ]}
             emptyState={
               <EmptyState
                 icon={Phone}
@@ -1524,54 +1412,25 @@ export default function ExtensionsComplete() {
               )}
             </div>
 
-            {/* Extension Type & Assignment */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">
-                  Extension Type <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-                >
-                  <SelectTrigger id="type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">PBX User Extension</SelectItem>
-                    <SelectItem value="conference">Conference Room</SelectItem>
-                    <SelectItem value="ring_group">Ring Group</SelectItem>
-                    <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
-                    <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                    <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                    <SelectItem value="forward">Forward</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="user_id">Assign to User (Optional)</Label>
-                <Select
-                  value={formData.user_id}
-                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                >
-                  <SelectTrigger id="user_id">
-                    <SelectValue placeholder="Select user or leave unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            {/* Type-specific fields */}
-            {renderTypeSpecificFields()}
+            {/* Unified Destination Selector */}
+            <DestinationTypeAndSelector
+              typeValue={getCurrentDestinationType()}
+              destinationValue={getCurrentDestinationValue()}
+              onChange={handleDestinationChange}
+              typeLabel="Extension Type"
+              destinationLabel="Assignment"
+              allowedTypes={['user', 'conference_room', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
+              layout="vertical"
+            />
+            {formErrors.user_id && <p className="text-sm text-destructive">{formErrors.user_id}</p>}
+            {formErrors.conference_room_id && <p className="text-sm text-destructive">{formErrors.conference_room_id}</p>}
+            {formErrors.ring_group_id && <p className="text-sm text-destructive">{formErrors.ring_group_id}</p>}
+            {formErrors.ivr_id && <p className="text-sm text-destructive">{formErrors.ivr_id}</p>}
+            {formErrors.ai_assistant_id && <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>}
+            {formErrors.ai_load_balancer_id && <p className="text-sm text-destructive">{formErrors.ai_load_balancer_id}</p>}
+            {formErrors.forward_to && <p className="text-sm text-destructive">{formErrors.forward_to}</p>}
           </div>
 
           <DialogFooter>
@@ -1587,10 +1446,10 @@ export default function ExtensionsComplete() {
             <Button onClick={handleCreateExtension}>Create Extension</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
       {/* Edit Extension Dialog */}
-      < Dialog open={showEditDialog} onOpenChange={setShowEditDialog} >
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Extension</DialogTitle>
@@ -1615,61 +1474,17 @@ export default function ExtensionsComplete() {
               </p>
             </div>
 
-            {/* Extension Type & Assignment */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_type">
-                  Extension Type <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-                >
-                  {(currentUser?.role as string) === 'pbx_user' && (
-                    <SelectTrigger id="edit_type" disabled>
-                      <SelectValue />
-                    </SelectTrigger>
-                  )}
-                  {(currentUser?.role as string) !== 'pbx_user' && (
-                    <SelectTrigger id="edit_type">
-                      <SelectValue />
-                    </SelectTrigger>
-                  )}
-                  <SelectContent>
-                    <SelectItem value="user">PBX User Extension</SelectItem>
-                    <SelectItem value="conference">Conference Room</SelectItem>
-                    <SelectItem value="ring_group">Ring Group</SelectItem>
-                    <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
-                    <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                    <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                    <SelectItem value="forward">Forward</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_user_id">Assign to User (Optional)</Label>
-                <Select
-                  value={formData.user_id}
-                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                >
-                  <SelectTrigger id="edit_user_id">
-                    <SelectValue placeholder="Select user or leave unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Type-specific fields */}
-            {renderTypeSpecificFields()}
+            {/* Unified Destination Selector (Edit Mode) */}
+            <DestinationTypeAndSelector
+              typeValue={getCurrentDestinationType()}
+              destinationValue={getCurrentDestinationValue()}
+              onChange={handleDestinationChange}
+              typeLabel="Extension Type"
+              destinationLabel="Assignment"
+              allowedTypes={['user', 'conference_room', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
+              layout="vertical"
+              disabled={currentUser?.role === 'pbx_user'}
+            />
           </div>
 
           <DialogFooter>
@@ -2094,7 +1909,7 @@ export default function ExtensionsComplete() {
                         const config = selectedExtension.configuration;
                         const provider = aiProviders.find((p: any) => p.key === config?.provider);
                         const protocol = provider?.protocol || 'sip';
-                        
+
                         return (
                           <>
                             <div className="flex justify-between items-center">
@@ -2116,7 +1931,7 @@ export default function ExtensionsComplete() {
                                 </Badge>
                               </div>
                             </div>
-                            
+
                             {/* Show SIP phone number */}
                             {config?.phone_number && (
                               <div className="flex justify-between">
@@ -2124,7 +1939,7 @@ export default function ExtensionsComplete() {
                                 <span className="text-sm font-medium font-mono">{config.phone_number}</span>
                               </div>
                             )}
-                            
+
                             {/* Show WebSocket fields */}
                             {config?.bot_id && (
                               <div className="flex justify-between">
@@ -2156,7 +1971,7 @@ export default function ExtensionsComplete() {
                                 <span className="text-sm font-medium font-mono">{config.session_id}</span>
                               </div>
                             )}
-                            
+
                             {provider?.description && (
                               <div className="pt-2 border-t">
                                 <p className="text-xs text-muted-foreground">{provider.description}</p>

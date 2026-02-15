@@ -208,11 +208,36 @@ export function getDestinationOptionsForType(
       return transformAiAssistantsToOptions(data.aiAssistants);
     case 'ai_load_balancer':
       return transformAiLoadBalancersToOptions(data.aiLoadBalancers);
+    case 'user':
+      // Users are not currently in DestinationsData, but we can support them if added
+      // or handle them separately. Ideally we should add users to DestinationsData.
+      // For now, return empty as they are likely handled via a separate hook or extended data.
+      // Wait, the plan says to extend DestinationsData.
+      return [];
+    case 'forward':
+      return []; // Forward is an input field, no options
     case 'hangup':
       return [];
     default:
       return [];
   }
+}
+
+export function transformUsersToOptions(
+  users: Array<{
+    id: string | number;
+    name: string;
+    email: string;
+  }>
+): DestinationOption[] {
+  return users.map((user) => ({
+    id: String(user.id),
+    type: 'user',
+    label: user.name,
+    subLabel: user.email,
+    badge: getBadgeConfig('user'),
+    metadata: { email: user.email },
+  }));
 }
 
 export function hasDestinationOptions(

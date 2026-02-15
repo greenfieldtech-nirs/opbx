@@ -13,6 +13,8 @@ import type { LucideIcon } from 'lucide-react';
  */
 export type DestinationType =
   | 'extension'
+  | 'user'
+  | 'forward'
   | 'ring_group'
   | 'conference_room'
   | 'ivr_menu'
@@ -234,6 +236,13 @@ export interface DestinationsData {
     name: string;
     label: string;
   }>;
+  /** Users */
+  users: Array<{
+    id: string;
+    name: string;
+    email: string;
+    extension?: { extension_number: string };
+  }>;
 }
 
 /**
@@ -247,6 +256,7 @@ export interface DestinationsLoadingState {
   businessHours: boolean;
   aiAssistants: boolean;
   aiLoadBalancers: boolean;
+  users: boolean;
 }
 
 /**
@@ -260,6 +270,7 @@ export interface DestinationsErrorState {
   businessHours: Error | null;
   aiAssistants: Error | null;
   aiLoadBalancers: Error | null;
+  users: Error | null;
 }
 
 /**

@@ -40,6 +40,22 @@ export const DESTINATION_TYPE_CONFIG: Record<DestinationType, TypeMetadata> = {
     category: 'pbx',
     requiresDestination: true,
   },
+  user: {
+    value: 'user',
+    label: 'PBX User',
+    description: 'Assign to a specific PBX user',
+    icon: Users,
+    category: 'pbx',
+    requiresDestination: true,
+  },
+  forward: {
+    value: 'forward',
+    label: 'Forward',
+    description: 'Forward calls to an external number or another extension',
+    icon: Phone,
+    category: 'routing',
+    requiresDestination: true, // Needs an input field
+  },
   ring_group: {
     value: 'ring_group',
     label: 'Ring Group',
@@ -215,6 +231,8 @@ export function requiresDestination(type: DestinationType): boolean {
  * Default empty state messages
  */
 export const DEFAULT_EMPTY_MESSAGES: Record<DestinationType, string> = {
+  user: 'No users available',
+  forward: '',
   extension: 'No extensions available',
   ring_group: 'No ring groups available',
   conference_room: 'No conference rooms available',

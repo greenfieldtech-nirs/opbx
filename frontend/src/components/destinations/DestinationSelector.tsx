@@ -4,6 +4,7 @@
 
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -42,6 +43,31 @@ export function DestinationSelector({
 
   const isDisabled = disabled || !type || isLoading;
   const emptyText = emptyMessage || (type ? getEmptyMessage(type) : 'No destinations available');
+
+  if (type === 'forward') {
+    return (
+      <div className={cn("min-w-0", className)}>
+        {label && <Label className="mb-2 block">{label}</Label>}
+        <Input
+          value={value}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            // Create a pseudo-option for the forward value
+            const option = {
+              id: newValue,
+              type: 'forward' as const,
+              label: newValue,
+              badge: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'Forward' }
+            };
+            onChange(newValue, option);
+          }}
+          disabled={disabled}
+          placeholder={placeholder || "Enter phone number or extension"}
+        />
+
+      </div>
+    );
+  }
 
   return (
     <div className={cn("min-w-0", className)}>
