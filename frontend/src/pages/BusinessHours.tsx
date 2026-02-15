@@ -1736,7 +1736,6 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
                     else if (id.startsWith('ivr-')) id = id.substring(4);
                     else if (id.startsWith('conf-')) id = id.substring(5);
                     else if (id.startsWith('alb-')) id = id.substring(4);
-                    else if (id.startsWith('bh-')) id = id.substring(3);
                     return id;
                   })()}
                   onChange={(type, destId) => {
@@ -1746,13 +1745,12 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
                     else if (type === 'ivr_menu') prefixedId = `ivr-${destId}`;
                     else if (type === 'conference_room') prefixedId = `conf-${destId}`;
                     else if (type === 'ai_load_balancer') prefixedId = `alb-${destId}`;
-                    else if (type === 'business_hours') prefixedId = `bh-${destId}`;
                     onOpenHoursActionChange({ type: type as BusinessHoursActionType, target_id: prefixedId });
                   }}
                   layout="vertical"
                   typeLabel="Open Hours Action"
                   destinationLabel="Destination"
-                  allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+                  allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
                 />
                 {formErrors.open_hours_action && <p className="text-sm text-destructive mt-2">{formErrors.open_hours_action}</p>}
                 <p className="text-sm text-muted-foreground mt-2">Where to forward calls during open hours</p>
@@ -1769,7 +1767,6 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
                     else if (id.startsWith('ivr-')) id = id.substring(4);
                     else if (id.startsWith('conf-')) id = id.substring(5);
                     else if (id.startsWith('alb-')) id = id.substring(4);
-                    else if (id.startsWith('bh-')) id = id.substring(3);
                     return id;
                   })()}
                   onChange={(type, destId) => {
@@ -1779,13 +1776,12 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
                     else if (type === 'ivr_menu') prefixedId = `ivr-${destId}`;
                     else if (type === 'conference_room') prefixedId = `conf-${destId}`;
                     else if (type === 'ai_load_balancer') prefixedId = `alb-${destId}`;
-                    else if (type === 'business_hours') prefixedId = `bh-${destId}`;
                     onClosedHoursActionChange({ type: type as BusinessHoursActionType, target_id: prefixedId });
                   }}
                   layout="vertical"
                   typeLabel="Closed Hours Action"
                   destinationLabel="Destination"
-                  allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+                  allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
                 />
                 {formErrors.closed_hours_action && <p className="text-sm text-destructive mt-2">{formErrors.closed_hours_action}</p>}
                 <p className="text-sm text-muted-foreground mt-2">Where to forward calls during closed hours</p>
