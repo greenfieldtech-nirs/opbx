@@ -5,13 +5,16 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Add ai_assistant and ai_load_balancer to ivr_menu_options.destination_type ENUM
         DB::statement("ALTER TABLE ivr_menu_options MODIFY COLUMN destination_type ENUM('extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer') NOT NULL");
 
@@ -24,6 +27,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Remove ai_assistant and ai_load_balancer from ivr_menu_options.destination_type ENUM
         DB::statement("ALTER TABLE ivr_menu_options MODIFY COLUMN destination_type ENUM('extension', 'ring_group', 'conference_room', 'ivr_menu') NOT NULL");
 

@@ -161,6 +161,10 @@ export interface DestinationTypeAndSelectorProps {
   showDescriptions?: boolean;
   /** Additional CSS classes for container */
   className?: string;
+  /** Additional CSS classes for type selector container */
+  typeClassName?: string;
+  /** Additional CSS classes for destination selector container */
+  destinationClassName?: string;
 }
 
 /**

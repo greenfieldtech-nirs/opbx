@@ -710,14 +710,9 @@ export default function IVRMenus() {
     });
   };
 
-  // Update menu option
   const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
     const updatedOptions = [...formData.options];
-    // For extensions, destination_id is the extension number (string)
-    // For other types, destination_id is the model ID (converted to number)
-    const processedValue = field === 'destination_id' && value !== '' &&
-      updatedOptions[index].destination_type !== 'extension' ? parseInt(value, 10) : value;
-    updatedOptions[index] = { ...updatedOptions[index], [field]: processedValue };
+    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
     setFormData({ ...formData, options: updatedOptions });
   };
 
@@ -735,9 +730,12 @@ export default function IVRMenus() {
       inter_digit_timeout: menu.inter_digit_timeout,
       max_turns: menu.max_turns,
       failover_destination_type: menu.failover_destination_type,
-      failover_destination_id: menu.failover_destination_id,
+      failover_destination_id: menu.failover_destination_id ? String(menu.failover_destination_id) : undefined,
       status: menu.status,
-      options: [...menu.options],
+      options: menu.options.map(opt => ({
+        ...opt,
+        destination_id: String(opt.destination_id)
+      })),
     });
     setIsEditDialogOpen(true);
   };
@@ -1121,26 +1119,26 @@ export default function IVRMenus() {
                 ) : (
                   <div className="space-y-4">
                     {(formData.options || []).map((option, index) => (
-                      <Card key={index}>
+                      <Card key={index} className="w-full">
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-12 gap-4 items-center">
-                            <div className="col-span-1">
+                          <div className="flex flex-col md:flex-row gap-6 items-start md:items-end w-full">
+                            <div className="w-full md:w-20 shrink-0 space-y-2">
                               <Label>Digits *</Label>
-                                <Input
-                                  value={option.input_digits}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    // Only allow digits and some special characters (*, #)
-                                    if (/^[0-9*#]*$/.test(value)) {
-                                      updateMenuOption(index, 'input_digits', value);
-                                    }
-                                  }}
-                                  placeholder="1"
-                                  maxLength={10}
-                                  className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
-                                />
+                              <Input
+                                value={option.input_digits}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Only allow digits and some special characters (*, #)
+                                  if (/^[0-9*#]*$/.test(value)) {
+                                    updateMenuOption(index, 'input_digits', value);
+                                  }
+                                }}
+                                placeholder="1"
+                                maxLength={10}
+                                className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
+                              />
                             </div>
-                            <div className="col-span-10">
+                            <div className="flex-1 min-w-0 w-full">
                               <DestinationTypeAndSelector
                                 typeValue={option.destination_type}
                                 destinationValue={option.destination_id}
@@ -1153,19 +1151,19 @@ export default function IVRMenus() {
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
                                 }}
-                                layout="grid"
-                                gridColumns={{ type: 3, destination: 9 }}
+                                layout="horizontal"
+                                typeClassName="w-full md:w-[220px] flex-none"
+                                destinationClassName="flex-1 min-w-0"
                                 extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 typeLabel="Type"
                                 destinationLabel="Destination"
                               />
                             </div>
-                            <div className="col-span-1">
-                              <Label className="invisible">Delete</Label>
+                            <div className="w-full md:w-10 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => removeMenuOption(index)}
-                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
                                 aria-label="Delete option"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1465,26 +1463,26 @@ export default function IVRMenus() {
                 ) : (
                   <div className="space-y-4">
                     {(formData.options || []).map((option, index) => (
-                      <Card key={index}>
+                      <Card key={index} className="w-full">
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-12 gap-4 items-center">
-                            <div className="col-span-1">
+                          <div className="flex flex-col md:flex-row gap-6 items-start md:items-end w-full">
+                            <div className="w-full md:w-20 shrink-0 space-y-2">
                               <Label>Digits *</Label>
-                                <Input
-                                  value={option.input_digits}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    // Only allow digits and some special characters (*, #)
-                                    if (/^[0-9*#]*$/.test(value)) {
-                                      updateMenuOption(index, 'input_digits', value);
-                                    }
-                                  }}
-                                  placeholder="1"
-                                  maxLength={10}
-                                  className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
-                                />
+                              <Input
+                                value={option.input_digits}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Only allow digits and some special characters (*, #)
+                                  if (/^[0-9*#]*$/.test(value)) {
+                                    updateMenuOption(index, 'input_digits', value);
+                                  }
+                                }}
+                                placeholder="1"
+                                maxLength={10}
+                                className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
+                              />
                             </div>
-                            <div className="col-span-10">
+                            <div className="flex-1 min-w-0 w-full">
                               <DestinationTypeAndSelector
                                 typeValue={option.destination_type}
                                 destinationValue={option.destination_id}
@@ -1497,19 +1495,19 @@ export default function IVRMenus() {
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
                                 }}
-                                layout="grid"
-                                gridColumns={{ type: 3, destination: 9 }}
+                                layout="horizontal"
+                                typeClassName="w-full md:w-[220px] flex-none"
+                                destinationClassName="flex-1 min-w-0"
                                 extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 typeLabel="Type"
                                 destinationLabel="Destination"
                               />
                             </div>
-                            <div className="col-span-1">
-                              <Label className="invisible">Delete</Label>
+                            <div className="w-full md:w-10 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => removeMenuOption(index)}
-                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
                                 aria-label="Delete option"
                               >
                                 <Trash2 className="h-4 w-4" />

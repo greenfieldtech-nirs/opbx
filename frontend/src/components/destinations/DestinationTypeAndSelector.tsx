@@ -19,6 +19,8 @@ export function DestinationTypeAndSelector({
   extensionTypes,
   showDescriptions = false,
   className,
+  typeClassName,
+  destinationClassName,
 }: DestinationTypeAndSelectorProps) {
   const handleTypeChange = (newType: typeof typeValue) => {
     if (newType) {
@@ -26,7 +28,7 @@ export function DestinationTypeAndSelector({
     }
   };
 
-  const handleDestinationChange = (newDestination: string) => {
+  const handleDestinationChange = (newDestination: string, option?: any) => {
     if (typeValue) {
       onChange(typeValue, newDestination);
     }
@@ -42,7 +44,7 @@ export function DestinationTypeAndSelector({
 
   return (
     <div className={cn(layoutClasses[layout], gridClass, className)}>
-      <div className={layout === 'grid' ? `col-span-${gridColumns.type}` : 'flex-1'}>
+      <div className={cn(layout === 'grid' ? `col-span-${gridColumns.type}` : 'flex-1', typeClassName)}>
         <DestinationTypeSelector
           value={typeValue}
           onChange={(type) => handleTypeChange(type)}
@@ -55,11 +57,11 @@ export function DestinationTypeAndSelector({
       </div>
 
       {typeValue && requiresDestination(typeValue) && (
-        <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3] min-w-0'}>
+        <div className={cn(layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3] min-w-0', destinationClassName)}>
           <DestinationSelector
             type={typeValue}
             value={destinationValue}
-            onChange={(_, option) => handleDestinationChange(option.id)}
+            onChange={(_, option) => handleDestinationChange(option.id, option)}
             label={destinationLabel}
             disabled={disabled}
             extensionTypes={extensionTypes}

@@ -35,13 +35,12 @@ class IvrMenuService
             'audio_file_path' => 'nullable|string|max:500',
             'tts_text' => 'nullable|string|max:1000',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => ['required', Rule::in(['extension', 'ring_group', 'conference_room', 'ivr_menu', 'hangup'])],
             'failover_destination_id' => [
                 Rule::requiredIf(function () use ($data) {
                     return (isset($data['failover_destination_type']) ? $data['failover_destination_type'] : null) !== 'hangup';
                 }),
                 'nullable',
-                'integer'
+                'string'
             ],
             'status' => 'required|string|in:active,inactive',
             'options' => 'required|array|min:1|max:20',
@@ -56,8 +55,8 @@ class IvrMenuService
                 },
             ],
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => ['required', Rule::in(['extension', 'ring_group', 'conference_room', 'ivr_menu'])],
-            'options.*.destination_id' => 'required|integer',
+            'options.*.destination_type' => ['required', Rule::in(['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer'])],
+            'options.*.destination_id' => 'required|string',
             'options.*.priority' => 'required|integer|min:1|max:20',
         ]);
 
@@ -90,9 +89,19 @@ class IvrMenuService
             }
 
             $exists = match ($destinationType) {
-                'extension' => Extension::where('id', $destinationId)
+                'extension' => Extension::where('organization_id', $organizationId)
+                    ->where('status', 'active')
+                    ->where('id', $destinationId)
+                    ->exists(),
+                'ai_assistant' => Extension::where('organization_id', $organizationId)
+                    ->where('type', 'ai_assistant')
+                    ->where('status', 'active')
+                    ->where('id', $destinationId)
+                    ->exists(),
+                'ai_load_balancer' => \DB::table('ai_assistant_load_balancers')
                     ->where('organization_id', $organizationId)
                     ->where('status', 'active')
+                    ->where('id', $destinationId)
                     ->exists(),
                 'ring_group' => RingGroup::where('id', $destinationId)
                     ->where('organization_id', $organizationId)
@@ -124,9 +133,19 @@ class IvrMenuService
 
             if ($failoverType !== 'hangup') {
                 $exists = match ($failoverType) {
-                    'extension' => Extension::where('id', $failoverId)
+                    'extension' => Extension::where('organization_id', $organizationId)
+                        ->where('status', 'active')
+                        ->where('id', $failoverId)
+                        ->exists(),
+                    'ai_assistant' => Extension::where('organization_id', $organizationId)
+                        ->where('type', 'ai_assistant')
+                        ->where('status', 'active')
+                        ->where('id', $failoverId)
+                        ->exists(),
+                    'ai_load_balancer' => \DB::table('ai_assistant_load_balancers')
                         ->where('organization_id', $organizationId)
                         ->where('status', 'active')
+                        ->where('id', $failoverId)
                         ->exists(),
                     'ring_group' => RingGroup::where('id', $failoverId)
                         ->where('organization_id', $organizationId)
@@ -353,7 +372,7 @@ class IvrMenuService
                 ->where('status', 'active')
                 ->select('id', 'extension_number', 'name')
                 ->get()
-                ->map(function($ext) {
+                ->map(function ($ext) {
                     return [
                         'id' => $ext->id,
                         'label' => "Ext {$ext->extension_number} - " . ($ext->name ?: 'Unassigned'),

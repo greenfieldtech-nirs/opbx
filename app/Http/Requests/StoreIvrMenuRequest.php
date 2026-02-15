@@ -36,7 +36,7 @@ class StoreIvrMenuRequest extends FormRequest
                     // Accept either a string URL or an integer recording ID
                     if (is_string($value) && strlen($value) > 500) {
                         $fail('The audio file path may not be greater than 500 characters.');
-                    } elseif (! is_string($value) && ! is_int($value) && $value !== null) {
+                    } elseif (!is_string($value) && !is_int($value) && $value !== null) {
                         $fail('The audio file path must be a string URL or a recording ID.');
                     }
 
@@ -44,7 +44,7 @@ class StoreIvrMenuRequest extends FormRequest
                     if (is_int($value) || (is_string($value) && ctype_digit($value))) {
                         $recordingId = (int) $value;
                         $exists = \App\Models\Recording::where('id', $recordingId)->exists();
-                        if (! $exists) {
+                        if (!$exists) {
                             $fail('The selected recording does not exist.');
                         }
                     }
@@ -62,7 +62,7 @@ class StoreIvrMenuRequest extends FormRequest
                 'integer',
                 function ($attribute, $value, $fail) {
                     if ($value && $this->input('failover_destination_type') !== 'hangup') {
-                        if (! $this->destinationExists($this->input('failover_destination_type'), $value)) {
+                        if (!$this->destinationExists($this->input('failover_destination_type'), $value)) {
                             $fail('The selected failover destination does not exist.');
                         }
                     }
@@ -78,31 +78,21 @@ class StoreIvrMenuRequest extends FormRequest
                 function ($attribute, $value, $fail) {
                     // Extract the index from the attribute (e.g., "options.0.destination_id" -> 0)
                     preg_match('/options\.(\d+)\.destination_id/', $attribute, $matches);
-                    if (! empty($matches[1])) {
+                    if (isset($matches[1])) {
                         $index = (int) $matches[1];
                         $options = $this->input('options', []);
                         if (isset($options[$index]['destination_type'])) {
                             $destinationType = $options[$index]['destination_type'];
 
-                            // Validate data type based on destination type
-                            if ($destinationType === 'extension' || $destinationType === 'ai_assistant') {
-                                // For extensions and AI assistants, destination_id should be a string (extension number)
-                                if (! is_string($value) && ! is_numeric($value)) {
-                                    $fail('Extension/AI Assistant destination must be a valid extension number.');
+                            // For all destination types, destination_id should be an integer (model ID)
+                            if (!is_int($value) && !ctype_digit((string) $value)) {
+                                $fail('Destination ID must be a valid integer.');
 
-                                    return;
-                                }
-                            } else {
-                                // For other types, destination_id should be an integer (model ID)
-                                if (! is_int($value) && ! ctype_digit((string) $value)) {
-                                    $fail('Destination ID must be a valid integer.');
-
-                                    return;
-                                }
-                                $value = (int) $value;
+                                return;
                             }
+                            $value = (int) $value;
 
-                            if (! $this->destinationExists($destinationType, $value)) {
+                            if (!$this->destinationExists($destinationType, $value)) {
                                 $fail('The selected destination does not exist.');
                             }
                         }
@@ -148,7 +138,7 @@ class StoreIvrMenuRequest extends FormRequest
             }
 
             // Must have at least one audio source
-            if (! $recordingId && ! $audioFilePath && ! $ttsText) {
+            if (!$recordingId && !$audioFilePath && !$ttsText) {
                 $validator->errors()->add(
                     'audio_configuration',
                     'An IVR menu must have either a recording, direct audio URL, or Text-to-Speech text configured.'
@@ -163,14 +153,14 @@ class StoreIvrMenuRequest extends FormRequest
     protected function destinationExists(string $type, string|int $id): bool
     {
         $user = $this->user();
-        if (! $user) {
+        if (!$user) {
             return false;
         }
 
         $organizationId = $user->organization_id;
 
         return match ($type) {
-            'extension' => Extension::where('extension_number', (string) $id)
+            'extension' => Extension::where('id', (int) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
             'ring_group' => RingGroup::where('id', (int) $id)
@@ -182,7 +172,7 @@ class StoreIvrMenuRequest extends FormRequest
             'ivr_menu' => IvrMenu::where('id', (int) $id)
                 ->where('organization_id', $organizationId)
                 ->exists(),
-            'ai_assistant' => Extension::where('extension_number', (string) $id)
+            'ai_assistant' => Extension::where('id', (int) $id)
                 ->where('type', 'ai_assistant')
                 ->where('organization_id', $organizationId)
                 ->exists(),
