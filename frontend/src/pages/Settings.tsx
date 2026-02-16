@@ -43,6 +43,8 @@ import {
    Mic,
    Link as LinkIcon,
    Copy,
+   Eye,
+   EyeOff,
    Loader2,
    CheckCircle2,
    AlertCircle,
@@ -79,6 +81,8 @@ export default function Settings() {
   const [isValidating, setIsValidating] = useState(false);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [settingsData, setSettingsData] = useState<CloudonixSettings | null>(null);
+  const [showDomainApiKey, setShowDomainApiKey] = useState(false);
+  const [showRequestsApiKey, setShowRequestsApiKey] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | null>(null);
 
@@ -398,19 +402,33 @@ export default function Settings() {
                       </TooltipContent>
                     </Tooltip>
                   </Label>
-                  <Input
-                    id="domain_api_key"
-                    type="text"
-                    placeholder="Enter your Cloudonix API key"
-                    disabled={isValidating}
-                    {...register('domain_api_key')}
-                  />
-                   {errors.domain_api_key && (
-                     <p className="text-sm text-destructive flex items-center gap-1">
-                       <XCircle className="h-3 w-3" />
-                       {errors.domain_api_key.message}
-                     </p>
-                   )}
+                  <div className="relative">
+                    <Input
+                      id="domain_api_key"
+                      type={showDomainApiKey ? 'text' : 'password'}
+                      placeholder="Enter your Cloudonix API key"
+                      disabled={isValidating}
+                      {...register('domain_api_key')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDomainApiKey(!showDomainApiKey)}
+                      disabled={isValidating}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {showDomainApiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.domain_api_key && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {errors.domain_api_key.message}
+                    </p>
+                  )}
 
 
                  </div>
@@ -472,14 +490,27 @@ export default function Settings() {
                   </Tooltip>
                 </Label>
                 <div className="flex gap-2">
-                  <Input
-                    id="domain_requests_api_key"
-                    type="text"
-                    placeholder="Optional - Generate a key"
-                    disabled={isValidating}
-                    className="flex-1"
-                    {...register('domain_requests_api_key')}
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      id="domain_requests_api_key"
+                      type={showRequestsApiKey ? 'text' : 'password'}
+                      placeholder="Optional - Generate a key"
+                      disabled={isValidating}
+                      {...register('domain_requests_api_key')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestsApiKey(!showRequestsApiKey)}
+                      disabled={isValidating}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {showRequestsApiKey ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
