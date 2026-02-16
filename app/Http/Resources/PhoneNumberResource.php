@@ -57,16 +57,16 @@ class PhoneNumberResource extends JsonResource
                 fn() => new ConferenceRoomResource($this->conference_room)
             ),
             'ai_assistant' => $this->when(
-                $this->routing_type === 'ai_assistant' && !empty($this->attributes['_ai_assistant']),
-                fn() => new AiAssistantResource($this->attributes['_ai_assistant'])
+                $this->routing_type === 'ai_assistant' && $this->ai_assistant !== null,
+                fn() => new AiAssistantResource($this->ai_assistant)
             ),
             'ai_load_balancer' => $this->when(
-                $this->routing_type === 'ai_load_balancer' && !empty($this->attributes['_ai_load_balancer']),
-                fn() => new AiAssistantLoadBalancerResource($this->attributes['_ai_load_balancer'])
+                $this->routing_type === 'ai_load_balancer' && $this->ai_load_balancer !== null,
+                fn() => new AiAssistantLoadBalancerResource($this->ai_load_balancer)
             ),
             'ivr_menu' => $this->when(
-                $this->routing_type === 'ivr_menu' && !empty($this->attributes['_ivr_menu']),
-                fn() => new IvrMenuResource($this->attributes['_ivr_menu'])
+                $this->routing_type === 'ivr_menu' && $this->ivr_menu !== null,
+                fn() => new IvrMenuResource($this->ivr_menu)
             ),
         ];
     }

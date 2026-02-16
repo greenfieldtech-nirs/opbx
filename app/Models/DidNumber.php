@@ -246,7 +246,7 @@ class DidNumber extends Model
      * Note: This is not a true Eloquent relationship due to JSON field limitation.
      * Use eager loading in queries via joins or manual loading.
      */
-    public function getAiAssistantAttribute(): ?Extension
+    public function getAiAssistantAttribute(): ?AiAssistant
     {
         $aiAssistantId = $this->getTargetAiAssistantId();
         if ($aiAssistantId === null) {
@@ -258,10 +258,9 @@ class DidNumber extends Model
             return $this->attributes['_ai_assistant'];
         }
 
-        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('id', $aiAssistantId)
             ->where('organization_id', $this->organization_id)
-            ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
             ->first();
     }
 
@@ -285,6 +284,30 @@ class DidNumber extends Model
 
         return IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('id', $ivrMenuId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
+    }
+
+    /**
+     * Get the AI load balancer for AI load balancer routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     * Use eager loading in queries via joins or manual loading.
+     */
+    public function getAiLoadBalancerAttribute(): ?AiAssistantLoadBalancer
+    {
+        $aiLoadBalancerId = $this->getTargetAiLoadBalancerId();
+        if ($aiLoadBalancerId === null) {
+            return null;
+        }
+
+        // Check if already loaded in attributes
+        if (array_key_exists('_ai_load_balancer', $this->attributes)) {
+            return $this->attributes['_ai_load_balancer'];
+        }
+
+        return AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $aiLoadBalancerId)
             ->where('organization_id', $this->organization_id)
             ->first();
     }
