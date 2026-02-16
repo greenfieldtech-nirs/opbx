@@ -343,6 +343,7 @@ class PhoneNumberController extends Controller
         $scheduleIds = [];
         $conferenceRoomIds = [];
         $aiAssistantIds = [];
+        $aiLoadBalancerIds = [];
         $ivrMenuIds = [];
         $phoneNumbersByType = [
             'extension' => [],
@@ -350,6 +351,7 @@ class PhoneNumberController extends Controller
             'business_hours' => [],
             'conference_room' => [],
             'ai_assistant' => [],
+            'ai_load_balancer' => [],
             'ivr_menu' => [],
         ];
 

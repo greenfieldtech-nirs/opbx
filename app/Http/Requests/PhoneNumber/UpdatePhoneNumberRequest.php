@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\PhoneNumber;
 
 use App\Enums\UserStatus;
+use App\Enums\AlbsStatus;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
 use App\Models\AiAssistant;
@@ -407,7 +408,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             return;
         }
 
-        if ($albs->status !== \App\Enums\UserStatus::ACTIVE) {
+        if ($albs->status !== \App\Enums\AlbsStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.ai_load_balancer_id',
                 'The selected AI load balancer must be active. AI load balancer "' . $albs->name . '" is currently ' . $albs->status->value . '.'
