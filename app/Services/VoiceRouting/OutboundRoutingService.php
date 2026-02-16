@@ -135,6 +135,17 @@ class OutboundRoutingService
             'whitelist_entries_count' => $whitelistEntries->count(),
         ]);
 
+        // Log all entries for debugging
+        foreach ($whitelistEntries as $entry) {
+            Log::debug('OutboundRoutingService: Whitelist entry', [
+                'entry_id' => $entry->id,
+                'name' => $entry->name,
+                'destination_country' => $entry->destination_country,
+                'destination_prefix' => $entry->destination_prefix,
+                'outbound_trunk_name' => $entry->outbound_trunk_name,
+            ]);
+        }
+
         // Extract country calling code from destination number
         $callingCode = $this->phoneNumberService->extractCallingCode($destinationNumber);
         $countryCode = $callingCode ? $this->phoneNumberService->callingCodeToCountryCode($callingCode) : null;
@@ -150,6 +161,13 @@ class OutboundRoutingService
         foreach ($whitelistEntries as $entry) {
             $matchScore = 0;
             $matchReason = '';
+
+            Log::debug('OutboundRoutingService: Evaluating entry', [
+                'entry_id' => $entry->id,
+                'name' => $entry->name,
+                'destination_country' => $entry->destination_country,
+                'destination_prefix' => $entry->destination_prefix,
+            ]);
 
             // Check country code match (both ISO codes and calling codes)
             if ($countryCode && $entry->destination_country === $countryCode) {
@@ -168,10 +186,20 @@ class OutboundRoutingService
                 $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
 
                 if (str_starts_with($normalizedPrefix, '+')) {
+                    // Full international prefix (e.g., +1212)
                     if (str_starts_with($destinationNumber, $normalizedPrefix)) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "full_prefix_match({$prefixLength}) ";
+                    }
+                } else {
+                    // Prefix without + (e.g., 1212) - match within the number after country code
+                    // Remove + from destination for matching
+                    $destWithoutPlus = ltrim($destinationNumber, '+');
+                    if (str_starts_with($destWithoutPlus, $normalizedPrefix)) {
+                        $prefixLength = strlen($normalizedPrefix);
+                        $matchScore += $prefixLength;
+                        $matchReason .= "prefix_match({$prefixLength}) ";
                     }
                 }
             }
@@ -182,6 +210,15 @@ class OutboundRoutingService
                     'score' => $matchScore,
                     'reason' => $matchReason,
                 ];
+                Log::debug('OutboundRoutingService: Entry matched', [
+                    'entry_id' => $entry->id,
+                    'score' => $matchScore,
+                    'reason' => $matchReason,
+                ]);
+            } else {
+                Log::debug('OutboundRoutingService: Entry did not match', [
+                    'entry_id' => $entry->id,
+                ]);
             }
         }
 
