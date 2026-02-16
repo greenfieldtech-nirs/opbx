@@ -911,10 +911,8 @@ class VoiceRoutingManager
             'extension_active' => $fromExtension->isActive(),
         ]);
 
-        // Check if destination is in outbound whitelist
-        $whitelistEntry = OutboundWhitelist::where('organization_id', $orgId)
-            ->where('phone_number', $to)
-            ->first();
+        // Use sophisticated whitelist matching (country code, prefix matching)
+        $whitelistEntry = $this->findOutboundWhitelistEntry($orgId, $to);
 
         if (! $whitelistEntry) {
             Log::info('VoiceRoutingManager: No outbound whitelist entry found for destination', [
@@ -925,14 +923,38 @@ class VoiceRoutingManager
             return null;
         }
 
-        Log::info('VoiceRoutingManager: Outbound whitelist entry found, routing via trunk', [
+        $trunkName = $whitelistEntry->outbound_trunk_name;
+
+        if (empty($trunkName)) {
+            Log::error('VoiceRoutingManager: Whitelist entry has no trunk configured', [
+                'to' => $to,
+                'org_id' => $orgId,
+                'whitelist_entry_id' => $whitelistEntry->id,
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('Outbound route configuration error'),
+                200,
+                ['Content-Type' => 'text/xml']
+            );
+        }
+
+        Log::info('VoiceRoutingManager: Routing outbound call via trunk', [
             'to' => $to,
+            'from' => $from,
             'org_id' => $orgId,
-            'trunk_id' => $whitelistEntry->trunk_id,
+            'trunk_name' => $trunkName,
+            'whitelist_entry_id' => $whitelistEntry->id,
         ]);
 
-        // Route via trunk (not implemented yet)
-        return response(CxmlBuilder::unavailable('Outbound routing not yet implemented'), 200, ['Content-Type' => 'text/xml']);
+        // Route via trunk using the caller ID from the extension
+        $callerId = $fromExtension->caller_id ?? $from;
+
+        return response(
+            CxmlBuilder::simpleDial($to, $callerId, null, $trunkName),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
     }
 
     public function handleIvrInput(Request $request): Response
