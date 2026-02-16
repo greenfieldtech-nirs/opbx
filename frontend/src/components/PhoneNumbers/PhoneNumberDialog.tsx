@@ -62,9 +62,11 @@ export function PhoneNumberDialog({
         const targetId =
           phoneNumber.routing_config.extension_id ||
           phoneNumber.routing_config.ai_assistant_id ||
+          phoneNumber.routing_config.ai_load_balancer_id ||
           phoneNumber.routing_config.ring_group_id ||
           phoneNumber.routing_config.business_hours_schedule_id ||
           phoneNumber.routing_config.conference_room_id ||
+          phoneNumber.routing_config.ivr_menu_id ||
           '';
 
         setFormData({
@@ -149,6 +151,9 @@ export function PhoneNumberDialog({
         break;
       case 'ivr_menu':
         routing_config.ivr_menu_id = formData.target_id;
+        break;
+      case 'ai_load_balancer':
+        routing_config.ai_load_balancer_id = formData.target_id;
         break;
     }
 
