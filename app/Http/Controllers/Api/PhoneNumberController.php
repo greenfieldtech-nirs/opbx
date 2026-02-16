@@ -9,6 +9,8 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
+use App\Enums\UserStatus;
+use App\Enums\AlbsStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
@@ -421,7 +423,7 @@ class PhoneNumberController extends Controller
         // Batch load AI assistants
         if (! empty($aiAssistantIds)) {
             $aiAssistants = AiAssistant::whereIn('id', array_filter($aiAssistantIds))
-                ->where('status', 'active')
+                ->where('status', UserStatus::ACTIVE)
                 ->get()
                 ->keyBy('id');
             foreach ($phoneNumbersByType['ai_assistant'] as $phoneNumber) {
@@ -435,7 +437,7 @@ class PhoneNumberController extends Controller
         // Batch load AI load balancers
         if (! empty($aiLoadBalancerIds)) {
             $aiLoadBalancers = AiAssistantLoadBalancer::whereIn('id', array_filter($aiLoadBalancerIds))
-                ->where('status', 'active')
+                ->where('status', AlbsStatus::ACTIVE)
                 ->get()
                 ->keyBy('id');
             foreach ($phoneNumbersByType['ai_load_balancer'] as $phoneNumber) {
