@@ -5,11 +5,9 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService, conferenceRoomsService, ivrMenusService } from '@/services/createResourceService';
-import { businessHoursService } from '@/services/businessHours.service';
 import type { DIDNumber, RoutingType, CreateDIDRequest, UpdateDIDRequest } from '@/types/api.types';
+import { DestinationTypeAndSelector } from '@/components/destinations';
+import type { DestinationType } from '@/components/destinations/types/destination.types';
 import {
   Dialog,
   DialogContent,
@@ -21,18 +19,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface PhoneNumberDialogProps {
   open: boolean;
@@ -101,55 +90,6 @@ export function PhoneNumberDialog({
     }
   }, [open, phoneNumber]);
 
-  // Fetch available PBX user extensions (active only, with user relationship)
-  const { data: pbxUserExtensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100, with: 'user' }],
-    queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100, with: 'user' }),
-    enabled: open && formData.routing_type === 'extension',
-  });
-
-  // Fetch available AI assistant extensions (active only)
-  const { data: aiAssistantExtensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'ai_assistant', status: 'active', per_page: 100 }],
-    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
-    enabled: open && formData.routing_type === 'ai_assistant',
-  });
-
-  // Fetch available ring groups (active only)
-  const { data: ringGroupsData } = useQuery({
-    queryKey: ['ring-groups', { status: 'active', per_page: 100 }],
-    queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 100 }),
-    enabled: open && formData.routing_type === 'ring_group',
-  });
-
-  // Fetch available business hours schedules
-  const { data: businessHoursData } = useQuery({
-    queryKey: ['business-hours', { per_page: 100 }],
-    queryFn: () => businessHoursService.getAll({ per_page: 100 }),
-    enabled: open && formData.routing_type === 'business_hours',
-  });
-
-  // Fetch available conference rooms (active only)
-  const { data: conferenceRoomsData } = useQuery({
-    queryKey: ['conference-rooms', { status: 'active', per_page: 100 }],
-    queryFn: () => conferenceRoomsService.getAll({ status: 'active', per_page: 100 }),
-    enabled: open && formData.routing_type === 'conference_room',
-  });
-
-  // Fetch available IVR menus (active only)
-  const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus', { status: 'active', per_page: 100 }],
-    queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
-    enabled: open && formData.routing_type === 'ivr_menu',
-  });
-
-  const availablePbxUserExtensions = pbxUserExtensionsData?.data || [];
-  const availableAiAssistantExtensions = aiAssistantExtensionsData?.data || [];
-  const availableRingGroups = ringGroupsData?.data || [];
-  const availableBusinessHours = businessHoursData?.data || [];
-  const availableConferenceRooms = conferenceRoomsData?.data || [];
-  const availableIvrMenus = ivrMenusData?.data || [];
-
   // Handle form field changes
   const handleFieldChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -161,15 +101,6 @@ export function PhoneNumberDialog({
         return newErrors;
       });
     }
-  };
-
-  // Handle routing type change - reset target
-  const handleRoutingTypeChange = (routingType: RoutingType) => {
-    setFormData((prev) => ({
-      ...prev,
-      routing_type: routingType,
-      target_id: '', // Reset target when routing type changes
-    }));
   };
 
   // Validate form
@@ -337,236 +268,32 @@ export function PhoneNumberDialog({
           <div className="space-y-4 border-t pt-4">
             <h3 className="text-sm font-semibold">Routing Configuration</h3>
 
-            {/* Routing Type */}
-            <div className="space-y-2">
-              <Label htmlFor="routing_type">
-                Route calls to <span className="text-red-500">*</span>
-              </Label>
-              <Select value={formData.routing_type} onValueChange={handleRoutingTypeChange}>
-                <SelectTrigger id="routing_type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="extension">PBX User Extension</SelectItem>
-                  <SelectItem value="ai_assistant">AI Assistant Extension</SelectItem>
-                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                  <SelectItem value="conference_room">Conference Room</SelectItem>
-                  <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                  <SelectItem value="business_hours">Business Hours</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Choose where calls should be routed
-              </p>
-            </div>
-
-            {/* Conditional Target Fields */}
-            {formData.routing_type === 'extension' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_extension">
-                  PBX User Extension <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.target_id}
-                  onValueChange={(val) => handleFieldChange('target_id', val)}
-                  disabled={availablePbxUserExtensions.length === 0}
-                >
-                  <SelectTrigger id="target_extension" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder={availablePbxUserExtensions.length === 0 ? "No options found for PBX User Extension" : "Select a PBX user extension"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePbxUserExtensions.map((extension) => (
-                      <SelectItem key={extension.id} value={extension.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${extension.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                          <span className="font-mono">{extension.extension_number}</span>
-                          <span className="text-muted-foreground">
-                            {extension.user ? extension.user.name : 'Unassigned'}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will ring the selected PBX user directly
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
-
-            {formData.routing_type === 'ai_assistant' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_ai_assistant">
-                  AI Assistant Extension <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.target_id}
-                  onValueChange={(val) => handleFieldChange('target_id', val)}
-                  disabled={availableAiAssistantExtensions.length === 0}
-                >
-                  <SelectTrigger id="target_ai_assistant" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder={availableAiAssistantExtensions.length === 0 ? "No options found for AI Assistant Extension" : "Select an AI assistant extension"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableAiAssistantExtensions.map((extension) => (
-                      <SelectItem key={extension.id} value={extension.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${extension.status === 'active' ? 'bg-blue-500' : 'bg-yellow-500'}`}></div>
-                          <span className="font-mono">{extension.extension_number}</span>
-                          <span className="text-muted-foreground">
-                            {extension.configuration?.provider ? `${extension.configuration.provider} Assistant` : 'AI Assistant'}
-                          </span>
-                          <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">AI</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will be handled by the selected AI assistant
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
-
-            {formData.routing_type === 'ring_group' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_ring_group">
-                  Ring Group <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.target_id}
-                  onValueChange={(val) => handleFieldChange('target_id', val)}
-                  disabled={availableRingGroups.length === 0}
-                >
-                  <SelectTrigger id="target_ring_group" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder={availableRingGroups.length === 0 ? "No options found for Ring Group" : "Select a ring group"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRingGroups.map((group) => (
-                      <SelectItem key={group.id} value={group.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${group.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                          <span>{group.name}</span>
-                          <span className="text-xs bg-purple-100 text-purple-800 px-1 rounded">
-                            {group.members.length} member{group.members.length !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will ring all members according to the group's strategy
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
-
-            {formData.routing_type === 'conference_room' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_conference_room">
-                  Conference Room <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.target_id}
-                  onValueChange={(val) => handleFieldChange('target_id', val)}
-                  disabled={availableConferenceRooms.length === 0}
-                >
-                  <SelectTrigger id="target_conference_room" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder={availableConferenceRooms.length === 0 ? "No options found for Conference Room" : "Select a conference room"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableConferenceRooms.map((room) => (
-                      <SelectItem key={room.id} value={room.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${room.status === 'active' ? 'bg-orange-500' : 'bg-gray-400'}`}></div>
-                          <span>{room.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will join the selected conference room
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
-
-            {formData.routing_type === 'ivr_menu' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_ivr_menu">
-                  IVR Menu <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.target_id}
-                  onValueChange={(val) => handleFieldChange('target_id', val)}
-                  disabled={availableIvrMenus.length === 0}
-                >
-                  <SelectTrigger id="target_ivr_menu" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder={availableIvrMenus.length === 0 ? "No options found for IVR Menu" : "Select an IVR menu"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableIvrMenus.map((menu) => (
-                      <SelectItem key={menu.id} value={menu.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${menu.status === 'active' ? 'bg-indigo-500' : 'bg-gray-400'}`}></div>
-                          <span>{menu.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will be handled by the selected IVR menu
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
-            )}
-
-            {formData.routing_type === 'business_hours' && (
-              <div className="space-y-2">
-                <Label htmlFor="target_business_hours">
-                  Business Hours <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.target_id}
-                  onValueChange={(val) => handleFieldChange('target_id', val)}
-                  disabled={availableBusinessHours.length === 0}
-                >
-                  <SelectTrigger id="target_business_hours" className={formErrors.target_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder={availableBusinessHours.length === 0 ? "No options found for Business Hours" : "Select business hours"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBusinessHours.map((bh) => (
-                      <SelectItem key={bh.id} value={bh.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-teal-500"></div>
-                          <span>{bh.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Calls will route based on the selected business hours schedule
-                </p>
-                {formErrors.target_id && (
-                  <p className="text-xs text-red-500">{formErrors.target_id}</p>
-                )}
-              </div>
+            {/* Unified Destination Selector */}
+            <DestinationTypeAndSelector
+              typeValue={formData.routing_type as DestinationType}
+              destinationValue={formData.target_id}
+              onChange={(type, destId) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  routing_type: type as RoutingType,
+                  target_id: destId,
+                }));
+                // Clear target error if present
+                if (formErrors.target_id) {
+                  setFormErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.target_id;
+                    return newErrors;
+                  });
+                }
+              }}
+              layout="vertical"
+              typeLabel="Route calls to"
+              destinationLabel="Destination"
+              allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+            />
+            {formErrors.target_id && (
+              <p className="text-xs text-red-500">{formErrors.target_id}</p>
             )}
 
           </div>
