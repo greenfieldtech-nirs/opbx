@@ -26,11 +26,22 @@ class SettingsController extends Controller
     use ApiRequestHandler;
 
     /**
-     * Create a new controller instance.
+     * Create a CloudonixClient with proper settings for the current organization.
      */
-    public function __construct(
-        private readonly CloudonixClient $cloudonixClient
-    ) {}
+    private function getCloudonixClient(): CloudonixClient
+    {
+        $user = auth()->user();
+        if (!$user) {
+            throw new \RuntimeException('Authentication required');
+        }
+        
+        $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
+        if (!$settings) {
+            throw new \RuntimeException('Cloudonix settings not configured');
+        }
+        
+        return new CloudonixClient($settings);
+    }
 
     /**
      * Get Cloudonix settings for the authenticated user's organization.
@@ -189,7 +200,7 @@ class SettingsController extends Controller
                     $profileData['cdr-endpoint'] = $cdrUrl;
                 }
 
-                $syncResult = $this->cloudonixClient->updateDomain(
+                $syncResult = $this->getCloudonixClient()->updateDomain(
                     $settings->domain_uuid,
                     $settings->domain_api_key,
                     $profileData
@@ -288,7 +299,7 @@ class SettingsController extends Controller
         ]);
 
         try {
-            $result = $this->cloudonixClient->validateDomain(
+            $result = $this->getCloudonixClient()->validateDomain(
                 $validated['domain_uuid'],
                 $validated['domain_api_key']
             );
@@ -553,7 +564,7 @@ class SettingsController extends Controller
                     'payload_json' => json_encode($applicationPayload),
                 ]);
 
-                $appResult = $this->cloudonixClient->createVoiceApplication(
+                $appResult = $this->getCloudonixClient()->createVoiceApplication(
                     $settings->domain_uuid,
                     $settings->domain_api_key,
                     $applicationPayload
@@ -603,7 +614,7 @@ class SettingsController extends Controller
                 // Check if we need to update the application URL
                 // We can't easily check the current URL without an API call, so we'll update it proactively
                 // when webhook_base_url changes (which would change the expected URL)
-                $updateResult = $this->cloudonixClient->updateVoiceApplication(
+                $updateResult = $this->getCloudonixClient()->updateVoiceApplication(
                     $settings->domain_uuid,
                     $settings->domain_api_key,
                     $applicationId,
@@ -644,7 +655,7 @@ class SettingsController extends Controller
             ]);
 
             // Set as default application for the domain
-            $defaultAppResult = $this->cloudonixClient->updateDomainDefaultApplication(
+            $defaultAppResult = $this->getCloudonixClient()->updateDomainDefaultApplication(
                 $settings->domain_uuid,
                 $settings->domain_api_key,
                 $applicationId
