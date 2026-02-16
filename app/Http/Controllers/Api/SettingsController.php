@@ -70,8 +70,8 @@ class SettingsController extends Controller
                 'organization_id' => $settings->organization_id,
                 'domain_uuid' => $settings->domain_uuid,
                 'domain_name' => $settings->domain_name,
-                'domain_api_key' => $settings->domain_api_key,
-                'domain_requests_api_key' => $settings->domain_requests_api_key,
+                'domain_api_key' => $settings->getMaskedDomainApiKey(),
+                'domain_requests_api_key' => $settings->getMaskedDomainRequestsApiKey(),
                 'webhook_base_url' => $settings->webhook_base_url,
                 'no_answer_timeout' => $settings->no_answer_timeout,
                 'recording_format' => $settings->recording_format,
@@ -106,6 +106,16 @@ class SettingsController extends Controller
         ]);
 
         try {
+            // Strip masked API key values to prevent overwriting real keys with masked strings.
+            // The getCloudonixSettings and updateCloudonixSettings responses return masked keys
+            // (e.g., "XI**...***xyz") — if the frontend sends these back unchanged, we must
+            // not persist them. Only update keys when the user provides a new, unmasked value.
+            foreach (['domain_api_key', 'domain_requests_api_key'] as $keyField) {
+                if (isset($validated[$keyField]) && str_contains($validated[$keyField], '***')) {
+                    unset($validated[$keyField]);
+                }
+            }
+
             // Save settings to local database
             $settings = DB::transaction(function () use ($user, $validated): CloudonixSettings {
                 $settings = CloudonixSettings::updateOrCreate(
@@ -225,8 +235,8 @@ class SettingsController extends Controller
                     'organization_id' => $settings->organization_id,
                     'domain_uuid' => $settings->domain_uuid,
                     'domain_name' => $settings->domain_name,
-                    'domain_api_key' => $settings->domain_api_key,
-                    'domain_requests_api_key' => $settings->domain_requests_api_key,
+                    'domain_api_key' => $settings->getMaskedDomainApiKey(),
+                    'domain_requests_api_key' => $settings->getMaskedDomainRequestsApiKey(),
                     'webhook_base_url' => $settings->webhook_base_url,
                     'no_answer_timeout' => $settings->no_answer_timeout,
                     'recording_format' => $settings->recording_format,
