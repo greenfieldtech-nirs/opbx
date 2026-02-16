@@ -43,8 +43,6 @@ import {
    Mic,
    Link as LinkIcon,
    Copy,
-   Eye,
-   EyeOff,
    Loader2,
    CheckCircle2,
    AlertCircle,
@@ -81,9 +79,6 @@ export default function Settings() {
   const [isValidating, setIsValidating] = useState(false);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [settingsData, setSettingsData] = useState<CloudonixSettings | null>(null);
-  const [originalValues, setOriginalValues] = useState<{ domain_uuid: string; domain_api_key: string }>({ domain_uuid: '', domain_api_key: '' });
-  const [showDomainApiKey, setShowDomainApiKey] = useState(false);
-  const [showRequestsApiKey, setShowRequestsApiKey] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | null>(null);
 
@@ -119,12 +114,6 @@ export default function Settings() {
         const data = await settingsService.getCloudonixSettings();
 
         setSettingsData(data);
-
-        // Store original values for comparison when saving
-        setOriginalValues({
-          domain_uuid: data.domain_uuid || '',
-          domain_api_key: data.domain_api_key || '',
-        });
 
         // Reset form with loaded data
         reset({
@@ -167,31 +156,11 @@ export default function Settings() {
   /**
    * Check if a value appears to be obfuscated (contains only dots, asterisks, or masking characters)
    */
-  const isObfuscated = (value: string): boolean => {
-    if (!value || value.length === 0) return false;
-    // Check if value contains only masking characters (dots, asterisks, bullets)
-    return /^[•\*\.\s]+$/.test(value) || (value.length > 0 && /^\u2022+$/.test(value));
-  };
-
-  /**
-   * Get the actual value to use, falling back to original if current value is obfuscated
-   */
-  const getActualValue = (currentValue: string, originalValue: string): string => {
-    if (isObfuscated(currentValue)) {
-      return originalValue;
-    }
-    return currentValue || originalValue;
-  };
-
   /**
    * Validate credentials and save all settings
    */
   const handleValidateAndSave = async () => {
-    // Get actual values, using original values if form values are obfuscated
-    const actualDomainUuid = getActualValue(domainUuid, originalValues.domain_uuid);
-    const actualDomainApiKey = getActualValue(domainApiKey, originalValues.domain_api_key);
-
-    if (!actualDomainUuid || !actualDomainApiKey) {
+    if (!domainUuid || !domainApiKey) {
       toast.error('Please enter both Domain UUID and API Key');
       return;
     }
@@ -202,8 +171,8 @@ export default function Settings() {
     try {
       // Step 1: Validate credentials
       const result = await settingsService.validateCloudonixCredentials({
-        domain_uuid: actualDomainUuid,
-        domain_api_key: actualDomainApiKey,
+        domain_uuid: domainUuid,
+        domain_api_key: domainApiKey,
       });
 
       if (result.valid) {
@@ -229,11 +198,11 @@ export default function Settings() {
 
         // Step 3: Save all settings to local DB and sync to Cloudonix
         try {
-          // Prepare update data with all fields, using actual values for credentials
+          // Prepare update data with all fields
           const updateData: UpdateCloudonixSettingsRequest = {
-            domain_uuid: getActualValue(currentFormValues.domain_uuid, originalValues.domain_uuid) || undefined,
+            domain_uuid: currentFormValues.domain_uuid || undefined,
             domain_name: currentFormValues.domain_name || undefined,
-            domain_api_key: getActualValue(currentFormValues.domain_api_key, originalValues.domain_api_key) || undefined,
+            domain_api_key: currentFormValues.domain_api_key || undefined,
             domain_requests_api_key: currentFormValues.domain_requests_api_key || undefined,
             webhook_base_url: currentFormValues.webhook_base_url || undefined,
             no_answer_timeout: currentFormValues.no_answer_timeout,
@@ -243,12 +212,6 @@ export default function Settings() {
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
 
           setSettingsData(savedSettings);
-
-          // Update original values after successful save
-          setOriginalValues({
-            domain_uuid: savedSettings.domain_uuid || '',
-            domain_api_key: savedSettings.domain_api_key || '',
-          });
 
           const settingsApplied = result.profile_settings &&
             (result.profile_settings.no_answer_timeout !== undefined ||
@@ -435,27 +398,13 @@ export default function Settings() {
                       </TooltipContent>
                     </Tooltip>
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id="domain_api_key"
-                      type={showDomainApiKey ? 'text' : 'password'}
-                      placeholder="Enter your Cloudonix API key"
-                      disabled={isValidating}
-                      {...register('domain_api_key')}
-                    />
-                     <button
-                       type="button"
-                       onClick={() => setShowDomainApiKey(!showDomainApiKey)}
-                       disabled={isValidating}
-                       className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                      {showDomainApiKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
+                  <Input
+                    id="domain_api_key"
+                    type="text"
+                    placeholder="Enter your Cloudonix API key"
+                    disabled={isValidating}
+                    {...register('domain_api_key')}
+                  />
                    {errors.domain_api_key && (
                      <p className="text-sm text-destructive flex items-center gap-1">
                        <XCircle className="h-3 w-3" />
@@ -523,27 +472,14 @@ export default function Settings() {
                   </Tooltip>
                 </Label>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="domain_requests_api_key"
-                      type={showRequestsApiKey ? 'text' : 'password'}
-                      placeholder="Optional - Generate a key"
-                      disabled={isValidating}
-                      {...register('domain_requests_api_key')}
-                    />
-                     <button
-                       type="button"
-                       onClick={() => setShowRequestsApiKey(!showRequestsApiKey)}
-                       disabled={isValidating}
-                       className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                      {showRequestsApiKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
+                  <Input
+                    id="domain_requests_api_key"
+                    type="text"
+                    placeholder="Optional - Generate a key"
+                    disabled={isValidating}
+                    className="flex-1"
+                    {...register('domain_requests_api_key')}
+                  />
                   <Button
                     type="button"
                     variant="outline"
