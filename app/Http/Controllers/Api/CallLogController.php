@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CallLog;
 
 
 use App\Http\Controllers\Traits\ApiRequestHandler;
@@ -23,6 +24,8 @@ class CallLogController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CallLog::class);
+
         $query = CallLog::with(['didNumber', 'extension', 'ringGroup'])
             ->orderBy('created_at', 'desc');
 
@@ -61,6 +64,8 @@ class CallLogController extends Controller
      */
     public function show(CallLog $callLog): JsonResponse
     {
+        $this->authorize('view', $callLog);
+
         $callLog->load(['didNumber', 'extension', 'ringGroup']);
 
         return response()->json($callLog);
@@ -71,6 +76,8 @@ class CallLogController extends Controller
      */
     public function active(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CallLog::class);
+
         $activeCalls = CallLog::whereIn('status', ['initiated', 'ringing', 'answered'])
             ->with(['didNumber', 'extension'])
             ->orderBy('initiated_at', 'desc')
@@ -84,6 +91,8 @@ class CallLogController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CallLog::class);
+
         $fromDate = $request->input('from_date', now()->subDays(30)->toDateString());
         $toDate = $request->input('to_date', now()->toDateString());
 
