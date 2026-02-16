@@ -48,6 +48,8 @@ class VoiceRoutingManager
         private readonly VoiceRoutingCacheService $cache,
         private readonly IvrStateService $ivrStateService,
         private readonly PhoneNumberService $phoneNumberService,
+        private readonly OutboundRoutingService $outboundRouting,
+        private readonly BusinessHoursRoutingService $businessHoursRouting,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
@@ -611,17 +613,8 @@ class VoiceRoutingManager
                             break;
 
                         default:
-                            // For legacy string actions, use the old method
-                            $currentAction = $schedule->getCurrentRouting();
-                            if (is_string($currentAction) && ! empty($currentAction)) {
-                                return $this->routeToBusinessHoursAction(
-                                    $currentAction,
-                                    $did->organization_id,
-                                    $request->input('CallSid', ''),
-                                    $request
-                                );
-                            }
-                            break;
+                            // Legacy action format - return error
+                            return $this->createCxmlErrorResponse('Business hours configuration needs update');
                     }
                 }
                 break;
@@ -851,27 +844,14 @@ class VoiceRoutingManager
      * @param  Request  $request  The incoming request
      * @return Response|null CXML response if business hours routing applies, null otherwise
      */
+    /**
+     * Check business hours and route accordingly.
+     *
+     * Delegates to BusinessHoursRoutingService for time-based routing.
+     */
     private function checkBusinessHours(int $organizationId, string $callSid, Request $request): ?Response
     {
-        $schedule = $this->cache->getActiveBusinessHoursSchedule($organizationId);
-
-        if (! $schedule) {
-            return null;
-        }
-
-        $currentAction = $schedule->getCurrentRouting();
-
-        if (! empty($currentAction)) {
-            Log::info('VoiceRoutingManager: Routing via business hours action', [
-                'call_sid' => $callSid,
-                'action' => $currentAction,
-                'is_open' => $schedule->isCurrentlyOpen(),
-            ]);
-
-            return $this->routeToBusinessHoursAction($currentAction, $organizationId, $callSid, $request);
-        }
-
-        return null;
+        return $this->businessHoursRouting->checkBusinessHours($organizationId, $callSid, $request);
     }
 
     /**
@@ -883,78 +863,14 @@ class VoiceRoutingManager
      * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if outbound routing applies, null otherwise
      */
+    /**
+     * Handle outbound routing via whitelist for calls from internal extensions.
+     *
+     * Delegates to OutboundRoutingService for whitelist matching and trunk routing.
+     */
     private function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
     {
-        Log::info('VoiceRoutingManager: Checking for outbound whitelist routing', [
-            'direction' => $request->input('Direction', 'unknown'),
-            'to' => $to,
-            'from' => $from,
-            'org_id' => $orgId,
-        ]);
-
-        // Only allow outbound routing for calls from internal extensions
-        $fromExtension = $this->cache->getExtension($orgId, $from);
-
-        if (! $fromExtension || ! $fromExtension->isActive()) {
-            Log::info('VoiceRoutingManager: Outbound routing not allowed - caller is not an active internal extension', [
-                'from' => $from,
-                'extension_found' => $fromExtension !== null,
-                'extension_active' => $fromExtension?->isActive(),
-            ]);
-
-            return null;
-        }
-
-        Log::info('VoiceRoutingManager: Caller is active internal extension, checking outbound whitelist', [
-            'from' => $from,
-            'extension_found' => $fromExtension !== null,
-            'extension_active' => $fromExtension->isActive(),
-        ]);
-
-        // Use sophisticated whitelist matching (country code, prefix matching)
-        $whitelistEntry = $this->findOutboundWhitelistEntry($orgId, $to);
-
-        if (! $whitelistEntry) {
-            Log::info('VoiceRoutingManager: No outbound whitelist entry found for destination', [
-                'to' => $to,
-                'org_id' => $orgId,
-            ]);
-
-            return null;
-        }
-
-        $trunkName = $whitelistEntry->outbound_trunk_name;
-
-        if (empty($trunkName)) {
-            Log::error('VoiceRoutingManager: Whitelist entry has no trunk configured', [
-                'to' => $to,
-                'org_id' => $orgId,
-                'whitelist_entry_id' => $whitelistEntry->id,
-            ]);
-
-            return response(
-                CxmlBuilder::unavailable('Outbound route configuration error'),
-                200,
-                ['Content-Type' => 'text/xml']
-            );
-        }
-
-        Log::info('VoiceRoutingManager: Routing outbound call via trunk', [
-            'to' => $to,
-            'from' => $from,
-            'org_id' => $orgId,
-            'trunk_name' => $trunkName,
-            'whitelist_entry_id' => $whitelistEntry->id,
-        ]);
-
-        // Route via trunk using the caller ID from the extension
-        $callerId = $fromExtension->caller_id ?? $from;
-
-        return response(
-            CxmlBuilder::simpleDial($to, $callerId, null, $trunkName),
-            200,
-            ['Content-Type' => 'text/xml']
-        );
+        return $this->outboundRouting->handleOutboundRouting($request, $to, $from, $orgId);
     }
 
     public function handleIvrInput(Request $request): Response
