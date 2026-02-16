@@ -500,39 +500,264 @@ class AlbsFollowThroughController extends Controller
     }
 
     /**
-     * Route to extension.
+     * Route to fallback extension.
      */
     private function routeToExtension(AiAssistantLoadBalancer $albs, Request $request): Response
     {
-        // This would need extension lookup - simplified for now
-        return $this->hangupResponse();
+        $extensionId = $albs->fallback_extension_id;
+
+        if (! $extensionId) {
+            Log::warning('ALBS Follow Through: No fallback extension configured', [
+                'albs_id' => $albs->id,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        $extension = \App\Models\Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $extensionId)
+            ->where('organization_id', $albs->organization_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $extension) {
+            Log::warning('ALBS Follow Through: Fallback extension not found or inactive', [
+                'albs_id' => $albs->id,
+                'extension_id' => $extensionId,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        $sipUri = $extension->getSipUri();
+
+        if (! $sipUri) {
+            Log::warning('ALBS Follow Through: Fallback extension has no SIP URI', [
+                'albs_id' => $albs->id,
+                'extension_id' => $extensionId,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        Log::info('ALBS Follow Through: Routing to fallback extension', [
+            'albs_id' => $albs->id,
+            'extension_id' => $extensionId,
+            'extension_number' => $extension->extension_number,
+        ]);
+
+        return response(
+            CxmlBuilder::simpleDial($sipUri),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
     }
 
     /**
-     * Route to ring group.
+     * Route to fallback ring group.
      */
     private function routeToRingGroup(AiAssistantLoadBalancer $albs, Request $request): Response
     {
-        // This would need ring group lookup - simplified for now
-        return $this->hangupResponse();
+        $ringGroupId = $albs->fallback_ring_group_id;
+
+        if (! $ringGroupId) {
+            Log::warning('ALBS Follow Through: No fallback ring group configured', [
+                'albs_id' => $albs->id,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        $ringGroup = \App\Models\RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ringGroupId)
+            ->where('organization_id', $albs->organization_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $ringGroup) {
+            Log::warning('ALBS Follow Through: Fallback ring group not found or inactive', [
+                'albs_id' => $albs->id,
+                'ring_group_id' => $ringGroupId,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        $members = $ringGroup->getMembers()->filter(fn (\App\Models\Extension $ext) => $ext->isActive());
+        $sipUris = $members->map(fn (\App\Models\Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
+
+        if (empty($sipUris)) {
+            Log::warning('ALBS Follow Through: Fallback ring group has no active members', [
+                'albs_id' => $albs->id,
+                'ring_group_id' => $ringGroupId,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        Log::info('ALBS Follow Through: Routing to fallback ring group', [
+            'albs_id' => $albs->id,
+            'ring_group_id' => $ringGroupId,
+            'member_count' => count($sipUris),
+        ]);
+
+        return response(
+            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
     }
 
     /**
-     * Route to IVR menu.
+     * Route to fallback IVR menu.
+     *
+     * Uses the IvrRoutingStrategy to generate the Gather CXML for the IVR menu,
+     * which presents the caller with options and collects DTMF input.
      */
     private function routeToIvrMenu(AiAssistantLoadBalancer $albs, Request $request): Response
     {
-        // This would need IVR lookup - simplified for now
-        return $this->hangupResponse();
+        $ivrMenuId = $albs->fallback_ivr_menu_id;
+
+        if (! $ivrMenuId) {
+            Log::warning('ALBS Follow Through: No fallback IVR menu configured', [
+                'albs_id' => $albs->id,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        $ivrMenu = \App\Models\IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $ivrMenuId)
+            ->where('organization_id', $albs->organization_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $ivrMenu) {
+            Log::warning('ALBS Follow Through: Fallback IVR menu not found or inactive', [
+                'albs_id' => $albs->id,
+                'ivr_menu_id' => $ivrMenuId,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        Log::info('ALBS Follow Through: Routing to fallback IVR menu', [
+            'albs_id' => $albs->id,
+            'ivr_menu_id' => $ivrMenuId,
+            'ivr_menu_name' => $ivrMenu->name,
+        ]);
+
+        // Delegate to IvrRoutingStrategy via app container
+        $ivrStrategy = app(\App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class);
+        $dummyDid = new \App\Models\DidNumber;
+
+        return $ivrStrategy->route($request, $dummyDid, ['ivr_menu' => $ivrMenu]);
     }
 
     /**
-     * Route to AI Assistant.
+     * Route to fallback AI Assistant.
+     *
+     * Reuses the existing routeToAssistant() method which handles
+     * both WebSocket and SIP-based AI assistant routing with CXML generation.
      */
     private function routeToAiAssistant(AiAssistantLoadBalancer $albs, Request $request): Response
     {
-        // This would need AI Assistant lookup - simplified for now
-        return $this->hangupResponse();
+        $aiAssistantId = $albs->fallback_ai_assistant_id;
+
+        if (! $aiAssistantId) {
+            Log::warning('ALBS Follow Through: No fallback AI assistant configured', [
+                'albs_id' => $albs->id,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        $aiAssistant = AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $aiAssistantId)
+            ->where('organization_id', $albs->organization_id)
+            ->where('status', UserStatus::ACTIVE->value)
+            ->first();
+
+        if (! $aiAssistant) {
+            Log::warning('ALBS Follow Through: Fallback AI assistant not found or inactive', [
+                'albs_id' => $albs->id,
+                'ai_assistant_id' => $aiAssistantId,
+            ]);
+
+            return $this->hangupResponse();
+        }
+
+        Log::info('ALBS Follow Through: Routing to fallback AI assistant', [
+            'albs_id' => $albs->id,
+            'ai_assistant_id' => $aiAssistantId,
+            'ai_assistant_name' => $aiAssistant->name,
+        ]);
+
+        // Reuse existing routing logic (no follow-through callback for the fallback itself)
+        return $this->routeToAssistantDirect($aiAssistant, $request);
+    }
+
+    /**
+     * Route directly to an AI Assistant without follow-through callback.
+     * Used for fallback routing where we don't want another ALB callback loop.
+     */
+    private function routeToAssistantDirect(AiAssistant $aiAssistant, Request $request): Response
+    {
+        $config = $aiAssistant->configuration ?? [];
+        $protocol = $aiAssistant->protocol;
+        $provider = $aiAssistant->provider;
+
+        if ($protocol === 'websocket') {
+            if (! $provider) {
+                return $this->errorResponse('Fallback AI Assistant provider not configured');
+            }
+
+            $providerDef = $this->providerRegistry->getProvider($provider);
+
+            if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
+                return $this->errorResponse('Invalid fallback AI Assistant provider');
+            }
+
+            $cloudonixParams = [
+                'session' => $request->input('CallSid', ''),
+                'from' => $request->input('From', ''),
+                'to' => $request->input('To', ''),
+            ];
+
+            try {
+                $websocketUrl = $this->urlBuilder->buildUrl(
+                    $providerDef->urlTemplate,
+                    $config,
+                    $cloudonixParams
+                );
+
+                return response(
+                    CxmlBuilder::streamToWebSocket($websocketUrl),
+                    200,
+                    ['Content-Type' => 'text/xml']
+                );
+            } catch (\InvalidArgumentException $e) {
+                Log::error('ALBS Follow Through: Failed to build fallback WebSocket URL', [
+                    'ai_assistant_id' => $aiAssistant->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $this->errorResponse('Fallback AI Assistant configuration error');
+            }
+        }
+
+        // SIP-based routing
+        $phoneNumber = $config['phone_number'] ?? null;
+
+        if (! $provider || ! $phoneNumber) {
+            return $this->errorResponse('Fallback AI Assistant configuration incomplete');
+        }
+
+        return response(
+            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
+            200,
+            ['Content-Type' => 'text/xml']
+        );
     }
 
     /**
