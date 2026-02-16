@@ -184,6 +184,17 @@ class OutboundRoutingService
             // Check prefix match
             if (! empty($entry->destination_prefix)) {
                 $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
+                $destWithoutPlus = ltrim($destinationNumber, '+');
+
+                Log::debug('OutboundRoutingService: Checking prefix', [
+                    'entry_id' => $entry->id,
+                    'prefix' => $normalizedPrefix,
+                    'destination' => $destinationNumber,
+                    'dest_without_plus' => $destWithoutPlus,
+                    'prefix_starts_with_plus' => str_starts_with($normalizedPrefix, '+'),
+                    'dest_starts_with_prefix' => str_starts_with($destinationNumber, $normalizedPrefix),
+                    'dest_without_plus_starts_with_prefix' => str_starts_with($destWithoutPlus, $normalizedPrefix),
+                ]);
 
                 if (str_starts_with($normalizedPrefix, '+')) {
                     // Full international prefix (e.g., +1212)
@@ -194,8 +205,6 @@ class OutboundRoutingService
                     }
                 } else {
                     // Prefix without + (e.g., 1212) - match within the number after country code
-                    // Remove + from destination for matching
-                    $destWithoutPlus = ltrim($destinationNumber, '+');
                     if (str_starts_with($destWithoutPlus, $normalizedPrefix)) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
