@@ -146,12 +146,16 @@ class OutboundRoutingService
             ]);
         }
 
+        // Normalize phone number first (ensure + prefix for proper country code extraction)
+        $normalizedNumber = $this->phoneNumberService->normalizeToE164($destinationNumber);
+        
         // Extract country calling code from destination number
-        $callingCode = $this->phoneNumberService->extractCallingCode($destinationNumber);
+        $callingCode = $normalizedNumber ? $this->phoneNumberService->extractCallingCode($normalizedNumber) : null;
         $countryCode = $callingCode ? $this->phoneNumberService->callingCodeToCountryCode($callingCode) : null;
 
         Log::debug('OutboundRoutingService: Extracted calling code and country code', [
             'destination_number' => $destinationNumber,
+            'normalized_number' => $normalizedNumber,
             'calling_code' => $callingCode,
             'country_code' => $countryCode,
         ]);
