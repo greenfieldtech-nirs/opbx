@@ -418,8 +418,8 @@ class PhoneNumberController extends Controller
 
         // Batch load AI assistants
         if (! empty($aiAssistantIds)) {
-            $aiAssistants = Extension::whereIn('id', array_filter($aiAssistantIds))
-                ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+            $aiAssistants = AiAssistant::whereIn('id', array_filter($aiAssistantIds))
+                ->where('status', 'active')
                 ->get()
                 ->keyBy('id');
             foreach ($phoneNumbersByType['ai_assistant'] as $phoneNumber) {
