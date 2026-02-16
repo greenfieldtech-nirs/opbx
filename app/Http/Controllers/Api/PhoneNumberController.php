@@ -196,7 +196,7 @@ class PhoneNumberController extends Controller
     /**
      * Update the specified phone number.
      */
-    public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource
+    public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource|JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
