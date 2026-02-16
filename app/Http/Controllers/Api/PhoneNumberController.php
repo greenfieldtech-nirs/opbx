@@ -9,10 +9,12 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
+use App\Models\AiAssistant;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -500,8 +502,8 @@ class PhoneNumberController extends Controller
     {
         $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
         if ($aiAssistantId) {
-            $aiAssistant = Extension::where('id', $aiAssistantId)
-                ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+            $aiAssistant = AiAssistant::where('id', $aiAssistantId)
+                ->where('status', \App\Enums\UserStatus::ACTIVE)
                 ->first();
             if ($aiAssistant) {
                 $phoneNumber->setAiAssistant($aiAssistant);

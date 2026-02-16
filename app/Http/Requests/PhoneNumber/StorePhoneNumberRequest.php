@@ -7,6 +7,7 @@ namespace App\Http\Requests\PhoneNumber;
 use App\Enums\UserStatus;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
+use App\Models\AiAssistant;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
@@ -345,9 +346,9 @@ class StorePhoneNumberRequest extends FormRequest
             return;
         }
 
-        $extension = Extension::find($routingConfig['ai_assistant_id']);
+        $aiAssistant = AiAssistant::find($routingConfig['ai_assistant_id']);
 
-        if (!$extension) {
+        if (!$aiAssistant) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
                 'The selected AI assistant does not exist.'
@@ -355,7 +356,7 @@ class StorePhoneNumberRequest extends FormRequest
             return;
         }
 
-        if ($extension->organization_id !== $user->organization_id) {
+        if ($aiAssistant->organization_id !== $user->organization_id) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
                 'The selected AI assistant does not belong to your organization.'
@@ -363,18 +364,10 @@ class StorePhoneNumberRequest extends FormRequest
             return;
         }
 
-        if ($extension->type !== \App\Enums\ExtensionType::AI_ASSISTANT) {
+        if ($aiAssistant->status !== UserStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
-                'The selected extension must be an AI assistant. Extension ' . $extension->extension_number . ' is of type ' . $extension->type->label() . '.'
-            );
-            return;
-        }
-
-        if ($extension->status !== UserStatus::ACTIVE) {
-            $validator->errors()->add(
-                'routing_config.ai_assistant_id',
-                'The selected AI assistant must be active. AI assistant ' . $extension->extension_number . ' is currently ' . $extension->status->value . '.'
+                'The selected AI assistant must be active. AI assistant "' . $aiAssistant->name . '" is currently ' . $aiAssistant->status->value . '.'
             );
         }
     }
