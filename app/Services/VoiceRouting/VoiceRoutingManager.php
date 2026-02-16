@@ -104,29 +104,38 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::debug('VoiceRoutingManager: Subscriber direction call', [
+        Log::info('VoiceRoutingManager: Subscriber direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
         ]);
 
         // 1. Try extension routing first (direct extension dial)
+        Log::debug('VoiceRoutingManager: Trying extension routing');
         $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
         if ($extensionResponse) {
+            Log::info('VoiceRoutingManager: Extension routing matched');
             return $extensionResponse;
         }
+        Log::debug('VoiceRoutingManager: Extension routing did not match');
 
         // 2. Try DID routing (fallback for internal calls)
+        Log::debug('VoiceRoutingManager: Trying DID routing');
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
+            Log::info('VoiceRoutingManager: DID routing matched');
             return $didResponse;
         }
+        Log::debug('VoiceRoutingManager: DID routing did not match');
 
         // 3. Try outbound routing (for calls to external numbers)
+        Log::debug('VoiceRoutingManager: Trying outbound routing');
         $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
         if ($outboundResponse) {
+            Log::info('VoiceRoutingManager: Outbound routing matched');
             return $outboundResponse;
         }
+        Log::debug('VoiceRoutingManager: Outbound routing did not match');
 
         Log::info('VoiceRoutingManager: No destination found for subscriber call', [
             'to' => $to,
