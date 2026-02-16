@@ -41,92 +41,81 @@ use Illuminate\Support\Facades\Route;
 // Broadcasting authentication routes (must be before auth middleware)
 Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
 
-// Test route for debugging
-Route::get('test/audio', function () {
-    return response()->json(['status' => 'ok', 'message' => 'Audio route is working']);
-});
 
-// Public routes for external services (Cloudonix) to access audio files
+// Public routes for external services (Cloudonix) to access audio files.
+// SECURITY: This route requires HMAC-signed URLs with expiration.
+// The serveMinioFile() method validates the ?expires= and ?sig= query parameters
+// using HMAC-SHA256 with APP_KEY. Unsigned or expired requests are rejected with 403.
 Route::get('storage/recordings/{path}', [\App\Http\Controllers\Api\RecordingsController::class, 'serveMinioFile'])
     ->name('storage.recordings.serve')
     ->where('path', '[0-9]+/.+');
 
-// Health check routes (public)
+// Health check routes
+// Public health endpoint - returns minimal status only (no internal details)
 Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
-        'service' => 'opbx-api',
         'timestamp' => now()->toIso8601String(),
     ]);
 })->name('health');
 
-Route::get('/storage/health', function () {
-    try {
-        $disk = Storage::disk('recordings');
-        $bucket = config('filesystems.disks.recordings.bucket');
-        $endpoint = config('filesystems.disks.recordings.endpoint');
+// Detailed health checks - behind authentication to prevent internal info leakage
+Route::middleware(['auth:sanctum'])->group(function (): void {
+    Route::get('/storage/health', function () {
+        try {
+            $disk = Storage::disk('recordings');
 
-        // Test connectivity
-        $disk->files();
+            // Test connectivity
+            $disk->files();
 
-        // Test write/read
-        $testFile = '.health-check-'.time();
-        $testContent = 'health-check-'.now()->timestamp;
-        $disk->put($testFile, $testContent);
-        $readContent = $disk->get($testFile);
-        $disk->delete($testFile);
+            // Test write/read
+            $testFile = '.health-check-'.time();
+            $testContent = 'health-check-'.now()->timestamp;
+            $disk->put($testFile, $testContent);
+            $readContent = $disk->get($testFile);
+            $disk->delete($testFile);
 
-        $isHealthy = ($readContent === $testContent);
+            $isHealthy = ($readContent === $testContent);
 
-        return response()->json([
-            'status' => $isHealthy ? 'ok' : 'degraded',
-            'storage' => 'recordings',
-            'bucket' => $bucket,
-            'endpoint' => $endpoint,
-            'writable' => $isHealthy,
-            'readable' => $isHealthy,
-            'timestamp' => now()->toIso8601String(),
-        ], $isHealthy ? 200 : 503);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'storage' => 'recordings',
-            'error' => $e->getMessage(),
-            'timestamp' => now()->toIso8601String(),
-        ], 503);
-    }
-})->name('storage.health');
+            return response()->json([
+                'status' => $isHealthy ? 'ok' : 'degraded',
+                'writable' => $isHealthy,
+                'readable' => $isHealthy,
+                'timestamp' => now()->toIso8601String(),
+            ], $isHealthy ? 200 : 503);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'timestamp' => now()->toIso8601String(),
+            ], 503);
+        }
+    })->name('storage.health');
 
-Route::get('/websocket/health', function () {
-    try {
-        // Test Pusher/Soketi connection
-        $pusher = new \Pusher\Pusher(
-            config('broadcasting.connections.pusher.key'),
-            config('broadcasting.connections.pusher.secret'),
-            config('broadcasting.connections.pusher.options.app_id'),
-            config('broadcasting.connections.pusher.options')
-        );
+    Route::get('/websocket/health', function () {
+        try {
+            // Test Pusher/Soketi connection
+            $pusher = new \Pusher\Pusher(
+                config('broadcasting.connections.pusher.key'),
+                config('broadcasting.connections.pusher.secret'),
+                config('broadcasting.connections.pusher.options.app_id'),
+                config('broadcasting.connections.pusher.options')
+            );
 
-        // Trigger a test event to verify connection
-        $pusher->trigger('test-channel', 'test-event', ['message' => 'health-check']);
+            // Trigger a test event to verify connection
+            $pusher->trigger('test-channel', 'test-event', ['message' => 'health-check']);
 
-        return response()->json([
-            'status' => 'ok',
-            'websocket' => 'connected',
-            'driver' => config('broadcasting.default'),
-            'host' => config('broadcasting.connections.pusher.options.host'),
-            'port' => config('broadcasting.connections.pusher.options.port'),
-            'timestamp' => now()->toIso8601String(),
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'error',
-            'websocket' => 'disconnected',
-            'error' => $e->getMessage(),
-            'timestamp' => now()->toIso8601String(),
-        ], 500);
-    }
-})->name('websocket.health');
+            return response()->json([
+                'status' => 'ok',
+                'timestamp' => now()->toIso8601String(),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'timestamp' => now()->toIso8601String(),
+            ], 500);
+        }
+    })->name('websocket.health');
+});
 
 // CSRF Cookie endpoint for SPA authentication
 // This must be called before login when using cookie-based auth
