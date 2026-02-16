@@ -1016,7 +1016,7 @@ export default function ExtensionsComplete() {
       ai_bot_id: (typeof config === 'object' && config?.bot_id) ? config.bot_id : '',
       ai_auth_token: (typeof config === 'object' && config?.auth_token) ? config.auth_token : '',
       ai_api_key: (typeof config === 'object' && config?.api_key) ? config.api_key : '',
-      ai_assistant_id: (typeof config === 'object' && config?.assistant_id) ? config.assistant_id : '',
+      ai_assistant_id: (typeof config === 'object' && config?.ai_assistant_id) ? config.ai_assistant_id.toString() : '',
       ai_session_id: (typeof config === 'object' && config?.session_id) ? config.session_id : '',
       ai_load_balancer_id: (typeof config === 'object' && config?.ai_load_balancer_id) ? config.ai_load_balancer_id.toString() : '',
       container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
