@@ -188,4 +188,52 @@ class PhoneNumberService
             'formatted_e164' => $validated['formatted'],
         ];
     }
+
+    /**
+     * Normalize a phone number to E.164 format.
+     *
+     * Simple normalization that:
+     * 1. Removes all non-numeric characters except +
+     * 2. Ensures the number starts with + for international format
+     *
+     * This is a lightweight alternative to validateAndFormatPhoneNumber()
+     * when you just need consistent formatting without full validation.
+     *
+     * @param string|null $number The raw phone number
+     * @return string|null Normalized E.164 number or null if input is empty
+     */
+    public function normalizeToE164(?string $number): ?string
+    {
+        if (empty($number)) {
+            return null;
+        }
+
+        // Remove all non-numeric characters except +
+        $normalized = preg_replace('/[^0-9+]/', '', $number);
+
+        // Ensure + prefix for E.164
+        if (!str_starts_with($normalized, '+')) {
+            $normalized = '+' . $normalized;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Strip formatting characters from phone number without adding + prefix.
+     *
+     * Use this when you need to compare numbers in their raw numeric form
+     * without enforcing E.164 format.
+     *
+     * @param string|null $number The raw phone number
+     * @return string|null Stripped number or null if input is empty
+     */
+    public function stripFormatting(?string $number): ?string
+    {
+        if (empty($number)) {
+            return null;
+        }
+
+        return preg_replace('/[^0-9+]/', '', $number);
+    }
 }

@@ -16,6 +16,7 @@ use App\Models\SessionUpdate;
 use App\Models\CallNotificationsSettings;
 use App\Services\CallNotifications\WebhookDispatcher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
+use App\Services\PhoneNumberService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -29,7 +30,8 @@ class CloudonixWebhookController extends Controller
 
     public function __construct(
         private readonly WebhookDispatcher $webhookDispatcher,
-        private readonly NotificationPayloadBuilder $payloadBuilder
+        private readonly NotificationPayloadBuilder $payloadBuilder,
+        private readonly PhoneNumberService $phoneNumberService
     ) {}
 
     /**
@@ -62,8 +64,8 @@ class CloudonixWebhookController extends Controller
         ]);
 
         // Normalize phone numbers
-        $fromNumber = $this->normalizePhoneNumber($from);
-        $toNumber = $this->normalizePhoneNumber($to);
+        $fromNumber = $this->phoneNumberService->normalizeToE164($from);
+        $toNumber = $this->phoneNumberService->normalizeToE164($to);
 
         // Identify organization from domain (set by VerifyCloudonixSignature middleware)
         // or fall back to DID-based lookup
@@ -262,8 +264,8 @@ class CloudonixWebhookController extends Controller
                 'domain' => $validated['domain'],
                 'subscriber_id' => $validated['subscriberId'],
                 'outgoing_subscriber_id' => $validated['outgoingSubscriberId'] ?? null,
-                'caller_id' => $this->normalizePhoneNumber($validated['callerId']),
-                'destination' => $this->normalizePhoneNumber($validated['destination']),
+                'caller_id' => $this->phoneNumberService->normalizeToE164($validated['callerId']),
+                'destination' => $this->phoneNumberService->normalizeToE164($validated['destination']),
                 'direction' => $validated['direction'],
                 'status' => $validated['status'],
                 'session_created_at' => $validated['createdAt'],
@@ -479,8 +481,8 @@ class CloudonixWebhookController extends Controller
             'domain_id' => $sessionData['domainId'] ?? null,
             'domain' => $request->input('domain'),
             'subscriber_id' => null, // Subscriber is UUID in CDR, not integer ID
-            'caller_id' => $this->normalizePhoneNumber($request->input('from')),
-            'destination' => $this->normalizePhoneNumber($request->input('to')),
+            'caller_id' => $this->phoneNumberService->normalizeToE164($request->input('from')),
+            'destination' => $this->phoneNumberService->normalizeToE164($request->input('to')),
             'direction' => 'incoming', // Assume incoming for CDR events
             'status' => $status,
             'session_created_at' => $callStartTimeSeconds
@@ -511,26 +513,6 @@ class CloudonixWebhookController extends Controller
             'disposition' => $disposition,
             'mapped_status' => $status,
         ]);
-    }
-
-    /**
-     * Normalize phone number to E.164 format.
-     */
-    private function normalizePhoneNumber(?string $number): ?string
-    {
-        if (! $number) {
-            return null;
-        }
-
-        // Remove common prefixes and formatting
-        $number = preg_replace('/[^0-9+]/', '', $number);
-
-        // Ensure + prefix for E.164
-        if (! str_starts_with($number, '+')) {
-            $number = '+'.$number;
-        }
-
-        return $number;
     }
 
     /**
