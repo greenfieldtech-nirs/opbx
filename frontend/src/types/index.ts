@@ -173,6 +173,7 @@ export interface DIDNumber {
   routing_config: {
     extension_id?: string;
     ai_assistant_id?: string;
+    ai_load_balancer_id?: string;
     ring_group_id?: string;
     business_hours_schedule_id?: string;
     conference_room_id?: string;
@@ -192,6 +193,9 @@ export interface DIDNumber {
   ring_group?: RingGroup;
   business_hours_schedule?: BusinessHours;
   conference_room?: ConferenceRoom;
+  ai_assistant?: AiAssistant;
+  ai_load_balancer?: AiAssistantLoadBalancer;
+  ivr_menu?: IvrMenu;
   created_at: string;
   updated_at: string;
 }

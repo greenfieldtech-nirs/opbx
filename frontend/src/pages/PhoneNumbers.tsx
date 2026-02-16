@@ -303,6 +303,21 @@ export default function PhoneNumbers() {
           return phoneNumber.conference_room.name;
         }
         return <span className="text-red-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Invalid destination</span>;
+      case 'ai_assistant':
+        if (phoneNumber.ai_assistant) {
+          return phoneNumber.ai_assistant.name;
+        }
+        return <span className="text-red-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Invalid destination</span>;
+      case 'ai_load_balancer':
+        if (phoneNumber.ai_load_balancer) {
+          return phoneNumber.ai_load_balancer.name;
+        }
+        return <span className="text-red-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Invalid destination</span>;
+      case 'ivr_menu':
+        if (phoneNumber.ivr_menu) {
+          return phoneNumber.ivr_menu.name;
+        }
+        return <span className="text-red-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Invalid destination</span>;
       default:
         return 'N/A';
     }
