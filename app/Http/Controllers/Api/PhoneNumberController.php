@@ -10,6 +10,7 @@ use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
 use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
@@ -321,6 +322,7 @@ class PhoneNumberController extends Controller
             'business_hours' => $this->loadBusinessHoursSchedule($phoneNumber),
             'conference_room' => $this->loadConferenceRoom($phoneNumber),
             'ai_assistant' => $this->loadAiAssistant($phoneNumber),
+            'ai_load_balancer' => $this->loadAiLoadBalancer($phoneNumber),
             'ivr_menu' => $this->loadIvrMenu($phoneNumber),
             default => null,
         };
@@ -364,6 +366,7 @@ class PhoneNumberController extends Controller
                 'business_hours' => $scheduleIds[] = $phoneNumber->getTargetBusinessHoursId(),
                 'conference_room' => $conferenceRoomIds[] = $phoneNumber->getTargetConferenceRoomId(),
                 'ai_assistant' => $aiAssistantIds[] = $phoneNumber->getTargetAiAssistantId(),
+                'ai_load_balancer' => $aiLoadBalancerIds[] = $phoneNumber->getTargetAiLoadBalancerId(),
                 'ivr_menu' => $ivrMenuIds[] = $phoneNumber->getTargetIvrMenuId(),
                 default => null,
             };
@@ -507,6 +510,22 @@ class PhoneNumberController extends Controller
                 ->first();
             if ($aiAssistant) {
                 $phoneNumber->setAiAssistant($aiAssistant);
+            }
+        }
+    }
+
+    /**
+     * Load AI load balancer for a phone number.
+     */
+    private function loadAiLoadBalancer(DidNumber $phoneNumber): void
+    {
+        $aiLoadBalancerId = $phoneNumber->getTargetAiLoadBalancerId();
+        if ($aiLoadBalancerId) {
+            $aiLoadBalancer = AiAssistantLoadBalancer::where('id', $aiLoadBalancerId)
+                ->where('status', 'active')
+                ->first();
+            if ($aiLoadBalancer) {
+                $phoneNumber->setAiLoadBalancer($aiLoadBalancer);
             }
         }
     }

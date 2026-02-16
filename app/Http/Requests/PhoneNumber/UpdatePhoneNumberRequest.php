@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
 use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
@@ -60,7 +61,7 @@ class UpdatePhoneNumberRequest extends FormRequest
                  'sometimes',
                  'required',
                  'string',
-                 Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ivr_menu']),
+                 Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu']),
              ],
             'routing_config' => [
                 'sometimes',
@@ -133,6 +134,7 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'business_hours' => $this->validateBusinessHoursRouting($validator, $user, $routingConfig),
                 'conference_room' => $this->validateConferenceRoomRouting($validator, $user, $routingConfig),
                 'ai_assistant' => $this->validateAiAssistantRouting($validator, $user, $routingConfig),
+                'ai_load_balancer' => $this->validateAiLoadBalancerRouting($validator, $user, $routingConfig),
                 'ivr_menu' => $this->validateIvrMenuRouting($validator, $user, $routingConfig),
                 default => null,
             };
@@ -365,6 +367,50 @@ class UpdatePhoneNumberRequest extends FormRequest
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
                 'The selected AI assistant must be active. AI assistant "' . $aiAssistant->name . '" is currently ' . $aiAssistant->status->value . '.'
+            );
+        }
+    }
+
+    /**
+     * Validate AI load balancer routing configuration.
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @param \App\Models\User $user
+     * @param array<string, mixed> $routingConfig
+     * @return void
+     */
+    private function validateAiLoadBalancerRouting($validator, $user, array $routingConfig): void
+    {
+        if (!isset($routingConfig['ai_load_balancer_id'])) {
+            $validator->errors()->add(
+                'routing_config.ai_load_balancer_id',
+                'AI load balancer ID is required when routing type is ai_load_balancer.'
+            );
+            return;
+        }
+
+        $albs = AiAssistantLoadBalancer::find($routingConfig['ai_load_balancer_id']);
+
+        if (!$albs) {
+            $validator->errors()->add(
+                'routing_config.ai_load_balancer_id',
+                'The selected AI load balancer does not exist.'
+            );
+            return;
+        }
+
+        if ($albs->organization_id !== $user->organization_id) {
+            $validator->errors()->add(
+                'routing_config.ai_load_balancer_id',
+                'The selected AI load balancer does not belong to your organization.'
+            );
+            return;
+        }
+
+        if ($albs->status !== \App\Enums\UserStatus::ACTIVE) {
+            $validator->errors()->add(
+                'routing_config.ai_load_balancer_id',
+                'The selected AI load balancer must be active. AI load balancer "' . $albs->name . '" is currently ' . $albs->status->value . '.'
             );
         }
     }
