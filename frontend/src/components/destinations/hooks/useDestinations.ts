@@ -8,6 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { extensionsService } from '@/services/extensions.service';
+import aiAssistantsService from '@/services/aiAssistants.service';
 import { createResourceService, usersService } from '@/services/createResourceService';
 import type {
   DestinationType,
@@ -146,6 +147,20 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch AI assistants (separate endpoint, not from extensions)
+  const aiAssistantsQuery = useQuery({
+    queryKey: destinationQueryKeys.aiAssistants(orgId),
+    queryFn: async () => {
+      const response = await aiAssistantsService.getAll({
+        organization_id: orgId,
+        per_page: 1000,
+      });
+      return (response as any)?.data || [];
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Fetch AI load balancers
   const aiLoadBalancersQuery = useQuery({
     queryKey: destinationQueryKeys.aiLoadBalancers(orgId),
@@ -181,9 +196,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     conferenceRooms: conferenceRoomsQuery.data || [],
     ivrMenus: ivrMenusQuery.data || [],
     businessHours: businessHoursQuery.data || [],
-    aiAssistants: extensionsQuery.data?.filter(
-      (ext: any) => ext.type === 'ai_assistant'
-    ) || [],
+    aiAssistants: aiAssistantsQuery.data || [],
     aiLoadBalancers: aiLoadBalancersQuery.data || [],
     users: usersQuery.data || [],
   };
@@ -195,7 +208,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     conferenceRooms: conferenceRoomsQuery.isLoading,
     ivrMenus: ivrMenusQuery.isLoading,
     businessHours: businessHoursQuery.isLoading,
-    aiAssistants: extensionsQuery.isLoading,
+    aiAssistants: aiAssistantsQuery.isLoading,
     aiLoadBalancers: aiLoadBalancersQuery.isLoading,
     users: usersQuery.isLoading,
   };
@@ -207,7 +220,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     conferenceRooms: conferenceRoomsQuery.error as Error | null,
     ivrMenus: ivrMenusQuery.error as Error | null,
     businessHours: businessHoursQuery.error as Error | null,
-    aiAssistants: extensionsQuery.error as Error | null,
+    aiAssistants: aiAssistantsQuery.error as Error | null,
     aiLoadBalancers: aiLoadBalancersQuery.error as Error | null,
     users: usersQuery.error as Error | null,
   };
@@ -223,6 +236,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     conferenceRoomsQuery.refetch();
     ivrMenusQuery.refetch();
     businessHoursQuery.refetch();
+    aiAssistantsQuery.refetch();
     aiLoadBalancersQuery.refetch();
     usersQuery.refetch();
   };
@@ -230,8 +244,10 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
   const refetchType = (type: DestinationType) => {
     switch (type) {
       case 'extension':
-      case 'ai_assistant':
         extensionsQuery.refetch();
+        break;
+      case 'ai_assistant':
+        aiAssistantsQuery.refetch();
         break;
       case 'ring_group':
         ringGroupsQuery.refetch();
