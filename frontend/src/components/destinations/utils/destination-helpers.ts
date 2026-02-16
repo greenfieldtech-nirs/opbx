@@ -150,6 +150,7 @@ export function transformBusinessHoursToOptions(
 export function transformAiAssistantsToOptions(
   aiAssistants: Array<{
     id: string | number;
+    ai_assistant_id?: string | number;
     extension_number: string;
     type?: string;
     ai_assistant?: { name: string };
@@ -160,13 +161,15 @@ export function transformAiAssistantsToOptions(
   return aiAssistants
     .filter((ext) => !ext.type || ext.type === 'ai_assistant')
     .map((ext) => ({
-      id: String(ext.id),
+      // Use ai_assistant_id if available, otherwise fall back to id
+      id: String(ext.ai_assistant_id || ext.id),
       type: 'ai_assistant' as const,
       label: ext.label || `Ext ${ext.extension_number} - ${ext.ai_assistant?.name || ext.name || 'AI Assistant'}`,
       badge: getBadgeConfig('ai_assistant'),
       metadata: {
         extensionNumber: ext.extension_number,
         name: ext.ai_assistant?.name || ext.name,
+        ai_assistant_id: ext.ai_assistant_id,
       },
     }));
 }
