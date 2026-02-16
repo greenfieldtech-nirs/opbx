@@ -217,12 +217,19 @@ class ExtensionController extends Controller
         }
 
         try {
-            $extension = DB::transaction(function () use ($validated): Extension {
+            $extension = DB::transaction(function () use ($validated, $extensionType): Extension {
+                // Extract ai_assistant_id from configuration and set as direct column for AI_ASSISTANT type
+                if ($extensionType === ExtensionType::AI_ASSISTANT->value
+                    && isset($validated['configuration']['ai_assistant_id'])) {
+                    $validated['ai_assistant_id'] = $validated['configuration']['ai_assistant_id'];
+                }
+
                 // DEBUG: Log what's being passed to create
                 Log::info('[ExtensionController] Creating extension with data', [
                     'extension_number' => $validated['extension_number'] ?? 'MISSING',
                     'has_password' => isset($validated['password']),
                     'password_value' => isset($validated['password']) ? 'set ('.strlen($validated['password']).' chars)' : 'NOT SET',
+                    'ai_assistant_id' => $validated['ai_assistant_id'] ?? 'NOT SET',
                 ]);
 
                 // Create extension
@@ -393,6 +400,12 @@ class ExtensionController extends Controller
             } elseif ($extension->{$key} != $value) {
                 $changedFields[] = $key;
             }
+        }
+
+        // Extract ai_assistant_id from configuration and set as direct column for AI_ASSISTANT type
+        if ($newType === ExtensionType::AI_ASSISTANT->value
+            && isset($validated['configuration']['ai_assistant_id'])) {
+            $validated['ai_assistant_id'] = $validated['configuration']['ai_assistant_id'];
         }
 
         // Log will be handled by success/failure methods below
