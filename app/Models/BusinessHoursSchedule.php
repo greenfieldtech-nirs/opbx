@@ -18,6 +18,36 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[ScopedBy([OrganizationScope::class])]
+/**
+ * Business Hours Schedule Model
+ *
+ * Manages time-based routing rules for inbound calls. Defines open/closed hours
+ * and specifies routing destinations for each state.
+ *
+ * ## Target ID Format
+ *
+ * Action target IDs use a prefixed format to identify destination types:
+ * - `ext-{id}` - Extension (e.g., "ext-13")
+ * - `rg-{id}` - Ring group (e.g., "rg-5")
+ * - `conf-{id}` - Conference room (e.g., "conf-1")
+ * - `ivr-{id}` - IVR menu (e.g., "ivr-1")
+ *
+ * Where `{id}` is the numeric database ID of the target entity.
+ *
+ * ## Action Configuration
+ *
+ * Actions are stored as JSON arrays with format:
+ * ```php
+ * [
+ *   'action' => 'route',           // Action type
+ *   'target_id' => 'ext-13',       // Target in prefixed format
+ *   'target_type' => 'extension',  // Entity type
+ * ]
+ * ```
+ *
+ * @see BusinessHoursActionType for available action types
+ * @see convertActionToRoutingFormat() for parsing logic
+ */
 class BusinessHoursSchedule extends Model
 {
     use HasFactory, SoftDeletes;
@@ -197,7 +227,55 @@ class BusinessHoursSchedule extends Model
     }
 
     /**
+     * Parse a target ID string into its components.
+     *
+     * Validates and extracts the target type and numeric ID from prefixed strings
+     * like "ext-13", "rg-5", "conf-1", or "ivr-1".
+     *
+     * @param string $targetId The target ID in prefixed format (e.g., "ext-13")
+     * @return array|null Returns ['type' => string, 'id' => int] or null if invalid
+     *
+     * @see BusinessHoursActionType for valid target type prefixes
+     */
+    public static function parseTargetId(string $targetId): ?array
+    {
+        $patterns = [
+            '/^ext-(\d+)$/' => 'extension',
+            '/^rg-(\d+)$/' => 'ring_group',
+            '/^conf-(\d+)$/' => 'conference_room',
+            '/^ivr-(\d+)$/' => 'ivr_menu',
+        ];
+
+        foreach ($patterns as $pattern => $type) {
+            if (preg_match($pattern, $targetId, $matches)) {
+                return [
+                    'type' => $type,
+                    'id' => (int) $matches[1],
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Validate that a target ID is in the correct prefixed format.
+     *
+     * @param string $targetId The target ID to validate
+     * @return bool True if valid, false otherwise
+     */
+    public static function isValidTargetId(string $targetId): bool
+    {
+        return self::parseTargetId($targetId) !== null;
+    }
+
+    /**
      * Convert business hours action to routing format expected by CallRoutingService.
+     *
+     * Parses target_id using the prefixed format (ext-13, rg-5, etc.) and extracts
+     * the numeric ID for database lookups.
+     *
+     * @see parseTargetId() for the parsing logic
      */
     private function convertActionToRoutingFormat(array $action, BusinessHoursActionType $actionType): array
     {
