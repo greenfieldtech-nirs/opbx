@@ -122,8 +122,15 @@ class VoiceRoutingManager
             return $didResponse;
         }
 
+        // 3. Try outbound routing (for calls to external numbers)
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
+        }
+
         Log::info('VoiceRoutingManager: No destination found for subscriber call', [
             'to' => $to,
+            'from' => $from,
             'org_id' => $orgId,
         ]);
 
@@ -232,6 +239,12 @@ class VoiceRoutingManager
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
             return $didResponse;
+        }
+
+        // 3. Try outbound routing (for calls to external numbers)
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
         }
 
         Log::info('VoiceRoutingManager: No destination found for internal DID call', [
@@ -350,8 +363,15 @@ class VoiceRoutingManager
             return $didResponse;
         }
 
+        // 3. Try outbound routing (for calls to external numbers)
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
+        }
+
         Log::info('VoiceRoutingManager: No destination found for application call', [
             'to' => $to,
+            'from' => $from,
             'org_id' => $orgId,
         ]);
 
