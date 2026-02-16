@@ -111,15 +111,6 @@ export default function Settings() {
   const domainUuid = watch('domain_uuid');
   const domainApiKey = watch('domain_api_key');
 
-  /**
-   * Check if a value from the backend is obfuscated (contains masking characters like **)
-   */
-  const isBackendObfuscated = (value: string): boolean => {
-    if (!value || value.length === 0) return false;
-    // Check for common obfuscation patterns: **, ****, etc.
-    return value.includes('**') || /\*+/.test(value);
-  };
-
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
@@ -129,12 +120,11 @@ export default function Settings() {
         setSettingsData(data);
 
         // Reset form with loaded data
-        // Don't populate API key fields if they contain obfuscated values from backend
         reset({
           domain_uuid: data.domain_uuid || '',
           domain_name: data.domain_name || '',
-          domain_api_key: isBackendObfuscated(data.domain_api_key) ? '' : (data.domain_api_key || ''),
-          domain_requests_api_key: isBackendObfuscated(data.domain_requests_api_key) ? '' : (data.domain_requests_api_key || ''),
+          domain_api_key: data.domain_api_key || '',
+          domain_requests_api_key: data.domain_requests_api_key || '',
           webhook_base_url: data.webhook_base_url || '',
           no_answer_timeout: data.no_answer_timeout,
           recording_format: data.recording_format,
@@ -174,18 +164,8 @@ export default function Settings() {
    * Validate credentials and save all settings
    */
   const handleValidateAndSave = async () => {
-    // Use form values, but if API key is empty and we have obfuscated data in settingsData,
-    // we need the user to enter the actual key
-    const apiKeyToValidate = domainApiKey || '';
-    const uuidToValidate = domainUuid || '';
-
-    if (!uuidToValidate) {
-      toast.error('Please enter the Domain UUID');
-      return;
-    }
-
-    if (!apiKeyToValidate) {
-      toast.error('Please enter the Domain API Key. The stored key is not available for security reasons.');
+    if (!domainUuid || !domainApiKey) {
+      toast.error('Please enter both Domain UUID and API Key');
       return;
     }
 
@@ -195,8 +175,8 @@ export default function Settings() {
     try {
       // Step 1: Validate credentials
       const result = await settingsService.validateCloudonixCredentials({
-        domain_uuid: uuidToValidate,
-        domain_api_key: apiKeyToValidate,
+        domain_uuid: domainUuid,
+        domain_api_key: domainApiKey,
       });
 
       if (result.valid) {
