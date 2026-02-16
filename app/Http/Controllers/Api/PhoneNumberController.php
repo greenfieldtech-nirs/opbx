@@ -432,6 +432,20 @@ class PhoneNumberController extends Controller
             }
         }
 
+        // Batch load AI load balancers
+        if (! empty($aiLoadBalancerIds)) {
+            $aiLoadBalancers = AiAssistantLoadBalancer::whereIn('id', array_filter($aiLoadBalancerIds))
+                ->where('status', 'active')
+                ->get()
+                ->keyBy('id');
+            foreach ($phoneNumbersByType['ai_load_balancer'] as $phoneNumber) {
+                $aiLoadBalancerId = $phoneNumber->getTargetAiLoadBalancerId();
+                if ($aiLoadBalancerId && isset($aiLoadBalancers[$aiLoadBalancerId])) {
+                    $phoneNumber->setAiLoadBalancer($aiLoadBalancers[$aiLoadBalancerId]);
+                }
+            }
+        }
+
         // Batch load IVR menus
         if (! empty($ivrMenuIds)) {
             $ivrMenus = IvrMenu::whereIn('id', array_filter($ivrMenuIds))->get()->keyBy('id');
