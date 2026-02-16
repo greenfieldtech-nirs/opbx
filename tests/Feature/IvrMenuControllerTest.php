@@ -58,6 +58,8 @@ class IvrMenuControllerTest extends TestCase
             'tts_text' => 'Welcome to our service',
             'tts_voice' => 'en-US-Neural2-A',
             'max_turns' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 5,
             'failover_destination_type' => 'extension',
             'failover_destination_id' => $this->extension->id,
             'status' => 'active',
@@ -104,6 +106,8 @@ class IvrMenuControllerTest extends TestCase
             'name' => 'Test Menu',
             'tts_text' => 'Welcome to our service',
             'max_turns' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 5,
             'failover_destination_type' => 'hangup',
             'status' => 'active',
             'options' => [
@@ -134,7 +138,10 @@ class IvrMenuControllerTest extends TestCase
         $data = [
             'name' => 'Updated Name',
             'description' => 'Updated description',
+            'tts_text' => 'Updated welcome message',
             'max_turns' => 5,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 3,
             'failover_destination_type' => 'hangup',
             'status' => 'active',
             'options' => [
@@ -168,6 +175,9 @@ class IvrMenuControllerTest extends TestCase
         $data = [
             'name' => 'Self Reference Test',
             'max_turns' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 3,
+            'tts_text' => 'Self Ref Test',
             'failover_destination_type' => 'ivr_menu',
             'failover_destination_id' => $ivrMenu->id, // Self-reference
             'status' => 'active',

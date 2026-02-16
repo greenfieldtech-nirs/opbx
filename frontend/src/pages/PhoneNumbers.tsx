@@ -437,16 +437,9 @@ export default function PhoneNumbers() {
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={canManage ? ((phoneNumber) => {
-              setSelectedPhoneNumber(phoneNumber);
-              setIsEditDialogOpen(true);
-            }) : undefined}
-            onEdit={canManage ? ((phoneNumber) => {
-              setSelectedPhoneNumber(phoneNumber);
-              setIsEditDialogOpen(true);
-            }) : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManage ? handleDeleteClick : undefined}
-            canEdit={canManage}
             canDelete={canManage}
             columns={[
               {

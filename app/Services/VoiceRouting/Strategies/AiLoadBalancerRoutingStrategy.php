@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting\Strategies;
 
+use App\Enums\AlbsStatus;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
@@ -67,8 +68,16 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
 
     public function route(Request $request, DidNumber $did, array $destination): Response
     {
+        // Check if we're receiving an Extension model (normal routing) or an ALB model directly (fallback routing)
         $extension = $destination['extension'] ?? null;
+        $aiLoadBalancerModel = $destination['ai_load_balancer'] ?? null;
 
+        // Case 1: Direct ALB model passed (from ring group fallback)
+        if ($aiLoadBalancerModel instanceof AiAssistantLoadBalancer) {
+            return $this->routeWithLoadBalancer($request, $aiLoadBalancerModel);
+        }
+
+        // Case 2: Extension model passed (normal routing from extension)
         if (! $extension instanceof Extension) {
             Log::error('AiLoadBalancerRoutingStrategy: Extension not found in destination', [
                 'destination_keys' => array_keys($destination),
@@ -110,12 +119,14 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             }])
             ->where('id', $aiLoadBalancerId)
             ->where('organization_id', $extension->organization_id)
+            ->where('status', AlbsStatus::ACTIVE)
             ->first();
 
         if (! $aiLoadBalancer) {
-            Log::error('AiLoadBalancerRoutingStrategy: AI Load Balancer not found', [
-                'extension_id' => $extension->id,
+            Log::error('AiLoadBalancerRoutingStrategy: AI Load Balancer not found or inactive', [
                 'ai_load_balancer_id' => $aiLoadBalancerId,
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
             ]);
 
             return response(
@@ -125,10 +136,22 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             );
         }
 
+        return $this->routeWithLoadBalancer($request, $aiLoadBalancer);
+    }
+
+    /**
+     * Route call using a loaded AI Load Balancer.
+     *
+     * @param  Request  $request  The incoming request
+     * @param  AiAssistantLoadBalancer  $aiLoadBalancer  The ALB to route to
+     * @return Response CXML response
+     */
+    private function routeWithLoadBalancer(Request $request, AiAssistantLoadBalancer $aiLoadBalancer): Response
+    {
         if ($aiLoadBalancer->status->value !== 'active') {
             Log::warning('AiLoadBalancerRoutingStrategy: AI Load Balancer is inactive', [
-                'extension_id' => $extension->id,
                 'ai_load_balancer_id' => $aiLoadBalancer->id,
+                'ai_load_balancer_name' => $aiLoadBalancer->name,
                 'status' => $aiLoadBalancer->status->value,
             ]);
 
@@ -136,8 +159,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         }
 
         Log::info('AiLoadBalancerRoutingStrategy: Routing to AI Load Balancer', [
-            'extension_id' => $extension->id,
-            'extension_number' => $extension->extension_number,
             'ai_load_balancer_id' => $aiLoadBalancer->id,
             'ai_load_balancer_name' => $aiLoadBalancer->name,
             'strategy' => $aiLoadBalancer->strategy->value,
@@ -147,7 +168,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
 
         if (! $selectedAiAssistant) {
             Log::warning('AiLoadBalancerRoutingStrategy: No AI Assistant selected', [
-                'extension_id' => $extension->id,
                 'ai_load_balancer_id' => $aiLoadBalancer->id,
                 'strategy' => $aiLoadBalancer->strategy->value,
             ]);
@@ -156,7 +176,6 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         }
 
         Log::info('AiLoadBalancerRoutingStrategy: Selected AI Assistant', [
-            'extension_id' => $extension->id,
             'ai_load_balancer_id' => $aiLoadBalancer->id,
             'selected_ai_assistant_id' => $selectedAiAssistant->id,
             'selected_ai_assistant_name' => $selectedAiAssistant->name,

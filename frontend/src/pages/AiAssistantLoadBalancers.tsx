@@ -1306,20 +1306,19 @@ export default function AiAssistantLoadBalancers() {
           <StandardDataTable<AiAssistantLoadBalancer>
             data={loadBalancers}
             isLoading={isLoading}
-            onRowClick={canManage ? setSelectedLoadBalancer : undefined}
+            onRowClick={canManage ? ((lb) => openEditDialog(lb as ExtendedAiAssistantLoadBalancer)) : undefined}
             identityIcon={Scale}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(lb) => lb.name}
             getIdentitySecondary={() => 'AI Load Balancer'}
-            onIdentityClick={canManage ? setSelectedLoadBalancer : undefined}
+            onIdentityClick={canManage ? ((lb) => openEditDialog(lb as ExtendedAiAssistantLoadBalancer)) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
-            onView={canManage ? openDetailSheet : undefined}
-            onEdit={canManage ? ((lb) => openEditDialog(lb as ExtendedAiAssistantLoadBalancer)) : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManage ? openDeleteDialog : undefined}
-            canEdit={canManage}
             canDelete={canManage}
             columns={[
               {

@@ -37,7 +37,7 @@ class RateLimitPerOrganization
         // Extract organization ID from request
         $organizationId = $this->extractOrganizationId($request);
 
-        if (! $organizationId) {
+        if (!$organizationId) {
             Log::warning('Rate limit: Organization not identified', [
                 'path' => $request->path(),
                 'ip' => $request->ip(),
@@ -52,7 +52,7 @@ class RateLimitPerOrganization
         // Get rate limit configuration
         $limits = config("rate-limiting.{$limitType}");
 
-        if (! $limits) {
+        if (!$limits) {
             Log::error('Rate limit: Invalid limit type', [
                 'limit_type' => $limitType,
                 'organization_id' => $organizationId,
@@ -63,7 +63,7 @@ class RateLimitPerOrganization
         }
 
         // Fallback to hardcoded defaults if config not loaded (e.g., in tests)
-        if (! $limits) {
+        if (!$limits) {
             $limits = [
                 'max_attempts' => 60,
                 'per_minutes' => 1,
@@ -146,21 +146,21 @@ class RateLimitPerOrganization
      */
     private function incrementAttempts(string $key, int $minutes): int
     {
-        // Use Redis connection directly for atomic operations
-        // Get the Redis client from the cache connection
-        $redis = Cache::connection()->client();
+        // Use standard Cache facade for driver compatibility
 
-        // Atomic increment (INCR is always atomic in Redis)
-        $newCount = $redis->incr($key);
+        // Atomic lock-free approach:
+        // 1. Try to add the key with value 1 and TTL
+        // 2. If successful (key didn't exist), return 1
+        // 3. If failed (key exists), increment and return new value
 
-        // Set TTL only on first request (when count == 1)
-        // This is also atomic when combined with INCR using a Lua script
-        // but for simplicity, we use EXPIRE which is safe to call multiple times
-        if ($newCount === 1) {
-            $redis->expire($key, $minutes * 60);
+        // Note: This relies on the cache driver's implementation of 'add' being atomic.
+        // For Redis, Memcached, Array, and File drivers in Laravel, this works as expected.
+
+        if (Cache::add($key, 1, $minutes * 60)) {
+            return 1;
         }
 
-        return $newCount;
+        return (int) Cache::increment($key);
     }
 
     /**

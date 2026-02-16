@@ -259,11 +259,12 @@ class CxmlBuilder
      *
      * @param  array<string>  $sipUris  Array of SIP URIs
      * @param  int|null  $timeout  Timeout in seconds
+     * @param  string|null  $action  Callback URL when dial completes (for fallback handling)
      */
-    public static function dialRingGroup(array $sipUris, ?int $timeout = null): string
+    public static function dialRingGroup(array $sipUris, ?int $timeout = null, ?string $action = null): string
     {
         $builder = new self;
-        $builder->dial($sipUris, $timeout ?? config('cloudonix.cxml.default_timeout', 30));
+        $builder->dial($sipUris, $timeout ?? config('cloudonix.cxml.default_timeout', 30), $action);
 
         return $builder->build();
     }

@@ -66,6 +66,8 @@ import { ringGroupsService } from '@/services/createResourceService';
 import { ivrMenusService } from '@/services/createResourceService';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { cn } from '@/lib/utils';
+import { DestinationTypeAndSelector } from '@/components/destinations/DestinationTypeAndSelector';
+import type { DestinationType } from '@/components/destinations/types/destination.types';
 import {
   StandardDataTable,
   Column,
@@ -1291,18 +1293,18 @@ const BusinessHours: React.FC = () => {
           <StandardDataTable<BusinessHoursSchedule>
             data={schedules}
             isLoading={isLoading}
-            onRowClick={handleOpenDetail}
+            onRowClick={handleOpenEdit}
             identityIcon={Clock}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(schedule) => schedule.name}
             getIdentitySecondary={() => 'Business Hours'}
-            onIdentityClick={handleOpenDetail}
+            onIdentityClick={handleOpenEdit}
             sortField={sortBy}
             sortDirection="asc"
             onSort={(field) => setSortBy(field as any)}
-            onView={handleOpenDetail}
-            onEdit={handleOpenEdit}
+            canView={false}
+            canEdit={false}
             onDelete={handleOpenDelete}
             columns={[
               {
@@ -1724,29 +1726,65 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
 
             <div className="grid grid-cols-2 gap-4">
               <Card className="p-4">
-                <ActionSelector
-                  label="Open Hours Action"
-                  value={openHoursAction}
-                  onChange={onOpenHoursActionChange}
-                  error={formErrors.open_hours_action}
-                  extensions={extensions}
-                  ringGroups={ringGroups}
-                  ivrMenus={ivrMenus}
-                  conferenceRooms={conferenceRooms}
+                <DestinationTypeAndSelector
+                  typeValue={(openHoursAction?.type as DestinationType) || null}
+                  destinationValue={(() => {
+                    if (!openHoursAction?.target_id) return '';
+                    let id = openHoursAction.target_id;
+                    if (id.startsWith('ext-')) id = id.substring(4);
+                    else if (id.startsWith('rg-')) id = id.substring(3);
+                    else if (id.startsWith('ivr-')) id = id.substring(4);
+                    else if (id.startsWith('conf-')) id = id.substring(5);
+                    else if (id.startsWith('alb-')) id = id.substring(4);
+                    return id;
+                  })()}
+                  onChange={(type, destId) => {
+                    let prefixedId = destId;
+                    if (type === 'extension') prefixedId = `ext-${destId}`;
+                    else if (type === 'ring_group') prefixedId = `rg-${destId}`;
+                    else if (type === 'ivr_menu') prefixedId = `ivr-${destId}`;
+                    else if (type === 'conference_room') prefixedId = `conf-${destId}`;
+                    else if (type === 'ai_load_balancer') prefixedId = `alb-${destId}`;
+                    onOpenHoursActionChange({ type: type as BusinessHoursActionType, target_id: prefixedId });
+                  }}
+                  layout="vertical"
+                  typeLabel="Open Hours Action"
+                  destinationLabel="Destination"
+                  allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
                 />
+                {formErrors.open_hours_action && <p className="text-sm text-destructive mt-2">{formErrors.open_hours_action}</p>}
+                <p className="text-sm text-muted-foreground mt-2">Where to forward calls during open hours</p>
               </Card>
 
               <Card className="p-4">
-                <ActionSelector
-                  label="Closed Hours Action"
-                  value={closedHoursAction}
-                  onChange={onClosedHoursActionChange}
-                  error={formErrors.closed_hours_action}
-                  extensions={extensions}
-                  ringGroups={ringGroups}
-                  ivrMenus={ivrMenus}
-                  conferenceRooms={conferenceRooms}
+                <DestinationTypeAndSelector
+                  typeValue={(closedHoursAction?.type as DestinationType) || null}
+                  destinationValue={(() => {
+                    if (!closedHoursAction?.target_id) return '';
+                    let id = closedHoursAction.target_id;
+                    if (id.startsWith('ext-')) id = id.substring(4);
+                    else if (id.startsWith('rg-')) id = id.substring(3);
+                    else if (id.startsWith('ivr-')) id = id.substring(4);
+                    else if (id.startsWith('conf-')) id = id.substring(5);
+                    else if (id.startsWith('alb-')) id = id.substring(4);
+                    return id;
+                  })()}
+                  onChange={(type, destId) => {
+                    let prefixedId = destId;
+                    if (type === 'extension') prefixedId = `ext-${destId}`;
+                    else if (type === 'ring_group') prefixedId = `rg-${destId}`;
+                    else if (type === 'ivr_menu') prefixedId = `ivr-${destId}`;
+                    else if (type === 'conference_room') prefixedId = `conf-${destId}`;
+                    else if (type === 'ai_load_balancer') prefixedId = `alb-${destId}`;
+                    onClosedHoursActionChange({ type: type as BusinessHoursActionType, target_id: prefixedId });
+                  }}
+                  layout="vertical"
+                  typeLabel="Closed Hours Action"
+                  destinationLabel="Destination"
+                  allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer']}
                 />
+                {formErrors.closed_hours_action && <p className="text-sm text-destructive mt-2">{formErrors.closed_hours_action}</p>}
+                <p className="text-sm text-muted-foreground mt-2">Where to forward calls during closed hours</p>
               </Card>
             </div>
 

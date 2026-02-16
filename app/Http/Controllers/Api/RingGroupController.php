@@ -136,12 +136,14 @@ class RingGroupController extends AbstractApiCrudController
         $incomingRingGroupId = $validated['fallback_ring_group_id'] ?? null;
         $incomingIvrMenuId = $validated['fallback_ivr_menu_id'] ?? null;
         $incomingAiAssistantId = $validated['fallback_ai_assistant_id'] ?? null;
+        $incomingAiLoadBalancerId = $validated['fallback_ai_load_balancer_id'] ?? null;
 
         // Clear all fallback IDs first
         $validated['fallback_extension_id'] = null;
         $validated['fallback_ring_group_id'] = null;
         $validated['fallback_ivr_menu_id'] = null;
         $validated['fallback_ai_assistant_id'] = null;
+        $validated['fallback_ai_load_balancer_id'] = null;
 
         // Set only the relevant fallback ID based on action type
         switch ($action) {
@@ -160,6 +162,10 @@ class RingGroupController extends AbstractApiCrudController
             case 'ai_assistant':
                 $validated['fallback_ai_assistant_id'] = $incomingAiAssistantId
                     ?? $ringGroup?->fallback_ai_assistant_id;
+                break;
+            case 'ai_load_balancer':
+                $validated['fallback_ai_load_balancer_id'] = $incomingAiLoadBalancerId
+                    ?? $ringGroup?->fallback_ai_load_balancer_id;
                 break;
                 // Other actions (voicemail, hangup, etc.) don't need fallback IDs
         }

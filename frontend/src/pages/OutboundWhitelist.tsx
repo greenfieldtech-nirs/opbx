@@ -346,7 +346,8 @@ const OutboundWhitelistPage: React.FC = () => {
             sortField={sortField || undefined}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onEdit={canManageWhitelist ? openEditDialog : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManageWhitelist ? (item) => setDeleteItem(item) : undefined}
             columns={[
               {

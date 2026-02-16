@@ -11,6 +11,8 @@ import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService } from '@/services/createResourceService';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
+import aiAssistantsService from '@/services/aiAssistants.service';
+import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,6 +59,11 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import {
+  DestinationTypeAndSelector,
+  DestinationBadge,
+  useDestinations,
+} from '@/components/destinations';
 import { Combobox } from '@/components/ui/combobox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -75,6 +82,12 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  ArrowRight,
+  Users,
+  Menu,
+  Bot,
+  Scale,
+  UserCheck,
 } from 'lucide-react';
 import {
   StandardDataTable,
@@ -260,6 +273,8 @@ export default function IVRMenus() {
   // Permission check
   const canManage = currentUser ? ['owner', 'pbx_admin'].includes(currentUser.role) : false;
 
+  // Debug: Check if destinations are loading properly
+
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<IvrMenuStatus | 'all'>('all');
@@ -332,13 +347,37 @@ export default function IVRMenus() {
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
+  const { data: aiAssistantsData, isLoading: aiAssistantsLoading, error: aiAssistantsError } = useQuery({
+    queryKey: ['ivr-ai-assistants'],
+    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
+  });
+
+  const { data: aiLoadBalancersData, isLoading: aiLoadBalancersLoading, error: aiLoadBalancersError } = useQuery({
+    queryKey: ['ivr-ai-load-balancers'],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  // Helper to get display label for an extension (matches Ring Groups format)
+  const getExtensionDisplayLabel = (ext: any) => {
+    if (ext.type === 'forward') {
+      const forwardTo = ext.configuration?.forward_to;
+      return forwardTo ? `Forward to ${forwardTo}` : 'Forward Extension';
+    }
+    return ext.user?.name || 'Unassigned User';
+  };
+
   // Combine all destinations
   const availableDestinations = {
-    extensions: extensionsData?.data?.map(ext => ({
-      id: String(ext.id),
-      extension_number: ext.extension_number,
-      label: `Ext ${ext.extension_number} - ${ext.user?.name || 'Unassigned'}`
-    })) || [],
+    // Only show 'user' and 'forward' type extensions (matching Ring Groups behavior)
+    extensions: extensionsData?.data
+      ?.filter(ext => ext.type === 'user' || ext.type === 'forward')
+      ?.map(ext => ({
+        id: String(ext.id),
+        extension_number: ext.extension_number,
+        type: ext.type,
+        label: `Ext ${ext.extension_number} - ${getExtensionDisplayLabel(ext)}`,
+        displayLabel: getExtensionDisplayLabel(ext)
+      })) || [],
     ring_groups: ringGroupsData?.data?.map(rg => ({
       id: String(rg.id),
       label: `Ring Group: ${rg.name}`
@@ -350,13 +389,54 @@ export default function IVRMenus() {
     ivr_menus: ivrMenusList?.data?.map(menu => ({
       id: String(menu.id),
       label: `IVR Menu: ${menu.name}`
+    })) || [],
+    ai_assistants: aiAssistantsData?.data?.filter(ext => ext.type === 'ai_assistant')?.map(ext => ({
+      id: String(ext.id),
+      extension_number: ext.extension_number,
+      label: `Ext ${ext.extension_number} - ${ext.ai_assistant?.name || 'AI Assistant'}`
+    })) || [],
+    ai_load_balancers: aiLoadBalancersData?.data?.map(alb => ({
+      id: String(alb.id),
+      label: `${alb.name}`
     })) || []
   };
 
-  const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading;
-  const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError;
+  const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading || aiAssistantsLoading || aiLoadBalancersLoading;
+  const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError || aiAssistantsError || aiLoadBalancersError;
 
+  // Helper to render destination badge (matches Extensions page format)
+  const renderDestinationBadge = (type: string, label: string, extType?: string) => {
+    const configs: Record<string, { color: string; icon: any }> = {
+      user: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
+      forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
+      ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+      conference: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
+      ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
+      ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+      ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
+    };
 
+    // For extensions, use the extension type; otherwise use the destination type
+    const configKey = type === 'extension' && extType ? extType : type === 'conference_room' ? 'conference' : type;
+    const config = configs[configKey] || configs.user;
+    const Icon = config.icon;
+
+    return (
+      <div className="flex items-center gap-1.5">
+        <Badge variant="outline" className={cn('flex items-center gap-1 px-1.5 py-0.5 text-xs', config.color)}>
+          <Icon className="h-3 w-3" />
+          {type === 'extension' && extType === 'user' && 'User'}
+          {type === 'extension' && extType === 'forward' && 'Forward'}
+          {type === 'ring_group' && 'Ring Group'}
+          {type === 'conference_room' && 'Conference'}
+          {type === 'ivr_menu' && 'IVR'}
+          {type === 'ai_assistant' && 'AI Assistant'}
+          {type === 'ai_load_balancer' && 'AI Load Balancer'}
+        </Badge>
+        <span className="text-sm">{label}</span>
+      </div>
+    );
+  };
 
   // Available recordings for audio selection
   const { data: recordingsData } = useQuery({
@@ -630,14 +710,9 @@ export default function IVRMenus() {
     });
   };
 
-  // Update menu option
   const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
     const updatedOptions = [...formData.options];
-    // For extensions, destination_id is the extension number (string)
-    // For other types, destination_id is the model ID (converted to number)
-    const processedValue = field === 'destination_id' && value !== '' &&
-      updatedOptions[index].destination_type !== 'extension' ? parseInt(value, 10) : value;
-    updatedOptions[index] = { ...updatedOptions[index], [field]: processedValue };
+    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
     setFormData({ ...formData, options: updatedOptions });
   };
 
@@ -655,9 +730,12 @@ export default function IVRMenus() {
       inter_digit_timeout: menu.inter_digit_timeout,
       max_turns: menu.max_turns,
       failover_destination_type: menu.failover_destination_type,
-      failover_destination_id: menu.failover_destination_id,
+      failover_destination_id: menu.failover_destination_id ? String(menu.failover_destination_id) : undefined,
       status: menu.status,
-      options: [...menu.options],
+      options: menu.options.map(opt => ({
+        ...opt,
+        destination_id: String(opt.destination_id)
+      })),
     });
     setIsEditDialogOpen(true);
   };
@@ -752,7 +830,7 @@ export default function IVRMenus() {
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
-            onView={openEditDialog}
+            canView={false}
             onEdit={openEditDialog}
             onDelete={openDeleteDialog}
             columns={[
@@ -860,7 +938,7 @@ export default function IVRMenus() {
         }
         }
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create IVR Menu</DialogTitle>
             <DialogDescription>
@@ -1041,138 +1119,56 @@ export default function IVRMenus() {
                 ) : (
                   <div className="space-y-4">
                     {(formData.options || []).map((option, index) => (
-                      <Card key={index}>
+                      <Card key={index} className="w-full">
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-12 gap-4 items-end">
-                            <div className="col-span-2">
+                          <div className="flex flex-col md:flex-row gap-6 items-start md:items-end w-full">
+                            <div className="w-full md:w-20 shrink-0 space-y-2">
                               <Label>Digits *</Label>
-                              <div>
-                                <Input
-                                  value={option.input_digits}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    // Only allow digits and some special characters (*, #)
-                                    if (/^[0-9*#]*$/.test(value)) {
-                                      updateMenuOption(index, 'input_digits', value);
-                                    }
-                                  }}
-                                  placeholder="1"
-                                  maxLength={10}
-                                  className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
-                                />
-                                {option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) && (
-                                  <p className="text-sm text-red-500 mt-1">
-                                    Only digits (0-9), asterisk (*), and pound (#) are allowed
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="col-span-3">
-                              <Label>Description</Label>
                               <Input
-                                value={option.description || ''}
-                                onChange={(e) => updateMenuOption(index, 'description', e.target.value)}
-                                placeholder="Press 1 for sales"
+                                value={option.input_digits}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Only allow digits and some special characters (*, #)
+                                  if (/^[0-9*#]*$/.test(value)) {
+                                    updateMenuOption(index, 'input_digits', value);
+                                  }
+                                }}
+                                placeholder="1"
+                                maxLength={10}
+                                className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
                               />
                             </div>
-                            <div className="col-span-2">
-                              <Label>Type</Label>
-                              <Select
-                                value={option.destination_type}
-                                onValueChange={(value) => {
-                                  // Update both destination_type and reset destination_id in a single state update
+                            <div className="flex-1 min-w-0 w-full">
+                              <DestinationTypeAndSelector
+                                typeValue={option.destination_type}
+                                destinationValue={option.destination_id}
+                                onChange={(type, destId) => {
                                   const updatedOptions = [...formData.options];
                                   updatedOptions[index] = {
                                     ...updatedOptions[index],
-                                    destination_type: value as IvrDestinationType,
-                                    destination_id: ''
+                                    destination_type: type as IvrDestinationType,
+                                    destination_id: destId
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
                                 }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="extension">Extension</SelectItem>
-                                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                                  <SelectItem value="conference_room">Conference</SelectItem>
-                                  <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                                </SelectContent>
-                              </Select>
+                                layout="horizontal"
+                                typeClassName="w-full md:w-[220px] flex-none"
+                                destinationClassName="flex-1 min-w-0"
+                                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+                                extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
+                                typeLabel="Type"
+                                destinationLabel="Destination"
+                              />
                             </div>
-                            <div className="col-span-4">
-                              <Label>Destination</Label>
-                              <Select
-                                key={`destination-${index}-${option.destination_type}`}
-                                value={option.destination_id?.toString() || ''}
-                                onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
-                                disabled={!option.destination_type}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select destination" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {destinationsLoading ? (
-                                    <div className="px-2 py-1 text-sm text-muted-foreground">
-                                      Loading destinations...
-                                    </div>
-                                  ) : destinationsError ? (
-                                    <div className="px-2 py-1 text-sm text-destructive">
-                                      Error loading destinations
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                        <SelectItem key={ext.id} value={ext.extension_number}>
-                                          {ext.label}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
-                                        <SelectItem key={rg.id} value={rg.id}>
-                                          {rg.label}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
-                                        <SelectItem key={cr.id} value={cr.id}>
-                                          {cr.label}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
-                                        <SelectItem key={menu.id} value={menu.id}>
-                                          {menu.label}
-                                        </SelectItem>
-                                      ))}
-                                      {(() => {
-                                        const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
-                                          option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
-                                          option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
-                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0;
-
-                                        if (!hasOptions && !destinationsLoading && !destinationsError) {
-                                          return (
-                                            <div className="px-2 py-1 text-sm text-muted-foreground">
-                                              No {option.destination_type?.replace('_', ' ')}s available
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="col-span-1">
-                              <Button
+                            <div className="w-full md:w-10 shrink-0">
+                              <button
                                 type="button"
-                                variant="outline"
-                                size="sm"
                                 onClick={() => removeMenuOption(index)}
-                                className="w-full"
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
+                                aria-label="Delete option"
                               >
-                                <X className="h-4 w-4" />
-                              </Button>
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                         </CardContent>
@@ -1256,71 +1252,25 @@ export default function IVRMenus() {
                           How many times to replay the menu on invalid input
                         </p>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="failover-type">Failover Destination</Label>
-                        <Select
-                          value={formData.failover_destination_type}
-                          onValueChange={(value) => setFormData({
-                            ...formData,
-                            failover_destination_type: value as IvrDestinationType,
-                            failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hangup">Hang Up</SelectItem>
-                            <SelectItem value="extension">Extension</SelectItem>
-                            <SelectItem value="ring_group">Ring Group</SelectItem>
-                            <SelectItem value="conference_room">Conference Room</SelectItem>
-                            <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
 
-                    {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
-                      <div className="space-y-2">
-                        <Label>Failover Destination</Label>
-                        <Select
-                          key={`failover-${formData.failover_destination_type}`}
-                          value={formData.failover_destination_id || ''}
-                          onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select failover destination" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formData.failover_destination_type === 'extension' &&
-                              availableDestinations?.extensions?.map((ext) => (
-                                <SelectItem key={ext.id} value={ext.id}>
-                                  {ext.label}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ring_group' &&
-                              availableDestinations?.ring_groups?.map((rg) => (
-                                <SelectItem key={rg.id} value={rg.id}>
-                                  {rg.label}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'conference_room' &&
-                              availableDestinations?.conference_rooms?.map((cr) => (
-                                <SelectItem key={cr.id} value={cr.id}>
-                                  {cr.label}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ivr_menu' &&
-                              availableDestinations?.ivr_menus?.map((menu) => (
-                                <SelectItem key={menu.id} value={menu.id}>
-                                  {menu.label}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <DestinationTypeAndSelector
+                      typeValue={formData.failover_destination_type}
+                      destinationValue={formData.failover_destination_id || ''}
+                      onChange={(type, destId) => {
+                        setFormData({
+                          ...formData,
+                          failover_destination_type: type as IvrDestinationType,
+                          failover_destination_id: destId || undefined
+                        });
+                      }}
+                      layout="vertical"
+                      includeHangup={true}
+                      allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+                      extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
+                      typeLabel="Failover Action"
+                      destinationLabel="Failover Destination"
+                    />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -1340,7 +1290,7 @@ export default function IVRMenus() {
 
       {/* Edit Dialog - Full tabbed interface */}
       < Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit IVR Menu</DialogTitle>
             <DialogDescription>
@@ -1515,138 +1465,56 @@ export default function IVRMenus() {
                 ) : (
                   <div className="space-y-4">
                     {(formData.options || []).map((option, index) => (
-                      <Card key={index}>
+                      <Card key={index} className="w-full">
                         <CardContent className="p-4">
-                          <div className="grid grid-cols-12 gap-4 items-end">
-                            <div className="col-span-2">
+                          <div className="flex flex-col md:flex-row gap-6 items-start md:items-end w-full">
+                            <div className="w-full md:w-20 shrink-0 space-y-2">
                               <Label>Digits *</Label>
-                              <div>
-                                <Input
-                                  value={option.input_digits}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    // Only allow digits and some special characters (*, #)
-                                    if (/^[0-9*#]*$/.test(value)) {
-                                      updateMenuOption(index, 'input_digits', value);
-                                    }
-                                  }}
-                                  placeholder="1"
-                                  maxLength={10}
-                                  className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
-                                />
-                                {option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) && (
-                                  <p className="text-sm text-red-500 mt-1">
-                                    Only digits (0-9), asterisk (*), and pound (#) are allowed
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="col-span-3">
-                              <Label>Description</Label>
                               <Input
-                                value={option.description || ''}
-                                onChange={(e) => updateMenuOption(index, 'description', e.target.value)}
-                                placeholder="Press 1 for sales"
+                                value={option.input_digits}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Only allow digits and some special characters (*, #)
+                                  if (/^[0-9*#]*$/.test(value)) {
+                                    updateMenuOption(index, 'input_digits', value);
+                                  }
+                                }}
+                                placeholder="1"
+                                maxLength={10}
+                                className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
                               />
                             </div>
-                            <div className="col-span-2">
-                              <Label>Type</Label>
-                              <Select
-                                value={option.destination_type}
-                                onValueChange={(value) => {
-                                  // Update both destination_type and reset destination_id in a single state update
+                            <div className="flex-1 min-w-0 w-full">
+                              <DestinationTypeAndSelector
+                                typeValue={option.destination_type}
+                                destinationValue={option.destination_id}
+                                onChange={(type, destId) => {
                                   const updatedOptions = [...formData.options];
                                   updatedOptions[index] = {
                                     ...updatedOptions[index],
-                                    destination_type: value as IvrDestinationType,
-                                    destination_id: ''
+                                    destination_type: type as IvrDestinationType,
+                                    destination_id: destId
                                   };
                                   setFormData({ ...formData, options: updatedOptions });
                                 }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="extension">Extension</SelectItem>
-                                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                                  <SelectItem value="conference_room">Conference</SelectItem>
-                                  <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                                </SelectContent>
-                              </Select>
+                                layout="horizontal"
+                                typeClassName="w-full md:w-[220px] flex-none"
+                                destinationClassName="flex-1 min-w-0"
+                                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+                                extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
+                                typeLabel="Type"
+                                destinationLabel="Destination"
+                              />
                             </div>
-                            <div className="col-span-4">
-                              <Label>Destination</Label>
-                              <Select
-                                key={`destination-${index}-${option.destination_type}`}
-                                value={option.destination_id?.toString() || ''}
-                                onValueChange={(value) => updateMenuOption(index, 'destination_id', value)}
-                                disabled={!option.destination_type}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select destination" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {destinationsLoading ? (
-                                    <div className="px-2 py-1 text-sm text-muted-foreground">
-                                      Loading destinations...
-                                    </div>
-                                  ) : destinationsError ? (
-                                    <div className="px-2 py-1 text-sm text-destructive">
-                                      Error loading destinations
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {option.destination_type === 'extension' && availableDestinations?.extensions?.map((ext) => (
-                                        <SelectItem key={ext.id} value={ext.extension_number}>
-                                          {ext.label}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.map((rg) => (
-                                        <SelectItem key={rg.id} value={rg.id}>
-                                          {rg.label}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.map((cr) => (
-                                        <SelectItem key={cr.id} value={cr.id}>
-                                          {cr.label}
-                                        </SelectItem>
-                                      ))}
-                                      {option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.map((menu) => (
-                                        <SelectItem key={menu.id} value={menu.id}>
-                                          {menu.label}
-                                        </SelectItem>
-                                      ))}
-                                      {(() => {
-                                        const hasOptions = option.destination_type === 'extension' && availableDestinations?.extensions?.length > 0 ||
-                                          option.destination_type === 'ring_group' && availableDestinations?.ring_groups?.length > 0 ||
-                                          option.destination_type === 'conference_room' && availableDestinations?.conference_rooms?.length > 0 ||
-                                          option.destination_type === 'ivr_menu' && availableDestinations?.ivr_menus?.length > 0;
-
-                                        if (!hasOptions && !destinationsLoading && !destinationsError) {
-                                          return (
-                                            <div className="px-2 py-1 text-sm text-muted-foreground">
-                                              No {option.destination_type?.replace('_', ' ')}s available
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="col-span-1">
-                              <Button
+                            <div className="w-full md:w-10 shrink-0">
+                              <button
                                 type="button"
-                                variant="outline"
-                                size="sm"
                                 onClick={() => removeMenuOption(index)}
-                                className="w-full"
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
+                                aria-label="Delete option"
                               >
-                                <X className="h-4 w-4" />
-                              </Button>
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                         </CardContent>
@@ -1730,71 +1598,25 @@ export default function IVRMenus() {
                           How many times to replay the menu on invalid input
                         </p>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-failover-type">Failover Destination</Label>
-                        <Select
-                          value={formData.failover_destination_type}
-                          onValueChange={(value) => setFormData({
-                            ...formData,
-                            failover_destination_type: value as IvrDestinationType,
-                            failover_destination_id: value === 'hangup' ? undefined : formData.failover_destination_id
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hangup">Hang Up</SelectItem>
-                            <SelectItem value="extension">Extension</SelectItem>
-                            <SelectItem value="ring_group">Ring Group</SelectItem>
-                            <SelectItem value="conference_room">Conference Room</SelectItem>
-                            <SelectItem value="ivr_menu">IVR Menu</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
 
-                    {formData.failover_destination_type && formData.failover_destination_type !== 'hangup' && (
-                      <div className="space-y-2">
-                        <Label>Failover Destination</Label>
-                        <Select
-                          key={`failover-${formData.failover_destination_type}`}
-                          value={formData.failover_destination_id || ''}
-                          onValueChange={(value) => setFormData({ ...formData, failover_destination_id: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select failover destination" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formData.failover_destination_type === 'extension' &&
-                              availableDestinations?.extensions?.map((ext) => (
-                                <SelectItem key={ext.id} value={ext.id}>
-                                  {ext.label}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ring_group' &&
-                              availableDestinations?.ring_groups?.map((rg) => (
-                                <SelectItem key={rg.id} value={rg.id}>
-                                  {rg.label}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'conference_room' &&
-                              availableDestinations?.conference_rooms?.map((cr) => (
-                                <SelectItem key={cr.id} value={cr.id}>
-                                  {cr.label}
-                                </SelectItem>
-                              ))}
-                            {formData.failover_destination_type === 'ivr_menu' &&
-                              availableDestinations?.ivr_menus?.map((menu) => (
-                                <SelectItem key={menu.id} value={menu.id}>
-                                  {menu.label}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <DestinationTypeAndSelector
+                      typeValue={formData.failover_destination_type}
+                      destinationValue={formData.failover_destination_id || ''}
+                      onChange={(type, destId) => {
+                        setFormData({
+                          ...formData,
+                          failover_destination_type: type as IvrDestinationType,
+                          failover_destination_id: destId || undefined
+                        });
+                      }}
+                      layout="vertical"
+                      includeHangup={true}
+                      allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+                      extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
+                      typeLabel="Failover Action"
+                      destinationLabel="Failover Destination"
+                    />
                   </CollapsibleContent>
                 </Collapsible>
               </div>

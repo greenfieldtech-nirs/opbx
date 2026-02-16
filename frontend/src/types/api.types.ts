@@ -70,7 +70,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
 
 // Ring Group Status
 export type RingGroupStatus = 'active' | 'inactive';
@@ -79,7 +79,7 @@ export type RingGroupStatus = 'active' | 'inactive';
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
 
 // IVR Destination Type
-export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'hangup';
+export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'hangup';
 
 // IVR Menu Status
 export type IvrMenuStatus = 'active' | 'inactive';

@@ -8,6 +8,7 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
+use App\Models\AI\AiAssistantLoadBalancer;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,6 +45,7 @@ class RingGroup extends Model
         'fallback_ring_group_id',
         'fallback_ivr_menu_id',
         'fallback_ai_assistant_id',
+        'fallback_ai_load_balancer_id',
         'status',
     ];
 
@@ -109,6 +111,14 @@ class RingGroup extends Model
     public function fallbackAiAssistant(): BelongsTo
     {
         return $this->belongsTo(Extension::class, 'fallback_ai_assistant_id');
+    }
+
+    /**
+     * Get the fallback AI load balancer for this ring group.
+     */
+    public function fallbackAiLoadBalancer(): BelongsTo
+    {
+        return $this->belongsTo(AiAssistantLoadBalancer::class, 'fallback_ai_load_balancer_id');
     }
 
     /**

@@ -70,7 +70,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
 
 // AI Assistant Load Balancer Strategy
 export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
@@ -217,6 +217,14 @@ export interface RingGroup {
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
   fallback_extension_number?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  fallback_ai_load_balancer_id?: string;
+  fallback_ai_load_balancer?: {
+    id: string;
+    name: string;
+  } | null;
   status: Status;
   created_at: string;
   updated_at: string;
@@ -718,7 +726,7 @@ export interface ExceptionDate {
 
 export type ScheduleStatus = 'active' | 'inactive';
 
-export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference' | 'ai_assistant' | 'forward';
+export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference_room' | 'ai_assistant' | 'ai_load_balancer' | 'forward';
 
 export interface BusinessHoursAction {
   type: BusinessHoursActionType;

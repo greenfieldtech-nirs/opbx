@@ -579,18 +579,18 @@ export default function UsersComplete() {
           <StandardDataTable<User>
             data={paginatedUsers}
             isLoading={isLoading}
-            onRowClick={openUserDetail}
+            onRowClick={openEditDialog}
             identityIcon={UserCheck}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(user) => user.name}
             getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : 'PBX User'}
-            onIdentityClick={openUserDetail}
+            onIdentityClick={openEditDialog}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={openUserDetail}
-            onEdit={openEditDialog}
+            canView={false}
+            canEdit={false}
             onDelete={(user) => {
               setSelectedUser(user);
               setShowDeleteDialog(true);

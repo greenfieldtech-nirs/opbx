@@ -49,7 +49,7 @@ class IvrInputRequest extends FormRequest
             'Domain' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', 'max:255'],
 
             // Call status - optional
-            'CallStatus' => ['nullable', 'string', 'in:ringing,answered,completed,failed,busy,no-answer', 'max:20'],
+            'CallStatus' => ['nullable', 'string', 'in:ringing,answered,completed,failed,busy,no-answer,in-progress', 'max:20'],
 
             // Organization ID - set by middleware
             '_organization_id' => ['nullable', 'integer', 'min:1'],
