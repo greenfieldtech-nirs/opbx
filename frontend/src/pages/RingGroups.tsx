@@ -1542,20 +1542,19 @@ export default function RingGroups() {
           <StandardDataTable<RingGroup>
             data={ringGroups}
             isLoading={isLoading}
-            onRowClick={canManage ? setSelectedGroup : undefined}
+            onRowClick={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
             identityIcon={Users}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(group) => group.name}
             getIdentitySecondary={() => 'Ring Group'}
-            onIdentityClick={canManage ? setSelectedGroup : undefined}
+            onIdentityClick={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
-            onView={canManage ? openDetailSheet : undefined}
-            onEdit={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManage ? openDeleteDialog : undefined}
-            canEdit={canManage}
             canDelete={canManage}
             columns={[
               {

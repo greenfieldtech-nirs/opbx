@@ -1225,33 +1225,22 @@ export default function ExtensionsComplete() {
           <StandardDataTable<Extension>
             data={displayedExtensions}
             isLoading={isLoading}
-            onRowClick={canCreate ? ((extension) => {
-              setSelectedExtension(extension);
-              setShowExtensionDetail(true);
-            }) : undefined}
+            onRowClick={canCreate ? openEditDialog : undefined}
             identityIcon={Phone}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(extension) => extension.extension_number}
             getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
-            onIdentityClick={canCreate ? ((extension) => {
-              setSelectedExtension(extension);
-              setShowExtensionDetail(true);
-            }) : undefined}
+            onIdentityClick={canCreate ? openEditDialog : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={canCreate ? ((extension) => {
-              setSelectedExtension(extension);
-              setShowExtensionDetail(true);
-            }) : undefined}
-            onEdit={canCreate ? openEditDialog : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canCreate ? ((extension) => {
               setSelectedExtension(extension);
               setShowDeleteDialog(true);
             }) : undefined}
-            canView={canCreate}
-            canEdit={canCreate}
             canDelete={canCreate}
             columns={[
               ...(displayedExtensions.some(ext => ext.type === 'user') && !isReadOnly ? [{

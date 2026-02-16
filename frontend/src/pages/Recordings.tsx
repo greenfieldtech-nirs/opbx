@@ -343,9 +343,9 @@ export default function Recordings() {
             getIdentityPrimary={(recording) => recording.name}
             getIdentitySecondary={(recording) => recording.type === 'upload' ? '📁 Local' : '🔗 Remote'}
             onIdentityClick={(recording) => setSelectedRecording(recording)}
-            onView={(recording) => setSelectedRecording(recording)}
-            onDelete={handleDelete}
+            canView={false}
             canEdit={false}
+            onDelete={handleDelete}
             columns={[
               {
                 header: 'Status',
