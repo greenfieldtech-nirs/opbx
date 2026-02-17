@@ -45,6 +45,19 @@ class OutboundRoutingService
             'org_id' => $orgId,
         ]);
 
+        // Check if destination looks like an external phone number (E.164 format or numeric)
+        // Skip outbound routing for internal extension calls (3-4 digit numbers)
+        $toDigits = preg_replace('/[^0-9]/', '', $to);
+        if (strlen($toDigits) < 7) {
+            Log::debug('OutboundRoutingService: Destination appears to be internal extension, skipping outbound routing', [
+                'to' => $to,
+                'to_digits' => $toDigits,
+                'digit_count' => strlen($toDigits),
+            ]);
+
+            return null;
+        }
+
         // Only allow outbound routing for calls from internal extensions
         $fromExtension = $this->cache->getExtension($orgId, $from);
 
@@ -68,12 +81,17 @@ class OutboundRoutingService
         $whitelistEntry = $this->findOutboundWhitelistEntry($orgId, $to);
 
         if (! $whitelistEntry) {
-            Log::info('OutboundRoutingService: No outbound whitelist entry found for destination', [
+            Log::warning('OutboundRoutingService: Call rejected - destination not in outbound whitelist', [
                 'to' => $to,
+                'from' => $from,
                 'org_id' => $orgId,
             ]);
 
-            return null;
+            return response(
+                CxmlBuilder::unavailable('Outbound calls to this destination are not allowed'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         }
 
         $trunkName = $whitelistEntry->outbound_trunk_name;
