@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\InboundBlacklist;
 
 use App\Enums\InboundBlacklistRejectionStrategy;
+use App\Enums\WhitelistStatus;
 use App\Models\BlockedCallLog;
 use App\Models\InboundBlacklist;
 use App\Services\CxmlBuilder\CxmlBuilder;

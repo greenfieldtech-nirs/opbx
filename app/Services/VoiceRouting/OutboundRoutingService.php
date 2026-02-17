@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
+use App\Enums\WhitelistStatus;
 use App\Models\Extension;
 use App\Models\OutboundWhitelist;
 use App\Scopes\OrganizationScope;
