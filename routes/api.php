@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
 use App\Http\Controllers\Api\IvrMenuController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
+use App\Http\Controllers\Api\InboundBlacklistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
@@ -40,7 +41,6 @@ use Illuminate\Support\Facades\Route;
 
 // Broadcasting authentication routes (must be before auth middleware)
 Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
-
 
 // Public routes for external services (Cloudonix) to access audio files.
 // SECURITY: This route requires HMAC-signed URLs with expiration.
@@ -243,6 +243,13 @@ Route::prefix('v1')->group(function (): void {
 
         // Outbound Whitelist
         Route::apiResource('outbound-whitelist', OutboundWhitelistController::class);
+
+        // Inbound Blacklist
+        Route::get('inbound-blacklist/statistics', [InboundBlacklistController::class, 'getStatistics'])
+            ->name('inbound-blacklist.statistics');
+        Route::get('inbound-blacklist/blocked-logs', [InboundBlacklistController::class, 'getBlockedCallLogs'])
+            ->name('inbound-blacklist.blocked-logs');
+        Route::apiResource('inbound-blacklist', InboundBlacklistController::class);
 
         // Call Logs (read-only)
         Route::prefix('call-logs')->group(function (): void {

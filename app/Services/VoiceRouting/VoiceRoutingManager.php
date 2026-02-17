@@ -15,6 +15,7 @@ use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\IvrStateService;
 use App\Services\PhoneNumberService;
+use App\Services\InboundBlacklist\InboundBlacklistService;
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -42,6 +43,7 @@ class VoiceRoutingManager
      * @param  VoiceRoutingCacheService  $cache  Service for caching extension and routing data
      * @param  IvrStateService  $ivrStateService  Service for managing IVR call state
      * @param  PhoneNumberService  $phoneNumberService  Service for phone number parsing and validation
+     * @param  InboundBlacklistService  $inboundBlacklistService  Service for checking inbound blacklist
      * @param  iterable<RoutingStrategy>  $strategies  Collection of routing strategies
      */
     public function __construct(
@@ -50,6 +52,7 @@ class VoiceRoutingManager
         private readonly PhoneNumberService $phoneNumberService,
         private readonly OutboundRoutingService $outboundRouting,
         private readonly BusinessHoursRoutingService $businessHoursRouting,
+        private readonly InboundBlacklistService $inboundBlacklistService,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
