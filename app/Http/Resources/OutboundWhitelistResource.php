@@ -17,7 +17,6 @@ class OutboundWhitelistResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -29,6 +28,7 @@ class OutboundWhitelistResource extends JsonResource
             'destination_country' => $this->destination_country,
             'destination_prefix' => $this->destination_prefix,
             'outbound_trunk_name' => $this->outbound_trunk_name,
+            'status' => $this->status?->value ?? 'active',
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
