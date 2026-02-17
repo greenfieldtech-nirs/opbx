@@ -26,8 +26,8 @@ return new class extends Migration
             $table->foreignId('did_number_id')->constrained('did_numbers')->onDelete('cascade');
             $table->timestamps();
 
-            // Prevent duplicates
-            $table->unique(['inbound_blacklist_id', 'did_number_id']);
+            // Prevent duplicates (use short index name to avoid MySQL 64-char limit)
+            $table->unique(['inbound_blacklist_id', 'did_number_id'], 'bl_did_unique');
 
             // Indexes
             $table->index('inbound_blacklist_id');
