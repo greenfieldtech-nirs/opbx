@@ -236,7 +236,13 @@ class OutboundRoutingService
 
                 if (str_starts_with($normalizedPrefix, '+')) {
                     // Full international prefix (e.g., +12123)
-                    if (str_starts_with($destinationNumber, $normalizedPrefix)) {
+                    $checkResult = str_starts_with($destinationNumber, $normalizedPrefix);
+                    Log::debug('OutboundRoutingService: Checking +prefixed prefix', [
+                        'destinationNumber' => $destinationNumber,
+                        'normalizedPrefix' => $normalizedPrefix,
+                        'checkResult' => $checkResult,
+                    ]);
+                    if ($checkResult) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "full_prefix_match({$prefixLength}) ";
@@ -244,7 +250,13 @@ class OutboundRoutingService
                     }
                 } else {
                     // Prefix without + (e.g., 12123) - match within the number after country code
-                    if (str_starts_with($destWithoutPlus, $normalizedPrefix)) {
+                    $checkResult = str_starts_with($destWithoutPlus, $normalizedPrefix);
+                    Log::debug('OutboundRoutingService: Checking non-prefixed prefix', [
+                        'destWithoutPlus' => $destWithoutPlus,
+                        'normalizedPrefix' => $normalizedPrefix,
+                        'checkResult' => $checkResult,
+                    ]);
+                    if ($checkResult) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "prefix_match({$prefixLength}) ";
