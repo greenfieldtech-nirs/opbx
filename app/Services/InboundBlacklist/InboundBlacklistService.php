@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\InboundBlacklist;
 
 use App\Enums\InboundBlacklistRejectionStrategy;
-use App\Enums\WhitelistStatus;
 use App\Models\BlockedCallLog;
 use App\Models\InboundBlacklist;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -23,7 +22,7 @@ class InboundBlacklistService
         // Get all active blacklist entries for this organization
         // Either global OR specific to this DID (via pivot table)
         $entries = InboundBlacklist::where('organization_id', $organizationId)
-            ->where('status', WhitelistStatus::ACTIVE)
+            ->where('status', InboundBlacklistStatus::ACTIVE)
             ->where(function ($query) use ($didNumberId) {
                 $query->where('is_global', true)
                     ->orWhereHas('didNumbers', function ($q) use ($didNumberId) {
