@@ -64,4 +64,13 @@ export const inboundBlacklistService = {
     return api.get('/inbound-blacklist', { params })
       .then(res => res.data);
   },
+
+  /**
+   * Toggle the status of a blacklist entry
+   * PATCH /inbound-blacklist/{id}/toggle-status
+   */
+  toggleStatus: (id: number): Promise<{ data: InboundBlacklist; message: string }> => {
+    return api.patch(`/inbound-blacklist/${id}/toggle-status`)
+      .then(res => res.data);
+  },
 };

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[ScopedBy([OrganizationScope::class])]
@@ -23,14 +24,11 @@ class InboundBlacklist extends Model
         'organization_id',
         'match_type',
         'caller_id_pattern',
-        'description',
-        'did_number_id',
         'is_global',
         'rejection_strategy',
         'torment_room_prefix',
         'torment_music_timeout',
         'status',
-        'expires_at',
         'blocked_count',
     ];
 
@@ -41,7 +39,6 @@ class InboundBlacklist extends Model
             'rejection_strategy' => InboundBlacklistRejectionStrategy::class,
             'status' => UserStatus::class,
             'is_global' => 'boolean',
-            'expires_at' => 'datetime',
             'blocked_count' => 'integer',
             'torment_music_timeout' => 'integer',
         ];
@@ -52,9 +49,21 @@ class InboundBlacklist extends Model
         return $this->belongsTo(Organization::class);
     }
 
-    public function didNumber(): BelongsTo
+    /**
+     * Many-to-many relationship with DID numbers.
+     */
+    public function didNumbers(): BelongsToMany
     {
-        return $this->belongsTo(DidNumber::class);
+        return $this->belongsToMany(DidNumber::class, 'inbound_blacklist_did_number')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the first DID number for backward compatibility.
+     */
+    public function didNumber(): ?DidNumber
+    {
+        return $this->didNumbers()->first();
     }
 
     public function blockedCallLogs(): HasMany
@@ -83,18 +92,21 @@ class InboundBlacklist extends Model
     }
 
     /**
-     * Check if this entry is expired.
+     * Toggle the status of this entry.
      */
-    public function isExpired(): bool
+    public function toggleStatus(): void
     {
-        return $this->expires_at !== null && $this->expires_at->isPast();
+        $this->status = $this->status === UserStatus::ACTIVE
+            ? UserStatus::INACTIVE
+            : UserStatus::ACTIVE;
+        $this->save();
     }
 
     /**
-     * Check if this entry is active and not expired.
+     * Check if this entry is active.
      */
     public function isActive(): bool
     {
-        return $this->status === UserStatus::ACTIVE && ! $this->isExpired();
+        return $this->status === UserStatus::ACTIVE;
     }
 }

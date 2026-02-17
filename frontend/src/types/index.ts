@@ -1105,22 +1105,19 @@ export interface InboundBlacklist {
   organization_id: number;
   match_type: InboundBlacklistMatchType;
   caller_id_pattern: string;
-  description?: string;
-  did_number_id?: number;
   is_global: boolean;
   rejection_strategy: InboundBlacklistRejectionStrategy;
   torment_room_prefix?: string;
   torment_music_timeout?: number;
   status: Status;
-  expires_at?: string;
   blocked_count: number;
   created_at: string;
   updated_at: string;
-  did_number?: {
+  did_numbers?: {
     id: number;
     phone_number: string;
     friendly_name: string;
-  };
+  }[];
 }
 
 export interface BlockedCallLog {
@@ -1170,27 +1167,21 @@ export interface InboundBlacklistStats {
 export interface CreateInboundBlacklistRequest {
   caller_id_pattern: string;
   match_type: InboundBlacklistMatchType;
-  description?: string;
   rejection_strategy: InboundBlacklistRejectionStrategy;
-  did_number_id?: number;
+  did_number_ids?: (number | string)[];
   is_global?: boolean;
   torment_room_prefix?: string;
   torment_music_timeout?: number;
-  status?: Status;
-  expires_at?: string;
 }
 
 export interface UpdateInboundBlacklistRequest {
   caller_id_pattern?: string;
   match_type?: InboundBlacklistMatchType;
-  description?: string;
   rejection_strategy?: InboundBlacklistRejectionStrategy;
-  did_number_id?: number;
+  did_number_ids?: (number | string)[];
   is_global?: boolean;
   torment_room_prefix?: string;
   torment_music_timeout?: number;
-  status?: Status;
-  expires_at?: string;
 }
 
 export interface InboundBlacklistFilterParams extends PaginationParams {

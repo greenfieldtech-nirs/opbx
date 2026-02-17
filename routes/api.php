@@ -14,9 +14,9 @@ use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
 use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
+use App\Http\Controllers\Api\InboundBlacklistController;
 use App\Http\Controllers\Api\IvrMenuController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
-use App\Http\Controllers\Api\InboundBlacklistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
@@ -249,6 +249,8 @@ Route::prefix('v1')->group(function (): void {
             ->name('inbound-blacklist.statistics');
         Route::get('inbound-blacklist/blocked-logs', [InboundBlacklistController::class, 'getBlockedCallLogs'])
             ->name('inbound-blacklist.blocked-logs');
+        Route::patch('inbound-blacklist/{inboundBlacklist}/toggle-status', [InboundBlacklistController::class, 'toggleStatus'])
+            ->name('inbound-blacklist.toggle-status');
         Route::apiResource('inbound-blacklist', InboundBlacklistController::class);
 
         // Call Logs (read-only)

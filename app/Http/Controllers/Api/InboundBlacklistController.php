@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\InboundBlacklist\StoreInboundBlacklistRequest;
@@ -34,8 +35,7 @@ class InboundBlacklistController extends Controller
         if ($request->has('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('caller_id_pattern', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $q->where('caller_id_pattern', 'like', "%{$search}%");
             });
         }
 
@@ -53,7 +53,7 @@ class InboundBlacklistController extends Controller
         if ($request->has('scope')) {
             match ($request->input('scope')) {
                 'global' => $query->where('is_global', true),
-                'did_specific' => $query->where('is_global', false)->whereNotNull('did_number_id'),
+                'did_specific' => $query->where('is_global', false),
                 default => null,
             };
         }
@@ -63,14 +63,9 @@ class InboundBlacklistController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        // Apply did_number_id filter
-        if ($request->has('did_number_id')) {
-            $query->where('did_number_id', $request->input('did_number_id'));
-        }
-
         $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
 
-        $entries = $query->with('didNumber:id,phone_number,friendly_name')
+        $entries = $query->with('didNumbers:id,phone_number,friendly_name')
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
 
@@ -105,7 +100,19 @@ class InboundBlacklistController extends Controller
         $this->authorize('create', InboundBlacklist::class);
 
         try {
+            // Extract DID IDs before creating
+            $didNumberIds = $validated['did_number_ids'] ?? [];
+            unset($validated['did_number_ids']);
+
+            // Set default status to active
+            $validated['status'] = $validated['status'] ?? UserStatus::ACTIVE;
+
             $entry = InboundBlacklist::create($validated);
+
+            // Attach DID numbers
+            if (! empty($didNumberIds)) {
+                $entry->didNumbers()->sync($didNumberIds);
+            }
 
             Log::info('Created inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -115,7 +122,7 @@ class InboundBlacklistController extends Controller
             ]);
 
             return response()->json([
-                'data' => $entry->load('didNumber:id,phone_number,friendly_name'),
+                'data' => $entry->load('didNumbers:id,phone_number,friendly_name'),
                 'message' => 'Blacklist entry created successfully',
             ], 201);
         } catch (\Exception $e) {
@@ -160,7 +167,7 @@ class InboundBlacklistController extends Controller
         }
 
         return response()->json([
-            'data' => $inboundBlacklist->load('didNumber:id,phone_number,friendly_name'),
+            'data' => $inboundBlacklist->load('didNumbers:id,phone_number,friendly_name'),
         ]);
     }
 
@@ -191,7 +198,18 @@ class InboundBlacklistController extends Controller
         }
 
         try {
-            $inboundBlacklist->update($request->validated());
+            $validated = $request->validated();
+
+            // Extract DID IDs before updating
+            $didNumberIds = $validated['did_number_ids'] ?? null;
+            unset($validated['did_number_ids']);
+
+            $inboundBlacklist->update($validated);
+
+            // Sync DID numbers if provided
+            if ($didNumberIds !== null) {
+                $inboundBlacklist->didNumbers()->sync($didNumberIds);
+            }
 
             Log::info('Updated inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -201,7 +219,7 @@ class InboundBlacklistController extends Controller
             ]);
 
             return response()->json([
-                'data' => $inboundBlacklist->fresh()->load('didNumber:id,phone_number,friendly_name'),
+                'data' => $inboundBlacklist->fresh()->load('didNumbers:id,phone_number,friendly_name'),
                 'message' => 'Blacklist entry updated successfully',
             ]);
         } catch (\Exception $e) {
@@ -271,6 +289,62 @@ class InboundBlacklistController extends Controller
 
             return response()->json([
                 'error' => 'Failed to delete blacklist entry',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Toggle the status of a blacklist entry.
+     */
+    public function toggleStatus(InboundBlacklist $inboundBlacklist): JsonResponse
+    {
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser();
+
+        $this->authorize('update', $inboundBlacklist);
+
+        // Tenant scope check
+        if ($inboundBlacklist->organization_id !== $user->organization_id) {
+            Log::warning('Cross-tenant blacklist toggle attempt', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'target_blacklist_id' => $inboundBlacklist->id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Blacklist entry not found.',
+            ], 404);
+        }
+
+        try {
+            $inboundBlacklist->toggleStatus();
+
+            Log::info('Toggled inbound blacklist entry status', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'blacklist_id' => $inboundBlacklist->id,
+                'new_status' => $inboundBlacklist->status->value,
+            ]);
+
+            return response()->json([
+                'data' => $inboundBlacklist->fresh()->load('didNumbers:id,phone_number,friendly_name'),
+                'message' => 'Status updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle blacklist entry status', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'blacklist_id' => $inboundBlacklist->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update status',
                 'message' => $e->getMessage(),
             ], 500);
         }
@@ -351,10 +425,6 @@ class InboundBlacklistController extends Controller
             'total_entries' => InboundBlacklist::where('organization_id', $user->organization_id)->count(),
             'active_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
                 ->where('status', 'active')
-                ->where(function ($query) {
-                    $query->whereNull('expires_at')
-                        ->orWhere('expires_at', '>', now());
-                })
                 ->count(),
             'global_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
                 ->where('is_global', true)

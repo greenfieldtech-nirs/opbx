@@ -6,7 +6,6 @@ namespace App\Http\Requests\InboundBlacklist;
 
 use App\Enums\InboundBlacklistMatchType;
 use App\Enums\InboundBlacklistRejectionStrategy;
-use App\Enums\UserStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -27,10 +26,13 @@ class UpdateInboundBlacklistRequest extends FormRequest
                 'regex:/^[\d\+\*\?]+$/', // E.164 format or wildcards
             ],
             'match_type' => ['sometimes', Rule::enum(InboundBlacklistMatchType::class)],
-            'description' => ['nullable', 'string', 'max:255'],
             'rejection_strategy' => ['sometimes', Rule::enum(InboundBlacklistRejectionStrategy::class)],
-            'did_number_id' => [
+            'did_number_ids' => [
                 'nullable',
+                'array',
+                'required_if:is_global,false',
+            ],
+            'did_number_ids.*' => [
                 'integer',
                 'exists:did_numbers,id',
             ],
@@ -47,8 +49,6 @@ class UpdateInboundBlacklistRequest extends FormRequest
                 'min:60',
                 'max:3600',
             ],
-            'status' => [Rule::enum(UserStatus::class)],
-            'expires_at' => ['nullable', 'date', 'after:now'],
         ];
     }
 
@@ -56,15 +56,15 @@ class UpdateInboundBlacklistRequest extends FormRequest
     {
         return [
             'caller_id_pattern.regex' => 'The caller ID pattern must be a valid phone number or pattern (digits, +, *, ? only).',
-            'did_number_id.exists' => 'The selected phone number does not exist.',
+            'did_number_ids.required_if' => 'Please select at least one phone number when not using global scope.',
             'torment_room_prefix.required_if' => 'A room prefix is required when using the Torment strategy.',
         ];
     }
 
     protected function prepareForValidation(): void
     {
-        // If did_number_id is provided, is_global should be false
-        if ($this->has('did_number_id') && $this->input('did_number_id')) {
+        // If did_number_ids is provided, is_global should be false
+        if ($this->has('did_number_ids') && ! empty($this->input('did_number_ids'))) {
             $this->merge(['is_global' => false]);
         }
     }

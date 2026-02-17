@@ -10,6 +10,9 @@ import {
   Music,
   Globe,
   Target,
+  CheckCircle2,
+  XCircle,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +37,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import {
@@ -47,6 +51,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import api from '@/services/api';
 import { inboundBlacklistService } from '@/services/inboundBlacklist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,13 +62,14 @@ import type {
   InboundBlacklistMatchType,
   InboundBlacklistRejectionStrategy,
   DIDNumber,
+  Status,
 } from '@/types';
 
 type BlacklistFormData = {
   caller_id_pattern: string;
   match_type: InboundBlacklistMatchType;
   rejection_strategy: InboundBlacklistRejectionStrategy;
-  did_number_id: number | null;
+  did_number_ids: string[];
   is_global: boolean;
   torment_room_prefix: string;
   torment_music_timeout: number;
@@ -73,7 +79,7 @@ const emptyFormData: BlacklistFormData = {
   caller_id_pattern: '',
   match_type: 'exact',
   rejection_strategy: 'drop',
-  did_number_id: null,
+  did_number_ids: [],
   is_global: true,
   torment_room_prefix: '',
   torment_music_timeout: 300,
@@ -141,6 +147,18 @@ const InboundBlacklistPage: React.FC = () => {
   });
 
   const phoneNumbers = phoneNumbersData?.data || [];
+
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: (id: number) => inboundBlacklistService.toggleStatus(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      toast.success('Status updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update status');
+    },
+  });
 
   // Create mutation
   const createMutation = useMutation({
@@ -212,7 +230,7 @@ const InboundBlacklistPage: React.FC = () => {
       caller_id_pattern: formData.caller_id_pattern,
       match_type: formData.match_type,
       rejection_strategy: formData.rejection_strategy,
-      did_number_id: formData.did_number_id || undefined,
+      did_number_ids: formData.is_global ? undefined : formData.did_number_ids,
       is_global: formData.is_global,
       torment_room_prefix: formData.rejection_strategy === 'torment' ? formData.torment_room_prefix : undefined,
       torment_music_timeout: formData.rejection_strategy === 'torment' ? formData.torment_music_timeout : undefined,
@@ -225,6 +243,12 @@ const InboundBlacklistPage: React.FC = () => {
     }
   };
 
+  // Handle status toggle
+  const handleToggleStatus = (item: InboundBlacklist) => {
+    if (toggleStatusMutation.isPending || toggleStatusMutation.variables === item.id) return;
+    toggleStatusMutation.mutate(item.id);
+  };
+
   // Open edit dialog
   const openEditDialog = (item: InboundBlacklist) => {
     setEditingItem(item);
@@ -232,7 +256,7 @@ const InboundBlacklistPage: React.FC = () => {
       caller_id_pattern: item.caller_id_pattern,
       match_type: item.match_type,
       rejection_strategy: item.rejection_strategy,
-      did_number_id: item.did_number_id || null,
+      did_number_ids: item.did_numbers?.map((d) => d.id) || [],
       is_global: item.is_global,
       torment_room_prefix: item.torment_room_prefix || '',
       torment_music_timeout: item.torment_music_timeout || 300,
@@ -300,6 +324,17 @@ const InboundBlacklistPage: React.FC = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Handle DID selection toggle
+  const toggleDidSelection = (didId: string) => {
+    setFormData((prev) => {
+      const currentIds = prev.did_number_ids;
+      const newIds = currentIds.includes(didId)
+        ? currentIds.filter((id) => id !== didId)
+        : [...currentIds, didId];
+      return { ...prev, did_number_ids: newIds };
+    });
   };
 
   return (
@@ -376,6 +411,49 @@ const InboundBlacklistPage: React.FC = () => {
             onDelete={canManageBlacklist ? (item) => setDeleteItem(item) : undefined}
             columns={[
               {
+                header: 'Status',
+                cell: (item) => (
+                  canManageBlacklist ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleStatus(item);
+                      }}
+                      disabled={toggleStatusMutation.isPending && toggleStatusMutation.variables === item.id}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors cursor-pointer hover:opacity-80",
+                        item.status === 'active'
+                          ? "bg-green-100 text-green-800 border-green-200"
+                          : "bg-gray-100 text-gray-800 border-gray-200"
+                      )}
+                    >
+                      {toggleStatusMutation.isPending && toggleStatusMutation.variables === item.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : item.status === 'active' ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      {item.status === 'active' ? 'Active' : 'Inactive'}
+                    </button>
+                  ) : (
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                      item.status === 'active'
+                        ? "bg-green-100 text-green-800 border-green-200"
+                        : "bg-gray-100 text-gray-800 border-gray-200"
+                    )}>
+                      {item.status === 'active' ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      {item.status === 'active' ? 'Active' : 'Inactive'}
+                    </span>
+                  )
+                ),
+              },
+              {
                 header: 'Strategy',
                 cell: (item) => {
                   const StrategyIcon = strategyIcons[item.rejection_strategy];
@@ -389,20 +467,25 @@ const InboundBlacklistPage: React.FC = () => {
               },
               {
                 header: 'Scope',
-                accessorKey: 'is_global',
-                cell: (item) => (
-                  item.is_global ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm">
-                      <Globe className="h-4 w-4 text-blue-500" />
-                      Global
-                    </span>
-                  ) : (
+                cell: (item) => {
+                  if (item.is_global) {
+                    return (
+                      <span className="inline-flex items-center gap-1.5 text-sm">
+                        <Globe className="h-4 w-4 text-blue-500" />
+                        Global
+                      </span>
+                    );
+                  }
+                  const didCount = item.did_numbers?.length || 0;
+                  return (
                     <span className="inline-flex items-center gap-1.5 text-sm">
                       <Target className="h-4 w-4 text-purple-500" />
-                      {item.did_number?.friendly_name || item.did_number?.phone_number || 'DID'}
+                      {didCount === 1
+                        ? (item.did_numbers?.[0]?.friendly_name || item.did_numbers?.[0]?.phone_number || '1 DID')
+                        : `${didCount} DIDs`}
                     </span>
-                  )
-                )
+                  );
+                }
               },
               {
                 header: 'Blocked Count',
@@ -506,9 +589,6 @@ const InboundBlacklistPage: React.FC = () => {
                       <SelectItem value="wildcard">Wildcard Pattern</SelectItem>
                     </SelectContent>
                   </Select>
-                  {formErrors.match_type && (
-                    <p className="text-sm text-destructive mt-1">{formErrors.match_type}</p>
-                  )}
                 </div>
 
                 <div>
@@ -526,9 +606,6 @@ const InboundBlacklistPage: React.FC = () => {
                       <SelectItem value="torment">Torment (Music)</SelectItem>
                     </SelectContent>
                   </Select>
-                  {formErrors.rejection_strategy && (
-                    <p className="text-sm text-destructive mt-1">{formErrors.rejection_strategy}</p>
-                  )}
                 </div>
               </div>
 
@@ -543,12 +620,6 @@ const InboundBlacklistPage: React.FC = () => {
                       placeholder="spam-trap"
                       required={formData.rejection_strategy === 'torment'}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Prefix for the random conference room name
-                    </p>
-                    {formErrors.torment_room_prefix && (
-                      <p className="text-sm text-destructive mt-1">{formErrors.torment_room_prefix}</p>
-                    )}
                   </div>
                   <div>
                     <Label htmlFor="torment_music_timeout">Timeout (seconds)</Label>
@@ -574,42 +645,49 @@ const InboundBlacklistPage: React.FC = () => {
                   </div>
                   <Switch
                     checked={formData.is_global}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked, did_number_id: checked ? null : formData.did_number_id })}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked, did_number_ids: checked ? [] : formData.did_number_ids })}
                   />
                 </div>
 
                 {!formData.is_global && (
                   <div>
-                    <Label htmlFor="did_number_id">Specific Phone Number</Label>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={formData.did_number_id?.toString() || ''}
-                        onValueChange={(value) => setFormData({ ...formData, did_number_id: parseInt(value) })}
-                        required={!formData.is_global}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Select a phone number" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {phoneNumbers.map((did: DIDNumber) => (
-                            <SelectItem key={did.id} value={did.id.toString()}>
-                              {did.friendly_name || did.phone_number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <Label>Select Phone Numbers</Label>
+                    <div className="border rounded-md p-2 mt-1 max-h-40 overflow-y-auto">
+                      {phoneNumbers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-2">No phone numbers available</p>
+                      ) : (
+                        phoneNumbers.map((did: DIDNumber) => (
+                          <label
+                            key={did.id}
+                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.did_number_ids.includes(did.id)}
+                              onChange={() => toggleDidSelection(did.id)}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm">{did.friendly_name || did.phone_number}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        {formData.did_number_ids.length} selected
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => refetchPhoneNumbers()}
-                        className="h-9 px-2"
                       >
-                        <RefreshCw className="h-4 w-4" />
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Refresh
                       </Button>
                     </div>
-                    {formErrors.did_number_id && (
-                      <p className="text-sm text-destructive mt-1">{formErrors.did_number_id}</p>
+                    {formErrors.did_number_ids && (
+                      <p className="text-sm text-destructive mt-1">{formErrors.did_number_ids}</p>
                     )}
                   </div>
                 )}
@@ -654,9 +732,6 @@ const InboundBlacklistPage: React.FC = () => {
                 <p className="text-xs text-muted-foreground mt-1">
                   E.164 format. Use * for wildcards
                 </p>
-                {formErrors.caller_id_pattern && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.caller_id_pattern}</p>
-                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -731,38 +806,45 @@ const InboundBlacklistPage: React.FC = () => {
                   </div>
                   <Switch
                     checked={formData.is_global}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked, did_number_id: checked ? null : formData.did_number_id })}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked, did_number_ids: checked ? [] : formData.did_number_ids })}
                   />
                 </div>
 
                 {!formData.is_global && (
                   <div>
-                    <Label htmlFor="edit-did_number_id">Specific Phone Number</Label>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={formData.did_number_id?.toString() || ''}
-                        onValueChange={(value) => setFormData({ ...formData, did_number_id: parseInt(value) })}
-                        required={!formData.is_global}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Select a phone number" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {phoneNumbers.map((did: DIDNumber) => (
-                            <SelectItem key={did.id} value={did.id.toString()}>
-                              {did.friendly_name || did.phone_number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <Label>Select Phone Numbers</Label>
+                    <div className="border rounded-md p-2 mt-1 max-h-40 overflow-y-auto">
+                      {phoneNumbers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-2">No phone numbers available</p>
+                      ) : (
+                        phoneNumbers.map((did: DIDNumber) => (
+                          <label
+                            key={did.id}
+                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.did_number_ids.includes(did.id)}
+                              onChange={() => toggleDidSelection(did.id)}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm">{did.friendly_name || did.phone_number}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        {formData.did_number_ids.length} selected
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => refetchPhoneNumbers()}
-                        className="h-9 px-2"
                       >
-                        <RefreshCw className="h-4 w-4" />
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Refresh
                       </Button>
                     </div>
                   </div>
