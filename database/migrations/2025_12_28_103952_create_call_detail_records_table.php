@@ -54,11 +54,11 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Indexes for common queries
-            $table->index(['organization_id', 'session_timestamp']);
-            $table->index(['organization_id', 'disposition']);
-            $table->index(['organization_id', 'from']);
-            $table->index(['organization_id', 'to']);
+            // Indexes for common queries (use short names to avoid MySQL 64-char limit)
+            $table->index(['organization_id', 'session_timestamp'], 'cdr_org_ts_idx');
+            $table->index(['organization_id', 'disposition'], 'cdr_org_disp_idx');
+            $table->index(['organization_id', 'from'], 'cdr_org_from_idx');
+            $table->index(['organization_id', 'to'], 'cdr_org_to_idx');
         });
     }
 

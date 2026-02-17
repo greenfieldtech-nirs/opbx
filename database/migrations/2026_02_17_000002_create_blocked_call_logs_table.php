@@ -36,10 +36,10 @@ return new class extends Migration
 
             $table->timestamp('blocked_at');
 
-            // Indexes
-            $table->index(['organization_id', 'blocked_at']);
-            $table->index(['organization_id', 'caller_id']);
-            $table->index(['organization_id', 'did_number_id', 'blocked_at']);
+            // Indexes (use short names to avoid MySQL 64-char limit)
+            $table->index(['organization_id', 'blocked_at'], 'bcl_org_blocked_idx');
+            $table->index(['organization_id', 'caller_id'], 'bcl_org_caller_idx');
+            $table->index(['organization_id', 'did_number_id', 'blocked_at'], 'bcl_org_did_blocked_idx');
         });
     }
 
