@@ -248,10 +248,20 @@ class OutboundRoutingService
                         $prefixMatched = true;
                     }
                 } else {
-                    // Prefix without + (e.g., 12123) - match within the number after country code
-                    $checkResult = str_starts_with($destWithoutPlus, $normalizedPrefix);
-                    Log::debug('OutboundRoutingService: Checking non-prefixed prefix', [
+                    // Prefix without + (e.g., 2123) - match after the country code
+                    // Strip the country code from the beginning of the number
+                    $numberAfterCountryCode = $destWithoutPlus;
+                    if ($callingCode) {
+                        $codeWithoutPlus = ltrim($callingCode, '+');
+                        if (str_starts_with($destWithoutPlus, $codeWithoutPlus)) {
+                            $numberAfterCountryCode = substr($destWithoutPlus, strlen($codeWithoutPlus));
+                        }
+                    }
+
+                    $checkResult = str_starts_with($numberAfterCountryCode, $normalizedPrefix);
+                    Log::debug('OutboundRoutingService: Checking prefix after country code', [
                         'destWithoutPlus' => $destWithoutPlus,
+                        'numberAfterCountryCode' => $numberAfterCountryCode,
                         'normalizedPrefix' => $normalizedPrefix,
                         'checkResult' => $checkResult,
                     ]);
