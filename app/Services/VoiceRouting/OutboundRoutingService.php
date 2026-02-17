@@ -38,6 +38,7 @@ class OutboundRoutingService
      */
     public function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
     {
+        Log::info('OutboundRoutingService: ========== OUTBOUND ROUTING START ==========');
         Log::info('OutboundRoutingService: Checking for outbound whitelist routing', [
             'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
