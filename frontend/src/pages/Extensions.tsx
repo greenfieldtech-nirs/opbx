@@ -156,7 +156,7 @@ export default function ExtensionsComplete() {
   const [perPage, setPerPage] = useState(25);
 
   // Sync state
-  const [syncComparison, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: any; from_cloudonix: any } | null>(null);
+  const [syncComparison, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: Record<string, unknown>; from_cloudonix: Record<string, unknown> } | null>(null);
   const [isSyncNeeded, setIsSyncNeeded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -311,7 +311,7 @@ export default function ExtensionsComplete() {
       queryClient.invalidateQueries({ queryKey: ['extensions'] });
       toast.success('Extension created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       const errors = error.response?.data?.errors;
       if (errors) {
         // Show first validation error
@@ -332,7 +332,7 @@ export default function ExtensionsComplete() {
       queryClient.invalidateQueries({ queryKey: ['extensions'] });
       toast.success('Extension updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       const errors = error.response?.data?.errors;
       if (errors) {
         // Show first validation error
@@ -352,7 +352,7 @@ export default function ExtensionsComplete() {
       queryClient.invalidateQueries({ queryKey: ['extensions'] });
       toast.success('Extension deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       const message = error.response?.data?.error?.message || 'Failed to delete extension';
       toast.error(message);
     },
@@ -396,7 +396,7 @@ export default function ExtensionsComplete() {
         toast.warning(data.cloudonix_warning.message, { duration: 8000 });
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to reset extension password';
       toast.error(message);
     },
@@ -419,7 +419,7 @@ export default function ExtensionsComplete() {
         { id: 'sync-extensions' }
       );
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
       toast.error(message, { id: 'sync-extensions' });
     },
@@ -558,7 +558,7 @@ export default function ExtensionsComplete() {
         }
         case 'ivr': {
           // Handle configuration as object or direct value
-          let ivrId: any = null;
+          let ivrId: string | null = null;
           if (typeof extension.configuration === 'object' && extension.configuration) {
             ivrId = extension.configuration.ivr_id || extension.configuration.ivr_menu_id;
           } else {
@@ -746,7 +746,7 @@ export default function ExtensionsComplete() {
       return;
     }
 
-    const configuration: any = {};
+    const configuration: Record<string, unknown> = {};
 
     // Build configuration based on type
     // Validation ensures required fields have values at this point
@@ -832,7 +832,7 @@ export default function ExtensionsComplete() {
       return;
     }
 
-    const configuration: any = {};
+    const configuration: Record<string, unknown> = {};
 
     // Build configuration based on type
     // Validation ensures required fields have values at this point
@@ -994,7 +994,7 @@ export default function ExtensionsComplete() {
 
     // Handle configuration parsing
     let config = extension.configuration;
-    let ivrId: any = null;
+    let ivrId: string | null = null;
     if (typeof config === 'object' && config) {
       // Configuration is an object
       ivrId = config.ivr_id || config.ivr_menu_id;
@@ -1152,7 +1152,7 @@ export default function ExtensionsComplete() {
             {/* Type Filter */}
             <Select
               value={typeFilter}
-              onValueChange={(value: any) => {
+              onValueChange={(value: string) => {
                 setTypeFilter(value);
                 setCurrentPage(1);
               }}
@@ -1175,7 +1175,7 @@ export default function ExtensionsComplete() {
             {/* Status Filter */}
             <Select
               value={statusFilter}
-              onValueChange={(value: any) => {
+              onValueChange={(value: string) => {
                 setStatusFilter(value);
                 setCurrentPage(1);
               }}
@@ -1193,7 +1193,7 @@ export default function ExtensionsComplete() {
             {/* Assignment Filter */}
             <Select
               value={assignmentFilter}
-              onValueChange={(value: any) => {
+              onValueChange={(value: string) => {
                 setAssignmentFilter(value);
                 setCurrentPage(1);
               }}
@@ -1845,7 +1845,7 @@ export default function ExtensionsComplete() {
                                   <div className="space-y-1">
                                     <span className="text-sm text-muted-foreground">Member Extensions:</span>
                                     <div className="ml-4 space-y-1">
-                                      {ringGroup.members.map((member: any, index: number) => (
+                                      {ringGroup.members.map((member: RingGroupMember, index: number) => (
                                         <div key={member.id || index} className="flex justify-between text-xs">
                                           <span>{member.extension_number || `Extension ${member.id}`}</span>
                                           <span className="text-muted-foreground">
@@ -1896,7 +1896,7 @@ export default function ExtensionsComplete() {
                       )}
                       {selectedExtension.type === 'ai_assistant' && (() => {
                         const config = selectedExtension.configuration;
-                        const provider = aiProviders.find((p: any) => p.key === config?.provider);
+                        const provider = aiProviders.find((p: AiProvider) => p.key === config?.provider);
                         const protocol = provider?.protocol || 'sip';
 
                         return (
@@ -2036,7 +2036,7 @@ export default function ExtensionsComplete() {
                         <>
                           {(() => {
                             // Handle configuration as object or direct value
-                            let ivrId: any = null;
+                            let ivrId: string | null = null;
                             if (typeof selectedExtension.configuration === 'object' && selectedExtension.configuration) {
                               ivrId = selectedExtension.configuration.ivr_id || selectedExtension.configuration.ivr_menu_id;
                             } else {
@@ -2145,7 +2145,7 @@ export default function ExtensionsComplete() {
                                   <div className="space-y-2">
                                     <span className="text-sm text-muted-foreground">Menu Options:</span>
                                     <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
-                                      {ivrMenu.options.map((option: any, index: number) => (
+                                      {ivrMenu.options.map((option: IvrMenuOption, index: number) => (
                                         <div key={option.id || index} className="text-xs border rounded p-2 bg-muted/50">
                                           <div className="flex justify-between items-center mb-1">
                                             <span className="font-medium">Press {option.input_digits}</span>

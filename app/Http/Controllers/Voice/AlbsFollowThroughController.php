@@ -427,7 +427,7 @@ class AlbsFollowThroughController extends Controller
             // Using action parameter on Connect verb for callback
             $builder = CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl);
 
-            return response($builder, 200, ['Content-Type' => 'text/xml']);
+            return response($builder, 200, ['Content-Type' => 'application/xml']);
         } catch (\InvalidArgumentException $e) {
             Log::error('ALBS Follow Through: Failed to build WebSocket URL', [
                 'ai_assistant_id' => $aiAssistant->id,
@@ -462,7 +462,7 @@ class AlbsFollowThroughController extends Controller
 
         $builder = CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl);
 
-        return response($builder, 200, ['Content-Type' => 'text/xml']);
+        return response($builder, 200, ['Content-Type' => 'application/xml']);
     }
 
     /**
@@ -495,7 +495,7 @@ class AlbsFollowThroughController extends Controller
         return response(
             CxmlBuilder::unavailable('All AI assistants are unavailable. Goodbye.'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -549,7 +549,7 @@ class AlbsFollowThroughController extends Controller
         return response(
             CxmlBuilder::simpleDial($sipUri),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -604,7 +604,7 @@ class AlbsFollowThroughController extends Controller
         return response(
             CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -734,7 +734,7 @@ class AlbsFollowThroughController extends Controller
                 return response(
                     CxmlBuilder::streamToWebSocket($websocketUrl),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             } catch (\InvalidArgumentException $e) {
                 Log::error('ALBS Follow Through: Failed to build fallback WebSocket URL', [
@@ -756,7 +756,7 @@ class AlbsFollowThroughController extends Controller
         return response(
             CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -768,7 +768,7 @@ class AlbsFollowThroughController extends Controller
         return response(
             CxmlBuilder::unavailable($message),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 

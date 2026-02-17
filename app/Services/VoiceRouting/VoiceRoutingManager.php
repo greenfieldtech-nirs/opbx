@@ -13,6 +13,7 @@ use App\Models\OutboundWhitelist;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\InboundBlacklist\InboundBlacklistService;
 use App\Services\IvrStateService;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
@@ -42,6 +43,7 @@ class VoiceRoutingManager
      * @param  VoiceRoutingCacheService  $cache  Service for caching extension and routing data
      * @param  IvrStateService  $ivrStateService  Service for managing IVR call state
      * @param  PhoneNumberService  $phoneNumberService  Service for phone number parsing and validation
+     * @param  InboundBlacklistService  $inboundBlacklistService  Service for checking inbound blacklist
      * @param  iterable<RoutingStrategy>  $strategies  Collection of routing strategies
      */
     public function __construct(
@@ -50,6 +52,7 @@ class VoiceRoutingManager
         private readonly PhoneNumberService $phoneNumberService,
         private readonly OutboundRoutingService $outboundRouting,
         private readonly BusinessHoursRoutingService $businessHoursRouting,
+        private readonly InboundBlacklistService $inboundBlacklistService,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
@@ -114,7 +117,8 @@ class VoiceRoutingManager
         Log::debug('VoiceRoutingManager: Trying extension routing');
         $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
         if ($extensionResponse) {
-            Log::info('VoiceRoutingManager: Extension routing matched');
+            Log::debug('VoiceRoutingManager: Extension routing matched');
+
             return $extensionResponse;
         }
         Log::debug('VoiceRoutingManager: Extension routing did not match');
@@ -123,19 +127,28 @@ class VoiceRoutingManager
         Log::debug('VoiceRoutingManager: Trying DID routing');
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
-            Log::info('VoiceRoutingManager: DID routing matched');
+            Log::debug('VoiceRoutingManager: DID routing matched');
+
             return $didResponse;
         }
         Log::debug('VoiceRoutingManager: DID routing did not match');
 
         // 3. Try outbound routing (for calls to external numbers)
-        Log::debug('VoiceRoutingManager: Trying outbound routing');
+        Log::info('VoiceRoutingManager: Trying outbound routing', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
         $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
         if ($outboundResponse) {
-            Log::info('VoiceRoutingManager: Outbound routing matched');
+            Log::info('VoiceRoutingManager: Outbound routing returned response', [
+                'response_type' => $outboundResponse->isOk() ? 'success' : 'rejection',
+                'status_code' => $outboundResponse->getStatusCode(),
+            ]);
+
             return $outboundResponse;
         }
-        Log::debug('VoiceRoutingManager: Outbound routing did not match');
+        Log::info('VoiceRoutingManager: Outbound routing returned null');
 
         Log::info('VoiceRoutingManager: No destination found for subscriber call', [
             'to' => $to,
@@ -713,7 +726,7 @@ class VoiceRoutingManager
         return response(
             CxmlBuilder::dialExtension($action, 30),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -910,7 +923,7 @@ class VoiceRoutingManager
             $menuId = (int) $request->query('menu_id');
             $orgId = (int) $request->input('_organization_id');
 
-            Log::info('IVR Input: Processing DTMF input', [
+            Log::debug('IVR Input: Processing DTMF input', [
                 'call_sid' => $callSid,
                 'digits' => $digits,
                 'menu_id' => $menuId,
@@ -938,11 +951,11 @@ class VoiceRoutingManager
                 return response(
                     CxmlBuilder::sayWithHangup('Menu configuration error.', true),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
-            Log::info('IVR Input: Menu found and active', [
+            Log::debug('IVR Input: Menu found and active', [
                 'call_sid' => $callSid,
                 'menu_id' => $menuId,
                 'menu_name' => $ivrMenu->name,
@@ -970,7 +983,7 @@ class VoiceRoutingManager
                 return response(
                     CxmlBuilder::sayWithHangup('Call state error. Please try again.', true),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
@@ -982,7 +995,7 @@ class VoiceRoutingManager
             // Find matching option
             $option = $ivrMenu->findOptionByDigits($digits);
 
-            Log::info('IVR Input: Option lookup result', [
+            Log::debug('IVR Input: Option lookup result', [
                 'call_sid' => $callSid,
                 'digits' => $digits,
                 'option_found' => $option !== null,
@@ -1011,7 +1024,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('An unexpected error occurred.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
     }
@@ -1161,7 +1174,7 @@ class VoiceRoutingManager
      */
     private function routeToOptionDestination(Request $request, $option, IvrMenu $ivrMenu): Response
     {
-        Log::info('DEBUG: routeToOptionDestination called', [
+        Log::debug('routeToOptionDestination called', [
             'ivr_menu_type' => gettype($ivrMenu),
             'ivr_menu_class' => get_class($ivrMenu),
             'ivr_menu_id' => $ivrMenu->id,
@@ -1170,7 +1183,7 @@ class VoiceRoutingManager
 
         try {
             $destination = [];
-            Log::info('IVR Input: Attempting to get validated destination', [
+            Log::debug('IVR Input: Attempting to get validated destination', [
                 'call_sid' => $request->input('CallSid'),
                 'option_id' => $option->id ?? 'mock',
                 'destination_type' => $option->destination_type->value ?? $option->destination_type,
@@ -1197,11 +1210,11 @@ class VoiceRoutingManager
                 return response(
                     CxmlBuilder::sayWithHangup('Destination is no longer available.', true),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
-            Log::info('IVR Input: Validated destination found', [
+            Log::debug('IVR Input: Validated destination found', [
                 'call_sid' => $request->input('CallSid'),
                 'option_id' => $option->id ?? 'mock',
                 'destination_type' => is_object($option->destination_type) ? $option->destination_type->value : $option->destination_type,
@@ -1212,7 +1225,7 @@ class VoiceRoutingManager
 
             switch ($option->destination_type) {
                 case \App\Enums\IvrDestinationType::EXTENSION:
-                    Log::info('IVR Input: Routing to extension', [
+                    Log::debug('IVR Input: Routing to extension', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id ?? 'mock',
                         'destination_id' => $option->destination_id,
@@ -1224,7 +1237,7 @@ class VoiceRoutingManager
                     // Resolve the extension destination (could be ring group, conference, etc.)
                     $destination = $this->resolveExtensionDestination($validatedDestination, $ivrMenu->organization_id);
 
-                    Log::info('IVR Input: About to execute strategy', [
+                    Log::debug('IVR Input: About to execute strategy', [
                         'extension_type' => $validatedDestination->type,
                         'extension_type_value' => $validatedDestination->type->value,
                         'resolved_destination' => $destination,
@@ -1233,7 +1246,7 @@ class VoiceRoutingManager
                     return $this->executeStrategy($validatedDestination->type, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::RING_GROUP:
-                    Log::info('IVR Input: Routing to ring group', [
+                    Log::debug('IVR Input: Routing to ring group', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'ring_group_id' => $validatedDestination->id,
@@ -1244,7 +1257,7 @@ class VoiceRoutingManager
                     return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::CONFERENCE_ROOM:
-                    Log::info('IVR Input: Routing to conference room', [
+                    Log::debug('IVR Input: Routing to conference room', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'conference_room_id' => $validatedDestination->id,
@@ -1255,7 +1268,7 @@ class VoiceRoutingManager
                     return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::IVR_MENU:
-                    Log::info('IVR Input: Routing to IVR menu', [
+                    Log::debug('IVR Input: Routing to IVR menu', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'ivr_menu_id' => $validatedDestination->id,
@@ -1277,7 +1290,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('Destination configuration error.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         } catch (\Exception $e) {
             Log::error('IVR Input: Exception in destination routing', [
@@ -1292,7 +1305,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('Routing error occurred.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
     }
@@ -1312,7 +1325,7 @@ class VoiceRoutingManager
         ]);
 
         if ($ivrMenu->failover_destination_type === \App\Enums\IvrDestinationType::HANGUP) {
-            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Route to failover destination directly
@@ -1369,7 +1382,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('Destination is no longer available.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -1395,7 +1408,7 @@ class VoiceRoutingManager
         return response(
             CxmlBuilder::sayWithHangup('Unknown destination type.', true),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -1727,6 +1740,6 @@ class VoiceRoutingManager
      */
     private function createCxmlErrorResponse(string $message): Response
     {
-        return response(CxmlBuilder::sayWithHangup($message, true), 200, ['Content-Type' => 'text/xml']);
+        return response(CxmlBuilder::sayWithHangup($message, true), 200, ['Content-Type' => 'application/xml']);
     }
 }

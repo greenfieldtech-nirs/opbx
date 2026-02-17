@@ -53,6 +53,7 @@ class SessionUpdateController extends Controller
             try {
                 // First, get sessions that have been completed or deleted
                 // These sessions should not appear in the active calls list
+                // Look back 24 hours to catch any recent completions
                 $completedSessionIds = DB::table('session_updates')
                     ->where('organization_id', $organizationId)
                     ->whereIn('action', ['cdr_final_status', 'deleted'])
@@ -64,11 +65,17 @@ class SessionUpdateController extends Controller
                 // This ensures we get the most recent status for each session
                 // We also exclude sessions that have ever been deleted or finalized,
                 // even if there are stale records after the deletion
+                // 
+                // IMPORTANT: Only consider calls active if they've been updated recently
+                // (within the last 30 minutes). This prevents stale records from appearing
+                // in the active calls list when Cloudonix webhooks fail or are delayed.
+                $activeCutoff = now()->subMinutes(30);
+                
                 $subquery = DB::table('session_updates')
                     ->select('session_id', DB::raw('MAX(id) as max_id'))
                     ->where('organization_id', $organizationId)
                     ->whereIn('status', ['processing', 'ringing', 'connected', 'answer'])
-                    ->where('updated_at', '>=', now()->subHours(24))
+                    ->where('updated_at', '>=', $activeCutoff)
                     ->groupBy('session_id');
 
                 $activeCalls = DB::table('session_updates as su1')

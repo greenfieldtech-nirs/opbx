@@ -5,7 +5,7 @@
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
 
-A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, IVR menus, business hours management, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
+A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, IVR menus, business hours management, AI assistant integration, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
 
 ---
 
@@ -29,22 +29,31 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 
 ### Call Routing & Management
 - **Direct Extension Calling**: Extension-to-extension dialing with SIP URI generation
-- **Outbound Calling**: E.164 international dialing with extension-type based permissions
+- **Outbound Calling**: E.164 international dialing with whitelist-based trunk routing
 - **Ring Groups**: Distribute calls with simultaneous, round-robin, or sequential strategies
 - **IVR Menus**: Interactive voice menus with DTMF input and configurable destinations
 - **Business Hours**: Time-based routing with weekly schedules and holiday exceptions
 - **AI Assistant Integration**: Route calls to AI-powered voice assistants
+- **AI Assistant Load Balancers**: Distribute calls across multiple AI assistants with fallback handling
+- **Conference Rooms**: Multi-party conference calls with PIN protection
+
+### Phone Number Management
+- **DID Management**: Full support for Direct Inward Dialing numbers
+- **Flexible Routing**: Route DIDs to extensions, ring groups, IVR menus, AI assistants, conference rooms, or business hours schedules
+- **Outbound Whitelist**: Control outbound calling with country/prefix-based rules and trunk selection
 
 ### Real-Time Monitoring
-- **Live Call Dashboard**: Real-time call presence via WebSockets
+- **Live Call Dashboard**: Real-time call presence via WebSockets with automatic stale record cleanup
 - **Call Detail Records (CDR)**: Complete call history with search, filtering, and CSV export
 - **Call Statistics**: Volume, duration, and disposition metrics
+- **Call Notifications**: Webhook-based notifications for call events
 
 ### Performance & Reliability
 - **Redis Caching Layer**: 50-90% faster routing lookups with automatic cache invalidation
 - **Idempotent Webhooks**: Redis-based deduplication prevents duplicate processing
 - **Distributed Locking**: Prevents race conditions on concurrent calls
 - **Queue Workers**: Async job processing for non-blocking operations
+- **Service Architecture**: Modular voice routing with dedicated services for outbound, business hours, and IVR handling
 
 ### Multi-Tenant Architecture
 - **Organization Isolation**: Complete data separation between tenants
@@ -83,6 +92,13 @@ graph TB
         SCHEDULER[Task Scheduler]
     end
 
+    subgraph "Voice Routing Services"
+        VRM[VoiceRoutingManager]
+        ORS[OutboundRoutingService]
+        BHRS[BusinessHoursRoutingService]
+        IVR[IVRRoutingStrategy]
+    end
+
     subgraph "Data Layer"
         MYSQL[(MySQL 8.0<br/>Port 3306)]
         REDIS[(Redis 7<br/>Port 6379)]
@@ -97,6 +113,10 @@ graph TB
     NGROK --> NGINX
     REACT --> NGINX
     NGINX --> APP
+    APP --> VRM
+    VRM --> ORS
+    VRM --> BHRS
+    VRM --> IVR
     APP --> MYSQL
     APP --> REDIS
     APP --> MINIO
@@ -120,18 +140,39 @@ sequenceDiagram
     participant UI
 
     Caller->>Cloudonix: Inbound Call
-    Cloudonix->>OPBX: Webhook (call-initiated)
-    OPBX->>Redis: Acquire Lock
+    Cloudonix->>OPBX: POST /voice/route
+    OPBX->>Redis: Acquire Lock (call_id)
     OPBX->>Redis: Check Idempotency
     OPBX->>Redis: Cache Lookup (routing)
     alt Cache Miss
-        OPBX->>MySQL: Query Routing Config
+        OPBX->>MySQL: Query DID/Extension Config
+        OPBX->>MySQL: Check Business Hours
         OPBX->>Redis: Store in Cache
     end
     OPBX->>MySQL: Log Call
-    OPBX->>Cloudonix: CXML Response
+    OPBX->>Cloudonix: CXML Response (<Dial>, <Gather>)
     OPBX->>Redis: Broadcast Event
     Redis->>UI: Real-time Update
+```
+
+### Outbound Call Flow
+
+```mermaid
+sequenceDiagram
+    participant Ext as Extension
+    participant OPBX
+    participant OW as Outbound Whitelist
+    participant CX as Cloudonix
+
+    Ext->>OPBX: Dial External Number
+    OPBX->>OPBX: Validate Extension Active
+    OPBS->>OW: Match Destination
+    alt Whitelist Match Found
+        OW->>OPBX: Return Trunk Configuration
+        OPBX->>CX: CXML <Dial trunks="Trunk-X">
+    else No Match
+        OPBX->>Ext: Reject Call
+    end
 ```
 
 ### Control Plane vs Execution Plane
@@ -200,16 +241,17 @@ sequenceDiagram
 
    Edit `.env` with your settings:
    ```env
-   # 
-   # Cloudonix API (No longer required - to be configured via your account settings)
-   # CLOUDONIX_API_TOKEN=your_api_token_here
-   # 
-   
    # ngrok (for local development)
    NGROK_AUTHTOKEN=your_ngrok_authtoken_here
    
    # Redis password (recommended for production)
    REDIS_PASSWORD=your_redis_password
+   
+   # MySQL
+   DB_ROOT_PASSWORD=rootsecret
+   DB_DATABASE=opbx
+   DB_USERNAME=opbx
+   DB_PASSWORD=secret
    ```
 
 3. **Start all services**
@@ -263,10 +305,10 @@ See `.env.example` for all available configuration options. Key variables:
 
 | Variable | Description |
 |----------|-------------|
-| `CLOUDONIX_API_TOKEN` | Cloudonix API authentication token |
 | `WEBHOOK_BASE_URL` | Public URL for webhooks (ngrok URL for local dev) |
 | `REDIS_PASSWORD` | Redis authentication password |
 | `DB_PASSWORD` | MySQL database password |
+| `NGROK_AUTHTOKEN` | ngrok authentication token |
 
 ### Cloudonix Webhook Configuration
 
@@ -274,10 +316,11 @@ Configure these webhook URLs in your Cloudonix portal:
 
 | Event | URL |
 |-------|-----|
-| Call Initiated | `{WEBHOOK_BASE_URL}/voice/route` |
-| IVR Input | `{WEBHOOK_BASE_URL}/voice/ivr-input` |
-| CDR | `{WEBHOOK_BASE_URL}/webhooks/cloudonix/cdr` |
-| Session Update | `{WEBHOOK_BASE_URL}/webhooks/cloudonix/session-update` |
+| Voice Application | `{WEBHOOK_BASE_URL}/api/voice/route` |
+| IVR Input | `{WEBHOOK_BASE_URL}/api/voice/ivr-input` |
+| CDR | `{WEBHOOK_BASE_URL}/api/webhooks/cloudonix/cdr` |
+| Session Update | `{WEBHOOK_BASE_URL}/api/webhooks/cloudonix/session-update` |
+| Call Status | `{WEBHOOK_BASE_URL}/api/webhooks/cloudonix/call-status` |
 
 ---
 
@@ -288,9 +331,13 @@ Configure these webhook URLs in your Cloudonix portal:
 - **Multi-Tenant Isolation**: Global query scopes enforce organization boundaries
 - **RBAC Authorization**: Policy-based access control at all layers
 - **API Authentication**: Laravel Sanctum with token rotation
-- **Webhook Security**: HMAC signature verification + idempotency
+- **Webhook Security**: 
+  - HMAC signature verification for CDR/status webhooks
+  - Bearer token authentication for voice routing
+  - Idempotency protection against duplicate processing
 - **Rate Limiting**: Configurable per-endpoint limits
 - **Security Headers**: CSP, HSTS, X-Frame-Options, and more
+- **API Key Masking**: Cloudonix API keys are encrypted and masked in API responses
 
 ### Monitoring
 
@@ -314,6 +361,15 @@ docker compose exec app php artisan queue:monitor
 docker compose exec redis redis-cli -a $REDIS_PASSWORD INFO stats
 ```
 
+**Cleanup Stale Session Updates:**
+```bash
+# Dry run to see what would be cleaned
+docker compose exec app php artisan session-updates:cleanup --hours=2 --dry-run
+
+# Actually clean stale records
+docker compose exec app php artisan session-updates:cleanup --hours=2
+```
+
 For detailed security implementation, see [`docs/architecture/security-implementation.md`](docs/architecture/security-implementation.md).
 
 ---
@@ -328,8 +384,127 @@ curl -X POST http://localhost/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@example.com", "password": "password"}'
 
+# Response: {"token": "YOUR_TOKEN", "user": {...}}
+
 # Use token in subsequent requests
 curl http://localhost/api/v1/extensions \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Extensions
+
+```bash
+# List extensions
+curl http://localhost/api/v1/extensions \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Create extension
+curl -X POST http://localhost/api/v1/extensions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "extension_number": "1001",
+    "type": "user",
+    "name": "John Doe",
+    "user_id": 1
+  }'
+
+# Update extension routing
+curl -X PUT http://localhost/api/v1/extensions/1001 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "call_forwarding_enabled": true,
+    "configuration": {
+      "forwarding_number": "+1234567890"
+    }
+  }'
+```
+
+### Phone Numbers (DIDs)
+
+```bash
+# List phone numbers
+curl http://localhost/api/v1/phone-numbers \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Create with extension routing
+curl -X POST http://localhost/api/v1/phone-numbers \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "+12125551234",
+    "friendly_name": "Main Line",
+    "routing_type": "extension",
+    "routing_config": {"extension_id": "1"}
+  }'
+
+# Route to AI Assistant
+curl -X PUT http://localhost/api/v1/phone-numbers/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routing_type": "ai_assistant",
+    "routing_config": {"ai_assistant_id": "5"}
+  }'
+
+# Route to IVR Menu
+curl -X PUT http://localhost/api/v1/phone-numbers/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routing_type": "ivr_menu",
+    "routing_config": {"ivr_menu_id": "3"}
+  }'
+```
+
+### Outbound Whitelist
+
+```bash
+# Create whitelist entry for US calls via Trunk-1
+curl -X POST http://localhost/api/v1/outbound-whitelist \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "US Calls",
+    "destination_country": "US",
+    "destination_prefix": "1212",
+    "outbound_trunk_name": "Trunk-1"
+  }'
+```
+
+### AI Assistant Load Balancers
+
+```bash
+# Create ALB with fallback
+curl -X POST http://localhost/api/v1/ai-assistant-load-balancers \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer Service LB",
+    "strategy": "round_robin",
+    "fallback_action": "extension",
+    "fallback_config": {"extension_id": "1"},
+    "members": [
+      {"ai_assistant_id": 1, "weight": 50},
+      {"ai_assistant_id": 2, "weight": 50}
+    ]
+  }'
+```
+
+### Live Calls
+
+```bash
+# Get active calls
+curl http://localhost/api/v1/session-updates/active \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get active call statistics
+curl http://localhost/api/v1/session-updates/active/stats \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Disconnect a session
+curl -X DELETE http://localhost/api/v1/session-updates/12345/disconnect \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -340,9 +515,16 @@ curl http://localhost/api/v1/extensions \
 | `GET` | `/api/v1/extensions` | List extensions |
 | `POST` | `/api/v1/extensions` | Create extension |
 | `GET` | `/api/v1/ring-groups` | List ring groups |
+| `POST` | `/api/v1/ring-groups` | Create ring group |
 | `GET` | `/api/v1/business-hours` | List schedules |
-| `GET` | `/api/v1/call-logs` | List call records |
+| `POST` | `/api/v1/business-hours` | Create schedule |
+| `GET` | `/api/v1/ivr-menus` | List IVR menus |
+| `POST` | `/api/v1/ivr-menus` | Create IVR menu |
 | `GET` | `/api/v1/phone-numbers` | List DIDs |
+| `POST` | `/api/v1/phone-numbers` | Create DID |
+| `GET` | `/api/v1/ai-assistants` | List AI assistants |
+| `GET` | `/api/v1/call-logs` | List call records |
+| `GET` | `/api/v1/settings/cloudonix` | Get Cloudonix settings |
 
 For complete API documentation, see [`docs/architecture/api-webhooks.md`](docs/architecture/api-webhooks.md).
 
@@ -369,11 +551,25 @@ docker compose exec app php artisan test --testsuite=Feature
 docker compose exec app php artisan test tests/Feature/RingGroupControllerTest.php
 ```
 
+### Code Quality
+
+```bash
+# Run PHP linting
+docker compose exec app vendor/bin/pint
+
+# Frontend linting
+cd frontend && npm run lint
+
+# TypeScript type checking
+cd frontend && npm run type-check
+```
+
 ### Test Coverage
 
 - **100+ tests** covering all major features
 - Cache system, voice routing, security, webhook processing
 - Multi-tenancy and RBAC verification
+- Service extraction and routing strategies
 
 ---
 
@@ -398,9 +594,10 @@ We welcome contributions from the community! Here's how to get started:
 ### Pull Request Process
 
 1. Ensure all tests pass: `docker compose exec app php artisan test`
-2. Update `CHANGELOG.md` with your changes
-3. Open a PR with a clear description of changes
-4. Address any review feedback
+2. Run code quality checks: `vendor/bin/pint` and frontend linting
+3. Update `CHANGELOG.md` with your changes
+4. Open a PR with a clear description of changes
+5. Address any review feedback
 
 ### Reporting Issues
 
@@ -480,7 +677,38 @@ Additional documentation is available in the `docs/` directory:
 
 ---
 
+## Recent Updates
+
+### Phase 4 - Infrastructure & Code Quality (Latest)
+- Docker health checks improved with actual endpoint monitoring
+- Docker Compose version warning resolved
+- MySQL volume changed from bind mount to named volume
+- CXML Content-Type standardized to `application/xml`
+- Excessive logging cleaned up in voice routing
+- Frontend error handling enhanced with ErrorBoundaries
+
+### Phase 3 - Code Quality
+- 60+ TypeScript `any` types replaced with proper types
+- React Query retry logic improved (no retry on 401/403)
+- VoiceRoutingManager logging reduced (debug vs info)
+
+### Phase 2 - Architecture Improvements
+- VoiceRoutingManager refactored into dedicated services
+- OutboundRoutingService for whitelist-based trunk routing
+- BusinessHoursRoutingService for time-based routing
+- PhoneNumberService with E.164 normalization
+- CloudonixClient DI issue fixed
+- Session update transaction safety added
+- Authorization policies added to controllers
+
+### Phase 1 - Security & Critical Fixes
+- Dual routing architecture fixed (webhook vs voice route)
+- API key masking in settings endpoints
+- ALB fallback actions implemented
+- Test route removed from production
+- Health endpoints hardened
+- Extension org scope bypass fixed
+
 <p align="center">
   Made with ❤️ by <a href="https://github.com/greenfieldtech-nirs">Greenfield Technologies</a>&nbsp;&nbsp;Empowered by <a href="https://developers.cloudonix.com">Cloudonix</a>
-
 </p>

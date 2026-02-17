@@ -24,11 +24,11 @@ class ConferenceRoutingStrategy implements RoutingStrategy
         $room = $destination['conference_room'] ?? null;
 
         if (!$room) {
-            return response(CxmlBuilder::unavailable('Conference room not found'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Conference room not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         if ($room->status !== \App\Enums\UserStatus::ACTIVE) {
-            return response(CxmlBuilder::unavailable('Conference room is closed'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Conference room is closed'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Use a safe unique identifier for the conference room
@@ -42,7 +42,7 @@ class ConferenceRoutingStrategy implements RoutingStrategy
                 $room->announce_join_leave ?? false
             ),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }

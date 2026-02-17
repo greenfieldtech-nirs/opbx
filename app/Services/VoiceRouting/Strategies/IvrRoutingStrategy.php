@@ -41,7 +41,7 @@ class IvrRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::sayWithHangup('IVR menu configuration error.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -94,7 +94,7 @@ class IvrRoutingStrategy implements RoutingStrategy
             'max_turns' => $ivrMenu->max_turns,
         ]);
 
-        return response($cxml, 200, ['Content-Type' => 'text/xml']);
+        return response($cxml, 200, ['Content-Type' => 'application/xml']);
     }
 
     /**

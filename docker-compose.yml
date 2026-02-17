@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -75,10 +73,11 @@ services:
     networks:
       - opbx
     healthcheck:
-      test: ["CMD", "php", "-v"]
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   queue-worker:
     build:
@@ -145,7 +144,7 @@ services:
       - MYSQL_USER=${DB_USERNAME:-opbx}
       - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
-      - ./volumes/mysql:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
     networks:
       - opbx
     healthcheck:
@@ -258,5 +257,7 @@ networks:
     driver: bridge
 
 volumes:
+  mysql_data:
+    driver: local
   redis_data:
     driver: local

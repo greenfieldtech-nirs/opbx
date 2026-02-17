@@ -85,6 +85,12 @@ import type {
   TimeRange,
   ExceptionType,
   Country,
+  Extension,
+  RingGroup,
+  IvrMenu,
+  ConferenceRoom,
+  CreateBusinessHoursRequest,
+  UpdateBusinessHoursRequest,
 } from '@/types';
 import {
   mockDidBusinessHours,
@@ -104,7 +110,7 @@ import {
 // ============================================================================
 
 // Helper function to get action display name for both structured and legacy formats
-const getActionDisplayName = (action: any, extensions: any[], ringGroups: any[], ivrMenus: any[]): JSX.Element => {
+const getActionDisplayName = (action: unknown, extensions: Extension[], ringGroups: RingGroup[], ivrMenus: IvrMenu[]): JSX.Element => {
   if (!action) return <span className="text-muted-foreground">Not set</span>;
 
   // If it's a structured object (new format)
@@ -125,7 +131,7 @@ const getActionDisplayName = (action: any, extensions: any[], ringGroups: any[],
       return configs[type as keyof typeof configs] || configs.user;
     };
     // Get the target option and display name
-    let targetOption: any = null;
+    let targetOption: Extension | RingGroup | IvrMenu | undefined = undefined;
     let displayName = '';
     let displayType = '';
 
@@ -191,10 +197,10 @@ interface ActionSelectorProps {
   value: BusinessHoursAction | null;
   onChange: (action: BusinessHoursAction) => void;
   error?: string;
-  extensions: any[];
-  ringGroups: any[];
-  ivrMenus: any[];
-  conferenceRooms: any[];
+  extensions: Extension[];
+  ringGroups: RingGroup[];
+  ivrMenus: IvrMenu[];
+  conferenceRooms: ConferenceRoom[];
 }
 
 const ActionSelector: React.FC<ActionSelectorProps> = ({
@@ -354,7 +360,7 @@ const ActionSelector: React.FC<ActionSelectorProps> = ({
               const Icon = typeConfig.icon;
 
               // Get display name based on extension type - matching Extensions page implementation
-              const getDisplayName = (ext: any) => {
+              const getDisplayName = (ext: Extension) => {
                 switch (ext.type) {
                   case 'user':
                     return ext.user?.name || 'Unassigned';
@@ -376,7 +382,7 @@ const ActionSelector: React.FC<ActionSelectorProps> = ({
                   }
                   case 'ivr': {
                     // Handle configuration as object or direct value - matching Extensions page logic
-                    let ivrId: any = null;
+                    let ivrId: string | null = null;
                     if (typeof ext.configuration === 'object' && ext.configuration) {
                       ivrId = ext.configuration.ivr_id || ext.configuration.ivr_menu_id;
                     } else {
@@ -764,27 +770,27 @@ const BusinessHours: React.FC = () => {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: any) => businessHoursService.create(data),
+    mutationFn: (data: CreateBusinessHoursRequest) => businessHoursService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-hours'] });
       toast.success('Business hours schedule has been created successfully.');
       setIsCreateEditDialogOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to create business hours schedule.');
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateBusinessHoursRequest }) =>
       businessHoursService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['business-hours'] });
       toast.success('Business hours schedule has been updated successfully.');
       setIsCreateEditDialogOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to update business hours schedule.');
     },
   });
@@ -797,7 +803,7 @@ const BusinessHours: React.FC = () => {
       toast.success('Business hours schedule has been deleted.');
       setIsDeleteDialogOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to delete business hours schedule.');
     },
   });
@@ -810,7 +816,7 @@ const BusinessHours: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['business-hours'] });
       toast.success('Business hours schedule status updated');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to update schedule status');
     },
   });
@@ -890,7 +896,7 @@ const BusinessHours: React.FC = () => {
     setFormData({ ...schedule });
 
     // Parse actions - handle both structured objects (new format) and strings (legacy format)
-    const parseAction = (action: any): BusinessHoursAction | null => {
+    const parseAction = (action: unknown): BusinessHoursAction | null => {
       if (!action) return null;
 
       // If it's already a structured object (new API format)
@@ -915,7 +921,7 @@ const BusinessHours: React.FC = () => {
   };
 
   // Handle form field changes
-  const handleFormChange = (field: string, value: any) => {
+  const handleFormChange = (field: string, value: string | boolean | Record<string, unknown>) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field
     if (formErrors[field]) {
@@ -1260,7 +1266,7 @@ const BusinessHours: React.FC = () => {
             </Button>
 
             {/* Filter dropdowns */}
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <Select value={statusFilter} onValueChange={(value: string) => setStatusFilter(value)}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
@@ -1272,7 +1278,7 @@ const BusinessHours: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+            <Select value={sortBy} onValueChange={(value: string) => setSortBy(value)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -1528,7 +1534,7 @@ interface CreateEditScheduleDialogProps {
   editing: boolean;
   formData: Partial<BusinessHoursSchedule>;
   formErrors: Record<string, string>;
-  onFormChange: (field: string, value: any) => void;
+  onFormChange: (field: string, value: string | boolean | Record<string, unknown>) => void;
   onDayScheduleChange: (day: DayOfWeek, enabled: boolean) => void;
   onTimeRangeChange: (day: DayOfWeek, rangeId: string, field: 'start_time' | 'end_time', value: string) => void;
   onAddTimeRange: (day: DayOfWeek) => void;
@@ -1542,10 +1548,10 @@ interface CreateEditScheduleDialogProps {
   closedHoursAction: BusinessHoursAction | null;
   onOpenHoursActionChange: (action: BusinessHoursAction) => void;
   onClosedHoursActionChange: (action: BusinessHoursAction) => void;
-  extensions: any[];
-  ringGroups: any[];
-  ivrMenus: any[];
-  conferenceRooms: any[];
+  extensions: Extension[];
+  ringGroups: RingGroup[];
+  ivrMenus: IvrMenu[];
+  conferenceRooms: ConferenceRoom[];
   onApplyTemplate: (template: string) => void;
 }
 
@@ -1960,7 +1966,7 @@ interface ExceptionDialogProps {
   onOpenChange: (open: boolean) => void;
   editing: boolean;
   formData: Partial<ExceptionDate>;
-  onFormChange: (field: string, value: any) => void;
+  onFormChange: (field: string, value: string | boolean | Record<string, unknown>) => void;
   onSave: () => void;
 }
 
@@ -2496,9 +2502,9 @@ interface ScheduleDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schedule: BusinessHoursSchedule | null;
-  extensions: any[];
-  ringGroups: any[];
-  ivrMenus: any[];
+  extensions: Extension[];
+  ringGroups: RingGroup[];
+  ivrMenus: Extension[];
 }
 
 const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({

@@ -968,6 +968,7 @@ export interface OutboundWhitelist {
   destination_country: string;
   destination_prefix?: string;
   outbound_trunk_name: string;
+  status: Status;
   created_at: string;
   updated_at: string;
 }
@@ -1091,4 +1092,113 @@ export interface CallNotificationsRateLimitStatus {
   current: number;
   remaining: number;
   reset_in_seconds: number;
+}
+
+// ============================================================================
+// Inbound Blacklist Types
+// ============================================================================
+
+export type InboundBlacklistMatchType = 'exact' | 'prefix' | 'wildcard';
+export type InboundBlacklistRejectionStrategy = 'drop' | 'reject' | 'torment';
+
+export interface InboundBlacklist {
+  id: number;
+  organization_id: number;
+  match_type: InboundBlacklistMatchType;
+  caller_id_pattern: string;
+  is_global: boolean;
+  rejection_strategy: InboundBlacklistRejectionStrategy;
+  torment_room_prefix?: string;
+  torment_music_timeout?: number;
+  status: Status;
+  blocked_count: number;
+  created_at: string;
+  updated_at: string;
+  did_numbers?: {
+    id: string;
+    phone_number: string;
+    friendly_name: string;
+  }[];
+}
+
+export interface BlockedCallLog {
+  id: number;
+  organization_id: number;
+  inbound_blacklist_id?: number;
+  did_number_id?: number;
+  caller_id: string;
+  called_number: string;
+  call_sid?: string;
+  session_id?: string;
+  rejection_strategy: InboundBlacklistRejectionStrategy;
+  torment_room_id?: string;
+  torment_duration?: number;
+  webhook_payload?: Record<string, unknown>;
+  source_ip?: string;
+  blocked_at: string;
+  inbound_blacklist?: {
+    id: number;
+    caller_id_pattern: string;
+  };
+  did_number?: {
+    id: number;
+    phone_number: string;
+  };
+}
+
+export interface InboundBlacklistStats {
+  total_entries: number;
+  active_entries: number;
+  global_entries: number;
+  by_strategy: {
+    drop: number;
+    reject: number;
+    torment: number;
+  };
+  by_match_type: {
+    exact: number;
+    prefix: number;
+    wildcard: number;
+  };
+  total_blocked_calls: number;
+  blocked_calls_today: number;
+  blocked_calls_this_week: number;
+}
+
+export interface CreateInboundBlacklistRequest {
+  caller_id_pattern: string;
+  match_type: InboundBlacklistMatchType;
+  rejection_strategy: InboundBlacklistRejectionStrategy;
+  did_number_ids?: (number | string)[];
+  is_global?: boolean;
+  torment_room_prefix?: string;
+  torment_music_timeout?: number;
+}
+
+export interface UpdateInboundBlacklistRequest {
+  caller_id_pattern?: string;
+  match_type?: InboundBlacklistMatchType;
+  rejection_strategy?: InboundBlacklistRejectionStrategy;
+  did_number_ids?: (number | string)[];
+  is_global?: boolean;
+  torment_room_prefix?: string;
+  torment_music_timeout?: number;
+}
+
+export interface InboundBlacklistFilterParams extends PaginationParams {
+  search?: string;
+  rejection_strategy?: InboundBlacklistRejectionStrategy;
+  match_type?: InboundBlacklistMatchType;
+  status?: Status;
+  scope?: 'global' | 'did_specific';
+  did_number_id?: number;
+}
+
+export interface BlockedCallLogFilterParams extends PaginationParams {
+  caller_id?: string;
+  blacklist_id?: number;
+  did_number_id?: number;
+  from_date?: string;
+  to_date?: string;
+  rejection_strategy?: InboundBlacklistRejectionStrategy;
 }
