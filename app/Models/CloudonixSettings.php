@@ -195,6 +195,10 @@ class CloudonixSettings extends Model
      */
     public function getEffectiveWebhookBaseUrlAttribute(): ?string
     {
+        if (! $this->organization) {
+            return null;
+        }
+
         return WebhookUrlResolver::resolveWebhookBaseUrl($this->organization);
     }
 
@@ -203,6 +207,10 @@ class CloudonixSettings extends Model
      */
     public function isWebhookUrlOverridden(): bool
     {
+        if (! $this->organization) {
+            return false;
+        }
+
         return WebhookUrlResolver::isWebhookUrlOverridden($this->organization);
     }
 
@@ -211,6 +219,16 @@ class CloudonixSettings extends Model
      */
     public function getWebhookUrlDetails(): array
     {
+        if (! $this->organization) {
+            return [
+                'effective_url' => null,
+                'application_url' => null,
+                'organization_url' => null,
+                'is_overridden' => false,
+                'source' => 'organization',
+            ];
+        }
+
         return WebhookUrlResolver::getWebhookUrlDetails($this->organization);
     }
 }

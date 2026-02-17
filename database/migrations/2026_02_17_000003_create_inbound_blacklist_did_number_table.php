@@ -14,6 +14,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Skip if pivot table already exists (idempotent migration)
+        if (Schema::hasTable('inbound_blacklist_did_number')) {
+            return;
+        }
+
         // Create pivot table for many-to-many relationship
         Schema::create('inbound_blacklist_did_number', function (Blueprint $table) {
             $table->id();
@@ -32,11 +37,13 @@ return new class extends Migration
         // Migrate existing single DID relationships to pivot table
         $this->migrateExistingData();
 
-        // Drop the old did_number_id column from inbound_blacklists
-        Schema::table('inbound_blacklists', function (Blueprint $table) {
-            $table->dropForeign(['did_number_id']);
-            $table->dropColumn('did_number_id');
-        });
+        // Drop the old did_number_id column from inbound_blacklists (if it still exists)
+        if (Schema::hasColumn('inbound_blacklists', 'did_number_id')) {
+            Schema::table('inbound_blacklists', function (Blueprint $table) {
+                $table->dropForeign(['did_number_id']);
+                $table->dropColumn('did_number_id');
+            });
+        }
     }
 
     /**

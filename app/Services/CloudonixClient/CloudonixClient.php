@@ -530,20 +530,44 @@ class CloudonixClient
      */
     public function validateDomain(string $domainUuid, string $apiKey): array
     {
+        return self::validateDomainCredentials($domainUuid, $apiKey);
+    }
+
+    /**
+     * Static method to validate domain credentials without requiring client instantiation.
+     *
+     * This allows validation of credentials before saving them to the database.
+     *
+     * @param  string  $domainUuid  The domain UUID to validate
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @return array{valid: bool, profile: array<string, mixed>|null} Validation result with domain profile data
+     */
+    public static function validateDomainCredentials(string $domainUuid, string $apiKey): array
+    {
         try {
             Log::info('Validating Cloudonix domain credentials', [
                 'domain_uuid' => $domainUuid,
                 'api_key_prefix' => substr($apiKey, 0, 4).'...',
             ]);
 
+            $baseUrl = config('cloudonix.api.base_url');
+            if (empty($baseUrl)) {
+                throw new \RuntimeException(
+                    'Cloudonix API base URL is not configured. '.
+                    'Please set CLOUDONIX_API_BASE_URL in your .env file (e.g., https://api.cloudonix.io)'
+                );
+            }
+
+            $timeout = (int) config('cloudonix.api.timeout', 30);
+
             // Create temporary client with provided credentials
-            $tempClient = Http::timeout($this->timeout)
+            $tempClient = Http::timeout($timeout)
                 ->withHeaders([
                     'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
-                ->baseUrl($this->baseUrl);
+                ->baseUrl(rtrim($baseUrl, '/'));
 
             $response = $tempClient->get("/customers/self/domains/{$domainUuid}");
 

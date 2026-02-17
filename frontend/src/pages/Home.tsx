@@ -29,7 +29,7 @@ import {
     Play,
 } from 'lucide-react';
 import {Link} from 'react-router-dom';
-import OPBXLogo from '@/assets/OPBX_logo.png';
+import OPBXLogo from '@/assets/opbx_logo.png';
 import {useState} from 'react';
 
 export default function Home() {
