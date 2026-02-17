@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\WhitelistStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,7 +28,20 @@ class OutboundWhitelist extends Model
         'destination_country',
         'destination_prefix',
         'outbound_trunk_name',
+        'status',
     ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => WhitelistStatus::class,
+        ];
+    }
 
     /**
      * Get the organization that owns the outbound whitelist.
@@ -56,5 +70,24 @@ class OutboundWhitelist extends Model
                 ->orWhere('destination_prefix', 'like', "%{$search}%")
                 ->orWhere('outbound_trunk_name', 'like', "%{$search}%");
         });
+    }
+
+    /**
+     * Toggle the status of this entry.
+     */
+    public function toggleStatus(): void
+    {
+        $this->status = $this->status === WhitelistStatus::ACTIVE
+            ? WhitelistStatus::INACTIVE
+            : WhitelistStatus::ACTIVE;
+        $this->save();
+    }
+
+    /**
+     * Check if this entry is active.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === WhitelistStatus::ACTIVE;
     }
 }

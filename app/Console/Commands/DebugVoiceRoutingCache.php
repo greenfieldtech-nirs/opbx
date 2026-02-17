@@ -136,8 +136,10 @@ class DebugVoiceRoutingCache extends Command
             $this->info('✅ Extension found:');
             $this->line("  ID: {$extension->id}");
             $this->line("  Number: {$extension->extension_number}");
-            $this->line("  Type: {$extension->type->value ?? $extension->type}");
-            $this->line("  Status: {$extension->status->value ?? $extension->status}");
+            $typeValue = $extension->type?->value ?? $extension->type;
+            $this->line("  Type: {$typeValue}");
+            $statusValue = $extension->status?->value ?? $extension->status;
+            $this->line("  Status: {$statusValue}");
             $this->line("  Config: " . json_encode($extension->configuration));
         } else {
             $this->error('❌ Extension not found');

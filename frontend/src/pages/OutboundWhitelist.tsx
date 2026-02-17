@@ -6,6 +6,9 @@ import {
   Filter,
   Shield,
   RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Loader2,
 } from 'lucide-react';
 import { getCountryOptions, getCountryByCode, type CountryOption } from '@/utils/countries';
 import { Button } from '@/components/ui/button';
@@ -191,6 +194,24 @@ const OutboundWhitelistPage: React.FC = () => {
       toast.error('Failed to delete outbound whitelist entry');
     },
   });
+
+  // Toggle status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: (id: string) => outboundWhitelistService.toggleStatus(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      toast.success('Status updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update status');
+    },
+  });
+
+  // Handle status toggle
+  const handleToggleStatus = (item: OutboundWhitelist) => {
+    if (toggleStatusMutation.isPending) return;
+    toggleStatusMutation.mutate(item.id);
+  };
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
@@ -389,6 +410,49 @@ const OutboundWhitelistPage: React.FC = () => {
                 header: 'Created',
                 accessorKey: 'created_at',
                 cell: (item) => new Date(item.created_at).toLocaleDateString()
+              },
+              {
+                header: 'Status',
+                cell: (item) => (
+                  canManageWhitelist ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleStatus(item);
+                      }}
+                      disabled={toggleStatusMutation.isPending}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors cursor-pointer hover:opacity-80",
+                        item.status === 'active'
+                          ? "bg-green-100 text-green-800 border-green-200"
+                          : "bg-gray-100 text-gray-800 border-gray-200"
+                      )}
+                    >
+                      {toggleStatusMutation.isPending && toggleStatusMutation.variables === item.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : item.status === 'active' ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      {item.status === 'active' ? 'Active' : 'Disabled'}
+                    </button>
+                  ) : (
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                      item.status === 'active'
+                        ? "bg-green-100 text-green-800 border-green-200"
+                        : "bg-gray-100 text-gray-800 border-gray-200"
+                    )}>
+                      {item.status === 'active' ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      {item.status === 'active' ? 'Active' : 'Disabled'}
+                    </span>
+                  )
+                ),
               }
             ]}
             emptyState={

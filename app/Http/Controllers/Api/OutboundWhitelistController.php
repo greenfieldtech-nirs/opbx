@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Requests\OutboundWhitelist\StoreOutboundWhitelistRequest;
-use App\Http\Requests\OutboundWhitelist\UpdateOutboundWhitelistRequest;
 use App\Http\Resources\OutboundWhitelistResource;
 use App\Models\OutboundWhitelist;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,7 +18,6 @@ use Illuminate\Http\Request;
  */
 class OutboundWhitelistController extends AbstractApiCrudController
 {
-
     /**
      * Get the model class name for this controller.
      */
@@ -95,7 +92,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
@@ -114,7 +111,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
 
         // Validate sort field
         $allowedSortFields = $this->getAllowedSortFields();
-        if (!in_array($sortField, $allowedSortFields, true)) {
+        if (! in_array($sortField, $allowedSortFields, true)) {
             $sortField = $this->getDefaultSortField();
         }
 
@@ -139,7 +136,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
             }
         }
 
-        \Illuminate\Support\Facades\Log::info($this->getPluralResourceKey() . ' list retrieved', [
+        \Illuminate\Support\Facades\Log::info($this->getPluralResourceKey().' list retrieved', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
@@ -149,6 +146,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
         ]);
 
         $resourceClass = $this->getResourceClass();
+
         return response()->json([
             'data' => $resourceClass::collection($models->items()),
             'meta' => [
@@ -187,5 +185,63 @@ class OutboundWhitelistController extends AbstractApiCrudController
     protected function shouldUseTransactionForDestroy(): bool
     {
         return false;
+    }
+
+    /**
+     * Toggle the status of an outbound whitelist entry.
+     */
+    public function toggleStatus(OutboundWhitelist $outboundWhitelist): JsonResponse
+    {
+        $requestId = $this->getRequestId();
+        $user = $this->getAuthenticatedUser();
+
+        $this->authorize($this->getUpdateAbility(), $outboundWhitelist);
+
+        // Tenant scope check
+        if ($outboundWhitelist->organization_id !== $user->organization_id) {
+            \Illuminate\Support\Facades\Log::warning('Cross-tenant outbound whitelist toggle attempt', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'target_whitelist_id' => $outboundWhitelist->id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Whitelist entry not found.',
+            ], 404);
+        }
+
+        try {
+            $outboundWhitelist->toggleStatus();
+
+            \Illuminate\Support\Facades\Log::info('Toggled outbound whitelist entry status', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'whitelist_id' => $outboundWhitelist->id,
+                'new_status' => $outboundWhitelist->status->value,
+            ]);
+
+            $resourceClass = $this->getResourceClass();
+
+            return response()->json([
+                'data' => new $resourceClass($outboundWhitelist->fresh()),
+                'message' => 'Status updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to toggle outbound whitelist status', [
+                'request_id' => $requestId,
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'whitelist_id' => $outboundWhitelist->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update status',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

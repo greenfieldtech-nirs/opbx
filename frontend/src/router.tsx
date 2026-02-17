@@ -31,6 +31,7 @@ const Recordings = lazy(() => import('@/pages/Recordings'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
+const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
 
 
@@ -122,6 +123,10 @@ export const router = createBrowserRouter([
              <OutboundWhitelistPage />
            </OwnerRoute>
          ),
+       },
+       {
+         path: 'inbound-blacklist',
+         element: <InboundBlacklistPage />,
        },
        {
          path: 'profile',

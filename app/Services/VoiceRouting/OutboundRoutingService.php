@@ -29,20 +29,34 @@ class OutboundRoutingService
     /**
      * Handle outbound routing via whitelist for calls from internal extensions.
      *
-     * @param Request $request The incoming call request
-     * @param string $to The destination phone number
-     * @param string $from The caller phone number
-     * @param int $orgId The organization ID
+     * @param  Request  $request  The incoming call request
+     * @param  string  $to  The destination phone number
+     * @param  string  $from  The caller phone number
+     * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if outbound routing applies, null otherwise
      */
     public function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
     {
+        Log::info('OutboundRoutingService: ========== OUTBOUND ROUTING START ==========');
         Log::info('OutboundRoutingService: Checking for outbound whitelist routing', [
             'direction' => $request->input('Direction', 'unknown'),
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
         ]);
+
+        // Check if destination looks like an external phone number (E.164 format or numeric)
+        // Skip outbound routing for internal extension calls (3-4 digit numbers)
+        $toDigits = preg_replace('/[^0-9]/', '', $to);
+        if (strlen($toDigits) < 7) {
+            Log::debug('OutboundRoutingService: Destination appears to be internal extension, skipping outbound routing', [
+                'to' => $to,
+                'to_digits' => $toDigits,
+                'digit_count' => strlen($toDigits),
+            ]);
+
+            return null;
+        }
 
         // Only allow outbound routing for calls from internal extensions
         $fromExtension = $this->cache->getExtension($orgId, $from);
@@ -67,12 +81,17 @@ class OutboundRoutingService
         $whitelistEntry = $this->findOutboundWhitelistEntry($orgId, $to);
 
         if (! $whitelistEntry) {
-            Log::info('OutboundRoutingService: No outbound whitelist entry found for destination', [
+            Log::warning('OutboundRoutingService: Call rejected - destination not in outbound whitelist', [
                 'to' => $to,
+                'from' => $from,
                 'org_id' => $orgId,
             ]);
 
-            return null;
+            return response(
+                CxmlBuilder::unavailable('Outbound calls to this destination are not allowed'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         }
 
         $trunkName = $whitelistEntry->outbound_trunk_name;
@@ -119,17 +138,18 @@ class OutboundRoutingService
      * 4. Within matches, check destination_prefix for additional matching
      * 5. Return the longest matching prefix
      *
-     * @param int $organizationId The organization ID
-     * @param string $destinationNumber The destination phone number
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $destinationNumber  The destination phone number
      * @return OutboundWhitelist|null The best matching whitelist entry or null
      */
     public function findOutboundWhitelistEntry(int $organizationId, string $destinationNumber): ?OutboundWhitelist
     {
         $whitelistEntries = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $organizationId)
+            ->where('status', 'active')
             ->get();
 
-        Log::debug('OutboundRoutingService: Checking outbound whitelist entries', [
+        Log::debug('OutboundRoutingService: Checking active outbound whitelist entries', [
             'organization_id' => $organizationId,
             'destination_number' => $destinationNumber,
             'whitelist_entries_count' => $whitelistEntries->count(),
@@ -148,7 +168,7 @@ class OutboundRoutingService
 
         // Normalize phone number first (ensure + prefix for proper country code extraction)
         $normalizedNumber = $this->phoneNumberService->normalizeToE164($destinationNumber);
-        
+
         // Extract country calling code from destination number
         $callingCode = $normalizedNumber ? $this->phoneNumberService->extractCallingCode($normalizedNumber) : null;
         $countryCode = $callingCode ? $this->phoneNumberService->callingCodeToCountryCode($callingCode) : null;
@@ -165,6 +185,7 @@ class OutboundRoutingService
         foreach ($whitelistEntries as $entry) {
             $matchScore = 0;
             $matchReason = '';
+            $countryMatched = false;
 
             Log::debug('OutboundRoutingService: Evaluating entry', [
                 'entry_id' => $entry->id,
@@ -175,17 +196,32 @@ class OutboundRoutingService
 
             // Check country code match (both ISO codes and calling codes)
             if ($countryCode && $entry->destination_country === $countryCode) {
+                $countryMatched = true;
                 $matchScore += 10;
                 $matchReason .= 'country_match ';
             } elseif ($callingCode && $entry->destination_country === $callingCode) {
+                $countryMatched = true;
                 $matchScore += 10;
                 $matchReason .= 'calling_code_match ';
             } elseif ($callingCode && $entry->destination_country === ltrim($callingCode, '+')) {
+                $countryMatched = true;
                 $matchScore += 10;
                 $matchReason .= 'calling_code_no_plus_match ';
             }
 
-            // Check prefix match
+            // If country doesn't match, skip this entry entirely
+            if (! $countryMatched) {
+                Log::debug('OutboundRoutingService: Entry country did not match', [
+                    'entry_id' => $entry->id,
+                    'entry_country' => $entry->destination_country,
+                    'destination_country_code' => $countryCode,
+                ]);
+
+                continue;
+            }
+
+            // Check prefix match - REQUIRED if prefix is specified
+            $prefixMatched = false;
             if (! empty($entry->destination_prefix)) {
                 $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
                 $destWithoutPlus = ltrim($destinationNumber, '+');
@@ -195,25 +231,57 @@ class OutboundRoutingService
                     'prefix' => $normalizedPrefix,
                     'destination' => $destinationNumber,
                     'dest_without_plus' => $destWithoutPlus,
-                    'prefix_starts_with_plus' => str_starts_with($normalizedPrefix, '+'),
-                    'dest_starts_with_prefix' => str_starts_with($destinationNumber, $normalizedPrefix),
-                    'dest_without_plus_starts_with_prefix' => str_starts_with($destWithoutPlus, $normalizedPrefix),
                 ]);
 
                 if (str_starts_with($normalizedPrefix, '+')) {
-                    // Full international prefix (e.g., +1212)
-                    if (str_starts_with($destinationNumber, $normalizedPrefix)) {
+                    // Full international prefix (e.g., +12123)
+                    $checkResult = str_starts_with($destinationNumber, $normalizedPrefix);
+                    Log::debug('OutboundRoutingService: Checking +prefixed prefix', [
+                        'destinationNumber' => $destinationNumber,
+                        'normalizedPrefix' => $normalizedPrefix,
+                        'checkResult' => $checkResult,
+                    ]);
+                    if ($checkResult) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "full_prefix_match({$prefixLength}) ";
+                        $prefixMatched = true;
                     }
                 } else {
-                    // Prefix without + (e.g., 1212) - match within the number after country code
-                    if (str_starts_with($destWithoutPlus, $normalizedPrefix)) {
+                    // Prefix without + (e.g., 2123) - match after the country code
+                    // Strip the country code from the beginning of the number
+                    $numberAfterCountryCode = $destWithoutPlus;
+                    if ($callingCode) {
+                        $codeWithoutPlus = ltrim($callingCode, '+');
+                        if (str_starts_with($destWithoutPlus, $codeWithoutPlus)) {
+                            $numberAfterCountryCode = substr($destWithoutPlus, strlen($codeWithoutPlus));
+                        }
+                    }
+
+                    $checkResult = str_starts_with($numberAfterCountryCode, $normalizedPrefix);
+                    Log::debug('OutboundRoutingService: Checking prefix after country code', [
+                        'destWithoutPlus' => $destWithoutPlus,
+                        'numberAfterCountryCode' => $numberAfterCountryCode,
+                        'normalizedPrefix' => $normalizedPrefix,
+                        'checkResult' => $checkResult,
+                    ]);
+                    if ($checkResult) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "prefix_match({$prefixLength}) ";
+                        $prefixMatched = true;
                     }
+                }
+
+                // If entry has a prefix but it didn't match, reject this entry
+                if (! $prefixMatched) {
+                    Log::debug('OutboundRoutingService: Entry prefix did not match - rejecting', [
+                        'entry_id' => $entry->id,
+                        'prefix' => $normalizedPrefix,
+                        'destination' => $destinationNumber,
+                    ]);
+
+                    continue;
                 }
             }
 
@@ -223,14 +291,10 @@ class OutboundRoutingService
                     'score' => $matchScore,
                     'reason' => $matchReason,
                 ];
-                Log::debug('OutboundRoutingService: Entry matched', [
+                Log::info('OutboundRoutingService: Entry matched', [
                     'entry_id' => $entry->id,
                     'score' => $matchScore,
                     'reason' => $matchReason,
-                ]);
-            } else {
-                Log::debug('OutboundRoutingService: Entry did not match', [
-                    'entry_id' => $entry->id,
                 ]);
             }
         }

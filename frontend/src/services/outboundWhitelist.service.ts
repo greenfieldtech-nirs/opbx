@@ -23,4 +23,13 @@ export const outboundWhitelistService = {
     return api.delete('/outbound-whitelist/bulk', { data: { ids } })
       .then(res => res.data);
   },
+
+  /**
+   * Toggle the status of an outbound whitelist entry
+   * PATCH /outbound-whitelist/{id}/toggle-status
+   */
+  toggleStatus: (id: string): Promise<{ data: OutboundWhitelist; message: string }> => {
+    return api.patch(`/outbound-whitelist/${id}/toggle-status`)
+      .then(res => res.data);
+  },
 };

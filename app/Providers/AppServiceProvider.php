@@ -70,6 +70,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy::class,
         ], 'voice_routing.strategies');
 
+        // Register Inbound Blacklist Service
+        $this->app->singleton(
+            \App\Services\InboundBlacklist\InboundBlacklistService::class
+        );
+
         // Register Voice Routing Manager
         $this->app->singleton(
             \App\Services\VoiceRouting\VoiceRoutingManager::class,
@@ -80,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
                     $app->make(\App\Services\PhoneNumberService::class),
                     $app->make(\App\Services\VoiceRouting\OutboundRoutingService::class),
                     $app->make(\App\Services\VoiceRouting\BusinessHoursRoutingService::class),
+                    $app->make(\App\Services\InboundBlacklist\InboundBlacklistService::class),
                     $app->tagged('voice_routing.strategies')
                 );
             }
@@ -121,6 +127,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\CallDetailRecord::class, \App\Policies\CallDetailRecordPolicy::class);
         Gate::policy(\App\Models\AiAssistant::class, \App\Policies\AiAssistantPolicy::class);
         Gate::policy(\App\Models\AiAssistantLoadBalancer::class, \App\Policies\AiAssistantLoadBalancerPolicy::class);
+        Gate::policy(\App\Models\InboundBlacklist::class, \App\Policies\InboundBlacklistPolicy::class);
+        Gate::policy(\App\Models\BlockedCallLog::class, \App\Policies\InboundBlacklistPolicy::class);
 
         // Configure rate limiting
         $this->configureRateLimiting();

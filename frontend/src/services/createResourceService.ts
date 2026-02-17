@@ -9,6 +9,7 @@ import type {
   BusinessHours,
   OutboundWhitelist,
   AiAssistantLoadBalancer,
+  InboundBlacklist,
 } from '@/types';
 import type {
   IvrMenu,
@@ -93,6 +94,7 @@ export const ivrMenusService = createResourceService<IvrMenu>('ivr-menus');
 export const businessHoursService = createResourceService<BusinessHours>('business-hours');
 export const outboundWhitelistService = createResourceService<OutboundWhitelist>('outbound-whitelist');
 export const recordingsService = createResourceService<Recording>('recordings');
+export const inboundBlacklistService = createResourceService<InboundBlacklist>('inbound-blacklist');
 
 /**
  * Resource factory class for dynamic service creation

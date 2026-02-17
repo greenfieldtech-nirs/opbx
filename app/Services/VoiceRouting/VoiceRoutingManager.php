@@ -13,6 +13,7 @@ use App\Models\OutboundWhitelist;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\InboundBlacklist\InboundBlacklistService;
 use App\Services\IvrStateService;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
@@ -42,6 +43,7 @@ class VoiceRoutingManager
      * @param  VoiceRoutingCacheService  $cache  Service for caching extension and routing data
      * @param  IvrStateService  $ivrStateService  Service for managing IVR call state
      * @param  PhoneNumberService  $phoneNumberService  Service for phone number parsing and validation
+     * @param  InboundBlacklistService  $inboundBlacklistService  Service for checking inbound blacklist
      * @param  iterable<RoutingStrategy>  $strategies  Collection of routing strategies
      */
     public function __construct(
@@ -50,6 +52,7 @@ class VoiceRoutingManager
         private readonly PhoneNumberService $phoneNumberService,
         private readonly OutboundRoutingService $outboundRouting,
         private readonly BusinessHoursRoutingService $businessHoursRouting,
+        private readonly InboundBlacklistService $inboundBlacklistService,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
@@ -115,6 +118,7 @@ class VoiceRoutingManager
         $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
         if ($extensionResponse) {
             Log::debug('VoiceRoutingManager: Extension routing matched');
+
             return $extensionResponse;
         }
         Log::debug('VoiceRoutingManager: Extension routing did not match');
@@ -124,18 +128,27 @@ class VoiceRoutingManager
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
             Log::debug('VoiceRoutingManager: DID routing matched');
+
             return $didResponse;
         }
         Log::debug('VoiceRoutingManager: DID routing did not match');
 
         // 3. Try outbound routing (for calls to external numbers)
-        Log::debug('VoiceRoutingManager: Trying outbound routing');
+        Log::info('VoiceRoutingManager: Trying outbound routing', [
+            'to' => $to,
+            'from' => $from,
+            'org_id' => $orgId,
+        ]);
         $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
         if ($outboundResponse) {
-            Log::debug('VoiceRoutingManager: Outbound routing matched');
+            Log::info('VoiceRoutingManager: Outbound routing returned response', [
+                'response_type' => $outboundResponse->isOk() ? 'success' : 'rejection',
+                'status_code' => $outboundResponse->getStatusCode(),
+            ]);
+
             return $outboundResponse;
         }
-        Log::debug('VoiceRoutingManager: Outbound routing did not match');
+        Log::info('VoiceRoutingManager: Outbound routing returned null');
 
         Log::info('VoiceRoutingManager: No destination found for subscriber call', [
             'to' => $to,

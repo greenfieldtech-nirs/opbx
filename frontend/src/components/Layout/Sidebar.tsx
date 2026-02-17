@@ -20,6 +20,7 @@ import {
   Volume2,
   Menu,
   Shield,
+  ShieldBan,
   Bot,
   Scale,
   Bell,
@@ -72,6 +73,7 @@ const navigation: NavSection[] = [
   {
     title: 'Security',
     items: [
+      { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: ShieldBan, roles: ['owner', 'pbx_admin'] },
       { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: Shield, roles: ['owner'] },
     ],
   },
