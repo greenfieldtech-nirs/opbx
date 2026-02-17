@@ -1114,7 +1114,7 @@ export interface InboundBlacklist {
   created_at: string;
   updated_at: string;
   did_numbers?: {
-    id: number;
+    id: string;
     phone_number: string;
     friendly_name: string;
   }[];

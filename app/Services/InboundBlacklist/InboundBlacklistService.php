@@ -20,15 +20,14 @@ class InboundBlacklistService
     public function isBlacklisted(string $callerId, int $didNumberId, int $organizationId): ?InboundBlacklist
     {
         // Get all active blacklist entries for this organization
+        // Either global OR specific to this DID (via pivot table)
         $entries = InboundBlacklist::where('organization_id', $organizationId)
             ->where('status', 'active')
             ->where(function ($query) use ($didNumberId) {
                 $query->where('is_global', true)
-                    ->orWhere('did_number_id', $didNumberId);
-            })
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
+                    ->orWhereHas('didNumbers', function ($q) use ($didNumberId) {
+                        $q->where('did_numbers.id', $didNumberId);
+                    });
             })
             ->get();
 
@@ -151,12 +150,27 @@ class InboundBlacklistService
         ?int $tormentDuration
     ): void {
         try {
+            // Get the called DID number from the request
+            $calledNumber = $request->input('To');
+
+            // Try to find the DID that was called
+            $didNumberId = null;
+            if (! $blacklist->is_global) {
+                // For non-global entries, find the specific DID that was called
+                $didNumber = $blacklist->didNumbers()
+                    ->where('phone_number', $calledNumber)
+                    ->first();
+                if ($didNumber) {
+                    $didNumberId = $didNumber->id;
+                }
+            }
+
             BlockedCallLog::create([
                 'organization_id' => $blacklist->organization_id,
                 'inbound_blacklist_id' => $blacklist->id,
-                'did_number_id' => $blacklist->did_number_id,
+                'did_number_id' => $didNumberId,
                 'caller_id' => $request->input('From'),
-                'called_number' => $request->input('To'),
+                'called_number' => $calledNumber,
                 'call_sid' => $request->input('CallSid'),
                 'session_id' => $request->input('Session'),
                 'rejection_strategy' => $blacklist->rejection_strategy,
