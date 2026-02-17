@@ -114,7 +114,7 @@ class VoiceRoutingManager
         Log::debug('VoiceRoutingManager: Trying extension routing');
         $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
         if ($extensionResponse) {
-            Log::info('VoiceRoutingManager: Extension routing matched');
+            Log::debug('VoiceRoutingManager: Extension routing matched');
             return $extensionResponse;
         }
         Log::debug('VoiceRoutingManager: Extension routing did not match');
@@ -123,7 +123,7 @@ class VoiceRoutingManager
         Log::debug('VoiceRoutingManager: Trying DID routing');
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
-            Log::info('VoiceRoutingManager: DID routing matched');
+            Log::debug('VoiceRoutingManager: DID routing matched');
             return $didResponse;
         }
         Log::debug('VoiceRoutingManager: DID routing did not match');
@@ -132,7 +132,7 @@ class VoiceRoutingManager
         Log::debug('VoiceRoutingManager: Trying outbound routing');
         $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
         if ($outboundResponse) {
-            Log::info('VoiceRoutingManager: Outbound routing matched');
+            Log::debug('VoiceRoutingManager: Outbound routing matched');
             return $outboundResponse;
         }
         Log::debug('VoiceRoutingManager: Outbound routing did not match');
@@ -910,7 +910,7 @@ class VoiceRoutingManager
             $menuId = (int) $request->query('menu_id');
             $orgId = (int) $request->input('_organization_id');
 
-            Log::info('IVR Input: Processing DTMF input', [
+            Log::debug('IVR Input: Processing DTMF input', [
                 'call_sid' => $callSid,
                 'digits' => $digits,
                 'menu_id' => $menuId,
@@ -942,7 +942,7 @@ class VoiceRoutingManager
                 );
             }
 
-            Log::info('IVR Input: Menu found and active', [
+            Log::debug('IVR Input: Menu found and active', [
                 'call_sid' => $callSid,
                 'menu_id' => $menuId,
                 'menu_name' => $ivrMenu->name,
@@ -982,7 +982,7 @@ class VoiceRoutingManager
             // Find matching option
             $option = $ivrMenu->findOptionByDigits($digits);
 
-            Log::info('IVR Input: Option lookup result', [
+            Log::debug('IVR Input: Option lookup result', [
                 'call_sid' => $callSid,
                 'digits' => $digits,
                 'option_found' => $option !== null,
@@ -1161,7 +1161,7 @@ class VoiceRoutingManager
      */
     private function routeToOptionDestination(Request $request, $option, IvrMenu $ivrMenu): Response
     {
-        Log::info('DEBUG: routeToOptionDestination called', [
+        Log::debug('routeToOptionDestination called', [
             'ivr_menu_type' => gettype($ivrMenu),
             'ivr_menu_class' => get_class($ivrMenu),
             'ivr_menu_id' => $ivrMenu->id,
@@ -1170,7 +1170,7 @@ class VoiceRoutingManager
 
         try {
             $destination = [];
-            Log::info('IVR Input: Attempting to get validated destination', [
+            Log::debug('IVR Input: Attempting to get validated destination', [
                 'call_sid' => $request->input('CallSid'),
                 'option_id' => $option->id ?? 'mock',
                 'destination_type' => $option->destination_type->value ?? $option->destination_type,
@@ -1201,7 +1201,7 @@ class VoiceRoutingManager
                 );
             }
 
-            Log::info('IVR Input: Validated destination found', [
+            Log::debug('IVR Input: Validated destination found', [
                 'call_sid' => $request->input('CallSid'),
                 'option_id' => $option->id ?? 'mock',
                 'destination_type' => is_object($option->destination_type) ? $option->destination_type->value : $option->destination_type,
@@ -1212,7 +1212,7 @@ class VoiceRoutingManager
 
             switch ($option->destination_type) {
                 case \App\Enums\IvrDestinationType::EXTENSION:
-                    Log::info('IVR Input: Routing to extension', [
+                    Log::debug('IVR Input: Routing to extension', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id ?? 'mock',
                         'destination_id' => $option->destination_id,
@@ -1224,7 +1224,7 @@ class VoiceRoutingManager
                     // Resolve the extension destination (could be ring group, conference, etc.)
                     $destination = $this->resolveExtensionDestination($validatedDestination, $ivrMenu->organization_id);
 
-                    Log::info('IVR Input: About to execute strategy', [
+                    Log::debug('IVR Input: About to execute strategy', [
                         'extension_type' => $validatedDestination->type,
                         'extension_type_value' => $validatedDestination->type->value,
                         'resolved_destination' => $destination,
@@ -1233,7 +1233,7 @@ class VoiceRoutingManager
                     return $this->executeStrategy($validatedDestination->type, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::RING_GROUP:
-                    Log::info('IVR Input: Routing to ring group', [
+                    Log::debug('IVR Input: Routing to ring group', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'ring_group_id' => $validatedDestination->id,
@@ -1244,7 +1244,7 @@ class VoiceRoutingManager
                     return $this->executeStrategy(\App\Enums\ExtensionType::RING_GROUP, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::CONFERENCE_ROOM:
-                    Log::info('IVR Input: Routing to conference room', [
+                    Log::debug('IVR Input: Routing to conference room', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'conference_room_id' => $validatedDestination->id,
@@ -1255,7 +1255,7 @@ class VoiceRoutingManager
                     return $this->executeStrategy(\App\Enums\ExtensionType::CONFERENCE, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::IVR_MENU:
-                    Log::info('IVR Input: Routing to IVR menu', [
+                    Log::debug('IVR Input: Routing to IVR menu', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'ivr_menu_id' => $validatedDestination->id,
