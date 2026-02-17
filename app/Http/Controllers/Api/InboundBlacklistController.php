@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\InboundBlacklist\StoreInboundBlacklistRequest;
@@ -105,7 +104,7 @@ class InboundBlacklistController extends Controller
             unset($validated['did_number_ids']);
 
             // Set default status to active
-            $validated['status'] = $validated['status'] ?? UserStatus::ACTIVE;
+            $validated['status'] = $validated['status'] ?? InboundBlacklistStatus::ACTIVE;
 
             $entry = InboundBlacklist::create($validated);
 
