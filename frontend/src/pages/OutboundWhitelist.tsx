@@ -220,10 +220,19 @@ const OutboundWhitelistPage: React.FC = () => {
   // Open edit dialog
   const openEditDialog = (item: OutboundWhitelist) => {
     setEditingItem(item);
+    // Strip country code from prefix for display
+    let prefix = item.destination_prefix || '';
+    if (prefix && item.destination_country) {
+      const countryOption = getCountryByCode(item.destination_country);
+      const callingCode = countryOption?.callingCode;
+      if (callingCode && prefix.startsWith(callingCode)) {
+        prefix = prefix.substring(callingCode.length);
+      }
+    }
     setFormData({
       name: item.name,
       destination_country: item.destination_country,
-      destination_prefix: item.destination_prefix || '',
+      destination_prefix: prefix,
       outbound_trunk_name: item.outbound_trunk_name,
     });
     setIsEditDialogOpen(true);
@@ -365,7 +374,16 @@ const OutboundWhitelistPage: React.FC = () => {
               {
                 header: 'Additional Prefix',
                 accessorKey: 'destination_prefix',
-                cell: (item) => item.destination_prefix || '-'
+                cell: (item) => {
+                  if (!item.destination_prefix) return '-';
+                  // Strip country code from display
+                  const countryOption = item.destination_country ? getCountryByCode(item.destination_country) : null;
+                  const callingCode = countryOption?.callingCode;
+                  if (callingCode && item.destination_prefix.startsWith(callingCode)) {
+                    return item.destination_prefix.substring(callingCode.length);
+                  }
+                  return item.destination_prefix;
+                }
               },
               {
                 header: 'Created',
@@ -464,10 +482,10 @@ const OutboundWhitelistPage: React.FC = () => {
                   id="destination_prefix"
                   value={formData.destination_prefix}
                   onChange={(e) => setFormData({ ...formData, destination_prefix: e.target.value })}
-                  placeholder="e.g., 1 for US, 44 for UK"
+                  placeholder="e.g., 972, 212 (area code without country code)"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Optional prefix for the destination (e.g., area code)
+                  Area code or prefix (without country code). Will be combined with selected country.
                 </p>
                 {formErrors.destination_prefix && (
                   <p className="text-sm text-destructive mt-1">{formErrors.destination_prefix}</p>
