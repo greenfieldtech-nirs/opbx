@@ -186,6 +186,7 @@ class OutboundRoutingService
         foreach ($whitelistEntries as $entry) {
             $matchScore = 0;
             $matchReason = '';
+            $countryMatched = false;
 
             Log::debug('OutboundRoutingService: Evaluating entry', [
                 'entry_id' => $entry->id,
@@ -196,17 +197,32 @@ class OutboundRoutingService
 
             // Check country code match (both ISO codes and calling codes)
             if ($countryCode && $entry->destination_country === $countryCode) {
+                $countryMatched = true;
                 $matchScore += 10;
                 $matchReason .= 'country_match ';
             } elseif ($callingCode && $entry->destination_country === $callingCode) {
+                $countryMatched = true;
                 $matchScore += 10;
                 $matchReason .= 'calling_code_match ';
             } elseif ($callingCode && $entry->destination_country === ltrim($callingCode, '+')) {
+                $countryMatched = true;
                 $matchScore += 10;
                 $matchReason .= 'calling_code_no_plus_match ';
             }
 
-            // Check prefix match
+            // If country doesn't match, skip this entry entirely
+            if (! $countryMatched) {
+                Log::debug('OutboundRoutingService: Entry country did not match', [
+                    'entry_id' => $entry->id,
+                    'entry_country' => $entry->destination_country,
+                    'destination_country_code' => $countryCode,
+                ]);
+
+                continue;
+            }
+
+            // Check prefix match - REQUIRED if prefix is specified
+            $prefixMatched = false;
             if (! empty($entry->destination_prefix)) {
                 $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
                 $destWithoutPlus = ltrim($destinationNumber, '+');
@@ -216,25 +232,35 @@ class OutboundRoutingService
                     'prefix' => $normalizedPrefix,
                     'destination' => $destinationNumber,
                     'dest_without_plus' => $destWithoutPlus,
-                    'prefix_starts_with_plus' => str_starts_with($normalizedPrefix, '+'),
-                    'dest_starts_with_prefix' => str_starts_with($destinationNumber, $normalizedPrefix),
-                    'dest_without_plus_starts_with_prefix' => str_starts_with($destWithoutPlus, $normalizedPrefix),
                 ]);
 
                 if (str_starts_with($normalizedPrefix, '+')) {
-                    // Full international prefix (e.g., +1212)
+                    // Full international prefix (e.g., +12123)
                     if (str_starts_with($destinationNumber, $normalizedPrefix)) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "full_prefix_match({$prefixLength}) ";
+                        $prefixMatched = true;
                     }
                 } else {
-                    // Prefix without + (e.g., 1212) - match within the number after country code
+                    // Prefix without + (e.g., 12123) - match within the number after country code
                     if (str_starts_with($destWithoutPlus, $normalizedPrefix)) {
                         $prefixLength = strlen($normalizedPrefix);
                         $matchScore += $prefixLength;
                         $matchReason .= "prefix_match({$prefixLength}) ";
+                        $prefixMatched = true;
                     }
+                }
+
+                // If entry has a prefix but it didn't match, reject this entry
+                if (! $prefixMatched) {
+                    Log::debug('OutboundRoutingService: Entry prefix did not match - rejecting', [
+                        'entry_id' => $entry->id,
+                        'prefix' => $normalizedPrefix,
+                        'destination' => $destinationNumber,
+                    ]);
+
+                    continue;
                 }
             }
 
@@ -244,14 +270,10 @@ class OutboundRoutingService
                     'score' => $matchScore,
                     'reason' => $matchReason,
                 ];
-                Log::debug('OutboundRoutingService: Entry matched', [
+                Log::info('OutboundRoutingService: Entry matched', [
                     'entry_id' => $entry->id,
                     'score' => $matchScore,
                     'reason' => $matchReason,
-                ]);
-            } else {
-                Log::debug('OutboundRoutingService: Entry did not match', [
-                    'entry_id' => $entry->id,
                 ]);
             }
         }
