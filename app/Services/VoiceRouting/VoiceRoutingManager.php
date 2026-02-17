@@ -853,30 +853,6 @@ class VoiceRoutingManager
         return null;
     }
 
-    /**
-     * Convert calling code to country code.
-     * Uses a mapping of common calling codes to ISO country codes.
-     *
-     * @return string|null The ISO country code or null if not found
-     */
-    private function callingCodeToCountryCode(string $callingCode): ?string
-    {
-        $callingCodeMap = config('country_calling_codes', []);
-
-        return $callingCodeMap[$callingCode] ?? null;
-    }
-
-    /**
-     * Check if a calling code is valid.
-     * Basic validation - could be enhanced with a proper phone library.
-     */
-    private function isValidCallingCode(string $callingCode): bool
-    {
-        // Remove + and check if remaining is numeric and reasonable length
-        $code = ltrim($callingCode, '+');
-
-        return is_numeric($code) && strlen($code) >= 1 && strlen($code) <= 4;
-    }
 
     /**
      * Check business hours and route accordingly.
