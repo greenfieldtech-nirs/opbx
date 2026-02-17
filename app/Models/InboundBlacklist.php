@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\InboundBlacklistMatchType;
 use App\Enums\InboundBlacklistRejectionStrategy;
+use App\Enums\WhitelistStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -104,13 +105,5 @@ class InboundBlacklist extends Model
     public function isActive(): bool
     {
         return $this->status === WhitelistStatus::ACTIVE;
-    }
-
-    /**
-     * Check if this entry is active.
-     */
-    public function isActive(): bool
-    {
-        return $this->status === UserStatus::ACTIVE;
     }
 }
