@@ -29,10 +29,10 @@ class OutboundRoutingService
     /**
      * Handle outbound routing via whitelist for calls from internal extensions.
      *
-     * @param Request $request The incoming call request
-     * @param string $to The destination phone number
-     * @param string $from The caller phone number
-     * @param int $orgId The organization ID
+     * @param  Request  $request  The incoming call request
+     * @param  string  $to  The destination phone number
+     * @param  string  $from  The caller phone number
+     * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if outbound routing applies, null otherwise
      */
     public function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
@@ -119,17 +119,18 @@ class OutboundRoutingService
      * 4. Within matches, check destination_prefix for additional matching
      * 5. Return the longest matching prefix
      *
-     * @param int $organizationId The organization ID
-     * @param string $destinationNumber The destination phone number
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $destinationNumber  The destination phone number
      * @return OutboundWhitelist|null The best matching whitelist entry or null
      */
     public function findOutboundWhitelistEntry(int $organizationId, string $destinationNumber): ?OutboundWhitelist
     {
         $whitelistEntries = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $organizationId)
+            ->where('status', 'active')
             ->get();
 
-        Log::debug('OutboundRoutingService: Checking outbound whitelist entries', [
+        Log::debug('OutboundRoutingService: Checking active outbound whitelist entries', [
             'organization_id' => $organizationId,
             'destination_number' => $destinationNumber,
             'whitelist_entries_count' => $whitelistEntries->count(),
@@ -148,7 +149,7 @@ class OutboundRoutingService
 
         // Normalize phone number first (ensure + prefix for proper country code extraction)
         $normalizedNumber = $this->phoneNumberService->normalizeToE164($destinationNumber);
-        
+
         // Extract country calling code from destination number
         $callingCode = $normalizedNumber ? $this->phoneNumberService->extractCallingCode($normalizedNumber) : null;
         $countryCode = $callingCode ? $this->phoneNumberService->callingCodeToCountryCode($callingCode) : null;
