@@ -15,6 +15,7 @@ import aiAssistantsService from '@/services/aiAssistants.service';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
 import { cn } from '@/lib/utils';
@@ -99,14 +100,14 @@ import {
 const VoiceSelector: React.FC<{
   value: string;
   onChange: (voiceId: string) => void;
-  voices: any[];
-  filters: any;
+  voices: CloudonixVoice[];
+  filters: CloudonixVoiceFilters;
   onRefresh?: () => void;
   cloudonixSettings?: CloudonixSettings;
 }> = ({ value, onChange, voices, filters, onRefresh, cloudonixSettings }) => {
   // Helper function to get language name from code
   const getLanguageName = (languageCode: string): string => {
-    const language = filters?.languages?.find((lang: any) => lang.code === languageCode);
+    const language = filters?.languages?.find((lang: CloudonixVoiceLanguage) => lang.code === languageCode);
     return language?.name || languageCode;
   };
 
@@ -121,7 +122,7 @@ const VoiceSelector: React.FC<{
     (typeof cloudonixSettings?.cloudonix_package === 'boolean' && cloudonixSettings.cloudonix_package === false);
   const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>(isLimitedTier ? 'standard' : 'all');
 
-  const filteredVoices = voices.filter((voice: any) => {
+  const filteredVoices = voices.filter((voice: CloudonixVoice) => {
     const matchesLanguage = languageFilter === 'all' || voice.language === languageFilter;
     const matchesGender = genderFilter === 'all' || voice.gender === genderFilter;
     const matchesProvider = providerFilter === 'all' || voice.provider === providerFilter;
@@ -141,7 +142,7 @@ const VoiceSelector: React.FC<{
         <div className="flex gap-2">
           <div className="flex-1">
             <Combobox
-              options={filteredVoices.map((voice: any) => {
+              options={filteredVoices.map((voice: CloudonixVoice) => {
                 const languageProviderPricing = `${getLanguageName(voice.language)} / ${voice.provider} / ${voice.pricing}`;
                 return {
                   value: voice.id,
@@ -181,7 +182,7 @@ const VoiceSelector: React.FC<{
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Languages</SelectItem>
-              {filters?.languages?.map((lang: any) => (
+              {filters?.languages?.map((lang: CloudonixVoiceLanguage) => (
                 <SelectItem key={lang.code} value={lang.code}>
                   {lang.name}
                 </SelectItem>
@@ -358,7 +359,7 @@ export default function IVRMenus() {
   });
 
   // Helper to get display label for an extension (matches Ring Groups format)
-  const getExtensionDisplayLabel = (ext: any) => {
+  const getExtensionDisplayLabel = (ext: Extension) => {
     if (ext.type === 'forward') {
       const forwardTo = ext.configuration?.forward_to;
       return forwardTo ? `Forward to ${forwardTo}` : 'Forward Extension';
@@ -406,7 +407,7 @@ export default function IVRMenus() {
 
   // Helper to render destination badge (matches Extensions page format)
   const renderDestinationBadge = (type: string, label: string, extType?: string) => {
-    const configs: Record<string, { color: string; icon: any }> = {
+    const configs: Record<string, { color: string; icon: LucideIcon }> = {
       user: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
       forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
       ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
@@ -511,7 +512,7 @@ export default function IVRMenus() {
       resetForm();
       toast.success('IVR menu created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to create IVR menu');
     },
   });
@@ -528,7 +529,7 @@ export default function IVRMenus() {
       resetForm();
       toast.success('IVR menu updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to update IVR menu');
     },
   });
@@ -543,7 +544,7 @@ export default function IVRMenus() {
       setSelectedMenu(null);
       toast.success('IVR menu deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to delete IVR menu');
     },
   });
@@ -556,7 +557,7 @@ export default function IVRMenus() {
       queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
       toast.success('IVR menu status updated');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       toast.error(error.response?.data?.message || 'Failed to update IVR menu status');
     },
   });
@@ -710,7 +711,7 @@ export default function IVRMenus() {
     });
   };
 
-  const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: any) => {
+  const updateMenuOption = (index: number, field: keyof typeof formData.options[0], value: string | number | boolean) => {
     const updatedOptions = [...formData.options];
     updatedOptions[index] = { ...updatedOptions[index], [field]: value };
     setFormData({ ...formData, options: updatedOptions });
@@ -800,7 +801,7 @@ export default function IVRMenus() {
             >
               <RefreshCw className={isRefetching ? 'animate-spin' : ''} />
             </Button>
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <Select value={statusFilter} onValueChange={(value: string) => setStatusFilter(value)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
@@ -1048,7 +1049,7 @@ export default function IVRMenus() {
                             <SelectValue placeholder="Choose a recording" />
                           </SelectTrigger>
                           <SelectContent>
-                            {recordingsData?.data?.map((recording: any) => (
+                            {recordingsData?.data?.map((recording: Recording) => (
                               <SelectItem key={recording.id} value={recording.id.toString()}>
                                 {recording.name || `Recording ${recording.id}`}
                               </SelectItem>
@@ -1394,7 +1395,7 @@ export default function IVRMenus() {
                             <SelectValue placeholder="Choose a recording" />
                           </SelectTrigger>
                           <SelectContent>
-                            {recordingsData?.data?.map((recording: any) => (
+                            {recordingsData?.data?.map((recording: Recording) => (
                               <SelectItem key={recording.id} value={recording.id.toString()}>
                                 {recording.name || `Recording ${recording.id}`}
                               </SelectItem>
