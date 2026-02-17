@@ -713,7 +713,7 @@ class VoiceRoutingManager
         return response(
             CxmlBuilder::dialExtension($action, 30),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -938,7 +938,7 @@ class VoiceRoutingManager
                 return response(
                     CxmlBuilder::sayWithHangup('Menu configuration error.', true),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
@@ -970,7 +970,7 @@ class VoiceRoutingManager
                 return response(
                     CxmlBuilder::sayWithHangup('Call state error. Please try again.', true),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
@@ -1011,7 +1011,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('An unexpected error occurred.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
     }
@@ -1197,7 +1197,7 @@ class VoiceRoutingManager
                 return response(
                     CxmlBuilder::sayWithHangup('Destination is no longer available.', true),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
@@ -1277,7 +1277,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('Destination configuration error.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         } catch (\Exception $e) {
             Log::error('IVR Input: Exception in destination routing', [
@@ -1292,7 +1292,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('Routing error occurred.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
     }
@@ -1312,7 +1312,7 @@ class VoiceRoutingManager
         ]);
 
         if ($ivrMenu->failover_destination_type === \App\Enums\IvrDestinationType::HANGUP) {
-            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Route to failover destination directly
@@ -1369,7 +1369,7 @@ class VoiceRoutingManager
             return response(
                 CxmlBuilder::sayWithHangup('Destination is no longer available.', true),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -1395,7 +1395,7 @@ class VoiceRoutingManager
         return response(
             CxmlBuilder::sayWithHangup('Unknown destination type.', true),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -1727,6 +1727,6 @@ class VoiceRoutingManager
      */
     private function createCxmlErrorResponse(string $message): Response
     {
-        return response(CxmlBuilder::sayWithHangup($message, true), 200, ['Content-Type' => 'text/xml']);
+        return response(CxmlBuilder::sayWithHangup($message, true), 200, ['Content-Type' => 'application/xml']);
     }
 }

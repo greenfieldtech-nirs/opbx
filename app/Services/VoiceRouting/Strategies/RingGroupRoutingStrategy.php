@@ -67,11 +67,11 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         $ringGroup = $destination['ring_group'] ?? null;
 
         if (! $ringGroup) {
-            return response(CxmlBuilder::unavailable('Ring group not found'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Ring group not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         if (! $ringGroup->isActive()) {
-            return response(CxmlBuilder::unavailable('Ring group is inactive'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Ring group is inactive'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Check if this is a callback (subsequent attempt) or initial call
@@ -174,7 +174,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::dialRingGroup($targets, $ringGroup->timeout ?? 30, $callbackUrl),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -573,7 +573,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::unavailable('No agents available. Goodbye.'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }

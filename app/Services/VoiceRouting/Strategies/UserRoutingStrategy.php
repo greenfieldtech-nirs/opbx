@@ -26,12 +26,12 @@ class UserRoutingStrategy implements RoutingStrategy
         $extension = $destination['extension'] ?? null;
 
         if (!$extension) {
-            return response(CxmlBuilder::unavailable('Extension not found'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Extension not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Check if extension is active
         if (!$extension->isActive()) {
-            return response(CxmlBuilder::unavailable('Extension is not available'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Extension is not available'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Check if this user extension has forwarding configuration
@@ -53,7 +53,7 @@ class UserRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::dialExtension($extension->extension_number, 30),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }

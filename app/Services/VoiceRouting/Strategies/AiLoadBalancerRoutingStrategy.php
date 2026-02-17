@@ -86,7 +86,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('Extension configuration error'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -102,7 +102,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Load Balancer not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -132,7 +132,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Load Balancer not found'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -208,7 +208,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Assistant provider not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -224,7 +224,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('Invalid AI Assistant provider configuration'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -255,7 +255,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         } catch (\InvalidArgumentException $e) {
             Log::error('AiLoadBalancerRoutingStrategy: Failed to build WebSocket URL', [
@@ -268,7 +268,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Assistant configuration error'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
     }
@@ -288,7 +288,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Agent provider or phone number not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -305,7 +305,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -505,7 +505,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::unavailable('No AI assistants available. Goodbye.'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }

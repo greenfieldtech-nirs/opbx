@@ -23,7 +23,7 @@ class QueueRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::busy('The queue system is currently under maintenance. Please try again later.'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }

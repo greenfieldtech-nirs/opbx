@@ -87,7 +87,7 @@ class OutboundRoutingService
             return response(
                 CxmlBuilder::unavailable('Outbound route configuration error'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -105,7 +105,7 @@ class OutboundRoutingService
         return response(
             CxmlBuilder::simpleDial($to, $callerId, null, $trunkName),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 

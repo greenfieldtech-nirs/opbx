@@ -24,14 +24,14 @@ class ForwardRoutingStrategy implements RoutingStrategy
         $extension = $destination['extension'] ?? null;
 
         if (!$extension) {
-            return response(CxmlBuilder::unavailable('Forward extension not found'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Forward extension not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         $config = $extension->configuration ?? [];
         $forwardTo = $config['forward_to'] ?? null;
 
         if (!$forwardTo) {
-            return response(CxmlBuilder::unavailable('Forward destination not configured'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('Forward destination not configured'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Case 1: SIP URI (starts with sip:)
@@ -39,7 +39,7 @@ class ForwardRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::dialExtension($forwardTo),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -48,7 +48,7 @@ class ForwardRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::simpleDial($forwardTo),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -60,22 +60,22 @@ class ForwardRoutingStrategy implements RoutingStrategy
             ->first();
 
         if (!$targetExtension) {
-            return response(CxmlBuilder::unavailable("Target extension $forwardTo not found"), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable("Target extension $forwardTo not found"), 200, ['Content-Type' => 'application/xml']);
         }
 
         if (!$targetExtension->isActive()) {
-            return response(CxmlBuilder::unavailable("Target extension $forwardTo is inactive"), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable("Target extension $forwardTo is inactive"), 200, ['Content-Type' => 'application/xml']);
         }
 
         $sipUri = $targetExtension->getSipUri();
         if (!$sipUri) {
-            return response(CxmlBuilder::unavailable("Target extension $forwardTo has no valid SIP URI"), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable("Target extension $forwardTo has no valid SIP URI"), 200, ['Content-Type' => 'application/xml']);
         }
 
         return response(
             CxmlBuilder::dialExtension($sipUri),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }

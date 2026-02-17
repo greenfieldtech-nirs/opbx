@@ -32,7 +32,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         $extension = $destination['extension'] ?? null;
 
         if (! $extension) {
-            return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'text/xml']);
+            return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Load AI Assistant relationship if not already loaded
@@ -52,7 +52,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Assistant not configured for this extension'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -83,7 +83,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Assistant provider not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -99,7 +99,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('Invalid AI Assistant provider configuration'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -126,7 +126,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::streamToWebSocket($websocketUrl),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         } catch (\InvalidArgumentException $e) {
             Log::error('Failed to build WebSocket URL', [
@@ -138,7 +138,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Assistant configuration error'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
     }
@@ -160,7 +160,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
                 return response(
                     CxmlBuilder::unavailable('AI Agent service URL not configured'),
                     200,
-                    ['Content-Type' => 'text/xml']
+                    ['Content-Type' => 'application/xml']
                 );
             }
 
@@ -173,7 +173,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -191,7 +191,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             return response(
                 CxmlBuilder::unavailable('AI Agent provider or phone number not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -206,7 +206,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         return response(
             CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 

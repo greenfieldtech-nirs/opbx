@@ -82,7 +82,7 @@ class BusinessHoursRoutingService
         return response(
             CxmlBuilder::unavailable('Business hours configuration needs update'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -110,12 +110,12 @@ class BusinessHoursRoutingService
             'ring_group' => $this->routeToRingGroup($config['ring_group_id'] ?? null, $organizationId, $callSid),
             'conference_room' => $this->routeToConferenceRoom($config['conference_room_id'] ?? null, $organizationId, $callSid),
             'ivr_menu' => $this->routeToIvrMenu($config['ivr_menu_id'] ?? null, $organizationId, $callSid),
-            'voicemail' => response(CxmlBuilder::sendToVoicemail(), 200, ['Content-Type' => 'text/xml']),
-            'hangup' => response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'text/xml']),
+            'voicemail' => response(CxmlBuilder::sendToVoicemail(), 200, ['Content-Type' => 'application/xml']),
+            'hangup' => response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']),
             default => response(
                 CxmlBuilder::unavailable('Business hours action not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             ),
         };
     }
@@ -129,7 +129,7 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('Extension not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -148,7 +148,7 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('Extension not available'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -158,14 +158,14 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('Extension has no SIP configuration'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
         return response(
             CxmlBuilder::simpleDial($sipUri),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -178,7 +178,7 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('Ring group not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -197,7 +197,7 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('Ring group not available'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -208,14 +208,14 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('No active members in ring group'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
         return response(
             CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -228,7 +228,7 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('Conference room not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -236,7 +236,7 @@ class BusinessHoursRoutingService
         return response(
             CxmlBuilder::unavailable('Conference room routing not yet implemented'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 
@@ -249,7 +249,7 @@ class BusinessHoursRoutingService
             return response(
                 CxmlBuilder::unavailable('IVR menu not configured'),
                 200,
-                ['Content-Type' => 'text/xml']
+                ['Content-Type' => 'application/xml']
             );
         }
 
@@ -257,7 +257,7 @@ class BusinessHoursRoutingService
         return response(
             CxmlBuilder::unavailable('IVR menu routing via business hours not yet implemented'),
             200,
-            ['Content-Type' => 'text/xml']
+            ['Content-Type' => 'application/xml']
         );
     }
 }
