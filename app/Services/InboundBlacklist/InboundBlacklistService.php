@@ -22,7 +22,7 @@ class InboundBlacklistService
         // Get all active blacklist entries for this organization
         // Either global OR specific to this DID (via pivot table)
         $entries = InboundBlacklist::where('organization_id', $organizationId)
-            ->where('status', 'active')
+            ->where('status', WhitelistStatus::ACTIVE)
             ->where(function ($query) use ($didNumberId) {
                 $query->where('is_global', true)
                     ->orWhereHas('didNumbers', function ($q) use ($didNumberId) {

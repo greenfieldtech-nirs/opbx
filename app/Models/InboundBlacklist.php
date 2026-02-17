@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Enums\InboundBlacklistMatchType;
 use App\Enums\InboundBlacklistRejectionStrategy;
-use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,7 +36,7 @@ class InboundBlacklist extends Model
         return [
             'match_type' => InboundBlacklistMatchType::class,
             'rejection_strategy' => InboundBlacklistRejectionStrategy::class,
-            'status' => UserStatus::class,
+            'status' => WhitelistStatus::class,
             'is_global' => 'boolean',
             'blocked_count' => 'integer',
             'torment_music_timeout' => 'integer',
@@ -96,10 +95,15 @@ class InboundBlacklist extends Model
      */
     public function toggleStatus(): void
     {
-        $this->status = $this->status === UserStatus::ACTIVE
-            ? UserStatus::INACTIVE
-            : UserStatus::ACTIVE;
+        $this->status = $this->status === WhitelistStatus::ACTIVE
+            ? WhitelistStatus::INACTIVE
+            : WhitelistStatus::ACTIVE;
         $this->save();
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === WhitelistStatus::ACTIVE;
     }
 
     /**

@@ -127,7 +127,7 @@ class OutboundRoutingService
     {
         $whitelistEntries = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $organizationId)
-            ->where('status', 'active')
+            ->where('status', WhitelistStatus::ACTIVE)
             ->get();
 
         Log::debug('OutboundRoutingService: Checking active outbound whitelist entries', [

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\UserStatus;
+use App\Enums\WhitelistStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,7 +39,7 @@ class OutboundWhitelist extends Model
     protected function casts(): array
     {
         return [
-            'status' => UserStatus::class,
+            'status' => WhitelistStatus::class,
         ];
     }
 
@@ -77,9 +77,9 @@ class OutboundWhitelist extends Model
      */
     public function toggleStatus(): void
     {
-        $this->status = $this->status === UserStatus::ACTIVE
-            ? UserStatus::INACTIVE
-            : UserStatus::ACTIVE;
+        $this->status = $this->status === WhitelistStatus::ACTIVE
+            ? WhitelistStatus::INACTIVE
+            : WhitelistStatus::ACTIVE;
         $this->save();
     }
 
@@ -88,6 +88,6 @@ class OutboundWhitelist extends Model
      */
     public function isActive(): bool
     {
-        return $this->status === UserStatus::ACTIVE;
+        return $this->status === WhitelistStatus::ACTIVE;
     }
 }
