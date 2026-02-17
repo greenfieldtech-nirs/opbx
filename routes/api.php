@@ -242,6 +242,8 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('phone-numbers', PhoneNumberController::class);
 
         // Outbound Whitelist
+        Route::patch('outbound-whitelist/{outboundWhitelist}/toggle-status', [OutboundWhitelistController::class, 'toggleStatus'])
+            ->name('outbound-whitelist.toggle-status');
         Route::apiResource('outbound-whitelist', OutboundWhitelistController::class);
 
         // Inbound Blacklist

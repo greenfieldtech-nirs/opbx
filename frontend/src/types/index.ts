@@ -968,6 +968,7 @@ export interface OutboundWhitelist {
   destination_country: string;
   destination_prefix?: string;
   outbound_trunk_name: string;
+  status: Status;
   created_at: string;
   updated_at: string;
 }

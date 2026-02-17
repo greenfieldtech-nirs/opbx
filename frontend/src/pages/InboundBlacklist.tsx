@@ -480,7 +480,7 @@ const InboundBlacklistPage: React.FC = () => {
                       ) : (
                         <XCircle className="h-3 w-3" />
                       )}
-                      {item.status === 'active' ? 'Active' : 'Inactive'}
+                      {item.status === 'active' ? 'Active' : 'Disabled'}
                     </button>
                   ) : (
                     <span className={cn(
@@ -494,7 +494,7 @@ const InboundBlacklistPage: React.FC = () => {
                       ) : (
                         <XCircle className="h-3 w-3" />
                       )}
-                      {item.status === 'active' ? 'Active' : 'Inactive'}
+                      {item.status === 'active' ? 'Active' : 'Disabled'}
                     </span>
                   )
                 ),
