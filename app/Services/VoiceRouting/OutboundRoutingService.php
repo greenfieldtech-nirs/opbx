@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
-use App\Enums\WhitelistStatus;
 use App\Models\Extension;
 use App\Models\OutboundWhitelist;
 use App\Scopes\OrganizationScope;
@@ -147,7 +146,7 @@ class OutboundRoutingService
     {
         $whitelistEntries = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $organizationId)
-            ->where('status', WhitelistStatus::ACTIVE)
+            ->where('status', 'active')
             ->get();
 
         Log::debug('OutboundRoutingService: Checking active outbound whitelist entries', [
