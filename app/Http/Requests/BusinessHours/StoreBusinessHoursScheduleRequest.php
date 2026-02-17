@@ -319,7 +319,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
         if ($type && $targetId) {
             // For extension actions, target_id should be a valid extension identifier
             if ($type === BusinessHoursActionType::EXTENSION->value) {
-                if (! preg_match('/^ext-[a-zA-Z0-9_-]+$/', $targetId)) {
+                if (! preg_match('/^ext-\d+$/', $targetId)) {
                     $validator->errors()->add(
                         $field.'.target_id',
                         'Extension target ID must be in format: ext-{identifier}'
@@ -329,7 +329,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
 
             // For ring group actions, target_id should be a valid ring group identifier
             if ($type === BusinessHoursActionType::RING_GROUP->value) {
-                if (! preg_match('/^rg-[a-zA-Z0-9_-]+$/', $targetId)) {
+                if (! preg_match('/^rg-\d+$/', $targetId)) {
                     $validator->errors()->add(
                         $field.'.target_id',
                         'Ring group target ID must be in format: rg-{identifier}'
@@ -339,7 +339,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
 
             // For IVR menu actions, target_id should be a valid IVR menu identifier
             if ($type === BusinessHoursActionType::IVR_MENU->value) {
-                if (! preg_match('/^ivr-[a-zA-Z0-9_-]+$/', $targetId)) {
+                if (! preg_match('/^ivr-\d+$/', $targetId)) {
                     $validator->errors()->add(
                         $field.'.target_id',
                         'IVR menu target ID must be in format: ivr-{identifier}'

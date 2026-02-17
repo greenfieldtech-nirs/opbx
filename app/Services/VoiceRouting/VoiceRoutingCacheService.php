@@ -47,6 +47,19 @@ class VoiceRoutingCacheService
     private const BUSINESS_HOURS_KEY_PREFIX = 'routing:business_hours';
 
     /**
+     * Cache key prefix for AI assistant load balancers
+     */
+    private const ALBS_KEY_PREFIX = 'albs';
+
+    /**
+     * Get TTL for ALBS cache entries
+     */
+    private function getAlbsCacheTtl(): int
+    {
+        return config('voice_routing.cache.albs_ttl', 1800);
+    }
+
+    /**
      * Get extension by organization and extension number with caching
      *
      * Implements cache-aside pattern:
@@ -239,5 +252,105 @@ class VoiceRoutingCacheService
     private function buildBusinessHoursCacheKey(int $organizationId): string
     {
         return sprintf('%s:%d', self::BUSINESS_HOURS_KEY_PREFIX, $organizationId);
+    }
+
+    /**
+     * Get AI Assistant Load Balancer with caching
+     *
+     * Implements cache-aside pattern for load balancer lookups.
+     * Loads full configuration including members and fallback relationships.
+     */
+    public function getAiAssistantLoadBalancer(int $albsId): ?AiAssistantLoadBalancer
+    {
+        $cacheKey = $this->buildAlbsCacheKey($albsId);
+
+        try {
+            $loadBalancer = Cache::remember(
+                $cacheKey,
+                $this->getAlbsCacheTtl(),
+                function () use ($albsId) {
+                    Log::debug('Voice routing cache: ALBS cache miss', [
+                        'albs_id' => $albsId,
+                    ]);
+
+                    return AiAssistantLoadBalancer::with([
+                        'members' => function ($query) {
+                            $query->where('status', 'active')
+                                ->orderBy('position');
+                        },
+                        'members.aiAssistant' => function ($query) {
+                            $query->where('status', 'active');
+                        },
+                        'fallbackExtension',
+                        'fallbackRingGroup',
+                        'fallbackIvrMenu',
+                        'fallbackAiAssistant',
+                    ])->find($albsId);
+                }
+            );
+
+            if ($loadBalancer) {
+                Log::debug('Voice routing cache: ALBS retrieved', [
+                    'albs_id' => $albsId,
+                    'from_cache' => Cache::has($cacheKey),
+                ]);
+            }
+
+            return $loadBalancer;
+        } catch (\Exception $e) {
+            Log::warning('Voice routing cache: ALBS cache unavailable, falling back to database', [
+                'albs_id' => $albsId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return AiAssistantLoadBalancer::with([
+                'members' => function ($query) {
+                    $query->where('status', 'active')
+                        ->orderBy('position');
+                },
+                'members.aiAssistant',
+                'fallbackExtension',
+                'fallbackRingGroup',
+                'fallbackIvrMenu',
+                'fallbackAiAssistant',
+            ])->find($albsId);
+        }
+    }
+
+    /**
+     * Invalidate AI Assistant Load Balancer cache
+     *
+     * Called when a load balancer is updated to ensure cache consistency.
+     * Also clears the round robin counter.
+     */
+    public function invalidateAiAssistantLoadBalancer(int $albsId): void
+    {
+        $cacheKey = $this->buildAlbsCacheKey($albsId);
+
+        try {
+            Cache::forget($cacheKey);
+            // Also clear round robin counter
+            Cache::forget("albs:rr:{$albsId}");
+
+            Log::debug('Voice routing cache: ALBS cache invalidated', [
+                'albs_id' => $albsId,
+                'cache_key' => $cacheKey,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Voice routing cache: Failed to invalidate ALBS cache', [
+                'albs_id' => $albsId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Build cache key for AI Assistant Load Balancer
+     *
+     * Format: albs:{albs_id}
+     */
+    private function buildAlbsCacheKey(int $albsId): string
+    {
+        return sprintf('%s:%d', self::ALBS_KEY_PREFIX, $albsId);
     }
 }

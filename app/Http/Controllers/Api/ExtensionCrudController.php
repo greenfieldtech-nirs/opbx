@@ -116,6 +116,7 @@ class ExtensionCrudController extends AbstractApiCrudController
         $query->with([
             Extension::DEFAULT_USER_FIELDS,
             'aiAssistant:id,organization_id,name,provider,protocol,status',
+            'aiLoadBalancer:id,name,organization_id,strategy',
         ]);
     }
 
@@ -198,6 +199,7 @@ class ExtensionCrudController extends AbstractApiCrudController
         $extension->load([
             Extension::DEFAULT_USER_FIELDS,
             'aiAssistant:id,organization_id,name,provider,protocol,status',
+            'aiLoadBalancer:id,name,organization_id,strategy',
         ]);
 
         // Sync to Cloudonix if USER type extension

@@ -9,10 +9,15 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
+use App\Enums\UserStatus;
+use App\Enums\AlbsStatus;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -193,7 +198,7 @@ class PhoneNumberController extends Controller
     /**
      * Update the specified phone number.
      */
-    public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource
+    public function update(UpdatePhoneNumberRequest $request, DidNumber $phoneNumber): PhoneNumberResource|JsonResponse
     {
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
@@ -319,6 +324,7 @@ class PhoneNumberController extends Controller
             'business_hours' => $this->loadBusinessHoursSchedule($phoneNumber),
             'conference_room' => $this->loadConferenceRoom($phoneNumber),
             'ai_assistant' => $this->loadAiAssistant($phoneNumber),
+            'ai_load_balancer' => $this->loadAiLoadBalancer($phoneNumber),
             'ivr_menu' => $this->loadIvrMenu($phoneNumber),
             default => null,
         };
@@ -339,6 +345,7 @@ class PhoneNumberController extends Controller
         $scheduleIds = [];
         $conferenceRoomIds = [];
         $aiAssistantIds = [];
+        $aiLoadBalancerIds = [];
         $ivrMenuIds = [];
         $phoneNumbersByType = [
             'extension' => [],
@@ -346,6 +353,7 @@ class PhoneNumberController extends Controller
             'business_hours' => [],
             'conference_room' => [],
             'ai_assistant' => [],
+            'ai_load_balancer' => [],
             'ivr_menu' => [],
         ];
 
@@ -362,6 +370,7 @@ class PhoneNumberController extends Controller
                 'business_hours' => $scheduleIds[] = $phoneNumber->getTargetBusinessHoursId(),
                 'conference_room' => $conferenceRoomIds[] = $phoneNumber->getTargetConferenceRoomId(),
                 'ai_assistant' => $aiAssistantIds[] = $phoneNumber->getTargetAiAssistantId(),
+                'ai_load_balancer' => $aiLoadBalancerIds[] = $phoneNumber->getTargetAiLoadBalancerId(),
                 'ivr_menu' => $ivrMenuIds[] = $phoneNumber->getTargetIvrMenuId(),
                 default => null,
             };
@@ -413,14 +422,28 @@ class PhoneNumberController extends Controller
 
         // Batch load AI assistants
         if (! empty($aiAssistantIds)) {
-            $aiAssistants = Extension::whereIn('id', array_filter($aiAssistantIds))
-                ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+            $aiAssistants = AiAssistant::whereIn('id', array_filter($aiAssistantIds))
+                ->where('status', UserStatus::ACTIVE)
                 ->get()
                 ->keyBy('id');
             foreach ($phoneNumbersByType['ai_assistant'] as $phoneNumber) {
                 $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
                 if ($aiAssistantId && isset($aiAssistants[$aiAssistantId])) {
                     $phoneNumber->setAiAssistant($aiAssistants[$aiAssistantId]);
+                }
+            }
+        }
+
+        // Batch load AI load balancers
+        if (! empty($aiLoadBalancerIds)) {
+            $aiLoadBalancers = AiAssistantLoadBalancer::whereIn('id', array_filter($aiLoadBalancerIds))
+                ->where('status', AlbsStatus::ACTIVE)
+                ->get()
+                ->keyBy('id');
+            foreach ($phoneNumbersByType['ai_load_balancer'] as $phoneNumber) {
+                $aiLoadBalancerId = $phoneNumber->getTargetAiLoadBalancerId();
+                if ($aiLoadBalancerId && isset($aiLoadBalancers[$aiLoadBalancerId])) {
+                    $phoneNumber->setAiLoadBalancer($aiLoadBalancers[$aiLoadBalancerId]);
                 }
             }
         }
@@ -500,11 +523,27 @@ class PhoneNumberController extends Controller
     {
         $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
         if ($aiAssistantId) {
-            $aiAssistant = Extension::where('id', $aiAssistantId)
-                ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+            $aiAssistant = AiAssistant::where('id', $aiAssistantId)
+                ->where('status', \App\Enums\UserStatus::ACTIVE)
                 ->first();
             if ($aiAssistant) {
                 $phoneNumber->setAiAssistant($aiAssistant);
+            }
+        }
+    }
+
+    /**
+     * Load AI load balancer for a phone number.
+     */
+    private function loadAiLoadBalancer(DidNumber $phoneNumber): void
+    {
+        $aiLoadBalancerId = $phoneNumber->getTargetAiLoadBalancerId();
+        if ($aiLoadBalancerId) {
+            $aiLoadBalancer = AiAssistantLoadBalancer::where('id', $aiLoadBalancerId)
+                ->where('status', 'active')
+                ->first();
+            if ($aiLoadBalancer) {
+                $phoneNumber->setAiLoadBalancer($aiLoadBalancer);
             }
         }
     }

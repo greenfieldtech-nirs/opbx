@@ -30,6 +30,7 @@ export interface AiAssistant {
 }
 
 export interface AiAssistantFilters {
+  organization_id?: number | string;
   page?: number;
   per_page?: number;
   search?: string;

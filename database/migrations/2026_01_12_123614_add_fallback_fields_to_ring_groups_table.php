@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('ring_groups', function (Blueprint $table) {
             // Update the enum to include new fallback actions
-            $table->enum('fallback_action', ['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'hangup'])
+            $table->enum('fallback_action', ['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'hangup'])
                 ->default('extension')
                 ->change();
 
@@ -21,6 +21,7 @@ return new class extends Migration
             $table->foreignId('fallback_ring_group_id')->nullable()->constrained('ring_groups')->nullOnDelete();
             $table->foreignId('fallback_ivr_menu_id')->nullable()->constrained('ivr_menus')->nullOnDelete();
             $table->foreignId('fallback_ai_assistant_id')->nullable()->constrained('extensions')->nullOnDelete();
+            $table->foreignId('fallback_ai_load_balancer_id')->nullable()->constrained('ai_assistant_load_balancers')->nullOnDelete();
         });
     }
 
@@ -37,6 +38,8 @@ return new class extends Migration
             $table->dropColumn('fallback_ivr_menu_id');
             $table->dropForeign(['fallback_ai_assistant_id']);
             $table->dropColumn('fallback_ai_assistant_id');
+            $table->dropForeign(['fallback_ai_load_balancer_id']);
+            $table->dropColumn('fallback_ai_load_balancer_id');
 
             // Revert enum to original values
             $table->enum('fallback_action', ['extension', 'hangup'])

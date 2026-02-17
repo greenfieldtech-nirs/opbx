@@ -283,7 +283,7 @@ export default function CallLogs() {
             getIdentityPrimary={(cdr) => formatPhoneNumber(cdr.from)}
             getIdentitySecondary={(cdr) => `To: ${formatPhoneNumber(cdr.to)}`}
             onRowClick={handleViewCdrDetails}
-            onView={handleViewCdrDetails}
+            canView={false}
             canEdit={false}
             canDelete={false}
             columns={[

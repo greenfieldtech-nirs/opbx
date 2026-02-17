@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
+use App\Http\Resources\AiAssistantLoadBalancerResource;
+use App\Http\Resources\AiAssistantResource;
+use App\Http\Resources\IvrMenuResource;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -52,6 +55,18 @@ class PhoneNumberResource extends JsonResource
             'conference_room' => $this->when(
                 $this->routing_type === 'conference_room' && $this->conference_room !== null,
                 fn() => new ConferenceRoomResource($this->conference_room)
+            ),
+            'ai_assistant' => $this->when(
+                $this->routing_type === 'ai_assistant' && $this->ai_assistant !== null,
+                fn() => new AiAssistantResource($this->ai_assistant)
+            ),
+            'ai_load_balancer' => $this->when(
+                $this->routing_type === 'ai_load_balancer' && $this->ai_load_balancer !== null,
+                fn() => new AiAssistantLoadBalancerResource($this->ai_load_balancer)
+            ),
+            'ivr_menu' => $this->when(
+                $this->routing_type === 'ivr_menu' && $this->ivr_menu !== null,
+                fn() => new IvrMenuResource($this->ivr_menu)
             ),
         ];
     }

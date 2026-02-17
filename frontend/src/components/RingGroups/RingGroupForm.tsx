@@ -24,8 +24,10 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { X, Users, PhoneForwarded, RotateCw, List, PhoneOff, Menu, Bot } from 'lucide-react';
 import { extensionsService } from '@/services/extensions.service';
+import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { mockExtensions } from '@/mock/extensions';
 import type { RingGroup, CreateRingGroupRequest, UpdateRingGroupRequest, RingGroupStrategy, RingGroupStatus, RingGroupFallbackAction } from '@/types/api.types';
+import type { AiAssistantLoadBalancer } from '@/types';
 
 // Mock data for destination selects
 const mockRingGroups = [
@@ -61,11 +63,12 @@ const ringGroupSchema = z.object({
     extension_id: z.string().min(1, 'Extension ID is required'),
     priority: z.number().min(1, 'Priority must be at least 1'),
   })).min(1, 'At least one member is required'),
-  fallback_action: z.enum(['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'hangup'] as const),
+  fallback_action: z.enum(['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'hangup'] as const),
   fallback_extension_id: z.string().optional(),
   fallback_ring_group_id: z.string().optional(),
   fallback_ivr_menu_id: z.string().optional(),
   fallback_ai_assistant_id: z.string().optional(),
+  fallback_ai_load_balancer_id: z.string().optional(),
 }).refine((data) => {
   // Validate based on fallback action
   switch (data.fallback_action) {
@@ -77,6 +80,8 @@ const ringGroupSchema = z.object({
       return data.fallback_ivr_menu_id && data.fallback_ivr_menu_id.length > 0;
     case 'ai_assistant':
       return data.fallback_ai_assistant_id && data.fallback_ai_assistant_id.length > 0;
+    case 'ai_load_balancer':
+      return data.fallback_ai_load_balancer_id && data.fallback_ai_load_balancer_id.length > 0;
     case 'hangup':
       return true;
     default:
@@ -103,6 +108,7 @@ type RingGroupFormData = {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_ai_load_balancer_id?: string;
 };
 
 interface RingGroupFormProps {
@@ -166,9 +172,19 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
     setValue('members', members.filter((member) => member.extension_id !== extensionId));
   };
 
+  const getExtensionDisplayName = (ext: typeof extensionsData.data[0]) => {
+    if (ext.type === 'forward') {
+      const forwardTo = ext.configuration?.forward_to;
+      return forwardTo ? `Forward to ${forwardTo}` : 'Forward Extension';
+    }
+    return ext.user?.name || 'Unassigned User';
+  };
+
   const getExtensionName = (extensionId: string) => {
     const ext = extensionsData?.data?.find((e) => e.id === extensionId);
-    return ext ? `${ext.extension_number} - ${ext.user?.name || 'No User'}` : extensionId;
+    if (!ext) return extensionId;
+    const displayName = getExtensionDisplayName(ext);
+    return `${ext.extension_number} - ${displayName}`;
   };
 
   const getFallbackIcon = (action: RingGroupFallbackAction) => {
@@ -388,10 +404,13 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
             </SelectTrigger>
             <SelectContent>
               {extensionsData?.data
-                ?.filter((ext) => !members.some(member => member.extension_id === ext.id))
+                ?.filter((ext) =>
+                  !members.some(member => member.extension_id === ext.id) &&
+                  (ext.type === 'user' || ext.type === 'forward')
+                )
                 .map((ext) => (
                   <SelectItem key={ext.id} value={ext.id}>
-                    {ext.extension_number} - {ext.user?.name || 'No User'}
+                    {ext.extension_number} - {getExtensionDisplayName(ext)}
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -504,6 +523,15 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
                     </div>
                   </div>
                 </SelectItem>
+                <SelectItem value="ai_load_balancer">
+                  <div className="flex items-center gap-2">
+                    {getFallbackIcon('ai_assistant')}
+                    <div>
+                      <div className="font-medium">AI Load Balancer</div>
+                      <div className="text-xs text-muted-foreground">Distribute calls across AI assistants</div>
+                    </div>
+                  </div>
+                </SelectItem>
                 <SelectItem value="hangup">
                   <div className="flex items-center gap-2">
                     {getFallbackIcon('hangup')}
@@ -598,6 +626,26 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
               </Select>
             )}
 
+            {fallbackAction === 'ai_load_balancer' && (
+              <Select
+                value={watch('fallback_ai_load_balancer_id') || ''}
+                onValueChange={(value) => setValue('fallback_ai_load_balancer_id', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select AI load balancer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* @ts-ignore - Using mock data for now */}
+                  {mockAiAssistants.filter(ai => ai.type === 'ai_load_balancer').map((alb) => (
+                    <SelectItem key={alb.id} value={alb.id}>
+                      {alb.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {fallbackAction === 'hangup' && (
               <div className="flex items-center justify-center h-10 px-3 py-2 bg-muted rounded-md">
                 <span className="text-sm text-muted-foreground">No destination needed</span>
@@ -620,6 +668,9 @@ export function RingGroupForm({ ringGroup, onSubmit, onCancel, isLoading }: Ring
         )}
         {fallbackAction === 'ai_assistant' && errors.fallback_ai_assistant_id && (
           <p className="text-sm text-destructive">{errors.fallback_ai_assistant_id.message}</p>
+        )}
+        {fallbackAction === 'ai_load_balancer' && errors.fallback_ai_load_balancer_id && (
+          <p className="text-sm text-destructive">{errors.fallback_ai_load_balancer_id.message}</p>
         )}
       </div>
 

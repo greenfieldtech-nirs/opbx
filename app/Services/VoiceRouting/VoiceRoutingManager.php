@@ -48,6 +48,8 @@ class VoiceRoutingManager
         private readonly VoiceRoutingCacheService $cache,
         private readonly IvrStateService $ivrStateService,
         private readonly PhoneNumberService $phoneNumberService,
+        private readonly OutboundRoutingService $outboundRouting,
+        private readonly BusinessHoursRoutingService $businessHoursRouting,
         iterable $strategies = []
     ) {
         $this->strategies = collect($strategies);
@@ -102,26 +104,42 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::debug('VoiceRoutingManager: Subscriber direction call', [
+        Log::info('VoiceRoutingManager: Subscriber direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
         ]);
 
         // 1. Try extension routing first (direct extension dial)
+        Log::debug('VoiceRoutingManager: Trying extension routing');
         $extensionResponse = $this->handleExtensionRouting($request, $to, $orgId);
         if ($extensionResponse) {
+            Log::info('VoiceRoutingManager: Extension routing matched');
             return $extensionResponse;
         }
+        Log::debug('VoiceRoutingManager: Extension routing did not match');
 
         // 2. Try DID routing (fallback for internal calls)
+        Log::debug('VoiceRoutingManager: Trying DID routing');
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
+            Log::info('VoiceRoutingManager: DID routing matched');
             return $didResponse;
         }
+        Log::debug('VoiceRoutingManager: DID routing did not match');
+
+        // 3. Try outbound routing (for calls to external numbers)
+        Log::debug('VoiceRoutingManager: Trying outbound routing');
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            Log::info('VoiceRoutingManager: Outbound routing matched');
+            return $outboundResponse;
+        }
+        Log::debug('VoiceRoutingManager: Outbound routing did not match');
 
         Log::info('VoiceRoutingManager: No destination found for subscriber call', [
             'to' => $to,
+            'from' => $from,
             'org_id' => $orgId,
         ]);
 
@@ -230,6 +248,12 @@ class VoiceRoutingManager
         $didResponse = $this->handleDidRouting($request, $to, $orgId);
         if ($didResponse) {
             return $didResponse;
+        }
+
+        // 3. Try outbound routing (for calls to external numbers)
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
         }
 
         Log::info('VoiceRoutingManager: No destination found for internal DID call', [
@@ -348,8 +372,15 @@ class VoiceRoutingManager
             return $didResponse;
         }
 
+        // 3. Try outbound routing (for calls to external numbers)
+        $outboundResponse = $this->handleOutboundRouting($request, $to, $from, $orgId);
+        if ($outboundResponse) {
+            return $outboundResponse;
+        }
+
         Log::info('VoiceRoutingManager: No destination found for application call', [
             'to' => $to,
+            'from' => $from,
             'org_id' => $orgId,
         ]);
 
@@ -611,17 +642,8 @@ class VoiceRoutingManager
                             break;
 
                         default:
-                            // For legacy string actions, use the old method
-                            $currentAction = $schedule->getCurrentRouting();
-                            if (is_string($currentAction) && ! empty($currentAction)) {
-                                return $this->routeToBusinessHoursAction(
-                                    $currentAction,
-                                    $did->organization_id,
-                                    $request->input('CallSid', ''),
-                                    $request
-                                );
-                            }
-                            break;
+                            // Legacy action format - return error
+                            return $this->createCxmlErrorResponse('Business hours configuration needs update');
                     }
                 }
                 break;
@@ -851,27 +873,14 @@ class VoiceRoutingManager
      * @param  Request  $request  The incoming request
      * @return Response|null CXML response if business hours routing applies, null otherwise
      */
+    /**
+     * Check business hours and route accordingly.
+     *
+     * Delegates to BusinessHoursRoutingService for time-based routing.
+     */
     private function checkBusinessHours(int $organizationId, string $callSid, Request $request): ?Response
     {
-        $schedule = $this->cache->getActiveBusinessHoursSchedule($organizationId);
-
-        if (! $schedule) {
-            return null;
-        }
-
-        $currentAction = $schedule->getCurrentRouting();
-
-        if (! empty($currentAction)) {
-            Log::info('VoiceRoutingManager: Routing via business hours action', [
-                'call_sid' => $callSid,
-                'action' => $currentAction,
-                'is_open' => $schedule->isCurrentlyOpen(),
-            ]);
-
-            return $this->routeToBusinessHoursAction($currentAction, $organizationId, $callSid, $request);
-        }
-
-        return null;
+        return $this->businessHoursRouting->checkBusinessHours($organizationId, $callSid, $request);
     }
 
     /**
@@ -883,56 +892,14 @@ class VoiceRoutingManager
      * @param  int  $orgId  The organization ID
      * @return Response|null CXML response if outbound routing applies, null otherwise
      */
+    /**
+     * Handle outbound routing via whitelist for calls from internal extensions.
+     *
+     * Delegates to OutboundRoutingService for whitelist matching and trunk routing.
+     */
     private function handleOutboundRouting(Request $request, string $to, string $from, int $orgId): ?Response
     {
-        Log::info('VoiceRoutingManager: Checking for outbound whitelist routing', [
-            'direction' => $request->input('Direction', 'unknown'),
-            'to' => $to,
-            'from' => $from,
-            'org_id' => $orgId,
-        ]);
-
-        // Only allow outbound routing for calls from internal extensions
-        $fromExtension = $this->cache->getExtension($orgId, $from);
-
-        if (! $fromExtension || ! $fromExtension->isActive()) {
-            Log::info('VoiceRoutingManager: Outbound routing not allowed - caller is not an active internal extension', [
-                'from' => $from,
-                'extension_found' => $fromExtension !== null,
-                'extension_active' => $fromExtension?->isActive(),
-            ]);
-
-            return null;
-        }
-
-        Log::info('VoiceRoutingManager: Caller is active internal extension, checking outbound whitelist', [
-            'from' => $from,
-            'extension_found' => $fromExtension !== null,
-            'extension_active' => $fromExtension->isActive(),
-        ]);
-
-        // Check if destination is in outbound whitelist
-        $whitelistEntry = OutboundWhitelist::where('organization_id', $orgId)
-            ->where('phone_number', $to)
-            ->first();
-
-        if (! $whitelistEntry) {
-            Log::info('VoiceRoutingManager: No outbound whitelist entry found for destination', [
-                'to' => $to,
-                'org_id' => $orgId,
-            ]);
-
-            return null;
-        }
-
-        Log::info('VoiceRoutingManager: Outbound whitelist entry found, routing via trunk', [
-            'to' => $to,
-            'org_id' => $orgId,
-            'trunk_id' => $whitelistEntry->trunk_id,
-        ]);
-
-        // Route via trunk (not implemented yet)
-        return response(CxmlBuilder::unavailable('Outbound routing not yet implemented'), 200, ['Content-Type' => 'text/xml']);
+        return $this->outboundRouting->handleOutboundRouting($request, $to, $from, $orgId);
     }
 
     public function handleIvrInput(Request $request): Response
@@ -1480,6 +1447,9 @@ class VoiceRoutingManager
             ],
             ExtensionType::AI_ASSISTANT => [
                 'extension' => $extension, // AI assistant logic handled in strategy
+            ],
+            ExtensionType::AI_LOAD_BALANCER => [
+                'extension' => $extension, // AI load balancer logic handled in strategy
             ],
             ExtensionType::FORWARD => [
                 'extension' => $extension, // Forwarding logic handled in strategy

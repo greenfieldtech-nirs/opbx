@@ -39,8 +39,8 @@ class RingGroupCallbackRequest extends FormRequest
             // Ring group ID - required, integer
             'ring_group_id' => ['required', 'integer', 'min:1'],
 
-            // Action type - required
-            'action' => ['required', 'string', 'in:next_member,timeout,completed,failed'],
+            // Action type - optional, provided by some callbacks but not all
+            'action' => ['nullable', 'string', 'in:next_member,timeout,completed,failed'],
 
             // Current member index - optional, integer
             'current_index' => ['nullable', 'integer', 'min:0'],

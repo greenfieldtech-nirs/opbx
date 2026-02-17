@@ -11,7 +11,7 @@ import {
   TooltipProvider,
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { ringGroupsService } from '@/services/createResourceService';
+import { ringGroupsService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
 import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,10 +23,10 @@ import {
 import type {
   RingGroup,
   RingGroupStrategy,
+  RingGroupFallbackAction,
   Status
 } from '@/types';
 import type {
-  RingGroupFallbackAction,
   CreateRingGroupRequest,
   UpdateRingGroupRequest,
 } from '@/types/api.types';
@@ -37,6 +37,7 @@ interface ExtendedRingGroup extends RingGroup {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_ai_load_balancer_id?: string;
 }
 import {
   getStrategyDisplayName,
@@ -271,10 +272,15 @@ export default function RingGroups() {
   }));
   const totalPages = ringGroupsData?.meta?.last_page || 1;
 
-  // Fetch available extensions (type: user, status: active)
-  const { data: extensionsData } = useQuery({
+  // Fetch available extensions (type: user or forward, status: active)
+  const { data: userExtensionsData } = useQuery({
     queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
+  });
+
+  const { data: forwardExtensionsData } = useQuery({
+    queryKey: ['extensions', { type: 'forward', status: 'active', per_page: 100 }],
+    queryFn: () => extensionsService.getAll({ type: 'forward', status: 'active', per_page: 100 }),
   });
 
   // Fetch available AI Assistants (type: ai_assistant, status: active)
@@ -283,7 +289,21 @@ export default function RingGroups() {
     queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
   });
 
-  const availableAiAssistants = aiAssistantsData?.data || [];
+  // Filter to only include ai_assistant type (client-side safety)
+  const availableAiAssistants = useMemo(() => {
+    const allAssistants = aiAssistantsData?.data || [];
+    return allAssistants.filter((ext) => ext.type === 'ai_assistant');
+  }, [aiAssistantsData]);
+
+  // Fetch available AI Load Balancers (status: active)
+  const { data: aiLoadBalancersData } = useQuery({
+    queryKey: ['ai-load-balancers', { status: 'active', per_page: 100 }],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  const availableAiLoadBalancers = useMemo(() => {
+    return aiLoadBalancersData?.data || [];
+  }, [aiLoadBalancersData]);
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
   const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
@@ -316,7 +336,22 @@ export default function RingGroups() {
     return groups;
   }, [allRingGroupsData, selectedGroup]);
 
-  const availableExtensions = extensionsData?.data || [];
+  // Combine user and forward extensions for ring group members
+  const availableExtensions = useMemo(() => {
+    const userExtensions = userExtensionsData?.data || [];
+    const forwardExtensions = forwardExtensionsData?.data || [];
+
+    // Filter to only include 'user' and 'forward' types, remove duplicates
+    const combined = [...userExtensions, ...forwardExtensions]
+      .filter((ext) => ext.type === 'user' || ext.type === 'forward');
+
+    // Remove duplicates by ID (in case an extension appears in both queries)
+    const uniqueExtensions = combined.filter((ext, index, self) =>
+      index === self.findIndex((e) => e.id === ext.id)
+    );
+
+    return uniqueExtensions;
+  }, [userExtensionsData, forwardExtensionsData]);
 
   // Fetch available IVR menus (status: active)
   const { data: ivrMenusData } = useQuery({
@@ -533,6 +568,10 @@ export default function RingGroups() {
       errors.fallback_extension = 'Fallback extension is required';
     }
 
+    if (formData.fallback_action === 'ai_load_balancer' && !formData.fallback_ai_load_balancer_id) {
+      errors.fallback_ai_load_balancer = 'Fallback AI load balancer is required';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -583,24 +622,35 @@ export default function RingGroups() {
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
       case 'ring_group':
         requestData.fallback_extension_id = null;
         requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
       case 'ivr_menu':
         requestData.fallback_extension_id = null;
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
       case 'ai_assistant':
         requestData.fallback_extension_id = null;
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        requestData.fallback_ai_load_balancer_id = null;
+        break;
+      case 'ai_load_balancer':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = formData.fallback_ai_load_balancer_id;
         break;
       case 'hangup':
         // No destination IDs needed for hangup action
@@ -608,6 +658,7 @@ export default function RingGroups() {
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
     }
 
@@ -644,24 +695,35 @@ export default function RingGroups() {
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
       case 'ring_group':
         requestData.fallback_extension_id = null;
         requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
       case 'ivr_menu':
         requestData.fallback_extension_id = null;
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
       case 'ai_assistant':
         requestData.fallback_extension_id = null;
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
+        requestData.fallback_ai_load_balancer_id = null;
+        break;
+      case 'ai_load_balancer':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = formData.fallback_ai_load_balancer_id;
         break;
       case 'hangup':
         // No destination IDs needed for hangup action
@@ -669,6 +731,7 @@ export default function RingGroups() {
         requestData.fallback_ring_group_id = null;
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
         break;
     }
 
@@ -703,6 +766,7 @@ export default function RingGroups() {
       fallback_ring_group_id: group.fallback_ring_group_id?.toString(),
       fallback_ivr_menu_id: group.fallback_ivr_menu_id?.toString(),
       fallback_ai_assistant_id: group.fallback_ai_assistant_id?.toString(),
+      fallback_ai_load_balancer_id: group.fallback_ai_load_balancer_id?.toString(),
       status: group.status,
       members: [...group.members],
     };
@@ -733,10 +797,13 @@ export default function RingGroups() {
     if (unusedExtensions.length === 0) return;
 
     const firstAvailable = unusedExtensions[0];
+    const displayName = firstAvailable.type === 'forward'
+      ? (firstAvailable.configuration?.forward_to || 'Forward')
+      : (firstAvailable.user?.name || null);
     const newMember: RingGroupMember = {
       extension_id: firstAvailable.id,
       extension_number: firstAvailable.extension_number,
-      user_name: firstAvailable.user?.name || null,
+      user_name: displayName,
       priority: currentMembers.length + 1,
     };
 
@@ -772,13 +839,24 @@ export default function RingGroups() {
       ...newMembers[index],
       extension_id: extension.id,
       extension_number: extension.extension_number,
-      user_name: extension.user?.name || null,
+      user_name: extension.type === 'forward'
+        ? (extension.configuration?.forward_to || 'Forward')
+        : (extension.user?.name || null),
     };
 
     setFormData({
       ...formData,
       members: newMembers,
     });
+  };
+
+  // Helper to get display name for an extension
+  const getExtensionDisplayLabel = (ext: Extension) => {
+    if (ext.type === 'forward') {
+      const forwardTo = ext.configuration?.forward_to;
+      return forwardTo ? `Forward to ${forwardTo}` : 'Forward Extension';
+    }
+    return ext.user?.name || 'Unassigned User';
   };
 
 
@@ -994,7 +1072,12 @@ export default function RingGroups() {
                                     <SelectContent>
                                       {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
                                         <SelectItem key={ext.id} value={ext.id}>
-                                          {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                          <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="bg-blue-50">
+                                              Ext {ext.extension_number}
+                                            </Badge>
+                                            <span>{getExtensionDisplayLabel(ext)}</span>
+                                          </div>
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -1054,7 +1137,12 @@ export default function RingGroups() {
                             <SelectContent>
                               {getAvailableExtensionsForMember(member.extension_id).map((ext) => (
                                 <SelectItem key={ext.id} value={ext.id}>
-                                  {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-blue-50">
+                                      Ext {ext.extension_number}
+                                    </Badge>
+                                    <span>{getExtensionDisplayLabel(ext)}</span>
+                                  </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1170,6 +1258,12 @@ export default function RingGroups() {
                         <span>AI Assistant</span>
                       </div>
                     </SelectItem>
+                    <SelectItem value="ai_load_balancer">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        <span>AI Load Balancer</span>
+                      </div>
+                    </SelectItem>
                     <SelectItem value="hangup">
                       <div className="flex items-center gap-2">
                         <PhoneOff className="h-4 w-4" />
@@ -1204,7 +1298,7 @@ export default function RingGroups() {
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="flex items-center gap-1.5 bg-blue-100 text-blue-800 border-blue-200">
                               <Phone className="h-3.5 w-3.5" />
-                              {ext.extension_number} - {ext.user?.name || 'Unassigned'}
+                              {ext.extension_number} - {getExtensionDisplayLabel(ext)}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -1279,7 +1373,38 @@ export default function RingGroups() {
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
                               <Bot className="h-3.5 w-3.5" />
-                              {assistant.configuration?.phone_number || 'No Number'} @ {assistant.configuration?.provider || 'Unknown'}
+                              Ext {assistant.extension_number} - {assistant.ai_assistant?.name || 'Unnamed Assistant'}
+                              {assistant.configuration?.phone_number && (
+                                <span className="text-muted-foreground text-xs">
+                                  ({assistant.configuration?.phone_number} @ {assistant.configuration?.provider || 'Unknown'})
+                                </span>
+                              )}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {formData.fallback_action === 'ai_load_balancer' && (
+                  <Select
+                    value={formData.fallback_ai_load_balancer_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_ai_load_balancer_id: value })
+                    }
+                    disabled={availableAiLoadBalancers.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={availableAiLoadBalancers.length === 0 ? "No Available Options for AI Load Balancer" : "Select AI load balancer"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAiLoadBalancers.map((alb) => (
+                        <SelectItem key={alb.id} value={alb.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-indigo-100 text-indigo-800 border-indigo-200">
+                              <Bot className="h-3.5 w-3.5" />
+                              {alb.name}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -1293,8 +1418,11 @@ export default function RingGroups() {
                     No destination needed
                   </div>
                 )}
-                {formErrors.fallback_extension && formData.fallback_action === 'extension' && (
-                  <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
+                {formErrors.fallback_ai_assistant && formData.fallback_action === 'ai_assistant' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_ai_assistant}</p>
+                )}
+                {formErrors.fallback_ai_load_balancer && formData.fallback_action === 'ai_load_balancer' && (
+                  <p className="text-sm text-red-500">{formErrors.fallback_ai_load_balancer}</p>
                 )}
               </div>
             </div>
@@ -1414,20 +1542,19 @@ export default function RingGroups() {
           <StandardDataTable<RingGroup>
             data={ringGroups}
             isLoading={isLoading}
-            onRowClick={canManage ? setSelectedGroup : undefined}
+            onRowClick={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
             identityIcon={Users}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(group) => group.name}
             getIdentitySecondary={() => 'Ring Group'}
-            onIdentityClick={canManage ? setSelectedGroup : undefined}
+            onIdentityClick={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={toggleSort}
-            onView={canManage ? setSelectedGroup : undefined}
-            onEdit={canManage ? ((group) => openEditDialog(group as ExtendedRingGroup)) : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManage ? openDeleteDialog : undefined}
-            canEdit={canManage}
             canDelete={canManage}
             columns={[
               {
@@ -1638,24 +1765,33 @@ export default function RingGroups() {
                     Members ({selectedGroup.members.length})
                   </h3>
                   <div className="space-y-2">
-                    {selectedGroup.members.map((member, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            Ext {member.extension_number}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {member.user_name || 'Unassigned'}
-                          </p>
+                    {selectedGroup.members.map((member, index) => {
+                      // Look up the extension to get type and configuration
+                      const ext = availableExtensions.find((e) => e.id === member.extension_id);
+                      const isForward = ext?.type === 'forward';
+                      const forwardTo = ext?.configuration?.forward_to;
+
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              Ext {member.extension_number}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {isForward && forwardTo
+                                ? `Forward to ${forwardTo}`
+                                : (member.user_name || 'Unassigned')}
+                            </p>
+                          </div>
+                          {selectedGroup.strategy === 'sequential' && (
+                            <Badge variant="outline">Priority {member.priority}</Badge>
+                          )}
                         </div>
-                        {selectedGroup.strategy === 'sequential' && (
-                          <Badge variant="outline">Priority {member.priority}</Badge>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

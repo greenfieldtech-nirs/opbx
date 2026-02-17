@@ -51,7 +51,7 @@ export type Status = 'active' | 'inactive';
 export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
 
 // Extension Types
-export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward';
+export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward' | 'ai_load_balancer';
 
 // Call Status
 export type CallStatus =
@@ -70,7 +70,10 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+
+// AI Assistant Load Balancer Strategy
+export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
 
 // Routing Type
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
@@ -143,6 +146,19 @@ export interface Extension {
     protocol: 'sip' | 'websocket';
     status: 'active' | 'inactive';
   } | null;
+  ai_load_balancer?: {
+    id: number;
+    name: string;
+    strategy: AlbsStrategy;
+    members: {
+      ai_assistant_id: string;
+      ai_assistant_name: string;
+      priority: number;
+      weight: number;
+      position: number;
+      status: Status;
+    }[];
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,6 +173,7 @@ export interface DIDNumber {
   routing_config: {
     extension_id?: string;
     ai_assistant_id?: string;
+    ai_load_balancer_id?: string;
     ring_group_id?: string;
     business_hours_schedule_id?: string;
     conference_room_id?: string;
@@ -176,6 +193,9 @@ export interface DIDNumber {
   ring_group?: RingGroup;
   business_hours_schedule?: BusinessHours;
   conference_room?: ConferenceRoom;
+  ai_assistant?: AiAssistant;
+  ai_load_balancer?: AiAssistantLoadBalancer;
+  ivr_menu?: IvrMenu;
   created_at: string;
   updated_at: string;
 }
@@ -201,7 +221,63 @@ export interface RingGroup {
   fallback_action: RingGroupFallbackAction;
   fallback_extension_id?: string;
   fallback_extension_number?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  fallback_ai_load_balancer_id?: string;
+  fallback_ai_load_balancer?: {
+    id: string;
+    name: string;
+  } | null;
   status: Status;
+  created_at: string;
+  updated_at: string;
+}
+
+// AI Assistant Load Balancer Member
+export interface AiAssistantLoadBalancerMember {
+  id: string;
+  ai_assistant_id: string;
+  ai_assistant_name: string;
+  priority: number;
+  weight: number;
+  position: number;
+  status: Status;
+}
+
+// AI Assistant Load Balancer
+export interface AiAssistantLoadBalancer {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  strategy: AlbsStrategy;
+  follow_through: boolean;
+  status: Status;
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  fallback_extension?: {
+    id: string;
+    extension_number: string;
+  } | null;
+  fallback_ring_group?: {
+    id: string;
+    name: string;
+  } | null;
+  fallback_ivr_menu?: {
+    id: string;
+    name: string;
+  } | null;
+  fallback_ai_assistant?: {
+    id: string;
+    name: string;
+  } | null;
+  members: AiAssistantLoadBalancerMember[];
+  members_count: number;
+  active_members_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -516,6 +592,56 @@ export interface RingGroupsFilterParams extends PaginationParams {
 }
 
 // ============================================================================
+// Request Types - AI Assistant Load Balancers
+// ============================================================================
+
+export interface CreateAiAssistantLoadBalancerRequest {
+  name: string;
+  description?: string;
+  strategy: AlbsStrategy;
+  follow_through?: boolean;
+  members: Array<{
+    ai_assistant_id: string;
+    priority?: number;
+    weight?: number;
+    position?: number;
+    status?: Status;
+  }>;
+  fallback_action: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  status?: Status;
+}
+
+export interface UpdateAiAssistantLoadBalancerRequest {
+  name?: string;
+  description?: string;
+  strategy?: AlbsStrategy;
+  follow_through?: boolean;
+  members?: Array<{
+    ai_assistant_id: string;
+    priority?: number;
+    weight?: number;
+    position?: number;
+    status?: Status;
+  }>;
+  fallback_action?: RingGroupFallbackAction;
+  fallback_extension_id?: string;
+  fallback_ring_group_id?: string;
+  fallback_ivr_menu_id?: string;
+  fallback_ai_assistant_id?: string;
+  status?: Status;
+}
+
+export interface AiAssistantLoadBalancersFilterParams extends PaginationParams {
+  search?: string;
+  strategy?: AlbsStrategy;
+  status?: Status;
+}
+
+// ============================================================================
 // Request Types - Conference Rooms
 // ============================================================================
 
@@ -604,7 +730,7 @@ export interface ExceptionDate {
 
 export type ScheduleStatus = 'active' | 'inactive';
 
-export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference' | 'ai_assistant' | 'forward';
+export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference_room' | 'ai_assistant' | 'ai_load_balancer' | 'forward';
 
 export interface BusinessHoursAction {
   type: BusinessHoursActionType;
@@ -887,4 +1013,82 @@ export interface VoiceTrunksResponse {
   meta?: {
     total: number;
   };
+}
+
+// ============================================================================
+// Call Notifications Types
+// ============================================================================
+
+export type CallNotificationAuthMethod = 'hmac_sha256' | 'bearer_token' | 'basic_auth' | 'none';
+export type CallNotificationEvent = 'new' | 'ringing' | 'connected' | 'answered' | 'busy' | 'cancel' | 'failed' | 'congestion';
+
+export interface CallNotificationsSettings {
+  id: string;
+  organization_id: string;
+  webhook_url: string;
+  auth_method: CallNotificationAuthMethod;
+  auth_username?: string;
+  has_auth_secret: boolean;
+  retry_attempts: number;
+  retry_backoff_seconds: number;
+  request_timeout_seconds: number;
+  enabled_events: CallNotificationEvent[];
+  rate_limit_per_minute: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CallNotificationLog {
+  id: string;
+  organization_id: string;
+  call_session_token: string;
+  event_id: string;
+  event_type: string;
+  status: string;
+  webhook_url: string;
+  request_payload: Record<string, unknown>;
+  request_headers?: Record<string, string>;
+  request_body?: string;
+  response_status_code?: number;
+  response_body?: string;
+  response_headers?: Record<string, string>;
+  response_time_ms?: number;
+  attempt_number: number;
+  is_success: boolean;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface CreateCallNotificationsSettingsRequest {
+  webhook_url: string;
+  auth_method: CallNotificationAuthMethod;
+  auth_secret?: string;
+  auth_username?: string;
+  retry_attempts?: number;
+  retry_backoff_seconds?: number;
+  request_timeout_seconds?: number;
+  enabled_events: CallNotificationEvent[];
+  rate_limit_per_minute?: number;
+  is_active?: boolean;
+}
+
+export interface UpdateCallNotificationsSettingsRequest {
+  webhook_url?: string;
+  auth_method?: CallNotificationAuthMethod;
+  auth_secret?: string;
+  auth_username?: string;
+  retry_attempts?: number;
+  retry_backoff_seconds?: number;
+  request_timeout_seconds?: number;
+  enabled_events?: CallNotificationEvent[];
+  rate_limit_per_minute?: number;
+  is_active?: boolean;
+}
+
+export interface CallNotificationsRateLimitStatus {
+  limit: number;
+  current: number;
+  remaining: number;
+  reset_in_seconds: number;
 }

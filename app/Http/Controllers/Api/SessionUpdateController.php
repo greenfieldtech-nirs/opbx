@@ -9,6 +9,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\SessionUpdate;
 
 /**
  * Session Update API Controller
@@ -31,6 +32,8 @@ class SessionUpdateController extends Controller
      */
     public function getActiveCalls(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', SessionUpdate::class);
+
         try {
             // Get the authenticated user's organization ID
             $user = auth()->user();
@@ -196,6 +199,8 @@ class SessionUpdateController extends Controller
      */
     public function getSessionDetails(int $sessionId): JsonResponse
     {
+        $this->authorize('viewAny', SessionUpdate::class);
+
         // Get all events for this session
         $events = SessionUpdate::where('session_id', $sessionId)
             ->orderBy('created_at', 'asc')
@@ -236,6 +241,8 @@ class SessionUpdateController extends Controller
      */
     public function getActiveCallsStats(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', SessionUpdate::class);
+
         // Get active session IDs (latest status per session)
         $activeSessions = SessionUpdate::selectRaw('session_id, MAX(updated_at) as latest_update, status')
             ->whereIn('status', ['processing', 'ringing', 'connected'])
@@ -353,6 +360,8 @@ class SessionUpdateController extends Controller
      */
     public function disconnectSession(int $sessionId): JsonResponse
     {
+        $this->authorize('disconnect', SessionUpdate::class);
+
         try {
             // Get the authenticated user
             $user = auth()->user();

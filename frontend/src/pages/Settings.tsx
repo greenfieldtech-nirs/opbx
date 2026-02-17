@@ -158,6 +158,9 @@ export default function Settings() {
   }, [settingsData]);
 
   /**
+   * Check if a value appears to be obfuscated (contains only dots, asterisks, or masking characters)
+   */
+  /**
    * Validate credentials and save all settings
    */
   const handleValidateAndSave = async () => {
@@ -407,12 +410,12 @@ export default function Settings() {
                       disabled={isValidating}
                       {...register('domain_api_key')}
                     />
-                     <button
-                       type="button"
-                       onClick={() => setShowDomainApiKey(!showDomainApiKey)}
-                       disabled={isValidating}
-                       className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
+                    <button
+                      type="button"
+                      onClick={() => setShowDomainApiKey(!showDomainApiKey)}
+                      disabled={isValidating}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       {showDomainApiKey ? (
                         <EyeOff className="h-4 w-4" />
                       ) : (
@@ -420,12 +423,12 @@ export default function Settings() {
                       )}
                     </button>
                   </div>
-                   {errors.domain_api_key && (
-                     <p className="text-sm text-destructive flex items-center gap-1">
-                       <XCircle className="h-3 w-3" />
-                       {errors.domain_api_key.message}
-                     </p>
-                   )}
+                  {errors.domain_api_key && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {errors.domain_api_key.message}
+                    </p>
+                  )}
 
 
                  </div>
@@ -495,12 +498,12 @@ export default function Settings() {
                       disabled={isValidating}
                       {...register('domain_requests_api_key')}
                     />
-                     <button
-                       type="button"
-                       onClick={() => setShowRequestsApiKey(!showRequestsApiKey)}
-                       disabled={isValidating}
-                       className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestsApiKey(!showRequestsApiKey)}
+                      disabled={isValidating}
+                      className="absolute right-3 top-3 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       {showRequestsApiKey ? (
                         <EyeOff className="h-4 w-4" />
                       ) : (

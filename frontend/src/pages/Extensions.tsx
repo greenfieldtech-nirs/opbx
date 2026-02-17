@@ -13,7 +13,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService } from '@/services/createResourceService';
+import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -41,6 +41,7 @@ import {
   RefreshCw,
   Key,
   Wifi,
+  Scale,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -101,6 +102,8 @@ import type {
   CreateExtensionRequest,
   UpdateExtensionRequest
 } from '@/types';
+import { DestinationTypeAndSelector } from '@/components/destinations';
+import type { DestinationType } from '@/components/destinations/types/destination.types';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -126,6 +129,8 @@ interface ExtensionFormData {
   ai_api_key: string;
   ai_assistant_id: string;
   ai_session_id: string;
+  // AI Load Balancer - select from pre-defined
+  ai_load_balancer_id: string;
   // Custom Logic - Cloudonix Container Application
   container_application_name: string;
   container_block_name: string;
@@ -241,6 +246,7 @@ export default function ExtensionsComplete() {
     ai_api_key: '',
     ai_assistant_id: '',
     ai_session_id: '',
+    ai_load_balancer_id: '',
     container_application_name: '',
     container_block_name: '',
     forward_to: '',
@@ -281,6 +287,14 @@ export default function ExtensionsComplete() {
   });
 
   const aiAssistants = aiAssistantsData?.data || [];
+
+  // Fetch AI Load Balancers for dropdown
+  const { data: aiLoadBalancersData } = useQuery({
+    queryKey: ['ai-assistant-load-balancers', { per_page: 100, status: 'active' }],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
+  });
+
+  const aiLoadBalancers = aiLoadBalancersData?.data || [];
 
   // Fetch AI Assistant providers for detail view
   const { data: aiProvidersData } = useQuery({
@@ -492,6 +506,7 @@ export default function ExtensionsComplete() {
       ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
       ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
       ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+      ai_load_balancer: { label: 'AI Load Balancer', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
       forward: { label: 'Forward', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
     };
 
@@ -515,6 +530,7 @@ export default function ExtensionsComplete() {
         ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
         ivr: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
         ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
+        ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
         forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
       };
       return configs[type] || configs.user;
@@ -562,6 +578,13 @@ export default function ExtensionsComplete() {
           const assistantId = extension.configuration?.ai_assistant_id || extension.ai_assistant_id;
           return assistantId ? `AI Assistant #${assistantId}` : 'Not configured';
         }
+        case 'ai_load_balancer': {
+          if (extension.ai_load_balancer) {
+            return extension.ai_load_balancer.name;
+          }
+          const loadBalancerId = extension.configuration?.ai_load_balancer_id;
+          return loadBalancerId ? `AI Load Balancer #${loadBalancerId}` : 'Not configured';
+        }
         case 'forward': {
           return extension.configuration?.forward_to || 'Not configured';
         }
@@ -580,9 +603,92 @@ export default function ExtensionsComplete() {
         {content}
       </Badge>
     );
+    return (
+      <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
+        <Icon className="h-3.5 w-3.5" />
+        {content}
+      </Badge>
+    );
   };
 
-  // Validate form
+  // Handle destination change from unified selector
+  const handleDestinationChange = (type: DestinationType, value: string) => {
+    // Map the generic destination type back to extension type
+    // Most types map 1:1, but mapped to ExtensionType
+    const extType = (type === 'ivr_menu' ? 'ivr' :
+      type === 'conference_room' ? 'conference' :
+        type as ExtensionType);
+
+    const newFormData = {
+      ...formData,
+      type: extType,
+      // Clear all destination fields first
+      user_id: '',
+      conference_room_id: '',
+      ring_group_id: '',
+      ivr_id: '',
+      ai_assistant_id: '',
+      ai_load_balancer_id: '',
+      forward_to: '',
+    };
+
+    // Set the specific field based on type
+    switch (type) {
+      case 'user':
+        newFormData.user_id = value;
+        break;
+      case 'conference_room':
+        newFormData.conference_room_id = value;
+        break;
+      case 'ring_group':
+        newFormData.ring_group_id = value;
+        break;
+      case 'ivr_menu':
+        newFormData.ivr_id = value;
+        break;
+      case 'ai_assistant':
+        newFormData.ai_assistant_id = value;
+        break;
+      case 'ai_load_balancer':
+        newFormData.ai_load_balancer_id = value;
+        break;
+      case 'forward':
+        newFormData.forward_to = value;
+        break;
+    }
+
+    setFormData(newFormData);
+  };
+
+  // Get current destination value for selector
+  const getCurrentDestinationValue = () => {
+    switch (formData.type) {
+      case 'user': return formData.user_id;
+      case 'conference': return formData.conference_room_id;
+      case 'ring_group': return formData.ring_group_id;
+      case 'ivr': return formData.ivr_id;
+      case 'ai_assistant': return formData.ai_assistant_id;
+      case 'ai_load_balancer': return formData.ai_load_balancer_id;
+      case 'forward': return formData.forward_to;
+      default: return '';
+    }
+  };
+
+  // Get current type for selector
+  const getCurrentDestinationType = (): DestinationType => {
+    switch (formData.type) {
+      case 'user': return 'user';
+      case 'conference': return 'conference_room';
+      case 'ring_group': return 'ring_group';
+      case 'ivr': return 'ivr_menu';
+      case 'ai_assistant': return 'ai_assistant';
+      case 'ai_load_balancer': return 'ai_load_balancer';
+      case 'forward': return 'forward';
+      default: return 'user';
+    }
+  };
+
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -614,6 +720,12 @@ export default function ExtensionsComplete() {
     if (formData.type === 'ai_assistant') {
       if (!formData.ai_assistant_id) {
         errors.ai_assistant_id = 'AI assistant selection is required';
+      }
+    }
+
+    if (formData.type === 'ai_load_balancer') {
+      if (!formData.ai_load_balancer_id) {
+        errors.ai_load_balancer_id = 'AI Load Balancer selection is required';
       }
     }
 
@@ -672,6 +784,14 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ai_assistant_id, 10);
           if (!isNaN(parsed)) {
             configuration.ai_assistant_id = parsed;
+          }
+        }
+        break;
+      case 'ai_load_balancer':
+        if (formData.ai_load_balancer_id) {
+          const parsed = parseInt(formData.ai_load_balancer_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_load_balancer_id = parsed;
           }
         }
         break;
@@ -753,6 +873,14 @@ export default function ExtensionsComplete() {
           }
         }
         break;
+      case 'ai_load_balancer':
+        if (formData.ai_load_balancer_id) {
+          const parsed = parseInt(formData.ai_load_balancer_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.ai_load_balancer_id = parsed;
+          }
+        }
+        break;
       case 'forward':
         configuration.forward_to = formData.forward_to;
         break;
@@ -823,6 +951,7 @@ export default function ExtensionsComplete() {
       ai_api_key: '',
       ai_assistant_id: '',
       ai_session_id: '',
+      ai_load_balancer_id: '',
       container_application_name: '',
       container_block_name: '',
       forward_to: '',
@@ -887,8 +1016,9 @@ export default function ExtensionsComplete() {
       ai_bot_id: (typeof config === 'object' && config?.bot_id) ? config.bot_id : '',
       ai_auth_token: (typeof config === 'object' && config?.auth_token) ? config.auth_token : '',
       ai_api_key: (typeof config === 'object' && config?.api_key) ? config.api_key : '',
-      ai_assistant_id: (typeof config === 'object' && config?.assistant_id) ? config.assistant_id : '',
+      ai_assistant_id: (typeof config === 'object' && config?.ai_assistant_id) ? config.ai_assistant_id.toString() : '',
       ai_session_id: (typeof config === 'object' && config?.session_id) ? config.session_id : '',
+      ai_load_balancer_id: (typeof config === 'object' && config?.ai_load_balancer_id) ? config.ai_load_balancer_id.toString() : '',
       container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
       container_block_name: (typeof config === 'object' && config?.container_block_name) ? config.container_block_name : '',
       forward_to: (typeof config === 'object' && config?.forward_to) ? config.forward_to : '',
@@ -897,168 +1027,7 @@ export default function ExtensionsComplete() {
   };
 
   // Render type-specific form fields
-  const renderTypeSpecificFields = () => {
-    switch (formData.type) {
-      case 'user':
-        // No additional fields for PBX User Extension
-        return null;
 
-      case 'conference':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="conference_room_id">
-              Conference Room <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.conference_room_id}
-              onValueChange={(value) => setFormData({ ...formData, conference_room_id: value })}
-            >
-              <SelectTrigger id="conference_room_id">
-                <SelectValue placeholder="Select a conference room" />
-              </SelectTrigger>
-              <SelectContent>
-                {conferenceRooms.map((room) => (
-                  <SelectItem key={room.id} value={room.id.toString()}>
-                    {room.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Conference rooms are managed in a separate page
-            </p>
-            {formErrors.conference_room_id && (
-              <p className="text-sm text-destructive">{formErrors.conference_room_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ring_group':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ring_group_id">
-              Ring Group <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.ring_group_id}
-              onValueChange={(value) => setFormData({ ...formData, ring_group_id: value })}
-            >
-              <SelectTrigger id="ring_group_id">
-                <SelectValue placeholder="Select a ring group" />
-              </SelectTrigger>
-              <SelectContent>
-                {ringGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id.toString()}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Ring groups are managed in a separate page
-            </p>
-            {formErrors.ring_group_id && (
-              <p className="text-sm text-destructive">{formErrors.ring_group_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ivr':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ivr_id">
-              IVR Menu <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.ivr_id}
-              onValueChange={(value) => setFormData({ ...formData, ivr_id: value })}
-            >
-              <SelectTrigger id="ivr_id">
-                <SelectValue placeholder="Select an IVR menu" />
-              </SelectTrigger>
-              <SelectContent>
-                {ivrMenus.map((ivr) => (
-                  <SelectItem
-                    key={ivr.id}
-                    value={ivr.id.toString()}
-                  >
-                    {ivr.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              IVR menus are managed in a separate page
-            </p>
-            {formErrors.ivr_id && (
-              <p className="text-sm text-destructive">{formErrors.ivr_id}</p>
-            )}
-          </div>
-        );
-
-      case 'ai_assistant':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="ai_assistant_id">
-              AI Assistant <span className="text-destructive">*</span>
-            </Label>
-            {aiAssistants.length === 0 ? (
-              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
-                No AI Assistants Available
-              </div>
-            ) : (
-              <Select
-                value={formData.ai_assistant_id}
-                onValueChange={(value) => setFormData({ ...formData, ai_assistant_id: value })}
-              >
-                <SelectTrigger id="ai_assistant_id">
-                  <SelectValue placeholder="Select an AI assistant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {aiAssistants.map((assistant) => (
-                    <SelectItem key={assistant.id} value={assistant.id.toString()}>
-                      {assistant.name} ({assistant.provider})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <p className="text-xs text-muted-foreground">
-              AI assistants are managed in a separate page
-            </p>
-            {formErrors.ai_assistant_id && (
-              <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>
-            )}
-          </div>
-        );
-
-      case 'forward':
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="forward_to">
-              Forward To <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="forward_to"
-              type="text"
-              value={formData.forward_to}
-              onChange={(e) => setFormData({ ...formData, forward_to: e.target.value })}
-              placeholder="+1234567890 or 1001"
-              autoComplete="off"
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter a phone number (+1234567890) or an existing extension number (1001)
-            </p>
-            {formErrors.forward_to && (
-              <p className="text-sm text-destructive">{formErrors.forward_to}</p>
-            )}
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
 
   // Loading state
   if (isLoading) {
@@ -1198,6 +1167,7 @@ export default function ExtensionsComplete() {
                 <SelectItem value="ring_group">Ring Group</SelectItem>
                 <SelectItem value="ivr">IVR Menu</SelectItem>
                 <SelectItem value="ai_assistant">AI Assistant</SelectItem>
+                <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
                 <SelectItem value="forward">Forward</SelectItem>
               </SelectContent>
             </Select>
@@ -1255,33 +1225,22 @@ export default function ExtensionsComplete() {
           <StandardDataTable<Extension>
             data={displayedExtensions}
             isLoading={isLoading}
-            onRowClick={canCreate ? ((extension) => {
-              setSelectedExtension(extension);
-              setShowExtensionDetail(true);
-            }) : undefined}
+            onRowClick={canCreate ? openEditDialog : undefined}
             identityIcon={Phone}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(extension) => extension.extension_number}
             getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
-            onIdentityClick={canCreate ? ((extension) => {
-              setSelectedExtension(extension);
-              setShowExtensionDetail(true);
-            }) : undefined}
+            onIdentityClick={canCreate ? openEditDialog : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={canCreate ? ((extension) => {
-              setSelectedExtension(extension);
-              setShowExtensionDetail(true);
-            }) : undefined}
-            onEdit={canCreate ? openEditDialog : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canCreate ? ((extension) => {
               setSelectedExtension(extension);
               setShowDeleteDialog(true);
             }) : undefined}
-            canView={canCreate}
-            canEdit={canCreate}
             canDelete={canCreate}
             columns={[
               ...(displayedExtensions.some(ext => ext.type === 'user') && !isReadOnly ? [{
@@ -1328,46 +1287,46 @@ export default function ExtensionsComplete() {
                   )
                 )
               }] as Column<Extension>[] : []),
-                {
-                  header: 'Type',
-                  sortKey: 'type',
-                  cell: (extension) => getTypeBadge(extension.type)
-                },
-                {
-                  header: 'Linked To',
-                  cell: (extension) => getDetailsBadge(extension)
-                },
-                {
-                  header: 'Created',
-                  sortKey: 'created_at',
-                  cell: (extension) => (
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(extension.created_at).toLocaleDateString()}
-                    </span>
-                  )
-                },
-                {
-                  header: 'Status',
-                  sortKey: 'status',
-                  cell: (extension) => (
-                    <Badge
-                      className={cn(
-                        getStatusColor(extension.status),
-                        "text-xs",
-                        !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isReadOnly) {
-                          handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
-                        }
-                      }}
-                    >
-                      {extension.status}
-                    </Badge>
-                  )
-                }
-              ]}
+              {
+                header: 'Type',
+                sortKey: 'type',
+                cell: (extension) => getTypeBadge(extension.type)
+              },
+              {
+                header: 'Linked To',
+                cell: (extension) => getDetailsBadge(extension)
+              },
+              {
+                header: 'Created',
+                sortKey: 'created_at',
+                cell: (extension) => (
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(extension.created_at).toLocaleDateString()}
+                  </span>
+                )
+              },
+              {
+                header: 'Status',
+                sortKey: 'status',
+                cell: (extension) => (
+                  <Badge
+                    className={cn(
+                      getStatusColor(extension.status),
+                      "text-xs",
+                      !isReadOnly && "cursor-pointer hover:opacity-80 transition-opacity"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) {
+                        handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
+                      }
+                    }}
+                  >
+                    {extension.status}
+                  </Badge>
+                )
+              }
+            ]}
             emptyState={
               <EmptyState
                 icon={Phone}
@@ -1442,53 +1401,25 @@ export default function ExtensionsComplete() {
               )}
             </div>
 
-            {/* Extension Type & Assignment */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">
-                  Extension Type <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-                >
-                  <SelectTrigger id="type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">PBX User Extension</SelectItem>
-                    <SelectItem value="conference">Conference Room</SelectItem>
-                    <SelectItem value="ring_group">Ring Group</SelectItem>
-                    <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
-                    <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                    <SelectItem value="forward">Forward</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="user_id">Assign to User (Optional)</Label>
-                <Select
-                  value={formData.user_id}
-                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                >
-                  <SelectTrigger id="user_id">
-                    <SelectValue placeholder="Select user or leave unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            {/* Type-specific fields */}
-            {renderTypeSpecificFields()}
+            {/* Unified Destination Selector */}
+            <DestinationTypeAndSelector
+              typeValue={getCurrentDestinationType()}
+              destinationValue={getCurrentDestinationValue()}
+              onChange={handleDestinationChange}
+              typeLabel="Extension Type"
+              destinationLabel="Assignment"
+              allowedTypes={['user', 'conference_room', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
+              layout="vertical"
+            />
+            {formErrors.user_id && <p className="text-sm text-destructive">{formErrors.user_id}</p>}
+            {formErrors.conference_room_id && <p className="text-sm text-destructive">{formErrors.conference_room_id}</p>}
+            {formErrors.ring_group_id && <p className="text-sm text-destructive">{formErrors.ring_group_id}</p>}
+            {formErrors.ivr_id && <p className="text-sm text-destructive">{formErrors.ivr_id}</p>}
+            {formErrors.ai_assistant_id && <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>}
+            {formErrors.ai_load_balancer_id && <p className="text-sm text-destructive">{formErrors.ai_load_balancer_id}</p>}
+            {formErrors.forward_to && <p className="text-sm text-destructive">{formErrors.forward_to}</p>}
           </div>
 
           <DialogFooter>
@@ -1504,10 +1435,10 @@ export default function ExtensionsComplete() {
             <Button onClick={handleCreateExtension}>Create Extension</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
       {/* Edit Extension Dialog */}
-      < Dialog open={showEditDialog} onOpenChange={setShowEditDialog} >
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Extension</DialogTitle>
@@ -1532,60 +1463,17 @@ export default function ExtensionsComplete() {
               </p>
             </div>
 
-            {/* Extension Type & Assignment */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_type">
-                  Extension Type <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: ExtensionType) => setFormData({ ...formData, type: value })}
-                >
-                  {(currentUser?.role as string) === 'pbx_user' && (
-                    <SelectTrigger id="edit_type" disabled>
-                      <SelectValue />
-                    </SelectTrigger>
-                  )}
-                  {(currentUser?.role as string) !== 'pbx_user' && (
-                    <SelectTrigger id="edit_type">
-                      <SelectValue />
-                    </SelectTrigger>
-                  )}
-                  <SelectContent>
-                    <SelectItem value="user">PBX User Extension</SelectItem>
-                    <SelectItem value="conference">Conference Room</SelectItem>
-                    <SelectItem value="ring_group">Ring Group</SelectItem>
-                    <SelectItem value="ivr">IVR (Interactive Menu)</SelectItem>
-                    <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                    <SelectItem value="forward">Forward</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_user_id">Assign to User (Optional)</Label>
-                <Select
-                  value={formData.user_id}
-                  onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                >
-                  <SelectTrigger id="edit_user_id">
-                    <SelectValue placeholder="Select user or leave unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Type-specific fields */}
-            {renderTypeSpecificFields()}
+            {/* Unified Destination Selector (Edit Mode) */}
+            <DestinationTypeAndSelector
+              typeValue={getCurrentDestinationType()}
+              destinationValue={getCurrentDestinationValue()}
+              onChange={handleDestinationChange}
+              typeLabel="Extension Type"
+              destinationLabel="Assignment"
+              allowedTypes={['user', 'conference_room', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
+              layout="vertical"
+              disabled={currentUser?.role === 'pbx_user'}
+            />
           </div>
 
           <DialogFooter>
@@ -2010,7 +1898,7 @@ export default function ExtensionsComplete() {
                         const config = selectedExtension.configuration;
                         const provider = aiProviders.find((p: any) => p.key === config?.provider);
                         const protocol = provider?.protocol || 'sip';
-                        
+
                         return (
                           <>
                             <div className="flex justify-between items-center">
@@ -2032,7 +1920,7 @@ export default function ExtensionsComplete() {
                                 </Badge>
                               </div>
                             </div>
-                            
+
                             {/* Show SIP phone number */}
                             {config?.phone_number && (
                               <div className="flex justify-between">
@@ -2040,7 +1928,7 @@ export default function ExtensionsComplete() {
                                 <span className="text-sm font-medium font-mono">{config.phone_number}</span>
                               </div>
                             )}
-                            
+
                             {/* Show WebSocket fields */}
                             {config?.bot_id && (
                               <div className="flex justify-between">
@@ -2072,7 +1960,7 @@ export default function ExtensionsComplete() {
                                 <span className="text-sm font-medium font-mono">{config.session_id}</span>
                               </div>
                             )}
-                            
+
                             {provider?.description && (
                               <div className="pt-2 border-t">
                                 <p className="text-xs text-muted-foreground">{provider.description}</p>
@@ -2081,6 +1969,69 @@ export default function ExtensionsComplete() {
                           </>
                         );
                       })()}
+                      {selectedExtension.type === 'ai_load_balancer' && (
+                        <>
+                          {(() => {
+                            const loadBalancer = selectedExtension.ai_load_balancer;
+                            const config = selectedExtension.configuration;
+                            const loadBalancerId = config?.ai_load_balancer_id;
+
+                            if (!loadBalancer && !loadBalancerId) {
+                              return (
+                                <div className="text-sm text-muted-foreground">
+                                  AI Load Balancer not configured
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-sm text-muted-foreground">AI Load Balancer:</span>
+                                  <span className="text-sm font-medium">{loadBalancer?.name || `ID: ${loadBalancerId}`}</span>
+                                </div>
+                                {loadBalancer && (
+                                  <>
+                                    <div className="flex justify-between">
+                                      <span className="text-sm text-muted-foreground">Strategy:</span>
+                                      <Badge variant="outline" className="text-xs capitalize">
+                                        {loadBalancer.strategy.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+                                    {loadBalancer.members && loadBalancer.members.length > 0 && (
+                                      <div className="mt-4 pt-4 border-t">
+                                        <span className="text-sm text-muted-foreground block mb-2">Members ({loadBalancer.members.length}):</span>
+                                        <div className="space-y-2">
+                                          {loadBalancer.members.map((member, index) => (
+                                            <div key={member.ai_assistant_id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                                                <Bot className="h-4 w-4 text-cyan-500" />
+                                                <span className="text-sm font-medium">{member.ai_assistant_name}</span>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {loadBalancer.strategy === 'percentage' && (
+                                                  <Badge variant="secondary" className="text-xs">{member.weight}%</Badge>
+                                                )}
+                                                {loadBalancer.strategy === 'priority' && (
+                                                  <Badge variant="secondary" className="text-xs">Priority: {member.priority}</Badge>
+                                                )}
+                                                <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                                                  {member.status}
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
                       {selectedExtension.type === 'ivr' && (
                         <>
                           {(() => {

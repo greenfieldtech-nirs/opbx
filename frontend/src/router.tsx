@@ -20,6 +20,7 @@ const Users = lazy(() => import('@/pages/UsersComplete'));
 const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
 const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
+const AiAssistantLoadBalancers = lazy(() => import('@/pages/AiAssistantLoadBalancers'));
 const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = lazy(() => import('@/pages/RingGroups'));
 const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
@@ -30,6 +31,7 @@ const Recordings = lazy(() => import('@/pages/Recordings'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
+const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
 
 
 // Unified router - NO basename, handles all routes
@@ -82,6 +84,10 @@ export const router = createBrowserRouter([
         element: <AiAssistants />,
       },
       {
+        path: 'ai-assistant-load-balancers',
+        element: <AiAssistantLoadBalancers />,
+      },
+      {
         path: 'phone-numbers',
         element: <PhoneNumbers />,
       },
@@ -121,15 +127,19 @@ export const router = createBrowserRouter([
          path: 'profile',
          element: <Profile />,
        },
-       {
-         path: 'settings',
-         element: (
-           <OwnerRoute>
-             <Settings />
-           </OwnerRoute>
-         ),
-       },
+        {
+          path: 'settings',
+          element: (
+            <OwnerRoute>
+              <Settings />
+            </OwnerRoute>
+          ),
+        },
+        {
+          path: 'call-notifications',
+          element: <CallNotificationsSettings />,
+        },
 
-     ],
-  },
+      ],
+   },
 ]);

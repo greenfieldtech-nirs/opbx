@@ -744,23 +744,22 @@ export default function ConferenceRooms() {
           <StandardDataTable<ConferenceRoom>
             data={rooms}
             isLoading={isLoading}
-            onRowClick={openDetailSheet}
+            onRowClick={canManageRooms ? openEditDialog : undefined}
             identityIcon={Mic}
             identityIconBg="bg-purple-100"
             identityIconColor="text-purple-600"
             getIdentityPrimary={(room) => room.name}
             getIdentitySecondary={() => 'Conference Room'}
-            onIdentityClick={openDetailSheet}
+            onIdentityClick={canManageRooms ? openEditDialog : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={openDetailSheet}
-            onEdit={canManageRooms ? openEditDialog : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManageRooms ? ((room) => {
               setSelectedRoom(room);
               setIsDeleteDialogOpen(true);
             }) : undefined}
-            canEdit={canManageRooms}
             canDelete={canManageRooms}
             columns={[
               {

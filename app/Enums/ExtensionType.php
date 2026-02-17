@@ -14,11 +14,10 @@ enum ExtensionType: string
     case CUSTOM_LOGIC = 'custom_logic';
     case FORWARD = 'forward';
     case QUEUE = 'queue';
+    case AI_LOAD_BALANCER = 'ai_load_balancer';
 
     /**
      * Get human-readable label for the extension type.
-     *
-     * @return string
      */
     public function label(): string
     {
@@ -31,13 +30,12 @@ enum ExtensionType: string
             self::CUSTOM_LOGIC => 'Custom Logic',
             self::FORWARD => 'Call Forwarding',
             self::QUEUE => 'Call Queue',
+            self::AI_LOAD_BALANCER => 'AI Load Balancer',
         };
     }
 
     /**
      * Get description for the extension type.
-     *
-     * @return string
      */
     public function description(): string
     {
@@ -49,13 +47,12 @@ enum ExtensionType: string
             self::AI_ASSISTANT => 'AI-powered virtual assistant',
             self::CUSTOM_LOGIC => 'Custom call routing logic',
             self::FORWARD => 'Forward calls to external number',
+            self::AI_LOAD_BALANCER => 'Route calls to AI Assistant Load Balancer with distribution algorithms',
         };
     }
 
     /**
      * Check if this extension type requires a user assignment.
-     *
-     * @return bool
      */
     public function requiresUser(): bool
     {
@@ -64,8 +61,6 @@ enum ExtensionType: string
 
     /**
      * Check if this extension type supports voicemail.
-     *
-     * @return bool
      */
     public function supportsVoicemail(): bool
     {
@@ -77,8 +72,6 @@ enum ExtensionType: string
      *
      * Only PBX User extensions are allowed to make outbound calls by default.
      * Other extension types (AI Assistant, IVR, etc.) cannot make outbound calls.
-     *
-     * @return bool
      */
     public function canMakeOutboundCalls(): bool
     {
@@ -100,6 +93,7 @@ enum ExtensionType: string
             self::AI_ASSISTANT => ['provider', 'phone_number'],
             self::CUSTOM_LOGIC => ['custom_logic_id'],
             self::FORWARD => ['forward_to'],
+            self::AI_LOAD_BALANCER => ['ai_load_balancer_id'],
         };
     }
 
@@ -110,6 +104,6 @@ enum ExtensionType: string
      */
     public static function values(): array
     {
-        return array_map(fn($case) => $case->value, self::cases());
+        return array_map(fn ($case) => $case->value, self::cases());
     }
 }

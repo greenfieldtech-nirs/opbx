@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Voice;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Voice\IvrInputRequest;
+use App\Http\Requests\Voice\RingGroupCallbackRequest;
 use App\Http\Requests\Voice\VoiceRoutingRequest;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\JsonResponse;

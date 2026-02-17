@@ -8,14 +8,16 @@ use App\Exceptions\Webhook\WebhookBusinessLogicException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
+use App\Http\Requests\Webhook\SessionUpdateRequest;
 use App\Http\Requests\Webhook\CdrRequest;
 use App\Jobs\ProcessInboundCallJob;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
-use App\Services\CallRouting\CallRoutingService;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Cache;
+use App\Models\CallNotificationsSettings;
+use App\Services\CallNotifications\WebhookDispatcher;
+use App\Services\CallNotifications\NotificationPayloadBuilder;
+use App\Services\PhoneNumberService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,470 +30,161 @@ class CloudonixWebhookController extends Controller
     use HandlesWebhookErrors;
 
     public function __construct(
-        private readonly CallRoutingService $routingService
+        private readonly WebhookDispatcher $webhookDispatcher,
+        private readonly NotificationPayloadBuilder $payloadBuilder,
+        private readonly PhoneNumberService $phoneNumberService
     ) {}
 
     /**
-     * Handle inbound call initiated webhook.
-     * This is called by Cloudonix when an inbound call arrives.
+     * Handle inbound call initiated webhook (async notification only).
      *
-     * @see https://developers.cloudonix.com/Documentation/voiceApplication/requestParameters
+     * This is an asynchronous notification from Cloudonix when a call arrives.
+     * It does NOT return CXML — real-time call routing is handled by
+     * VoiceRoutingController (/api/voice/route) which returns CXML.
+     *
+     * This handler:
+     * 1. Logs the incoming call notification
+     * 2. Dispatches a job to create a CallLog record
+     * 3. Triggers real-time events for the frontend UI
+     *
+     * @see https://developers.cloudonix.com/Documentation/make.com/webhooks
+     * @see VoiceRoutingController::handleInbound() for CXML routing
      */
-    public function callInitiated(CallInitiatedRequest $request): Response
+    public function callInitiated(CallInitiatedRequest $request): \Illuminate\Http\JsonResponse
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $from = $request->input('From') ?? $request->input('from');
         $to = $request->input('To') ?? $request->input('to');
-        $cacheKey = "idem:call-initiated:{$callId}";
+        $direction = $request->input('Direction') ?? 'unknown';
 
-        Log::info('Received call-initiated webhook', [
+        Log::info('Received call-initiated webhook (async notification)', [
             'call_id' => $callId,
             'from' => $from,
             'to' => $to,
-            'payload' => $request->all(),
+            'direction' => $direction,
         ]);
 
-        // Check for cached response (controller-level idempotency)
-        $cachedCxml = Cache::get($cacheKey);
-        if ($cachedCxml) {
-            Log::info('Returning cached CXML for duplicate call-initiated', [
-                'call_id' => $callId,
-            ]);
+        // Normalize phone numbers
+        $fromNumber = $this->phoneNumberService->normalizeToE164($from);
+        $toNumber = $this->phoneNumberService->normalizeToE164($to);
 
-            return response($cachedCxml, 200)
-                ->header('Content-Type', 'application/xml');
+        // Identify organization from domain (set by VerifyCloudonixSignature middleware)
+        // or fall back to DID-based lookup
+        $organizationId = $request->input('_organization_id');
+
+        if (! $organizationId) {
+            // Try DID-based lookup
+            $didNumber = DidNumber::where('phone_number', $toNumber)
+                ->where('status', 'active')
+                ->first();
+
+            if ($didNumber) {
+                $organizationId = $didNumber->organization_id;
+            }
         }
 
-        // Acquire lock to prevent concurrent processing of the same call
-        $lock = Cache::lock("lock:call-initiated:{$callId}", 30);
-        if (! $lock->get()) {
-            // Another request is processing this call - wait briefly then return cached response
-            Log::info('Call-initiated lock contention, waiting for cached response', [
+        if (! $organizationId) {
+            Log::warning('call-initiated: Could not identify organization', [
                 'call_id' => $callId,
-            ]);
-
-            sleep(1);
-            $cachedCxml = Cache::get($cacheKey);
-            if ($cachedCxml) {
-                return response($cachedCxml, 200)
-                    ->header('Content-Type', 'application/xml');
-            }
-
-            // Lock held but no cached response - return safe fallback
-            return response(
-                '<Response><Say>Please wait while we connect your call.</Say></Response>',
-                200
-            )->header('Content-Type', 'application/xml');
-        }
-
-        try {
-            // Normalize phone numbers
-            $fromNumber = $this->normalizePhoneNumber($from);
-            $toNumber = $this->normalizePhoneNumber($to);
-
-            // Determine call direction and find organization
-            $direction = $request->input('Direction') ?? 'unknown';
-            $organizationId = null;
-            $organization = null;
-
-            // For internal calls (subscriber direction), check extensions first
-            if ($direction === 'subscriber') {
-                // Find organization by checking if extension exists within any organization
-                $extension = \App\Models\Extension::with('organization:id,name,status')
-                    ->where('extension_number', $toNumber)
-                    ->where('status', 'active')
-                    ->first();
-
-                if ($extension && $extension->organization) {
-                    $organization = $extension->organization;
-                    $organizationId = $organization->id;
-
-                    Log::info('Found organization via extension for internal call', [
-                        'call_id' => $callId,
-                        'to_number' => $toNumber,
-                        'organization_id' => $organizationId,
-                        'extension_id' => $extension->id,
-                        'extension_type' => $extension->type->value,
-                    ]);
-                }
-            }
-
-            // If no organization found via extension, try DID-based lookup (external calls)
-            if (! $organizationId) {
-                $didNumber = DidNumber::with('organization:id,name,status')
-                    ->where('phone_number', $toNumber)
-                    ->where('status', 'active')
-                    ->first();
-
-                if ($didNumber && $didNumber->organization) {
-                    $organization = $didNumber->organization;
-                    $organizationId = $organization->id;
-
-                    Log::info('Found organization via DID for external call', [
-                        'call_id' => $callId,
-                        'to_number' => $toNumber,
-                        'organization_id' => $organizationId,
-                        'did_id' => $didNumber->id,
-                    ]);
-                }
-            }
-
-            // Validate organization was found
-            if (! $organizationId || ! $organization) {
-                Log::warning('No organization found for call (neither extension nor DID)', [
-                    'call_id' => $callId,
-                    'to_number' => $toNumber,
-                    'from' => $fromNumber,
-                    'direction' => $direction,
-                ]);
-
-                return response(
-                    '<Response><Say>This number is not configured.</Say><Hangup/></Response>',
-                    200
-                )->header('Content-Type', 'application/xml');
-            }
-
-            // Validate organization is active
-            if ($organization->status !== 'active') {
-                Log::error('Organization is not active', [
-                    'call_id' => $callId,
-                    'organization_id' => $organizationId,
-                    'organization_status' => $organization->status,
-                ]);
-
-                return response(
-                    '<Response><Say>Service temporarily unavailable.</Say><Hangup/></Response>',
-                    200
-                )->header('Content-Type', 'application/xml');
-            }
-
-            Log::info('Webhook validated for organization', [
-                'call_id' => $callId,
-                'organization_id' => $organizationId,
-                'organization_name' => $organization->name,
                 'to_number' => $toNumber,
+                'from' => $fromNumber,
                 'direction' => $direction,
             ]);
 
-            // Handle routing based on call type
-            if ($direction === 'subscriber') {
-                // Internal call - check if it's a direct extension dial
-                $extension = \App\Models\Extension::where('organization_id', $organizationId)
-                    ->where('extension_number', $toNumber)
-                    ->where('status', 'active')
-                    ->first();
+            // Still return 200 to acknowledge receipt — don't retry
+            return response()->json([
+                'status' => 'warning',
+                'message' => 'Organization not identified',
+            ], 200);
+        }
 
-                if ($extension) {
-                    // Direct extension routing
-                    Log::info('Routing internal call to extension', [
-                        'call_id' => $callId,
-                        'extension_id' => $extension->id,
-                        'extension_type' => $extension->type->value,
-                    ]);
+        // Dispatch async job to create call log and broadcast event
+        ProcessInboundCallJob::dispatch([
+            'call_id' => $callId,
+            'from_number' => $fromNumber,
+            'to_number' => $toNumber,
+            'webhook_data' => $request->all(),
+        ]);
 
-                    $cxml = $this->routeExtensionDirectly($extension, $request, $organizationId);
-                } else {
-                    // No direct extension found, fall back to DID routing
-                    Log::info('No direct extension found, falling back to DID routing', [
-                        'call_id' => $callId,
-                        'to_number' => $toNumber,
-                    ]);
+        Log::info('call-initiated: Dispatched async processing job', [
+            'call_id' => $callId,
+            'organization_id' => $organizationId,
+        ]);
 
-                    $cxml = $this->routingService->routeInboundCall(
-                        $toNumber,
-                        $fromNumber,
-                        $organizationId
-                    );
+        return response()->json([
+            'status' => 'accepted',
+            'message' => 'Call notification received',
+        ], 200);
+    }
+
+    /**
+     * Handle call status webhook.
+     * This is called by Cloudonix when a call's status changes.
+     *
+     * @see https://developers.cloudonix.com/Documentation/make.com/webhooks
+     */
+    public function callStatus(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        $callId = $request->input('CallSid') ?? $request->input('call_id');
+        $status = $request->input('CallStatus') ?? $request->input('status');
+
+        Log::info('Received call-status webhook', [
+            'call_id' => $callId,
+            'status' => $status,
+            'payload' => $request->all(),
+        ]);
+
+        // Update call log if it exists
+        if ($callId) {
+            $callLog = \App\Models\CallLog::where('call_id', $callId)->first();
+
+            if ($callLog) {
+                $updateData = [];
+
+                if ($status) {
+                    $updateData['status'] = $status;
                 }
-            } else {
-                // External call - use DID-based routing
-                Log::info('Routing external call via DID', [
-                    'call_id' => $callId,
-                    'to_number' => $toNumber,
-                ]);
 
-                $cxml = $this->routingService->routeInboundCall(
-                    $toNumber,
-                    $fromNumber,
-                    $organizationId
-                );
+                if ($request->has('Duration') || $request->has('duration')) {
+                    $updateData['duration'] = (int) ($request->input('Duration') ?? $request->input('duration'));
+                }
+
+                if (! empty($updateData)) {
+                    $callLog->update($updateData);
+
+                    Log::info('Call log updated from call-status webhook', [
+                        'call_id' => $callId,
+                        'call_log_id' => $callLog->id,
+                        'updated_fields' => array_keys($updateData),
+                    ]);
+                }
             }
-
-            // Cache the CXML response for idempotency (1 hour TTL)
-            Cache::put($cacheKey, $cxml, 3600);
-
-            // Dispatch job to process webhook asynchronously (CDR creation)
-            ProcessInboundCallJob::dispatch([
-                'call_id' => $callId,
-                'from_number' => $fromNumber,
-                'to_number' => $toNumber,
-                'webhook_data' => $request->all(),
-            ]);
-
-            Log::info('Returning CXML response', [
-                'call_id' => $callId,
-                'cxml_length' => strlen($cxml),
-            ]);
-
-            return response($cxml, 200)
-                ->header('Content-Type', 'application/xml');
-        } finally {
-            $lock->release();
-        }
-    }
-
-    /**
-     * Route call directly to an extension based on its type
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return string CXML response
-     */
-    private function routeExtensionDirectly(\App\Models\Extension $extension, $request, int $organizationId): string
-    {
-        // Verify extension belongs to expected organization
-        if ($extension->organization_id !== $organizationId) {
-            Log::warning('Extension organization mismatch in direct routing', [
-                'extension_id' => $extension->id,
-                'extension_org' => $extension->organization_id,
-                'expected_org' => $organizationId,
-            ]);
-
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
         }
 
-        return match ($extension->type) {
-            \App\Enums\ExtensionType::USER => $this->routeUserExtensionDirectly($extension, $organizationId),
-            \App\Enums\ExtensionType::CONFERENCE => $this->routeConferenceExtensionDirectly($extension, $organizationId),
-            \App\Enums\ExtensionType::RING_GROUP => $this->routeRingGroupExtensionDirectly($extension, $organizationId),
-            default => \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension type not supported'),
-        };
-    }
-
-    /**
-     * Route directly to a user extension
-     *
-     * @return string CXML response
-     */
-    private function routeUserExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
-    {
-        // Verify extension belongs to expected organization
-        if ($extension->organization_id !== $organizationId) {
-            Log::warning('Extension organization mismatch in user routing', [
-                'extension_id' => $extension->id,
-                'extension_org' => $extension->organization_id,
-                'expected_org' => $organizationId,
-            ]);
-
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
-        }
-
-        if (! $extension->user || ! $extension->user->isActive()) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension user not available');
-        }
-
-        $sipUri = $extension->getSipUri();
-        if (! $sipUri) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension has no SIP configuration');
-        }
-
-        return \App\Services\CxmlBuilder\CxmlBuilder::simpleDial($sipUri);
-    }
-
-    /**
-     * Route directly to a conference extension
-     *
-     * @return string CXML response
-     */
-    private function routeConferenceExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
-    {
-        // Verify extension belongs to expected organization
-        if ($extension->organization_id !== $organizationId) {
-            Log::warning('Extension organization mismatch in conference routing', [
-                'extension_id' => $extension->id,
-                'extension_org' => $extension->organization_id,
-                'expected_org' => $organizationId,
-            ]);
-
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
-        }
-
-        $conferenceRoomId = $extension->configuration['conference_room_id'] ?? null;
-
-        if (! $conferenceRoomId) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Conference room not configured');
-        }
-
-        $conferenceRoom = \App\Models\ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $conferenceRoomId)
-            ->where('organization_id', $organizationId)
-            ->where('status', \App\Enums\UserStatus::ACTIVE)
-            ->first();
-
-        if (! $conferenceRoom) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Conference room not found');
-        }
-
-        $conferenceIdentifier = $this->generateConferenceIdentifier($conferenceRoom->name);
-
-        return \App\Services\CxmlBuilder\CxmlBuilder::conference(
-            $conferenceIdentifier,
-            $conferenceRoom->pin
-        );
-    }
-
-    /**
-     * Route directly to a ring group extension
-     *
-     * @return string CXML response
-     */
-    private function routeRingGroupExtensionDirectly(\App\Models\Extension $extension, int $organizationId): string
-    {
-        // Verify extension belongs to expected organization
-        if ($extension->organization_id !== $organizationId) {
-            Log::warning('Extension organization mismatch in ring group routing', [
-                'extension_id' => $extension->id,
-                'extension_org' => $extension->organization_id,
-                'expected_org' => $organizationId,
-            ]);
-
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Extension not found');
-        }
-
-        $ringGroupId = $extension->configuration['ring_group_id'] ?? null;
-
-        if (! $ringGroupId) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Ring group not configured');
-        }
-
-        $ringGroup = \App\Models\RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('id', $ringGroupId)
-            ->where('organization_id', $organizationId)
-            ->where('status', \App\Enums\UserStatus::ACTIVE)
-            ->first();
-
-        if (! $ringGroup) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Ring group not found');
-        }
-
-        $members = $ringGroup->getMembers()->filter(fn (\App\Models\Extension $ext) => $ext->isActive());
-        $sipUris = $members->map(fn (\App\Models\Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
-
-        if (empty($sipUris)) {
-            // Handle fallback
-            $fallback = $ringGroup->fallback_action;
-
-            return match ($fallback['action'] ?? 'hangup') {
-                'extension' => $this->routeFallbackExtensionDirectly($fallback, $organizationId),
-                'voicemail' => \App\Services\CxmlBuilder\CxmlBuilder::sendToVoicemail(),
-                'busy' => \App\Services\CxmlBuilder\CxmlBuilder::busy($fallback['message'] ?? null),
-                default => \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup(),
-            };
-        }
-
-        return \App\Services\CxmlBuilder\CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout);
-    }
-
-    /**
-     * Route to fallback extension directly
-     *
-     * @return string CXML response
-     */
-    private function routeFallbackExtensionDirectly(array $fallbackConfig, int $organizationId): string
-    {
-        $extensionId = $fallbackConfig['extension_id'] ?? null;
-
-        if (! $extensionId) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
-        }
-
-        $extension = \App\Models\Extension::find($extensionId);
-
-        if (! $extension || ! $extension->isActive()) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
-        }
-
-        // Verify extension belongs to expected organization
-        if ($extension->organization_id !== $organizationId) {
-            Log::warning('Extension organization mismatch in fallback routing', [
-                'extension_id' => $extension->id,
-                'extension_org' => $extension->organization_id,
-                'expected_org' => $organizationId,
-            ]);
-
-            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
-        }
-
-        $sipUri = $extension->getSipUri();
-
-        if (! $sipUri) {
-            return \App\Services\CxmlBuilder\CxmlBuilder::simpleHangup();
-        }
-
-        return \App\Services\CxmlBuilder\CxmlBuilder::simpleDial($sipUri);
-    }
-
-    /**
-     * Generate a clean conference identifier from conference room name
-     */
-    private function generateConferenceIdentifier(string $conferenceName): string
-    {
-        // Convert to lowercase and keep only letters, numbers, and spaces
-        $clean = preg_replace('/[^a-zA-Z0-9\s]/', '', strtolower($conferenceName));
-
-        // Replace spaces with underscores and limit length
-        $identifier = preg_replace('/\s+/', '_', trim($clean));
-
-        // Ensure it's not empty and limit to 32 characters
-        if (empty($identifier)) {
-            $identifier = 'conference';
-        }
-
-        return substr($identifier, 0, 32);
+        return response()->json([
+            'status' => 'accepted',
+            'message' => 'Call status received',
+        ], 200);
     }
 
     /**
      * Handle session update webhook.
      * Session updates are sent during call progress for monitoring and debugging.
      */
-    public function sessionUpdate(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    public function sessionUpdate(SessionUpdateRequest $request): \Illuminate\Http\JsonResponse
     {
         $requestId = (string) \Illuminate\Support\Str::uuid();
-        $payload = $request->all();
+        $validated = $request->validated();
 
         Log::info('Processing session-update webhook', [
             'request_id' => $requestId,
-            'session_id' => $payload['id'] ?? null,
-            'event_id' => $payload['eventId'] ?? null,
-            'action' => $payload['action'] ?? null,
-            'status' => $payload['status'] ?? null,
+            'session_id' => $validated['id'] ?? null,
+            'event_id' => $validated['eventId'] ?? null,
+            'action' => $validated['action'] ?? null,
+            'status' => $validated['status'] ?? null,
         ]);
 
         try {
-            // Validate required fields
-            $validated = $request->validate([
-                'id' => 'required|integer',
-                'token' => 'nullable|string',
-                'eventId' => 'nullable|string',
-                'domainId' => 'nullable|integer',
-                'domain' => 'nullable|string',
-                'subscriberId' => 'nullable|integer',
-                'callerId' => 'nullable|string',
-                'destination' => 'required|string',
-                'direction' => 'nullable|in:incoming,outgoing,internal,application',
-                'status' => 'nullable|string',
-                'createdAt' => 'required|string',
-                'modifiedAt' => 'required|string',
-                'callStartTime' => 'nullable|integer',
-                'callAnswerTime' => 'nullable|integer',
-                'answerTime' => 'nullable|string',
-                'timeLimit' => 'nullable|integer',
-                'vappServer' => 'nullable|string',
-                'action' => 'required|string',
-                'reason' => 'nullable|string',
-                'lastError' => 'nullable|string',
-                'callIds' => 'nullable|array',
-                'profile' => 'nullable|array',
-            ]);
 
             // Filter events by status - only process specific statuses
             $allowedStatuses = ['processing', 'ringing', 'connected', 'answer'];
@@ -537,54 +230,51 @@ class CloudonixWebhookController extends Controller
                 return response()->json(['message' => 'Session record updated successfully'], 200);
             }
 
-            // Process and store session update
-            $sessionUpdate = new SessionUpdate([
-                'organization_id' => $organizationId,
-                'session_id' => $validated['id'],
-                'session_token' => $validated['token'] ?? null,
-                'event_id' => $validated['eventId'],
-                'domain_id' => $validated['domainId'],
-                'domain' => $validated['domain'],
-                'subscriber_id' => $validated['subscriberId'],
-                'outgoing_subscriber_id' => $validated['outgoingSubscriberId'] ?? null,
-                'caller_id' => $this->normalizePhoneNumber($validated['callerId']),
-                'destination' => $this->normalizePhoneNumber($validated['destination']),
-                'direction' => $validated['direction'],
-                'status' => $validated['status'],
-                'session_created_at' => $validated['createdAt'],
-                'session_modified_at' => $validated['modifiedAt'],
-                'call_start_time' => $validated['callStartTime'] ?? null,
-                'start_time' => isset($validated['startTime']) ? $validated['startTime'] : null,
-                'call_answer_time' => $validated['callAnswerTime'] ?? null,
-                'answer_time' => isset($validated['answerTime']) ? $validated['answerTime'] : null,
-                'time_limit' => $validated['timeLimit'] ?? null,
-                'vapp_server' => $validated['vappServer'] ?? null,
-                'action' => $validated['action'],
-                'reason' => $validated['reason'],
-                'last_error' => $validated['lastError'] ?? null,
-                'call_ids' => $validated['callIds'] ?? [],
-                'profile' => $validated['profile'] ?? [],
-            ]);
+            // Process and store session update within a transaction
+            $sessionUpdate = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $organizationId, $requestId) {
+                $sessionUpdate = SessionUpdate::create([
+                    'organization_id' => $organizationId,
+                    'session_id' => $validated['id'],
+                    'session_token' => $validated['token'] ?? null,
+                    'event_id' => $validated['eventId'],
+                    'domain_id' => $validated['domainId'],
+                    'domain' => $validated['domain'],
+                    'subscriber_id' => $validated['subscriberId'],
+                    'outgoing_subscriber_id' => $validated['outgoingSubscriberId'] ?? null,
+                    'caller_id' => $this->phoneNumberService->normalizeToE164($validated['callerId']),
+                    'destination' => $this->phoneNumberService->normalizeToE164($validated['destination']),
+                    'direction' => $validated['direction'],
+                    'status' => $validated['status'],
+                    'session_created_at' => $validated['createdAt'],
+                    'session_modified_at' => $validated['modifiedAt'],
+                    'call_start_time' => $validated['callStartTime'] ?? null,
+                    'start_time' => $validated['startTime'] ?? null,
+                    'call_answer_time' => $validated['callAnswerTime'] ?? null,
+                    'answer_time' => $validated['answerTime'] ?? null,
+                    'time_limit' => $validated['timeLimit'] ?? null,
+                    'vapp_server' => $validated['vappServer'] ?? null,
+                    'action' => $validated['action'],
+                    'reason' => $validated['reason'],
+                    'last_error' => $validated['lastError'] ?? null,
+                    'call_ids' => $validated['callIds'] ?? [],
+                    'profile' => $validated['profile'] ?? [],
+                ]);
 
-            $sessionUpdate->save();
+                Log::info('Session update stored successfully', [
+                    'request_id' => $requestId,
+                    'session_update_id' => $sessionUpdate->id,
+                    'session_id' => $validated['id'],
+                    'event_id' => $validated['eventId'],
+                    'organization_id' => $organizationId,
+                ]);
 
-            Log::info('Session update stored successfully', [
-                'request_id' => $requestId,
-                'session_update_id' => $sessionUpdate->id,
-                'session_id' => $validated['id'],
-                'event_id' => $validated['eventId'],
-                'organization_id' => $organizationId,
-            ]);
+                return $sessionUpdate;
+            });
+
+            // Trigger call notification webhook if enabled for this organization
+            $this->triggerCallNotification($sessionUpdate, $organizationId);
 
             return response()->json(['message' => 'Session record updated successfully'], 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::warning('Session update validation failed', [
-                'request_id' => $requestId,
-                'errors' => $e->errors(),
-                'payload' => $payload,
-            ]);
-
-            return response()->json(['error' => 'Validation failed', 'details' => $e->errors()], 403);
         } catch (\Exception $e) {
             Log::error('Session update processing failed', [
                 'request_id' => $requestId,
@@ -761,8 +451,8 @@ class CloudonixWebhookController extends Controller
             'domain_id' => $sessionData['domainId'] ?? null,
             'domain' => $request->input('domain'),
             'subscriber_id' => null, // Subscriber is UUID in CDR, not integer ID
-            'caller_id' => $this->normalizePhoneNumber($request->input('from')),
-            'destination' => $this->normalizePhoneNumber($request->input('to')),
+            'caller_id' => $this->phoneNumberService->normalizeToE164($request->input('from')),
+            'destination' => $this->phoneNumberService->normalizeToE164($request->input('to')),
             'direction' => 'incoming', // Assume incoming for CDR events
             'status' => $status,
             'session_created_at' => $callStartTimeSeconds
@@ -796,22 +486,95 @@ class CloudonixWebhookController extends Controller
     }
 
     /**
-     * Normalize phone number to E.164 format.
+     * Trigger call notification webhook for the session update.
      */
-    private function normalizePhoneNumber(?string $number): ?string
+    private function triggerCallNotification(SessionUpdate $sessionUpdate, int $organizationId): void
     {
-        if (! $number) {
-            return null;
+        try {
+            // Get notification settings for organization
+            $settings = CallNotificationsSettings::forOrganization($organizationId)
+                ->active()
+                ->first();
+
+            if (! $settings || ! $settings->isConfigured()) {
+                // No notification settings configured
+                return;
+            }
+
+            // Check if this status should trigger a notification
+            $normalizedStatus = $this->normalizeNotificationStatus($sessionUpdate->status ?? 'unknown');
+            if (! $settings->isEventEnabled($normalizedStatus)) {
+                Log::debug('Call notification skipped - event not enabled', [
+                    'organization_id' => $organizationId,
+                    'session_id' => $sessionUpdate->session_id,
+                    'status' => $normalizedStatus,
+                    'enabled_events' => $settings->enabled_events,
+                ]);
+
+                return;
+            }
+
+            // Get previous status from database
+            $previousStatus = SessionUpdate::where('organization_id', $organizationId)
+                ->where('session_id', $sessionUpdate->session_id)
+                ->where('id', '<', $sessionUpdate->id)
+                ->orderBy('id', 'desc')
+                ->value('status') ?? 'unknown';
+
+            // Build notification payload
+            $payload = $this->payloadBuilder->build($sessionUpdate, $previousStatus);
+
+            // Dispatch webhook
+            $this->webhookDispatcher->dispatch(
+                $settings,
+                $payload,
+                $payload['event_id'],
+                $sessionUpdate->session_token ?? (string) $sessionUpdate->session_id
+            );
+
+            Log::info('Call notification triggered', [
+                'organization_id' => $organizationId,
+                'session_id' => $sessionUpdate->session_id,
+                'event_id' => $payload['event_id'],
+                'status' => $normalizedStatus,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to trigger call notification', [
+                'organization_id' => $organizationId,
+                'session_id' => $sessionUpdate->session_id,
+                'error' => $e->getMessage(),
+            ]);
         }
+    }
 
-        // Remove common prefixes and formatting
-        $number = preg_replace('/[^0-9+]/', '', $number);
+    /**
+     * Normalize status for notification event checking.
+     */
+    private function normalizeNotificationStatus(string $status): string
+    {
+        $statusMap = [
+            'new' => 'new',
+            'initiated' => 'new',
+            'created' => 'new',
+            'ringing' => 'ringing',
+            'ring' => 'ringing',
+            'progress' => 'ringing',
+            'connected' => 'connected',
+            'connect' => 'connected',
+            'answer' => 'answered',
+            'answered' => 'answered',
+            'active' => 'answered',
+            'busy' => 'busy',
+            'cancel' => 'cancel',
+            'cancelled' => 'cancel',
+            'canceled' => 'cancel',
+            'failed' => 'failed',
+            'fail' => 'failed',
+            'error' => 'failed',
+            'congestion' => 'congestion',
+            'congested' => 'congestion',
+        ];
 
-        // Ensure + prefix for E.164
-        if (! str_starts_with($number, '+')) {
-            $number = '+'.$number;
-        }
-
-        return $number;
+        return $statusMap[strtolower($status)] ?? strtolower($status);
     }
 }

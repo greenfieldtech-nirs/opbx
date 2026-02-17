@@ -10,6 +10,7 @@ use App\Models\Extension;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Services\PhoneNumberService;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -26,6 +27,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class VerifyVoiceWebhookAuth
 {
+    public function __construct(
+        private readonly PhoneNumberService $phoneNumberService
+    ) {}
     /**
      * Handle an incoming request
      *
@@ -62,8 +66,8 @@ class VerifyVoiceWebhookAuth
         // Get request payload
         $payload = $request->json()->all();
         $domain = $payload['Domain'] ?? $payload['domain'] ?? null;
-        $fromNumber = $this->normalizePhoneNumber($payload['from'] ?? $payload['From'] ?? null);
-        $toNumber = $this->normalizePhoneNumber($payload['to'] ?? $payload['To'] ?? null);
+        $fromNumber = $this->phoneNumberService->stripFormatting($payload['from'] ?? $payload['From'] ?? null);
+        $toNumber = $this->phoneNumberService->stripFormatting($payload['to'] ?? $payload['To'] ?? null);
 
         if (!$domain) {
             Log::warning('Voice webhook missing Domain in request body', [
@@ -186,19 +190,6 @@ class VerifyVoiceWebhookAuth
         ];
     }
 
-    /**
-     * Normalize phone number by removing formatting characters
-     */
-    private function normalizePhoneNumber(?string $number): ?string
-    {
-        if (!$number) {
-            return null;
-        }
-
-        $number = preg_replace('/[^0-9+]/', '', $number);
-
-        return $number;
-    }
 
     /**
      * Return unauthorized response in CXML format

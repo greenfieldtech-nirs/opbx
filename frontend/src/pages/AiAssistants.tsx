@@ -496,7 +496,7 @@ export default function AiAssistants() {
           <StandardDataTable<AiAssistant>
             data={assistants}
             isLoading={isLoading}
-            onRowClick={openDetailSheet}
+            onRowClick={canManageAssistants ? openEditDialog : undefined}
             identityIcon={Bot}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
@@ -505,12 +505,12 @@ export default function AiAssistants() {
               const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
               return provider?.name || assistant.provider;
             }}
-            onIdentityClick={openDetailSheet}
+            onIdentityClick={canManageAssistants ? openEditDialog : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
-            onView={openDetailSheet}
-            onEdit={canManageAssistants ? openEditDialog : undefined}
+            canView={false}
+            canEdit={false}
             onDelete={canManageAssistants ? ((assistant, e) => {
               if ((assistant.usage_count || 0) > 0) {
                 toast.error(`Cannot delete AI Assistant in use by ${assistant.usage_count} extension(s)`);
@@ -519,7 +519,6 @@ export default function AiAssistants() {
               setSelectedAssistant(assistant);
               setIsDeleteDialogOpen(true);
             }) : undefined}
-            canEdit={canManageAssistants}
             canDelete={canManageAssistants}
             columns={columns}
             emptyState={
