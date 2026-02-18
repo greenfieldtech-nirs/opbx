@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useEmailValidation } from '@/hooks/useEmailValidation';
+import { useRecaptcha } from '@/hooks/useRecaptcha';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -116,6 +117,12 @@ export default function Register() {
 
   const { register: registerUser, isAuthenticated: authIsAuthenticated, isLoading: authLoading } = useAuth();
 
+  const {
+    isEnabled: isRecaptchaEnabled,
+    executeRecaptcha,
+    resetRecaptcha,
+  } = useRecaptcha('register');
+
   // Watch email changes and trigger validation
   useEffect(() => {
     if (adminEmail && adminEmail.length > 3) {
@@ -165,6 +172,17 @@ export default function Register() {
     setIsLoading(true);
 
     try {
+      // Execute reCAPTCHA if enabled
+      let recaptchaToken = null;
+      if (isRecaptchaEnabled) {
+        recaptchaToken = await executeRecaptcha();
+        if (!recaptchaToken) {
+          toast.error('Security verification failed. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       await registerUser({
         organization: {
           name: data.organization.name,
@@ -176,10 +194,13 @@ export default function Register() {
           password: data.admin.password,
           password_confirmation: data.admin.password_confirmation,
         },
+        recaptcha_token: recaptchaToken,
       }, () => navigate('/ui/dashboard'));
 
       toast.success('Organization registered successfully!');
     } catch (error) {
+      // Reset reCAPTCHA on error so user can retry
+      resetRecaptcha();
       toast.error(error instanceof Error ? error.message : 'Registration failed');
     } finally {
       setIsLoading(false);

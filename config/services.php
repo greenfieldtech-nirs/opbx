@@ -69,4 +69,22 @@ return [
         'block_public_domains' => env('USERCHECK_BLOCK_PUBLIC_DOMAINS', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Google reCAPTCHA v3
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Google reCAPTCHA v3 to prevent bot registrations.
+    | reCAPTCHA v3 is invisible to users and returns a score (0.0 to 1.0).
+    |
+    | Get your keys from: https://www.google.com/recaptcha/admin
+    |
+    */
+    'recaptcha' => [
+        'enabled' => env('RECAPTCHA_ENABLED', false),
+        'site_key' => env('RECAPTCHA_SITE_KEY'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+        'min_score' => env('RECAPTCHA_MIN_SCORE', 0.5),
+    ],
+
 ];

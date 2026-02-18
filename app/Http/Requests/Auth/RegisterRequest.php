@@ -79,6 +79,11 @@ class RegisterRequest extends FormRequest
                 'required',
                 'string',
             ],
+            'recaptcha_token' => [
+                'nullable',
+                'string',
+                new Recaptcha,
+            ],
         ];
     }
 
