@@ -6,6 +6,7 @@ namespace App\Http\Requests\Auth;
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Rules\ValidEmailDomain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
