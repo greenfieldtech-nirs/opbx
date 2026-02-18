@@ -12,12 +12,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useEmailValidation } from '@/hooks/useEmailValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
+import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
 const commonTimezones = [
@@ -80,6 +82,8 @@ export default function Register() {
     trigger,
     watch,
     formState: { errors },
+    setError,
+    clearErrors,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -97,8 +101,41 @@ export default function Register() {
   });
 
   const organizationName = watch('organization.name');
+  const adminEmail = watch('admin.email');
+
+  const {
+    status: emailValidationStatus,
+    message: emailValidationMessage,
+    suggestion: emailSuggestion,
+    isValid: isEmailValid,
+    isValidating: isEmailValidating,
+    hasError: hasEmailError,
+    validateEmail,
+    resetValidation: resetEmailValidation,
+  } = useEmailValidation(500); // 500ms debounce
 
   const { register: registerUser, isAuthenticated: authIsAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Watch email changes and trigger validation
+  useEffect(() => {
+    if (adminEmail && adminEmail.length > 3) {
+      validateEmail(adminEmail);
+    } else {
+      resetEmailValidation();
+    }
+  }, [adminEmail, validateEmail, resetEmailValidation]);
+
+  // Sync email validation errors with form errors
+  useEffect(() => {
+    if (hasEmailError && emailValidationMessage) {
+      setError('admin.email', {
+        type: 'manual',
+        message: emailValidationMessage,
+      });
+    } else if (isEmailValid) {
+      clearErrors('admin.email');
+    }
+  }, [hasEmailError, emailValidationMessage, isEmailValid, setError, clearErrors]);
 
   useEffect(() => {
     if (!authLoading && authIsAuthenticated) {
@@ -115,9 +152,16 @@ export default function Register() {
 
   const handleBack = () => {
     setStep('organization');
+    resetEmailValidation();
   };
 
   const onSubmit = async (data: RegisterFormData) => {
+    // Final email validation check
+    if (!isEmailValid) {
+      toast.error(emailValidationMessage || 'Please enter a valid email address');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -140,6 +184,75 @@ export default function Register() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Get email validation indicator
+  const getEmailValidationIndicator = () => {
+    if (emailValidationStatus === 'idle' || !adminEmail) return null;
+
+    if (isEmailValidating) {
+      return (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+        </div>
+      );
+    }
+
+    if (isEmailValid) {
+      return (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+        </div>
+      );
+    }
+
+    if (hasEmailError) {
+      return (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <XCircle className="h-5 w-5 text-destructive" />
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // Get email validation message with suggestion
+  const getEmailValidationMessage = () => {
+    if (emailValidationStatus === 'idle') return null;
+
+    if (emailSuggestion && hasEmailError) {
+      return (
+        <div className="text-sm mt-1">
+          <span className="text-destructive">{emailValidationMessage}</span>
+          <button
+            type="button"
+            onClick={() => {
+              // Update form value with suggestion
+              const emailInput = document.getElementById('adminEmail') as HTMLInputElement;
+              if (emailInput && emailSuggestion) {
+                emailInput.value = emailSuggestion;
+                // Trigger change event
+                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }}
+            className="ml-2 text-blue-600 hover:text-blue-800 underline"
+          >
+            Use {emailSuggestion} instead
+          </button>
+        </div>
+      );
+    }
+
+    if (hasEmailError) {
+      return <p className="text-sm text-destructive mt-1">{emailValidationMessage}</p>;
+    }
+
+    if (isEmailValid) {
+      return <p className="text-sm text-green-600 mt-1">Email looks good!</p>;
+    }
+
+    return null;
   };
 
   return (
@@ -267,18 +380,25 @@ export default function Register() {
                       <div className="space-y-2">
                         <Label htmlFor="adminEmail" className="text-base font-medium">
                           Email Address
+                          <span className="text-muted-foreground text-sm font-normal ml-2">
+                            (will be validated)
+                          </span>
                         </Label>
-                        <Input
-                          id="adminEmail"
-                          type="email"
-                          placeholder="admin@example.com"
-                          disabled={isLoading}
-                          className="h-11"
-                          {...formRegister('admin.email')}
-                        />
+                        <div className="relative">
+                          <Input
+                            id="adminEmail"
+                            type="email"
+                            placeholder="admin@example.com"
+                            disabled={isLoading}
+                            className="h-11 pr-10"
+                            {...formRegister('admin.email')}
+                          />
+                          {getEmailValidationIndicator()}
+                        </div>
                         {errors.admin?.email && (
                           <p className="text-sm text-destructive">{errors.admin.email.message}</p>
                         )}
+                        {getEmailValidationMessage()}
                       </div>
 
                       <div className="space-y-2">
@@ -331,11 +451,21 @@ export default function Register() {
                         <Button
                           type="submit"
                           className="flex-1 h-11"
-                          disabled={isLoading}
+                          disabled={isLoading || !isEmailValid || isEmailValidating}
                         >
                           {isLoading ? 'Creating...' : 'Create Organization'}
                         </Button>
                       </div>
+
+                      {/* Info notice about email validation */}
+                      {emailValidationStatus === 'error' && (
+                        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-amber-800">
+                            Unable to validate email at this time. Please try again later or contact support.
+                          </p>
+                        </div>
+                      )}
                     </>
                   )}
                 </form>
