@@ -129,6 +129,12 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 // API Version 1 routes
 Route::prefix('v1')->group(function (): void {
+    // Email validation endpoint (public, rate limited)
+    // Used for async email validation during registration
+    Route::get('/validate-email', [EmailValidationController::class, 'validate'])
+        ->middleware('throttle:10,1')
+        ->name('validate-email');
+
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
