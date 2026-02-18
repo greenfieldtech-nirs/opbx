@@ -21,10 +21,10 @@ return new class extends Migration
             $table->string('outbound_trunk_name');
             $table->timestamps();
 
-            // Indexes
-            $table->index(['organization_id', 'destination_country']);
-            $table->index(['organization_id', 'destination_prefix']);
-            $table->index(['organization_id', 'outbound_trunk_name']);
+            // Indexes (use short names to avoid MySQL 64-char limit)
+            $table->index(['organization_id', 'destination_country'], 'owl_org_dest_country_idx');
+            $table->index(['organization_id', 'destination_prefix'], 'owl_org_dest_prefix_idx');
+            $table->index(['organization_id', 'outbound_trunk_name'], 'owl_org_trunk_name_idx');
         });
     }
 

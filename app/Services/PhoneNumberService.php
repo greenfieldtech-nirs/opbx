@@ -6,10 +6,9 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use libphonenumber\PhoneNumberUtil;
-use libphonenumber\PhoneNumberFormat;
 use libphonenumber\NumberParseException;
-use libphonenumber\PhoneNumber;
+use libphonenumber\PhoneNumberFormat;
+use libphonenumber\PhoneNumberUtil;
 
 /**
  * Phone Number Service
@@ -20,8 +19,6 @@ use libphonenumber\PhoneNumber;
  *
  * Replaces hardcoded country code mappings with industry-standard
  * phone number processing.
- *
- * @package App\Services
  */
 class PhoneNumberService
 {
@@ -41,7 +38,7 @@ class PhoneNumberService
      * Uses libphonenumber for robust parsing and validation to determine
      * the country calling code (e.g., +1 for US/Canada, +44 for UK).
      *
-     * @param string $phoneNumber Raw phone number (with or without +)
+     * @param  string  $phoneNumber  Raw phone number (with or without +)
      * @return string|null The calling code (e.g., "+1", "+44") or null if unparseable
      */
     public function extractCallingCode(string $phoneNumber): ?string
@@ -53,12 +50,13 @@ class PhoneNumberService
             // Get the country code directly from the parsed number
             $countryCode = $parsedNumber->getCountryCode();
 
-            return '+' . $countryCode;
+            return '+'.$countryCode;
         } catch (NumberParseException $e) {
             Log::warning('Failed to parse phone number for calling code extraction', [
                 'phone_number' => $phoneNumber,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -68,7 +66,6 @@ class PhoneNumberService
      * Uses libphonenumber for accurate country code mapping.
      * Results are cached for performance.
      *
-     * @param string $callingCode
      * @return string|null The ISO country code or null if not found
      */
     public function callingCodeToCountryCode(string $callingCode): ?string
@@ -80,45 +77,23 @@ class PhoneNumberService
             3600, // Cache for 1 hour
             function () use ($callingCode) {
                 try {
-                    // Remove + prefix if present
-                    $code = ltrim($callingCode, '+');
+                    // Use libphonenumber to get supported regions for this calling code
+                    $code = (int) ltrim($callingCode, '+');
+                    $regions = $this->phoneUtil->getRegionCodesForCountryCode($code);
 
-                    // Try to find a region that uses this calling code
-                    // This is a simplified approach - in practice, multiple countries can share calling codes
-                    $regions = [
-                        1 => 'US',    // United States, Canada, etc.
-                        7 => 'RU',    // Russia, Kazakhstan
-                        20 => 'EG',   // Egypt
-                        27 => 'ZA',   // South Africa
-                        30 => 'GR',   // Greece
-                        31 => 'NL',   // Netherlands
-                        32 => 'BE',   // Belgium
-                        33 => 'FR',   // France
-                        34 => 'ES',   // Spain
-                        36 => 'HU',   // Hungary
-                        39 => 'IT',   // Italy
-                        40 => 'RO',   // Romania
-                        41 => 'CH',   // Switzerland
-                        43 => 'AT',   // Austria
-                        44 => 'GB',   // United Kingdom
-                        45 => 'DK',   // Denmark
-                        46 => 'SE',   // Sweden
-                        47 => 'NO',   // Norway
-                        48 => 'PL',   // Poland
-                        49 => 'DE',   // Germany
-                        81 => 'JP',   // Japan
-                        82 => 'KR',   // South Korea
-                        86 => 'CN',   // China
-                        91 => 'IN',   // India
-                    ];
+                    if (empty($regions)) {
+                        return null;
+                    }
 
-                    $countryCode = (int) $code;
-                    return $regions[$countryCode] ?? null;
+                    // Return the first region (primary region for this calling code)
+                    // For shared codes (e.g., +1 for US/CA), this returns 'US' as primary
+                    return $regions[0];
                 } catch (\Exception $e) {
                     Log::warning('Failed to determine country code from calling code', [
                         'calling_code' => $callingCode,
                         'error' => $e->getMessage(),
                     ]);
+
                     return null;
                 }
             }
@@ -129,8 +104,7 @@ class PhoneNumberService
      * Validate and format a phone number.
      * Results are cached for performance.
      *
-     * @param string $phoneNumber
-     * @param string $defaultRegion Default region for parsing (e.g., 'US')
+     * @param  string  $defaultRegion  Default region for parsing (e.g., 'US')
      * @return array|null Returns ['formatted' => string, 'country_code' => string, 'national_number' => string] or null if invalid
      */
     public function validateAndFormatPhoneNumber(string $phoneNumber, string $defaultRegion = 'US'): ?array
@@ -144,13 +118,13 @@ class PhoneNumberService
                 try {
                     $parsedNumber = $this->phoneUtil->parse($phoneNumber, $defaultRegion);
 
-                    if (!$this->phoneUtil->isValidNumber($parsedNumber)) {
+                    if (! $this->phoneUtil->isValidNumber($parsedNumber)) {
                         return null;
                     }
 
                     return [
                         'formatted' => $this->phoneUtil->format($parsedNumber, PhoneNumberFormat::E164),
-                        'country_code' => '+' . $parsedNumber->getCountryCode(),
+                        'country_code' => '+'.$parsedNumber->getCountryCode(),
                         'national_number' => $parsedNumber->getNationalNumber(),
                         'region' => $this->phoneUtil->getRegionCodeForNumber($parsedNumber),
                         'is_valid' => true,
@@ -161,6 +135,7 @@ class PhoneNumberService
                         'default_region' => $defaultRegion,
                         'error' => $e->getMessage(),
                     ]);
+
                     return null;
                 }
             }
@@ -170,14 +145,13 @@ class PhoneNumberService
     /**
      * Extract phone number components.
      *
-     * @param string $phoneNumber
      * @return array|null Returns ['calling_code', 'national_number', 'country_code'] or null
      */
     public function extractPhoneComponents(string $phoneNumber): ?array
     {
         $validated = $this->validateAndFormatPhoneNumber($phoneNumber);
 
-        if (!$validated) {
+        if (! $validated) {
             return null;
         }
 
@@ -199,7 +173,7 @@ class PhoneNumberService
      * This is a lightweight alternative to validateAndFormatPhoneNumber()
      * when you just need consistent formatting without full validation.
      *
-     * @param string|null $number The raw phone number
+     * @param  string|null  $number  The raw phone number
      * @return string|null Normalized E.164 number or null if input is empty
      */
     public function normalizeToE164(?string $number): ?string
@@ -212,8 +186,8 @@ class PhoneNumberService
         $normalized = preg_replace('/[^0-9+]/', '', $number);
 
         // Ensure + prefix for E.164
-        if (!str_starts_with($normalized, '+')) {
-            $normalized = '+' . $normalized;
+        if (! str_starts_with($normalized, '+')) {
+            $normalized = '+'.$normalized;
         }
 
         return $normalized;
@@ -225,7 +199,7 @@ class PhoneNumberService
      * Use this when you need to compare numbers in their raw numeric form
      * without enforcing E.164 format.
      *
-     * @param string|null $number The raw phone number
+     * @param  string|null  $number  The raw phone number
      * @return string|null Stripped number or null if input is empty
      */
     public function stripFormatting(?string $number): ?string

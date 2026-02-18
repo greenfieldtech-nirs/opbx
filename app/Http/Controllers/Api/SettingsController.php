@@ -70,8 +70,8 @@ class SettingsController extends Controller
         if (! $settings) {
             return response()->json([
                 'settings' => null,
-                'callback_url' => (new CloudonixSettings)->getCallbackUrl(),
-                'cdr_url' => (new CloudonixSettings)->getCdrUrl(),
+                'callback_url' => null,
+                'cdr_url' => null,
             ]);
         }
 
@@ -299,7 +299,8 @@ class SettingsController extends Controller
         ]);
 
         try {
-            $result = $this->getCloudonixClient()->validateDomain(
+            // Use static validation method (doesn't require client instantiation or existing settings)
+            $result = CloudonixClient::validateDomainCredentials(
                 $validated['domain_uuid'],
                 $validated['domain_api_key']
             );
