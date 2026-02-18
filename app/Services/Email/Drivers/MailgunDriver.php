@@ -21,8 +21,6 @@ class MailgunDriver extends AbstractEmailDriver
     /**
      * Send an email via Mailgun.
      *
-     * @param EmailMessage $message
-     * @return EmailSendResult
      * @throws \App\Services\Email\Exceptions\DriverException
      */
     public function send(EmailMessage $message): EmailSendResult
@@ -66,9 +64,6 @@ class MailgunDriver extends AbstractEmailDriver
 
     /**
      * Build the API payload.
-     *
-     * @param EmailMessage $message
-     * @return array
      */
     private function buildPayload(EmailMessage $message): array
     {
@@ -134,9 +129,6 @@ class MailgunDriver extends AbstractEmailDriver
 
     /**
      * Get the full API URL.
-     *
-     * @param string $path
-     * @return string
      */
     private function getApiUrl(string $path): string
     {
@@ -148,8 +140,6 @@ class MailgunDriver extends AbstractEmailDriver
 
     /**
      * Check if driver supports attachments.
-     *
-     * @return bool
      */
     public function supportsAttachments(): bool
     {
@@ -158,8 +148,6 @@ class MailgunDriver extends AbstractEmailDriver
 
     /**
      * Check if driver supports templates.
-     *
-     * @return bool
      */
     public function supportsTemplates(): bool
     {
@@ -168,8 +156,6 @@ class MailgunDriver extends AbstractEmailDriver
 
     /**
      * Get the driver name.
-     *
-     * @return string
      */
     public function getDriverName(): string
     {
@@ -178,15 +164,14 @@ class MailgunDriver extends AbstractEmailDriver
 
     /**
      * Perform a health check.
-     *
-     * @return bool
      */
     public function healthCheck(): bool
     {
         try {
+            $endpoint = $this->config['endpoint'] ?? 'api.mailgun.net';
             $response = Http::withBasicAuth('api', $this->config['secret'])
                 ->timeout(5)
-                ->get("https://{$this->config['endpoint'] ?? 'api.mailgun.net'}/v3/domains");
+                ->get("https://{$endpoint}/v3/domains");
 
             return $response->successful();
         } catch (\Exception $e) {
