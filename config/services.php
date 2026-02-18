@@ -41,4 +41,50 @@ return [
         'voice_webhook_token' => env('VOICE_WEBHOOK_TOKEN'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | UserCheck Email Validation Service
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the UserCheck.com email validation API.
+    | All validation rules are individually configurable via environment
+    | variables to allow flexible security policies.
+    |
+    | IMPORTANT: This is a BLOCKING validation. If the API is unavailable,
+    | registration will be blocked for security reasons.
+    |
+    */
+    'usercheck' => [
+        'enabled' => env('USERCHECK_ENABLED', true),
+        'api_token' => env('USERCHECK_API_TOKEN'),
+        'base_url' => env('USERCHECK_BASE_URL', 'https://api.usercheck.com'),
+        'timeout' => env('USERCHECK_TIMEOUT', 5),
+
+        // Individual validation rule toggles (all default to true for strict validation)
+        'block_disposable' => env('USERCHECK_BLOCK_DISPOSABLE', true),
+        'block_blocklisted' => env('USERCHECK_BLOCK_BLOCKLISTED', true),
+        'block_spam' => env('USERCHECK_BLOCK_SPAM', true),
+        'block_role_accounts' => env('USERCHECK_BLOCK_ROLE_ACCOUNTS', true),
+        'block_relay_domains' => env('USERCHECK_BLOCK_RELAY_DOMAINS', false),
+        'block_public_domains' => env('USERCHECK_BLOCK_PUBLIC_DOMAINS', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Google reCAPTCHA v3
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Google reCAPTCHA v3 to prevent bot registrations.
+    | reCAPTCHA v3 is invisible to users and returns a score (0.0 to 1.0).
+    |
+    | Get your keys from: https://www.google.com/recaptcha/admin
+    |
+    */
+    'recaptcha' => [
+        'enabled' => env('RECAPTCHA_ENABLED', false),
+        'site_key' => env('RECAPTCHA_SITE_KEY'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+        'min_score' => env('RECAPTCHA_MIN_SCORE', 0.5),
+    ],
+
 ];

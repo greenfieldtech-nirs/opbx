@@ -437,6 +437,7 @@ export interface AdminUserRegistration {
 export interface RegisterRequest {
   organization: OrganizationRegistration;
   admin: AdminUserRegistration;
+  recaptcha_token?: string | null;
 }
 
 export interface RegisterResponse {

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
+use App\Http\Controllers\Api\EmailValidationController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
 use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
@@ -129,6 +130,12 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 // API Version 1 routes
 Route::prefix('v1')->group(function (): void {
+    // Email validation endpoint (public, rate limited)
+    // Used for async email validation during registration
+    Route::get('/validate-email', [EmailValidationController::class, 'validate'])
+        ->middleware('throttle:10,1')
+        ->name('validate-email');
+
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
