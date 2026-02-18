@@ -79,7 +79,7 @@ class UserCheckEmailValidator implements EmailValidatorInterface
                 'Authorization' => 'Bearer '.$apiToken,
                 'Accept' => 'application/json',
             ])
-                ->timeout($timeout)
+                ->timeout((int) $timeout)
                 ->get("{$baseUrl}/email/".urlencode($email));
 
             // Handle different HTTP status codes
