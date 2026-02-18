@@ -75,6 +75,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\InboundBlacklist\InboundBlacklistService::class
         );
 
+        // Register Email Validation Service
+        $this->app->singleton(
+            \App\Services\EmailValidation\Contracts\EmailValidatorInterface::class,
+            \App\Services\EmailValidation\UserCheckEmailValidator::class
+        );
+
         // Register Voice Routing Manager
         $this->app->singleton(
             \App\Services\VoiceRouting\VoiceRoutingManager::class,

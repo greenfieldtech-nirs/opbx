@@ -57,6 +57,7 @@ class RegisterRequest extends FormRequest
                 'required',
                 'email',
                 'max:255',
+                new ValidEmailDomain,
                 function ($attribute, $value, $fail) {
                     if (User::where('email', $value)->exists()) {
                         $fail('The admin email has already been taken.');
