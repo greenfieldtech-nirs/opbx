@@ -395,10 +395,11 @@ export default function Register() {
                           />
                           {getEmailValidationIndicator()}
                         </div>
-                        {errors.admin?.email && (
+                        {errors.admin?.email ? (
                           <p className="text-sm text-destructive">{errors.admin.email.message}</p>
+                        ) : (
+                          getEmailValidationMessage()
                         )}
-                        {getEmailValidationMessage()}
                       </div>
 
                       <div className="space-y-2">
