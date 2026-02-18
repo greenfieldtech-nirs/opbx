@@ -87,4 +87,52 @@ return [
         'min_score' => env('RECAPTCHA_MIN_SCORE', 0.5),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Transactional Email Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for transactional email providers. ONLY ONE provider
+    | can be enabled at a time. If multiple providers are enabled, the
+    | application will display an error and refuse to send emails.
+    |
+    | Supported providers: mailgun, mailjet, mailerlite, sendinblue
+    |
+    */
+    'transactional_email' => [
+        // The active provider (must match a provider key below)
+        'provider' => env('EMAIL_PROVIDER', 'mailgun'),
+
+        // Queue configuration
+        'queue' => env('EMAIL_QUEUE', 'default'),
+
+        // Tracking settings
+        'track_opens' => env('EMAIL_TRACK_OPENS', true),
+        'track_clicks' => env('EMAIL_TRACK_CLICKS', true),
+
+        // Provider configurations (ONLY ONE should be enabled)
+        'providers' => [
+            'mailgun' => [
+                'enabled' => env('MAILGUN_ENABLED', false),
+                'domain' => env('MAILGUN_DOMAIN'),
+                'secret' => env('MAILGUN_SECRET'),
+                'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+                'region' => env('MAILGUN_REGION', 'us'), // us or eu
+            ],
+            'mailjet' => [
+                'enabled' => env('MAILJET_ENABLED', false),
+                'key' => env('MAILJET_APIKEY'),
+                'secret' => env('MAILJET_APISECRET'),
+            ],
+            'mailerlite' => [
+                'enabled' => env('MAILERLITE_ENABLED', false),
+                'api_key' => env('MAILERLITE_API_KEY'),
+            ],
+            'sendinblue' => [
+                'enabled' => env('SENDINBLUE_ENABLED', false),
+                'api_key' => env('SENDINBLUE_API_KEY'),
+            ],
+        ],
+    ],
+
 ];
