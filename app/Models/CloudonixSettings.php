@@ -135,7 +135,8 @@ class CloudonixSettings extends Model
     /**
      * Get a masked version of the domain API key.
      *
-     * Shows only the first 4 and last 4 characters.
+     * Shows only the first 4 and last 4 characters, with *** as separator.
+     * The *** pattern is used by the controller to detect masked values.
      */
     public function getMaskedDomainApiKey(): ?string
     {
@@ -150,13 +151,14 @@ class CloudonixSettings extends Model
             return str_repeat('*', $length);
         }
 
-        return substr($key, 0, 4).str_repeat('*', $length - 8).substr($key, -4);
+        return substr($key, 0, 4).'***'.substr($key, -4);
     }
 
     /**
      * Get a masked version of the domain requests API key.
      *
-     * Shows only the first 4 and last 4 characters.
+     * Shows only the first 4 and last 4 characters, with *** as separator.
+     * The *** pattern is used by the controller to detect masked values.
      */
     public function getMaskedDomainRequestsApiKey(): ?string
     {
@@ -171,7 +173,7 @@ class CloudonixSettings extends Model
             return str_repeat('*', $length);
         }
 
-        return substr($key, 0, 4).str_repeat('*', $length - 8).substr($key, -4);
+        return substr($key, 0, 4).'***'.substr($key, -4);
     }
 
     /**
