@@ -13,8 +13,32 @@ import type {
   UpdateExtensionRequest,
 } from '@/types';
 
+export interface ExtensionPasswordResponse {
+  data: {
+    extension_id: string;
+    extension_number: string;
+    password: string;
+    warning: string;
+  };
+}
+
 export const extensionsService = {
   ...baseExtensionsService,
+
+  /**
+   * Get extension password
+   * GET /extensions/:id/password
+   * Returns 204 No Content for non-USER extension types
+   */
+  getPassword: (id: string): Promise<ExtensionPasswordResponse | null> => {
+    return api.get<ExtensionPasswordResponse>(`/extensions/${id}/password`)
+      .then(res => res.status === 204 ? null : res.data)
+      .catch(err => {
+        // 204 No Content returns as error with some axios configs
+        if (err.response?.status === 204) return null;
+        throw err;
+      });
+  },
 
   /**
    * Compare extensions sync status

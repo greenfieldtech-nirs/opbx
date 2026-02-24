@@ -59,11 +59,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         // Register Voice Routing Strategies
+        // Note: QueueRoutingStrategy is reserved for Phase 4+ Call Center features
         $this->app->tag([
             \App\Services\VoiceRouting\Strategies\UserRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\RingGroupRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\ConferenceRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class,
             \App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy::class,
