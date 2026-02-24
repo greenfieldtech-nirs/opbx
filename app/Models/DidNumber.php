@@ -60,15 +60,27 @@ class DidNumber extends Model
     }
 
     /**
+     * Get the target ID from routing config for a given routing type.
+     *
+     * @param  string  $routingType  The routing type to match
+     * @param  string  $configKey  The key in routing_config to retrieve
+     * @return int|null The target ID or null if not found/mismatched
+     */
+    public function getTargetId(string $routingType, string $configKey): ?int
+    {
+        if ($this->routing_type === $routingType && isset($this->routing_config[$configKey])) {
+            return (int) $this->routing_config[$configKey];
+        }
+
+        return null;
+    }
+
+    /**
      * Get the routing target extension ID.
      */
     public function getTargetExtensionId(): ?int
     {
-        if ($this->routing_type === 'extension' && isset($this->routing_config['extension_id'])) {
-            return (int) $this->routing_config['extension_id'];
-        }
-
-        return null;
+        return $this->getTargetId('extension', 'extension_id');
     }
 
     /**
@@ -76,11 +88,7 @@ class DidNumber extends Model
      */
     public function getTargetRingGroupId(): ?int
     {
-        if ($this->routing_type === 'ring_group' && isset($this->routing_config['ring_group_id'])) {
-            return (int) $this->routing_config['ring_group_id'];
-        }
-
-        return null;
+        return $this->getTargetId('ring_group', 'ring_group_id');
     }
 
     /**
@@ -88,11 +96,7 @@ class DidNumber extends Model
      */
     public function getTargetBusinessHoursId(): ?int
     {
-        if ($this->routing_type === 'business_hours' && isset($this->routing_config['business_hours_schedule_id'])) {
-            return (int) $this->routing_config['business_hours_schedule_id'];
-        }
-
-        return null;
+        return $this->getTargetId('business_hours', 'business_hours_schedule_id');
     }
 
     /**
@@ -100,11 +104,7 @@ class DidNumber extends Model
      */
     public function getTargetConferenceRoomId(): ?int
     {
-        if ($this->routing_type === 'conference_room' && isset($this->routing_config['conference_room_id'])) {
-            return (int) $this->routing_config['conference_room_id'];
-        }
-
-        return null;
+        return $this->getTargetId('conference_room', 'conference_room_id');
     }
 
     /**
@@ -112,11 +112,7 @@ class DidNumber extends Model
      */
     public function getTargetAiAssistantId(): ?int
     {
-        if ($this->routing_type === 'ai_assistant' && isset($this->routing_config['ai_assistant_id'])) {
-            return (int) $this->routing_config['ai_assistant_id'];
-        }
-
-        return null;
+        return $this->getTargetId('ai_assistant', 'ai_assistant_id');
     }
 
     /**
@@ -124,11 +120,7 @@ class DidNumber extends Model
      */
     public function getTargetIvrMenuId(): ?int
     {
-        if ($this->routing_type === 'ivr_menu' && isset($this->routing_config['ivr_menu_id'])) {
-            return (int) $this->routing_config['ivr_menu_id'];
-        }
-
-        return null;
+        return $this->getTargetId('ivr_menu', 'ivr_menu_id');
     }
 
     /**
@@ -136,11 +128,7 @@ class DidNumber extends Model
      */
     public function getTargetAiLoadBalancerId(): ?int
     {
-        if ($this->routing_type === 'ai_load_balancer' && isset($this->routing_config['ai_load_balancer_id'])) {
-            return (int) $this->routing_config['ai_load_balancer_id'];
-        }
-
-        return null;
+        return $this->getTargetId('ai_load_balancer', 'ai_load_balancer_id');
     }
 
     /**
@@ -313,7 +301,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the extension relationship.
+     * Set the extension relationship manually.
      */
     public function setExtension(?Extension $extension): void
     {
@@ -321,7 +309,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the ring group relationship.
+     * Set the ring group relationship manually.
      */
     public function setRingGroup(?RingGroup $ringGroup): void
     {
@@ -329,7 +317,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the business hours schedule relationship.
+     * Set the business hours schedule relationship manually.
      */
     public function setBusinessHoursSchedule(?BusinessHoursSchedule $schedule): void
     {
@@ -337,7 +325,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the conference room relationship.
+     * Set the conference room relationship manually.
      */
     public function setConferenceRoom(?ConferenceRoom $conferenceRoom): void
     {
@@ -345,7 +333,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the AI assistant relationship.
+     * Set the AI assistant relationship manually.
      */
     public function setAiAssistant(?AiAssistant $aiAssistant): void
     {
@@ -353,7 +341,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the IVR menu relationship.
+     * Set the IVR menu relationship manually.
      */
     public function setIvrMenu(?IvrMenu $ivrMenu): void
     {
@@ -361,7 +349,7 @@ class DidNumber extends Model
     }
 
     /**
-     * Manually set the AI load balancer relationship.
+     * Set the AI load balancer relationship manually.
      */
     public function setAiLoadBalancer(?AiAssistantLoadBalancer $aiLoadBalancer): void
     {

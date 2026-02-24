@@ -199,19 +199,6 @@ class Recording extends Model
     }
 
     /**
-     * Generate a temporary signed URL for MinIO storage.
-     */
-    private function generateTemporaryUrl(int $minutes): string
-    {
-        $filePath = "{$this->organization_id}/{$this->file_path}";
-
-        return \Illuminate\Support\Facades\Storage::disk('recordings')->temporaryUrl(
-            $filePath,
-            now()->addMinutes($minutes)
-        );
-    }
-
-    /**
      * Get the formatted file size.
      */
     public function getFormattedFileSize(): string

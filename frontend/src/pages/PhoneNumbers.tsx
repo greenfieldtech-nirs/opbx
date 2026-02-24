@@ -66,15 +66,11 @@ import {
   Users,
   Clock,
   Video,
-  Edit,
-  Trash2,
   Loader2,
   AlertTriangle,
   RefreshCw,
-  Eye,
 } from 'lucide-react';
 import { formatPhoneNumber } from '@/utils/formatters';
-
 
 export default function PhoneNumbers() {
   const queryClient = useQueryClient();
@@ -334,7 +330,6 @@ export default function PhoneNumbers() {
   };
 
   const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all';
-  const paginatedPhoneNumbers = phoneNumbers; // Assuming phoneNumbers is already paginated by the API
 
   return (
     <div className="space-y-6">
@@ -434,7 +429,7 @@ export default function PhoneNumbers() {
       <Card>
         <CardContent className="pt-6">
           <StandardDataTable<DIDNumber>
-            data={paginatedPhoneNumbers}
+            data={phoneNumbers}
             isLoading={isLoading}
             onRowClick={canManage ? ((phoneNumber) => {
               setSelectedPhoneNumber(phoneNumber);
