@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
-import type { Recording } from '@/types/api.types';
+import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
 
 export default function Recordings() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,7 +26,11 @@ export default function Recordings() {
 
 
   // Form state for filters
-  const [filterForm, setFilterForm] = useState({
+  const [filterForm, setFilterForm] = useState<{
+    search: string;
+    type: RecordingType | 'all' | '';
+    status: RecordingStatus | 'all' | '';
+  }>({
     search: '',
     type: '',
     status: '',
@@ -49,7 +53,7 @@ export default function Recordings() {
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
-  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -279,7 +283,7 @@ export default function Recordings() {
             <Select
               value={filterForm.type || 'all'}
               onValueChange={(value) => {
-                setFilterForm({ ...filterForm, type: value });
+                setFilterForm({ ...filterForm, type: value as RecordingType | 'all' });
                 setCurrentPage(1);
               }}
             >
@@ -298,7 +302,7 @@ export default function Recordings() {
             <Select
               value={filterForm.status || 'all'}
               onValueChange={(value) => {
-                setFilterForm({ ...filterForm, status: value });
+                setFilterForm({ ...filterForm, status: value as RecordingStatus | 'all' });
                 setCurrentPage(1);
               }}
             >
@@ -461,7 +465,7 @@ export default function Recordings() {
           </DialogHeader>
 
           <UploadForm
-            onSubmit={(data) => createRecordingMutation.mutate(data)}
+            onSubmit={(data) => createRecordingMutation.mutate(data as unknown as Partial<Recording>)}
             onCancel={() => setShowUploadDialog(false)}
             isLoading={createRecordingMutation.isPending}
           />
@@ -479,7 +483,7 @@ export default function Recordings() {
           </DialogHeader>
 
           <RemoteUrlForm
-            onSubmit={(data) => createRecordingMutation.mutate(data)}
+            onSubmit={(data) => createRecordingMutation.mutate(data as unknown as Partial<Recording>)}
             onCancel={() => setShowRemoteDialog(false)}
             isLoading={createRecordingMutation.isPending}
           />
@@ -506,14 +510,20 @@ export default function Recordings() {
 }
 
 // Type definitions
-interface FormProps {
-  onSubmit: (data: any) => void;
+interface UploadFormProps {
+  onSubmit: (data: FormData) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+interface RemoteUrlFormProps {
+  onSubmit: (data: { name: string; type: 'remote'; remote_url: string }) => void;
   onCancel: () => void;
   isLoading: boolean;
 }
 
 // Upload Form Component
-function UploadForm({ onSubmit, onCancel, isLoading }: FormProps) {
+function UploadForm({ onSubmit, onCancel, isLoading }: UploadFormProps) {
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -568,7 +578,7 @@ function UploadForm({ onSubmit, onCancel, isLoading }: FormProps) {
 }
 
 // Remote URL Form Component
-function RemoteUrlForm({ onSubmit, onCancel, isLoading }: FormProps) {
+function RemoteUrlForm({ onSubmit, onCancel, isLoading }: RemoteUrlFormProps) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
@@ -623,7 +633,7 @@ function RemoteUrlForm({ onSubmit, onCancel, isLoading }: FormProps) {
 }
 
 // Recording Details Component
-function RecordingDetails({ recording }: { recording: any }) {
+function RecordingDetails({ recording }: { recording: Recording }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
