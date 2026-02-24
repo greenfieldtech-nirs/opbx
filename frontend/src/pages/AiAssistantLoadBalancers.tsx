@@ -5,11 +5,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -79,7 +74,6 @@ import {
   Filter,
   Users,
   RotateCw,
-  List,
   PhoneForwarded,
   PhoneOff,
   Edit,
@@ -87,12 +81,10 @@ import {
   Eye,
   X,
   Info,
-  ArrowUpDown,
   RefreshCw,
   GripVertical,
   Menu,
   Bot,
-  UserCheck,
   Phone,
   ArrowRight,
   Scale,
@@ -220,6 +212,30 @@ interface MemberFormData {
 
 // Generate weight options for percentage strategy (0% to 100% in 5% increments)
 const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5); // [0, 5, 10, ..., 100]
+
+// Helper to build fallback fields based on action
+const buildFallbackFields = (formData: FormData): Record<string, string | null | undefined> => {
+  const base = {
+    fallback_extension_id: null as string | null,
+    fallback_ring_group_id: null as string | null,
+    fallback_ivr_menu_id: null as string | null,
+    fallback_ai_assistant_id: null as string | null,
+  };
+
+  switch (formData.fallback_action) {
+    case 'extension':
+      return { ...base, fallback_extension_id: formData.fallback_extension_id };
+    case 'ring_group':
+      return { ...base, fallback_ring_group_id: formData.fallback_ring_group_id };
+    case 'ivr_menu':
+      return { ...base, fallback_ivr_menu_id: formData.fallback_ivr_menu_id };
+    case 'ai_assistant':
+      return { ...base, fallback_ai_assistant_id: formData.fallback_ai_assistant_id };
+    case 'hangup':
+    default:
+      return base;
+  }
+};
 
 // Form data type
 interface FormData {
@@ -503,7 +519,7 @@ export default function AiAssistantLoadBalancers() {
       position: member.position,
     }));
 
-    const requestData: any = {
+    const requestData = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy,
@@ -511,43 +527,10 @@ export default function AiAssistantLoadBalancers() {
       fallback_action: formData.fallback_action,
       status: formData.status,
       members,
+      ...buildFallbackFields(formData),
     };
 
-    // Only include the relevant fallback ID based on fallback_action
-    switch (formData.fallback_action) {
-      case 'extension':
-        requestData.fallback_extension_id = formData.fallback_extension_id;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ring_group':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ivr_menu':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ai_assistant':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
-        break;
-      case 'hangup':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-    }
-
-    createMutation.mutate(requestData as any);
+    createMutation.mutate(requestData);
   };
 
   // Handle update
@@ -560,7 +543,7 @@ export default function AiAssistantLoadBalancers() {
       position: member.position,
     }));
 
-    const requestData: any = {
+    const requestData = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy,
@@ -568,43 +551,10 @@ export default function AiAssistantLoadBalancers() {
       fallback_action: formData.fallback_action,
       status: formData.status,
       members,
+      ...buildFallbackFields(formData),
     };
 
-    // Only include the relevant fallback ID based on fallback_action
-    switch (formData.fallback_action) {
-      case 'extension':
-        requestData.fallback_extension_id = formData.fallback_extension_id;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ring_group':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ivr_menu':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ai_assistant':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
-        break;
-      case 'hangup':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-    }
-
-    updateMutation.mutate({ id: selectedLoadBalancer.id, data: requestData as any });
+    updateMutation.mutate({ id: selectedLoadBalancer.id, data: requestData });
   };
 
   // Handle delete
@@ -1273,7 +1223,7 @@ export default function AiAssistantLoadBalancers() {
             >
               <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
             </Button>
-            <Select value={strategyFilter} onValueChange={(value: any) => setStrategyFilter(value)}>
+            <Select value={strategyFilter} onValueChange={(value) => setStrategyFilter(value as typeof strategyFilter)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Strategy" />
@@ -1285,7 +1235,7 @@ export default function AiAssistantLoadBalancers() {
                 <SelectItem value="percentage">Percentage Based</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
