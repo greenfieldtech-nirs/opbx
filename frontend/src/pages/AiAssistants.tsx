@@ -47,7 +47,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
@@ -60,6 +59,7 @@ import { toast } from 'sonner';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import { useAuth } from '@/hooks/useAuth';
+import { AiAssistantForm } from './AiAssistants/components/AiAssistantForm';
 import {
   StandardDataTable,
   Column,
@@ -280,23 +280,7 @@ export default function AiAssistants() {
     });
   };
 
-  // Get provider definition for selected provider
-  const selectedProvider = formData.provider
-    ? providers.find((p: ProviderDefinition) => p.key === formData.provider)
-    : null;
 
-  // Handle provider change
-  const handleProviderChange = (providerKey: string) => {
-    const provider = providers.find((p: ProviderDefinition) => p.key === providerKey);
-    if (!provider) return;
-
-    // Reset configuration when provider changes
-    setFormData({
-      ...formData,
-      provider: providerKey,
-      configuration: {},
-    });
-  };
 
   // Handle sort
   const handleSort = (field: string) => {
@@ -573,87 +557,12 @@ export default function AiAssistants() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="create-name">Name *</Label>
-              <Input
-                id="create-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Customer Service Bot"
-              />
-            </div>
-
-            {/* Provider Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="create-provider">AI Service Provider *</Label>
-              <Select value={formData.provider} onValueChange={handleProviderChange}>
-                <SelectTrigger id="create-provider">
-                  <SelectValue placeholder="Select Provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providersData?.data?.grouped?.sip && providersData.data.grouped.sip.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2">
-                        <Phone className="h-3 w-3" />
-                        SIP Providers
-                      </div>
-                      {providersData.data.grouped.sip.map((provider: ProviderDefinition) => (
-                        <SelectItem key={provider.key} value={provider.key}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {providersData?.data?.grouped?.websocket && providersData.data.grouped.websocket.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2 mt-2">
-                        <Wifi className="h-3 w-3" />
-                        WebSocket Providers
-                      </div>
-                      {providersData.data.grouped.websocket.map((provider: ProviderDefinition) => (
-                        <SelectItem key={provider.key} value={provider.key}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Dynamic Configuration Fields */}
-            {selectedProvider?.config_fields && selectedProvider.config_fields.length > 0 && (
-              <div className="space-y-4 pt-4 border-t">
-                {selectedProvider.config_fields.map((field) => (
-                  <div key={field.name} className="space-y-2">
-                    <Label htmlFor={`create-${field.name}`}>
-                      {field.label} {field.required && <span className="text-destructive">*</span>}
-                    </Label>
-                    <Input
-                      id={`create-${field.name}`}
-                      type={field.type === 'password' ? 'password' : 'text'}
-                      value={formData.configuration[field.name] || ''}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          configuration: {
-                            ...formData.configuration,
-                            [field.name]: e.target.value,
-                          },
-                        })
-                      }
-                      placeholder={field.placeholder || ''}
-                    />
-                    {field.description && (
-                      <p className="text-xs text-muted-foreground">{field.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AiAssistantForm
+            formData={formData}
+            onChange={setFormData}
+            providers={providers}
+            mode="create"
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -676,84 +585,12 @@ export default function AiAssistants() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-
-            {/* Provider Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-provider">AI Service Provider *</Label>
-              <Select value={formData.provider} onValueChange={handleProviderChange}>
-                <SelectTrigger id="edit-provider">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {providersData?.data?.grouped?.sip && providersData.data.grouped.sip.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2">
-                        <Phone className="h-3 w-3" />
-                        SIP Providers
-                      </div>
-                      {providersData.data.grouped.sip.map((provider: ProviderDefinition) => (
-                        <SelectItem key={provider.key} value={provider.key}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {providersData?.data?.grouped?.websocket && providersData.data.grouped.websocket.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2 mt-2">
-                        <Wifi className="h-3 w-3" />
-                        WebSocket Providers
-                      </div>
-                      {providersData.data.grouped.websocket.map((provider: ProviderDefinition) => (
-                        <SelectItem key={provider.key} value={provider.key}>
-                          {provider.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedProvider?.config_fields && selectedProvider.config_fields.length > 0 && (
-              <div className="space-y-4 pt-4 border-t">
-                {selectedProvider.config_fields.map((field) => (
-                  <div key={field.name} className="space-y-2">
-                    <Label htmlFor={`edit-${field.name}`}>
-                      {field.label} {field.required && <span className="text-destructive">*</span>}
-                    </Label>
-                    <Input
-                      id={`edit-${field.name}`}
-                      type={field.type === 'password' ? 'password' : 'text'}
-                      value={formData.configuration[field.name] || ''}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          configuration: {
-                            ...formData.configuration,
-                            [field.name]: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                    {field.description && (
-                      <p className="text-xs text-muted-foreground">{field.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AiAssistantForm
+            formData={formData}
+            onChange={setFormData}
+            providers={providers}
+            mode="edit"
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
