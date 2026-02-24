@@ -18,7 +18,8 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   StandardDataTable,
   Column,
-  EmptyState
+  EmptyState,
+  RingGroupStrategySelector,
 } from '@/components/design-system';
 import type {
   RingGroup,
@@ -967,46 +968,11 @@ export default function RingGroups() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="strategy">
-                Ring Strategy <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.strategy}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, strategy: value as RingGroupStrategy })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="simultaneous">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <span>Simultaneous (Ring All)</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="round_robin">
-                    <div className="flex items-center gap-2">
-                      <RotateCw className="h-4 w-4" />
-                      <span>Round Robin</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="sequential">
-                    <div className="flex items-center gap-2">
-                      <List className="h-4 w-4" />
-                      <span>Sequential</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <RingGroupStrategySelector
+                value={formData.strategy as import('@/components/design-system').RingGroupStrategy}
+                onChange={(value) => setFormData({ ...formData, strategy: value })}
+              />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              {getStrategyDescription(formData.strategy as RingGroupStrategy)}
-            </p>
           </div>
 
           {/* Members */}
