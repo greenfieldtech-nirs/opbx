@@ -429,7 +429,7 @@ export default function AiAssistants() {
             </Button>
 
             {/* Filter dropdowns */}
-            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as typeof statusFilter)}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
@@ -441,7 +441,7 @@ export default function AiAssistants() {
               </SelectContent>
             </Select>
 
-            <Select value={protocolFilter} onValueChange={(val: any) => setProtocolFilter(val)}>
+            <Select value={protocolFilter} onValueChange={(val) => setProtocolFilter(val as typeof protocolFilter)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Protocol" />
               </SelectTrigger>
