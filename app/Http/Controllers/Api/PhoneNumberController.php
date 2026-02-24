@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AlbsStatus;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
-use App\Enums\UserStatus;
-use App\Enums\AlbsStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
@@ -249,9 +249,8 @@ class PhoneNumberController extends Controller
             ]);
 
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to update phone number',
-                'error_code' => 'UPDATE_FAILED',
+                'error' => 'Failed to update phone number',
+                'message' => 'An error occurred while updating the phone number.',
             ], 500);
         }
     }
