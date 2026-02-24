@@ -275,10 +275,6 @@ class PhoneNumberController extends Controller
         ]);
 
         try {
-            // Check for recent call activity (log warning if found)
-            // Note: This would require call_logs table query, which we'll skip for now
-            // as the requirement is just to log a warning, not block deletion
-
             DB::transaction(function () use ($phoneNumber): void {
                 $phoneNumber->delete();
             });
