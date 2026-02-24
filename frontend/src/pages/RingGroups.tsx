@@ -236,10 +236,7 @@ export default function RingGroups() {
     members: [],
   });
 
-  // Debug formData changes
-  // useEffect(() => {
-  //   console.log('formData updated:', formData);
-  // }, [formData]);
+
 
   const [selectedGroup, setSelectedGroup] = useState<RingGroup | null>(null);
 
@@ -315,25 +312,12 @@ export default function RingGroups() {
 
   // Filter out current ring group when editing (can't fallback to self)
   const allRingGroups = useMemo(() => {
-    console.log('[allRingGroups useMemo] Computing...');
-    console.log('  - allRingGroupsData:', allRingGroupsData);
-    console.log('  - allRingGroupsData?.data:', allRingGroupsData?.data);
-    console.log('  - typeof allRingGroupsData?.data:', typeof allRingGroupsData?.data);
-    console.log('  - Array.isArray(allRingGroupsData?.data):', Array.isArray(allRingGroupsData?.data));
-    console.log('  - selectedGroup:', selectedGroup);
-
     const groups = allRingGroupsData?.data || [];
-    console.log('  - groups (before filter):', groups);
-    console.log('  - groups.length:', groups.length);
 
     if (selectedGroup) {
-      const filtered = groups.filter(g => g.id !== selectedGroup.id);
-      console.log('  - filtered (after removing current):', filtered);
-      console.log('  - filtered.length:', filtered.length);
-      return filtered;
+      return groups.filter(g => g.id !== selectedGroup.id);
     }
 
-    console.log('  - returning all groups (no selectedGroup)');
     return groups;
   }, [allRingGroupsData, selectedGroup]);
 
@@ -910,27 +894,6 @@ export default function RingGroups() {
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
-    // Debug logging for fallback selects
-    console.log('=== RING GROUPS DEBUG ===');
-    console.log('isLoadingAllRingGroups:', isLoadingAllRingGroups);
-    console.log('allRingGroupsData RAW:', allRingGroupsData);
-    console.log('allRingGroupsData?.data:', allRingGroupsData?.data);
-    console.log('allRingGroups (after filter):', allRingGroups);
-    console.log('selectedGroup:', selectedGroup);
-    console.log('Available data for fallback selects:', {
-      allRingGroups: allRingGroups?.length || 0,
-      availableIvrMenus: availableIvrMenus?.length || 0,
-      availableAiAssistants: availableAiAssistants?.length || 0,
-      availableExtensions: availableExtensions?.length || 0,
-    });
-    console.log('Current formData fallback values:', {
-      fallback_action: formData.fallback_action,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-    });
-
     const title = isEdit ? 'Edit Ring Group' : 'Create Ring Group';
     const description = isEdit
       ? 'Update ring group settings and members'
