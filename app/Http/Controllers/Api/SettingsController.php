@@ -301,7 +301,7 @@ class SettingsController extends Controller
             // fetch the real key from the database for validation.
             $apiKey = $validated['domain_api_key'];
             if (str_contains($apiKey, '***')) {
-                $settings = CloudonixSettings::where('organization_id', $user->u003eorganization_id)->first();
+                $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
                 if ($settings && $settings->domain_api_key) {
                     $apiKey = $settings->domain_api_key;
                     Log::debug('Using stored API key for validation (masked value received)', [
