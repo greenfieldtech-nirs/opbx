@@ -31,15 +31,15 @@ class SettingsController extends Controller
     private function getCloudonixClient(): CloudonixClient
     {
         $user = auth()->user();
-        if (!$user) {
+        if (! $user) {
             throw new \RuntimeException('Authentication required');
         }
-        
+
         $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
-        if (!$settings) {
+        if (! $settings) {
             throw new \RuntimeException('Cloudonix settings not configured');
         }
-        
+
         return new CloudonixClient($settings);
     }
 
@@ -485,24 +485,14 @@ class SettingsController extends Controller
     /**
      * Generate a cryptographically secure random API key.
      *
+     * Uses Laravel's Str::random() for cryptographically secure random generation.
+     *
      * @param  int  $length  The length of the API key
      * @return string The generated API key
      */
     private function generateSecureApiKey(int $length = 32): string
     {
-        // Use a mix of alphanumeric characters and symbols for high entropy
-        $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-        $charactersLength = strlen($characters);
-        $apiKey = '';
-
-        // Generate random bytes and convert to characters
-        $randomBytes = random_bytes($length);
-
-        for ($i = 0; $i < $length; $i++) {
-            $apiKey .= $characters[ord($randomBytes[$i]) % $charactersLength];
-        }
-
-        return $apiKey;
+        return Str::random($length);
     }
 
     /**
