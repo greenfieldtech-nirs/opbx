@@ -259,8 +259,11 @@ export interface CreateDIDRequest {
     ring_group_id?: string;
     business_hours_schedule_id?: string;
     conference_room_id?: string;
+    ivr_menu_id?: string;
+    ai_load_balancer_id?: string;
   };
   status?: 'active' | 'inactive';
+  enable_non_e164?: boolean;
 }
 
 export interface UpdateDIDRequest {
