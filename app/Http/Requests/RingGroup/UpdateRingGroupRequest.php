@@ -208,12 +208,12 @@ class UpdateRingGroupRequest extends FormRequest
                     );
                 }
 
-                // Validate that all extensions are type 'user'
+                // Validate that all extensions are type 'user' or 'forward'
                 foreach ($validExtensions as $extension) {
-                    if ($extension->type !== ExtensionType::USER) {
+                    if ($extension->type !== ExtensionType::USER && $extension->type !== ExtensionType::FORWARD) {
                         $validator->errors()->add(
                             'members',
-                            'Only user extensions (PBX User type) can be added to ring groups. Extension '.$extension->extension_number.' is not a user extension.'
+                            'Only user and forward extensions can be added to ring groups. Extension '.$extension->extension_number.' is not allowed.'
                         );
                         break;
                     }
