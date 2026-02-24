@@ -226,7 +226,7 @@ export default function CallNotificationsSettingsPage() {
         retry_attempts: 3,
         retry_backoff_seconds: 60,
         request_timeout_seconds: 30,
-        enabled_events: ['new', 'ringing', 'answered', 'busy', 'failed'],
+    enabled_events: ['new', 'ringing', 'connected', 'answered', 'busy', 'cancel', 'failed', 'congestion'],
         rate_limit_per_minute: 500,
         is_active: true,
       });
