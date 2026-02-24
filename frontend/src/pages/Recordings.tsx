@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Eye, Pause, Play, Plus, Search, Trash2, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
+import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
@@ -207,7 +207,6 @@ export default function Recordings() {
       type: '',
       status: '',
     });
-    setCurrentPage(1);
     setCurrentPage(1);
   };
 
