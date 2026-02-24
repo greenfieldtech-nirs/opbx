@@ -141,12 +141,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Register model observers for cache invalidation (Phase 1 Step 8)
         \App\Models\Extension::observe(\App\Observers\ExtensionCacheObserver::class);
-        \App\Models\BusinessHoursSchedule::observe(\App\Observers\BusinessHoursScheduleCacheObserver::class);
 
-        // Register observers for nested business hours models (Phase 1 Step 8.6)
-        \App\Models\BusinessHoursScheduleDay::observe(\App\Observers\BusinessHoursScheduleDayCacheObserver::class);
-        \App\Models\BusinessHoursTimeRange::observe(\App\Observers\BusinessHoursTimeRangeCacheObserver::class);
-        \App\Models\BusinessHoursException::observe(\App\Observers\BusinessHoursExceptionCacheObserver::class);
+        // Register consolidated business hours cache observer for all related models
+        $businessHoursObserver = app(\App\Observers\BusinessHoursCacheObserver::class);
+        \App\Models\BusinessHoursSchedule::observe($businessHoursObserver);
+        \App\Models\BusinessHoursScheduleDay::observe($businessHoursObserver);
+        \App\Models\BusinessHoursTimeRange::observe($businessHoursObserver);
+        \App\Models\BusinessHoursException::observe($businessHoursObserver);
 
         // Disable model events for CLI commands if needed
         if ($this->app->runningInConsole()) {
