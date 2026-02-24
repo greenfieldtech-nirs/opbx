@@ -20,8 +20,6 @@ export type { ExtensionType, ExtensionStatus, ExtensionData } from './ExtensionC
 export { RingGroupStrategySelector } from './RingGroupStrategySelector';
 export type { RingGroupStrategy } from './RingGroupStrategySelector';
 
-export { BusinessHoursScheduleBuilder } from './BusinessHoursScheduleBuilder';
-export type { DaySchedule } from './BusinessHoursScheduleBuilder';
 export * from './StandardDataTable';
 export { EmptyState } from './EmptyState';
 export { LoadingSpinner } from './LoadingSpinner';

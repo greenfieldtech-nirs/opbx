@@ -323,11 +323,14 @@ class BusinessHoursController extends AbstractApiCrudController
             ];
         }
 
+        // Ensure status has a default value
+        $status = $validated['status'] ?? BusinessHoursStatus::ACTIVE->value;
+
         return [
             'basic' => [
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
-                'status' => $validated['status'],
+                'status' => $status,
                 'timezone' => $validated['timezone'],
             ],
             'schedule' => $scheduleArray,
