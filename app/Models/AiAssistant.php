@@ -217,10 +217,6 @@ class AiAssistant extends Model
      */
     public function isInUse(): bool
     {
-        // Query directly without global scope to avoid organization scope conflicts
-        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->where('ai_assistant_id', $this->id)
-            ->where('organization_id', $this->organization_id)
-            ->exists();
+        return $this->usage_count > 0;
     }
 }
