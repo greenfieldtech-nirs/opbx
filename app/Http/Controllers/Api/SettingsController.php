@@ -516,13 +516,13 @@ class SettingsController extends Controller
     /**
      * Setup voice application for the organization.
      *
-     * Creates a new voice application or updates existing one, then sets it as the domain's default application.
+     * Orchestrates voice application creation/update and sets it as the domain's default.
      *
      * @param  CloudonixSettings  $settings  The Cloudonix settings
      * @param  string  $requestId  Request ID for logging
      * @param  int  $userId  User ID for logging
      * @param  int  $organizationId  Organization ID for logging
-     * @return void
+     * @return string|null Error message if failed, null on success
      */
     private function setupVoiceApplication(
         CloudonixSettings $settings,
@@ -531,7 +531,6 @@ class SettingsController extends Controller
         int $organizationId
     ): ?string {
         try {
-            // Generate webhook URL for voice routing using effective webhook base URL
             $webhookUrl = $settings->getVoiceRouteUrl();
 
             Log::info('[VOICE_APP_SETUP] Starting voice application setup', [
@@ -543,176 +542,32 @@ class SettingsController extends Controller
                 'existing_app_id' => $settings->voice_application_id,
             ]);
 
-            // Check if we already have an application
-            $shouldCreateNew = empty($settings->voice_application_id);
+            // Get or create voice application
+            $result = $this->getOrCreateVoiceApplication($settings, $webhookUrl, $requestId, $userId, $organizationId);
 
-            if ($shouldCreateNew) {
-                // Create new application with unique name
-                $appName = 'opbx-routing-application-'.Str::random(8);
-
-                Log::info('[VOICE_APP_SETUP] Creating new voice application', [
-                    'request_id' => $requestId,
-                    'user_id' => $userId,
-                    'organization_id' => $organizationId,
-                    'application_name' => $appName,
-                    'webhook_url' => $webhookUrl,
-                ]);
-
-                // Create application payload with proper JSON object for profile
-                $applicationPayload = [
-                    'name' => $appName,
-                    'type' => 'cxml',
-                    'url' => $webhookUrl,
-                    'method' => 'POST',
-                    'profile' => new \stdClass, // Empty object, not array
-                ];
-
-                Log::info('[VOICE_APP_SETUP] Application payload prepared', [
-                    'request_id' => $requestId,
-                    'payload' => $applicationPayload,
-                    'payload_json' => json_encode($applicationPayload),
-                ]);
-
-                $appResult = $this->getCloudonixClient()->createVoiceApplication(
-                    $settings->domain_uuid,
-                    $settings->domain_api_key,
-                    $applicationPayload
-                );
-
-                if (! $appResult['success']) {
-                    $errorMessage = 'Failed to create voice application: '.($appResult['message'] ?? 'Unknown error');
-
-                    Log::error('[VOICE_APP_SETUP] Voice application creation failed', [
-                        'request_id' => $requestId,
-                        'user_id' => $userId,
-                        'organization_id' => $organizationId,
-                        'error' => $appResult['message'],
-                        'response_data' => $appResult['data'] ?? null,
-                    ]);
-
-                    return $errorMessage;
-                }
-
-                $appData = $appResult['data'];
-                $applicationId = $appData['id'];
-
-                Log::info('[VOICE_APP_SETUP] Voice application created successfully', [
-                    'request_id' => $requestId,
-                    'user_id' => $userId,
-                    'organization_id' => $organizationId,
-                    'application_id' => $applicationId,
-                    'application_uuid' => $appData['uuid'] ?? null,
-                    'application_name' => $appData['name'] ?? null,
-                    'full_response' => $appData,
-                ]);
-            } else {
-                // Use existing application but check if URL needs updating
-                $applicationId = $settings->voice_application_id;
-
-                // Generate expected webhook URL for comparison
-                $expectedWebhookUrl = $settings->getVoiceRouteUrl();
-
-                Log::info('[VOICE_APP_SETUP] Using existing voice application - checking if URL update needed', [
-                    'request_id' => $requestId,
-                    'user_id' => $userId,
-                    'organization_id' => $organizationId,
-                    'application_id' => $applicationId,
-                    'expected_webhook_url' => $expectedWebhookUrl,
-                ]);
-
-                // Check if we need to update the application URL
-                // We can't easily check the current URL without an API call, so we'll update it proactively
-                // when webhook_base_url changes (which would change the expected URL)
-                $updateResult = $this->getCloudonixClient()->updateVoiceApplication(
-                    $settings->domain_uuid,
-                    $settings->domain_api_key,
-                    $applicationId,
-                    [
-                        'url' => $expectedWebhookUrl,
-                        'method' => 'POST',
-                        'profile' => new \stdClass, // Ensure profile is an object
-                    ]
-                );
-
-                if (! $updateResult['success']) {
-                    Log::warning('[VOICE_APP_SETUP] Failed to update voice application URL', [
-                        'request_id' => $requestId,
-                        'user_id' => $userId,
-                        'organization_id' => $organizationId,
-                        'application_id' => $applicationId,
-                        'expected_url' => $expectedWebhookUrl,
-                        'error' => $updateResult['message'],
-                    ]);
-
-                    // Don't fail the whole process for URL update issues
-                    // The application might still work with the old URL
-                } else {
-                    Log::info('[VOICE_APP_SETUP] Voice application URL updated successfully', [
-                        'request_id' => $requestId,
-                        'user_id' => $userId,
-                        'organization_id' => $organizationId,
-                        'application_id' => $applicationId,
-                        'new_url' => $expectedWebhookUrl,
-                    ]);
-                }
+            if ($result['error']) {
+                return $result['error'];
             }
 
-            Log::info('[VOICE_APP_SETUP] Setting default application for domain', [
-                'request_id' => $requestId,
-                'application_id' => $applicationId,
-                'domain_uuid' => $settings->domain_uuid,
-            ]);
+            $applicationId = $result['application_id'];
+            $appData = $result['app_data'] ?? null;
 
-            // Set as default application for the domain
-            $defaultAppResult = $this->getCloudonixClient()->updateDomainDefaultApplication(
-                $settings->domain_uuid,
-                $settings->domain_api_key,
-                $applicationId
+            // Set as default application
+            $defaultError = $this->setVoiceApplicationAsDefault(
+                $settings,
+                $applicationId,
+                $requestId,
+                $userId,
+                $organizationId
             );
 
-            if (! $defaultAppResult['success']) {
-                $errorMessage = 'Failed to set default application: '.($defaultAppResult['message'] ?? 'Unknown error');
-
-                Log::error('[VOICE_APP_SETUP] Failed to set default application', [
-                    'request_id' => $requestId,
-                    'user_id' => $userId,
-                    'organization_id' => $organizationId,
-                    'application_id' => $applicationId,
-                    'error' => $defaultAppResult['message'],
-                    'response_data' => $defaultAppResult['data'] ?? null,
-                ]);
-
-                return $errorMessage;
+            if ($defaultError) {
+                return $defaultError;
             }
 
-            Log::info('[VOICE_APP_SETUP] Default application set successfully', [
-                'request_id' => $requestId,
-                'user_id' => $userId,
-                'organization_id' => $organizationId,
-                'application_id' => $applicationId,
-            ]);
-
-            // Store application details if we created a new one
-            if ($shouldCreateNew && isset($appData)) {
-                Log::info('[VOICE_APP_SETUP] Storing application details in database', [
-                    'request_id' => $requestId,
-                    'application_id' => $appData['id'],
-                    'application_uuid' => $appData['uuid'] ?? null,
-                    'application_name' => $appData['name'] ?? null,
-                ]);
-
-                $settings->update([
-                    'voice_application_id' => $appData['id'],
-                    'voice_application_uuid' => $appData['uuid'] ?? null,
-                    'voice_application_name' => $appData['name'] ?? null,
-                ]);
-
-                Log::info('[VOICE_APP_SETUP] Voice application details stored successfully', [
-                    'request_id' => $requestId,
-                    'user_id' => $userId,
-                    'organization_id' => $organizationId,
-                    'application_id' => $appData['id'],
-                ]);
+            // Store application details if newly created
+            if ($appData) {
+                $this->storeVoiceApplicationDetails($settings, $appData, $requestId, $userId, $organizationId);
             }
 
             Log::info('[VOICE_APP_SETUP] Voice application setup completed successfully', [
@@ -720,21 +575,216 @@ class SettingsController extends Controller
                 'application_id' => $applicationId,
             ]);
 
-            return null; // Success - no error
+            return null;
         } catch (\Exception $e) {
-            $errorMessage = 'Exception during voice application setup: '.$e->getMessage();
-
             Log::error('[VOICE_APP_SETUP] Exception during voice application setup', [
                 'request_id' => $requestId,
                 'user_id' => $userId,
                 'organization_id' => $organizationId,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
             ]);
 
-            return $errorMessage;
+            return 'Exception during voice application setup: '.$e->getMessage();
         }
+    }
+
+    /**
+     * Get existing voice application or create a new one.
+     *
+     * @return array{application_id: int, app_data: array|null, error: string|null}
+     */
+    private function getOrCreateVoiceApplication(
+        CloudonixSettings $settings,
+        string $webhookUrl,
+        string $requestId,
+        int $userId,
+        int $organizationId
+    ): array {
+        if (! empty($settings->voice_application_id)) {
+            return $this->updateExistingVoiceApplication($settings, $webhookUrl, $requestId, $userId, $organizationId);
+        }
+
+        return $this->createNewVoiceApplication($settings, $webhookUrl, $requestId, $userId, $organizationId);
+    }
+
+    /**
+     * Create a new voice application in Cloudonix.
+     *
+     * @return array{application_id: int, app_data: array|null, error: string|null}
+     */
+    private function createNewVoiceApplication(
+        CloudonixSettings $settings,
+        string $webhookUrl,
+        string $requestId,
+        int $userId,
+        int $organizationId
+    ): array {
+        $appName = 'opbx-routing-application-'.Str::random(8);
+
+        Log::info('[VOICE_APP_SETUP] Creating new voice application', [
+            'request_id' => $requestId,
+            'application_name' => $appName,
+            'webhook_url' => $webhookUrl,
+        ]);
+
+        $payload = [
+            'name' => $appName,
+            'type' => 'cxml',
+            'url' => $webhookUrl,
+            'method' => 'POST',
+            'profile' => new \stdClass,
+        ];
+
+        $result = $this->getCloudonixClient()->createVoiceApplication(
+            $settings->domain_uuid,
+            $settings->domain_api_key,
+            $payload
+        );
+
+        if (! $result['success']) {
+            Log::error('[VOICE_APP_SETUP] Voice application creation failed', [
+                'request_id' => $requestId,
+                'error' => $result['message'],
+            ]);
+
+            return [
+                'application_id' => 0,
+                'app_data' => null,
+                'error' => 'Failed to create voice application: '.($result['message'] ?? 'Unknown error'),
+            ];
+        }
+
+        Log::info('[VOICE_APP_SETUP] Voice application created successfully', [
+            'request_id' => $requestId,
+            'application_id' => $result['data']['id'],
+        ]);
+
+        return [
+            'application_id' => $result['data']['id'],
+            'app_data' => $result['data'],
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Update existing voice application URL if needed.
+     *
+     * @return array{application_id: int, app_data: null, error: string|null}
+     */
+    private function updateExistingVoiceApplication(
+        CloudonixSettings $settings,
+        string $webhookUrl,
+        string $requestId,
+        int $userId,
+        int $organizationId
+    ): array {
+        $applicationId = $settings->voice_application_id;
+
+        Log::info('[VOICE_APP_SETUP] Updating existing voice application URL', [
+            'request_id' => $requestId,
+            'application_id' => $applicationId,
+            'webhook_url' => $webhookUrl,
+        ]);
+
+        $result = $this->getCloudonixClient()->updateVoiceApplication(
+            $settings->domain_uuid,
+            $settings->domain_api_key,
+            $applicationId,
+            [
+                'url' => $webhookUrl,
+                'method' => 'POST',
+                'profile' => new \stdClass,
+            ]
+        );
+
+        if (! $result['success']) {
+            // Log warning but don't fail - app might still work with old URL
+            Log::warning('[VOICE_APP_SETUP] Failed to update voice application URL', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'error' => $result['message'],
+            ]);
+        } else {
+            Log::info('[VOICE_APP_SETUP] Voice application URL updated successfully', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+            ]);
+        }
+
+        return [
+            'application_id' => $applicationId,
+            'app_data' => null,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Set voice application as the domain's default.
+     *
+     * @return string|null Error message if failed, null on success
+     */
+    private function setVoiceApplicationAsDefault(
+        CloudonixSettings $settings,
+        int $applicationId,
+        string $requestId,
+        int $userId,
+        int $organizationId
+    ): ?string {
+        Log::info('[VOICE_APP_SETUP] Setting default application for domain', [
+            'request_id' => $requestId,
+            'application_id' => $applicationId,
+        ]);
+
+        $result = $this->getCloudonixClient()->updateDomainDefaultApplication(
+            $settings->domain_uuid,
+            $settings->domain_api_key,
+            $applicationId
+        );
+
+        if (! $result['success']) {
+            Log::error('[VOICE_APP_SETUP] Failed to set default application', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'error' => $result['message'],
+            ]);
+
+            return 'Failed to set default application: '.($result['message'] ?? 'Unknown error');
+        }
+
+        Log::info('[VOICE_APP_SETUP] Default application set successfully', [
+            'request_id' => $requestId,
+            'application_id' => $applicationId,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Store voice application details in database.
+     */
+    private function storeVoiceApplicationDetails(
+        CloudonixSettings $settings,
+        array $appData,
+        string $requestId,
+        int $userId,
+        int $organizationId
+    ): void {
+        Log::info('[VOICE_APP_SETUP] Storing application details in database', [
+            'request_id' => $requestId,
+            'application_id' => $appData['id'],
+        ]);
+
+        $settings->update([
+            'voice_application_id' => $appData['id'],
+            'voice_application_uuid' => $appData['uuid'] ?? null,
+            'voice_application_name' => $appData['name'] ?? null,
+        ]);
+
+        Log::info('[VOICE_APP_SETUP] Voice application details stored successfully', [
+            'request_id' => $requestId,
+            'application_id' => $appData['id'],
+        ]);
     }
 
     /**
