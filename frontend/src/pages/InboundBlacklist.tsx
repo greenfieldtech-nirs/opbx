@@ -35,8 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -55,6 +53,7 @@ import api from '@/services/api';
 import { inboundBlacklistService } from '@/services/inboundBlacklist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
+import { BlacklistForm } from './InboundBlacklist/components/BlacklistForm';
 import type {
   InboundBlacklist,
   CreateInboundBlacklistRequest,
@@ -555,144 +554,14 @@ const InboundBlacklistPage: React.FC = () => {
                 Create a new inbound blacklist entry to block unwanted callers.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="caller_id_pattern">Caller ID Pattern</Label>
-                <Input
-                  id="caller_id_pattern"
-                  value={formData.caller_id_pattern}
-                  onChange={(e) => setFormData({ ...formData, caller_id_pattern: e.target.value })}
-                  placeholder="+14155551234 or +1415*"
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  E.164 format. Use * for wildcards (e.g., +1415* blocks all SF numbers)
-                </p>
-                {formErrors.caller_id_pattern && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.caller_id_pattern}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="match_type">Match Type</Label>
-                  <Select
-                    value={formData.match_type}
-                    onValueChange={(value) => setFormData({ ...formData, match_type: value as InboundBlacklistMatchType })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="exact">Exact Match</SelectItem>
-                      <SelectItem value="prefix">Prefix Match</SelectItem>
-                      <SelectItem value="wildcard">Wildcard Pattern</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="rejection_strategy">Rejection Strategy</Label>
-                  <Select
-                    value={formData.rejection_strategy}
-                    onValueChange={(value) => setFormData({ ...formData, rejection_strategy: value as InboundBlacklistRejectionStrategy })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="drop">Drop (Silent)</SelectItem>
-                      <SelectItem value="reject">Reject (Message)</SelectItem>
-                      <SelectItem value="torment">Torment (Music)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {formData.rejection_strategy === 'torment' && (
-                <div className="p-4 bg-purple-50 rounded-lg space-y-4">
-                  <div>
-                    <Label htmlFor="torment_room_prefix">Room Prefix</Label>
-                    <Input
-                      id="torment_room_prefix"
-                      value={formData.torment_room_prefix}
-                      onChange={(e) => setFormData({ ...formData, torment_room_prefix: e.target.value })}
-                      placeholder="spam-trap"
-                      required={formData.rejection_strategy === 'torment'}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="torment_music_timeout">Timeout (seconds)</Label>
-                    <Input
-                      id="torment_music_timeout"
-                      type="number"
-                      min={60}
-                      max={3600}
-                      value={formData.torment_music_timeout}
-                      onChange={(e) => setFormData({ ...formData, torment_music_timeout: parseInt(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="border-t pt-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Global Blacklist</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Apply to all phone numbers in your organization
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.is_global}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked, did_number_ids: checked ? [] : formData.did_number_ids })}
-                  />
-                </div>
-
-                {!formData.is_global && (
-                  <div>
-                    <Label>Select Phone Numbers</Label>
-                    <div className="border rounded-md p-2 mt-1 max-h-40 overflow-y-auto">
-                      {phoneNumbers.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-2">No phone numbers available</p>
-                      ) : (
-                        phoneNumbers.map((did: DIDNumber) => (
-                          <label
-                            key={did.id}
-                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.did_number_ids.includes(did.id)}
-                              onChange={() => toggleDidSelection(did.id)}
-                              className="rounded border-gray-300"
-                            />
-                            <span className="text-sm">{did.friendly_name || did.phone_number}</span>
-                          </label>
-                        ))
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        {formData.did_number_ids.length} selected
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => refetchPhoneNumbers()}
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Refresh
-                      </Button>
-                    </div>
-                    {formErrors.did_number_ids && (
-                      <p className="text-sm text-destructive mt-1">{formErrors.did_number_ids}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            <BlacklistForm
+              formData={formData}
+              formErrors={formErrors}
+              phoneNumbers={phoneNumbers}
+              onChange={setFormData}
+              onToggleDid={toggleDidSelection}
+              onRefreshPhoneNumbers={refetchPhoneNumbers}
+            />
             <DialogFooter>
               <Button
                 type="button"
@@ -719,138 +588,14 @@ const InboundBlacklistPage: React.FC = () => {
                 Update the inbound blacklist entry settings.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="edit-caller_id_pattern">Caller ID Pattern</Label>
-                <Input
-                  id="edit-caller_id_pattern"
-                  value={formData.caller_id_pattern}
-                  onChange={(e) => setFormData({ ...formData, caller_id_pattern: e.target.value })}
-                  placeholder="+14155551234 or +1415*"
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  E.164 format. Use * for wildcards
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-match_type">Match Type</Label>
-                  <Select
-                    value={formData.match_type}
-                    onValueChange={(value) => setFormData({ ...formData, match_type: value as InboundBlacklistMatchType })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="exact">Exact Match</SelectItem>
-                      <SelectItem value="prefix">Prefix Match</SelectItem>
-                      <SelectItem value="wildcard">Wildcard Pattern</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="edit-rejection_strategy">Rejection Strategy</Label>
-                  <Select
-                    value={formData.rejection_strategy}
-                    onValueChange={(value) => setFormData({ ...formData, rejection_strategy: value as InboundBlacklistRejectionStrategy })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="drop">Drop (Silent)</SelectItem>
-                      <SelectItem value="reject">Reject (Message)</SelectItem>
-                      <SelectItem value="torment">Torment (Music)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {formData.rejection_strategy === 'torment' && (
-                <div className="p-4 bg-purple-50 rounded-lg space-y-4">
-                  <div>
-                    <Label htmlFor="edit-torment_room_prefix">Room Prefix</Label>
-                    <Input
-                      id="edit-torment_room_prefix"
-                      value={formData.torment_room_prefix}
-                      onChange={(e) => setFormData({ ...formData, torment_room_prefix: e.target.value })}
-                      placeholder="spam-trap"
-                      required={formData.rejection_strategy === 'torment'}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-torment_music_timeout">Timeout (seconds)</Label>
-                    <Input
-                      id="edit-torment_music_timeout"
-                      type="number"
-                      min={60}
-                      max={3600}
-                      value={formData.torment_music_timeout}
-                      onChange={(e) => setFormData({ ...formData, torment_music_timeout: parseInt(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="border-t pt-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Global Blacklist</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Apply to all phone numbers in your organization
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.is_global}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_global: checked, did_number_ids: checked ? [] : formData.did_number_ids })}
-                  />
-                </div>
-
-                {!formData.is_global && (
-                  <div>
-                    <Label>Select Phone Numbers</Label>
-                    <div className="border rounded-md p-2 mt-1 max-h-40 overflow-y-auto">
-                      {phoneNumbers.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-2">No phone numbers available</p>
-                      ) : (
-                        phoneNumbers.map((did: DIDNumber) => (
-                          <label
-                            key={did.id}
-                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.did_number_ids.includes(did.id)}
-                              onChange={() => toggleDidSelection(did.id)}
-                              className="rounded border-gray-300"
-                            />
-                            <span className="text-sm">{did.friendly_name || did.phone_number}</span>
-                          </label>
-                        ))
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        {formData.did_number_ids.length} selected
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => refetchPhoneNumbers()}
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Refresh
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <BlacklistForm
+              formData={formData}
+              formErrors={formErrors}
+              phoneNumbers={phoneNumbers}
+              onChange={setFormData}
+              onToggleDid={toggleDidSelection}
+              onRefreshPhoneNumbers={refetchPhoneNumbers}
+            />
             <DialogFooter>
               <Button
                 type="button"
