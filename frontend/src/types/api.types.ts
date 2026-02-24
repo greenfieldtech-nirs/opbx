@@ -796,4 +796,6 @@ export interface Recording {
   updated_by?: number;
   created_at: string;
   updated_at: string;
+  playback_url?: string;
+  download_url?: string;
 }

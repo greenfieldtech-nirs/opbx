@@ -2,12 +2,13 @@
  * Recordings Page
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
+import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,20 +37,8 @@ export default function Recordings() {
     status: '',
   });
 
-  // Audio playback state
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-
-  // Cleanup audio when component unmounts
-  useEffect(() => {
-    return () => {
-      if (audioElement) {
-        audioElement.pause();
-        audioElement.src = '';
-        setAudioElement(null);
-      }
-    };
-  }, []); // Only run on unmount
+  // Audio playback hook
+  const { currentlyPlaying, play, pause, isPlaying } = useAudioPlayer();
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
@@ -148,57 +137,16 @@ export default function Recordings() {
     }
   };
 
-  const handlePlayback = async (recording: any) => {
-    if (currentlyPlaying === recording.id) {
-      // Currently playing this recording, pause it
-      if (audioElement) {
-        audioElement.pause();
-        setCurrentlyPlaying(null);
-        setAudioElement(null);
-      }
+  const handlePlayback = async (recording: Recording) => {
+    if (isPlaying(recording.id)) {
+      pause();
     } else {
-      // Start playing this recording
-      try {
-        let audioSrc = '';
+      const audioSrc = recording.type === 'upload'
+        ? recording.playback_url
+        : recording.remote_url;
 
-        if (recording.type === 'upload') {
-          // For uploaded files, use the API stream endpoint
-          audioSrc = recording.playback_url;
-        } else {
-          // For remote files, use remote URL directly
-          audioSrc = recording.remote_url;
-        }
-
-        // Stop any currently playing audio
-        if (audioElement) {
-          audioElement.pause();
-          audioElement.src = ''; // Clear source to free resources
-          setAudioElement(null);
-        }
-
-        const audio = new Audio(audioSrc);
-
-        audio.addEventListener('ended', () => {
-          setCurrentlyPlaying(null);
-          setAudioElement(null);
-        });
-
-        audio.addEventListener('error', () => {
-          // Only show error if audio is not paused and we're still trying to play this recording
-          if (!audio.paused && currentlyPlaying === recording.id) {
-            toast.error('Failed to play recording');
-          }
-          setCurrentlyPlaying(null);
-          setAudioElement(null);
-        });
-
-        setAudioElement(audio);
-
-        await audio.play();
-        setCurrentlyPlaying(recording.id);
-        setAudioElement(audio);
-      } catch (error) {
-        toast.error('Failed to start playback');
+      if (audioSrc) {
+        await play(recording.id, audioSrc);
       }
     }
   };
