@@ -5,11 +5,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-} from '@/components/ui/tooltip';
+
 import { toast } from 'sonner';
 import { ringGroupsService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
@@ -94,19 +90,15 @@ import {
   List,
   PhoneForwarded,
   PhoneOff,
-  Edit,
   Trash2,
-  Eye,
   ChevronUp,
   ChevronDown,
   X,
   Info,
-  ArrowUpDown,
   RefreshCw,
   GripVertical,
   Menu,
   Bot,
-  UserCheck,
   Phone,
   ArrowRight,
 } from 'lucide-react';
