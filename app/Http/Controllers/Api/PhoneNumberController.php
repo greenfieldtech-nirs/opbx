@@ -75,7 +75,7 @@ class PhoneNumberController extends Controller
         // Apply routing_type filter
         if ($request->has('routing_type') && $request->filled('routing_type')) {
             $routingType = $request->input('routing_type');
-            if (in_array($routingType, ['extension', 'ring_group', 'business_hours', 'conference_room'], true)) {
+            if (in_array($routingType, ['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu'], true)) {
                 $query->where('routing_type', $routingType);
             }
         }
