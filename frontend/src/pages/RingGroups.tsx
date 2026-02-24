@@ -906,28 +906,27 @@ export default function RingGroups() {
         </Alert>
 
         <div className="space-y-4 py-4">
-          {/* Name and Strategy side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Sales Team"
-                className={formErrors.name ? 'border-red-500' : ''}
-              />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
-            </div>
+          {/* Name - full width */}
+          <div className="space-y-2">
+            <Label htmlFor="name">
+              Ring Group Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="name"
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Sales Team"
+              className={formErrors.name ? 'border-red-500' : ''}
+            />
+            {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+          </div>
 
-            <div className="space-y-2">
-              <RingGroupStrategySelector
-                value={formData.strategy as import('@/components/design-system').RingGroupStrategy}
-                onChange={(value) => setFormData({ ...formData, strategy: value })}
-              />
-            </div>
+          {/* Ring Strategy - full width */}
+          <div className="space-y-2">
+            <RingGroupStrategySelector
+              value={formData.strategy as import('@/components/design-system').RingGroupStrategy}
+              onChange={(value) => setFormData({ ...formData, strategy: value })}
+            />
           </div>
 
           {/* Members */}
