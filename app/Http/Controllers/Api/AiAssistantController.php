@@ -9,7 +9,6 @@ use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Resources\AiAssistantResource;
 use App\Models\AiAssistant;
 use App\Services\AiAssistant\ProviderRegistry;
-use App\Services\AiAssistantService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -23,10 +22,6 @@ use Illuminate\Http\Request;
 class AiAssistantController extends AbstractApiCrudController
 {
     use AppliesFilters;
-
-    public function __construct(
-        private readonly AiAssistantService $aiAssistantService
-    ) {}
 
     /**
      * Get the model class name for this controller.
