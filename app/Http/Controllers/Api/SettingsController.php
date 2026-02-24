@@ -68,10 +68,15 @@ class SettingsController extends Controller
         ]);
 
         if (! $settings) {
+            // Generate URLs even without settings, using config app URL as fallback
+            $baseUrl = rtrim(config('app.url'), '/');
+            $callbackUrl = "{$baseUrl}/api/webhooks/cloudonix/session-update";
+            $cdrUrl = "{$baseUrl}/api/webhooks/cloudonix/cdr";
+
             return response()->json([
                 'settings' => null,
-                'callback_url' => null,
-                'cdr_url' => null,
+                'callback_url' => $callbackUrl,
+                'cdr_url' => $cdrUrl,
             ]);
         }
 
@@ -299,10 +304,34 @@ class SettingsController extends Controller
         ]);
 
         try {
+            // Handle masked API key: if the frontend sends a masked value (e.g., "XI12***abcd"),
+            // fetch the real key from the database for validation.
+            $apiKey = $validated['domain_api_key'];
+            if (str_contains($apiKey, '***')) {
+                $settings = CloudonixSettings::where('organization_id', $user->u003eorganization_id)->first();
+                if ($settings && $settings->domain_api_key) {
+                    $apiKey = $settings->domain_api_key;
+                    Log::debug('Using stored API key for validation (masked value received)', [
+                        'request_id' => $requestId,
+                        'organization_id' => $user->organization_id,
+                    ]);
+                } else {
+                    Log::warning('Masked API key received but no stored settings found', [
+                        'request_id' => $requestId,
+                        'organization_id' => $user->organization_id,
+                    ]);
+
+                    return response()->json([
+                        'valid' => false,
+                        'message' => 'Cannot validate with masked API key. Please provide the full API key or save settings first.',
+                    ], 422);
+                }
+            }
+
             // Use static validation method (doesn't require client instantiation or existing settings)
             $result = CloudonixClient::validateDomainCredentials(
                 $validated['domain_uuid'],
-                $validated['domain_api_key']
+                $apiKey
             );
 
             $isValid = $result['valid'] ?? false;
