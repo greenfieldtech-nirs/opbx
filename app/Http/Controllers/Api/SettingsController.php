@@ -786,49 +786,4 @@ class SettingsController extends Controller
             'application_id' => $appData['id'],
         ]);
     }
-
-    /**
-     * Reveal full API keys for the authenticated user's organization.
-     * Owner-only, rate-limited, audit-logged.
-     */
-    public function revealKeys(): JsonResponse
-    {
-        $requestId = $this->getRequestId();
-        $user = auth()->user();
-
-        if (! $user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
-
-        // Only owners can reveal keys
-        if (! $user->isOwner()) {
-            return response()->json(['error' => 'Forbidden. Only organization owners can reveal API keys.'], 403);
-        }
-
-        $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
-
-        if (! $settings) {
-            return response()->json(['error' => 'Settings not found'], 404);
-        }
-
-        // Audit log the key reveal
-        AuditLogger::log('api_keys_revealed', [
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
-
-        Log::info('API keys revealed', [
-            'request_id' => $requestId,
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-        ]);
-
-        return response()->json([
-            'domain_api_key' => $settings->domain_api_key,
-            'domain_requests_api_key' => $settings->domain_requests_api_key,
-            'warning' => 'These keys provide full access to your Cloudonix domain. Keep them secure.',
-        ]);
-    }
 }
