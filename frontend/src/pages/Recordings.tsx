@@ -72,7 +72,25 @@ export default function Recordings() {
       toast.success('Recording created successfully');
     },
     onError: (error: any) => {
-      toast.error('Failed to create recording: ' + error.message);
+      // Extract detailed error message from backend response
+      const backendMessage = error.response?.data?.message;
+      const backendErrors = error.response?.data?.errors;
+
+      let errorMessage = 'Failed to create recording';
+
+      if (backendMessage) {
+        errorMessage = backendMessage;
+      } else if (backendErrors) {
+        // Combine all validation errors into a single message
+        const errorList = Object.values(backendErrors).flat().filter(Boolean);
+        if (errorList.length > 0) {
+          errorMessage = errorList.join(', ');
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
     },
   });
 
