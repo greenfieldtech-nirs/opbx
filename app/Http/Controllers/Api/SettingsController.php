@@ -30,10 +30,7 @@ class SettingsController extends Controller
      */
     private function getCloudonixClient(): CloudonixClient
     {
-        $user = auth()->user();
-        if (! $user) {
-            throw new \RuntimeException('Authentication required');
-        }
+        $user = $this->getAuthenticatedUser();
 
         $settings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
         if (! $settings) {
@@ -49,11 +46,7 @@ class SettingsController extends Controller
     public function getCloudonixSettings(): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = auth()->user();
-
-        if (! $user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Check authorization using policy
         $this->authorize('viewAny', CloudonixSettings::class);
@@ -412,11 +405,7 @@ class SettingsController extends Controller
     public function generateRequestsApiKey(): JsonResponse
     {
         $requestId = $this->getRequestId();
-        $user = auth()->user();
-
-        if (! $user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
-        }
+        $user = $this->getAuthenticatedUser();
 
         // Check authorization using policy
         $this->authorize('generateApiKey', CloudonixSettings::class);
