@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Broadcast;
  * Authorization: User must belong to the organization
  * Returns: User info (id, name, role) for presence list
  */
-Broadcast::channel('presence.org.{organizationId}', function ($user, $organizationId) {
+Broadcast::channel('org.{organizationId}', function ($user, $organizationId) {
     // Check if user belongs to this organization
     if ((string) $user->organization_id !== (string) $organizationId) {
         return false;
@@ -61,7 +61,7 @@ Broadcast::channel('extension.{extensionId}', function ($user, $extensionId) {
     // Load extension with organization relationship
     $extension = \App\Models\Extension::with('organization')->find($extensionId);
 
-    if (!$extension) {
+    if (! $extension) {
         return false;
     }
 
