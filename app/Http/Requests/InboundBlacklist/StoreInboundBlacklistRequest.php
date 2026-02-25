@@ -47,7 +47,6 @@ class StoreInboundBlacklistRequest extends FormRequest
         return [
             'caller_id_pattern.regex' => 'The caller ID pattern must be a valid phone number or pattern (digits, +, *, ? only).',
             'did_number_ids.required_if' => 'Please select at least one phone number when not using global scope.',
-            'torment_room_prefix.required_if' => 'A room prefix is required when using the Torment strategy.',
         ];
     }
 
