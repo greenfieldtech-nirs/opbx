@@ -18,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { AlbsStrategySelector } from '@/components/design-system';
+import { DestinationTypeAndSelector } from '@/components/destinations';
+import type { DestinationType } from '@/components/destinations/types/destination.types';
 import {
   Plus,
   X,
@@ -366,214 +368,41 @@ export function LoadBalancerForm({
         </Alert>
       </div>
 
-      {/* Fallback Action */}
+      {/* Fallback Action - Using shared DestinationTypeAndSelector */}
       <div className="space-y-2">
         <Label>
           Fallback Action <span className="text-red-500">*</span>
         </Label>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="fallback_action" className="text-sm text-muted-foreground">Action</Label>
-            <Select
-              value={formData.fallback_action}
-              onValueChange={(value) => {
-                onChange({
-                  ...formData,
-                  fallback_action: value as RingGroupFallbackAction,
-                  fallback_extension_id:
-                    value === 'extension' ? formData.fallback_extension_id : undefined,
-                  fallback_ring_group_id:
-                    value === 'ring_group' ? formData.fallback_ring_group_id : undefined,
-                  fallback_ivr_menu_id:
-                    value === 'ivr_menu' ? formData.fallback_ivr_menu_id : undefined,
-                  fallback_ai_assistant_id:
-                    value === 'ai_assistant' ? formData.fallback_ai_assistant_id : undefined,
-                });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="extension">
-                  <div className="flex items-center gap-2">
-                    <PhoneForwarded className="h-4 w-4" />
-                    <span>Extension</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="ring_group">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>Ring Group</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="ivr_menu">
-                  <div className="flex items-center gap-2">
-                    <Menu className="h-4 w-4" />
-                    <span>IVR Menu</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="ai_assistant">
-                  <div className="flex items-center gap-2">
-                    <BotIcon className="h-4 w-4" />
-                    <span>AI Assistant</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="hangup">
-                  <div className="flex items-center gap-2">
-                    <PhoneOff className="h-4 w-4" />
-                    <span>Hangup</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">Destination</Label>
-            {formData.fallback_action === 'extension' && (
-              <Select
-                value={formData.fallback_extension_id || ''}
-                onValueChange={(value) =>
-                  onChange({ ...formData, fallback_extension_id: value })
-                }
-                disabled={availableExtensions.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      availableExtensions.length === 0
-                        ? 'No Available Options for Extension'
-                        : 'Select extension'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableExtensions.map((ext) => (
-                    <SelectItem key={ext.id} value={ext.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="flex items-center gap-1.5 bg-blue-100 text-blue-800 border-blue-200"
-                        >
-                          <Phone className="h-3.5 w-3.5" />
-                          {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {formData.fallback_action === 'ring_group' && (
-              <Select
-                value={formData.fallback_ring_group_id || ''}
-                onValueChange={(value) =>
-                  onChange({ ...formData, fallback_ring_group_id: value })
-                }
-                disabled={availableRingGroups.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      availableRingGroups.length === 0
-                        ? 'No Available Options for Ring Group'
-                        : 'Select ring group'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRingGroups.map((group) => (
-                    <SelectItem key={group.id} value={group.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200"
-                        >
-                          <Users className="h-3.5 w-3.5" />
-                          {group.name}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {formData.fallback_action === 'ivr_menu' && (
-              <Select
-                value={formData.fallback_ivr_menu_id || ''}
-                onValueChange={(value) =>
-                  onChange({ ...formData, fallback_ivr_menu_id: value })
-                }
-                disabled={availableIvrMenus.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      availableIvrMenus.length === 0
-                        ? 'No Available Options for IVR Menu'
-                        : 'Select IVR menu'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableIvrMenus.map((menu) => (
-                    <SelectItem key={menu.id} value={menu.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200"
-                        >
-                          <Menu className="h-3.5 w-3.5" />
-                          {menu.name}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {formData.fallback_action === 'ai_assistant' && (
-              <Select
-                value={formData.fallback_ai_assistant_id || ''}
-                onValueChange={(value) =>
-                  onChange({ ...formData, fallback_ai_assistant_id: value })
-                }
-                disabled={availableAiAssistants.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      availableAiAssistants.length === 0
-                        ? 'No Available Options for AI Assistant'
-                        : 'Select AI assistant'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAiAssistants.map((assistant) => (
-                    <SelectItem key={assistant.id} value={String(assistant.id)}>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200"
-                        >
-                          <BotIcon className="h-3.5 w-3.5" />
-                          {assistant.name}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {formData.fallback_action === 'hangup' && (
-              <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-                No destination needed
-              </div>
-            )}
-          </div>
-        </div>
+        <DestinationTypeAndSelector
+          typeValue={formData.fallback_action as DestinationType}
+          destinationValue={
+            formData.fallback_action === 'extension'
+              ? formData.fallback_extension_id || ''
+              : formData.fallback_action === 'ring_group'
+              ? formData.fallback_ring_group_id || ''
+              : formData.fallback_action === 'ivr_menu'
+              ? formData.fallback_ivr_menu_id || ''
+              : formData.fallback_action === 'ai_assistant'
+              ? formData.fallback_ai_assistant_id || ''
+              : ''
+          }
+          onChange={(type, destinationId) => {
+            onChange({
+              ...formData,
+              fallback_action: type as RingGroupFallbackAction,
+              fallback_extension_id: type === 'extension' ? destinationId : undefined,
+              fallback_ring_group_id: type === 'ring_group' ? destinationId : undefined,
+              fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : undefined,
+              fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : undefined,
+            });
+          }}
+          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant']}
+          includeHangup={true}
+          typeLabel="Action"
+          destinationLabel="Destination"
+          layout="grid"
+          gridColumns={{ type: 4, destination: 8 }}
+        />
       </div>
     </div>
   );
