@@ -31,10 +31,12 @@ import { toast } from 'sonner';
 
 /**
  * Combined call type that matches both API and WebSocket formats
+ * Uses call_id as primary identifier (consistent across WebSocket events)
  */
 interface LiveCall {
-  id: string | number;
-  session_id: number;
+  id: string;
+  call_id: string;
+  session_id?: number;
   caller_id: string;
   destination: string;
   direction: string;
@@ -77,19 +79,26 @@ export default function LiveCalls() {
   });
 
   // Transform initial HTTP data
+  // Note: HTTP API uses session_id, but WebSocket uses call_id
+  // We use call_ids from the API if available, otherwise fall back to session_id
   useEffect(() => {
     if (initialData?.data) {
-      const calls: LiveCall[] = initialData.data.map((call: ApiActiveCall) => ({
-        id: call.session_id,
-        session_id: call.session_id,
-        caller_id: call.caller_id || 'Unknown Caller',
-        destination: call.destination || 'Unknown',
-        direction: call.direction || 'unknown',
-        status: call.status,
-        session_created_at: call.session_created_at,
-        duration_seconds: call.duration_seconds || 0,
-        formatted_duration: call.formatted_duration || '0s',
-      }));
+      const calls: LiveCall[] = initialData.data.map((call: ApiActiveCall) => {
+        // Use first call_id from array, or fall back to session_id as string
+        const callId = call.call_ids?.[0] || String(call.session_id);
+        return {
+          id: callId,
+          call_id: callId,
+          session_id: call.session_id,
+          caller_id: call.caller_id || 'Unknown Caller',
+          destination: call.destination || 'Unknown',
+          direction: call.direction || 'unknown',
+          status: call.status,
+          session_created_at: call.session_created_at,
+          duration_seconds: call.duration_seconds || 0,
+          formatted_duration: call.formatted_duration || '0s',
+        };
+      });
       setLiveCalls(calls);
     }
   }, [initialData]);
@@ -98,14 +107,15 @@ export default function LiveCalls() {
   useEffect(() => {
     if (wsActiveCalls.length === 0) return;
 
+    console.log('[LiveCalls] WebSocket calls received:', wsActiveCalls);
+
     setLiveCalls((prevCalls) => {
-      // Create a map of existing calls by ID
-      const callsMap = new Map(prevCalls.map((c) => [String(c.session_id), c]));
+      // Create a map of existing calls by call_id (consistent with WebSocket)
+      const callsMap = new Map(prevCalls.map((c) => [c.call_id, c]));
 
       // Merge or add WebSocket calls
       wsActiveCalls.forEach((wsCall) => {
         const existing = callsMap.get(wsCall.call_id);
-        const sessionId = parseInt(wsCall.call_id, 10);
 
         if (existing) {
           // Update existing call
@@ -118,8 +128,8 @@ export default function LiveCalls() {
         } else {
           // Add new call from WebSocket
           callsMap.set(wsCall.call_id, {
-            id: sessionId,
-            session_id: sessionId,
+            id: wsCall.call_id,
+            call_id: wsCall.call_id,
             caller_id: wsCall.from_number || 'Unknown Caller',
             destination: wsCall.to_number || 'Unknown',
             direction: 'unknown',
@@ -335,7 +345,7 @@ export default function LiveCalls() {
                   accessorKey: 'session_id',
                   cell: (call) => (
                     <span className="font-mono text-xs text-muted-foreground">
-                      {call.session_id}
+                      {call.session_id || 'N/A'}
                     </span>
                   ),
                 },
@@ -343,21 +353,24 @@ export default function LiveCalls() {
                   ? [
                       {
                         header: 'Actions',
-                        cell: (call: LiveCall) => (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDisconnect(call.session_id);
-                            }}
-                            disabled={disconnectMutation.isPending}
-                            className="gap-2"
-                          >
-                            <PhoneOff className="h-4 w-4" />
-                            Disconnect
-                          </Button>
-                        ),
+                        cell: (call: LiveCall) =>
+                          call.session_id ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDisconnect(call.session_id!);
+                              }}
+                              disabled={disconnectMutation.isPending}
+                              className="gap-2"
+                            >
+                              <PhoneOff className="h-4 w-4" />
+                              Disconnect
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          ),
                       },
                     ]
                   : []),
