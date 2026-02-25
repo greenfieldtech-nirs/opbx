@@ -7,8 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\CallDetailRecordResource;
 use App\Models\CallDetailRecord;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * Call Detail Record (CDR) API controller (read-only).
@@ -52,12 +52,12 @@ class CallDetailRecordController extends AbstractApiCrudController
     {
         // Filter by caller number (from)
         if ($request->filled('from')) {
-            $query->where('from', 'like', '%' . $request->input('from') . '%');
+            $query->where('from', 'like', '%'.$request->input('from').'%');
         }
 
         // Filter by called number (to)
         if ($request->filled('to')) {
-            $query->where('to', 'like', '%' . $request->input('to') . '%');
+            $query->where('to', 'like', '%'.$request->input('to').'%');
         }
 
         // Filter by disposition
@@ -73,6 +73,92 @@ class CallDetailRecordController extends AbstractApiCrudController
         if ($request->filled('to_date')) {
             $query->whereDate('session_timestamp', '<=', $request->input('to_date'));
         }
+    }
+
+    /**
+     * Export CDRs to CSV.
+     */
+    public function export(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $user = $this->getAuthenticatedUser();
+
+        // Build query with same filters as index
+        $query = CallDetailRecord::forOrganization($user->organization_id);
+
+        // Apply filters
+        if ($request->filled('from')) {
+            $query->where('from', 'like', '%'.$request->input('from').'%');
+        }
+
+        if ($request->filled('to')) {
+            $query->where('to', 'like', '%'.$request->input('to').'%');
+        }
+
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->input('disposition'));
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('session_timestamp', '>=', $request->input('from_date'));
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('session_timestamp', '<=', $request->input('to_date'));
+        }
+
+        // Order by timestamp desc
+        $query->orderBy('session_timestamp', 'desc');
+
+        $filename = 'call-detail-records-'.now()->format('Y-m-d-His').'.csv';
+
+        $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($query) {
+            $handle = fopen('php://output', 'w');
+
+            // CSV Headers
+            fputcsv($handle, [
+                'Session Timestamp',
+                'Call ID',
+                'From',
+                'To',
+                'Disposition',
+                'Duration (sec)',
+                'Billable (sec)',
+                'Domain',
+                'Subscriber',
+                'Application',
+                'Rated Cost',
+                'Sell Cost',
+                'Status',
+            ]);
+
+            // Stream results in chunks to avoid memory issues
+            $query->chunk(1000, function ($records) use ($handle) {
+                foreach ($records as $record) {
+                    fputcsv($handle, [
+                        $record->session_timestamp?->format('Y-m-d H:i:s'),
+                        $record->call_id,
+                        $record->from,
+                        $record->to,
+                        $record->disposition,
+                        $record->duration,
+                        $record->billsec,
+                        $record->domain,
+                        $record->subscriber,
+                        $record->application,
+                        $record->rated_cost,
+                        $record->sell_cost,
+                        $record->status,
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        });
+
+        $response->headers->set('Content-Type', 'text/csv');
+        $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
+
+        return $response;
     }
 
     /**
