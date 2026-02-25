@@ -25,14 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Combobox } from '@/components/ui/combobox';
+
 import {
   Table,
   TableBody,
@@ -41,7 +34,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import {
@@ -58,6 +50,7 @@ import { toast } from 'sonner';
 import { outboundWhitelistService } from '@/services/outboundWhitelist.service';
 import { settingsService, type CloudonixTrunk } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
+import { OutboundWhitelistForm } from './OutboundWhitelist/components/OutboundWhitelistForm';
 import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest } from '@/types';
 
 type WhitelistFormData = {
@@ -503,95 +496,15 @@ const OutboundWhitelistPage: React.FC = () => {
                 Create a new outbound whitelist entry to allow calls to specific numbers or patterns.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Local Calls, Emergency Numbers"
-                  required
-                />
-                {formErrors.name && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.name}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="destination_country">Country</Label>
-                <Combobox
-                  options={countryOptions}
-                  value={formData.destination_country}
-                  onValueChange={(value) => setFormData({ ...formData, destination_country: value })}
-                  placeholder="Select destination country"
-                  searchPlaceholder="Search countries..."
-                  emptyText="No country found."
-                  buttonClassName="w-full"
-                  contentClassName="w-[--radix-popover-trigger-width]"
-                />
-                {formErrors.destination_country && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.destination_country}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="destination_prefix">Additional Prefix</Label>
-                <Input
-                  id="destination_prefix"
-                  value={formData.destination_prefix}
-                  onChange={(e) => setFormData({ ...formData, destination_prefix: e.target.value })}
-                  placeholder="e.g., 972, 212 (area code without country code)"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Area code or prefix (without country code). Will be combined with selected country.
-                </p>
-                {formErrors.destination_prefix && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.destination_prefix}</p>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="outbound_trunk_name">Voice Trunk</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => refetchTrunks()}
-                    disabled={trunksLoading}
-                    className="h-6 px-2"
-                  >
-                    <RefreshCw className={cn("h-3 w-3", trunksLoading && "animate-spin")} />
-                  </Button>
-                </div>
-                {trunks.length > 0 ? (
-                  <Select
-                    value={formData.outbound_trunk_name}
-                    onValueChange={(value) => setFormData({ ...formData, outbound_trunk_name: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a voice trunk" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {trunks.map((trunk) => (
-                        <SelectItem key={trunk.id} value={trunk.name}>
-                          {trunk.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="text-center py-4 border border-destructive/20 rounded-md bg-destructive/5">
-                    <p className="text-sm text-destructive font-medium">No outbound trunks available</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Configure Cloudonix settings to fetch available trunks
-                    </p>
-                  </div>
-                )}
-                {formErrors.outbound_trunk_name && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.outbound_trunk_name}</p>
-                )}
-              </div>
-            </div>
+            <OutboundWhitelistForm
+              formData={formData}
+              formErrors={formErrors}
+              countryOptions={countryOptions}
+              trunks={trunks}
+              trunksLoading={trunksLoading}
+              onChange={setFormData}
+              onRefreshTrunks={refetchTrunks}
+            />
             <DialogFooter>
               <Button
                 type="button"
@@ -618,95 +531,15 @@ const OutboundWhitelistPage: React.FC = () => {
                 Update the outbound whitelist entry settings.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="edit-name">Name</Label>
-                <Input
-                  id="edit-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Local Calls, Emergency Numbers"
-                  required
-                />
-                {formErrors.name && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.name}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-destination_country">Country</Label>
-                <Combobox
-                  options={countryOptions}
-                  value={formData.destination_country}
-                  onValueChange={(value) => setFormData({ ...formData, destination_country: value })}
-                  placeholder="Select destination country"
-                  searchPlaceholder="Search countries..."
-                  emptyText="No country found."
-                  buttonClassName="w-full"
-                  contentClassName="w-[--radix-popover-trigger-width]"
-                />
-                {formErrors.destination_country && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.destination_country}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-destination_prefix">Additional Prefix</Label>
-                <Input
-                  id="edit-destination_prefix"
-                  value={formData.destination_prefix}
-                  onChange={(e) => setFormData({ ...formData, destination_prefix: e.target.value })}
-                  placeholder="e.g., 1 for US, 44 for UK"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Optional prefix for the destination (e.g., area code)
-                </p>
-                {formErrors.destination_prefix && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.destination_prefix}</p>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="edit-outbound_trunk_name">Voice Trunk</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => refetchTrunks()}
-                    disabled={trunksLoading}
-                    className="h-6 px-2"
-                  >
-                    <RefreshCw className={cn("h-3 w-3", trunksLoading && "animate-spin")} />
-                  </Button>
-                </div>
-                {trunks.length > 0 ? (
-                  <Select
-                    value={formData.outbound_trunk_name}
-                    onValueChange={(value) => setFormData({ ...formData, outbound_trunk_name: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a voice trunk" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {trunks.map((trunk) => (
-                        <SelectItem key={trunk.id} value={trunk.name}>
-                          {trunk.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="text-center py-4 border border-destructive/20 rounded-md bg-destructive/5">
-                    <p className="text-sm text-destructive font-medium">No outbound trunks available</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Configure Cloudonix settings to fetch available trunks
-                    </p>
-                  </div>
-                )}
-                {formErrors.outbound_trunk_name && (
-                  <p className="text-sm text-destructive mt-1">{formErrors.outbound_trunk_name}</p>
-                )}
-              </div>
-            </div>
+            <OutboundWhitelistForm
+              formData={formData}
+              formErrors={formErrors}
+              countryOptions={countryOptions}
+              trunks={trunks}
+              trunksLoading={trunksLoading}
+              onChange={setFormData}
+              onRefreshTrunks={refetchTrunks}
+            />
             <DialogFooter>
               <Button
                 type="button"
