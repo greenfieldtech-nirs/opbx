@@ -84,7 +84,7 @@ export default function Dashboard() {
       icon: Activity,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      link: '/live-calls',
+      link: '/ui/live-calls',
     },
     {
       title: 'Extensions',
@@ -92,7 +92,7 @@ export default function Dashboard() {
       icon: Users,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      link: '/extensions',
+      link: '/ui/extensions',
     },
     {
       title: 'Phone Numbers',
@@ -100,7 +100,7 @@ export default function Dashboard() {
       icon: Phone,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-      link: '/phone-numbers',
+      link: '/ui/phone-numbers',
     },
     {
       title: 'Conference Rooms',
@@ -108,7 +108,7 @@ export default function Dashboard() {
       icon: PhoneCall,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
-      link: '/conference-rooms',
+      link: '/ui/conference-rooms',
     },
   ];
 
