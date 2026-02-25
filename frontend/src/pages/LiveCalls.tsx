@@ -20,7 +20,6 @@ import {
   PhoneOff,
   Wifi,
   WifiOff,
-  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -105,25 +104,13 @@ export default function LiveCalls() {
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
 
   // Initial data fetch via HTTP with configurable refresh
-  const { data: initialData, isLoading, error, isFetching } = useQuery({
+  const { data: initialData, isLoading, error } = useQuery({
     queryKey: ['active-calls'],
     queryFn: () => sessionUpdatesService.getActiveCalls(),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
     refetchIntervalInBackground: true,
     staleTime: 0, // Always consider data stale to enable refresh
   });
-
-  // Debounced loading state to prevent flickering on quick refreshes
-  const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
-  useEffect(() => {
-    if (isFetching) {
-      // Only show loading indicator if fetch takes longer than 300ms
-      const timer = setTimeout(() => setShowLoadingIndicator(true), 300);
-      return () => clearTimeout(timer);
-    } else {
-      setShowLoadingIndicator(false);
-    }
-  }, [isFetching]);
 
   // Transform initial HTTP data
   // Note: HTTP API uses session_id, but WebSocket uses call_id
@@ -267,12 +254,6 @@ export default function LiveCalls() {
                 ))}
               </SelectContent>
             </Select>
-            {/* Loading indicator - debounced to prevent flickering */}
-            <div className="w-4">
-              {showLoadingIndicator && refreshInterval > 0 && (
-                <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
-              )}
-            </div>
           </div>
 
           {/* WebSocket Connection Status */}
@@ -375,7 +356,7 @@ export default function LiveCalls() {
           <CardContent className="pt-6">
             <StandardDataTable<LiveCall>
               data={liveCalls}
-              isLoading={isFetching}
+              isLoading={false}
               identityIcon={PhoneCall}
               identityIconBg="bg-blue-100"
               identityIconColor="text-blue-600"
