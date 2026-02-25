@@ -115,6 +115,7 @@ interface LoadBalancerFormProps {
   onChange: (data: FormData) => void;
   onAddMember: () => void;
   onRemoveMember: (assistantId: string) => void;
+  onUpdateMember: (index: number, assistantId: string) => void;
   onDragEnd: (event: any) => void;
 }
 
@@ -139,6 +140,7 @@ export function LoadBalancerForm({
   onChange,
   onAddMember,
   onRemoveMember,
+  onUpdateMember,
   onDragEnd,
 }: LoadBalancerFormProps) {
   const sensors = useSensors(
@@ -149,9 +151,16 @@ export function LoadBalancerForm({
   );
 
   const totalWeight = formData.members.reduce((sum, m) => sum + (m.weight || 0), 0);
-  const availableAiAssistantsForMembers = availableAiAssistants.filter(
-    a => !formData.members.some(m => m.ai_assistant_id === String(a.id))
-  );
+
+  // Get available AI assistants for a member (excluding ones used by other members)
+  const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
+    const usedAssistantIds = formData.members
+      .map((m) => m.ai_assistant_id)
+      .filter((id) => id !== currentMemberAssistantId);
+    return availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
+  };
+
+  const availableAiAssistantsForMembers = getAvailableAiAssistantsForMember();
 
   return (
     <div className="space-y-4 py-4">
@@ -246,7 +255,7 @@ export function LoadBalancerForm({
               strategy={verticalListSortingStrategy}
             >
               <div className="border rounded-lg divide-y">
-                {formData.members.map((member) => (
+                {formData.members.map((member, index) => (
                   <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
                     {(dragHandleProps) => (
                       <div className="p-3 flex items-center gap-3">
@@ -254,10 +263,24 @@ export function LoadBalancerForm({
                           <GripVertical className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <BotIcon className="h-4 w-4 text-cyan-500" />
-                            <span className="font-medium">{member.ai_assistant_name}</span>
-                          </div>
+                          <Select
+                            value={member.ai_assistant_id}
+                            onValueChange={(value) => onUpdateMember(index, value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getAvailableAiAssistantsForMember(member.ai_assistant_id).map((assistant) => (
+                                <SelectItem key={assistant.id} value={String(assistant.id)}>
+                                  <div className="flex items-center gap-2">
+                                    <BotIcon className="h-4 w-4 text-cyan-500" />
+                                    <span>{assistant.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <Button
                           type="button"
@@ -278,13 +301,27 @@ export function LoadBalancerForm({
 
         {formData.members && formData.members.length > 0 && formData.strategy !== 'priority' && (
           <div className="border rounded-lg divide-y">
-            {formData.members.map((member) => (
+            {formData.members.map((member, index) => (
               <div key={member.ai_assistant_id} className="p-3 flex items-center gap-3">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <BotIcon className="h-4 w-4 text-cyan-500" />
-                    <span className="font-medium">{member.ai_assistant_name}</span>
-                  </div>
+                  <Select
+                    value={member.ai_assistant_id}
+                    onValueChange={(value) => onUpdateMember(index, value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableAiAssistantsForMember(member.ai_assistant_id).map((assistant) => (
+                        <SelectItem key={assistant.id} value={String(assistant.id)}>
+                          <div className="flex items-center gap-2">
+                            <BotIcon className="h-4 w-4 text-cyan-500" />
+                            <span>{assistant.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {formData.strategy === 'percentage' && (

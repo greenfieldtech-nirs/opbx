@@ -671,6 +671,24 @@ export default function AiAssistantLoadBalancers() {
     });
   };
 
+  const updateMemberAssistant = (index: number, assistantId: string) => {
+    const currentMembers = formData.members || [];
+    const assistant = availableAiAssistants.find((a) => String(a.id) === assistantId);
+    if (!assistant) return;
+
+    const newMembers = [...currentMembers];
+    newMembers[index] = {
+      ...newMembers[index],
+      ai_assistant_id: String(assistant.id),
+      ai_assistant_name: assistant.name,
+    };
+
+    setFormData({
+      ...formData,
+      members: newMembers,
+    });
+  };
+
   const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
     const currentMembers = formData.members || [];
     const usedAssistantIds = currentMembers
@@ -755,6 +773,7 @@ export default function AiAssistantLoadBalancers() {
           onChange={setFormData}
           onAddMember={addMember}
           onRemoveMember={removeMember}
+          onUpdateMember={updateMemberAssistant}
           onDragEnd={handleDragEnd}
         />
 
