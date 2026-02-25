@@ -17,13 +17,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
+import { AlbsStrategySelector } from '@/components/design-system';
 import {
   Plus,
   X,
   Info,
-  RotateCw,
-  Target,
-  Scale,
   GripVertical,
   Bot,
   PhoneForwarded,
@@ -162,64 +160,26 @@ export function LoadBalancerForm({
         </AlertDescription>
       </Alert>
 
-      {/* Name and Strategy side by side */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">
-            Name <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="name"
-            value={formData.name || ''}
-            onChange={(e) => onChange({ ...formData, name: e.target.value })}
-            placeholder="e.g., Support AI Pool"
-            className={formErrors.name ? 'border-red-500' : ''}
-          />
-          {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="strategy">
-            Strategy <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.strategy}
-            onValueChange={(value) =>
-              onChange({ ...formData, strategy: value as AlbsStrategy })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="round_robin">
-                <div className="flex items-center gap-2">
-                  <RotateCw className="h-4 w-4" />
-                  <span>Round Robin</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="priority">
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  <span>Priority Based</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="percentage">
-                <div className="flex items-center gap-2">
-                  <Scale className="h-4 w-4" />
-                  <span>Percentage Based</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
+      {/* Name */}
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          {getStrategyDescription(formData.strategy)}
-        </p>
+        <Label htmlFor="name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="name"
+          value={formData.name || ''}
+          onChange={(e) => onChange({ ...formData, name: e.target.value })}
+          placeholder="e.g., Support AI Pool"
+          className={formErrors.name ? 'border-red-500' : ''}
+        />
+        {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
       </div>
+
+      {/* Strategy Selector */}
+      <AlbsStrategySelector
+        value={formData.strategy}
+        onChange={(strategy) => onChange({ ...formData, strategy })}
+      />
 
       {/* Members */}
       <div className="space-y-2">
