@@ -154,20 +154,24 @@ export function LoadBalancerForm({
 
   // Get available AI assistants for a member (excluding ones used by other members)
   // Always include the currently selected assistant so it's visible in the dropdown
-  const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
+  const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string | number) => {
+    // Convert current ID to string for consistent comparison
+    const currentIdStr = currentMemberAssistantId ? String(currentMemberAssistantId) : undefined;
+    
+    // Get used assistant IDs (excluding current member) - all as strings
     const usedAssistantIds = formData.members
-      .map((m) => m.ai_assistant_id)
-      .filter((id) => id !== currentMemberAssistantId);
+      .map((m) => String(m.ai_assistant_id))
+      .filter((id) => id !== currentIdStr);
 
     // Get available assistants (not used by others)
     const available = availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
 
     // If there's a current selection, make sure it's included in the list
-    if (currentMemberAssistantId) {
+    if (currentIdStr) {
       const currentAssistant = availableAiAssistants.find(
-        (a) => String(a.id) === currentMemberAssistantId
+        (a) => String(a.id) === currentIdStr
       );
-      if (currentAssistant && !available.some((a) => String(a.id) === currentMemberAssistantId)) {
+      if (currentAssistant && !available.some((a) => String(a.id) === currentIdStr)) {
         available.unshift(currentAssistant);
       }
     }
@@ -279,7 +283,7 @@ export function LoadBalancerForm({
                         </div>
                         <div className="flex-1">
                           <Select
-                            value={member.ai_assistant_id}
+                            value={String(member.ai_assistant_id)}
                             onValueChange={(value) => onUpdateMember(index, value)}
                           >
                             <SelectTrigger>
@@ -320,7 +324,7 @@ export function LoadBalancerForm({
               <div key={member.ai_assistant_id} className="p-3 flex items-center gap-3">
                 <div className="flex-1">
                   <Select
-                    value={member.ai_assistant_id}
+                    value={String(member.ai_assistant_id)}
                     onValueChange={(value) => onUpdateMember(index, value)}
                   >
                     <SelectTrigger>
