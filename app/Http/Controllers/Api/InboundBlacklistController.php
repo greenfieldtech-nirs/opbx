@@ -107,6 +107,12 @@ class InboundBlacklistController extends Controller
             // Set default status to active
             $validated['status'] = $validated['status'] ?? InboundBlacklistStatus::ACTIVE;
 
+            // Auto-generate torment settings if using torment strategy
+            if ($validated['rejection_strategy'] === 'torment') {
+                $validated['torment_room_prefix'] = \Illuminate\Support\Str::random(16);
+                $validated['torment_music_timeout'] = 600;
+            }
+
             $entry = InboundBlacklist::create($validated);
 
             // Attach DID numbers
@@ -206,6 +212,12 @@ class InboundBlacklistController extends Controller
             // Extract DID IDs before updating
             $didNumberIds = $validated['did_number_ids'] ?? null;
             unset($validated['did_number_ids']);
+
+            // Auto-generate torment settings if using torment strategy
+            if (isset($validated['rejection_strategy']) && $validated['rejection_strategy'] === 'torment') {
+                $validated['torment_room_prefix'] = \Illuminate\Support\Str::random(16);
+                $validated['torment_music_timeout'] = 600;
+            }
 
             $inboundBlacklist->update($validated);
 

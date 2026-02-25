@@ -37,18 +37,8 @@ class StoreInboundBlacklistRequest extends FormRequest
                 'exists:did_numbers,id',
             ],
             'is_global' => ['boolean'],
-            'torment_room_prefix' => [
-                'nullable',
-                'string',
-                'max:20',
-                'required_if:rejection_strategy,torment',
-            ],
-            'torment_music_timeout' => [
-                'nullable',
-                'integer',
-                'min:60',
-                'max:3600',
-            ],
+            // Note: torment_room_prefix and torment_music_timeout are auto-generated
+            // Room prefix: random 16-char string, Timeout: fixed at 600 seconds
         ];
     }
 
