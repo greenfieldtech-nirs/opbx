@@ -396,12 +396,11 @@ export function LoadBalancerForm({
               fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : undefined,
             });
           }}
-          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant']}
+          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'hangup']}
           includeHangup={true}
           typeLabel="Action"
           destinationLabel="Destination"
-          layout="grid"
-          gridColumns={{ type: 4, destination: 8 }}
+          layout="vertical"
         />
       </div>
     </div>
