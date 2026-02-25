@@ -114,40 +114,51 @@ class CallDetailRecordController extends AbstractApiCrudController
         $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($query) {
             $handle = fopen('php://output', 'w');
 
-            // CSV Headers
+            // CSV Headers - using raw_cdr session data as requested
             fputcsv($handle, [
-                'Session Timestamp',
-                'Call ID',
+                'Timestamp',
                 'From',
                 'To',
-                'Disposition',
+                'Call Start Time',
+                'Call Answer Time',
+                'Call End Time',
+                'Domain',
+                'Session Token',
                 'Duration (sec)',
                 'Billable (sec)',
-                'Domain',
-                'Subscriber',
-                'Application',
-                'Rated Cost',
-                'Sell Cost',
                 'Status',
             ]);
 
             // Stream results in chunks to avoid memory issues
             $query->chunk(1000, function ($records) use ($handle) {
                 foreach ($records as $record) {
+                    // Extract session data from raw_cdr
+                    $rawCdr = $record->raw_cdr ?? [];
+                    $session = $rawCdr['session'] ?? [];
+
+                    // Format timestamps from raw_cdr (milliseconds to seconds)
+                    $callStartTime = isset($session['callStartTime']) && $session['callStartTime'] > 0
+                        ? \Carbon\Carbon::createFromTimestampMs($session['callStartTime'])->format('Y-m-d H:i:s')
+                        : '';
+                    $callAnswerTime = isset($session['callAnswerTime']) && $session['callAnswerTime'] > 0
+                        ? \Carbon\Carbon::createFromTimestampMs($session['callAnswerTime'])->format('Y-m-d H:i:s')
+                        : '';
+                    $callEndTime = isset($session['callEndTime']) && $session['callEndTime'] > 0
+                        ? \Carbon\Carbon::createFromTimestampMs($session['callEndTime'])->format('Y-m-d H:i:s')
+                        : '';
+
                     fputcsv($handle, [
                         $record->session_timestamp?->format('Y-m-d H:i:s'),
-                        $record->call_id,
                         $record->from,
                         $record->to,
-                        $record->disposition,
+                        $callStartTime,
+                        $callAnswerTime,
+                        $callEndTime,
+                        $record->domain,
+                        $session['token'] ?? '',
                         $record->duration,
                         $record->billsec,
-                        $record->domain,
-                        $record->subscriber,
-                        $record->application,
-                        $record->rated_cost,
-                        $record->sell_cost,
-                        $record->status,
+                        $session['status'] ?? $record->status,
                     ]);
                 }
             });
