@@ -6,6 +6,8 @@ namespace App\Http\Requests\Auth;
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Rules\Recaptcha;
+use App\Rules\ValidEmailDomain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
@@ -57,6 +59,7 @@ class RegisterRequest extends FormRequest
                 'required',
                 'email',
                 'max:255',
+                new ValidEmailDomain,
                 function ($attribute, $value, $fail) {
                     if (User::where('email', $value)->exists()) {
                         $fail('The admin email has already been taken.');
@@ -76,6 +79,11 @@ class RegisterRequest extends FormRequest
             'admin.password_confirmation' => [
                 'required',
                 'string',
+            ],
+            'recaptcha_token' => [
+                'nullable',
+                'string',
+                new Recaptcha,
             ],
         ];
     }

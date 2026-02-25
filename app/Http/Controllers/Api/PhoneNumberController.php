@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AlbsStatus;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
 use App\Http\Requests\PhoneNumber\UpdatePhoneNumberRequest;
 use App\Http\Resources\PhoneNumberResource;
-use App\Enums\UserStatus;
-use App\Enums\AlbsStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
@@ -75,7 +75,7 @@ class PhoneNumberController extends Controller
         // Apply routing_type filter
         if ($request->has('routing_type') && $request->filled('routing_type')) {
             $routingType = $request->input('routing_type');
-            if (in_array($routingType, ['extension', 'ring_group', 'business_hours', 'conference_room'], true)) {
+            if (in_array($routingType, ['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu'], true)) {
                 $query->where('routing_type', $routingType);
             }
         }
@@ -249,9 +249,8 @@ class PhoneNumberController extends Controller
             ]);
 
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to update phone number',
-                'error_code' => 'UPDATE_FAILED',
+                'error' => 'Failed to update phone number',
+                'message' => 'An error occurred while updating the phone number.',
             ], 500);
         }
     }
@@ -276,10 +275,6 @@ class PhoneNumberController extends Controller
         ]);
 
         try {
-            // Check for recent call activity (log warning if found)
-            // Note: This would require call_logs table query, which we'll skip for now
-            // as the requirement is just to log a warning, not block deletion
-
             DB::transaction(function () use ($phoneNumber): void {
                 $phoneNumber->delete();
             });

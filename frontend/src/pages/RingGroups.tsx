@@ -5,11 +5,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-} from '@/components/ui/tooltip';
+
 import { toast } from 'sonner';
 import { ringGroupsService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { extensionsService } from '@/services/extensions.service';
@@ -18,7 +14,8 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   StandardDataTable,
   Column,
-  EmptyState
+  EmptyState,
+  RingGroupStrategySelector,
 } from '@/components/design-system';
 import type {
   RingGroup,
@@ -93,19 +90,15 @@ import {
   List,
   PhoneForwarded,
   PhoneOff,
-  Edit,
   Trash2,
-  Eye,
   ChevronUp,
   ChevronDown,
   X,
   Info,
-  ArrowUpDown,
   RefreshCw,
   GripVertical,
   Menu,
   Bot,
-  UserCheck,
   Phone,
   ArrowRight,
 } from 'lucide-react';
@@ -235,10 +228,7 @@ export default function RingGroups() {
     members: [],
   });
 
-  // Debug formData changes
-  // useEffect(() => {
-  //   console.log('formData updated:', formData);
-  // }, [formData]);
+
 
   const [selectedGroup, setSelectedGroup] = useState<RingGroup | null>(null);
 
@@ -314,25 +304,12 @@ export default function RingGroups() {
 
   // Filter out current ring group when editing (can't fallback to self)
   const allRingGroups = useMemo(() => {
-    console.log('[allRingGroups useMemo] Computing...');
-    console.log('  - allRingGroupsData:', allRingGroupsData);
-    console.log('  - allRingGroupsData?.data:', allRingGroupsData?.data);
-    console.log('  - typeof allRingGroupsData?.data:', typeof allRingGroupsData?.data);
-    console.log('  - Array.isArray(allRingGroupsData?.data):', Array.isArray(allRingGroupsData?.data));
-    console.log('  - selectedGroup:', selectedGroup);
-
     const groups = allRingGroupsData?.data || [];
-    console.log('  - groups (before filter):', groups);
-    console.log('  - groups.length:', groups.length);
 
     if (selectedGroup) {
-      const filtered = groups.filter(g => g.id !== selectedGroup.id);
-      console.log('  - filtered (after removing current):', filtered);
-      console.log('  - filtered.length:', filtered.length);
-      return filtered;
+      return groups.filter(g => g.id !== selectedGroup.id);
     }
 
-    console.log('  - returning all groups (no selectedGroup)');
     return groups;
   }, [allRingGroupsData, selectedGroup]);
 
@@ -909,27 +886,6 @@ export default function RingGroups() {
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
-    // Debug logging for fallback selects
-    console.log('=== RING GROUPS DEBUG ===');
-    console.log('isLoadingAllRingGroups:', isLoadingAllRingGroups);
-    console.log('allRingGroupsData RAW:', allRingGroupsData);
-    console.log('allRingGroupsData?.data:', allRingGroupsData?.data);
-    console.log('allRingGroups (after filter):', allRingGroups);
-    console.log('selectedGroup:', selectedGroup);
-    console.log('Available data for fallback selects:', {
-      allRingGroups: allRingGroups?.length || 0,
-      availableIvrMenus: availableIvrMenus?.length || 0,
-      availableAiAssistants: availableAiAssistants?.length || 0,
-      availableExtensions: availableExtensions?.length || 0,
-    });
-    console.log('Current formData fallback values:', {
-      fallback_action: formData.fallback_action,
-      fallback_extension_id: formData.fallback_extension_id,
-      fallback_ring_group_id: formData.fallback_ring_group_id,
-      fallback_ivr_menu_id: formData.fallback_ivr_menu_id,
-      fallback_ai_assistant_id: formData.fallback_ai_assistant_id,
-    });
-
     const title = isEdit ? 'Edit Ring Group' : 'Create Ring Group';
     const description = isEdit
       ? 'Update ring group settings and members'
@@ -950,63 +906,27 @@ export default function RingGroups() {
         </Alert>
 
         <div className="space-y-4 py-4">
-          {/* Name and Strategy side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Sales Team"
-                className={formErrors.name ? 'border-red-500' : ''}
-              />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="strategy">
-                Ring Strategy <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.strategy}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, strategy: value as RingGroupStrategy })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="simultaneous">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <span>Simultaneous (Ring All)</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="round_robin">
-                    <div className="flex items-center gap-2">
-                      <RotateCw className="h-4 w-4" />
-                      <span>Round Robin</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="sequential">
-                    <div className="flex items-center gap-2">
-                      <List className="h-4 w-4" />
-                      <span>Sequential</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Name - full width */}
+          <div className="space-y-2">
+            <Label htmlFor="name">
+              Ring Group Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="name"
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Sales Team"
+              className={formErrors.name ? 'border-red-500' : ''}
+            />
+            {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
           </div>
 
+          {/* Ring Strategy - full width */}
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              {getStrategyDescription(formData.strategy as RingGroupStrategy)}
-            </p>
+            <RingGroupStrategySelector
+              value={formData.strategy as import('@/components/design-system').RingGroupStrategy}
+              onChange={(value) => setFormData({ ...formData, strategy: value })}
+            />
           </div>
 
           {/* Members */}

@@ -51,16 +51,12 @@ class ExtensionPasswordController extends Controller
             ], 404);
         }
 
-        if (! $extension->password) {
-            // Check if it's a non-USER extension
-            if ($extension->type !== \App\Enums\ExtensionType::USER) {
-                return response()->json([
-                    'error' => 'No password',
-                    'message' => 'Only PBX User extensions have SIP passwords. '.
-                        ucfirst($extension->type->value).' extensions do not require authentication.',
-                ], 400);
-            }
+        // Only USER type extensions have passwords - return 204 No Content for others
+        if ($extension->type !== \App\Enums\ExtensionType::USER) {
+            return response()->json(null, 204);
+        }
 
+        if (! $extension->password) {
             return response()->json([
                 'error' => 'No password',
                 'message' => 'This extension does not have a password set.',

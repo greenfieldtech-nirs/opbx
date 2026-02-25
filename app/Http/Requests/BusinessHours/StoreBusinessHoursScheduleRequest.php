@@ -211,8 +211,8 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Set default status if not provided
-        if (! $this->has('status')) {
+        // Set default status if not provided or empty
+        if (! $this->has('status') || empty($this->input('status'))) {
             $this->merge([
                 'status' => BusinessHoursStatus::ACTIVE->value,
             ]);

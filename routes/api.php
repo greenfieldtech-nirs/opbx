@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
+use App\Http\Controllers\Api\EmailValidationController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
 use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
@@ -36,11 +37,7 @@ use Illuminate\Support\Facades\Route;
 | These routes handle the REST API for PBX configuration and management.
 | All routes require authentication via Laravel Sanctum.
 |
-
 */
-
-// Broadcasting authentication routes (must be before auth middleware)
-Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
 
 // Public routes for external services (Cloudonix) to access audio files.
 // SECURITY: This route requires HMAC-signed URLs with expiration.
@@ -129,6 +126,16 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 // API Version 1 routes
 Route::prefix('v1')->group(function (): void {
+    // Broadcasting authentication routes (for WebSocket presence channels)
+    // Must be accessible to authenticated users for Laravel Echo
+    Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
+
+    // Email validation endpoint (public, rate limited)
+    // Used for async email validation during registration
+    Route::get('/validate-email', [EmailValidationController::class, 'validate'])
+        ->middleware('throttle:10,1')
+        ->name('validate-email');
+
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
@@ -266,6 +273,7 @@ Route::prefix('v1')->group(function (): void {
         // Call Detail Records (read-only)
         Route::prefix('call-detail-records')->group(function (): void {
             Route::get('/', [CallDetailRecordController::class, 'index'])->name('call-detail-records.index');
+            Route::get('/export', [CallDetailRecordController::class, 'export'])->name('call-detail-records.export');
             Route::get('/statistics', [CallDetailRecordController::class, 'statistics'])->name('call-detail-records.statistics');
             Route::get('/{call_detail_record}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
         });
@@ -282,9 +290,6 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/validate', [SettingsController::class, 'validateCloudonixCredentials'])->name('settings.cloudonix.validate');
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
-            Route::post('cloudonix/reveal-keys', [SettingsController::class, 'revealKeys'])
-                ->middleware('sensitive-operations')
-                ->name('settings.cloudonix.reveal-keys');
         });
 
     });

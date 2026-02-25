@@ -174,7 +174,10 @@ class AiAssistantLoadBalancer extends Model
      */
     public function getActiveMemberCount(): int
     {
-        return $this->getActiveMembers()->count();
+        return $this->members()
+            ->where('status', 'active')
+            ->whereHas('aiAssistant', fn ($q) => $q->where('status', UserStatus::ACTIVE->value))
+            ->count();
     }
 
     /**

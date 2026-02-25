@@ -6,21 +6,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CallLog;
-
-
-use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * Call log API controller (read-only).
+ *
+ * @deprecated Use CallDetailRecordController instead. This controller is maintained for
+ * backwards compatibility but new code should use the CDR endpoints at /api/v1/call-detail-records.
+ * See docs/architecture/call-logs.md for detailed explanation of the dual-table design.
  */
 class CallLogController extends Controller
 {
-    use ApiRequestHandler;
     /**
      * List call logs for the authenticated user's organization.
+     *
+     * @deprecated Use CallDetailRecordController::index() instead.
      */
     public function index(Request $request): JsonResponse
     {
@@ -47,11 +48,11 @@ class CallLogController extends Controller
         }
 
         if ($request->has('from_number')) {
-            $query->where('from_number', 'like', '%' . $request->input('from_number') . '%');
+            $query->where('from_number', 'like', '%'.$request->input('from_number').'%');
         }
 
         if ($request->has('to_number')) {
-            $query->where('to_number', 'like', '%' . $request->input('to_number') . '%');
+            $query->where('to_number', 'like', '%'.$request->input('to_number').'%');
         }
 
         $callLogs = $query->paginate(50);
@@ -61,6 +62,8 @@ class CallLogController extends Controller
 
     /**
      * Get a specific call log.
+     *
+     * @deprecated Use CallDetailRecordController::show() instead.
      */
     public function show(CallLog $callLog): JsonResponse
     {
@@ -73,6 +76,8 @@ class CallLogController extends Controller
 
     /**
      * Get active calls for the organization.
+     *
+     * @deprecated Use SessionUpdateController::getActiveCalls() instead.
      */
     public function active(Request $request): JsonResponse
     {
@@ -88,6 +93,8 @@ class CallLogController extends Controller
 
     /**
      * Get call statistics for the organization.
+     *
+     * @deprecated Use CallDetailRecordController::statistics() instead.
      */
     public function statistics(Request $request): JsonResponse
     {

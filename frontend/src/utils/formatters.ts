@@ -206,3 +206,16 @@ export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return `${str.slice(0, length)}...`;
 }
+
+/**
+ * Safely parse JSON string
+ * Returns parsed data or original string if parsing fails
+ */
+export function safeParseJson(jsonString: string | undefined): { data: unknown | null; error: boolean } {
+  if (!jsonString) return { data: null, error: false };
+  try {
+    return { data: JSON.parse(jsonString), error: false };
+  } catch (e) {
+    return { data: jsonString, error: true };
+  }
+}

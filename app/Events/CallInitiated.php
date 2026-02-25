@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Events;
 
 use App\Models\CallLog;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -20,8 +19,7 @@ class CallInitiated implements ShouldBroadcast
      */
     public function __construct(
         public CallLog $callLog
-    ) {
-    }
+    ) {}
 
     /**
      * Get the channels the event should broadcast on.
@@ -31,7 +29,7 @@ class CallInitiated implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new Channel('presence.org.' . $this->callLog->organization_id),
+            new PresenceChannel('org.'.$this->callLog->organization_id),
         ];
     }
 

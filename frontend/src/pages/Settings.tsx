@@ -36,24 +36,22 @@ import {
 } from '@/components/ui/tooltip';
 import {
    Settings as SettingsIcon,
-   Globe,
-   Key,
-   RefreshCw,
-   Clock,
-   Mic,
-   Link as LinkIcon,
-   Copy,
-   Eye,
-   EyeOff,
-   Loader2,
-   CheckCircle2,
-   AlertCircle,
-   Info,
-   XCircle,
-   FileText,
-   Shield,
-   Zap,
-   BarChart3,
+    Globe,
+    Key,
+    RefreshCw,
+    Clock,
+    Mic,
+    Link as LinkIcon,
+    Copy,
+    Eye,
+    EyeOff,
+    Loader2,
+    CheckCircle2,
+    AlertCircle,
+    Info,
+    XCircle,
+    FileText,
+    Shield,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -69,8 +67,6 @@ const settingsSchema = z.object({
   webhook_base_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
   no_answer_timeout: z.number().min(5, 'Minimum 5 seconds').max(120, 'Maximum 120 seconds'),
   recording_format: z.enum(['wav', 'mp3']),
-  // Sentry settings
-
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -158,9 +154,6 @@ export default function Settings() {
   }, [settingsData]);
 
   /**
-   * Check if a value appears to be obfuscated (contains only dots, asterisks, or masking characters)
-   */
-  /**
    * Validate credentials and save all settings
    */
   const handleValidateAndSave = async () => {
@@ -183,36 +176,34 @@ export default function Settings() {
         setValidationStatus('valid');
 
         // Step 2: Populate form fields with Cloudonix profile settings if available
-        const currentFormValues = watch();
+        const formValues = watch();
+        const updateData: UpdateCloudonixSettingsRequest = {
+          domain_uuid: formValues.domain_uuid || undefined,
+          domain_name: formValues.domain_name || undefined,
+          domain_api_key: formValues.domain_api_key || undefined,
+          domain_requests_api_key: formValues.domain_requests_api_key || undefined,
+          webhook_base_url: formValues.webhook_base_url || undefined,
+          no_answer_timeout: formValues.no_answer_timeout,
+          recording_format: formValues.recording_format,
+        };
+
         if (result.profile_settings) {
           if (result.profile_settings.domain_name !== undefined) {
             setValue('domain_name', result.profile_settings.domain_name);
-            currentFormValues.domain_name = result.profile_settings.domain_name;
+            updateData.domain_name = result.profile_settings.domain_name;
           }
           if (result.profile_settings.no_answer_timeout !== undefined) {
             setValue('no_answer_timeout', result.profile_settings.no_answer_timeout);
-            currentFormValues.no_answer_timeout = result.profile_settings.no_answer_timeout;
+            updateData.no_answer_timeout = result.profile_settings.no_answer_timeout;
           }
           if (result.profile_settings.recording_format !== undefined) {
             setValue('recording_format', result.profile_settings.recording_format);
-            currentFormValues.recording_format = result.profile_settings.recording_format;
+            updateData.recording_format = result.profile_settings.recording_format;
           }
-
         }
 
         // Step 3: Save all settings to local DB and sync to Cloudonix
         try {
-          // Prepare update data with all fields
-          const updateData: UpdateCloudonixSettingsRequest = {
-            domain_uuid: currentFormValues.domain_uuid || undefined,
-            domain_name: currentFormValues.domain_name || undefined,
-            domain_api_key: currentFormValues.domain_api_key || undefined,
-            domain_requests_api_key: currentFormValues.domain_requests_api_key || undefined,
-            webhook_base_url: currentFormValues.webhook_base_url || undefined,
-            no_answer_timeout: currentFormValues.no_answer_timeout,
-            recording_format: currentFormValues.recording_format,
-          };
-
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
 
           setSettingsData(savedSettings);
@@ -822,9 +813,6 @@ export default function Settings() {
             </form>
           </CardContent>
         </Card>
-
-        {/* Routing Sentry Defaults */}
-
       </div>
     </TooltipProvider>
   );

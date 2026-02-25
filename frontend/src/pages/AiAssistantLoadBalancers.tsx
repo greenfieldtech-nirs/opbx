@@ -5,11 +5,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -22,6 +17,7 @@ import {
   Column,
   EmptyState
 } from '@/components/design-system';
+import { LoadBalancerForm } from './AiAssistantLoadBalancers/components/LoadBalancerForm';
 import type {
   AiAssistantLoadBalancer,
   AlbsStrategy,
@@ -70,7 +66,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertCircle,
@@ -79,7 +74,6 @@ import {
   Filter,
   Users,
   RotateCw,
-  List,
   PhoneForwarded,
   PhoneOff,
   Edit,
@@ -87,12 +81,10 @@ import {
   Eye,
   X,
   Info,
-  ArrowUpDown,
   RefreshCw,
   GripVertical,
   Menu,
   Bot,
-  UserCheck,
   Phone,
   ArrowRight,
   Scale,
@@ -220,6 +212,30 @@ interface MemberFormData {
 
 // Generate weight options for percentage strategy (0% to 100% in 5% increments)
 const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5); // [0, 5, 10, ..., 100]
+
+// Helper to build fallback fields based on action
+const buildFallbackFields = (formData: FormData): Record<string, string | null | undefined> => {
+  const base = {
+    fallback_extension_id: null as string | null,
+    fallback_ring_group_id: null as string | null,
+    fallback_ivr_menu_id: null as string | null,
+    fallback_ai_assistant_id: null as string | null,
+  };
+
+  switch (formData.fallback_action) {
+    case 'extension':
+      return { ...base, fallback_extension_id: formData.fallback_extension_id };
+    case 'ring_group':
+      return { ...base, fallback_ring_group_id: formData.fallback_ring_group_id };
+    case 'ivr_menu':
+      return { ...base, fallback_ivr_menu_id: formData.fallback_ivr_menu_id };
+    case 'ai_assistant':
+      return { ...base, fallback_ai_assistant_id: formData.fallback_ai_assistant_id };
+    case 'hangup':
+    default:
+      return base;
+  }
+};
 
 // Form data type
 interface FormData {
@@ -503,7 +519,7 @@ export default function AiAssistantLoadBalancers() {
       position: member.position,
     }));
 
-    const requestData: any = {
+    const requestData = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy,
@@ -511,43 +527,10 @@ export default function AiAssistantLoadBalancers() {
       fallback_action: formData.fallback_action,
       status: formData.status,
       members,
+      ...buildFallbackFields(formData),
     };
 
-    // Only include the relevant fallback ID based on fallback_action
-    switch (formData.fallback_action) {
-      case 'extension':
-        requestData.fallback_extension_id = formData.fallback_extension_id;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ring_group':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ivr_menu':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ai_assistant':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
-        break;
-      case 'hangup':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-    }
-
-    createMutation.mutate(requestData as any);
+    createMutation.mutate(requestData);
   };
 
   // Handle update
@@ -560,7 +543,7 @@ export default function AiAssistantLoadBalancers() {
       position: member.position,
     }));
 
-    const requestData: any = {
+    const requestData = {
       name: formData.name,
       description: formData.description,
       strategy: formData.strategy,
@@ -568,43 +551,10 @@ export default function AiAssistantLoadBalancers() {
       fallback_action: formData.fallback_action,
       status: formData.status,
       members,
+      ...buildFallbackFields(formData),
     };
 
-    // Only include the relevant fallback ID based on fallback_action
-    switch (formData.fallback_action) {
-      case 'extension':
-        requestData.fallback_extension_id = formData.fallback_extension_id;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ring_group':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = formData.fallback_ring_group_id;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ivr_menu':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = formData.fallback_ivr_menu_id;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-      case 'ai_assistant':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = formData.fallback_ai_assistant_id;
-        break;
-      case 'hangup':
-        requestData.fallback_extension_id = null;
-        requestData.fallback_ring_group_id = null;
-        requestData.fallback_ivr_menu_id = null;
-        requestData.fallback_ai_assistant_id = null;
-        break;
-    }
-
-    updateMutation.mutate({ id: selectedLoadBalancer.id, data: requestData as any });
+    updateMutation.mutate({ id: selectedLoadBalancer.id, data: requestData });
   };
 
   // Handle delete
@@ -660,16 +610,38 @@ export default function AiAssistantLoadBalancers() {
   // Member management functions
   const addMember = () => {
     const currentMembers = formData.members || [];
-    const usedAssistantIds = currentMembers.map((m) => m.ai_assistant_id);
+
+    // Prevent adding if already at max members
+    if (currentMembers.length >= 50) {
+      toast.error('Maximum of 50 AI Assistants allowed per load balancer');
+      return;
+    }
+
+    // Get list of AI assistants already in members
+    const usedAssistantIds = new Set(currentMembers.map((m) => m.ai_assistant_id));
+
+    // Filter out already-used assistants
     const unusedAssistants = availableAiAssistants.filter(
-      (a) => !usedAssistantIds.includes(String(a.id))
+      (a) => !usedAssistantIds.has(String(a.id))
     );
 
-    if (unusedAssistants.length === 0) return;
+    // Prevent adding if no assistants available
+    if (unusedAssistants.length === 0) {
+      toast.info('All available AI Assistants have been added');
+      return;
+    }
 
+    // Prevent adding duplicate (double-check)
     const firstAvailable = unusedAssistants[0];
+    const assistantId = String(firstAvailable.id);
+
+    if (usedAssistantIds.has(assistantId)) {
+      toast.error('This AI Assistant is already a member');
+      return;
+    }
+
     const newMember: MemberFormData = {
-      ai_assistant_id: String(firstAvailable.id),
+      ai_assistant_id: assistantId,
       ai_assistant_name: firstAvailable.name,
       weight: 100,
       position: currentMembers.length,
@@ -679,6 +651,8 @@ export default function AiAssistantLoadBalancers() {
       ...formData,
       members: [...currentMembers, newMember],
     });
+
+    toast.success(`Added ${firstAvailable.name} to load balancer`);
   };
 
   const removeMember = (assistantId: string) => {
@@ -694,6 +668,24 @@ export default function AiAssistantLoadBalancers() {
     setFormData({
       ...formData,
       members: reorderedMembers,
+    });
+  };
+
+  const updateMemberAssistant = (index: number, assistantId: string) => {
+    const currentMembers = formData.members || [];
+    const assistant = availableAiAssistants.find((a) => String(a.id) === assistantId);
+    if (!assistant) return;
+
+    const newMembers = [...currentMembers];
+    newMembers[index] = {
+      ...newMembers[index],
+      ai_assistant_id: String(assistant.id),
+      ai_assistant_name: assistant.name,
+    };
+
+    setFormData({
+      ...formData,
+      members: newMembers,
     });
   };
 
@@ -771,427 +763,19 @@ export default function AiAssistantLoadBalancers() {
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            Only active AI Assistants can be added to load balancers.
-          </AlertDescription>
-        </Alert>
-
-        <div className="space-y-4 py-4">
-          {/* Name and Strategy side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Support AI Pool"
-                className={formErrors.name ? 'border-red-500' : ''}
-              />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="strategy">
-                Strategy <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.strategy}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, strategy: value as AlbsStrategy })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="round_robin">
-                    <div className="flex items-center gap-2">
-                      <RotateCw className="h-4 w-4" />
-                      <span>Round Robin</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="priority">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4" />
-                      <span>Priority Based</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="percentage">
-                    <div className="flex items-center gap-2">
-                      <Scale className="h-4 w-4" />
-                      <span>Percentage Based</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              {getStrategyDescription(formData.strategy)}
-            </p>
-          </div>
-
-          {/* Members */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>
-                AI Assistant Members <span className="text-red-500">*</span>
-              </Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addMember}
-                disabled={
-                  (formData.members || []).length >= 50 ||
-                  availableAiAssistantsForMembers.length === 0
-                }
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Member
-              </Button>
-            </div>
-
-            {formErrors.members && <p className="text-sm text-red-500">{formErrors.members}</p>}
-
-            {(!formData.members || formData.members.length === 0) && (
-              <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No AI Assistants added yet</p>
-                <p className="text-xs">Click "Add Member" to add AI Assistants</p>
-              </div>
-            )}
-
-            {formData.members && formData.members.length > 0 && formData.strategy === 'priority' && (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={formData.members.map(m => m.ai_assistant_id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="border rounded-lg divide-y">
-                    {formData.members.map((member, index) => (
-                      <SortableItem key={member.ai_assistant_id} id={member.ai_assistant_id}>
-                        {(dragHandleProps) => (
-                          <div className="p-3 flex items-center gap-3">
-                            {/* Drag handle */}
-                            <div {...dragHandleProps} className="cursor-grab hover:cursor-grabbing">
-                              <GripVertical className="h-5 w-5 text-muted-foreground" />
-                            </div>
-
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Bot className="h-4 w-4 text-cyan-500" />
-                                <span className="font-medium">{member.ai_assistant_name}</span>
-                              </div>
-                            </div>
-
-                            {/* Remove button */}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeMember(member.ai_assistant_id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </SortableItem>
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            )}
-
-            {formData.members && formData.members.length > 0 && formData.strategy !== 'priority' && (
-              <div className="border rounded-lg divide-y">
-                {formData.members.map((member) => (
-                  <div key={member.ai_assistant_id} className="p-3 flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Bot className="h-4 w-4 text-cyan-500" />
-                        <span className="font-medium">{member.ai_assistant_name}</span>
-                      </div>
-                    </div>
-
-                    {/* Weight selector for percentage strategy */}
-                    {formData.strategy === 'percentage' && (
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs">Weight:</Label>
-                        <Select
-                          value={member.weight.toString()}
-                          onValueChange={(value) => {
-                            const newMembers = [...formData.members];
-                            const memberIndex = newMembers.findIndex(m => m.ai_assistant_id === member.ai_assistant_id);
-                            newMembers[memberIndex] = { ...member, weight: parseInt(value) };
-                            setFormData({ ...formData, members: newMembers });
-                          }}
-                        >
-                          <SelectTrigger className="w-24 h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {WEIGHT_OPTIONS.map(weight => (
-                              <SelectItem key={weight} value={weight.toString()}>
-                                {weight}%
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {/* Remove button */}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeMember(member.ai_assistant_id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {formData.strategy === 'percentage' && totalWeight > 0 && (
-              <div className="text-sm text-muted-foreground">
-                Total Distribution: {totalWeight}%
-              </div>
-            )}
-          </div>
-
-          {/* Follow Through Toggle */}
-          <div className="space-y-4 pt-4 border-t">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Follow Through</Label>
-                <p className="text-sm text-muted-foreground">
-                  Try next AI Assistant if current one fails
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="follow_through" className="text-sm text-muted-foreground">
-                  {formData.follow_through ? 'Enabled' : 'Disabled'}
-                </Label>
-                <Switch
-                  id="follow_through"
-                  checked={formData.follow_through}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, follow_through: checked })
-                  }
-                />
-              </div>
-            </div>
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                When enabled, if an AI Assistant call fails, the load balancer will
-                automatically try the next available assistant before executing the
-                fallback action. When disabled, the fallback action is executed immediately
-                when the first assistant fails.
-              </AlertDescription>
-            </Alert>
-          </div>
-
-          {/* Fallback Action */}
-          <div className="space-y-2">
-            <Label>
-              Fallback Action <span className="text-red-500">*</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fallback_action" className="text-sm text-muted-foreground">Action</Label>
-                <Select
-                  value={formData.fallback_action}
-                  onValueChange={(value) => {
-                    setFormData({
-                      ...formData,
-                      fallback_action: value as RingGroupFallbackAction,
-                      fallback_extension_id: value === 'extension' ? formData.fallback_extension_id : undefined,
-                      fallback_ring_group_id: value === 'ring_group' ? formData.fallback_ring_group_id : undefined,
-                      fallback_ivr_menu_id: value === 'ivr_menu' ? formData.fallback_ivr_menu_id : undefined,
-                      fallback_ai_assistant_id: value === 'ai_assistant' ? formData.fallback_ai_assistant_id : undefined,
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="extension">
-                      <div className="flex items-center gap-2">
-                        <PhoneForwarded className="h-4 w-4" />
-                        <span>Extension</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="ring_group">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        <span>Ring Group</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="ivr_menu">
-                      <div className="flex items-center gap-2">
-                        <Menu className="h-4 w-4" />
-                        <span>IVR Menu</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="ai_assistant">
-                      <div className="flex items-center gap-2">
-                        <Bot className="h-4 w-4" />
-                        <span>AI Assistant</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="hangup">
-                      <div className="flex items-center gap-2">
-                        <PhoneOff className="h-4 w-4" />
-                        <span>Hangup</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Destination</Label>
-                {formData.fallback_action === 'extension' && (
-                  <Select
-                    value={formData.fallback_extension_id || ''}
-                    onValueChange={(value) => {
-                      setFormData({
-                        ...formData,
-                        fallback_extension_id: value,
-                      });
-                    }}
-                    disabled={availableExtensions.length === 0}
-                  >
-                    <SelectTrigger className={formErrors.fallback_extension ? 'border-red-500' : ''}>
-                      <SelectValue placeholder={availableExtensions.length === 0 ? "No Available Options for Extension" : "Select extension"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableExtensions.map((ext) => (
-                        <SelectItem key={ext.id} value={ext.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1.5 bg-blue-100 text-blue-800 border-blue-200">
-                              <Phone className="h-3.5 w-3.5" />
-                              {ext.extension_number} - {ext.user?.name || 'Unassigned'}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {formData.fallback_action === 'ring_group' && (
-                  <Select
-                    value={formData.fallback_ring_group_id || ''}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fallback_ring_group_id: value })
-                    }
-                    disabled={allRingGroups.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={allRingGroups.length === 0 ? "No Available Options for Ring Group" : "Select ring group"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allRingGroups.map((group) => (
-                        <SelectItem key={group.id} value={group.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1.5 bg-orange-100 text-orange-800 border-orange-200">
-                              <Users className="h-3.5 w-3.5" />
-                              {group.name}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {formData.fallback_action === 'ivr_menu' && (
-                  <Select
-                    value={formData.fallback_ivr_menu_id || ''}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fallback_ivr_menu_id: value })
-                    }
-                    disabled={availableIvrMenus.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={availableIvrMenus.length === 0 ? "No Available Options for IVR Menu" : "Select IVR menu"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableIvrMenus.map((menu) => (
-                        <SelectItem key={menu.id} value={menu.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1.5 bg-purple-100 text-purple-800 border-purple-200">
-                              <Menu className="h-3.5 w-3.5" />
-                              {menu.name}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {formData.fallback_action === 'ai_assistant' && (
-                  <Select
-                    value={formData.fallback_ai_assistant_id || ''}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, fallback_ai_assistant_id: value })
-                    }
-                    disabled={availableAiAssistants.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={availableAiAssistants.length === 0 ? "No Available Options for AI Assistant" : "Select AI assistant"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableAiAssistants.map((assistant) => (
-                        <SelectItem key={assistant.id} value={String(assistant.id)}>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
-                              <Bot className="h-3.5 w-3.5" />
-                              {assistant.name}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {formData.fallback_action === 'hangup' && (
-                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-                    No destination needed
-                  </div>
-                )}
-                {formErrors.fallback_extension && formData.fallback_action === 'extension' && (
-                  <p className="text-sm text-red-500">{formErrors.fallback_extension}</p>
-                )}
-                {formErrors.fallback_ring_group && formData.fallback_action === 'ring_group' && (
-                  <p className="text-sm text-red-500">{formErrors.fallback_ring_group}</p>
-                )}
-                {formErrors.fallback_ivr_menu && formData.fallback_action === 'ivr_menu' && (
-                  <p className="text-sm text-red-500">{formErrors.fallback_ivr_menu}</p>
-                )}
-                {formErrors.fallback_ai_assistant && formData.fallback_action === 'ai_assistant' && (
-                  <p className="text-sm text-red-500">{formErrors.fallback_ai_assistant}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <LoadBalancerForm
+          formData={formData}
+          formErrors={formErrors}
+          availableAiAssistants={availableAiAssistants}
+          availableExtensions={availableExtensions}
+          availableRingGroups={allRingGroups}
+          availableIvrMenus={availableIvrMenus}
+          onChange={setFormData}
+          onAddMember={addMember}
+          onRemoveMember={removeMember}
+          onUpdateMember={updateMemberAssistant}
+          onDragEnd={handleDragEnd}
+        />
 
         <DialogFooter>
           <Button
@@ -1273,7 +857,7 @@ export default function AiAssistantLoadBalancers() {
             >
               <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
             </Button>
-            <Select value={strategyFilter} onValueChange={(value: any) => setStrategyFilter(value)}>
+            <Select value={strategyFilter} onValueChange={(value) => setStrategyFilter(value as typeof strategyFilter)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Strategy" />
@@ -1285,7 +869,7 @@ export default function AiAssistantLoadBalancers() {
                 <SelectItem value="percentage">Percentage Based</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />

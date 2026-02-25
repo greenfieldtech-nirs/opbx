@@ -107,12 +107,21 @@ class InboundBlacklistController extends Controller
             // Set default status to active
             $validated['status'] = $validated['status'] ?? InboundBlacklistStatus::ACTIVE;
 
+            // Auto-generate torment settings if using torment strategy
+            if ($validated['rejection_strategy'] === 'torment') {
+                $validated['torment_room_prefix'] = \Illuminate\Support\Str::random(16);
+                $validated['torment_music_timeout'] = 600;
+            }
+
             $entry = InboundBlacklist::create($validated);
 
             // Attach DID numbers
             if (! empty($didNumberIds)) {
                 $entry->didNumbers()->sync($didNumberIds);
             }
+
+            // Clear statistics cache
+            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Created inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -204,12 +213,21 @@ class InboundBlacklistController extends Controller
             $didNumberIds = $validated['did_number_ids'] ?? null;
             unset($validated['did_number_ids']);
 
+            // Auto-generate torment settings if using torment strategy
+            if (isset($validated['rejection_strategy']) && $validated['rejection_strategy'] === 'torment') {
+                $validated['torment_room_prefix'] = \Illuminate\Support\Str::random(16);
+                $validated['torment_music_timeout'] = 600;
+            }
+
             $inboundBlacklist->update($validated);
 
             // Sync DID numbers if provided
             if ($didNumberIds !== null) {
                 $inboundBlacklist->didNumbers()->sync($didNumberIds);
             }
+
+            // Clear statistics cache
+            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Updated inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -268,6 +286,9 @@ class InboundBlacklistController extends Controller
             $blacklistId = $inboundBlacklist->id;
             $inboundBlacklist->delete();
 
+            // Clear statistics cache
+            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
+
             Log::info('Deleted inbound blacklist entry', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -321,6 +342,9 @@ class InboundBlacklistController extends Controller
 
         try {
             $inboundBlacklist->toggleStatus();
+
+            // Clear statistics cache
+            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Toggled inbound blacklist entry status', [
                 'request_id' => $requestId,
@@ -413,6 +437,8 @@ class InboundBlacklistController extends Controller
 
     /**
      * Get blacklist statistics.
+     *
+     * Results are cached for 5 minutes to reduce database load.
      */
     public function getStatistics(Request $request): JsonResponse
     {
@@ -421,49 +447,54 @@ class InboundBlacklistController extends Controller
 
         $this->authorize('viewAny', InboundBlacklist::class);
 
-        $stats = [
-            'total_entries' => InboundBlacklist::where('organization_id', $user->organization_id)->count(),
-            'active_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
-                ->where('status', 'active')
-                ->count(),
-            'global_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
-                ->where('is_global', true)
-                ->count(),
-            'by_strategy' => [
-                'drop' => InboundBlacklist::where('organization_id', $user->organization_id)
-                    ->where('rejection_strategy', 'drop')
+        $cacheKey = "inbound-blacklist:stats:{$user->organization_id}";
+
+        $stats = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($user) {
+            return [
+                'total_entries' => InboundBlacklist::where('organization_id', $user->organization_id)->count(),
+                'active_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
+                    ->where('status', 'active')
                     ->count(),
-                'reject' => InboundBlacklist::where('organization_id', $user->organization_id)
-                    ->where('rejection_strategy', 'reject')
+                'global_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
+                    ->where('is_global', true)
                     ->count(),
-                'torment' => InboundBlacklist::where('organization_id', $user->organization_id)
-                    ->where('rejection_strategy', 'torment')
+                'by_strategy' => [
+                    'drop' => InboundBlacklist::where('organization_id', $user->organization_id)
+                        ->where('rejection_strategy', 'drop')
+                        ->count(),
+                    'reject' => InboundBlacklist::where('organization_id', $user->organization_id)
+                        ->where('rejection_strategy', 'reject')
+                        ->count(),
+                    'torment' => InboundBlacklist::where('organization_id', $user->organization_id)
+                        ->where('rejection_strategy', 'torment')
+                        ->count(),
+                ],
+                'by_match_type' => [
+                    'exact' => InboundBlacklist::where('organization_id', $user->organization_id)
+                        ->where('match_type', 'exact')
+                        ->count(),
+                    'prefix' => InboundBlacklist::where('organization_id', $user->organization_id)
+                        ->where('match_type', 'prefix')
+                        ->count(),
+                    'wildcard' => InboundBlacklist::where('organization_id', $user->organization_id)
+                        ->where('match_type', 'wildcard')
+                        ->count(),
+                ],
+                'total_blocked_calls' => BlockedCallLog::where('organization_id', $user->organization_id)->count(),
+                'blocked_calls_today' => BlockedCallLog::where('organization_id', $user->organization_id)
+                    ->whereDate('blocked_at', today())
                     ->count(),
-            ],
-            'by_match_type' => [
-                'exact' => InboundBlacklist::where('organization_id', $user->organization_id)
-                    ->where('match_type', 'exact')
+                'blocked_calls_this_week' => BlockedCallLog::where('organization_id', $user->organization_id)
+                    ->whereBetween('blocked_at', [now()->startOfWeek(), now()->endOfWeek()])
                     ->count(),
-                'prefix' => InboundBlacklist::where('organization_id', $user->organization_id)
-                    ->where('match_type', 'prefix')
-                    ->count(),
-                'wildcard' => InboundBlacklist::where('organization_id', $user->organization_id)
-                    ->where('match_type', 'wildcard')
-                    ->count(),
-            ],
-            'total_blocked_calls' => BlockedCallLog::where('organization_id', $user->organization_id)->count(),
-            'blocked_calls_today' => BlockedCallLog::where('organization_id', $user->organization_id)
-                ->whereDate('blocked_at', today())
-                ->count(),
-            'blocked_calls_this_week' => BlockedCallLog::where('organization_id', $user->organization_id)
-                ->whereBetween('blocked_at', [now()->startOfWeek(), now()->endOfWeek()])
-                ->count(),
-        ];
+            ];
+        });
 
         Log::info('Retrieved blacklist statistics', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
+            'cached' => \Illuminate\Support\Facades\Cache::has($cacheKey),
         ]);
 
         return response()->json(['data' => $stats]);

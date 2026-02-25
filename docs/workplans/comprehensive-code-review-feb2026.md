@@ -93,12 +93,7 @@ private function routeToAiAssistant(...) { return $this->hangupResponse(); }
 
 **Problem:** The `getCloudonixSettings()` endpoint returns `domain_api_key` and `domain_requests_api_key` in the response JSON. While the model has `$hidden` for these fields, the controller explicitly accesses them: `$settings->domain_api_key`.
 
-**Current Mitigation:** There IS a separate `revealKeys` endpoint behind `sensitive-operations` middleware and owner-only check. But the main `getCloudonixSettings` endpoint also returns the keys.
-
-**Remediation:**
-- Remove `domain_api_key` and `domain_requests_api_key` from the `getCloudonixSettings` response
-- Return masked versions (`getMaskedDomainApiKey()`) in the standard response
-- Keep the `revealKeys` endpoint as the only way to see full keys
+**Status:** FIXED - Controller now returns masked keys via `getMaskedDomainApiKey()` and `getMaskedDomainRequestsApiKey()`. The `revealKeys` endpoint has been removed as it was unused.
 
 ### 1.6 [HIGH] Test Route Left in Production Routes
 

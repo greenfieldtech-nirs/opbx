@@ -2,12 +2,13 @@
  * Recordings Page
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Eye, Pause, Play, Plus, Search, Trash2, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
+import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
+import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
-import type { Recording } from '@/types/api.types';
+import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
 
 export default function Recordings() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,30 +27,22 @@ export default function Recordings() {
 
 
   // Form state for filters
-  const [filterForm, setFilterForm] = useState({
+  const [filterForm, setFilterForm] = useState<{
+    search: string;
+    type: RecordingType | 'all' | '';
+    status: RecordingStatus | 'all' | '';
+  }>({
     search: '',
     type: '',
     status: '',
   });
 
-  // Audio playback state
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-
-  // Cleanup audio when component unmounts
-  useEffect(() => {
-    return () => {
-      if (audioElement) {
-        audioElement.pause();
-        audioElement.src = '';
-        setAudioElement(null);
-      }
-    };
-  }, []); // Only run on unmount
+  // Audio playback hook
+  const { currentlyPlaying, play, pause, isPlaying } = useAudioPlayer();
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
-  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -79,7 +72,25 @@ export default function Recordings() {
       toast.success('Recording created successfully');
     },
     onError: (error: any) => {
-      toast.error('Failed to create recording: ' + error.message);
+      // Extract detailed error message from backend response
+      const backendMessage = error.response?.data?.message;
+      const backendErrors = error.response?.data?.errors;
+
+      let errorMessage = 'Failed to create recording';
+
+      if (backendMessage) {
+        errorMessage = backendMessage;
+      } else if (backendErrors) {
+        // Combine all validation errors into a single message
+        const errorList = Object.values(backendErrors).flat().filter(Boolean);
+        if (errorList.length > 0) {
+          errorMessage = errorList.join(', ');
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
     },
   });
 
@@ -144,57 +155,16 @@ export default function Recordings() {
     }
   };
 
-  const handlePlayback = async (recording: any) => {
-    if (currentlyPlaying === recording.id) {
-      // Currently playing this recording, pause it
-      if (audioElement) {
-        audioElement.pause();
-        setCurrentlyPlaying(null);
-        setAudioElement(null);
-      }
+  const handlePlayback = async (recording: Recording) => {
+    if (isPlaying(recording.id)) {
+      pause();
     } else {
-      // Start playing this recording
-      try {
-        let audioSrc = '';
+      const audioSrc = recording.type === 'upload'
+        ? recording.playback_url
+        : recording.remote_url;
 
-        if (recording.type === 'upload') {
-          // For uploaded files, use the API stream endpoint
-          audioSrc = recording.playback_url;
-        } else {
-          // For remote files, use remote URL directly
-          audioSrc = recording.remote_url;
-        }
-
-        // Stop any currently playing audio
-        if (audioElement) {
-          audioElement.pause();
-          audioElement.src = ''; // Clear source to free resources
-          setAudioElement(null);
-        }
-
-        const audio = new Audio(audioSrc);
-
-        audio.addEventListener('ended', () => {
-          setCurrentlyPlaying(null);
-          setAudioElement(null);
-        });
-
-        audio.addEventListener('error', () => {
-          // Only show error if audio is not paused and we're still trying to play this recording
-          if (!audio.paused && currentlyPlaying === recording.id) {
-            toast.error('Failed to play recording');
-          }
-          setCurrentlyPlaying(null);
-          setAudioElement(null);
-        });
-
-        setAudioElement(audio);
-
-        await audio.play();
-        setCurrentlyPlaying(recording.id);
-        setAudioElement(audio);
-      } catch (error) {
-        toast.error('Failed to start playback');
+      if (audioSrc) {
+        await play(recording.id, audioSrc);
       }
     }
   };
@@ -207,7 +177,6 @@ export default function Recordings() {
       type: '',
       status: '',
     });
-    setCurrentPage(1);
     setCurrentPage(1);
   };
 
@@ -280,7 +249,7 @@ export default function Recordings() {
             <Select
               value={filterForm.type || 'all'}
               onValueChange={(value) => {
-                setFilterForm({ ...filterForm, type: value });
+                setFilterForm({ ...filterForm, type: value as RecordingType | 'all' });
                 setCurrentPage(1);
               }}
             >
@@ -299,7 +268,7 @@ export default function Recordings() {
             <Select
               value={filterForm.status || 'all'}
               onValueChange={(value) => {
-                setFilterForm({ ...filterForm, status: value });
+                setFilterForm({ ...filterForm, status: value as RecordingStatus | 'all' });
                 setCurrentPage(1);
               }}
             >
@@ -462,7 +431,7 @@ export default function Recordings() {
           </DialogHeader>
 
           <UploadForm
-            onSubmit={(data) => createRecordingMutation.mutate(data)}
+            onSubmit={(data) => createRecordingMutation.mutate(data as unknown as Partial<Recording>)}
             onCancel={() => setShowUploadDialog(false)}
             isLoading={createRecordingMutation.isPending}
           />
@@ -480,7 +449,7 @@ export default function Recordings() {
           </DialogHeader>
 
           <RemoteUrlForm
-            onSubmit={(data) => createRecordingMutation.mutate(data)}
+            onSubmit={(data) => createRecordingMutation.mutate(data as unknown as Partial<Recording>)}
             onCancel={() => setShowRemoteDialog(false)}
             isLoading={createRecordingMutation.isPending}
           />
@@ -507,14 +476,20 @@ export default function Recordings() {
 }
 
 // Type definitions
-interface FormProps {
-  onSubmit: (data: any) => void;
+interface UploadFormProps {
+  onSubmit: (data: FormData) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+interface RemoteUrlFormProps {
+  onSubmit: (data: { name: string; type: 'remote'; remote_url: string }) => void;
   onCancel: () => void;
   isLoading: boolean;
 }
 
 // Upload Form Component
-function UploadForm({ onSubmit, onCancel, isLoading }: FormProps) {
+function UploadForm({ onSubmit, onCancel, isLoading }: UploadFormProps) {
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -569,7 +544,7 @@ function UploadForm({ onSubmit, onCancel, isLoading }: FormProps) {
 }
 
 // Remote URL Form Component
-function RemoteUrlForm({ onSubmit, onCancel, isLoading }: FormProps) {
+function RemoteUrlForm({ onSubmit, onCancel, isLoading }: RemoteUrlFormProps) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
@@ -624,7 +599,7 @@ function RemoteUrlForm({ onSubmit, onCancel, isLoading }: FormProps) {
 }
 
 // Recording Details Component
-function RecordingDetails({ recording }: { recording: any }) {
+function RecordingDetails({ recording }: { recording: Recording }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">

@@ -93,10 +93,6 @@ import type {
   UpdateBusinessHoursRequest,
 } from '@/types';
 import {
-  mockDidBusinessHours,
-  mockExtensions,
-  getScheduleSummary,
-  getDetailedHours,
   isValidTimeFormat,
   isEndTimeAfterStart,
   formatExceptionDate,
@@ -668,26 +664,6 @@ const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
 // Time Range Editor Component (for detailed editing)
 // ============================================================================
 
-interface TimeRangeEditorProps {
-  schedule: WeeklySchedule;
-  onTimeRangeChange: (day: DayOfWeek, rangeId: string, field: 'start_time' | 'end_time', value: string) => void;
-  onAddTimeRange: (day: DayOfWeek) => void;
-  onRemoveTimeRange: (day: DayOfWeek, rangeId: string) => void;
-  errors: Record<string, string>;
-}
-
-const TimeRangeEditor: React.FC<TimeRangeEditorProps> = ({
-  schedule,
-  onTimeRangeChange,
-  onAddTimeRange,
-  onRemoveTimeRange,
-  errors,
-}) => {
-  // This component can be expanded later for more detailed time editing
-  // For now, the calendar view handles inline editing
-  return null;
-};
-
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -742,7 +718,7 @@ const BusinessHours: React.FC = () => {
     queryFn: () => extensionsService.getAll({ per_page: 1000 }),
   });
 
-  const extensions = extensionsData?.data || mockExtensions;
+  const extensions = extensionsData?.data || [];
 
   // Fetch ring groups for action selectors
   const { data: ringGroupsData } = useQuery({
@@ -1189,16 +1165,9 @@ const BusinessHours: React.FC = () => {
   const handleConfirmDelete = () => {
     if (!selectedSchedule) return;
 
-    // Check if schedule is associated with DIDs (TODO: fetch from backend)
-    const associatedDids = mockDidBusinessHours.filter(
-      (dh) => dh.business_hours_schedule_id === selectedSchedule.id
-    );
-
-    if (associatedDids.length > 0) {
-      toast.error(`This schedule is associated with ${associatedDids.length} DID(s). Remove associations first.`);
-      setIsDeleteDialogOpen(false);
-      return;
-    }
+    // TODO: Check if schedule is associated with DIDs before allowing deletion
+    // This requires a backend endpoint to check for associations
+    // For now, proceed with deletion and let backend handle referential integrity
 
     deleteMutation.mutate(selectedSchedule.id);
   };
@@ -1841,14 +1810,6 @@ const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> = ({
               errors={formErrors}
             />
 
-            {/* Time Range Editor - appears when editing a specific day */}
-            <TimeRangeEditor
-              schedule={formData.schedule || createEmptyWeeklySchedule()}
-              onTimeRangeChange={onTimeRangeChange}
-              onAddTimeRange={onAddTimeRange}
-              onRemoveTimeRange={onRemoveTimeRange}
-              errors={formErrors}
-            />
           </div>
 
           <Separator />
@@ -2517,10 +2478,11 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
 }) => {
   if (!schedule) return null;
 
-  const associatedDids = mockDidBusinessHours.filter(
-    (dh) => dh.business_hours_schedule_id === schedule.id
-  );
-  const detailedHours = getDetailedHours(schedule.schedule);
+  // TODO: Fetch associated DIDs from backend when endpoint is available
+  // const { data: associatedDids } = useQuery({
+  //   queryKey: ['business-hours-dids', schedule.id],
+  //   queryFn: () => businessHoursService.getAssociatedDids(schedule.id),
+  // });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -2620,15 +2582,6 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
               })}
             </div>
 
-            {/* Detailed Hours */}
-            <div className="space-y-1">
-              <Label className="text-sm">Detailed Hours:</Label>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                {detailedHours.map((hour, index) => (
-                  <li key={index}>{hour}</li>
-                ))}
-              </ul>
-            </div>
           </div>
 
           <Separator />
@@ -2658,40 +2611,6 @@ const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">No exception dates configured</p>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Associated DIDs */}
-          <div className="space-y-3">
-            <h3 className="font-semibold">
-              Associated DIDs {associatedDids.length > 0 && `(${associatedDids.length})`}
-            </h3>
-            {associatedDids.length > 0 ? (
-              <div className="space-y-4">
-                {associatedDids.map((did) => (
-                  <div key={did.did_number_id} className="border rounded-lg p-3 space-y-2 text-sm">
-                    <div className="font-medium">
-                      {did.phone_number} {did.name && `(${did.name})`}
-                    </div>
-                    <div className="text-xs space-y-1">
-                      <div>
-                        <span className="text-muted-foreground">Business Hours:</span>{' '}
-                        {did.business_hours_action}
-                        {did.business_hours_target && ` → ${did.business_hours_target}`}
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">After Hours:</span>{' '}
-                        {did.after_hours_action}
-                        {did.after_hours_target && ` → ${did.after_hours_target}`}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Not associated with any DIDs</p>
             )}
           </div>
         </div>

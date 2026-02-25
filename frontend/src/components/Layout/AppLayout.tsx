@@ -7,11 +7,11 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { useWebSocketConnection } from '@/hooks/useWebSocket';
+import { useEchoConnection } from '@/hooks/useEchoConnection';
 
 export function AppLayout() {
-  // Initialize WebSocket connection for real-time updates
-  useWebSocketConnection();
+  // Initialize Laravel Echo WebSocket connection for real-time updates
+  useEchoConnection();
 
   return (
     <div className="flex h-screen overflow-hidden">

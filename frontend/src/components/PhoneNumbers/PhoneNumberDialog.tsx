@@ -174,6 +174,7 @@ export function PhoneNumberDialog({
         routing_type: formData.routing_type,
         routing_config,
         status: formData.status,
+        enable_non_e164: formData.enable_non_e164,
       };
       onSubmit(createData);
     }

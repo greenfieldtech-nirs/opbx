@@ -1,36 +1,71 @@
 /**
  * Live Calls Page
  *
- * Real-time active calls monitoring using session-updates API
+ * Real-time active calls monitoring with configurable refresh rate
+ * Falls back to HTTP polling since WebSocket updates are unreliable
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, PhoneCall, Clock, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, PhoneOff } from 'lucide-react';
+import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Activity,
+  PhoneCall,
+  ArrowRightLeft,
+  ArrowUpRight,
+  ArrowDownLeft,
+  PhoneOff,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { ActiveCall } from '@/types/api.types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { CallStatus, getCallStatusColor, getCallStatusLabel, LiveCallStatuses } from '@/types/call.types';
+import type { ActiveCall as ApiActiveCall } from '@/types/api.types';
 import { toast } from 'sonner';
 
 /**
- * Get status color for call status badges
+ * Refresh interval options in milliseconds
  */
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'processing':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'ringing':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    case 'connected':
-      return 'bg-green-100 text-green-800 border-green-200';
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-};
+const REFRESH_OPTIONS = [
+  { value: '0', label: 'No Refresh', ms: 0 },
+  { value: '1000', label: '1 Second', ms: 1000 },
+  { value: '5000', label: '5 Seconds', ms: 5000 },
+  { value: '15000', label: '15 Seconds', ms: 15000 },
+  { value: '30000', label: '30 Seconds', ms: 30000 },
+  { value: '60000', label: '60 Seconds', ms: 60000 },
+] as const;
+
+type RefreshInterval = typeof REFRESH_OPTIONS[number]['ms'];
+
+/**
+ * Combined call type that matches both API and WebSocket formats
+ * Uses call_id as primary identifier (consistent across WebSocket events)
+ */
+interface LiveCall {
+  id: string;
+  call_id: string;
+  session_id?: number;
+  caller_id: string;
+  destination: string;
+  direction: string;
+  status: string;
+  session_created_at: string;
+  duration_seconds: number;
+  formatted_duration: string;
+}
 
 /**
  * Get direction icon
@@ -46,29 +81,117 @@ const getDirectionIcon = (direction: string | null) => {
   }
 };
 
+/**
+ * Format refresh interval for display
+ */
+const formatRefreshInterval = (ms: number): string => {
+  const option = REFRESH_OPTIONS.find(o => o.ms === ms);
+  return option?.label || 'Custom';
+};
+
 export default function LiveCalls() {
   const { user: currentUser } = useAuth();
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
   const queryClient = useQueryClient();
 
-  // Fetch active calls with polling every 5 seconds (not rate limited)
-  const { data: activeCallsResponse, isLoading, error, refetch } = useQuery({
+  // Refresh interval state (default: 5 seconds)
+  const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(5000);
+
+  // WebSocket real-time call presence
+  const { activeCalls: wsActiveCalls, isConnected: isWsConnected, connectionState } = useCallPresence();
+
+  // State for merged calls (initial HTTP + WebSocket updates)
+  const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
+
+  // Initial data fetch via HTTP with configurable refresh
+  const { data: initialData, isLoading, error } = useQuery({
     queryKey: ['active-calls'],
     queryFn: () => sessionUpdatesService.getActiveCalls(),
-    refetchInterval: 5000, // Poll every 5 seconds
-    staleTime: 2000, // Consider data fresh for 2 seconds
+    refetchInterval: refreshInterval === 0 ? false : refreshInterval,
+    refetchIntervalInBackground: true,
+    staleTime: 0, // Always consider data stale to enable refresh
   });
+
+  // Transform initial HTTP data
+  // Note: HTTP API uses session_id, but WebSocket uses call_id
+  // We use call_ids from the API if available, otherwise fall back to session_id
+  useEffect(() => {
+    if (initialData?.data) {
+      const calls: LiveCall[] = initialData.data.map((call: ApiActiveCall) => {
+        // Use first call_id from array, or fall back to session_id as string
+        const callId = call.call_ids?.[0] || String(call.session_id);
+        return {
+          id: callId,
+          call_id: callId,
+          session_id: call.session_id,
+          caller_id: call.caller_id || 'Unknown Caller',
+          destination: call.destination || 'Unknown',
+          direction: call.direction || 'unknown',
+          status: call.status,
+          session_created_at: call.session_created_at,
+          duration_seconds: call.duration_seconds || 0,
+          formatted_duration: call.formatted_duration || '0s',
+        };
+      });
+      setLiveCalls(calls);
+    }
+  }, [initialData]);
+
+  // Merge WebSocket updates into live calls
+  useEffect(() => {
+    if (wsActiveCalls.length === 0) return;
+
+    console.log('[LiveCalls] WebSocket calls received:', wsActiveCalls);
+
+    setLiveCalls((prevCalls) => {
+      // Create a map of existing calls by call_id (consistent with WebSocket)
+      const callsMap = new Map(prevCalls.map((c) => [c.call_id, c]));
+
+      // Merge or add WebSocket calls
+      wsActiveCalls.forEach((wsCall) => {
+        const existing = callsMap.get(wsCall.call_id);
+
+        if (existing) {
+          // Update existing call
+          callsMap.set(wsCall.call_id, {
+            ...existing,
+            status: wsCall.status,
+            duration_seconds: wsCall.duration,
+            formatted_duration: formatCallDuration(wsCall.duration),
+          });
+        } else {
+          // Add new call from WebSocket
+          callsMap.set(wsCall.call_id, {
+            id: wsCall.call_id,
+            call_id: wsCall.call_id,
+            caller_id: wsCall.from_number || 'Unknown Caller',
+            destination: wsCall.to_number || 'Unknown',
+            direction: 'unknown',
+            status: wsCall.status,
+            session_created_at: wsCall.initiated_at,
+            duration_seconds: wsCall.duration,
+            formatted_duration: formatCallDuration(wsCall.duration),
+          });
+        }
+      });
+
+      // Filter out terminal state calls (WebSocket sends ended events but they might linger briefly)
+      return Array.from(callsMap.values()).filter((call) =>
+        LiveCallStatuses.includes(call.status as CallStatus)
+      );
+    });
+  }, [wsActiveCalls]);
 
   // Disconnect session mutation
   const disconnectMutation = useMutation({
     mutationFn: (sessionId: number) => sessionUpdatesService.disconnectSession(sessionId),
-    onSuccess: (data, sessionId) => {
+    onSuccess: () => {
       toast.success('Session disconnected successfully');
-      // Invalidate and refetch active calls
       queryClient.invalidateQueries({ queryKey: ['active-calls'] });
     },
-    onError: (error: any, sessionId) => {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to disconnect session';
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'Failed to disconnect session';
       toast.error(errorMessage);
     },
   });
@@ -79,11 +202,13 @@ export default function LiveCalls() {
     }
   };
 
-  const activeCalls = ((activeCallsResponse?.data as ActiveCall[]) || []).map(call => ({
-    ...call,
-    id: call.session_id
-  }));
-  const meta = activeCallsResponse?.meta;
+  // Calculate statistics
+  const stats = {
+    total: liveCalls.length,
+    processing: liveCalls.filter((c) => c.status === CallStatus.PROCESSING).length,
+    ringing: liveCalls.filter((c) => c.status === CallStatus.RINGING).length,
+    connected: liveCalls.filter((c) => c.status === CallStatus.CONNECTED).length,
+  };
 
   return (
     <div className="space-y-6">
@@ -102,7 +227,7 @@ export default function LiveCalls() {
             )}
           </div>
           <p className="text-muted-foreground mt-1">
-            Real-time active call monitoring using session updates
+            Real-time active call monitoring
           </p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
@@ -111,72 +236,91 @@ export default function LiveCalls() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Activity className="h-4 w-4 animate-pulse text-green-500" />
-            Auto-refresh: 5s
+          {/* Refresh Rate Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Refresh:</span>
+            <Select
+              value={String(refreshInterval)}
+              onValueChange={(value) => setRefreshInterval(Number(value) as RefreshInterval)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REFRESH_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          {meta && (
-            <div className="text-sm text-muted-foreground">
-              Last updated: {new Date(meta.last_updated).toLocaleTimeString()}
-            </div>
-          )}
+
+          {/* WebSocket Connection Status */}
+          <div
+            className={cn(
+              'flex items-center gap-2 text-sm px-3 py-1.5 rounded-full border',
+              isWsConnected
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+            )}
+          >
+            {isWsConnected ? (
+              <>
+                <Wifi className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Live
+                </span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-4 w-4" />
+                <span className="capitalize">{connectionState}</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Statistics Cards */}
-      {meta && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Active
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{meta.total_active_calls}</div>
-            </CardContent>
-          </Card>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Processing
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {meta.by_status.processing}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Processing</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.processing}</div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Ringing
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
-                {meta.by_status.ringing}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ringing</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats.ringing}</div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Connected
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {meta.by_status.connected}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Connected</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.connected}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Active Calls List */}
       {isLoading ? (
@@ -195,114 +339,111 @@ export default function LiveCalls() {
             </p>
           </CardContent>
         </Card>
-      ) : activeCalls.length === 0 ? (
+      ) : liveCalls.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
             <PhoneCall className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No active calls at the moment</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Calls will appear here automatically when they become active
+              {refreshInterval > 0
+                ? `Refreshing every ${formatRefreshInterval(refreshInterval).toLowerCase()}`
+                : 'Auto-refresh disabled'}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <>
-          {/* Active Calls Table */}
-          <Card>
-            <CardContent className="pt-6">
-              <StandardDataTable<ActiveCall & { id: string | number }>
-                data={activeCalls as (ActiveCall & { id: string | number })[]}
-                isLoading={isLoading}
-                identityIcon={PhoneCall}
-                identityIconBg="bg-blue-100"
-                identityIconColor="text-blue-600"
-                getIdentityPrimary={(call) => call.caller_id || 'Unknown Caller'}
-                getIdentitySecondary={(call) => `To: ${call.destination || 'Unknown'}`}
-                columns={[
-                  {
-                    header: 'Direction',
-                    cell: (call) => (
-                      <div className="flex items-center gap-2">
-                        {getDirectionIcon(call.direction)}
-                        <span className="capitalize text-sm">{call.direction}</span>
-                      </div>
-                    )
-                  },
-                  {
-                    header: 'Status',
-                    accessorKey: 'status' as any,
-                    cell: (call) => (
-                      <Badge
-                        variant="outline"
-                        className={cn('px-3 py-1', getStatusColor(call.status))}
-                      >
-                        {call.status}
-                      </Badge>
-                    )
-                  },
-                  {
-                    header: 'Duration',
-                    accessorKey: 'formatted_duration' as any,
-                    cell: (call) => (
-                      <span className="font-mono font-medium">{call.formatted_duration}</span>
-                    )
-                  },
-                  {
-                    header: 'Started',
-                    accessorKey: 'session_created_at' as any,
-                    cell: (call) => new Date(call.session_created_at).toLocaleTimeString()
-                  },
-                  {
-                    header: 'Session ID',
-                    accessorKey: 'session_id' as any,
-                    cell: (call) => (
-                      <span className="font-mono text-xs text-muted-foreground">{call.session_id}</span>
-                    )
-                  },
-                  ...(!isReadOnly ? [{
-                    header: 'Actions',
-                    cell: (call) => (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDisconnect(call.session_id);
-                        }}
-                        disabled={disconnectMutation.isPending}
-                        className="gap-2"
-                      >
-                        <PhoneOff className="h-4 w-4" />
-                        Disconnect
-                      </Button>
-                    )
-                  }] : [])
-                ]}
-                canView={false}
-                canEdit={false}
-                canDelete={false}
-                emptyState={
-                  <EmptyState
-                    icon={PhoneCall}
-                    title="No active calls at the moment"
-                    description="Calls will appear here automatically when they become active"
-                  />
-                }
-              />
-            </CardContent>
-          </Card>
-
-          {/* Manual Refresh Button */}
-          <div className="flex justify-center">
-            <Button
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="px-4 py-2"
-            >
-              {isLoading ? 'Refreshing...' : 'Refresh Now'}
-            </Button>
-          </div>
-        </>
+        <Card>
+          <CardContent className="pt-6">
+            <StandardDataTable<LiveCall>
+              data={liveCalls}
+              isLoading={false}
+              identityIcon={PhoneCall}
+              identityIconBg="bg-blue-100"
+              identityIconColor="text-blue-600"
+              getIdentityPrimary={(call) => call.caller_id}
+              getIdentitySecondary={(call) => `To: ${call.destination}`}
+              columns={[
+                {
+                  header: 'Direction',
+                  cell: (call) => (
+                    <div className="flex items-center gap-2">
+                      {getDirectionIcon(call.direction)}
+                      <span className="capitalize text-sm">{call.direction}</span>
+                    </div>
+                  ),
+                },
+                {
+                  header: 'Status',
+                  accessorKey: 'status',
+                  cell: (call) => (
+                    <Badge
+                      variant="outline"
+                      className={cn('px-3 py-1', getCallStatusColor(call.status))}
+                    >
+                      {getCallStatusLabel(call.status)}
+                    </Badge>
+                  ),
+                },
+                {
+                  header: 'Duration',
+                  accessorKey: 'duration_seconds',
+                  cell: (call) => (
+                    <span className="font-mono font-medium">{call.formatted_duration}</span>
+                  ),
+                },
+                {
+                  header: 'Started',
+                  accessorKey: 'session_created_at',
+                  cell: (call) => new Date(call.session_created_at).toLocaleTimeString(),
+                },
+                {
+                  header: 'Session ID',
+                  accessorKey: 'session_id',
+                  cell: (call) => (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {call.session_id || 'N/A'}
+                    </span>
+                  ),
+                },
+                ...(!isReadOnly
+                  ? [
+                      {
+                        header: 'Actions',
+                        cell: (call: LiveCall) =>
+                          call.session_id ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDisconnect(call.session_id!);
+                              }}
+                              disabled={disconnectMutation.isPending}
+                              className="gap-2"
+                            >
+                              <PhoneOff className="h-4 w-4" />
+                              Disconnect
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          ),
+                      },
+                    ]
+                  : []),
+              ]}
+              canView={false}
+              canEdit={false}
+              canDelete={false}
+              emptyState={
+                <EmptyState
+                  icon={PhoneCall}
+                  title="No active calls at the moment"
+                  description="Calls will appear here automatically when they become active"
+                />
+              }
+            />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

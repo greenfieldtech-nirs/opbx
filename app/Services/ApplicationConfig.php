@@ -137,6 +137,10 @@ class ApplicationConfig
             'is_valid_configuration' => self::isValidConfiguration(),
             'warnings' => self::getConfigurationWarnings(),
             'hide_webhook_fields' => self::shouldHideWebhookFields(),
+            'recaptcha' => [
+                'enabled' => config('services.recaptcha.enabled', false),
+                'site_key' => config('services.recaptcha.site_key'),
+            ],
         ];
     }
 }
