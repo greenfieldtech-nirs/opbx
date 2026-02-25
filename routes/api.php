@@ -37,11 +37,7 @@ use Illuminate\Support\Facades\Route;
 | These routes handle the REST API for PBX configuration and management.
 | All routes require authentication via Laravel Sanctum.
 |
-
 */
-
-// Broadcasting authentication routes (must be before auth middleware)
-Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
 
 // Public routes for external services (Cloudonix) to access audio files.
 // SECURITY: This route requires HMAC-signed URLs with expiration.
@@ -130,6 +126,10 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 // API Version 1 routes
 Route::prefix('v1')->group(function (): void {
+    // Broadcasting authentication routes (for WebSocket presence channels)
+    // Must be accessible to authenticated users for Laravel Echo
+    Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
+
     // Email validation endpoint (public, rate limited)
     // Used for async email validation during registration
     Route::get('/validate-email', [EmailValidationController::class, 'validate'])
