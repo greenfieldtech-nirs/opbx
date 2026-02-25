@@ -37,18 +37,8 @@ class StoreInboundBlacklistRequest extends FormRequest
                 'exists:did_numbers,id',
             ],
             'is_global' => ['boolean'],
-            'torment_room_prefix' => [
-                'nullable',
-                'string',
-                'max:20',
-                'required_if:rejection_strategy,torment',
-            ],
-            'torment_music_timeout' => [
-                'nullable',
-                'integer',
-                'min:60',
-                'max:3600',
-            ],
+            // Note: torment_room_prefix and torment_music_timeout are auto-generated
+            // Room prefix: random 16-char string, Timeout: fixed at 600 seconds
         ];
     }
 
@@ -57,7 +47,6 @@ class StoreInboundBlacklistRequest extends FormRequest
         return [
             'caller_id_pattern.regex' => 'The caller ID pattern must be a valid phone number or pattern (digits, +, *, ? only).',
             'did_number_ids.required_if' => 'Please select at least one phone number when not using global scope.',
-            'torment_room_prefix.required_if' => 'A room prefix is required when using the Torment strategy.',
         ];
     }
 
