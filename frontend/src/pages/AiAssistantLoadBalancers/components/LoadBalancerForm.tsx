@@ -186,6 +186,9 @@ export function LoadBalancerForm({
         <div className="flex items-center justify-between">
           <Label>
             AI Assistant Members <span className="text-red-500">*</span>
+            <span className="text-sm text-muted-foreground ml-2">
+              ({formData.members?.length || 0} of {availableAiAssistants.length})
+            </span>
           </Label>
           <Button
             type="button"
@@ -196,6 +199,11 @@ export function LoadBalancerForm({
               (formData.members || []).length >= 50 ||
               availableAiAssistantsForMembers.length === 0
             }
+            title={
+              availableAiAssistantsForMembers.length === 0
+                ? 'All available AI Assistants have been added'
+                : 'Add another AI Assistant to the load balancer'
+            }
           >
             <Plus className="h-4 w-4 mr-1" />
             Add Member
@@ -204,11 +212,24 @@ export function LoadBalancerForm({
 
         {formErrors.members && <p className="text-sm text-red-500">{formErrors.members}</p>}
 
+        {availableAiAssistantsForMembers.length === 0 && formData.members?.length > 0 && (
+          <Alert variant="default" className="bg-muted">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              All available AI Assistants have been added to this load balancer.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {(!formData.members || formData.members.length === 0) && (
           <div className="border rounded-lg p-8 text-center text-muted-foreground">
             <BotIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No AI Assistants added yet</p>
-            <p className="text-xs">Click "Add Member" to add AI Assistants</p>
+            <p className="text-xs">
+              {availableAiAssistantsForMembers.length > 0
+                ? 'Click "Add Member" to add AI Assistants'
+                : 'No available AI Assistants to add'}
+            </p>
           </div>
         )}
 

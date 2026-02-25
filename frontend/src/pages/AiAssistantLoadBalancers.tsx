@@ -610,16 +610,38 @@ export default function AiAssistantLoadBalancers() {
   // Member management functions
   const addMember = () => {
     const currentMembers = formData.members || [];
-    const usedAssistantIds = currentMembers.map((m) => m.ai_assistant_id);
+
+    // Prevent adding if already at max members
+    if (currentMembers.length >= 50) {
+      toast.error('Maximum of 50 AI Assistants allowed per load balancer');
+      return;
+    }
+
+    // Get list of AI assistants already in members
+    const usedAssistantIds = new Set(currentMembers.map((m) => m.ai_assistant_id));
+
+    // Filter out already-used assistants
     const unusedAssistants = availableAiAssistants.filter(
-      (a) => !usedAssistantIds.includes(String(a.id))
+      (a) => !usedAssistantIds.has(String(a.id))
     );
 
-    if (unusedAssistants.length === 0) return;
+    // Prevent adding if no assistants available
+    if (unusedAssistants.length === 0) {
+      toast.info('All available AI Assistants have been added');
+      return;
+    }
 
+    // Prevent adding duplicate (double-check)
     const firstAvailable = unusedAssistants[0];
+    const assistantId = String(firstAvailable.id);
+
+    if (usedAssistantIds.has(assistantId)) {
+      toast.error('This AI Assistant is already a member');
+      return;
+    }
+
     const newMember: MemberFormData = {
-      ai_assistant_id: String(firstAvailable.id),
+      ai_assistant_id: assistantId,
       ai_assistant_name: firstAvailable.name,
       weight: 100,
       position: currentMembers.length,
@@ -629,6 +651,8 @@ export default function AiAssistantLoadBalancers() {
       ...formData,
       members: [...currentMembers, newMember],
     });
+
+    toast.success(`Added ${firstAvailable.name} to load balancer`);
   };
 
   const removeMember = (assistantId: string) => {
