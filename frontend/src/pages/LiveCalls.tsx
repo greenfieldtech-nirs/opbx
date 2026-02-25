@@ -113,6 +113,18 @@ export default function LiveCalls() {
     staleTime: 0, // Always consider data stale to enable refresh
   });
 
+  // Debounced loading state to prevent flickering on quick refreshes
+  const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
+  useEffect(() => {
+    if (isFetching) {
+      // Only show loading indicator if fetch takes longer than 300ms
+      const timer = setTimeout(() => setShowLoadingIndicator(true), 300);
+      return () => clearTimeout(timer);
+    } else {
+      setShowLoadingIndicator(false);
+    }
+  }, [isFetching]);
+
   // Transform initial HTTP data
   // Note: HTTP API uses session_id, but WebSocket uses call_id
   // We use call_ids from the API if available, otherwise fall back to session_id
@@ -255,9 +267,12 @@ export default function LiveCalls() {
                 ))}
               </SelectContent>
             </Select>
-            {isFetching && refreshInterval > 0 && (
-              <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
-            )}
+            {/* Loading indicator - debounced to prevent flickering */}
+            <div className="w-4">
+              {showLoadingIndicator && refreshInterval > 0 && (
+                <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
+              )}
+            </div>
           </div>
 
           {/* WebSocket Connection Status */}
