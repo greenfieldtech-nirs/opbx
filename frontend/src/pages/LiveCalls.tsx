@@ -1,8 +1,8 @@
 /**
  * Live Calls Page
  *
- * Real-time active calls monitoring using WebSocket (Laravel Echo)
- * Initial data loaded via HTTP, updates received via WebSocket
+ * Real-time active calls monitoring with configurable refresh rate
+ * Falls back to HTTP polling since WebSocket updates are unreliable
  */
 
 import { useEffect, useState } from 'react';
@@ -20,14 +20,36 @@ import {
   PhoneOff,
   Wifi,
   WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { CallStatus, getCallStatusColor, getCallStatusLabel, LiveCallStatuses } from '@/types/call.types';
 import type { ActiveCall as ApiActiveCall } from '@/types/api.types';
 import { toast } from 'sonner';
+
+/**
+ * Refresh interval options in milliseconds
+ */
+const REFRESH_OPTIONS = [
+  { value: '0', label: 'No Refresh', ms: 0 },
+  { value: '1000', label: '1 Second', ms: 1000 },
+  { value: '5000', label: '5 Seconds', ms: 5000 },
+  { value: '15000', label: '15 Seconds', ms: 15000 },
+  { value: '30000', label: '30 Seconds', ms: 30000 },
+  { value: '60000', label: '60 Seconds', ms: 60000 },
+] as const;
+
+type RefreshInterval = typeof REFRESH_OPTIONS[number]['ms'];
 
 /**
  * Combined call type that matches both API and WebSocket formats
@@ -60,10 +82,21 @@ const getDirectionIcon = (direction: string | null) => {
   }
 };
 
+/**
+ * Format refresh interval for display
+ */
+const formatRefreshInterval = (ms: number): string => {
+  const option = REFRESH_OPTIONS.find(o => o.ms === ms);
+  return option?.label || 'Custom';
+};
+
 export default function LiveCalls() {
   const { user: currentUser } = useAuth();
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
   const queryClient = useQueryClient();
+
+  // Refresh interval state (default: 5 seconds)
+  const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(5000);
 
   // WebSocket real-time call presence
   const { activeCalls: wsActiveCalls, isConnected: isWsConnected, connectionState } = useCallPresence();
@@ -71,11 +104,13 @@ export default function LiveCalls() {
   // State for merged calls (initial HTTP + WebSocket updates)
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
 
-  // Initial data fetch via HTTP (for immediate display on page load)
-  const { data: initialData, isLoading, error } = useQuery({
+  // Initial data fetch via HTTP with configurable refresh
+  const { data: initialData, isLoading, error, isFetching } = useQuery({
     queryKey: ['active-calls'],
     queryFn: () => sessionUpdatesService.getActiveCalls(),
-    staleTime: Infinity, // Don't refetch, we use WebSocket for updates
+    refetchInterval: refreshInterval === 0 ? false : refreshInterval,
+    refetchIntervalInBackground: true,
+    staleTime: 0, // Always consider data stale to enable refresh
   });
 
   // Transform initial HTTP data
@@ -193,7 +228,7 @@ export default function LiveCalls() {
             )}
           </div>
           <p className="text-muted-foreground mt-1">
-            Real-time active call monitoring with WebSocket updates
+            Real-time active call monitoring
           </p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
@@ -202,6 +237,29 @@ export default function LiveCalls() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Refresh Rate Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Refresh:</span>
+            <Select
+              value={String(refreshInterval)}
+              onValueChange={(value) => setRefreshInterval(Number(value) as RefreshInterval)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REFRESH_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isFetching && refreshInterval > 0 && (
+              <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
+            )}
+          </div>
+
           {/* WebSocket Connection Status */}
           <div
             className={cn(
@@ -291,7 +349,9 @@ export default function LiveCalls() {
             <PhoneCall className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No active calls at the moment</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Calls will appear here automatically when they become active
+              {refreshInterval > 0
+                ? `Refreshing every ${formatRefreshInterval(refreshInterval).toLowerCase()}`
+                : 'Auto-refresh disabled'}
             </p>
           </CardContent>
         </Card>
@@ -300,7 +360,7 @@ export default function LiveCalls() {
           <CardContent className="pt-6">
             <StandardDataTable<LiveCall>
               data={liveCalls}
-              isLoading={false}
+              isLoading={isFetching}
               identityIcon={PhoneCall}
               identityIconBg="bg-blue-100"
               identityIconColor="text-blue-600"
