@@ -153,11 +153,26 @@ export function LoadBalancerForm({
   const totalWeight = formData.members.reduce((sum, m) => sum + (m.weight || 0), 0);
 
   // Get available AI assistants for a member (excluding ones used by other members)
+  // Always include the currently selected assistant so it's visible in the dropdown
   const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
     const usedAssistantIds = formData.members
       .map((m) => m.ai_assistant_id)
       .filter((id) => id !== currentMemberAssistantId);
-    return availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
+
+    // Get available assistants (not used by others)
+    const available = availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
+
+    // If there's a current selection, make sure it's included in the list
+    if (currentMemberAssistantId) {
+      const currentAssistant = availableAiAssistants.find(
+        (a) => String(a.id) === currentMemberAssistantId
+      );
+      if (currentAssistant && !available.some((a) => String(a.id) === currentMemberAssistantId)) {
+        available.unshift(currentAssistant);
+      }
+    }
+
+    return available;
   };
 
   const availableAiAssistantsForMembers = getAvailableAiAssistantsForMember();
