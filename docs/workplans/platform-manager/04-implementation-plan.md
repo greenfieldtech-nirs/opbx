@@ -18,7 +18,19 @@
   - **Dependencies:** [PM-1.1.1]
   - **Details:** Full schema in Section 3.1.2. Must include all indexes.
 
-- [ ] **[PM-1.2.1]** Update User model: add `is_platform_manager` to `$casts`, add `isPlatformManager()` method, add `platformAuditLogs()` relationship
+- [ ] **[PM-1.1.3]** Create OrganizationStatus enum
+  - **File:** `app/Enums/OrganizationStatus.php`
+  - **Complexity:** S
+  - **Dependencies:** None
+  - **Details:** Enum with ACTIVE, SUSPENDED, DELETED cases. Includes label(), color(), allowsAuthentication(), and values() methods. See Section 3.1.4.
+
+- [ ] **[PM-1.1.4]** Create migration: add `status` column to `organizations` table (if not exists)
+  - **File:** `database/migrations/YYYY_MM_DD_HHMMSS_add_status_to_organizations_table.php`
+  - **Complexity:** S
+  - **Dependencies:** [PM-1.1.3]
+  - **Details:** Adds status column with default 'active', indexed. Skips if column already exists. See Section 3.1.3.
+
+- [ ] **[PM-1.2.1]** Update User model: add `is_platform_manager` to `$casts`, add `isPlatformManager()` method, add `platformAuditLogs()` relationship, add `revokeAllTokens()` method
   - **File:** `app/Models/User.php`
   - **Complexity:** S
   - **Dependencies:** [PM-1.1.1]
@@ -71,6 +83,12 @@
   - **Complexity:** S
   - **Dependencies:** [PM-1.4.1], [PM-1.7.1]
   - **Details:** Override binding for `organization` parameter to bypass OrganizationScope when the request matches `api/v1/platform/*`. See Section 3.3.2.
+
+- [ ] **[PM-1.8.2]** Update EnsureTenantScope middleware to check organization status
+  - **File:** `app/Http/Middleware/EnsureTenantScope.php` (or equivalent existing middleware)
+  - **Complexity:** S
+  - **Dependencies:** [PM-1.1.3], [PM-1.1.4]
+  - **Details:** After validating tenant scope, check if the user's organization status is 'suspended'. If suspended, return 403 with message "Your organization has been suspended." Do NOT check for platform managers (they bypass tenant scope entirely).
 
 - [ ] **[PM-1.9.1]** Run migrations and verify existing tests pass
   - **Complexity:** S
@@ -232,7 +250,20 @@
     3. If not a platform manager, output notice "User is not a platform manager" and exit with code 0
     4. Count total platform managers (bypass scope); if count <= 1, output error "Cannot revoke the last platform manager" and exit with code 1
     5. Set `is_platform_manager = false`, save
-    6. Output success message
+    6. **Revoke all Sanctum tokens for the user** (force re-authentication)
+    7. Output success message with token revocation notice
+
+- [ ] **[PM-3.1.4]** Create `opbx:cleanup-audit-logs` command
+  - **File:** `app/Console/Commands/CleanupPlatformAuditLogs.php`
+  - **Complexity:** S
+  - **Dependencies:** [PM-1.2.2]
+  - **Details:** Signature: `opbx:cleanup-audit-logs {--days=14} {--dry-run}`. Deletes audit logs older than 14 days (configurable). Supports dry-run mode. Should be scheduled to run daily. See Section 3.2.7.
+
+- [ ] **[PM-3.1.5]** Schedule audit log cleanup command
+  - **File:** `app/Console/Kernel.php` (or equivalent in Laravel 12)
+  - **Complexity:** S
+  - **Dependencies:** [PM-3.1.4]
+  - **Details:** Add `$schedule->command('opbx:cleanup-audit-logs')->daily();` to the scheduler.
 
 ### Phase 4: Frontend Foundation
 
@@ -262,7 +293,13 @@
   - **File:** `frontend/src/components/platform/PlatformManagerRoute.tsx`
   - **Complexity:** S
   - **Dependencies:** [PM-4.1.1]
-  - **Details:** Route guard that checks `user.is_platform_manager`. Redirects to `/ui/dashboard` if not a platform manager. Renders `<Outlet />` if authorized. Full code in Section 3.4.2.
+  - **Details:** Route guard that checks `user.is_platform_manager`. Renders `<Outlet />` if authorized. Shows PlatformErrorPage with 403 message if user is not a platform manager.
+
+- [ ] **[PM-4.3.1a]** Create PlatformErrorPage component
+  - **File:** `frontend/src/components/platform/PlatformErrorPage.tsx`
+  - **Complexity:** S
+  - **Dependencies:** None
+  - **Details:** Error page for platform routes. Shows 403 Forbidden with "Access Denied" message for non-platform-managers. Includes a button to return to dashboard. Does NOT redirect - shows the error inline.
 
 - [ ] **[PM-4.3.2]** Create PlatformLayout component
   - **File:** `frontend/src/components/platform/PlatformLayout.tsx`

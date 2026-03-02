@@ -72,8 +72,9 @@ Platform API tokens carry elevated abilities that are scoped and validated indep
 | `platform:audit-logs` | Read audit trail |
 
 - [ ] [PM-9.4.1] Tokens created for non-PM users MUST NOT include any `platform:*` abilities
-- [ ] [PM-9.4.2] When PM flag is revoked, all user's Sanctum tokens should be revoked (force re-authentication)
+- [ ] [PM-9.4.2] **CRITICAL:** When PM flag is revoked via `opbx:revoke-platform-manager` command or API, all user's Sanctum tokens MUST be immediately deleted via `$user->tokens()->delete()`. This forces re-authentication and prevents continued access with stale platform abilities.
 - [ ] [PM-9.4.3] Token abilities must be validated server-side; the frontend must never rely solely on cached ability lists
+- [ ] [PM-9.4.4] The `revokeAllTokens()` method on User model uses `$this->tokens()->delete()` to revoke all Sanctum tokens
 
 ### 9.5 Audit Trail Completeness
 
@@ -112,7 +113,23 @@ The `PlatformManagerRoute` component is a **UX convenience, not a security bound
 - [ ] [PM-9.8.2] Direct URL access to `/ui/platform/*` by a non-PM user shows a redirect — never a flash of platform content
 - [ ] [PM-9.8.3] **Security boundary is the API**: even if the frontend guard is bypassed, all API calls return `403`
 
-### 9.9 Cross-Site Protections
+### 9.9 Organization Suspension Enforcement
+
+When an organization is suspended via the platform management API, all users in that organization must be immediately blocked from accessing the system.
+
+**Implementation:**
+
+1. The `EnsureTenantScope` middleware (or equivalent existing middleware) checks the authenticated user's organization status
+2. If `organization.status === 'suspended'`, return **403 Forbidden** with message: `"Your organization has been suspended."`
+3. This check runs AFTER authentication but BEFORE tenant scope validation
+4. Platform managers bypass this check entirely (they bypass all tenant-scoped middleware)
+
+- [ ] [PM-9.9.1] Verify that users from suspended organizations receive 403 on all API endpoints
+- [ ] [PM-9.9.2] Verify that the 403 response includes the exact message "Your organization has been suspended."
+- [ ] [PM-9.9.3] Verify that platform managers are NOT blocked by this check (they bypass tenant scope)
+- [ ] [PM-9.9.4] Verify that activating a suspended organization immediately restores access
+
+### 9.10 Cross-Site Protections
 
 Existing protections apply to platform endpoints:
 

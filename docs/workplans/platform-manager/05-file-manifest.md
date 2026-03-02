@@ -6,6 +6,8 @@
 |---|---|---|---|
 | `database/migrations/YYYY_MM_DD_HHMMSS_add_is_platform_manager_to_users_table.php` | 1 | PM-1.1.1 | Migration: add boolean column to users |
 | `database/migrations/YYYY_MM_DD_HHMMSS_create_platform_audit_logs_table.php` | 1 | PM-1.1.2 | Migration: create audit log table |
+| `app/Enums/OrganizationStatus.php` | 1 | PM-1.1.3 | Enum: ACTIVE, SUSPENDED, DELETED |
+| `database/migrations/YYYY_MM_DD_HHMMSS_add_status_to_organizations_table.php` | 1 | PM-1.1.4 | Migration: add status column to organizations |
 | `app/Models/PlatformAuditLog.php` | 1 | PM-1.2.2 | Audit log Eloquent model |
 | `app/Services/PlatformAuditService.php` | 1 | PM-1.3.1 | Service for writing audit log entries |
 | `app/Http/Middleware/EnsurePlatformManager.php` | 1 | PM-1.5.1 | Middleware: validates platform manager flag |
@@ -21,7 +23,10 @@
 | `app/Http/Requests/Platform/PlatformSetManagerRequest.php` | 2 | PM-2.3.10 | Form request: set PM flag validation |
 | `app/Console/Commands/CreatePlatformManager.php` | 3 | PM-3.1.1 | Interactive create command |
 | `app/Console/Commands/SetPlatformManager.php` | 3 | PM-3.1.2 | Set flag command |
-| `app/Console/Commands/RevokePlatformManager.php` | 3 | PM-3.1.3 | Revoke flag command |
+| `app/Console/Commands/RevokePlatformManager.php` | 3 | PM-3.1.3 | Revoke flag command (with token revocation) |
+| `app/Console/Commands/CleanupPlatformAuditLogs.php` | 3 | PM-3.1.4 | Audit log cleanup command |
+| `app/Console/Kernel.php` | 3 | PM-3.1.5 | Schedule daily cleanup |
+| `frontend/src/components/platform/PlatformErrorPage.tsx` | 4 | PM-4.3.1a | Error page for 403 access denied |
 | `frontend/src/types/platform.ts` | 4 | PM-4.1.2 | TypeScript types for platform entities |
 | `frontend/src/services/platformApi.ts` | 4 | PM-4.2.1 | API client for platform endpoints |
 | `frontend/src/components/platform/PlatformManagerRoute.tsx` | 4 | PM-4.3.1 | Route guard component |
@@ -59,6 +64,7 @@
 | `app/Http/Controllers/AuthController.php` | 1 | PM-1.6.1 | Add platform token abilities |
 | `routes/api.php` | 1 | PM-1.7.1 | Include platform routes file |
 | `app/Providers/AppServiceProvider.php` | 1 | PM-1.8.1 | Route model binding override |
+| `app/Http/Middleware/EnsureTenantScope.php` | 1 | PM-1.8.2 | Check org status (suspended = 403) |
 | `frontend/src/types/auth.ts` | 4 | PM-4.1.1 | Add `is_platform_manager` to User type |
 | `frontend/src/router.tsx` | 4 | PM-4.5.1 | Add platform routes |
 | `frontend/src/components/Sidebar.tsx` | 4 | PM-4.5.2 | Add platform nav section |

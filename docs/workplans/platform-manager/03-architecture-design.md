@@ -87,6 +87,105 @@ return new class extends Migration
 };
 ```
 
+#### 3.1.3 Migration: Add `status` column to `organizations` table
+
+**Note:** If the `organizations` table already has a `status` column, this migration should be skipped or modified to use the existing column.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('organizations', function (Blueprint $table) {
+            // Add status column if it doesn't exist
+            if (!Schema::hasColumn('organizations', 'status')) {
+                $table->string('status', 20)
+                    ->default('active')
+                    ->after('slug')
+                    ->index('idx_organizations_status');
+            }
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('organizations', function (Blueprint $table) {
+            if (Schema::hasColumn('organizations', 'status')) {
+                $table->dropIndex('idx_organizations_status');
+                $table->dropColumn('status');
+            }
+        });
+    }
+};
+```
+
+#### 3.1.4 Enum: OrganizationStatus
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enums;
+
+enum OrganizationStatus: string
+{
+    case ACTIVE = 'active';
+    case SUSPENDED = 'suspended';
+    case DELETED = 'deleted';
+
+    /**
+     * Get human-readable label for the status.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::ACTIVE => 'Active',
+            self::SUSPENDED => 'Suspended',
+            self::DELETED => 'Deleted',
+        };
+    }
+
+    /**
+     * Get color for UI display.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::ACTIVE => 'green',
+            self::SUSPENDED => 'yellow',
+            self::DELETED => 'red',
+        };
+    }
+
+    /**
+     * Check if the status allows user authentication.
+     */
+    public function allowsAuthentication(): bool
+    {
+        return $this === self::ACTIVE;
+    }
+
+    /**
+     * Get all valid status values for validation.
+     *
+     * @return array<string>
+     */
+    public static function values(): array
+    {
+        return array_map(fn (self $status) => $status->value, self::cases());
+    }
+}
+```
+
 ### 3.2 Backend Architecture
 
 #### 3.2.1 Component Overview
@@ -320,9 +419,77 @@ public function platformAuditLogs(): HasMany
 {
     return $this->hasMany(PlatformAuditLog::class, 'platform_manager_user_id');
 }
+
+// Add method to revoke all Sanctum tokens (called when PM flag is revoked):
+public function revokeAllTokens(): void
+{
+    $this->tokens()->delete();
+}
 ```
 
-#### 3.2.7 Token Abilities Update
+#### 3.2.7 Audit Log Retention Command
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Console\Commands;
+
+use App\Models\PlatformAuditLog;
+use Carbon\Carbon;
+use Illuminate\Console\Command;
+
+class CleanupPlatformAuditLogs extends Command
+{
+    protected $signature = 'opbx:cleanup-audit-logs 
+                            {--days=14 : Number of days to retain (default: 14)} 
+                            {--dry-run : Show what would be deleted without deleting}';
+
+    protected $description = 'Clean up platform audit logs older than the retention period (default: 14 days)';
+
+    public function handle(): int
+    {
+        $days = (int) $this->option('days');
+        $dryRun = $this->option('dry-run');
+        
+        $cutoffDate = Carbon::now()->subDays($days);
+        
+        $query = PlatformAuditLog::where('created_at', '<', $cutoffDate);
+        $count = $query->count();
+        
+        if ($count === 0) {
+            $this->info("No audit logs older than {$days} days found.");
+            return self::SUCCESS;
+        }
+        
+        $this->info("Found {$count} audit log entries older than {$days} days (before {$cutoffDate->toDateTimeString()}).");
+        
+        if ($dryRun) {
+            $this->warn('Dry-run mode: No records will be deleted.');
+            return self::SUCCESS;
+        }
+        
+        if (!$this->confirm('Do you want to delete these records?')) {
+            $this->info('Operation cancelled.');
+            return self::SUCCESS;
+        }
+        
+        $deleted = $query->delete();
+        $this->info("Successfully deleted {$deleted} audit log entries.");
+        
+        return self::SUCCESS;
+    }
+}
+```
+
+**Schedule:** This command should be scheduled in `app/Console/Kernel.php` to run daily:
+
+```php
+$schedule->command('opbx:cleanup-audit-logs')->daily();
+```
+
+#### 3.2.8 Token Abilities Update
 
 In `AuthController`, the token abilities for platform managers include additional `platform:*` abilities:
 
