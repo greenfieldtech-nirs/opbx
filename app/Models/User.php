@@ -66,6 +66,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,
+            'is_platform_manager' => 'boolean',
         ];
     }
 
@@ -126,20 +127,51 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is an admin (Owner or PBX Admin).
+     * Check if user is inactive.
      *
-     * @deprecated Use role permission methods instead (canManageUsers, etc.)
+     * @return bool
      */
-    public function isAdmin(): bool
+    public function isInactive(): bool
     {
-        return in_array($this->role, [UserRole::OWNER, UserRole::PBX_ADMIN], true);
+        return $this->status === UserStatus::INACTIVE;
     }
+
+    /**
+     * Check if user is a platform manager.
+     *
+     * @return bool
+     */
+    public function isPlatformManager(): bool
+    {
+        return $this->is_platform_manager === true;
+    }
+
+    /**
+     * Get the platform audit logs for this user (as platform manager).
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function platformAuditLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PlatformAuditLog::class, 'platform_manager_user_id');
+    }
+
+    /**
+     * Revoke all Sanctum tokens for this user.
+     * Called when platform manager flag is revoked.
+     *
+     * @return void
+     */
+    public function revokeAllTokens(): void
+    {
+        $this->tokens()->delete();
+    }
+}
 
     /**
      * Scope query to users in a specific organization.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param int|string $organizationId
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeForOrganization($query, int|string $organizationId)
@@ -150,8 +182,7 @@ class User extends Authenticatable
     /**
      * Scope query to users with a specific role.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param UserRole $role
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeWithRole($query, UserRole $role)
@@ -162,8 +193,7 @@ class User extends Authenticatable
     /**
      * Scope query to users with a specific status.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param UserStatus $status
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeWithStatus($query, UserStatus $status)
@@ -174,8 +204,7 @@ class User extends Authenticatable
     /**
      * Scope query to search users by name or email.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $search
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeSearch($query, string $search)
@@ -193,9 +222,6 @@ class User extends Authenticatable
      * - PBX Admin can only manage PBX User and Reporter
      * - PBX User and Reporter cannot manage any users
      * - No one can manage themselves
-     *
-     * @param User $targetUser
-     * @return bool
      */
     public function canManageUser(User $targetUser): bool
     {
@@ -225,8 +251,6 @@ class User extends Authenticatable
 
     /**
      * Check if user is active.
-     *
-     * @return bool
      */
     public function isActive(): bool
     {
@@ -235,8 +259,6 @@ class User extends Authenticatable
 
     /**
      * Check if user is inactive.
-     *
-     * @return bool
      */
     public function isInactive(): bool
     {
