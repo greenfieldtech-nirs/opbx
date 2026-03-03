@@ -128,8 +128,6 @@ class User extends Authenticatable
 
     /**
      * Check if user is inactive.
-     *
-     * @return bool
      */
     public function isInactive(): bool
     {
@@ -138,8 +136,6 @@ class User extends Authenticatable
 
     /**
      * Check if user is a platform manager.
-     *
-     * @return bool
      */
     public function isPlatformManager(): bool
     {
@@ -148,8 +144,6 @@ class User extends Authenticatable
 
     /**
      * Get the platform audit logs for this user (as platform manager).
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function platformAuditLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
@@ -159,14 +153,11 @@ class User extends Authenticatable
     /**
      * Revoke all Sanctum tokens for this user.
      * Called when platform manager flag is revoked.
-     *
-     * @return void
      */
     public function revokeAllTokens(): void
     {
         $this->tokens()->delete();
     }
-}
 
     /**
      * Scope query to users in a specific organization.
@@ -255,13 +246,5 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->status === UserStatus::ACTIVE;
-    }
-
-    /**
-     * Check if user is inactive.
-     */
-    public function isInactive(): bool
-    {
-        return $this->status === UserStatus::INACTIVE;
     }
 }
