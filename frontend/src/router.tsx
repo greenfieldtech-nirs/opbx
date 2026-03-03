@@ -8,6 +8,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/Layout/AppLayout';
 import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 import { OwnerRoute } from '@/components/Auth/OwnerRoute';
+import { PlatformManagerRoute } from '@/components/platform/PlatformManagerRoute';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
@@ -33,6 +34,13 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
+
+// Platform Management (lazy loaded)
+const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
+const PlatformOrganizations = lazy(() => import('@/pages/platform/PlatformOrganizations'));
+const PlatformOrganizationDetail = lazy(() => import('@/pages/platform/PlatformOrganizationDetail'));
+const PlatformUsers = lazy(() => import('@/pages/platform/PlatformUsers'));
+const PlatformAuditLog = lazy(() => import('@/pages/platform/PlatformAuditLog'));
 
 
 // Unified router - NO basename, handles all routes
@@ -140,10 +148,59 @@ export const router = createBrowserRouter([
             </OwnerRoute>
           ),
         },
-        {
-          path: 'call-notifications',
-          element: <CallNotificationsSettings />,
-        },
+{
+  path: 'call-notifications',
+  element: <CallNotificationsSettings />,
+},
+// Platform Management routes (platform manager only)
+{
+  path: 'platform',
+  element: (
+    <PlatformManagerRoute>
+      <Navigate to="/ui/platform/dashboard" replace />
+    </PlatformManagerRoute>
+  ),
+},
+{
+  path: 'platform/dashboard',
+  element: (
+    <PlatformManagerRoute>
+      <PlatformDashboard />
+    </PlatformManagerRoute>
+  ),
+},
+{
+  path: 'platform/organizations',
+  element: (
+    <PlatformManagerRoute>
+      <PlatformOrganizations />
+    </PlatformManagerRoute>
+  ),
+},
+{
+  path: 'platform/organizations/:id',
+  element: (
+    <PlatformManagerRoute>
+      <PlatformOrganizationDetail />
+    </PlatformManagerRoute>
+  ),
+},
+{
+  path: 'platform/users',
+  element: (
+    <PlatformManagerRoute>
+      <PlatformUsers />
+    </PlatformManagerRoute>
+  ),
+},
+{
+  path: 'platform/audit-log',
+  element: (
+    <PlatformManagerRoute>
+      <PlatformAuditLog />
+    </PlatformManagerRoute>
+  ),
+},
 
       ],
    },

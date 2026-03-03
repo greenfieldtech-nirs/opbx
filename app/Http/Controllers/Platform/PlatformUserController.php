@@ -12,6 +12,7 @@ use App\Http\Requests\Platform\PlatformSetManagerRequest;
 use App\Http\Requests\Platform\PlatformUpdateUserRequest;
 use App\Models\Organization;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\PlatformAuditService;
 use Illuminate\Hashing\HashManager;
 use Illuminate\Http\JsonResponse;
@@ -29,59 +30,63 @@ class PlatformUserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = User::query()
-            ->with('organization:id,name,slug')
-            ->select([
-                'id',
-                'organization_id',
-                'name',
-                'email',
-                'role',
-                'status',
-                'is_platform_manager',
-                'created_at',
-            ]);
+        // Bypass organization scope to get users across all organizations
+        $users = OrganizationScope::bypass(function () use ($request) {
+            $query = User::query()
+                ->with('organization:id,name,slug')
+                ->select([
+                    'id',
+                    'organization_id',
+                    'name',
+                    'email',
+                    'role',
+                    'status',
+                    'is_platform_manager',
+                    'created_at',
+                ]);
 
-        // Search
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
+            // Search
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
 
-        // Filter by organization
-        if ($request->filled('organization_id')) {
-            $query->where('organization_id', $request->input('organization_id'));
-        }
+            // Filter by organization
+            if ($request->filled('organization_id')) {
+                $query->where('organization_id', $request->input('organization_id'));
+            }
 
-        // Filter by role
-        if ($request->filled('role')) {
-            $query->where('role', $request->input('role'));
-        }
+            // Filter by role
+            if ($request->filled('role')) {
+                $query->where('role', $request->input('role'));
+            }
 
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+            // Filter by status
+            if ($request->filled('status')) {
+                $query->where('status', $request->input('status'));
+            }
 
-        // Filter by platform manager
-        if ($request->has('is_platform_manager')) {
-            $query->where('is_platform_manager', $request->boolean('is_platform_manager'));
-        }
+            // Filter by platform manager
+            if ($request->has('is_platform_manager')) {
+                $query->where('is_platform_manager', $request->boolean('is_platform_manager'));
+            }
 
-        // Sort
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDirection = $request->input('sort_direction', 'desc');
-        $allowedSorts = ['name', 'email', 'created_at'];
+            // Sort
+            $sortBy = $request->input('sort_by', 'created_at');
+            $sortDirection = $request->input('sort_direction', 'desc');
+            $allowedSorts = ['name', 'email', 'created_at'];
 
-        if (in_array($sortBy, $allowedSorts, true)) {
-            $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
-        }
+            if (in_array($sortBy, $allowedSorts, true)) {
+                $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
+            }
 
-        $perPage = $request->input('per_page', 25);
-        $users = $query->paginate(min($perPage, 100));
+            $perPage = $request->input('per_page', 25);
+
+            return $query->paginate(min($perPage, 100));
+        });
 
         return response()->json($users);
     }

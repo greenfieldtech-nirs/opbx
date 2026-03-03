@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Platform\UpdateOrganizationSettingsRequest;
 use App\Http\Requests\Platform\UpdateOrganizationStatusRequest;
 use App\Models\Organization;
+use App\Scopes\OrganizationScope;
 use App\Services\PlatformAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,34 +26,38 @@ class PlatformOrganizationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Organization::query()
-            ->withCount(['users', 'extensions', 'didNumbers as dids_count']);
+        // Bypass organization scope to get counts across all organizations
+        $organizations = OrganizationScope::bypass(function () use ($request) {
+            $query = Organization::query()
+                ->withCount(['users', 'extensions', 'didNumbers as dids_count']);
 
-        // Search by name or slug
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('slug', 'like', "%{$search}%");
-            });
-        }
+            // Search by name or slug
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('slug', 'like', "%{$search}%");
+                });
+            }
 
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+            // Filter by status
+            if ($request->filled('status')) {
+                $query->where('status', $request->input('status'));
+            }
 
-        // Sort
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDirection = $request->input('sort_direction', 'desc');
-        $allowedSorts = ['name', 'created_at', 'users_count'];
+            // Sort
+            $sortBy = $request->input('sort_by', 'created_at');
+            $sortDirection = $request->input('sort_direction', 'desc');
+            $allowedSorts = ['name', 'created_at', 'users_count'];
 
-        if (in_array($sortBy, $allowedSorts, true)) {
-            $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
-        }
+            if (in_array($sortBy, $allowedSorts, true)) {
+                $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
+            }
 
-        $perPage = $request->input('per_page', 25);
-        $organizations = $query->paginate(min($perPage, 100));
+            $perPage = $request->input('per_page', 25);
+
+            return $query->paginate(min($perPage, 100));
+        });
 
         return response()->json($organizations);
     }
@@ -62,29 +67,34 @@ class PlatformOrganizationController extends Controller
      */
     public function show(Organization $organization): JsonResponse
     {
-        $organization->load([
-            'users:id,organization_id,name,email,role,status,created_at',
-        ]);
+        // Bypass organization scope to load all users across all organizations
+        $organizationData = OrganizationScope::bypass(function () use ($organization) {
+            $organization->load([
+                'users:id,organization_id,name,email,role,status,created_at',
+            ]);
 
-        $organization->loadCount([
-            'users',
-            'extensions',
-            'didNumbers as dids_count',
-            'ringGroups',
-            'businessHoursSchedules as business_hours_count',
-        ]);
+            $organization->loadCount([
+                'users',
+                'extensions',
+                'didNumbers as dids_count',
+                'ringGroups',
+                'businessHoursSchedules as business_hours_count',
+            ]);
 
-        // Mask sensitive Cloudonix settings
-        $settings = $organization->settings;
-        if (is_array($settings) && isset($settings['cloudonix'])) {
-            $settings['cloudonix'] = $this->maskSensitiveSettings($settings['cloudonix']);
-        }
+            // Mask sensitive Cloudonix settings
+            $settings = $organization->settings;
+            if (is_array($settings) && isset($settings['cloudonix'])) {
+                $settings['cloudonix'] = $this->maskSensitiveSettings($settings['cloudonix']);
+            }
 
-        return response()->json([
-            'data' => array_merge(
+            return array_merge(
                 $organization->toArray(),
                 ['settings' => $settings]
-            ),
+            );
+        });
+
+        return response()->json([
+            'data' => $organizationData,
         ]);
     }
 

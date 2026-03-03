@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('api/v1/platform')
+Route::prefix('v1/platform')
     ->middleware(['auth:sanctum', 'platform.manager'])
     ->group(function (): void {
         // Dashboard

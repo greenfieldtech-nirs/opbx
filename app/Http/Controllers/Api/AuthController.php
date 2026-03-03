@@ -214,6 +214,7 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role->value,
                     'status' => $user->status,
+                    'is_platform_manager' => $user->is_platform_manager,
                 ],
             ]);
         }
@@ -242,6 +243,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role->value,
                 'status' => $user->status,
+                'is_platform_manager' => $user->is_platform_manager,
             ],
         ]);
     }
@@ -417,6 +419,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role->value,
                 'status' => $user->status,
+                'is_platform_manager' => $user->is_platform_manager,
                 'organization' => [
                     'id' => $user->organization->id,
                     'name' => $user->organization->name,
