@@ -7,10 +7,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { ScrollText, Search, Filter } from 'lucide-react';
+import {
+  ScrollText,
+  Search,
+  X,
+  RefreshCw,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -55,10 +61,20 @@ export default function PlatformAuditLog() {
   const [platformManagerUserId, setPlatformManagerUserId] = useState('');
   const [action, setAction] = useState('all');
 
-  const { data, isLoading } = usePlatformAuditLogs({
+  const { data, isLoading, isRefetching, refetch } = usePlatformAuditLogs({
     platform_manager_user_id: platformManagerUserId || undefined,
     action: action === 'all' ? undefined : action,
   });
+
+  const entries = data?.data || [];
+  const totalEntries = data?.meta?.total || 0;
+
+  const hasActiveFilters = platformManagerUserId || action !== 'all';
+
+  const clearFilters = () => {
+    setPlatformManagerUserId('');
+    setAction('all');
+  };
 
   return (
     <PlatformLayout>
@@ -66,27 +82,50 @@ export default function PlatformAuditLog() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Audit Log</h1>
-            <p className="text-muted-foreground">Track all platform management activities</p>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <ScrollText className="h-8 w-8" />
+              Audit Log
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {totalEntries} entr{totalEntries !== 1 ? 'ies' : 'y'} recorded
+            </p>
           </div>
         </div>
 
         {/* Filters */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[250px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by user ID..."
+                  placeholder="Search by platform manager user ID..."
                   value={platformManagerUserId}
                   onChange={(e) => setPlatformManagerUserId(e.target.value)}
                   className="pl-9"
+                  autoComplete="off"
                 />
               </div>
-              <Select value={action} onValueChange={setAction}>
+
+              {/* Refresh Button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+                title="Refresh"
+              >
+                <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+              </Button>
+
+              {/* Action Filter */}
+              <Select
+                value={action}
+                onValueChange={setAction}
+              >
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="All Actions" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {actionTypes.map((type) => (
@@ -96,24 +135,36 @@ export default function PlatformAuditLog() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
             </div>
-          </CardHeader>
-          <CardContent>
+          </CardContent>
+        </Card>
+
+        {/* Audit Log Entries */}
+        <Card>
+          <CardContent className="pt-6">
             {isLoading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : !data?.data || data.data.length === 0 ? (
+            ) : !entries || entries.length === 0 ? (
               <div className="text-center py-12">
                 <ScrollText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No audit entries found</h3>
                 <p className="text-muted-foreground">
-                  {action !== 'all' || platformManagerUserId ? 'Try adjusting your filters' : 'No activity recorded yet'}
+                  {hasActiveFilters ? 'Try adjusting your filters' : 'No activity recorded yet'}
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {data.data.map((entry) => (
+                {entries.map((entry) => (
                   <AuditLogEntry key={entry.id} entry={entry} />
                 ))}
               </div>
