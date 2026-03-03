@@ -52,6 +52,16 @@ function formatDate(dateString: string): string {
   });
 }
 
+function formatValue(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return '-';
+  if (typeof value === 'object') {
+    // Pretty print objects/arrays with indentation
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value);
+}
+
 function JsonDiff({ previous, current }: { previous: Record<string, unknown> | null; current: Record<string, unknown> | null }) {
   if (!previous && !current) {
     return <p className="text-sm text-muted-foreground italic">No changes recorded</p>;
@@ -63,24 +73,50 @@ function JsonDiff({ previous, current }: { previous: Record<string, unknown> | n
   ]);
 
   return (
-    <div className="space-y-1 text-sm font-mono">
+    <div className="space-y-2 text-sm font-mono">
       {Array.from(allKeys).map((key) => {
         const oldValue = previous?.[key];
         const newValue = current?.[key];
         const hasChanged = JSON.stringify(oldValue) !== JSON.stringify(newValue);
+        const isObject = typeof oldValue === 'object' || typeof newValue === 'object';
+
+        if (isObject) {
+          // For objects, show them in a more readable format
+          return (
+            <div key={key} className="border rounded p-2 bg-muted/50">
+              <div className="font-medium text-muted-foreground mb-1">{key}:</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className={cn(hasChanged && 'opacity-50')}>
+                  <div className="text-xs text-muted-foreground mb-1">Before:</div>
+                  <pre className="text-xs whitespace-pre-wrap break-all overflow-x-auto">
+                    {formatValue(oldValue)}
+                  </pre>
+                </div>
+                {hasChanged && (
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">After:</div>
+                    <pre className="text-xs whitespace-pre-wrap break-all overflow-x-auto text-green-600">
+                      {formatValue(newValue)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
 
         return (
-          <div key={key} className="grid grid-cols-3 gap-2">
+          <div key={key} className="grid grid-cols-3 gap-2 items-center">
             <span className="text-muted-foreground">{key}:</span>
             <span className={cn(
               'truncate',
               hasChanged && 'text-red-600 line-through'
             )}>
-              {oldValue !== undefined ? String(oldValue) : '-'}
+              {formatValue(oldValue)}
             </span>
             {hasChanged && (
               <span className="text-green-600 truncate">
-                {newValue !== undefined ? String(newValue) : '-'}
+                {formatValue(newValue)}
               </span>
             )}
           </div>
