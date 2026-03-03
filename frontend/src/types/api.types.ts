@@ -110,6 +110,7 @@ export interface User {
   name: string;
   role: UserRole;
   status: UserStatus;
+  is_platform_manager: boolean;
   extension?: Extension;
   organization?: Organization;
   created_at: string;

@@ -136,6 +136,18 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\InboundBlacklist::class, \App\Policies\InboundBlacklistPolicy::class);
         Gate::policy(\App\Models\BlockedCallLog::class, \App\Policies\InboundBlacklistPolicy::class);
 
+        // Platform Manager: Route model binding override for platform routes
+        // This bypasses OrganizationScope when resolving organization models in platform routes
+        \Illuminate\Support\Facades\Route::bind('organization', function (string $value) {
+            if (request()->is('api/v1/platform/*')) {
+                return \App\Scopes\OrganizationScope::bypass(
+                    fn () => \App\Models\Organization::findOrFail($value)
+                );
+            }
+
+            return \App\Models\Organization::findOrFail($value);
+        });
+
         // Configure rate limiting
         $this->configureRateLimiting();
 

@@ -314,3 +314,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/rate-limit', [CallNotificationsSettingsController::class, 'rateLimit'])->name('call-notifications.rate-limit');
     });
 });
+
+// Platform Manager Routes (separate file)
+require __DIR__.'/platform.php';
