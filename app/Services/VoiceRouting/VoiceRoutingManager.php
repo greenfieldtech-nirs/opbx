@@ -1254,13 +1254,35 @@ class VoiceRoutingManager
                     return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
 
                 case \App\Enums\IvrDestinationType::AI_ASSISTANT:
-                    Log::debug('IVR Input: Routing to AI Assistant', [
+                    // Find the Extension that links to this AI Assistant
+                    $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                        ->where('organization_id', $ivrMenu->organization_id)
+                        ->where('ai_assistant_id', $validatedDestination->id)
+                        ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+                        ->first();
+
+                    if (! $extension) {
+                        Log::error('IVR Input: No extension found for AI Assistant', [
+                            'call_sid' => $request->input('CallSid'),
+                            'option_id' => $option->id,
+                            'ai_assistant_id' => $validatedDestination->id,
+                        ]);
+
+                        return response(
+                            CxmlBuilder::sayWithHangup('AI Agent extension not found.', true),
+                            200,
+                            ['Content-Type' => 'application/xml']
+                        );
+                    }
+
+                    Log::debug('IVR Input: Routing to AI Assistant via Extension', [
                         'call_sid' => $request->input('CallSid'),
                         'option_id' => $option->id,
                         'ai_assistant_id' => $validatedDestination->id,
-                        'ai_assistant_name' => $validatedDestination->name,
+                        'extension_id' => $extension->id,
+                        'extension_number' => $extension->extension_number,
                     ]);
-                    $destination = ['ai_assistant' => $validatedDestination];
+                    $destination = ['extension' => $extension];
 
                     return $this->executeStrategy(\App\Enums\ExtensionType::AI_ASSISTANT, $request, new DidNumber, $destination);
 
