@@ -150,13 +150,14 @@ This documentation provides comprehensive technical details for the OpBX open-so
 
 ### Community
 - **GitHub Issues**: Bug reports and feature requests
-- **Discussions**: General questions and community support
+- **Discord**: [Join our community](https://discord.gg/etCGgNh9VV) for questions and support
 - **Contributing Guide**: Detailed contribution guidelines
 
 ### Cloudonix Resources
-- **Developer Portal**: https://developers.cloudonix.com/
-- **API Documentation**: Cloudonix REST API reference
-- **Webhook Guide**: Real-time event handling
+- **Cloudonix Documentation**: https://developers.cloudonix.com/
+- **Cloudonix REST API Playground**: https://developers.cloudonix.com/cloudonixRestOpenAPI
+- **OPBX Documentation**: https://developers.cloudonix.com/opbx
+- **OPBX REST API Playground**: https://developers.cloudonix.com/opbxRestOpenAPI
 
 ### Additional Documentation
 - **API Reference**: Complete endpoint documentation

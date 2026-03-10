@@ -128,9 +128,12 @@ Never commit `.env` files or secrets to git.
 
 ## Documentation References
 
-- Cloudonix API Docs: https://developers.cloudonix.com/
-- Laravel Docs: https://laravel.com/docs/12.x
-- shadcn/ui Components: https://ui.shadcn.com/
+- **Cloudonix Documentation**: https://developers.cloudonix.com/
+- **Cloudonix REST API Playground**: https://developers.cloudonix.com/cloudonixRestOpenAPI
+- **OPBX Documentation**: https://developers.cloudonix.com/opbx
+- **OPBX REST API Playground**: https://developers.cloudonix.com/opbxRestOpenAPI
+- **Laravel Docs**: https://laravel.com/docs/12.x
+- **shadcn/ui Components**: https://ui.shadcn.com/
 
 ---
 
