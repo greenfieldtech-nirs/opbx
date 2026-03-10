@@ -1,0 +1,97 @@
+---
+id: conference-room
+title: ConferenceRoom
+sidebar_label: ConferenceRoom
+---
+
+# ConferenceRoom Model
+
+The `ConferenceRoom` model represents a multi-party conference room for voice calls.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `conference_rooms` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `bigint unsigned` | No | auto | Primary key |
+| `organization_id` | `bigint unsigned` | No | - | Foreign key to organizations |
+| `name` | `varchar(255)` | No | - | Room name |
+| `description` | `text` | Yes | null | Optional description |
+| `max_participants` | `int` | No | `25` | Maximum participants |
+| `status` | `varchar(50)` | No | `active` | UserStatus enum |
+| `pin` | `varchar(20)` | Yes | null | Participant PIN |
+| `pin_required` | `boolean` | No | `false` | Require PIN to join |
+| `host_pin` | `varchar(20)` | Yes | null | Host/moderator PIN |
+| `recording_enabled` | `boolean` | No | `false` | Enable recording |
+| `recording_auto_start` | `boolean` | No | `false` | Auto-start recording |
+| `recording_webhook_url` | `varchar(500)` | Yes | null | Recording webhook |
+| `wait_for_host` | `boolean` | No | `false` | Wait for host before starting |
+| `mute_on_entry` | `boolean` | No | `true` | Mute participants on entry |
+| `announce_join_leave` | `boolean` | No | `true` | Announce participants joining/leaving |
+| `music_on_hold` | `boolean` | No | `true` | Play music when alone |
+| `talk_detection_enabled` | `boolean` | No | `false` | Enable talk detection |
+| `talk_detection_webhook_url` | `varchar(500)` | Yes | null | Talk detection webhook |
+| `created_at` | `timestamp` | No | - | Creation timestamp |
+| `updated_at` | `timestamp` | No | - | Last update timestamp |
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'name',
+    'description',
+    'max_participants',
+    'status',
+    'pin',
+    'pin_required',
+    'host_pin',
+    'recording_enabled',
+    'recording_auto_start',
+    'recording_webhook_url',
+    'wait_for_host',
+    'mute_on_entry',
+    'announce_join_leave',
+    'music_on_hold',
+    'talk_detection_enabled',
+    'talk_detection_webhook_url',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `status` | `UserStatus::class` | Status enum |
+| `pin_required` | `boolean` | Boolean cast |
+| `recording_enabled` | `boolean` | Boolean cast |
+| `recording_auto_start` | `boolean` | Boolean cast |
+| `wait_for_host` | `boolean` | Boolean cast |
+| `mute_on_entry` | `boolean` | Boolean cast |
+| `announce_join_leave` | `boolean` | Boolean cast |
+| `music_on_hold` | `boolean` | Boolean cast |
+| `talk_detection_enabled` | `boolean` | Boolean cast |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+
+## Query Scopes
+
+- `scopeForOrganization($query, $orgId)`
+- `scopeActive($query)`
+- `scopeInactive($query)`
+- `scopeWithStatus($query, $status)`
+- `scopeSearch($query, $search)`
