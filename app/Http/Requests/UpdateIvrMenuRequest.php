@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Models\AiAssistant;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
