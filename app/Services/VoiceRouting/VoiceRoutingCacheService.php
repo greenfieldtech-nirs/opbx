@@ -25,7 +25,7 @@ class VoiceRoutingCacheService
      */
     private function getExtensionCacheTtl(): int
     {
-        return config('voice_routing.cache.extension_ttl', 1800);
+        return (int) config('voice_routing.cache.extension_ttl', 1800);
     }
 
     /**
@@ -33,7 +33,7 @@ class VoiceRoutingCacheService
      */
     private function getBusinessHoursCacheTtl(): int
     {
-        return config('voice_routing.cache.business_hours_ttl', 900);
+        return (int) config('voice_routing.cache.business_hours_ttl', 900);
     }
 
     /**
@@ -56,7 +56,7 @@ class VoiceRoutingCacheService
      */
     private function getAlbsCacheTtl(): int
     {
-        return config('voice_routing.cache.albs_ttl', 1800);
+        return (int) config('voice_routing.cache.albs_ttl', 1800);
     }
 
     /**
