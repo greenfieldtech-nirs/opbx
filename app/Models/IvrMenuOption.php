@@ -61,7 +61,7 @@ class IvrMenuOption extends Model
             IvrDestinationType::RING_GROUP => $this->belongsTo(RingGroup::class, 'destination_id'),
             IvrDestinationType::CONFERENCE_ROOM => $this->belongsTo(ConferenceRoom::class, 'destination_id'),
             IvrDestinationType::IVR_MENU => $this->belongsTo(IvrMenu::class, 'destination_id'),
-            IvrDestinationType::AI_ASSISTANT => $this->belongsTo(Extension::class, 'destination_id'),
+            IvrDestinationType::AI_ASSISTANT => $this->belongsTo(\App\Models\AiAssistant::class, 'destination_id'),
             IvrDestinationType::AI_LOAD_BALANCER => $this->belongsTo(AiAssistantLoadBalancer::class, 'destination_id'),
             default => null,
         };
@@ -76,39 +76,36 @@ class IvrMenuOption extends Model
     {
         $ivrMenu = $ivrMenu ?? $this->ivrMenu;
 
-        if (!$ivrMenu) {
+        if (! $ivrMenu) {
             Log::error('IVR Option: IVR menu is null when trying to access organization_id');
+
             return null;
         }
 
         $orgId = $ivrMenu->organization_id;
 
         return match ($this->destination_type) {
-            IvrDestinationType::EXTENSION, IvrDestinationType::AI_ASSISTANT =>
-            Extension::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $orgId)
-                ->where('id', $this->destination_id)
-                ->when($this->destination_type === IvrDestinationType::AI_ASSISTANT, function ($q) {
-                        return $q->where('type', 'ai_assistant');
-                    })
-                ->first(),
-            IvrDestinationType::RING_GROUP =>
-            RingGroup::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::EXTENSION => Extension::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::CONFERENCE_ROOM =>
-            ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::AI_ASSISTANT => \App\Models\AiAssistant::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::IVR_MENU =>
-            IvrMenu::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::RING_GROUP => RingGroup::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::AI_LOAD_BALANCER =>
-            \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::CONFERENCE_ROOM => ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $orgId)
+                ->where('id', $this->destination_id)
+                ->first(),
+            IvrDestinationType::IVR_MENU => IvrMenu::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $orgId)
+                ->where('id', $this->destination_id)
+                ->first(),
+            IvrDestinationType::AI_LOAD_BALANCER => \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
@@ -123,16 +120,16 @@ class IvrMenuOption extends Model
     {
         $destination = $this->destination()->first();
 
-        if (!$destination) {
+        if (! $destination) {
             return 'Invalid Destination';
         }
 
         return match ($this->destination_type) {
-            IvrDestinationType::EXTENSION => "Ext {$destination->extension_number} - " . ($destination->name ?: 'Unassigned'),
+            IvrDestinationType::EXTENSION => "Ext {$destination->extension_number} - ".($destination->name ?: 'Unassigned'),
             IvrDestinationType::RING_GROUP => "Ring Group: {$destination->name}",
             IvrDestinationType::CONFERENCE_ROOM => "Conference: {$destination->name}",
             IvrDestinationType::IVR_MENU => "IVR Menu: {$destination->name}",
-            IvrDestinationType::AI_ASSISTANT => "AI Assistant: {$destination->extension_number} - " . ($destination->ai_assistant?->name ?: 'AI'),
+            IvrDestinationType::AI_ASSISTANT => 'AI Assistant: '.($destination->name ?: 'AI'),
             IvrDestinationType::AI_LOAD_BALANCER => "AI Load Balancer: {$destination->name}",
         };
     }
@@ -151,13 +148,14 @@ class IvrMenuOption extends Model
 
         $destination = $this->getDestinationWithFallback($ivrMenu);
 
-        if (!$destination) {
+        if (! $destination) {
             Log::warning('IVR Option: Destination model not found', [
                 'option_id' => $this->id,
                 'ivr_menu_id' => $this->ivr_menu_id,
                 'destination_type' => $this->destination_type->value,
                 'destination_id' => $this->destination_id,
             ]);
+
             return false;
         }
 
@@ -184,7 +182,7 @@ class IvrMenuOption extends Model
             'is_valid' => $isValid,
         ]);
 
-        if (!$isValid) {
+        if (! $isValid) {
             Log::warning('IVR Option: Destination exists but is not active', [
                 'option_id' => $this->id,
                 'ivr_menu_id' => $this->ivr_menu_id,
@@ -211,12 +209,14 @@ class IvrMenuOption extends Model
             'ivr_menu_org_id' => $ivrMenu?->organization_id,
         ]);
 
-        if (!$this->isValidDestination($ivrMenu)) {
+        if (! $this->isValidDestination($ivrMenu)) {
             Log::debug('IvrMenuOption: Destination is not valid');
+
             return null;
         }
 
         Log::debug('IvrMenuOption: Calling getDestinationWithFallback');
+
         return $this->getDestinationWithFallback($ivrMenu);
     }
 }
