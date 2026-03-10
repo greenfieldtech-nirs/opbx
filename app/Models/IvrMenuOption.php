@@ -167,12 +167,12 @@ class IvrMenuOption extends Model
 
         // Additional validation based on destination type
         $isValid = match ($this->destination_type) {
-            IvrDestinationType::EXTENSION => $destination->status === 'active' || $destination->status === UserStatus::ACTIVE,
+            IvrDestinationType::EXTENSION => $destination->status === UserStatus::ACTIVE,
             IvrDestinationType::RING_GROUP => $destination->isActive(),
             IvrDestinationType::CONFERENCE_ROOM => true, // Conference rooms don't have status
             IvrDestinationType::IVR_MENU => $destination->isActive(),
-            IvrDestinationType::AI_ASSISTANT => $destination->status === 'active' || $destination->status === UserStatus::ACTIVE,
-            IvrDestinationType::AI_LOAD_BALANCER => $destination->status === 'active',
+            IvrDestinationType::AI_ASSISTANT => $destination->status === UserStatus::ACTIVE,
+            IvrDestinationType::AI_LOAD_BALANCER => $destination->status === UserStatus::ACTIVE,
         };
 
         Log::debug('IVR Option: Destination validation result', [
