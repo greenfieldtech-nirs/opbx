@@ -367,10 +367,10 @@ class AlbsFollowThroughController extends Controller
         // Look up organization's Cloudonix settings
         $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $organizationId)->first();
 
-        // Use configured webhook base URL, or fall back to request host
-        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
-            ? rtrim($cloudonixSettings->webhook_base_url, '/')
-            : $request->getSchemeAndHttpHost();
+        // Use configured webhook base URL, or fall back to app URL
+        $baseUrl = $cloudonixSettings
+            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
+            : rtrim(config('app.url'), '/');
 
         // Build the relative URL using the named route
         $relativeUrl = route('voice.albs-follow-through', [
