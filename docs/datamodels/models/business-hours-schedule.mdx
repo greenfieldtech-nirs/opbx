@@ -1,0 +1,58 @@
+---
+id: business-hours-schedule
+title: BusinessHoursSchedule
+sidebar_label: BusinessHoursSchedule
+---
+
+# BusinessHoursSchedule Model
+
+The `BusinessHoursSchedule` model represents business hours configuration for time-based call routing.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `business_hours_schedules` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | `bigint unsigned` | No | Primary key |
+| `organization_id` | `bigint unsigned` | No | Organization ID |
+| `name` | `varchar(255)` | No | Schedule name |
+| `timezone` | `varchar(100)` | No | PHP timezone identifier |
+| `status` | `varchar(50)` | No | active/inactive |
+| `configuration` | `json` | Yes | Schedule configuration |
+| `created_at` | `timestamp` | No | Creation timestamp |
+| `updated_at` | `timestamp` | No | Update timestamp |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+
+### Has Many
+
+- `days()` → BusinessHoursScheduleDay[]
+- `exceptions()` → BusinessHoursException[]
+
+## Configuration Structure
+
+```json
+{
+  "monday": {
+    "is_open": true,
+    "time_ranges": [
+      {"start": "09:00", "end": "12:00"},
+      {"start": "13:00", "end": "17:00"}
+    ]
+  },
+  "tuesday": { ... },
+  ...
+}
+```
