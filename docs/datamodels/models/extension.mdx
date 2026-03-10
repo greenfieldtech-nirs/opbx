@@ -1,0 +1,422 @@
+---
+id: extension
+title: Extension
+sidebar_label: Extension
+---
+
+# Extension Model
+
+The `Extension` model is the central entity for call routing in OPBX. Extensions represent various types of PBX endpoints including users, conference rooms, ring groups, IVR menus, AI assistants, and more.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `extensions` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `bigint unsigned` | No | auto | Primary key |
+| `organization_id` | `bigint unsigned` | No | - | Foreign key to organizations |
+| `user_id` | `bigint unsigned` | Yes | null | Assigned user (USER type) |
+| `ai_assistant_id` | `bigint unsigned` | Yes | null | Assigned AI assistant |
+| `extension_number` | `varchar(50)` | No | - | Extension number (e.g., 1001) |
+| `password` | `varchar(255)` | Yes | null | SIP password (USER type only) |
+| `cloudonix_subscriber_id` | `bigint unsigned` | Yes | null | Cloudonix subscriber ID |
+| `cloudonix_uuid` | `char(36)` | Yes | null | Cloudonix UUID |
+| `cloudonix_synced` | `boolean` | No | `false` | Sync status with Cloudonix |
+| `type` | `varchar(50)` | No | - | ExtensionType enum |
+| `status` | `varchar(50)` | No | `active` | UserStatus enum |
+| `voicemail_enabled` | `boolean` | No | `true` | Voicemail enabled flag |
+| `configuration` | `json` | Yes | null | Type-specific configuration |
+| `service_url` | `varchar(500)` | Yes | null | Service URL (AI assistants) |
+| `service_token` | `varchar(255)` | Yes | null | Service authentication token |
+| `service_params` | `json` | Yes | null | Service parameters |
+| `created_at` | `timestamp` | No | - | Creation timestamp |
+| `updated_at` | `timestamp` | No | - | Last update timestamp |
+
+### Indexes
+
+- `PRIMARY` on `id`
+- `UNIQUE` on `organization_id` + `extension_number`
+- `INDEX` on `organization_id`
+- `INDEX` on `user_id`
+- `INDEX` on `type`
+- `INDEX` on `status`
+- `INDEX` on `ai_assistant_id`
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'user_id',
+    'extension_number',
+    'password',
+    'cloudonix_subscriber_id',
+    'cloudonix_uuid',
+    'cloudonix_synced',
+    'type',
+    'status',
+    'voicemail_enabled',
+    'configuration',
+    'service_url',
+    'service_token',
+    'service_params',
+    'ai_assistant_id',
+];
+```
+
+### Hidden
+
+```php
+protected $hidden = [
+    'password', // SIP password protected from serialization
+];
+```
+
+**Security Note:** The SIP password is hidden from API responses to prevent toll fraud and unauthorized access.
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `type` | `ExtensionType::class` | [ExtensionType](../enums/extension-type) enum |
+| `status` | `UserStatus::class` | [UserStatus](../enums/user-status) enum |
+| `voicemail_enabled` | `boolean` | Boolean cast |
+| `cloudonix_synced` | `boolean` | Boolean cast |
+| `configuration` | `array` | JSON configuration |
+| `service_params` | `array` | JSON service parameters |
+
+## Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DEFAULT_USER_FIELDS` | `'user:id,organization_id,name,email,role,status'` | Default eager load fields for user relationship |
+
+## Extension Types
+
+The `ExtensionType` enum defines the available extension types:
+
+| Type | Description | Requires User |
+|------|-------------|---------------|
+| `user` | Direct extension for a user | Yes |
+| `conference` | Conference room | No |
+| `ring_group` | Ring multiple extensions | No |
+| `ivr` | Interactive voice response menu | No |
+| `ai_assistant` | AI-powered virtual assistant | No |
+| `forward` | Call forwarding | No |
+| `ai_load_balancer` | AI Assistant load balancer | No |
+
+## Relationships
+
+### Belongs To
+
+#### `organization(): BelongsTo`
+The organization this extension belongs to.
+
+```php
+$extension->organization; // Organization model
+```
+
+#### `user(): BelongsTo`
+The user assigned to this extension (USER type only).
+
+```php
+$extension->user; // User model or null
+```
+
+#### `aiAssistant(): BelongsTo`
+The AI assistant assigned to this extension.
+
+```php
+$extension->aiAssistant; // AiAssistant model or null
+```
+
+#### `aiLoadBalancer(): BelongsTo`
+The AI Load Balancer assigned (via configuration).
+
+```php
+$extension->aiLoadBalancer; // AiAssistantLoadBalancer or null
+```
+
+## Methods
+
+### Status Checking
+
+#### `isActive(): bool`
+Check if the extension is active.
+
+```php
+if ($extension->isActive()) {
+    // Can receive calls
+}
+```
+
+#### `isInactive(): bool`
+Check if the extension is inactive.
+
+```php
+if ($extension->isInactive()) {
+    // Cannot receive calls
+}
+```
+
+### User Assignment
+
+#### `belongsToUser(int|string $userId): bool`
+Check if extension belongs to a specific user.
+
+```php
+if ($extension->belongsToUser($userId)) {
+    // User owns this extension
+}
+```
+
+### SIP/URI Methods
+
+#### `getSipUri(): ?string`
+Get the SIP URI for this extension.
+
+- USER type: Returns extension number
+- Other types: Returns `configuration['sip_uri']` or null
+
+```php
+$sipUri = $extension->getSipUri(); // "1001" or "sip:service@example.com"
+```
+
+#### `hasSipUri(): bool`
+Check if extension has a SIP URI configured.
+
+```php
+if ($extension->hasSipUri()) {
+    // Can be dialed via SIP
+}
+```
+
+### Password Management
+
+#### `getSipPassword(): ?string`
+Get the SIP password (USER type only, audited).
+
+```php
+$password = $extension->getSipPassword();
+```
+
+**Security:** All accesses are logged for security monitoring. Returns `null` for non-USER extensions.
+
+#### `regeneratePassword(): ?string`
+Generate and save a new SIP password (USER type only).
+
+```php
+$newPassword = $extension->regeneratePassword();
+```
+
+#### `generateSecurePassword(): string`
+Generate a cryptographically secure password (32-char hex).
+
+```php
+$password = $extension->generateSecurePassword();
+// Returns: "a1b2c3d4e5f6..." (32 characters)
+```
+
+### Accessors
+
+#### `getFormattedNumberAttribute(): string`
+Get extension number padded to 4 digits.
+
+```php
+$extension->extension_number = "101";
+$extension->formatted_number; // "0101"
+```
+
+## Query Scopes
+
+### `scopeForOrganization(Builder $query, int|string $organizationId): Builder`
+Filter by organization.
+
+```php
+$extensions = Extension::forOrganization(1)->get();
+```
+
+### `scopeWithType(Builder $query, ExtensionType $type): Builder`
+Filter by extension type.
+
+```php
+$userExtensions = Extension::withType(ExtensionType::USER)->get();
+```
+
+### `scopeWithStatus(Builder $query, UserStatus $status): Builder`
+Filter by status.
+
+```php
+$active = Extension::withStatus(UserStatus::ACTIVE)->get();
+```
+
+### `scopeForUser(Builder $query, int|string $userId): Builder`
+Filter by assigned user.
+
+```php
+$userExtensions = Extension::forUser($userId)->get();
+```
+
+### `scopeSearch(Builder $query, string $search): Builder`
+Search by extension number.
+
+```php
+$results = Extension::search('100')->get();
+```
+
+### `scopeActive(Builder $query): Builder`
+Filter to active extensions only.
+
+```php
+$active = Extension::active()->get();
+```
+
+### `scopeUnassigned(Builder $query): Builder`
+Filter to unassigned extensions (no user).
+
+```php
+$available = Extension::unassigned()->get();
+```
+
+## Configuration Structure
+
+Each extension type has specific configuration stored in the `configuration` JSON column:
+
+### USER Type
+```json
+{
+  "forward_to": "+1234567890",
+  "forward_enabled": true
+}
+```
+
+### CONFERENCE Type
+```json
+{
+  "conference_room_id": 5
+}
+```
+
+### RING_GROUP Type
+```json
+{
+  "ring_group_id": 10
+}
+```
+
+### IVR Type
+```json
+{
+  "ivr_id": 3
+}
+```
+
+### AI_ASSISTANT Type
+```json
+{
+  "provider": "openai",
+  "phone_number": "+18001234567"
+}
+```
+
+### FORWARD Type
+```json
+{
+  "forward_to": "+1234567890"
+}
+```
+
+### AI_LOAD_BALANCER Type
+```json
+{
+  "ai_load_balancer_id": 7
+}
+```
+
+## Related Enums
+
+- [ExtensionType](../enums/extension-type) - Extension type definitions
+- [UserStatus](../enums/user-status) - Status values (active, inactive)
+
+## Usage Examples
+
+### Creating Extensions
+
+```php
+use App\Models\Extension;
+use App\Enums\ExtensionType;
+use App\Enums\UserStatus;
+
+// Create user extension
+$userExt = Extension::create([
+    'organization_id' => $orgId,
+    'user_id' => $user->id,
+    'extension_number' => '1001',
+    'type' => ExtensionType::USER,
+    'status' => UserStatus::ACTIVE,
+    'voicemail_enabled' => true,
+    'password' => $extension->generateSecurePassword(),
+]);
+
+// Create conference room extension
+$confExt = Extension::create([
+    'organization_id' => $orgId,
+    'extension_number' => '8000',
+    'type' => ExtensionType::CONFERENCE,
+    'status' => UserStatus::ACTIVE,
+    'configuration' => ['conference_room_id' => $room->id],
+]);
+```
+
+### Querying Extensions
+
+```php
+// Get all active user extensions
+$extensions = Extension::active()
+    ->withType(ExtensionType::USER)
+    ->with(['user'])
+    ->get();
+
+// Search for extensions
+$results = Extension::search('100')
+    ->forOrganization($orgId)
+    ->get();
+
+// Get unassigned extensions
+$available = Extension::unassigned()
+    ->withType(ExtensionType::USER)
+    ->get();
+```
+
+### SIP Password Management
+
+```php
+// Get password (with audit logging)
+$password = $extension->getSipPassword();
+
+// Regenerate password
+$newPassword = $extension->regeneratePassword();
+```
+
+### Cloudonix Sync Status
+
+```php
+// Check sync status
+if ($extension->cloudonix_synced) {
+    // Extension is synced with Cloudonix
+}
+
+// Get Cloudonix identifiers
+$subscriberId = $extension->cloudonix_subscriber_id;
+$uuid = $extension->cloudonix_uuid;
+```
