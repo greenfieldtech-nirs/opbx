@@ -853,7 +853,6 @@ class VoiceRoutingManager
         return null;
     }
 
-
     /**
      * Check business hours and route accordingly.
      *
@@ -1253,6 +1252,28 @@ class VoiceRoutingManager
                     $destination = ['ivr_menu' => $validatedDestination];
 
                     return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
+
+                case \App\Enums\IvrDestinationType::AI_ASSISTANT:
+                    Log::debug('IVR Input: Routing to AI Assistant', [
+                        'call_sid' => $request->input('CallSid'),
+                        'option_id' => $option->id,
+                        'ai_assistant_id' => $validatedDestination->id,
+                        'ai_assistant_name' => $validatedDestination->name,
+                    ]);
+                    $destination = ['ai_assistant' => $validatedDestination];
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::AI_ASSISTANT, $request, new DidNumber, $destination);
+
+                case \App\Enums\IvrDestinationType::AI_LOAD_BALANCER:
+                    Log::debug('IVR Input: Routing to AI Load Balancer', [
+                        'call_sid' => $request->input('CallSid'),
+                        'option_id' => $option->id,
+                        'ai_load_balancer_id' => $validatedDestination->id,
+                        'ai_load_balancer_name' => $validatedDestination->name,
+                    ]);
+                    $destination = ['ai_load_balancer' => $validatedDestination];
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::AI_LOAD_BALANCER, $request, new DidNumber, $destination);
             }
 
             // Fallback for invalid destination
