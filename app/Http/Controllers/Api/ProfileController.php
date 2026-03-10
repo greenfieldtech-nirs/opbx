@@ -315,7 +315,7 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user, $request) {
+            DB::transaction(function () use ($user, $request, $requestId) {
                 // Update password with bcrypt hashing
                 $user->password = Hash::make($request->input('new_password'));
                 $user->save();
@@ -341,12 +341,12 @@ class ProfileController extends Controller
                         'error' => $auditException->getMessage(),
                     ]);
                 }
-
-                return response()->json([
-                    'message' => 'Password updated successfully. Please log in again with your new password.',
-                ]);
             });
 
+            return response()->json([
+                'message' => 'Password updated successfully. Please log in again with your new password.',
+            ]);
+        } catch (\Exception $e) {
             Log::error('Password change failed', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -359,22 +359,6 @@ class ProfileController extends Controller
                 'Failed to update password. Please try again.',
                 500,
                 'PASSWORD_UPDATE_FAILED',
-                $requestId
-            );
-        } catch (\Exception $e) {
-            Log::error('Organization update failed', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-                'organization_id' => $organization->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return $this->logAndRespondError(
-                ['error' => $e->getMessage()],
-                'Failed to update organization. Please try again.',
-                500,
-                'ORGANIZATION_UPDATE_FAILED',
                 $requestId
             );
         }
