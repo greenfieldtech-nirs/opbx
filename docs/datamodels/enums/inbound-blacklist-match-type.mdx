@@ -1,0 +1,34 @@
+---
+id: inbound-blacklist-match-type
+title: InboundBlacklistMatchType
+sidebar_label: InboundBlacklistMatchType
+---
+
+# InboundBlacklistMatchType Enum
+
+The `InboundBlacklistMatchType` enum defines how blacklist entries match incoming phone numbers.
+
+## Definition
+
+```php
+namespace App\Enums;
+
+enum InboundBlacklistMatchType: string
+{
+    case EXACT = 'exact';
+    case PREFIX = 'prefix';
+    case PATTERN = 'pattern';
+}
+```
+
+## Values
+
+| Value | Description | Example |
+|-------|-------------|---------|
+| `exact` | Exact number match | `+1234567890` matches only this number |
+| `prefix` | Starts with prefix | `+1800` matches any toll-free US number |
+| `pattern` | Regex pattern | `^+1(800|888)` matches 800 or 888 numbers |
+
+## Used By
+
+- [InboundBlacklist](../models/inbound-blacklist) model
