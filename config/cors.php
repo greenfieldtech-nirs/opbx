@@ -27,6 +27,10 @@ return [
         'http://127.0.0.1:3000',
         'http://localhost',
         'http://127.0.0.1',
+        'https://developers.cloudonix.com',
+        'https://developers.staging.cloudonix.com',
+        'https://cloudonix.cloud',
+        'https://opbx.cloudonix.cloud',
     ]),
 
     'allowed_origins_patterns' => [],
