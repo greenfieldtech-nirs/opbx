@@ -1,0 +1,120 @@
+paths:
+  /callbacks/voice/ring-group-callback:
+    post:
+      tags:
+        - Voice Routing
+      summary: Ring group callback
+      description: |
+        Handle ring group member callback from Cloudonix.
+        Called when a ring group member finishes ringing (answered, busy, no-answer, etc.)
+        or to get the next member in sequence.
+        
+        Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+        
+        Authentication: Bearer token (per-organization domain_requests_api_key)
+      operationId: ringGroupCallback
+      security:
+        - voiceWebhookAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                CallSid:
+                  type: string
+                  description: Unique call identifier from Cloudonix
+                  example: CA550e8400e29b41d4a716446655440000
+                ring_group_id:
+                  type: integer
+                  description: ID of the ring group being processed
+                  example: 11
+                action:
+                  type: string
+                  enum: [next_member, timeout, completed, failed]
+                  nullable: true
+                  description: Action type for this callback
+                  example: next_member
+                current_index:
+                  type: integer
+                  minimum: 0
+                  nullable: true
+                  description: Current member index in the ring sequence
+                  example: 0
+                attempt_count:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  description: Number of attempts made so far
+                  example: 1
+                From:
+                  type: string
+                  description: Caller number in E.164 format or extension
+                  example: '+1234567890'
+                To:
+                  type: string
+                  description: Called number in E.164 format or extension
+                  example: '+1987654321'
+                Domain:
+                  type: string
+                  nullable: true
+                  description: Cloudonix domain
+                  example: example.cloudonix.io
+                CallStatus:
+                  type: string
+                  enum: [ringing, answered, completed, failed, busy, no-answer]
+                  nullable: true
+                  description: Current call status
+                  example: no-answer
+                _organization_id:
+                  type: integer
+                  nullable: true
+                  description: Organization ID (set by VerifyVoiceWebhookAuth middleware)
+              required:
+                - CallSid
+                - ring_group_id
+                - From
+                - To
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                CallSid:
+                  type: string
+                ring_group_id:
+                  type: integer
+                action:
+                  type: string
+                current_index:
+                  type: integer
+                attempt_count:
+                  type: integer
+                From:
+                  type: string
+                To:
+                  type: string
+                Domain:
+                  type: string
+                CallStatus:
+                  type: string
+      responses:
+        '200':
+          description: CXML routing response
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+              example: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Response>
+                  <Connect>
+                    <Stream url="wss://ai.example.com/stream" name="ai-assistant"/>
+                  </Connect>
+                </Response>
+        '204':
+          description: Empty response to continue call normally
+        '401':
+          description: Unauthorized - Invalid Bearer token
+        '429':
+          description: Rate limit exceeded

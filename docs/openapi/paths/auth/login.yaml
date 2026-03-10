@@ -1,0 +1,137 @@
+paths:
+  /v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: |
+        Authenticate user and issue authentication credentials.
+        
+        Supports two authentication modes:
+        - **Cookie-based (SPA)**: Returns user data, sets httpOnly session cookie
+        - **Token-based (API)**: Returns API token for bearer authentication
+        
+        Mode is automatically detected based on request headers:
+        - Uses cookie auth if `X-Requested-With: XMLHttpRequest` header is present
+        - Uses cookie auth if `X-Auth-Mode: cookie` header is set
+        - Otherwise uses token-based auth
+        
+        Rate limited to 5 attempts per minute per IP.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email address
+                  example: admin@example.com
+                password:
+                  type: string
+                  format: password
+                  description: User password
+                  example: SecurePass123!
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - title: Cookie Auth Response
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Login successful
+                      user:
+                        $ref: '../../components/schemas/User.yaml'
+                  - title: Token Auth Response
+                    type: object
+                    properties:
+                      access_token:
+                        type: string
+                        description: Bearer token for API authentication
+                        example: 1|laravel_sanctum_token_xyz123
+                      token_type:
+                        type: string
+                        example: Bearer
+                      expires_in:
+                        type: integer
+                        description: Token expiration in seconds
+                        example: 86400
+                      user:
+                        $ref: '../../components/schemas/User.yaml'
+              examples:
+                cookieAuth:
+                  summary: Cookie-based authentication
+                  value:
+                    message: Login successful
+                    user:
+                      id: 123
+                      organization_id: 1
+                      name: John Doe
+                      email: john@example.com
+                      role: owner
+                      status: active
+                      is_platform_manager: false
+                tokenAuth:
+                  summary: Token-based authentication
+                  value:
+                    access_token: 1|laravel_sanctum_token_xyz123
+                    token_type: Bearer
+                    expires_in: 86400
+                    user:
+                      id: 123
+                      organization_id: 1
+                      name: John Doe
+                      email: john@example.com
+                      role: owner
+                      status: active
+                      is_platform_manager: false
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Session cookie (only in cookie auth mode)
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: UNAUTHORIZED
+                message: Invalid credentials.
+                code: INVALID_CREDENTIALS
+        '403':
+          description: Account or organization inactive
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              examples:
+                accountInactive:
+                  summary: User account inactive
+                  value:
+                    error: FORBIDDEN
+                    message: Your account is not active. Please contact support.
+                    code: ACCOUNT_INACTIVE
+                orgInactive:
+                  summary: Organization inactive
+                  value:
+                    error: FORBIDDEN
+                    message: Your organization is not active. Please contact support.
+                    code: ORGANIZATION_INACTIVE
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'

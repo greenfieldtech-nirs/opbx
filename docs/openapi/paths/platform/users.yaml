@@ -1,0 +1,57 @@
+paths:
+  /v1/platform/users:
+    get:
+      tags:
+        - Platform
+      summary: List all users (cross-tenant)
+      operationId: listAllUsers
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Users list
+  
+  /v1/platform/users/{user}:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+    
+    get:
+      tags:
+        - Platform
+      summary: Get user details
+      operationId: getUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User details
+    
+    put:
+      tags:
+        - Platform
+      summary: Update user
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User updated
+    
+    delete:
+      tags:
+        - Platform
+      summary: Delete user
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: User deleted

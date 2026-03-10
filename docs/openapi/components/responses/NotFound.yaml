@@ -1,0 +1,9 @@
+description: Not Found - Resource does not exist
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      error: NOT_FOUND
+      message: Resource not found
+      code: RESOURCE_NOT_FOUND

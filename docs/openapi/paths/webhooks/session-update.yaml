@@ -1,0 +1,34 @@
+paths:
+  /webhooks/cloudonix/session-update:
+    post:
+      tags:
+        - Webhooks
+      summary: Session update webhook
+      description: |
+        High-velocity session update webhook from Cloudonix.
+        
+        Note: No rate limiting on this endpoint due to high message volume.
+        
+        Middleware: webhook.signature (no rate limiting)
+      operationId: sessionUpdateWebhook
+      security:
+        - webhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/webhooks/SessionUpdatePayload.yaml'
+      responses:
+        '200':
+          description: Session update processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: processed
+        '400':
+          $ref: '../../components/responses/BadRequest.yaml'

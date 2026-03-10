@@ -1,0 +1,26 @@
+paths:
+  /voice/health:
+    get:
+      tags:
+        - Voice Routing
+      summary: Voice routing health check
+      description: Health check endpoint for voice routing service
+      operationId: voiceHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: voice-routing
+                  timestamp:
+                    type: string
+                    format: date-time

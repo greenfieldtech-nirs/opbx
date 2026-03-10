@@ -1,0 +1,19 @@
+paths:
+  /v1/platform/users/{user}/platform-manager:
+    patch:
+      tags:
+        - Platform
+      summary: Set platform manager flag
+      operationId: setPlatformManager
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Platform manager status updated

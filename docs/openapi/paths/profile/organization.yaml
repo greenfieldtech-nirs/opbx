@@ -1,0 +1,55 @@
+paths:
+  /v1/profile/organization:
+    put:
+      tags:
+        - Profile
+      summary: Update organization
+      description: |
+        Update organization details.
+        
+        **Authorization:** Only users with Owner role can update organization.
+        
+        Rate limited with `throttle:sensitive` middleware.
+      operationId: updateOrganization
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: Organization name
+                  example: Acme Corporation Inc.
+                timezone:
+                  type: string
+                  description: PHP timezone identifier
+                  example: America/Los_Angeles
+      responses:
+        '200':
+          description: Organization updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Organization updated successfully.
+                  organization:
+                    $ref: '../../components/schemas/Organization.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+        '500':
+          $ref: '../../components/responses/ServerError.yaml'

@@ -1,0 +1,119 @@
+paths:
+  /v1/inbound-blacklist:
+    get:
+      tags:
+        - Inbound Blacklist
+      summary: List Inbound Blacklist Entrys
+      description: Get paginated list of Inbound Blacklist Entrys
+      operationId: listInboundBlacklistEntrys
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+      responses:
+        '200':
+          description: List of Inbound Blacklist Entrys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/InboundBlacklist.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+    post:
+      tags:
+        - Inbound Blacklist
+      summary: Create Inbound Blacklist Entry
+      operationId: createInboundBlacklistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Inbound Blacklist Entry created
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/inbound-blacklist/{inboundBlacklist}:
+    parameters:
+      - name: inboundBlacklist
+        in: path
+        required: true
+        schema:
+          type: integer
+
+    get:
+      tags:
+        - Inbound Blacklist
+      summary: Get Inbound Blacklist Entry
+      operationId: getInboundBlacklistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Inbound Blacklist Entry details
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    put:
+      tags:
+        - Inbound Blacklist
+      summary: Update Inbound Blacklist Entry
+      operationId: updateInboundBlacklistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Inbound Blacklist Entry updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+    delete:
+      tags:
+        - Inbound Blacklist
+      summary: Delete Inbound Blacklist Entry
+      operationId: deleteInboundBlacklistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Inbound Blacklist Entry deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

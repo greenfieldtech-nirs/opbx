@@ -1,0 +1,9 @@
+description: Forbidden - Insufficient permissions
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      error: FORBIDDEN
+      message: You do not have permission to access this resource
+      code: INSUFFICIENT_PERMISSIONS

@@ -1,0 +1,43 @@
+paths:
+  /webhooks/cloudonix/call-initiated:
+    post:
+      tags:
+        - Webhooks
+      summary: Call initiated webhook
+      description: |
+        Async notification from Cloudonix when a call is initiated.
+        
+        **Note**: This is NOT the CXML routing endpoint. For real-time
+        call routing that returns CXML, use `/voice/route`.
+        
+        This endpoint:
+        1. Logs the incoming call notification
+        2. Dispatches job to create CallLog record
+        3. Triggers real-time frontend events
+        
+        Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+      operationId: callInitiatedWebhook
+      security:
+        - webhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/webhooks/CallInitiatedPayload.yaml'
+      responses:
+        '200':
+          description: Webhook received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: accepted
+                  message:
+                    type: string
+                    example: Call notification received
+        '400':
+          $ref: '../../components/responses/BadRequest.yaml'

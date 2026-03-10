@@ -1,0 +1,8 @@
+name: user
+in: path
+required: true
+description: User ID
+schema:
+  type: integer
+  minimum: 1
+example: 456

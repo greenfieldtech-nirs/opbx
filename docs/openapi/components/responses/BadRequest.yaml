@@ -1,0 +1,9 @@
+description: Bad Request - Invalid input data
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      error: BAD_REQUEST
+      message: Invalid request parameters
+      code: INVALID_PARAMS

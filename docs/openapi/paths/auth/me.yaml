@@ -1,0 +1,78 @@
+paths:
+  /v1/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: |
+        Returns current authenticated user details including organization information.
+        Validates that the user belongs to an active organization.
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    allOf:
+                      - $ref: '../../components/schemas/User.yaml'
+                      - type: object
+                        properties:
+                          organization:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                                example: 1
+                              name:
+                                type: string
+                                example: Acme Corporation
+                              slug:
+                                type: string
+                                example: acme-corporation
+                              status:
+                                type: string
+                                example: active
+                              timezone:
+                                type: string
+                                example: America/New_York
+              example:
+                user:
+                  id: 123
+                  organization_id: 1
+                  name: John Doe
+                  email: john@example.com
+                  role: owner
+                  status: active
+                  is_platform_manager: false
+                  organization:
+                    id: 1
+                    name: Acme Corporation
+                    slug: acme-corporation
+                    status: active
+                    timezone: America/New_York
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Organization inactive or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              examples:
+                invalidOrg:
+                  summary: Invalid organization
+                  value:
+                    error: INVALID_ORGANIZATION
+                    message: Your account is not associated with a valid organization
+                orgInactive:
+                  summary: Organization inactive
+                  value:
+                    error: ORGANIZATION_INACTIVE
+                    message: Your organization is not active. Please contact support.

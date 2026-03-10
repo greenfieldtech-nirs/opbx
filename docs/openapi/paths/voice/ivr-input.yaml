@@ -1,0 +1,23 @@
+paths:
+  /voice/ivr-input:
+    post:
+      tags:
+        - Voice Routing
+      summary: Handle IVR digit input
+      description: Process DTMF input from IVR menu
+      operationId: handleIvrInput
+      security:
+        - voiceWebhookAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: CXML response
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'

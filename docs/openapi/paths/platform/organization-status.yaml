@@ -1,0 +1,19 @@
+paths:
+  /v1/platform/organizations/{organization}/status:
+    patch:
+      tags:
+        - Platform
+      summary: Update organization status
+      operationId: updateOrganizationStatus
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Status updated

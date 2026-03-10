@@ -1,0 +1,119 @@
+paths:
+  /v1/outbound-whitelist:
+    get:
+      tags:
+        - Outbound Whitelist
+      summary: List Outbound Whitelist Entrys
+      description: Get paginated list of Outbound Whitelist Entrys
+      operationId: listOutboundWhitelistEntrys
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+      responses:
+        '200':
+          description: List of Outbound Whitelist Entrys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/OutboundWhitelist.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+    post:
+      tags:
+        - Outbound Whitelist
+      summary: Create Outbound Whitelist Entry
+      operationId: createOutboundWhitelistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Outbound Whitelist Entry created
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/outbound-whitelist/{outboundWhitelist}:
+    parameters:
+      - name: outboundWhitelist
+        in: path
+        required: true
+        schema:
+          type: integer
+
+    get:
+      tags:
+        - Outbound Whitelist
+      summary: Get Outbound Whitelist Entry
+      operationId: getOutboundWhitelistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Outbound Whitelist Entry details
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    put:
+      tags:
+        - Outbound Whitelist
+      summary: Update Outbound Whitelist Entry
+      operationId: updateOutboundWhitelistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Outbound Whitelist Entry updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+    delete:
+      tags:
+        - Outbound Whitelist
+      summary: Delete Outbound Whitelist Entry
+      operationId: deleteOutboundWhitelistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Outbound Whitelist Entry deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
