@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
 import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
@@ -454,24 +454,18 @@ export default function Register() {
                         <Label htmlFor="timezone" className="text-base font-medium">
                           Timezone
                         </Label>
-                        <Select
-                          defaultValue={watch('organization.timezone')}
+                        <Combobox
+                          value={watch('organization.timezone')}
                           onValueChange={(value) => {
                             formRegister('organization.timezone').onChange({ target: { value } });
                           }}
+                          options={commonTimezones}
+                          placeholder="Search or select timezone..."
+                          searchPlaceholder="Search timezone..."
                           disabled={isLoading}
-                        >
-                          <SelectTrigger id="timezone" className="h-11">
-                            <SelectValue placeholder="Select timezone" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            {commonTimezones.map((tz) => (
-                              <SelectItem key={tz.value} value={tz.value}>
-                                {tz.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          emptyText="No timezone found"
+                          buttonClassName="h-11"
+                        />
                         {errors.organization?.timezone && (
                           <p className="text-sm text-destructive">{errors.organization.timezone.message}</p>
                         )}
