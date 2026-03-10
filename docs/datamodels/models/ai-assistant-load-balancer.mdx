@@ -1,0 +1,155 @@
+---
+id: ai-assistant-load-balancer
+title: AiAssistantLoadBalancer
+sidebar_label: AiAssistantLoadBalancer
+---
+
+# AiAssistantLoadBalancer Model
+
+The `AiAssistantLoadBalancer` model represents a load balancer for distributing calls across multiple AI assistants based on configured strategies.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `ai_assistant_load_balancers` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+| **Soft Deletes** | Yes |
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | `bigint unsigned` | No | Primary key |
+| `organization_id` | `bigint unsigned` | No | Organization ID |
+| `name` | `varchar(255)` | No | Load balancer name |
+| `description` | `text` | Yes | Optional description |
+| `strategy` | `varchar(50)` | No | AlbsStrategy enum |
+| `follow_through` | `boolean` | No | Try next assistant on failure |
+| `status` | `varchar(50)` | No | AlbsStatus enum |
+| `fallback_action` | `varchar(50)` | No | RingGroupFallbackAction enum |
+| `fallback_extension_id` | `bigint unsigned` | Yes | Fallback extension |
+| `fallback_ring_group_id` | `bigint unsigned` | Yes | Fallback ring group |
+| `fallback_ivr_menu_id` | `bigint unsigned` | Yes | Fallback IVR menu |
+| `fallback_ai_assistant_id` | `bigint unsigned` | Yes | Fallback AI assistant |
+| `created_by` | `bigint unsigned` | Yes | Creator user ID |
+| `updated_by` | `bigint unsigned` | Yes | Updater user ID |
+| `deleted_at` | `timestamp` | Yes | Soft delete timestamp |
+| `created_at` | `timestamp` | No | Creation timestamp |
+| `updated_at` | `timestamp` | No | Update timestamp |
+
+## Load Balancer Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `round_robin` | Distribute evenly in sequence |
+| `priority` | Route by priority order |
+| `weighted` | Route by percentage weights |
+| `least_connections` | Route to least busy |
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'name',
+    'description',
+    'strategy',
+    'follow_through',
+    'status',
+    'fallback_action',
+    'fallback_extension_id',
+    'fallback_ring_group_id',
+    'fallback_ivr_menu_id',
+    'fallback_ai_assistant_id',
+    'created_by',
+    'updated_by',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `strategy` | `AlbsStrategy::class` | Strategy enum |
+| `follow_through` | `boolean` | Boolean cast |
+| `fallback_action` | `RingGroupFallbackAction::class` | Fallback action enum |
+| `status` | `AlbsStatus::class` | Status enum |
+
+## Constants
+
+| Constant | Value |
+|----------|-------|
+| `DEFAULT_RELATIONSHIP_FIELDS` | Array of default eager load relationships |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+- `fallbackExtension()` → Extension
+- `fallbackRingGroup()` → RingGroup
+- `fallbackIvrMenu()` → IvrMenu
+- `fallbackAiAssistant()` → AiAssistant
+- `creator()` → User
+- `updater()` → User
+
+### Has Many
+
+- `members()` → AiAssistantLoadBalancerMember[]
+
+## Methods
+
+### Status
+
+#### `isActive(): bool`
+#### `isInactive(): bool`
+
+### Members
+
+#### `getActiveMembers(): Collection`
+Get active member AI assistants.
+
+```php
+$members = $loadBalancer->getActiveMembers();
+```
+
+#### `getActiveMemberCount(): int`
+Get count of active members.
+
+```php
+$count = $loadBalancer->getActiveMemberCount();
+```
+
+## Query Scopes
+
+- `scopeForOrganization($query, $orgId)`
+- `scopeWithStrategy($query, $strategy)`
+- `scopeWithStatus($query, $status)`
+- `scopeSearch($query, $search)`
+- `scopeActive($query)`
+
+## Usage Example
+
+```php
+$albs = AiAssistantLoadBalancer::create([
+    'organization_id' => $orgId,
+    'name' => 'Support Team',
+    'strategy' => AlbsStrategy::ROUND_ROBIN,
+    'follow_through' => true,
+    'status' => AlbsStatus::ACTIVE,
+    'fallback_action' => RingGroupFallbackAction::EXTENSION,
+    'fallback_extension_id' => $fallbackExtId,
+]);
+
+// Add members
+$albs->members()->create([
+    'ai_assistant_id' => $assistant1->id,
+    'position' => 1,
+    'weight' => 50,
+]);
+```
