@@ -189,6 +189,7 @@ export default function Register() {
     handleSubmit,
     trigger,
     watch,
+    setValue,
     formState: { errors },
     setError,
     clearErrors,
@@ -457,7 +458,7 @@ export default function Register() {
                         <Combobox
                           value={watch('organization.timezone')}
                           onValueChange={(value) => {
-                            formRegister('organization.timezone').onChange({ target: { value } });
+                            setValue('organization.timezone', value, { shouldValidate: true });
                           }}
                           options={commonTimezones}
                           placeholder="Search or select timezone..."
