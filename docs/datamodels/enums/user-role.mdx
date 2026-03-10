@@ -1,0 +1,148 @@
+---
+id: user-role
+title: UserRole
+sidebar_label: UserRole
+---
+
+# UserRole Enum
+
+The `UserRole` enum defines the role-based access control (RBAC) levels for users in the OPBX system.
+
+## Definition
+
+```php
+namespace App\Enums;
+
+enum UserRole: string
+{
+    case OWNER = 'owner';
+    case PBX_ADMIN = 'pbx_admin';
+    case PBX_USER = 'pbx_user';
+    case REPORTER = 'reporter';
+}
+```
+
+## Values
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `owner` | Owner | Full organization control |
+| `pbx_admin` | PBX Admin | Configuration and user management |
+| `pbx_user` | PBX User | Regular PBX agent |
+| `reporter` | Reporter | Read-only access to reports |
+
+## Permission Matrix
+
+| Permission | Owner | PBX Admin | PBX User | Reporter |
+|------------|-------|-----------|----------|----------|
+| Manage Organization | ✅ | ❌ | ❌ | ❌ |
+| Manage Users | ✅ | ✅ | ❌ | ❌ |
+| Manage Configuration | ✅ | ✅ | ❌ | ❌ |
+| View Reports | ✅ | ✅ | ❌ | ✅ |
+| Manage Own Data | ✅ | ✅ | ✅ | ✅ |
+| Make/Receive Calls | ✅ | ✅ | ✅ | ❌ |
+
+## Methods
+
+### `label(): string`
+Get human-readable label.
+
+```php
+UserRole::OWNER->label(); // "Owner"
+UserRole::PBX_ADMIN->label(); // "PBX Admin"
+```
+
+### Permission Checks
+
+#### `canManageOrganization(): bool`
+Only Owner can manage organization settings.
+
+```php
+if ($user->role->canManageOrganization()) {
+    // Allow organization settings access
+}
+```
+
+#### `canManageUsers(): bool`
+Owner and PBX Admin can manage users.
+
+```php
+if ($user->role->canManageUsers()) {
+    // Allow user CRUD operations
+}
+```
+
+#### `canManageConfiguration(): bool`
+Owner and PBX Admin can manage PBX configuration.
+
+```php
+if ($user->role->canManageConfiguration()) {
+    // Allow extension, ring group, IVR configuration
+}
+```
+
+#### `canViewReports(): bool`
+Owner, PBX Admin, and Reporter can view reports.
+
+```php
+if ($user->role->canViewReports()) {
+    // Allow access to call logs and CDRs
+}
+```
+
+### Type Checks
+
+#### `isOwner(): bool`
+#### `isPBXAdmin(): bool`
+#### `isPBXUser(): bool`
+#### `isReporter(): bool`
+
+```php
+if ($user->role->isOwner()) {
+    // Owner-specific logic
+}
+```
+
+## Usage Example
+
+```php
+use App\Enums\UserRole;
+use App\Models\User;
+
+// Create user with role
+$user = User::create([
+    'name' => 'John Doe',
+    'email' => 'john@example.com',
+    'role' => UserRole::PBX_ADMIN,
+]);
+
+// Check permissions
+if ($user->role->canManageUsers()) {
+    // Allow creating new users
+}
+
+// Role hierarchy for user management
+if ($authUser->role === UserRole::OWNER) {
+    // Can manage all users
+} elseif ($authUser->role === UserRole::PBX_ADMIN) {
+    // Can only manage PBX_USER and REPORTER
+}
+```
+
+## Database Storage
+
+Stored as `VARCHAR(50)` in the database:
+
+```sql
+role VARCHAR(50) NOT NULL DEFAULT 'pbx_user'
+```
+
+## Validation
+
+```php
+use Illuminate\Validation\Rules\Enum;
+
+$validated = $request->validate([
+    'role' => ['required', new Enum(UserRole::class)],
+]);
+```

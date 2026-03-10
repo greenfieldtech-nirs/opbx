@@ -1,0 +1,156 @@
+---
+id: extension-type
+title: ExtensionType
+sidebar_label: ExtensionType
+---
+
+# ExtensionType Enum
+
+The `ExtensionType` enum defines the different types of extensions available in the OPBX system for call routing.
+
+## Definition
+
+```php
+namespace App\Enums;
+
+enum ExtensionType: string
+{
+    case USER = 'user';
+    case CONFERENCE = 'conference';
+    case RING_GROUP = 'ring_group';
+    case IVR = 'ivr';
+    case AI_ASSISTANT = 'ai_assistant';
+    case CUSTOM_LOGIC = 'custom_logic';
+    case FORWARD = 'forward';
+    case AI_LOAD_BALANCER = 'ai_load_balancer';
+}
+```
+
+## Values
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `user` | User Extension | Direct extension for a user |
+| `conference` | Conference Room | Conference room for multiple participants |
+| `ring_group` | Ring Group | Ring multiple extensions simultaneously or sequentially |
+| `ivr` | IVR Menu | Interactive voice response menu |
+| `ai_assistant` | AI Assistant | AI-powered virtual assistant |
+| `custom_logic` | Custom Logic | Custom call routing logic |
+| `forward` | Call Forwarding | Forward calls to external number |
+| `ai_load_balancer` | AI Load Balancer | Route calls to AI Assistant Load Balancer |
+
+## Methods
+
+### `label(): string`
+Get human-readable label.
+
+```php
+ExtensionType::USER->label();           // "User Extension"
+ExtensionType::AI_ASSISTANT->label();   // "AI Assistant"
+```
+
+### `description(): string`
+Get detailed description.
+
+```php
+ExtensionType::RING_GROUP->description();
+// "Ring multiple extensions simultaneously or sequentially"
+```
+
+### Capability Checks
+
+#### `requiresUser(): bool`
+Check if extension type requires user assignment.
+
+```php
+ExtensionType::USER->requiresUser();           // true
+ExtensionType::CONFERENCE->requiresUser();     // false
+```
+
+#### `supportsVoicemail(): bool`
+Check if extension type supports voicemail.
+
+```php
+ExtensionType::USER->supportsVoicemail();      // true
+ExtensionType::AI_ASSISTANT->supportsVoicemail(); // false
+```
+
+#### `canMakeOutboundCalls(): bool`
+Check if extension type can make outbound calls.
+
+```php
+ExtensionType::USER->canMakeOutboundCalls();   // true
+ExtensionType::IVR->canMakeOutboundCalls();    // false
+```
+
+### `requiredConfigFields(): array`
+Get required configuration fields for the extension type.
+
+```php
+ExtensionType::CONFERENCE->requiredConfigFields();
+// ['conference_room_id']
+
+ExtensionType::AI_ASSISTANT->requiredConfigFields();
+// ['provider', 'phone_number']
+```
+
+| Type | Required Fields |
+|------|-----------------|
+| `user` | None (optional: `forward_to`) |
+| `conference` | `conference_room_id` |
+| `ring_group` | `ring_group_id` |
+| `ivr` | `ivr_id` |
+| `ai_assistant` | `provider`, `phone_number` |
+| `custom_logic` | `custom_logic_id` |
+| `forward` | `forward_to` |
+| `ai_load_balancer` | `ai_load_balancer_id` |
+
+### `values(): array`
+Get all extension type values as an array.
+
+```php
+ExtensionType::values();
+// ['user', 'conference', 'ring_group', 'ivr', 'ai_assistant', ...]
+```
+
+## Usage Example
+
+```php
+use App\Enums\ExtensionType;
+use App\Models\Extension;
+
+// Create user extension
+$ext = Extension::create([
+    'extension_number' => '1001',
+    'type' => ExtensionType::USER,
+    'user_id' => $user->id,
+]);
+
+// Create conference room extension
+$ext = Extension::create([
+    'extension_number' => '8000',
+    'type' => ExtensionType::CONFERENCE,
+    'configuration' => ['conference_room_id' => $room->id],
+]);
+
+// Check capabilities
+if ($extension->type->supportsVoicemail()) {
+    // Show voicemail settings
+}
+
+if ($extension->type->canMakeOutboundCalls()) {
+    // Allow outbound calling
+}
+```
+
+## Database Storage
+
+Stored as `VARCHAR(50)` in the database:
+
+```sql
+type VARCHAR(50) NOT NULL
+```
+
+## Used By
+
+- [Extension](../models/extension) model
