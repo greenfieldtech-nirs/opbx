@@ -1,0 +1,192 @@
+---
+id: cloudonix-settings
+title: CloudonixSettings
+sidebar_label: CloudonixSettings
+---
+
+# CloudonixSettings Model
+
+The `CloudonixSettings` model stores Cloudonix CPaaS integration configuration for an organization.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `cloudonix_settings` |
+| **Primary Key** | `id` |
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | `bigint unsigned` | No | Primary key |
+| `organization_id` | `bigint unsigned` | No | Organization ID |
+| `domain_uuid` | `char(36)` | Yes | Cloudonix domain UUID |
+| `domain_name` | `varchar(255)` | Yes | Cloudonix domain name |
+| `domain_api_key` | `text` | Yes | API key (encrypted) |
+| `domain_requests_api_key` | `text` | Yes | Voice webhook auth key (encrypted) |
+| `webhook_base_url` | `varchar(500)` | Yes | Base URL for webhooks |
+| `voice_application_id` | `int` | Yes | Voice app ID |
+| `voice_application_uuid` | `char(36)` | Yes | Voice app UUID |
+| `voice_application_name` | `varchar(255)` | Yes | Voice app name |
+| `no_answer_timeout` | `int` | No | No answer timeout (default: 30) |
+| `recording_format` | `varchar(20)` | No | Recording format (default: wav) |
+| `cloudonix_package` | `varchar(100)` | Yes | Subscription package |
+| `created_at` | `timestamp` | No | Creation timestamp |
+| `updated_at` | `timestamp` | No | Update timestamp |
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'domain_uuid',
+    'domain_name',
+    'domain_api_key',
+    'domain_requests_api_key',
+    'webhook_base_url',
+    'voice_application_id',
+    'voice_application_uuid',
+    'voice_application_name',
+    'no_answer_timeout',
+    'recording_format',
+    'cloudonix_package',
+];
+```
+
+### Hidden
+
+```php
+protected $hidden = [
+    'domain_api_key',
+    'domain_requests_api_key',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `domain_uuid` | `string` | String cast |
+| `domain_api_key` | `encrypted` | Encrypted storage |
+| `domain_requests_api_key` | `encrypted` | Encrypted storage |
+| `no_answer_timeout` | `integer` | Integer cast |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+
+## Methods
+
+### URL Generation
+
+#### `getCallbackUrl(): string`
+Get session update webhook URL.
+
+```php
+$url = $settings->getCallbackUrl();
+// https://api.example.com/api/webhooks/cloudonix/session-update
+```
+
+#### `getCdrUrl(): string`
+Get CDR webhook URL.
+
+```php
+$url = $settings->getCdrUrl();
+// https://api.example.com/api/webhooks/cloudonix/cdr
+```
+
+#### `getVoiceRouteUrl(): string`
+Get voice routing URL.
+
+```php
+$url = $settings->getVoiceRouteUrl();
+// https://api.example.com/api/voice/route
+```
+
+### API Key Masking
+
+#### `getMaskedDomainApiKey(): ?string`
+Get masked API key (first 4 + *** + last 4).
+
+```php
+$masked = $settings->getMaskedDomainApiKey();
+// "abcd***wxyz"
+```
+
+#### `getMaskedDomainRequestsApiKey(): ?string`
+Get masked requests API key.
+
+```php
+$masked = $settings->getMaskedDomainRequestsApiKey();
+// "xi12***abcd"
+```
+
+### Status Checking
+
+#### `isConfigured(): bool`
+Check if Cloudonix is configured.
+
+```php
+if ($settings->isConfigured()) {
+    // Ready for API calls
+}
+```
+
+#### `hasWebhookAuth(): bool`
+Check if webhook auth is enabled.
+
+```php
+if ($settings->hasWebhookAuth()) {
+    // Voice webhooks use Bearer token auth
+}
+```
+
+### Webhook URL Management
+
+#### `getEffectiveWebhookBaseUrlAttribute(): ?string`
+Get effective webhook base URL (with override support).
+
+#### `isWebhookUrlOverridden(): bool`
+Check if webhook URL is overridden at application level.
+
+#### `getWebhookUrlDetails(): array`
+Get detailed webhook URL information.
+
+```php
+$details = $settings->getWebhookUrlDetails();
+// [
+//   'effective_url' => 'https://...',
+//   'application_url' => 'https://...',
+//   'organization_url' => 'https://...',
+//   'is_overridden' => true,
+//   'source' => 'application',
+// ]
+```
+
+## Usage Example
+
+```php
+use App\Models\CloudonixSettings;
+
+$settings = CloudonixSettings::create([
+    'organization_id' => $orgId,
+    'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
+    'domain_name' => 'example.cloudonix.io',
+    'domain_api_key' => 'XI-...',
+    'domain_requests_api_key' => 'XI-...',
+    'webhook_base_url' => 'https://api.example.com',
+    'no_answer_timeout' => 30,
+    'recording_format' => 'wav',
+]);
+
+// Get webhook URLs
+$sessionUrl = $settings->getCallbackUrl();
+$cdrUrl = $settings->getCdrUrl();
+$voiceUrl = $settings->getVoiceRouteUrl();
+```

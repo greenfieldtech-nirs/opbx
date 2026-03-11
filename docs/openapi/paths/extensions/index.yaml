@@ -1,0 +1,211 @@
+paths:
+  /v1/extensions:
+    get:
+      tags:
+        - Extensions
+      summary: List extensions
+      description: Get paginated list of extensions in the organization
+      operationId: listExtensions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [extension_number, name, type, status, created_at]
+            default: extension_number
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [user, conference, ring_group, ivr, ai_assistant, forward, ai_load_balancer]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in extension number or name
+      responses:
+        '200':
+          description: List of extensions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/Extension.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+    post:
+      tags:
+        - Extensions
+      summary: Create extension
+      description: Create a new extension
+      operationId: createExtension
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                extension_number:
+                  type: string
+                  description: Extension number (must be unique in organization)
+                  example: '1001'
+                user_id:
+                  type: integer
+                  nullable: true
+                  description: User ID (required for USER type)
+                type:
+                  type: string
+                  enum: [user, conference, ring_group, ivr, ai_assistant, forward, ai_load_balancer]
+                  example: user
+                status:
+                  type: string
+                  enum: [active, inactive]
+                  default: active
+                voicemail_enabled:
+                  type: boolean
+                  default: true
+                configuration:
+                  type: object
+                  additionalProperties: true
+                ai_assistant_id:
+                  type: integer
+                  nullable: true
+              required:
+                - extension_number
+                - type
+      responses:
+        '201':
+          description: Extension created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Extension.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/extensions/{extension}:
+    get:
+      tags:
+        - Extensions
+      summary: Get extension
+      operationId: getExtension
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/path/ExtensionId.yaml'
+      responses:
+        '200':
+          description: Extension details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Extension.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    put:
+      tags:
+        - Extensions
+      summary: Update extension
+      operationId: updateExtension
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/path/ExtensionId.yaml'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                extension_number:
+                  type: string
+                user_id:
+                  type: integer
+                  nullable: true
+                type:
+                  type: string
+                  enum: [user, conference, ring_group, ivr, ai_assistant, forward, ai_load_balancer]
+                status:
+                  type: string
+                  enum: [active, inactive]
+                voicemail_enabled:
+                  type: boolean
+                configuration:
+                  type: object
+                ai_assistant_id:
+                  type: integer
+                  nullable: true
+      responses:
+        '200':
+          description: Extension updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Extension.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+    delete:
+      tags:
+        - Extensions
+      summary: Delete extension
+      operationId: deleteExtension
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/path/ExtensionId.yaml'
+      responses:
+        '204':
+          description: Extension deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

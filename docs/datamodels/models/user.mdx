@@ -1,0 +1,329 @@
+---
+id: user
+title: User
+sidebar_label: User
+---
+
+# User Model
+
+The `User` model represents a person who has access to the OPBX system. Users are scoped to an organization and have role-based permissions.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `users` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `bigint unsigned` | No | auto | Primary key |
+| `organization_id` | `bigint unsigned` | No | - | Foreign key to organizations |
+| `name` | `varchar(255)` | No | - | Full name |
+| `email` | `varchar(255)` | No | - | Unique email address |
+| `password` | `varchar(255)` | No | - | Hashed password |
+| `role` | `varchar(50)` | No | - | UserRole enum value |
+| `status` | `varchar(50)` | No | `active` | UserStatus enum value |
+| `phone` | `varchar(20)` | Yes | null | Phone number |
+| `street_address` | `varchar(500)` | Yes | null | Street address |
+| `city` | `varchar(100)` | Yes | null | City |
+| `state_province` | `varchar(100)` | Yes | null | State/Province |
+| `postal_code` | `varchar(20)` | Yes | null | Postal/ZIP code |
+| `country` | `varchar(100)` | Yes | null | Country |
+| `is_platform_manager` | `boolean` | No | `false` | Platform manager flag |
+| `email_verified_at` | `timestamp` | Yes | null | Email verification timestamp |
+| `remember_token` | `varchar(100)` | Yes | null | Laravel remember token |
+| `created_at` | `timestamp` | No | - | Creation timestamp |
+| `updated_at` | `timestamp` | No | - | Last update timestamp |
+
+### Indexes
+
+- `PRIMARY` on `id`
+- `UNIQUE` on `email`
+- `INDEX` on `organization_id`
+- `INDEX` on `role`
+- `INDEX` on `status`
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'name',
+    'email',
+    'password',
+    'role',
+    'status',
+    'phone',
+    'street_address',
+    'city',
+    'state_province',
+    'postal_code',
+    'country',
+];
+```
+
+### Hidden
+
+```php
+protected $hidden = [
+    'password',
+    'remember_token',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `email_verified_at` | `datetime` | Carbon instance |
+| `password` | `hashed` | Automatic bcrypt hashing |
+| `role` | `UserRole::class` | [UserRole](../enums/user-role) enum |
+| `status` | `UserStatus::class` | [UserStatus](../enums/user-status) enum |
+| `is_platform_manager` | `boolean` | Boolean cast |
+
+## Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DEFAULT_EXTENSION_FIELDS` | `'extension:id,user_id,extension_number'` | Default eager load fields for extension relationship |
+
+## Relationships
+
+### Belongs To
+
+#### `organization(): BelongsTo`
+The organization this user belongs to.
+
+```php
+$user->organization; // Returns Organization model
+```
+
+### Has One
+
+#### `extension(): HasOne`
+The extension associated with this user (for USER type extensions).
+
+```php
+$user->extension; // Returns Extension model or null
+```
+
+### Has Many
+
+#### `platformAuditLogs(): HasMany`
+Platform audit logs where this user is the platform manager.
+
+```php
+$user->platformAuditLogs; // Returns collection of PlatformAuditLog
+```
+
+## Methods
+
+### Role Checking
+
+#### `hasRole(UserRole $role): bool`
+Check if user has a specific role.
+
+```php
+if ($user->hasRole(UserRole::OWNER)) {
+    // User is an owner
+}
+```
+
+#### `isOwner(): bool`
+Check if user is an owner.
+
+```php
+if ($user->isOwner()) {
+    // Owner can manage organization
+}
+```
+
+#### `isPBXAdmin(): bool`
+Check if user is a PBX admin.
+
+```php
+if ($user->isPBXAdmin()) {
+    // PBX admin can manage configuration
+}
+```
+
+#### `isPBXUser(): bool`
+Check if user is a PBX user (agent).
+
+```php
+if ($user->isPBXUser()) {
+    // Regular PBX user
+}
+```
+
+#### `isReporter(): bool`
+Check if user is a reporter (read-only access).
+
+```php
+if ($user->isReporter()) {
+    // Reporter can only view reports
+}
+```
+
+### Status Checking
+
+#### `isActive(): bool`
+Check if user account is active.
+
+```php
+if ($user->isActive()) {
+    // User can access the system
+}
+```
+
+#### `isInactive(): bool`
+Check if user account is inactive.
+
+```php
+if ($user->isInactive()) {
+    // User cannot access the system
+}
+```
+
+### Platform Manager
+
+#### `isPlatformManager(): bool`
+Check if user is a platform manager (cross-tenant admin).
+
+```php
+if ($user->isPlatformManager()) {
+    // Can access platform management endpoints
+}
+```
+
+#### `revokeAllTokens(): void`
+Revoke all Sanctum tokens. Called when platform manager flag is revoked.
+
+```php
+$user->revokeAllTokens();
+```
+
+### User Management
+
+#### `canManageUser(User $targetUser): bool`
+Check if current user can manage the target user based on role hierarchy.
+
+**Business Rules:**
+- Owner can manage all users
+- PBX Admin can only manage PBX User and Reporter
+- PBX User and Reporter cannot manage any users
+- No one can manage themselves
+- Different organizations cannot manage each other
+
+```php
+if ($authUser->canManageUser($targetUser)) {
+    // Allow user management actions
+}
+```
+
+## Query Scopes
+
+### `scopeForOrganization($query, int|string $organizationId)`
+Filter users by organization.
+
+```php
+$users = User::forOrganization(1)->get();
+```
+
+### `scopeWithRole($query, UserRole $role)`
+Filter users by role.
+
+```php
+$admins = User::withRole(UserRole::PBX_ADMIN)->get();
+```
+
+### `scopeWithStatus($query, UserStatus $status)`
+Filter users by status.
+
+```php
+$activeUsers = User::withStatus(UserStatus::ACTIVE)->get();
+```
+
+### `scopeSearch($query, string $search)`
+Search users by name or email.
+
+```php
+$results = User::search('john')->get();
+```
+
+## Related Enums
+
+- [UserRole](../enums/user-role) - Defines user roles (owner, pbx_admin, pbx_user, reporter)
+- [UserStatus](../enums/user-status) - Defines user status (active, inactive)
+
+## Usage Examples
+
+### Creating a User
+
+```php
+use App\Models\User;
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
+use Illuminate\Support\Facades\Hash;
+
+$user = User::create([
+    'organization_id' => $organization->id,
+    'name' => 'John Doe',
+    'email' => 'john@example.com',
+    'password' => Hash::make('securepassword'),
+    'role' => UserRole::PBX_USER,
+    'status' => UserStatus::ACTIVE,
+    'phone' => '+1-555-123-4567',
+]);
+```
+
+### Checking Permissions
+
+```php
+// Check role
+if ($user->isOwner()) {
+    // Full organization management
+}
+
+// Check if can manage another user
+if ($authUser->canManageUser($targetUser)) {
+    // Allow update/delete
+}
+
+// Check status
+if ($user->isActive()) {
+    // Allow login
+}
+```
+
+### Eager Loading
+
+```php
+// Load with organization and extension
+$users = User::with(['organization', 'extension'])->get();
+
+// Load with default extension fields
+$users = User::with('extension:id,user_id,extension_number')->get();
+```
+
+### Querying with Scopes
+
+```php
+// Get active PBX admins in organization
+$admins = User::forOrganization($orgId)
+    ->withRole(UserRole::PBX_ADMIN)
+    ->withStatus(UserStatus::ACTIVE)
+    ->get();
+
+// Search users
+$results = User::search('john')
+    ->forOrganization($orgId)
+    ->get();
+```

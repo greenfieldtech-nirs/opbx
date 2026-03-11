@@ -1,0 +1,19 @@
+type: object
+description: Cloudonix session-update webhook payload
+properties:
+  session_token:
+    type: string
+    description: Session token
+  session_id:
+    type: integer
+    description: Session ID
+  status:
+    type: string
+    description: Session status
+    example: active
+  call_id:
+    type: string
+    description: Associated call ID
+  timestamp:
+    type: integer
+    description: Unix timestamp

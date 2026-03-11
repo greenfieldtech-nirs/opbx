@@ -17,6 +17,13 @@ class BusinessHours extends Model
     use HasFactory;
 
     /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'business_hours_schedules';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -79,7 +86,7 @@ class BusinessHours extends Model
         $dayOfWeek = strtolower($dateTime->format('l'));
         $schedule = $this->schedules[$dayOfWeek] ?? null;
 
-        if (!$schedule || !isset($schedule['enabled']) || !$schedule['enabled']) {
+        if (! $schedule || ! isset($schedule['enabled']) || ! $schedule['enabled']) {
             return false;
         }
 

@@ -1,0 +1,91 @@
+paths:
+  /v1/call-logs:
+    get:
+      tags:
+        - Call Logs
+      summary: List call logs
+      description: Get paginated list of call logs
+      operationId: listCallLogs
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [inbound, outbound]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [initiated, ringing, answered, completed, missed, busy, failed, no_answer]
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter calls from date (Y-m-d)
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter calls to date (Y-m-d)
+        - name: extension_id
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in from_number or to_number
+      responses:
+        '200':
+          description: List of call logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/CallLog.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/call-logs/{callLog}:
+    get:
+      tags:
+        - Call Logs
+      summary: Get call log
+      operationId: getCallLog
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: callLog
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Call log details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/CallLog.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

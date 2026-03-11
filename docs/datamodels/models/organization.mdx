@@ -1,0 +1,295 @@
+---
+id: organization
+title: Organization
+sidebar_label: Organization
+---
+
+# Organization Model
+
+The `Organization` model represents a tenant in the multi-tenant OPBX system. All data is scoped to an organization, providing complete data isolation between tenants.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `organizations` |
+| **Primary Key** | `id` |
+| **Soft Deletes** | Yes |
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `bigint unsigned` | No | auto | Primary key |
+| `name` | `varchar(255)` | No | - | Organization name |
+| `slug` | `varchar(255)` | No | - | URL-friendly identifier (auto-generated) |
+| `status` | `varchar(50)` | No | `active` | Organization status |
+| `timezone` | `varchar(100)` | No | `UTC` | Default timezone |
+| `settings` | `json` | Yes | null | Organization configuration |
+| `deleted_at` | `timestamp` | Yes | null | Soft delete timestamp |
+| `created_at` | `timestamp` | No | - | Creation timestamp |
+| `updated_at` | `timestamp` | No | - | Last update timestamp |
+
+### Indexes
+
+- `PRIMARY` on `id`
+- `UNIQUE` on `slug`
+- `INDEX` on `status`
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'name',
+    'slug',
+    'status',
+    'timezone',
+    'settings',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `settings` | `array` | JSON array for flexible configuration |
+
+## Lifecycle Hooks
+
+### Boot - Auto-generate Slug
+
+When creating an organization, the slug is automatically generated from the name if not provided:
+
+```php
+static::creating(function (Organization $organization): void {
+    if (empty($organization->slug)) {
+        $organization->slug = Str::slug($organization->name);
+    }
+});
+```
+
+**Example:**
+- Name: "Acme Corporation"
+- Auto-generated slug: "acme-corporation"
+
+## Relationships
+
+### Has Many
+
+#### `users(): HasMany`
+All users belonging to this organization.
+
+```php
+$organization->users; // Collection of User models
+$organization->users()->count(); // User count
+```
+
+#### `extensions(): HasMany`
+All extensions in this organization.
+
+```php
+$organization->extensions; // Collection of Extension models
+```
+
+#### `didNumbers(): HasMany`
+All DID numbers assigned to this organization.
+
+```php
+$organization->didNumbers; // Collection of DidNumber models
+```
+
+#### `ringGroups(): HasMany`
+All ring groups in this organization.
+
+```php
+$organization->ringGroups; // Collection of RingGroup models
+```
+
+#### `businessHoursSchedules(): HasMany`
+All business hours schedules for this organization.
+
+```php
+$organization->businessHoursSchedules; // Collection of BusinessHoursSchedule
+```
+
+#### `callLogs(): HasMany`
+All call logs for this organization.
+
+```php
+$organization->callLogs; // Collection of CallLog models
+```
+
+### Has One
+
+#### `cloudonixSettings(): HasOne`
+Cloudonix integration settings for this organization.
+
+```php
+$organization->cloudonixSettings; // CloudonixSettings model or null
+```
+
+## Methods
+
+### `isActive(): bool`
+Check if the organization is active.
+
+```php
+if ($organization->isActive()) {
+    // Organization can use the system
+}
+```
+
+## Settings Structure
+
+The `settings` JSON column stores organization-specific configuration:
+
+```json
+{
+  "features": {
+    "call_recording": false,
+    "voicemail": true,
+    "music_on_hold": true,
+    "call_waiting": true
+  },
+  "ui": {
+    "language": "en",
+    "date_format": "Y-m-d",
+    "time_format": "H:i"
+  },
+  "pbx": {
+    "default_extension_length": 4,
+    "extension_range_start": "1000",
+    "extension_range_end": "9999"
+  }
+}
+```
+
+### Default Settings
+
+When creating an organization, default settings are applied:
+
+```php
+$defaults = [
+    'features' => [
+        'call_recording' => false,
+        'voicemail' => true,
+        'music_on_hold' => true,
+        'call_waiting' => true,
+    ],
+    'ui' => [
+        'language' => 'en',
+        'date_format' => 'Y-m-d',
+        'time_format' => 'H:i',
+    ],
+    'pbx' => [
+        'default_extension_length' => 4,
+        'extension_range_start' => '1000',
+        'extension_range_end' => '9999',
+    ],
+];
+```
+
+## Related Enums
+
+- [OrganizationStatus](../enums/organization-status) - Organization status values
+
+## Usage Examples
+
+### Creating an Organization
+
+```php
+use App\Models\Organization;
+
+$organization = Organization::create([
+    'name' => 'Acme Corporation',
+    'timezone' => 'America/New_York',
+    'settings' => [
+        'features' => [
+            'call_recording' => true,
+            'voicemail' => true,
+        ],
+    ],
+]);
+
+// Slug is auto-generated: "acme-corporation"
+```
+
+### Checking Status
+
+```php
+$organization = Organization::find(1);
+
+if ($organization->isActive()) {
+    // Allow operations
+} else {
+    // Organization suspended or inactive
+}
+```
+
+### Accessing Related Data
+
+```php
+$organization = Organization::with([
+    'users',
+    'extensions',
+    'didNumbers',
+    'cloudonixSettings'
+])->find(1);
+
+// Count resources
+$userCount = $organization->users->count();
+$extensionCount = $organization->extensions->count();
+
+// Get Cloudonix settings
+$apiKey = $organization->cloudonixSettings?->api_key;
+```
+
+### Updating Settings
+
+```php
+$organization = Organization::find(1);
+
+// Get current settings
+$settings = $organization->settings ?? [];
+
+// Modify
+$settings['features']['call_recording'] = true;
+
+// Save
+$organization->update(['settings' => $settings]);
+```
+
+### Soft Delete
+
+```php
+// Delete (soft)
+$organization->delete();
+
+// Check if deleted
+if ($organization->trashed()) {
+    // Organization is soft-deleted
+}
+
+// Restore
+$organization->restore();
+
+// Force delete (permanent)
+$organization->forceDelete();
+```
+
+## Multi-Tenancy
+
+All models that belong to an organization use the `OrganizationScope` global scope:
+
+```php
+#[ScopedBy([OrganizationScope::class])]
+class User extends Model
+{
+    // Automatically filtered by organization_id
+}
+```
+
+This ensures complete data isolation between organizations.

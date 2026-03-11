@@ -1,0 +1,13 @@
+paths:
+  /v1/ivr-menus/voices:
+    get:
+      tags:
+        - IVR Menus
+      summary: Get available voices
+      operationId: getIvrVoices
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Voices retrieved

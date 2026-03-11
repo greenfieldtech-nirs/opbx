@@ -35,9 +35,9 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         $organizationId = $request->input('_organization_id');
         $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
 
-        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
-            ? rtrim($cloudonixSettings->webhook_base_url, '/')
-            : $request->getSchemeAndHttpHost();
+        $baseUrl = $cloudonixSettings
+            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
+            : rtrim(config('app.url'), '/');
 
         // Build session data with ring group context
         $sessionData = [
@@ -241,9 +241,9 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         $organizationId = $request->input('_organization_id');
         $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
 
-        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
-            ? rtrim($cloudonixSettings->webhook_base_url, '/')
-            : $request->getSchemeAndHttpHost();
+        $baseUrl = $cloudonixSettings
+            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
+            : rtrim(config('app.url'), '/');
 
         $relativeUrl = route('voice.ring-group-callback', [
             'ring_group_id' => $ringGroup->id,

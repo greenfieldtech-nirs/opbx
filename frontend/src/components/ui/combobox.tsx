@@ -69,7 +69,7 @@ export function Combobox({
 
   // Handle option selection
   const handleSelect = (selectedValue: string) => {
-    onValueChange(selectedValue === value ? '' : selectedValue);
+    onValueChange(selectedValue);
     setOpen(false);
     setSearchQuery('');
   };

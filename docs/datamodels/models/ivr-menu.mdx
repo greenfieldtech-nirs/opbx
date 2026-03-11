@@ -1,0 +1,48 @@
+---
+id: ivr-menu
+title: IvrMenu
+sidebar_label: IvrMenu
+---
+
+# IvrMenu Model
+
+The `IvrMenu` model represents Interactive Voice Response (IVR) menus for automated call handling.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `ivr_menus` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | `bigint unsigned` | No | Primary key |
+| `organization_id` | `bigint unsigned` | No | Organization ID |
+| `name` | `varchar(255)` | No | Menu name |
+| `greeting_message` | `text` | Yes | Initial greeting |
+| `voice` | `varchar(100)` | No | TTS voice |
+| `status` | `varchar(50)` | No | active/inactive |
+| `timeout` | `int` | No | Input timeout (seconds) |
+| `max_attempts` | `int` | No | Max input attempts |
+| `created_at` | `timestamp` | No | Creation timestamp |
+| `updated_at` | `timestamp` | No | Update timestamp |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+
+### Has Many
+
+- `options()` → IvrMenuOption[]
+
+## Methods
+
+- `isActive(): bool`
+- `isInactive(): bool`

@@ -214,6 +214,7 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role->value,
                     'status' => $user->status,
+                    'is_platform_manager' => $user->is_platform_manager,
                 ],
             ]);
         }
@@ -223,7 +224,8 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         // Create new token with role-scoped abilities
-        $abilities = $this->getTokenAbilities($user->role);
+        // Include platform abilities if user is a platform manager
+        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager);
         $token = $user->createToken(
             'api-token',
             $abilities,
@@ -241,6 +243,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role->value,
                 'status' => $user->status,
+                'is_platform_manager' => $user->is_platform_manager,
             ],
         ]);
     }
@@ -285,19 +288,39 @@ class AuthController extends Controller
     }
 
     /**
+     * Platform manager abilities added to tokens for PM users.
+     */
+    private const PLATFORM_ABILITIES = [
+        'platform:read',
+        'platform:write',
+        'platform:manage-users',
+        'platform:manage-organizations',
+        'platform:audit-logs',
+    ];
+
+    /**
      * Get token abilities based on user role.
      *
      * Security: Returns role-specific abilities instead of wildcard ['*']
      * to limit token scope and reduce impact of token compromise.
      *
+     * If the user is a platform manager, platform abilities are merged in.
+     *
      * @param  UserRole  $role  User's role
+     * @param  bool  $isPlatformManager  Whether user has platform manager flag
      * @return array Token abilities
      */
-    private function getTokenAbilities(UserRole $role): array
+    private function getTokenAbilities(UserRole $role, bool $isPlatformManager = false): array
     {
         $roleValue = $role->value;
+        $abilities = self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
 
-        return self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
+        // Add platform abilities for platform managers
+        if ($isPlatformManager) {
+            $abilities = array_merge($abilities, self::PLATFORM_ABILITIES);
+        }
+
+        return $abilities;
     }
 
     /**
@@ -396,6 +419,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role->value,
                 'status' => $user->status,
+                'is_platform_manager' => $user->is_platform_manager,
                 'organization' => [
                     'id' => $user->organization->id,
                     'name' => $user->organization->name,
@@ -460,7 +484,8 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         // Create new token with role-scoped abilities
-        $abilities = $this->getTokenAbilities($user->role);
+        // Include platform abilities if user is a platform manager
+        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager);
         $token = $user->createToken(
             'api-token',
             $abilities,

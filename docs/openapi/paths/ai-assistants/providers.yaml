@@ -1,0 +1,123 @@
+paths:
+  /v1/ai-assistant/providers:
+    get:
+      tags:
+        - AI Assistants
+      summary: List AI assistant providers
+      description: |
+        Get all available AI assistant providers grouped by protocol.
+        Includes configuration metadata for dynamic form rendering.
+      operationId: listAiAssistantProviders
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      providers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                            protocol:
+                              type: string
+                              enum: [sip, websocket]
+                            config_fields:
+                              type: array
+                      grouped:
+                        type: object
+                        properties:
+                          sip:
+                            type: array
+                          websocket:
+                            type: array
+                      protocols:
+                        type: array
+                        items:
+                          type: string
+                        example: [sip, websocket]
+
+  /v1/ai-assistant/providers/{provider}:
+    get:
+      tags:
+        - AI Assistants
+      summary: Get provider details
+      description: Get specific provider configuration metadata
+      operationId: getAiAssistantProvider
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          example: openai
+      responses:
+        '200':
+          description: Provider details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Provider not found
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+
+  /v1/ai-assistant/providers/protocol/{protocol}:
+    get:
+      tags:
+        - AI Assistants
+      summary: Get providers by protocol
+      description: Get providers filtered by protocol (sip or websocket)
+      operationId: getProvidersByProtocol
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: protocol
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sip, websocket]
+          example: websocket
+      responses:
+        '200':
+          description: Providers for protocol
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          description: Invalid protocol
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: 'Invalid protocol. Must be "sip" or "websocket".'

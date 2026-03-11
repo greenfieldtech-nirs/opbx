@@ -105,6 +105,7 @@ export interface User {
   name: string;
   role: UserRole;
   status: Status;
+  is_platform_manager: boolean;
   phone?: string | null;
   street_address?: string | null;
   city?: string | null;

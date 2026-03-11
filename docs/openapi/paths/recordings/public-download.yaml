@@ -1,0 +1,17 @@
+paths:
+  /storage/recordings/{path}:
+    get:
+      tags:
+        - Recordings
+      summary: Public recording download with HMAC
+      operationId: publicRecordingDownload
+      security: []
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recording downloaded

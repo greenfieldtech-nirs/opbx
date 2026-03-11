@@ -1,0 +1,8 @@
+name: organization
+in: path
+required: true
+description: Organization ID
+schema:
+  type: integer
+  minimum: 1
+example: 1

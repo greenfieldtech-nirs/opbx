@@ -1,0 +1,19 @@
+paths:
+  /v1/outbound-whitelist/{outboundWhitelist}/toggle-status:
+    patch:
+      tags:
+        - Outbound Whitelist
+      summary: Toggle whitelist entry status
+      operationId: toggleWhitelistStatus
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: outboundWhitelist
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Status toggled

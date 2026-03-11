@@ -1,0 +1,161 @@
+---
+id: call-log
+title: CallLog
+sidebar_label: CallLog
+---
+
+# CallLog Model
+
+The `CallLog` model represents a call activity record. It tracks the lifecycle of calls from initiation to completion.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `call_logs` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | `bigint unsigned` | No | Primary key |
+| `organization_id` | `bigint unsigned` | No | Organization ID |
+| `call_id` | `varchar(255)` | No | Unique call identifier from Cloudonix |
+| `direction` | `enum(inbound,outbound)` | No | Call direction |
+| `from_number` | `varchar(50)` | No | Caller number |
+| `to_number` | `varchar(50)` | No | Called number |
+| `did_id` | `bigint unsigned` | Yes | Associated DID number ID |
+| `extension_id` | `bigint unsigned` | Yes | Associated extension ID |
+| `ring_group_id` | `bigint unsigned` | Yes | Associated ring group ID |
+| `status` | `varchar(50)` | No | CallStatus enum |
+| `initiated_at` | `datetime` | Yes | Call initiation time |
+| `answered_at` | `datetime` | Yes | Call answer time |
+| `ended_at` | `datetime` | Yes | Call end time |
+| `duration` | `int` | Yes | Call duration in seconds |
+| `recording_url` | `varchar(500)` | Yes | URL to call recording |
+| `cloudonix_cdr` | `json` | Yes | Raw Cloudonix CDR data |
+| `created_at` | `timestamp` | No | Creation timestamp |
+| `updated_at` | `timestamp` | No | Update timestamp |
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'call_id',
+    'direction',
+    'from_number',
+    'to_number',
+    'did_id',
+    'extension_id',
+    'ring_group_id',
+    'status',
+    'initiated_at',
+    'answered_at',
+    'ended_at',
+    'duration',
+    'recording_url',
+    'cloudonix_cdr',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `status` | `CallStatus::class` | Call status enum |
+| `initiated_at` | `datetime` | Carbon instance |
+| `answered_at` | `datetime` | Carbon instance |
+| `ended_at` | `datetime` | Carbon instance |
+| `duration` | `integer` | Integer cast |
+| `cloudonix_cdr` | `array` | JSON data |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+- `didNumber()` → DidNumber
+- `extension()` → Extension
+- `ringGroup()` → RingGroup
+
+## Methods
+
+### Status Checking
+
+#### `isActive(): bool`
+Check if the call is currently active.
+
+```php
+if ($callLog->isActive()) {
+    // Call is in progress
+}
+```
+
+#### `isCompleted(): bool`
+Check if the call has completed (terminal status).
+
+```php
+if ($callLog->isCompleted()) {
+    // Call has ended
+}
+```
+
+## Call Statuses
+
+| Status | Description |
+|--------|-------------|
+| `initiated` | Call has been initiated |
+| `ringing` | Call is ringing |
+| `answered` | Call has been answered |
+| `completed` | Call completed successfully |
+| `missed` | Call was not answered |
+| `busy` | Line was busy |
+| `failed` | Call failed |
+| `no_answer` | No answer from destination |
+
+## Usage Examples
+
+### Creating a Call Log
+
+```php
+use App\Models\CallLog;
+use App\Enums\CallStatus;
+
+$callLog = CallLog::create([
+    'organization_id' => $orgId,
+    'call_id' => 'CA550e8400e29b41d4a716446655440000',
+    'direction' => 'inbound',
+    'from_number' => '+1234567890',
+    'to_number' => '+1987654321',
+    'did_id' => $didId,
+    'status' => CallStatus::INITIATED,
+    'initiated_at' => now(),
+]);
+```
+
+### Updating Call Status
+
+```php
+$callLog->update([
+    'status' => CallStatus::ANSWERED,
+    'answered_at' => now(),
+    'extension_id' => $extensionId,
+]);
+```
+
+### Completing a Call
+
+```php
+$callLog->update([
+    'status' => CallStatus::COMPLETED,
+    'ended_at' => now(),
+    'duration' => $seconds,
+    'recording_url' => $recordingUrl,
+]);
+```

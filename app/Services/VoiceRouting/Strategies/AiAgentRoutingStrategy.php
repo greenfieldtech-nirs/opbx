@@ -28,32 +28,35 @@ class AiAgentRoutingStrategy implements RoutingStrategy
 
     public function route(Request $request, DidNumber $did, array $destination): Response
     {
-        /** @var Extension $extension */
+        // Support both direct AiAssistant (from IVR) and Extension-based routing
+        $aiAssistant = $destination['ai_assistant'] ?? null;
         $extension = $destination['extension'] ?? null;
 
-        if (! $extension) {
-            return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'application/xml']);
-        }
+        // If we have an Extension, extract the AI Assistant from it
+        if ($extension && ! $aiAssistant) {
+            // Load AI Assistant relationship if not already loaded
+            if (! $extension->relationLoaded('aiAssistant')) {
+                $extension->load('aiAssistant');
+            }
+            $aiAssistant = $extension->aiAssistant;
 
-        // Load AI Assistant relationship if not already loaded
-        if (! $extension->relationLoaded('aiAssistant')) {
-            $extension->load('aiAssistant');
-        }
+            if (! $aiAssistant) {
+                Log::error('Extension has no AI Assistant configured', [
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'ai_assistant_id' => $extension->ai_assistant_id,
+                ]);
 
-        $aiAssistant = $extension->aiAssistant;
+                return response(
+                    CxmlBuilder::unavailable('AI Assistant not configured for this extension'),
+                    200,
+                    ['Content-Type' => 'application/xml']
+                );
+            }
+        }
 
         if (! $aiAssistant) {
-            Log::error('Extension has no AI Assistant configured', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
-                'ai_assistant_id' => $extension->ai_assistant_id,
-            ]);
-
-            return response(
-                CxmlBuilder::unavailable('AI Assistant not configured for this extension'),
-                200,
-                ['Content-Type' => 'application/xml']
-            );
+            return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Extract configuration from AI Assistant
@@ -63,21 +66,27 @@ class AiAgentRoutingStrategy implements RoutingStrategy
 
         // Route based on protocol
         if ($protocol === 'websocket') {
-            return $this->routeWebSocket($request, $extension, $config, $provider);
+            return $this->routeWebSocket($request, $aiAssistant, $config, $provider, $extension);
         } else {
-            return $this->routeSip($extension, $config, $provider);
+            return $this->routeSip($aiAssistant, $config, $provider, $extension);
         }
     }
 
     /**
      * Route call to WebSocket-based AI provider.
      */
-    private function routeWebSocket(Request $request, Extension $extension, array $config, ?string $provider): Response
-    {
+    private function routeWebSocket(
+        Request $request,
+        \App\Models\AiAssistant $aiAssistant,
+        array $config,
+        ?string $provider,
+        ?Extension $extension = null
+    ): Response {
         if (! $provider) {
             Log::error('WebSocket AI Assistant missing provider', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+                'extension_id' => $extension?->id,
             ]);
 
             return response(
@@ -92,7 +101,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
 
         if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
             Log::error('Invalid WebSocket provider', [
-                'extension_id' => $extension->id,
+                'ai_assistant_id' => $aiAssistant->id,
                 'provider' => $provider,
             ]);
 
@@ -115,8 +124,10 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             );
 
             Log::info('Routing to WebSocket AI provider', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
+                'ai_assistant_id' => $aiAssistant->id,
+                'ai_assistant_name' => $aiAssistant->name,
+                'extension_id' => $extension?->id,
+                'extension_number' => $extension?->extension_number,
                 'provider' => $provider,
                 'call_sid' => $cloudonixParams['session'] ?? null,
                 'from' => $cloudonixParams['from'] ?? null,
@@ -130,7 +141,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             );
         } catch (\InvalidArgumentException $e) {
             Log::error('Failed to build WebSocket URL', [
-                'extension_id' => $extension->id,
+                'ai_assistant_id' => $aiAssistant->id,
                 'provider' => $provider,
                 'error' => $e->getMessage(),
             ]);
@@ -148,10 +159,14 @@ class AiAgentRoutingStrategy implements RoutingStrategy
      *
      * This supports both legacy configuration and service_url column.
      */
-    private function routeSip(Extension $extension, array $config, ?string $provider): Response
-    {
-        // Check new columns first (preferred format for generic service URLs)
-        if ($extension->service_url) {
+    private function routeSip(
+        \App\Models\AiAssistant $aiAssistant,
+        array $config,
+        ?string $provider,
+        ?Extension $extension = null
+    ): Response {
+        // Check extension service_url first (preferred format for generic service URLs)
+        if ($extension && $extension->service_url) {
             $serviceUrl = $extension->service_url;
             $serviceToken = $extension->service_token;
             $serviceParams = $extension->service_params ?? [];
@@ -165,6 +180,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             }
 
             Log::info('Routing to SIP AI provider via service URL', [
+                'ai_assistant_id' => $aiAssistant->id,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
                 'service_url' => $serviceUrl,
@@ -182,8 +198,9 @@ class AiAgentRoutingStrategy implements RoutingStrategy
 
         if (! $provider || ! $phoneNumber) {
             Log::error('SIP AI Assistant missing provider or phone number', [
-                'extension_id' => $extension->id,
-                'extension_number' => $extension->extension_number,
+                'ai_assistant_id' => $aiAssistant->id,
+                'extension_id' => $extension?->id,
+                'extension_number' => $extension?->extension_number,
                 'has_provider' => $provider !== null,
                 'has_phone_number' => $phoneNumber !== null,
             ]);
@@ -196,8 +213,9 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         }
 
         Log::info('Routing to SIP AI provider', [
-            'extension_id' => $extension->id,
-            'extension_number' => $extension->extension_number,
+            'ai_assistant_id' => $aiAssistant->id,
+            'extension_id' => $extension?->id,
+            'extension_number' => $extension?->extension_number,
             'provider' => $provider,
             'phone_number' => $phoneNumber,
         ]);

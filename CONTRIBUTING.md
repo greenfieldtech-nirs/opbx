@@ -41,7 +41,7 @@ Before contributing, ensure you have:
 1. **Star the repository** - It helps the project visibility
 2. **Watch the repository** - Stay updated with discussions and changes
 3. **Check existing issues** - Look for bugs, feature requests, or enhancement ideas
-4. **Join discussions** - Participate in GitHub Discussions for ideas and feedback
+4. **Join our Discord** - Participate in our [Discord community](https://discord.gg/etCGgNh9VV) for ideas and feedback
 
 ## Development Setup
 
@@ -524,7 +524,7 @@ If you have questions:
 
 1. **Check documentation** - Review existing docs first
 2. **Search issues** - Look for similar discussions
-3. **Ask in Discussions** - GitHub Discussions for questions
+3. **Ask on Discord** - Join our [Discord server](https://discord.gg/etCGgNh9VV) for questions
 4. **Open an issue** - For bugs or feature requests
 5. **Be specific** - Provide context and details
 

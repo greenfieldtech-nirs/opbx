@@ -1,0 +1,8 @@
+name: sort_by
+in: query
+required: false
+description: Field to sort by
+schema:
+  type: string
+  default: id
+example: created_at

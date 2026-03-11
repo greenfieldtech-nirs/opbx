@@ -1,0 +1,19 @@
+paths:
+  /v1/ivr-menus/{ivr_menu}/toggle-status:
+    patch:
+      tags:
+        - IVR Menus
+      summary: Toggle IVR menu status
+      operationId: toggleIvrMenuStatus
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: ivr_menu
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Status toggled

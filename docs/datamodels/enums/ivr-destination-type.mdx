@@ -1,0 +1,40 @@
+---
+id: ivr-destination-type
+title: IvrDestinationType
+sidebar_label: IvrDestinationType
+---
+
+# IvrDestinationType Enum
+
+The `IvrDestinationType` enum defines the possible destinations for IVR menu options.
+
+## Definition
+
+```php
+namespace App\Enums;
+
+enum IvrDestinationType: string
+{
+    case EXTENSION = 'extension';
+    case RING_GROUP = 'ring_group';
+    case IVR_MENU = 'ivr_menu';
+    case AI_ASSISTANT = 'ai_assistant';
+    case AI_LOAD_BALANCER = 'ai_load_balancer';
+    case HANGUP = 'hangup';
+}
+```
+
+## Values
+
+| Value | Description |
+|-------|-------------|
+| `extension` | Route to an extension |
+| `ring_group` | Route to a ring group |
+| `ivr_menu` | Route to another IVR menu (submenu) |
+| `ai_assistant` | Route to an AI assistant |
+| `ai_load_balancer` | Route to an AI load balancer |
+| `hangup` | End the call |
+
+## Used By
+
+- IvrMenuOption model

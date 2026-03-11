@@ -1,0 +1,129 @@
+---
+id: did-number
+title: DidNumber (DID)
+sidebar_label: DidNumber
+---
+
+# DidNumber Model
+
+The `DidNumber` model represents a Direct Inward Dialing (DID) phone number that can be routed to various destinations within the PBX.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `did_numbers` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `bigint unsigned` | No | auto | Primary key |
+| `organization_id` | `bigint unsigned` | No | - | Foreign key to organizations |
+| `phone_number` | `varchar(50)` | No | - | Phone number in E.164 format |
+| `friendly_name` | `varchar(255)` | Yes | null | Display name/label |
+| `routing_type` | `varchar(50)` | No | - | Type of routing destination |
+| `routing_config` | `json` | Yes | null | Routing configuration |
+| `status` | `varchar(50)` | No | `active` | active/inactive |
+| `cloudonix_config` | `json` | Yes | null | Cloudonix-specific configuration |
+| `created_at` | `timestamp` | No | - | Creation timestamp |
+| `updated_at` | `timestamp` | No | - | Last update timestamp |
+
+## Routing Types
+
+| Type | Description | Config Key |
+|------|-------------|------------|
+| `extension` | Route to extension | `extension_id` |
+| `ring_group` | Route to ring group | `ring_group_id` |
+| `business_hours` | Route via business hours | `business_hours_schedule_id` |
+| `conference_room` | Route to conference | `conference_room_id` |
+| `ai_assistant` | Route to AI assistant | `ai_assistant_id` |
+| `ivr_menu` | Route to IVR menu | `ivr_menu_id` |
+| `ai_load_balancer` | Route to AI load balancer | `ai_load_balancer_id` |
+
+## Attributes
+
+### Fillable
+
+```php
+protected $fillable = [
+    'organization_id',
+    'phone_number',
+    'friendly_name',
+    'routing_type',
+    'routing_config',
+    'status',
+    'cloudonix_config',
+];
+```
+
+## Casts
+
+| Attribute | Cast | Description |
+|-----------|------|-------------|
+| `routing_config` | `array` | JSON routing configuration |
+| `cloudonix_config` | `array` | JSON Cloudonix config |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+
+### Dynamic Accessors
+
+These are not true Eloquent relationships but computed accessors:
+
+- `extension` → Extension (if routing_type = 'extension')
+- `ringGroup` → RingGroup (if routing_type = 'ring_group')
+- `businessHoursSchedule` → BusinessHoursSchedule
+- `conferenceRoom` → ConferenceRoom
+- `aiAssistant` → AiAssistant
+- `ivrMenu` → IvrMenu
+- `aiLoadBalancer` → AiAssistantLoadBalancer
+
+## Methods
+
+### Routing Target Methods
+
+- `getTargetId($routingType, $configKey): ?int`
+- `getTargetExtensionId(): ?int`
+- `getTargetRingGroupId(): ?int`
+- `getTargetBusinessHoursId(): ?int`
+- `getTargetConferenceRoomId(): ?int`
+- `getTargetAiAssistantId(): ?int`
+- `getTargetIvrMenuId(): ?int`
+- `getTargetAiLoadBalancerId(): ?int`
+
+### Status
+
+- `isActive(): bool`
+
+### Setters (for eager loading)
+
+- `setExtension(?Extension $extension)`
+- `setRingGroup(?RingGroup $ringGroup)`
+- `setBusinessHoursSchedule(?BusinessHoursSchedule $schedule)`
+- `setConferenceRoom(?ConferenceRoom $conferenceRoom)`
+- `setAiAssistant(?AiAssistant $aiAssistant)`
+- `setIvrMenu(?IvrMenu $ivrMenu)`
+- `setAiLoadBalancer(?AiAssistantLoadBalancer $aiLoadBalancer)`
+
+## Usage Example
+
+```php
+$did = DidNumber::create([
+    'organization_id' => $orgId,
+    'phone_number' => '+1987654321',
+    'friendly_name' => 'Main Line',
+    'routing_type' => 'ring_group',
+    'routing_config' => ['ring_group_id' => 5],
+    'status' => 'active',
+]);
+
+// Get routing target
+$ringGroupId = $did->getTargetRingGroupId();
+```

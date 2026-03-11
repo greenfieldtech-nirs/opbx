@@ -18,26 +18,133 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
 import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
-const commonTimezones = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Anchorage',
-  'Pacific/Honolulu',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Asia/Tokyo',
-  'Asia/Shanghai',
-  'Asia/Dubai',
-  'Australia/Sydney',
-  'UTC',
+// Comprehensive list of IANA timezones with display names
+// Source: https://us.kintone.help/general/en/admin/list_systemadmin/list_localization/timezone
+interface Timezone {
+  value: string;
+  label: string;
+}
+
+const commonTimezones: Timezone[] = [
+  // UTC
+  { value: 'UTC', label: '(UTC+00:00) Coordinated Universal Time' },
+  { value: 'Etc/GMT', label: '(UTC+00:00) Coordinated Universal Time' },
+  { value: 'Etc/GMT+12', label: '(UTC-12:00) International Date Line West' },
+  { value: 'Etc/GMT+11', label: '(UTC-11:00) Coordinated Universal Time-11' },
+  { value: 'Etc/GMT+2', label: '(UTC-02:00) Coordinated Universal Time-2' },
+  { value: 'Etc/GMT-12', label: '(UTC+12:00) Coordinated Universal Time+12' },
+
+  // North America
+  { value: 'America/New_York', label: '(UTC-05:00) Eastern Time (US and Canada)' },
+  { value: 'America/Chicago', label: '(UTC-06:00) Central Time (US and Canada)' },
+  { value: 'America/Denver', label: '(UTC-07:00) Mountain Time (US and Canada)' },
+  { value: 'America/Los_Angeles', label: '(UTC-08:00) Pacific Time (US and Canada)' },
+  { value: 'America/Anchorage', label: '(UTC-09:00) Alaska' },
+  { value: 'Pacific/Honolulu', label: '(UTC-10:00) Hawaii' },
+  { value: 'America/Phoenix', label: '(UTC-07:00) Arizona' },
+  { value: 'America/Regina', label: '(UTC-06:00) Saskatchewan' },
+  { value: 'America/Mexico_City', label: '(UTC-06:00) Guadalajara, Mexico City, Monterrey' },
+  { value: 'America/Guatemala', label: '(UTC-06:00) Central America' },
+  { value: 'America/Bogota', label: '(UTC-05:00) Bogota, Lima, Quito' },
+  { value: 'America/Indiana/Indianapolis', label: '(UTC-05:00) Indiana (East)' },
+  { value: 'America/Halifax', label: '(UTC-04:00) Atlantic Time (Canada)' },
+  { value: 'America/St_Johns', label: '(UTC-03:30) Newfoundland' },
+  { value: 'America/Santa_Isabel', label: '(UTC-08:00) Baja California' },
+  { value: 'America/Chihuahua', label: '(UTC-07:00) Chihuahua, La Paz, Mazatlan' },
+  { value: 'America/Caracas', label: '(UTC-04:30) Caracas' },
+  { value: 'America/La_Paz', label: '(UTC-04:00) Georgetown, La Paz, Manaus, San Juan' },
+  { value: 'America/Cuiaba', label: '(UTC-04:00) Cuiaba' },
+  { value: 'America/Santiago', label: '(UTC-04:00) Santiago' },
+  { value: 'America/Asuncion', label: '(UTC-04:00) Asuncion' },
+
+  // South America
+  { value: 'America/Sao_Paulo', label: '(UTC-03:00) Brasilia' },
+  { value: 'America/Argentina/Buenos_Aires', label: '(UTC-03:00) Buenos Aires' },
+  { value: 'America/Montevideo', label: '(UTC-03:00) Montevideo' },
+  { value: 'America/Cayenne', label: '(UTC-03:00) Cayenne, Fortaleza' },
+  { value: 'America/Godthab', label: '(UTC-03:00) Greenland' },
+
+  // Europe
+  { value: 'Europe/London', label: '(UTC+00:00) Dublin, Edinburgh, Lisbon, London' },
+  { value: 'Europe/Paris', label: '(UTC+01:00) Brussels, Copenhagen, Madrid, Paris' },
+  { value: 'Europe/Berlin', label: '(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna' },
+  { value: 'Europe/Budapest', label: '(UTC+01:00) Belgrade, Bratislava, Budapest, Ljubljana, Prague' },
+  { value: 'Europe/Warsaw', label: '(UTC+01:00) Sarajevo, Skopje, Warsaw, Zagreb' },
+  { value: 'Europe/Istanbul', label: '(UTC+02:00) Athens, Bucharest, Istanbul' },
+  { value: 'Europe/Moscow', label: '(UTC+04:00) Moscow, St. Petersburg, Volgograd' },
+  { value: 'Europe/Kiev', label: '(UTC+02:00) Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius' },
+  { value: 'Europe/Minsk', label: '(UTC+03:00) Minsk' },
+
+  // Africa & Middle East
+  { value: 'Africa/Cairo', label: '(UTC+02:00) Cairo' },
+  { value: 'Africa/Johannesburg', label: '(UTC+02:00) Harare, Pretoria' },
+  { value: 'Africa/Lagos', label: '(UTC+01:00) West Central Africa' },
+  { value: 'Africa/Nairobi', label: '(UTC+03:00) Nairobi' },
+  { value: 'Africa/Casablanca', label: '(UTC+00:00) Casablanca' },
+  { value: 'Africa/Windhoek', label: '(UTC+01:00) Windhoek' },
+  { value: 'Asia/Jerusalem', label: '(UTC+02:00) Jerusalem' },
+  { value: 'Asia/Beirut', label: '(UTC+02:00) Beirut' },
+  { value: 'Asia/Damascus', label: '(UTC+02:00) Damascus' },
+  { value: 'Asia/Amman', label: '(UTC+02:00) Amman' },
+  { value: 'Asia/Baghdad', label: '(UTC+03:00) Baghdad' },
+  { value: 'Asia/Riyadh', label: '(UTC+03:00) Kuwait, Riyadh' },
+  { value: 'Asia/Tehran', label: '(UTC+03:30) Tehran' },
+  { value: 'Asia/Dubai', label: '(UTC+04:00) Abu Dhabi, Muscat' },
+
+  // Asia
+  { value: 'Asia/Tokyo', label: '(UTC+09:00) Osaka, Sapporo, Tokyo' },
+  { value: 'Asia/Seoul', label: '(UTC+09:00) Seoul' },
+  { value: 'Asia/Shanghai', label: '(UTC+08:00) Beijing, Chongqing, Hong Kong, Urumqi' },
+  { value: 'Asia/Taipei', label: '(UTC+08:00) Taipei' },
+  { value: 'Asia/Singapore', label: '(UTC+08:00) Kuala Lumpur, Singapore' },
+  { value: 'Asia/Bangkok', label: '(UTC+07:00) Bangkok, Hanoi, Jakarta' },
+  { value: 'Asia/Yangon', label: '(UTC+06:30) Yangon' },
+  { value: 'Asia/Dhaka', label: '(UTC+06:00) Dhaka' },
+  { value: 'Asia/Karachi', label: '(UTC+05:00) Islamabad, Karachi' },
+  { value: 'Asia/Kolkata', label: '(UTC+05:30) Chennai, Kolkata, Mumbai, New Delhi' },
+  { value: 'Asia/Colombo', label: '(UTC+05:30) Sri Jayewardenepura Kotte' },
+  { value: 'Asia/Kathmandu', label: '(UTC+05:45) Kathmandu' },
+  { value: 'Asia/Kabul', label: '(UTC+04:30) Kabul' },
+  { value: 'Asia/Tashkent', label: '(UTC+05:00) Tashkent' },
+  { value: 'Asia/Yerevan', label: '(UTC+04:00) Yerevan' },
+  { value: 'Asia/Baku', label: '(UTC+04:00) Baku' },
+  { value: 'Asia/Tbilisi', label: '(UTC+04:00) Tbilisi' },
+  { value: 'Asia/Almaty', label: '(UTC+06:00) Astana' },
+  { value: 'Asia/Yekaterinburg', label: '(UTC+06:00) Yekaterinburg' },
+  { value: 'Asia/Novosibirsk', label: '(UTC+07:00) Novosibirsk' },
+  { value: 'Asia/Krasnoyarsk', label: '(UTC+08:00) Krasnoyarsk' },
+  { value: 'Asia/Irkutsk', label: '(UTC+09:00) Irkutsk' },
+  { value: 'Asia/Yakutsk', label: '(UTC+10:00) Yakutsk' },
+  { value: 'Asia/Vladivostok', label: '(UTC+11:00) Vladivostok' },
+  { value: 'Asia/Magadan', label: '(UTC+12:00) Magadan' },
+  { value: 'Asia/Ulaanbaatar', label: '(UTC+08:00) Ulaanbaatar' },
+
+  // Australia & Pacific
+  { value: 'Australia/Sydney', label: '(UTC+10:00) Canberra, Melbourne, Sydney' },
+  { value: 'Australia/Brisbane', label: '(UTC+10:00) Brisbane' },
+  { value: 'Australia/Perth', label: '(UTC+08:00) Perth' },
+  { value: 'Australia/Adelaide', label: '(UTC+09:30) Adelaide' },
+  { value: 'Australia/Darwin', label: '(UTC+09:30) Darwin' },
+  { value: 'Australia/Hobart', label: '(UTC+10:00) Hobart' },
+  { value: 'Pacific/Auckland', label: '(UTC+12:00) Auckland, Wellington' },
+  { value: 'Pacific/Fiji', label: '(UTC+12:00) Fiji, Marshall Islands' },
+  { value: 'Pacific/Guadalcanal', label: '(UTC+11:00) Solomon Islands, New Caledonia' },
+  { value: 'Pacific/Port_Moresby', label: '(UTC+10:00) Guam, Port Moresby' },
+  { value: 'Pacific/Tongatapu', label: '(UTC+13:00) Nuku\'alofa' },
+  { value: 'Pacific/Apia', label: '(UTC+13:00) Samoa' },
+
+  // Atlantic
+  { value: 'Atlantic/Azores', label: '(UTC-01:00) Azores' },
+  { value: 'Atlantic/Cape_Verde', label: '(UTC-01:00) Cape Verde' },
+  { value: 'Atlantic/Reykjavik', label: '(UTC+00:00) Monrovia, Reykjavik' },
+
+  // Indian Ocean
+  { value: 'Indian/Mauritius', label: '(UTC+04:00) Port Louis' },
 ];
 
 const organizationSchema = z.object({
@@ -82,6 +189,7 @@ export default function Register() {
     handleSubmit,
     trigger,
     watch,
+    setValue,
     formState: { errors },
     setError,
     clearErrors,
@@ -347,24 +455,18 @@ export default function Register() {
                         <Label htmlFor="timezone" className="text-base font-medium">
                           Timezone
                         </Label>
-                        <Select
-                          defaultValue={watch('organization.timezone')}
+                        <Combobox
+                          value={watch('organization.timezone')}
                           onValueChange={(value) => {
-                            formRegister('organization.timezone').onChange({ target: { value } });
+                            setValue('organization.timezone', value, { shouldValidate: true });
                           }}
+                          options={commonTimezones}
+                          placeholder="Search or select timezone..."
+                          searchPlaceholder="Search timezone..."
                           disabled={isLoading}
-                        >
-                          <SelectTrigger id="timezone" className="h-11">
-                            <SelectValue placeholder="Select timezone" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {commonTimezones.map((tz) => (
-                              <SelectItem key={tz} value={tz}>
-                                {tz.replace('_', ' ')}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          emptyText="No timezone found"
+                          buttonClassName="h-11"
+                        />
                         {errors.organization?.timezone && (
                           <p className="text-sm text-destructive">{errors.organization.timezone.message}</p>
                         )}

@@ -1,0 +1,50 @@
+---
+id: inbound-blacklist
+title: InboundBlacklist
+sidebar_label: InboundBlacklist
+---
+
+# InboundBlacklist Model
+
+The `InboundBlacklist` model represents blocked caller entries for filtering unwanted inbound calls.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Namespace** | `App\Models` |
+| **Table** | `inbound_blacklists` |
+| **Primary Key** | `id` |
+| **Global Scope** | `OrganizationScope` |
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | `bigint unsigned` | No | Primary key |
+| `organization_id` | `bigint unsigned` | No | Organization ID |
+| `phone_number` | `varchar(50)` | No | Number/pattern to block |
+| `match_type` | `enum(exact,prefix,pattern)` | No | Match type |
+| `description` | `text` | Yes | Description |
+| `status` | `varchar(50)` | No | active/inactive |
+| `created_at` | `timestamp` | No | Creation timestamp |
+| `updated_at` | `timestamp` | No | Update timestamp |
+
+## Match Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `exact` | Exact match | `+1234567890` |
+| `prefix` | Starts with | `+1800` |
+| `pattern` | Regex pattern | `^+1(800|888)` |
+
+## Relationships
+
+### Belongs To
+
+- `organization()` → Organization
+
+## Methods
+
+- `isActive(): bool`
+- `matches(string $number): bool`

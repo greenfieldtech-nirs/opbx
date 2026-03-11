@@ -24,6 +24,9 @@ import {
   Bot,
   Scale,
   Bell,
+  Crown,
+  Building2,
+  ScrollText,
 } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -87,6 +90,17 @@ const navigation: NavSection[] = [
   },
 ];
 
+// Platform Management section (shown only to platform managers)
+const platformNavigation: NavSection = {
+  title: 'Platform Management',
+  items: [
+    { name: 'Dashboard', href: '/ui/platform/dashboard', icon: Crown },
+    { name: 'Organizations', href: '/ui/platform/organizations', icon: Building2 },
+    { name: 'Users', href: '/ui/platform/users', icon: Users },
+    { name: 'Audit Log', href: '/ui/platform/audit-log', icon: ScrollText },
+  ],
+};
+
 export function Sidebar() {
   const { user } = useAuth();
 
@@ -97,6 +111,9 @@ export function Sidebar() {
       return user?.role && item.roles.includes(user.role);
     });
   };
+
+  // Check if user is a platform manager
+  const isPlatformManager = user?.is_platform_manager === true;
 
   return (
     <div className="flex h-full w-64 flex-col bg-gray-900 text-white">
@@ -147,6 +164,36 @@ export function Sidebar() {
             </div>
           );
         })}
+
+        {/* Platform Management Section (Platform Managers only) */}
+        {isPlatformManager && (
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <div className="px-3 mb-2">
+              <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
+                {platformNavigation.title}
+              </h3>
+            </div>
+            <div className="space-y-1">
+              {platformNavigation.items.map((item) => (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-amber-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    )
+                  }
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Footer */}

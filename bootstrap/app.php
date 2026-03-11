@@ -36,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'voice.webhook.auth' => \App\Http\Middleware\VerifyVoiceWebhookAuth::class,
             'rate_limit_org' => \App\Http\Middleware\RateLimitPerOrganization::class,
             'sensitive-operations' => \App\Http\Middleware\RateLimitSensitiveOperations::class,
+            'platform.manager' => \App\Http\Middleware\EnsurePlatformManager::class,
         ]);
 
         // Configure authentication to return JSON for API routes instead of redirecting
@@ -44,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*') || $request->expectsJson()) {
                 return null; // Return 401 with JSON instead of redirect
             }
+
             // For web routes, redirect to home (no login page in this API-first app)
             return '/';
         });

@@ -853,7 +853,6 @@ class VoiceRoutingManager
         return null;
     }
 
-
     /**
      * Check business hours and route accordingly.
      *
@@ -1253,6 +1252,51 @@ class VoiceRoutingManager
                     $destination = ['ivr_menu' => $validatedDestination];
 
                     return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
+
+                case \App\Enums\IvrDestinationType::AI_ASSISTANT:
+                    Log::debug('IVR Input: Routing to AI Assistant', [
+                        'call_sid' => $request->input('CallSid'),
+                        'option_id' => $option->id,
+                        'ai_assistant_id' => $validatedDestination->id,
+                        'ai_assistant_name' => $validatedDestination->name,
+                    ]);
+                    $destination = ['ai_assistant' => $validatedDestination];
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::AI_ASSISTANT, $request, new DidNumber, $destination);
+
+                case \App\Enums\IvrDestinationType::AI_LOAD_BALANCER:
+                    Log::debug('IVR Input: Routing to AI Load Balancer', [
+                        'call_sid' => $request->input('CallSid'),
+                        'option_id' => $option->id,
+                        'ai_load_balancer_id' => $validatedDestination->id,
+                        'ai_load_balancer_name' => $validatedDestination->name,
+                    ]);
+                    $destination = ['ai_load_balancer' => $validatedDestination];
+
+                    return $this->executeStrategy(\App\Enums\ExtensionType::AI_LOAD_BALANCER, $request, new DidNumber, $destination);
+
+                case \App\Enums\IvrDestinationType::BUSINESS_HOURS:
+                    Log::debug('IVR Input: Routing to Business Hours', [
+                        'call_sid' => $request->input('CallSid'),
+                        'option_id' => $option->id,
+                        'business_hours_id' => $validatedDestination->id,
+                        'business_hours_name' => $validatedDestination->name,
+                    ]);
+
+                    // Get current routing from business hours schedule
+                    $actionType = $validatedDestination->getCurrentRoutingType();
+                    $targetId = $validatedDestination->getCurrentRoutingTargetId();
+
+                    Log::debug('IVR Input: Business hours routing', [
+                        'call_sid' => $request->input('CallSid'),
+                        'business_hours_id' => $validatedDestination->id,
+                        'action_type' => $actionType->value,
+                        'target_id' => $targetId,
+                        'is_open' => $validatedDestination->isCurrentlyOpen(),
+                    ]);
+
+                    // Route based on action type
+                    return $this->routeBusinessHoursAction($request, $actionType, $targetId, $validatedDestination->organization_id);
             }
 
             // Fallback for invalid destination
@@ -1306,6 +1350,191 @@ class VoiceRoutingManager
 
         // Route to failover destination directly
         return $this->routeToDestination($request, $ivrMenu->failover_destination_type, $ivrMenu->failover_destination_id, $ivrMenu);
+    }
+
+    /**
+     * Route based on business hours action type.
+     */
+    private function routeBusinessHoursAction(
+        Request $request,
+        \App\Enums\BusinessHoursActionType $actionType,
+        ?string $targetId,
+        int $organizationId
+    ): Response {
+        $callSid = $request->input('CallSid');
+
+        switch ($actionType) {
+            case \App\Enums\BusinessHoursActionType::EXTENSION:
+                if ($targetId) {
+                    // Support both "ext-1" format and plain "1" format
+                    $extensionId = is_numeric($targetId) ? (int) $targetId : null;
+                    if (preg_match('/^ext-(\d+)$/', $targetId, $matches)) {
+                        $extensionId = (int) $matches[1];
+                    }
+
+                    if ($extensionId) {
+                        $extension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('id', $extensionId)
+                            ->where('organization_id', $organizationId)
+                            ->where('status', 'active')
+                            ->first();
+
+                        if ($extension) {
+                            $destination = $this->resolveExtensionDestination($extension, $organizationId);
+
+                            return $this->executeStrategy($extension->type, $request, new DidNumber, $destination);
+                        }
+                    }
+                }
+                break;
+
+            case \App\Enums\BusinessHoursActionType::RING_GROUP:
+                if ($targetId) {
+                    // Support both "rg-1" format and plain "1" format
+                    $ringGroupId = is_numeric($targetId) ? (int) $targetId : null;
+                    if (preg_match('/^rg-(\d+)$/', $targetId, $matches)) {
+                        $ringGroupId = (int) $matches[1];
+                    }
+
+                    if ($ringGroupId) {
+                        $ringGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('id', $ringGroupId)
+                            ->where('organization_id', $organizationId)
+                            ->where('status', 'active')
+                            ->first();
+
+                        if ($ringGroup) {
+                            return $this->executeStrategy(
+                                \App\Enums\ExtensionType::RING_GROUP,
+                                $request,
+                                new DidNumber,
+                                ['ring_group' => $ringGroup]
+                            );
+                        }
+                    }
+                }
+                break;
+
+            case \App\Enums\BusinessHoursActionType::CONFERENCE_ROOM:
+                if ($targetId) {
+                    // Support both "conf-1" format and plain "1" format
+                    $conferenceRoomId = is_numeric($targetId) ? (int) $targetId : null;
+                    if (preg_match('/^conf-(\d+)$/', $targetId, $matches)) {
+                        $conferenceRoomId = (int) $matches[1];
+                    }
+
+                    if ($conferenceRoomId) {
+                        $conferenceRoom = ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('id', $conferenceRoomId)
+                            ->where('organization_id', $organizationId)
+                            ->first();
+
+                        if ($conferenceRoom) {
+                            return $this->executeStrategy(
+                                \App\Enums\ExtensionType::CONFERENCE,
+                                $request,
+                                new DidNumber,
+                                ['conference_room' => $conferenceRoom]
+                            );
+                        }
+                    }
+                }
+                break;
+
+            case \App\Enums\BusinessHoursActionType::IVR_MENU:
+                if ($targetId) {
+                    // Support both "ivr-1" format and plain "1" format
+                    $ivrMenuId = is_numeric($targetId) ? (int) $targetId : null;
+                    if (preg_match('/^ivr-(\d+)$/', $targetId, $matches)) {
+                        $ivrMenuId = (int) $matches[1];
+                    }
+
+                    if ($ivrMenuId) {
+                        $ivrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('id', $ivrMenuId)
+                            ->where('organization_id', $organizationId)
+                            ->where('status', 'active')
+                            ->first();
+
+                        if ($ivrMenu) {
+                            return $this->executeStrategy(
+                                \App\Enums\ExtensionType::IVR,
+                                $request,
+                                new DidNumber,
+                                ['ivr_menu' => $ivrMenu]
+                            );
+                        }
+                    }
+                }
+                break;
+
+            case \App\Enums\BusinessHoursActionType::AI_ASSISTANT:
+                if ($targetId) {
+                    // Support both "ai-1" format and plain "1" format
+                    $aiAssistantId = is_numeric($targetId) ? (int) $targetId : null;
+                    if (preg_match('/^ai-(\d+)$/', $targetId, $matches)) {
+                        $aiAssistantId = (int) $matches[1];
+                    }
+
+                    if ($aiAssistantId) {
+                        $aiAssistant = \App\Models\AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('id', $aiAssistantId)
+                            ->where('organization_id', $organizationId)
+                            ->where('status', 'active')
+                            ->first();
+
+                        if ($aiAssistant) {
+                            return $this->executeStrategy(
+                                \App\Enums\ExtensionType::AI_ASSISTANT,
+                                $request,
+                                new DidNumber,
+                                ['ai_assistant' => $aiAssistant]
+                            );
+                        }
+                    }
+                }
+                break;
+
+            case \App\Enums\BusinessHoursActionType::AI_LOAD_BALANCER:
+                if ($targetId) {
+                    // Support both "albs-1" format and plain "1" format
+                    $albsId = is_numeric($targetId) ? (int) $targetId : null;
+                    if (preg_match('/^albs-(\d+)$/', $targetId, $matches)) {
+                        $albsId = (int) $matches[1];
+                    }
+
+                    if ($albsId) {
+                        $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                            ->where('id', $albsId)
+                            ->where('organization_id', $organizationId)
+                            ->where('status', 'active')
+                            ->first();
+
+                        if ($aiLoadBalancer) {
+                            return $this->executeStrategy(
+                                \App\Enums\ExtensionType::AI_LOAD_BALANCER,
+                                $request,
+                                new DidNumber,
+                                ['ai_load_balancer' => $aiLoadBalancer]
+                            );
+                        }
+                    }
+                }
+                break;
+        }
+
+        Log::warning('IVR Input: Business hours routing failed', [
+            'call_sid' => $callSid,
+            'action_type' => $actionType->value,
+            'target_id' => $targetId,
+            'organization_id' => $organizationId,
+        ]);
+
+        return response(
+            CxmlBuilder::sayWithHangup('Business hours routing not available.', true),
+            200,
+            ['Content-Type' => 'application/xml']
+        );
     }
 
     private function routeToDestination(Request $request, $destinationType, $destinationId, IvrMenu $ivrMenu): Response

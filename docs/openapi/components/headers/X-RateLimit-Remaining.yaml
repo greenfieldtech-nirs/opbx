@@ -1,0 +1,4 @@
+description: Remaining requests in current window
+schema:
+  type: integer
+example: 45

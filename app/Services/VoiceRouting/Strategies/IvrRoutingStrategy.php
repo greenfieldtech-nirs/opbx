@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
-use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\IvrMenu;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -33,11 +32,12 @@ class IvrRoutingStrategy implements RoutingStrategy
         // Extract IVR menu from destination
         $ivrMenu = $destination['ivr_menu'] ?? null;
 
-        if (!$ivrMenu instanceof IvrMenu) {
+        if (! $ivrMenu instanceof IvrMenu) {
             Log::error('IVR Routing: Invalid IVR menu destination', [
                 'call_sid' => $callSid,
-                'destination_keys' => array_keys($destination)
+                'destination_keys' => array_keys($destination),
             ]);
+
             return response(
                 CxmlBuilder::sayWithHangup('IVR menu configuration error.', true),
                 200,
@@ -47,9 +47,9 @@ class IvrRoutingStrategy implements RoutingStrategy
 
         // Get the organization's webhook base URL for consistent callback URLs
         $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $orgId)->first();
-        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
-            ? rtrim($cloudonixSettings->webhook_base_url, '/')
-            : $request->getSchemeAndHttpHost();
+        $baseUrl = $cloudonixSettings
+            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
+            : rtrim(config('app.url'), '/');
 
         // Initialize or get current call state
         $callState = $this->ivrStateService->initializeCallState($callSid, $ivrMenu->id);
@@ -69,8 +69,8 @@ class IvrRoutingStrategy implements RoutingStrategy
         $audioContent = $this->getAudioContent($request, $ivrMenu, $baseUrl, $errorMessage);
 
         // Create Gather verb for DTMF collection
-        $relativeUrl = route('voice.ivr-input', [], false) . '?menu_id=' . $ivrMenu->id;
-        $gatherAction = $baseUrl . $relativeUrl;
+        $relativeUrl = route('voice.ivr-input', [], false).'?menu_id='.$ivrMenu->id;
+        $gatherAction = $baseUrl.$relativeUrl;
         $interDigitTimeout = $ivrMenu->inter_digit_timeout ?? 2; // Default 2 seconds
         $maxTimeout = $ivrMenu->max_timeout ?? 3; // Default 3 seconds
         $gatherFinishOnKey = '#'; // End input on #

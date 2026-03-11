@@ -27,6 +27,7 @@ import {
     Code,
     ChevronDown,
     Play,
+    HelpCircle,
 } from 'lucide-react';
 import {Link} from 'react-router-dom';
 import OPBXLogo from '@/assets/opbx_logo.png';
@@ -157,7 +158,7 @@ export default function Home() {
                             FAQ
                         </a>
                         <a
-                            href="https://github.com/greenfieldtech-nirs/OPBX"
+                            href="https://developers.cloudonix.com/opbx"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-lg font-medium hover:text-primary transition-colors"
@@ -216,6 +217,14 @@ export default function Home() {
                                     View on GitHub
                                 </a>
                             </Button>
+                            <Button size="lg" variant="outline" asChild className="text-lg h-12 px-8 bg-[#5865F2] text-white border-[#5865F2] hover:bg-[#4752C4] hover:border-[#4752C4]">
+                                <a href="https://discord.gg/etCGgNh9VV" target="_blank" rel="noopener noreferrer">
+                                    <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                                    </svg>
+                                    Join Discord
+                                </a>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -251,9 +260,166 @@ export default function Home() {
                  */
             }
 
+            {/* What is OPBX? */}
+            <section className="container mx-auto px-4 py-16 md:py-24">
+                <div className="max-w-4xl mx-auto text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                        <Phone className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Open Source PBX</span>
+                    </div>
+                    <h2 className="text-4xl md:text-5xl font-bold mb-6">What is OPBX?</h2>
+                    <p className="text-xl text-muted-foreground leading-relaxed mb-8">
+                        OPBX is an <span className="text-foreground font-semibold">open-source business PBX platform</span> that transforms how organizations handle voice communications. Built on top of the Cloudonix CPaaS, OPBX eliminates the complexity of managing VoIP infrastructure while giving you complete control over your phone system.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                        <div className="p-6 rounded-xl bg-muted/50 border">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                                <Settings className="h-5 w-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold mb-2">Easy Configuration</h3>
+                            <p className="text-sm text-muted-foreground">Set up extensions, ring groups, and IVR menus through an intuitive web interface—no command line required.</p>
+                        </div>
+                        <div className="p-6 rounded-xl bg-muted/50 border">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                                <Code className="h-5 w-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold mb-2">Developer Friendly</h3>
+                            <p className="text-sm text-muted-foreground">Built with Laravel and React, OPBX is fully customizable. Fork it, extend it, make it yours.</p>
+                        </div>
+                        <div className="p-6 rounded-xl bg-muted/50 border">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                                <Shield className="h-5 w-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold mb-2">Self-Hosted & Secure</h3>
+                            <p className="text-sm text-muted-foreground">Deploy on your own infrastructure. Your data stays under your control with enterprise-grade security.</p>
+                        </div>
+                    </div>
+                    <div className="mt-10">
+                        <Button size="lg" asChild>
+                            <Link to="/ui/register">
+                                Get Started Free
+                                <ArrowRight className="ml-2 h-5 w-5"/>
+                            </Link>
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            {/* Human Architected, Vibe Coded */}
+            <section className="bg-gradient-to-r from-primary/5 via-background to-primary/5 py-16 md:py-24 border-y">
+                <div className="container mx-auto px-4">
+                    <div className="text-center mb-12">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                            <Zap className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium text-primary">Built Different</span>
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-bold mb-6">Human Architected, Vibe Coded</h2>
+                        <p className="text-xl text-muted-foreground leading-relaxed max-w-4xl mx-auto">
+                            OPBX represents a new way of building software. Every line of code is
+                            <span className="text-foreground font-semibold"> born from human vision </span>
+                            and
+                            <span className="text-foreground font-semibold"> brought to life through AI collaboration</span>.
+                            No shortcuts, no compromises—just pure engineering excellence.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="text-left p-6 rounded-2xl bg-background border-2 border-primary/20">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                    <Users className="h-6 w-6 text-primary" />
+                                </div>
+                                <h3 className="text-xl font-bold">Human Architected</h3>
+                            </div>
+                            <p className="text-muted-foreground mb-6 text-sm">
+                                Every feature starts with deep domain expertise. Our architects design the system
+                                with decades of telecom experience, ensuring scalability, security, and reliability.
+                            </p>
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Multi-tenant architecture designed for scale</span>
+                                </li>
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Enterprise-grade security from day one</span>
+                                </li>
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Real-time call state management</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div className="text-left p-6 rounded-2xl bg-background border-2 border-primary/20">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                    <Zap className="h-6 w-6 text-primary" />
+                                </div>
+                                <h3 className="text-xl font-bold">Vibe Coded</h3>
+                            </div>
+                            <p className="text-muted-foreground mb-6 text-sm">
+                                The implementation leverages cutting-edge AI assistance, allowing us to move fast
+                                without sacrificing quality. Every commit is reviewed, tested, and refined.
+                            </p>
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Rapid iteration with AI pair programming</span>
+                                </li>
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Comprehensive test coverage</span>
+                                </li>
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Type-safe, modern codebase</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div className="text-left p-6 rounded-2xl bg-background border-2 border-primary/20">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                    <Code className="h-6 w-6 text-primary" />
+                                </div>
+                                <h3 className="text-xl font-bold">AI Coding Ready</h3>
+                            </div>
+                            <p className="text-muted-foreground mb-6 text-sm">
+                                OPBX is designed from the ground up to be AI-developer friendly. Clear documentation,
+                                consistent patterns, and well-structured code make it easy for AI assistants to help you customize.
+                            </p>
+                            <ul className="space-y-3">
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Comprehensive inline documentation</span>
+                                </li>
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Consistent coding patterns throughout</span>
+                                </li>
+                                <li className="flex items-center gap-3 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span>Modular, extensible architecture</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="mt-12 text-center">
+                        <Button size="lg" variant="outline" asChild>
+                            <a href="https://github.com/greenfieldtech-nirs/OPBX" target="_blank" rel="noopener noreferrer">
+                                <Github className="mr-2 h-5 w-5"/>
+                                Explore the Code
+                            </a>
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
             {/* Features Grid */}
             <section id="features" className="container mx-auto px-4 py-20 md:py-32">
                 <div className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                        <Zap className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Features</span>
+                    </div>
                     <h2 className="text-5xl md:text-5xl font-bold mb-4">Everything You Need</h2>
                     <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
                         A complete business PBX solution with powerful features that scale with your organization
@@ -277,6 +443,14 @@ export default function Home() {
                             </CardContent>
                         </Card>
                     ))}
+                </div>
+                <div className="mt-12 text-center">
+                    <Button size="lg" asChild>
+                        <Link to="/ui/register">
+                            Try All Features
+                            <ArrowRight className="ml-2 h-5 w-5"/>
+                        </Link>
+                    </Button>
                 </div>
             </section>
 
@@ -326,6 +500,10 @@ export default function Home() {
             {/* How It Works */}
             <section id="how-it-works" className="container mx-auto px-4 py-20 md:py-32">
                 <div className="text-center mb-16">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                        <Workflow className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Getting Started</span>
+                    </div>
                     <h2 className="text-4xl md:text-5xl font-bold mb-4">How It Works</h2>
                     <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                         Get started with OPBX in three simple steps
@@ -372,6 +550,14 @@ export default function Home() {
                         </div>
                     ))}
                 </div>
+                <div className="mt-16 text-center">
+                    <Button size="lg" variant="outline" asChild>
+                        <Link to="/ui/register">
+                            Start Your Setup
+                            <ArrowRight className="ml-2 h-5 w-5"/>
+                        </Link>
+                    </Button>
+                </div>
             </section>
 
             {/* Technical Highlights */}
@@ -379,6 +565,10 @@ export default function Home() {
                 <div className="container mx-auto px-4">
                     <div className="max-w-6xl mx-auto">
                         <div className="text-center mb-16">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                                <Code className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium text-primary">Technology</span>
+                            </div>
                             <h2 className="text-4xl md:text-5xl font-bold mb-4">Built for Developers</h2>
                             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                                 Modern architecture, production-ready deployment, complete control
@@ -430,6 +620,10 @@ export default function Home() {
             {/* Integration Section */}
             <section className="container mx-auto px-4 py-20 md:py-32">
                 <div className="max-w-4xl mx-auto text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                        <Phone className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Integration</span>
+                    </div>
                     <h2 className="text-4xl md:text-5xl font-bold mb-6">Powered by Cloudonix</h2>
                     <p className="text-xl text-muted-foreground mb-12">
                         OPBX integrates seamlessly with Cloudonix CPaaS platform for enterprise-grade telephony
@@ -472,7 +666,7 @@ export default function Home() {
                             </a>
                         </Button>&nbsp;
                         <Button size="lg" variant="outline" asChild>
-                            <a href="https://developers.cloudonix.com" target="_blank" rel="noopener noreferrer">
+                            <a href="https://developers.cloudonix.com/opbx" target="_blank" rel="noopener noreferrer">
                                 Read our developer documentation
                                 <ArrowRight className="ml-2 h-4 w-4"/>
                             </a>
@@ -486,6 +680,10 @@ export default function Home() {
                 <div className="container mx-auto px-4">
                     <div className="max-w-3xl mx-auto">
                         <div className="text-center mb-16">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+                                <HelpCircle className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium text-primary">FAQ</span>
+                            </div>
                             <h2 className="text-4xl md:text-5xl font-bold mb-4">Frequently Asked Questions</h2>
                             <p className="text-xl text-muted-foreground">Everything you need to know about OPBX</p>
                         </div>
@@ -512,6 +710,17 @@ export default function Home() {
                                 </Card>
                             ))}
                         </div>
+                        <div className="mt-12 text-center">
+                            <p className="text-muted-foreground mb-4">Still have questions?</p>
+                            <Button size="lg" variant="outline" asChild>
+                                <a href="https://discord.gg/etCGgNh9VV" target="_blank" rel="noopener noreferrer">
+                                    <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                                    </svg>
+                                    Ask on Discord
+                                </a>
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -535,7 +744,7 @@ export default function Home() {
                         </Button>
                         <Button size="lg" variant="outline" asChild
                                 className="text-lg h-12 px-8 bg-transparent border-white text-white hover:bg-white hover:text-primary">
-                            <a href="https://github.com/greenfieldtech-nirs/OPBX" target="_blank"
+                            <a href="https://developers.cloudonix.com/opbx" target="_blank"
                                rel="noopener noreferrer">
                                 <Github className="mr-2 h-5 w-5"/>
                                 View Documentation
@@ -573,7 +782,7 @@ export default function Home() {
                                 </li>
                                 <li>
                                     <a
-                                        href="https://github.com/greenfieldtech-nirs/OPBX"
+                                        href="https://developers.cloudonix.com/opbx"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="hover:text-foreground transition-colors"
@@ -588,7 +797,7 @@ export default function Home() {
                             <ul className="space-y-2 text-sm text-muted-foreground">
                                 <li>
                                     <a
-                                        href="https://developers.cloudonix.com"
+                                        href="https://developers.cloudonix.com/"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="hover:text-foreground transition-colors"
@@ -623,12 +832,12 @@ export default function Home() {
                             <ul className="space-y-2 text-sm text-muted-foreground">
                                 <li>
                                     <a
-                                        href="https://github.com/greenfieldtech-nirs/OPBX/discussions"
+                                        href="https://discord.gg/etCGgNh9VV"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="hover:text-foreground transition-colors"
                                     >
-                                        Discussions
+                                        Discord Community
                                     </a>
                                 </li>
                                 <li>
@@ -666,6 +875,16 @@ export default function Home() {
                                 className="text-muted-foreground hover:text-foreground transition-colors"
                             >
                                 <Github className="h-5 w-5"/>
+                            </a>
+                            <a
+                                href="https://discord.gg/etCGgNh9VV"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                                </svg>
                             </a>
                         </div>
                     </div>

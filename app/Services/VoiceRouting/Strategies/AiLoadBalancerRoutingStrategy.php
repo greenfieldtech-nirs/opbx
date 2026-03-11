@@ -49,9 +49,9 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         $organizationId = $request->input('_organization_id');
         $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $organizationId)->first();
 
-        $baseUrl = $cloudonixSettings && $cloudonixSettings->webhook_base_url
-            ? rtrim($cloudonixSettings->webhook_base_url, '/')
-            : $request->getSchemeAndHttpHost();
+        $baseUrl = $cloudonixSettings
+            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
+            : rtrim(config('app.url'), '/');
 
         $relativeUrl = route('voice.albs-follow-through', [
             'albs_id' => $aiLoadBalancer->id,

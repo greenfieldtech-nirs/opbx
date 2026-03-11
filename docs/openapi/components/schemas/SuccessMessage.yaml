@@ -1,0 +1,9 @@
+type: object
+description: Generic success message response
+properties:
+  message:
+    type: string
+    description: Success message
+    example: Operation completed successfully
+required:
+  - message
