@@ -21,7 +21,7 @@ class BusinessHours extends Model
      *
      * @var string
      */
-    protected $table = 'business_hours';
+    protected $table = 'business_hours_schedules';
 
     /**
      * The attributes that are mass assignable.
