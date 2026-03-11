@@ -63,6 +63,7 @@ class IvrMenuOption extends Model
             IvrDestinationType::IVR_MENU => $this->belongsTo(IvrMenu::class, 'destination_id'),
             IvrDestinationType::AI_ASSISTANT => $this->belongsTo(\App\Models\AiAssistant::class, 'destination_id'),
             IvrDestinationType::AI_LOAD_BALANCER => $this->belongsTo(AiAssistantLoadBalancer::class, 'destination_id'),
+            IvrDestinationType::BUSINESS_HOURS => $this->belongsTo(BusinessHours::class, 'destination_id'),
             default => null,
         };
     }
@@ -109,6 +110,10 @@ class IvrMenuOption extends Model
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
+            IvrDestinationType::BUSINESS_HOURS => BusinessHours::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $orgId)
+                ->where('id', $this->destination_id)
+                ->first(),
             default => null,
         };
     }
@@ -131,6 +136,7 @@ class IvrMenuOption extends Model
             IvrDestinationType::IVR_MENU => "IVR Menu: {$destination->name}",
             IvrDestinationType::AI_ASSISTANT => 'AI Assistant: '.($destination->name ?: 'AI'),
             IvrDestinationType::AI_LOAD_BALANCER => "AI Load Balancer: {$destination->name}",
+            IvrDestinationType::BUSINESS_HOURS => "Business Hours: {$destination->name}",
         };
     }
 
@@ -173,6 +179,7 @@ class IvrMenuOption extends Model
             IvrDestinationType::IVR_MENU => $destination->isActive(),
             IvrDestinationType::AI_ASSISTANT => $destination->status === UserStatus::ACTIVE,
             IvrDestinationType::AI_LOAD_BALANCER => $destination->status === UserStatus::ACTIVE,
+            IvrDestinationType::BUSINESS_HOURS => $destination->isActive(),
         };
 
         Log::debug('IVR Option: Destination validation result', [
