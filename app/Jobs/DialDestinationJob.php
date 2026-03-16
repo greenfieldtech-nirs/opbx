@@ -28,13 +28,15 @@ class DialDestinationJob implements ShouldQueue
 
     /**
      * The number of times the job may be attempted.
+     * Note: We use Laravel's built-in retry mechanism only.
      */
     public int $tries = 3;
 
     /**
      * The number of seconds to wait before retrying.
+     * Exponential backoff: 5 min, 15 min, 45 min
      */
-    public int $backoff = [30, 60, 120];
+    public array $backoff = [300, 900, 2700];
 
     /**
      * The number of seconds the job can run before timing out.
@@ -148,16 +150,8 @@ class DialDestinationJob implements ShouldQueue
                     'call_id' => $result['callId'] ?? null,
                 ]);
             } else {
-                // Call initiation failed
-                $destination->markAsFailed('Failed to initiate call');
-
-                Log::warning('Call initiation failed', [
-                    'destination_id' => $this->destinationId,
-                    'phone_number' => $destination->phone_number,
-                ]);
-
-                // Retry if attempts remaining
-                $this->scheduleRetryIfNeeded($destination, $campaign);
+                // Call initiation failed - will retry via Laravel's retry mechanism
+                throw new \Exception('Failed to initiate call via Cloudonix API');
             }
         } catch (\Exception $e) {
             Log::error('Exception while dialing destination', [
@@ -165,12 +159,11 @@ class DialDestinationJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
+            // Mark as failed - Laravel will handle retry via $tries
             $destination->markAsFailed($e->getMessage());
 
-            // Retry if attempts remaining
-            $this->scheduleRetryIfNeeded($destination, $campaign);
-
-            throw $e; // Re-throw to trigger job retry
+            // Re-throw to trigger Laravel's retry mechanism
+            throw $e;
         }
     }
 
@@ -212,29 +205,7 @@ class DialDestinationJob implements ShouldQueue
     }
 
     /**
-     * Schedule a retry if dial attempts remaining.
-     */
-    private function scheduleRetryIfNeeded(
-        AutoDialerDestination $destination,
-        AutoDialerCampaign $campaign
-    ): void {
-        if ($destination->dial_attempts < $campaign->max_dial_attempts) {
-            // Exponential backoff: 5 min, 15 min, 45 min
-            $delay = pow(3, $destination->dial_attempts - 1) * 5 * 60;
-
-            self::dispatch($destination->id, $campaign->id)
-                ->delay($delay);
-
-            Log::info('Scheduled retry for destination', [
-                'destination_id' => $destination->id,
-                'attempt' => $destination->dial_attempts,
-                'delay_seconds' => $delay,
-            ]);
-        }
-    }
-
-    /**
-     * Handle a job failure.
+     * Handle a job failure (after all retries exhausted).
      */
     public function failed(\Throwable $exception): void
     {
