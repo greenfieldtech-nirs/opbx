@@ -64,6 +64,11 @@ class AutoDialerCampaignController extends Controller
 
         $data = $request->validated();
         $data['organization_id'] = Auth::user()->organization_id;
+        $data['status'] = CampaignStatus::DRAFT;
+        $data['total_destinations'] = 0;
+        $data['completed_calls'] = 0;
+        $data['failed_calls'] = 0;
+        $data['pending_calls'] = 0;
 
         $campaign = AutoDialerCampaign::create($data);
 
