@@ -27,6 +27,7 @@ import {
   Crown,
   Building2,
   ScrollText,
+  Radio,
 } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -62,6 +63,7 @@ const navigation: NavSection[] = [
       { name: 'Recordings', href: '/ui/recordings', icon: Volume2, roles: ['owner', 'pbx_admin'] },
       { name: 'Phone Numbers', href: '/ui/phone-numbers', icon: PhoneCall, roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'Call Notifications', href: '/ui/call-notifications', icon: Bell, roles: ['owner', 'pbx_admin'] },
+      { name: 'Auto Dialer', href: '/ui/auto-dialer', icon: Radio, roles: ['owner', 'pbx_admin'] },
     ],
   },
   // AI Configuration

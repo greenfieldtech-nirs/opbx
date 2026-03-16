@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Archive,
   PhoneCall,
-  ChevronDown,
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
