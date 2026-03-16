@@ -9,10 +9,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Platform\UpdateOrganizationSettingsRequest;
 use App\Http\Requests\Platform\UpdateOrganizationStatusRequest;
 use App\Models\Organization;
+use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\PlatformAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Platform Organization Controller
@@ -165,17 +167,82 @@ class PlatformOrganizationController extends Controller
             ], 422);
         }
 
+        // Check for platform manager users before deletion
+        if ($newStatus === OrganizationStatus::DELETED) {
+            $platformManagerCount = User::where('organization_id', $organization->id)
+                ->where('is_platform_manager', true)
+                ->count();
+
+            if ($platformManagerCount > 0) {
+                return response()->json([
+                    'message' => 'Cannot delete organization: one or more users in this organization are Platform Managers. Please revoke Platform Manager status from all users in this organization before deleting.',
+                ], 422);
+            }
+        }
+
         $beforeState = ['status' => $currentStatus];
 
-        // Update status
-        $organization->status = $newStatus->value;
-
-        // For soft delete
+        // For hard delete with cascade
         if ($newStatus === OrganizationStatus::DELETED) {
-            $organization->delete();
-        } else {
-            $organization->save();
+            // Capture organization data before deletion for audit log
+            $organizationData = $organization->toArray();
+            $organizationId = $organization->id;
+
+            DB::transaction(function () use ($organization) {
+                // Delete in correct order to respect foreign keys
+                // 1. Delete users' tokens first
+                $userIds = User::where('organization_id', $organization->id)->pluck('id');
+                if ($userIds->isNotEmpty()) {
+                    DB::table('personal_access_tokens')->whereIn('tokenable_id', $userIds)->delete();
+                }
+
+                // 2. Delete extensions (and their related data)
+                $organization->extensions()->delete();
+
+                // 3. Delete ring groups
+                $organization->ringGroups()->delete();
+
+                // 4. Delete business hours schedules
+                $organization->businessHoursSchedules()->delete();
+
+                // 5. Delete DID numbers
+                $organization->didNumbers()->delete();
+
+                // 6. Delete call logs
+                $organization->callLogs()->delete();
+
+                // 7. Delete users
+                $organization->users()->delete();
+
+                // 8. Finally delete the organization (forceDelete for hard delete)
+                $organization->forceDelete();
+            });
+
+            // Audit log for deletion
+            $auditService->log(
+                request: $request,
+                action: 'organization.deleted',
+                targetOrganizationId: null, // Organization no longer exists
+                targetEntityType: 'Organization',
+                targetEntityId: $organizationId,
+                beforeState: $organizationData,
+                afterState: null,
+                reason: $validated['reason'] ?? null,
+            );
+
+            return response()->json([
+                'message' => 'Organization deleted successfully.',
+                'data' => [
+                    'id' => $organizationId,
+                    'status' => OrganizationStatus::DELETED->value,
+                    'previous_status' => $currentStatus,
+                ],
+            ]);
         }
+
+        // For other status transitions (active <-> suspended)
+        $organization->status = $newStatus->value;
+        $organization->save();
 
         // Audit log
         $auditService->log(
