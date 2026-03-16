@@ -8,15 +8,15 @@ use App\Exceptions\Webhook\WebhookBusinessLogicException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
-use App\Http\Requests\Webhook\SessionUpdateRequest;
 use App\Http\Requests\Webhook\CdrRequest;
+use App\Http\Requests\Webhook\SessionUpdateRequest;
 use App\Jobs\ProcessInboundCallJob;
+use App\Models\CallNotificationsSettings;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
-use App\Models\CallNotificationsSettings;
-use App\Services\CallNotifications\WebhookDispatcher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
+use App\Services\CallNotifications\WebhookDispatcher;
 use App\Services\PhoneNumberService;
 use Illuminate\Support\Facades\Log;
 
@@ -372,6 +372,17 @@ class CloudonixWebhookController extends Controller
                 // Just log the error and continue
             }
 
+            // Check if this is an auto-dialer call and update destination
+            try {
+                $this->processAutoDialerCDR($request, $cdr);
+            } catch (\Exception $e) {
+                Log::error('Failed to process auto-dialer CDR', [
+                    'call_id' => $callId,
+                    'error' => $e->getMessage(),
+                ]);
+                // Don't fail the entire CDR processing
+            }
+
             // Return 204 No Content to indicate successful creation
             return response()->json(['message' => 'CDR Inserted successfully'], 200);
         } catch (\Exception $e) {
@@ -576,5 +587,81 @@ class CloudonixWebhookController extends Controller
         ];
 
         return $statusMap[strtolower($status)] ?? strtolower($status);
+    }
+
+    /**
+     * Process CDR for auto-dialer calls.
+     *
+     * Updates auto-dialer destination records when a CDR is received.
+     */
+    private function processAutoDialerCDR(\Illuminate\Http\Request $request, \App\Models\CallDetailRecord $cdr): void
+    {
+        $sessionToken = $request->input('session_token');
+        $callId = $request->input('call_id');
+
+        if (! $sessionToken) {
+            return;
+        }
+
+        // Find auto-dialer session by session token
+        $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+
+        if (! $session) {
+            return;
+        }
+
+        // Update destination record
+        $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
+
+        if ($destination) {
+            $destination->update([
+                'status' => $this->mapDispositionToStatus($request->input('disposition')),
+                'last_disposition' => $request->input('disposition'),
+                'duration' => $request->input('duration', 0),
+                'billsec' => $request->input('billsec', 0),
+                'last_cdr_id' => $cdr->id,
+            ]);
+
+            // Increment dial attempts
+            $destination->incrementDialAttempts();
+
+            // Update CDR to mark as auto-dialer call
+            $cdr->update([
+                'is_auto_dialer' => true,
+                'auto_dialer_campaign_id' => $session->campaign_id,
+            ]);
+
+            Log::info('Auto-dialer CDR processed', [
+                'call_id' => $callId,
+                'session_token' => $sessionToken,
+                'destination_id' => $destination->id,
+                'campaign_id' => $session->campaign_id,
+            ]);
+        }
+
+        // Update campaign statistics
+        $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+        if ($campaign) {
+            $campaign->increment('completed_calls');
+            $campaign->decrement('pending_calls');
+        }
+    }
+
+    /**
+     * Map CDR disposition to destination status.
+     */
+    private function mapDispositionToStatus(?string $disposition): string
+    {
+        $dispositionMap = [
+            'answered' => 'completed',
+            'completed' => 'completed',
+            'busy' => 'failed',
+            'no-answer' => 'failed',
+            'failed' => 'failed',
+            'cancelled' => 'failed',
+            'congestion' => 'failed',
+        ];
+
+        return $dispositionMap[strtolower($disposition ?? '')] ?? 'completed';
     }
 }
