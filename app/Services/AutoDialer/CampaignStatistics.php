@@ -7,6 +7,7 @@ namespace App\Services\AutoDialer;
 use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCampaign;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
