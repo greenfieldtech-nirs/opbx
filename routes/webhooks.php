@@ -75,6 +75,25 @@ Route::prefix('callbacks')->group(function (): void {
         ->name('voice.albs-follow-through');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Auto Dialer Webhook Routes
+|--------------------------------------------------------------------------
+|
+| These routes handle webhooks specific to auto-dialer campaigns.
+|
+*/
+
+Route::prefix('webhooks/auto-dialer')->group(function (): void {
+    Route::post('/call-status', [AutoDialerWebhookController::class, 'callStatus'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
+        ->name('webhooks.auto-dialer.call-status');
+
+    Route::post('/amd-result', [AutoDialerWebhookController::class, 'amdResult'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
+        ->name('webhooks.auto-dialer.amd-result');
+});
+
 // Health check endpoint
 Route::get('/health', function () {
     return response()->json([
