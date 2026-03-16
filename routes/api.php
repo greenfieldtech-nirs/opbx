@@ -187,6 +187,8 @@ Route::prefix('v1')->group(function (): void {
 
         // Users
         Route::apiResource('users', UsersController::class);
+        Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
+            ->name('users.password.update');
 
         // Extensions - Cloudonix sync (using ExtensionCloudonixController)
         // Must be defined BEFORE apiResource to avoid wildcard matching issues

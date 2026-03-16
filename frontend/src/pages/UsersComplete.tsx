@@ -136,8 +136,12 @@ export default function UsersComplete() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserDetail, setShowUserDetail] = useState(false);
+
+  // Password form state
+  const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
 
   // Form state
   const [formData, setFormData] = useState<UserFormData>({
@@ -230,6 +234,22 @@ export default function UsersComplete() {
     },
     onError: (error: any) => {
       toast.error('Failed to delete user', {
+        description: error.response?.data?.message || error.message,
+      });
+    },
+  });
+
+  // Update password mutation
+  const updatePasswordMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { password: string; password_confirmation: string } }) =>
+      usersService.updatePassword(id, data),
+    onSuccess: () => {
+      setShowPasswordDialog(false);
+      setPasswordFormData({ password: '', password_confirmation: '' });
+      toast.success('Password updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update password', {
         description: error.response?.data?.message || error.message,
       });
     },
@@ -420,6 +440,33 @@ export default function UsersComplete() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
+  };
+
+  // Open password dialog
+  const openPasswordDialog = (user: User) => {
+    setSelectedUser(user);
+    setPasswordFormData({ password: '', password_confirmation: '' });
+    setShowPasswordDialog(true);
+  };
+
+  // Handle password change
+  const handlePasswordChange = () => {
+    if (!selectedUser) return;
+
+    if (passwordFormData.password !== passwordFormData.password_confirmation) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (passwordFormData.password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    updatePasswordMutation.mutate({
+      id: selectedUser.id,
+      data: passwordFormData,
+    });
   };
 
   // Error state
@@ -1066,6 +1113,20 @@ export default function UsersComplete() {
                 />
               </div>
             </div>
+
+            {/* Change Password Section */}
+            <div className="pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditDialog(false);
+                  openPasswordDialog(selectedUser!);
+                }}
+              >
+                <KeyRound className="h-4 w-4 mr-2" />
+                Change Password
+              </Button>
+            </div>
           </div>
 
           <DialogFooter className="gap-2">
@@ -1110,6 +1171,52 @@ export default function UsersComplete() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteUser} disabled={deleteUserMutation.isPending}>
               {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {selectedUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">New Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={passwordFormData.password}
+                onChange={(e) => setPasswordFormData({ ...passwordFormData, password: e.target.value })}
+                placeholder="Enter new password"
+              />
+              <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password_confirmation">Confirm Password</Label>
+              <Input
+                id="password_confirmation"
+                type="password"
+                value={passwordFormData.password_confirmation}
+                onChange={(e) => setPasswordFormData({ ...passwordFormData, password_confirmation: e.target.value })}
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePasswordChange}
+              disabled={updatePasswordMutation.isPending || !passwordFormData.password || !passwordFormData.password_confirmation}
+            >
+              {updatePasswordMutation.isPending ? 'Updating...' : 'Update Password'}
             </Button>
           </DialogFooter>
         </DialogContent>

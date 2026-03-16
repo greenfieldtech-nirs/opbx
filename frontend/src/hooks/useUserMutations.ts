@@ -35,3 +35,10 @@ export function useDeleteUser() {
     },
   })
 }
+
+export function useUpdateUserPassword() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { password: string; password_confirmation: string } }) =>
+      usersService.updatePassword(id, data),
+  })
+}

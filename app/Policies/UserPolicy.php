@@ -114,7 +114,7 @@ class UserPolicy
     public function updateRole(User $authUser, User $targetUser): bool
     {
         // Only Owner can change roles
-        if (!$authUser->role->isOwner()) {
+        if (! $authUser->role->isOwner()) {
             return false;
         }
 
@@ -140,7 +140,7 @@ class UserPolicy
     public function delete(User $authUser, User $targetUser): bool
     {
         // Owner and PBX Admin can delete users
-        if (!$authUser->role->canManageUsers()) {
+        if (! $authUser->role->canManageUsers()) {
             return false;
         }
 
@@ -150,5 +150,36 @@ class UserPolicy
         }
 
         return true;
+    }
+
+    /**
+     * Determine if the user can change another user's password.
+     *
+     * - Owner can change any user's password (except their own through this UI)
+     * - PBX Admin can change PBX User and Reporter passwords
+     * - Users cannot change their own password through this UI (should use profile/settings)
+     *
+     * @param  User  $authUser  The authenticated user
+     * @param  User  $targetUser  The user whose password is being changed
+     * @return bool True if authorized to change the target user's password
+     */
+    public function updatePassword(User $authUser, User $targetUser): bool
+    {
+        // Users cannot change their own password through this UI
+        if ($authUser->id === $targetUser->id) {
+            return false;
+        }
+
+        // Owner can change any user's password
+        if ($authUser->role->isOwner()) {
+            return true;
+        }
+
+        // PBX Admin can only change PBX User and Reporter passwords
+        if ($authUser->role->isPBXAdmin()) {
+            return $targetUser->role->isPBXUser() || $targetUser->role->isReporter();
+        }
+
+        return false;
     }
 }
