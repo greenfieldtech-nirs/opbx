@@ -78,6 +78,14 @@ class AutoDialerCampaign extends Model
     ];
 
     /**
+     * Scope query to a specific organization.
+     */
+    public function scopeForOrganization($query, int|string $organizationId)
+    {
+        return $query->where('organization_id', $organizationId);
+    }
+
+    /**
      * Get the organization that owns the campaign.
      */
     public function organization(): BelongsTo
