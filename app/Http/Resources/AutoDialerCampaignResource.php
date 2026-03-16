@@ -20,13 +20,13 @@ class AutoDialerCampaignResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
-            'status' => $this->status->value,
-            'status_label' => $this->status->label(),
+            'status' => $this->status?->value,
+            'status_label' => $this->status?->label(),
             'auto_start' => $this->auto_start,
 
             // Routing
-            'routing_destination_type' => $this->routing_destination_type->value,
-            'routing_destination_label' => $this->routing_destination_type->label(),
+            'routing_destination_type' => $this->routing_destination_type?->value,
+            'routing_destination_label' => $this->routing_destination_type?->label(),
             'routing_destination_id' => $this->routing_destination_id,
 
             // Settings
@@ -40,8 +40,8 @@ class AutoDialerCampaignResource extends JsonResource
             'days_active' => $this->days_active,
             'start_time' => $this->start_time,
             'end_time' => $this->end_time,
-            'start_date' => $this->start_date->format('Y-m-d'),
-            'end_date' => $this->end_date->format('Y-m-d'),
+            'start_date' => $this->start_date?->format('Y-m-d'),
+            'end_date' => $this->end_date?->format('Y-m-d'),
             'timezone' => $this->timezone,
 
             // Recording & AMD
@@ -61,8 +61,8 @@ class AutoDialerCampaignResource extends JsonResource
             // Timestamps
             'started_at' => $this->started_at?->format('Y-m-d H:i:s'),
             'completed_at' => $this->completed_at?->format('Y-m-d H:i:s'),
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
 
             // Computed
             'is_runnable' => $this->isRunnable(),
