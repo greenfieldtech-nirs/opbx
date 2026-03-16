@@ -69,26 +69,34 @@ class ProcessAutoDialerCampaignJob implements ShouldQueue
             $nextRun = $scheduler->getNextScheduledTime($campaign);
             if ($nextRun) {
                 $delay = $nextRun->diffInSeconds(now());
-                self::dispatch($this->campaignId)->delay($delay);
+                self::dispatch($this->campaignId)
+                    ->onQueue('auto-dialer')
+                    ->delay($delay);
             }
 
             return;
         }
 
-        // Process the campaign
-        $processor->process($campaign);
+        try {
+            // Process the campaign
+            $processor->process($campaign);
+        } finally {
+            // Always schedule next batch if campaign is still active
+            // This ensures the campaign continues even if processing fails
+            $freshCampaign = $campaign->fresh();
+            if ($freshCampaign && $freshCampaign->status->isRunnable()) {
+                // Rate limit: dispatch next job after 1 second per CPS
+                $delay = max(1, ceil(10 / $freshCampaign->calls_per_second));
 
-        // Schedule next batch if campaign is still active
-        if ($campaign->fresh()->status->isRunnable()) {
-            // Rate limit: dispatch next job after 1 second per CPS
-            $delay = max(1, ceil(10 / $campaign->calls_per_second));
+                self::dispatch($this->campaignId)
+                    ->onQueue('auto-dialer')
+                    ->delay($delay);
 
-            self::dispatch($this->campaignId)->delay($delay);
-
-            Log::info('Scheduled next campaign batch', [
-                'campaign_id' => $this->campaignId,
-                'delay_seconds' => $delay,
-            ]);
+                Log::info('Scheduled next campaign batch', [
+                    'campaign_id' => $this->campaignId,
+                    'delay_seconds' => $delay,
+                ]);
+            }
         }
     }
 

@@ -41,7 +41,8 @@ class CampaignLifecycleManager
         ]);
 
         // Dispatch processing job
-        ProcessAutoDialerCampaignJob::dispatch($campaign->id);
+        ProcessAutoDialerCampaignJob::dispatch($campaign->id)
+            ->onQueue('auto-dialer');
 
         Log::info('Campaign started', [
             'campaign_id' => $campaign->id,
@@ -94,7 +95,8 @@ class CampaignLifecycleManager
         ]);
 
         // Resume processing
-        ProcessAutoDialerCampaignJob::dispatch($campaign->id);
+        ProcessAutoDialerCampaignJob::dispatch($campaign->id)
+            ->onQueue('auto-dialer');
 
         Log::info('Campaign resumed', [
             'campaign_id' => $campaign->id,
