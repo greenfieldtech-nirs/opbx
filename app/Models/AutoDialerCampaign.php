@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[ScopedBy([OrganizationScope::class])]
@@ -102,11 +103,11 @@ class AutoDialerCampaign extends Model
     }
 
     /**
-     * Get the destinations for this campaign.
+     * Get the destinations for this campaign through the list.
      */
-    public function destinations(): HasMany
+    public function destinations(): HasManyThrough
     {
-        return $this->hasMany(AutoDialerDestination::class, 'campaign_id');
+        return $this->hasManyThrough(AutoDialerDestination::class, AutoDialerList::class, 'campaign_id', 'list_id', 'id', 'id');
     }
 
     /**
@@ -240,7 +241,7 @@ class AutoDialerCampaign extends Model
      */
     public function getPendingCount(): int
     {
-        return $this->hasMany(AutoDialerDestination::class, 'campaign_id')
+        return $this->destinations()
             ->where('status', 'pending')
             ->count();
     }
