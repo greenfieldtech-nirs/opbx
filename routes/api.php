@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\AutoDialerCampaignController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
@@ -27,6 +26,7 @@ use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\AutoDialerCampaignController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
