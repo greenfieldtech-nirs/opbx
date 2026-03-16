@@ -326,4 +326,38 @@ class PlatformUserController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Update user password.
+     */
+    public function updatePassword(
+        User $user,
+        Request $request,
+        HashManager $hash,
+        PlatformAuditService $auditService
+    ): JsonResponse {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user->password = $hash->make($validated['password']);
+        $user->save();
+
+        // Audit log
+        $auditService->log(
+            request: $request,
+            action: 'user.password.updated',
+            targetOrganizationId: $user->organization_id,
+            targetEntityType: 'User',
+            targetEntityId: $user->id,
+            afterState: ['password_changed' => true],
+        );
+
+        return response()->json([
+            'message' => 'Password updated successfully.',
+            'data' => [
+                'id' => $user->id,
+            ],
+        ]);
+    }
 }

@@ -93,6 +93,11 @@ export const platformUsersApi = {
     api
       .patch<{ data: { id: string; is_platform_manager: boolean } }>(`/platform/users/${id}/platform-manager`, data)
       .then((r) => r.data.data),
+
+  updatePassword: (id: string, data: { password: string; password_confirmation: string }) =>
+    api
+      .patch<{ data: { id: string } }>(`/platform/users/${id}/password`, data)
+      .then((r) => r.data.data),
 };
 
 /**
