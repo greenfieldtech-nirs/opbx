@@ -19,27 +19,38 @@ class CampaignStatistics
     private const CACHE_TTL = 300; // 5 minutes
 
     /**
-     * Update campaign statistics.
+     * Update campaign statistics with locking.
      */
     public function updateCounts(AutoDialerCampaign $campaign): void
     {
-        $stats = $this->calculateStats($campaign);
+        // Use pessimistic locking to prevent race conditions
+        DB::transaction(function () use ($campaign) {
+            // Lock the campaign row for update
+            $lockedCampaign = AutoDialerCampaign::lockForUpdate()
+                ->find($campaign->id);
 
-        $campaign->update([
-            'total_destinations' => $stats['total'],
-            'completed_calls' => $stats['completed'],
-            'failed_calls' => $stats['failed'],
-            'pending_calls' => $stats['pending'],
-        ]);
+            if (! $lockedCampaign) {
+                return;
+            }
 
-        // Cache the statistics
-        $cacheKey = $this->getCacheKey($campaign);
-        Cache::put($cacheKey, $stats, self::CACHE_TTL);
+            $stats = $this->calculateStats($lockedCampaign);
 
-        Log::debug('Campaign statistics updated', [
-            'campaign_id' => $campaign->id,
-            'stats' => $stats,
-        ]);
+            $lockedCampaign->update([
+                'total_destinations' => $stats['total'],
+                'completed_calls' => $stats['completed'],
+                'failed_calls' => $stats['failed'],
+                'pending_calls' => $stats['pending'],
+            ]);
+
+            // Cache the statistics
+            $cacheKey = $this->getCacheKey($lockedCampaign);
+            Cache::put($cacheKey, $stats, self::CACHE_TTL);
+
+            Log::debug('Campaign statistics updated', [
+                'campaign_id' => $lockedCampaign->id,
+                'stats' => $stats,
+            ]);
+        });
     }
 
     /**
