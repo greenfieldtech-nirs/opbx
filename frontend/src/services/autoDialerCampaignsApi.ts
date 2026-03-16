@@ -32,6 +32,10 @@ export interface AutoDialerCampaign {
   record_calls: boolean;
   amd_enabled: boolean;
   amd_mode: 'Enabled' | 'DetectMessageEnd' | null;
+  amd_timeout: number;
+  amd_speech_threshold: number;
+  amd_speech_end_threshold: number;
+  amd_silence_timeout: number;
   statistics: {
     total_destinations: number;
     completed_calls: number;

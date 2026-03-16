@@ -36,6 +36,7 @@ const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
 const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
 const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
+const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
 
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
@@ -159,8 +160,16 @@ export const router = createBrowserRouter([
         element: <AutoDialerCampaigns />,
       },
       {
+        path: 'auto-dialer/new',
+        element: <AutoDialerCampaignForm />,
+      },
+      {
         path: 'auto-dialer/:id',
         element: <AutoDialerCampaignDetail />,
+      },
+      {
+        path: 'auto-dialer/:id/edit',
+        element: <AutoDialerCampaignForm />,
       },
       // Platform Management routes (platform manager only)
 {
