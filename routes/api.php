@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AutoDialerCampaignController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallLogController;
@@ -198,6 +199,25 @@ Route::prefix('v1')->group(function (): void {
             Route::post('sync', [ExtensionCloudonixController::class, 'performSync'])
                 ->name('extensions.sync.perform');
         });
+
+        // Auto Dialer Campaigns
+        Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class);
+        Route::patch('auto-dialer-campaigns/{campaign}/start', [AutoDialerCampaignController::class, 'start'])
+            ->name('auto-dialer-campaigns.start');
+        Route::patch('auto-dialer-campaigns/{campaign}/pause', [AutoDialerCampaignController::class, 'pause'])
+            ->name('auto-dialer-campaigns.pause');
+        Route::patch('auto-dialer-campaigns/{campaign}/resume', [AutoDialerCampaignController::class, 'resume'])
+            ->name('auto-dialer-campaigns.resume');
+        Route::patch('auto-dialer-campaigns/{campaign}/archive', [AutoDialerCampaignController::class, 'archive'])
+            ->name('auto-dialer-campaigns.archive');
+        Route::post('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'uploadList'])
+            ->name('auto-dialer-campaigns.list.upload');
+        Route::get('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'getList'])
+            ->name('auto-dialer-campaigns.list.get');
+        Route::delete('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'deleteList'])
+            ->name('auto-dialer-campaigns.list.delete');
+        Route::get('auto-dialer-campaigns/{campaign}/destinations', [AutoDialerCampaignController::class, 'getDestinations'])
+            ->name('auto-dialer-campaigns.destinations');
 
         // Extensions - CRUD (using ExtensionCrudController)
         Route::apiResource('extensions', ExtensionCrudController::class);
