@@ -627,6 +627,11 @@ class VoiceRoutingManager
                     'did_id' => $did->id,
                     'schedule_found' => $schedule !== null,
                     'schedule_id' => $schedule?->id,
+                    'schedule_type' => $schedule ? gettype($schedule) : null,
+                ]);
+                Log::info('VoiceRoutingManager: Schedule check', [
+                    'schedule_bool' => (bool) $schedule,
+                    'schedule_is_object' => is_object($schedule),
                 ]);
                 if ($schedule) {
                     // For business hours, route based on current status
