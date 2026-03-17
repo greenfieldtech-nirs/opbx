@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, FileSpreadsheet, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { ArrowLeft, Upload, FileSpreadsheet, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,11 @@ import { useUploadCampaignList, useAutoDialerCampaign } from '@/hooks/useAutoDia
 export default function AutoDialerUploadList() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [listName, setListName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [listNameError, setListNameError] = useState('');
 
   const { data: campaign } = useAutoDialerCampaign(id || '');
   const uploadMutation = useUploadCampaignList();
@@ -59,17 +61,28 @@ export default function AutoDialerUploadList() {
   const handleUpload = async () => {
     if (!id || !file) return;
 
+    // Validate list name is required
+    if (!listName.trim()) {
+      setListNameError('List name is required');
+      toast.error('Please enter a list name');
+      return;
+    }
+
     try {
       await uploadMutation.mutateAsync({
         campaignId: id,
         file,
-        name: listName || undefined,
+        name: listName.trim(),
       });
       toast.success('List uploaded successfully');
       navigate(`/ui/auto-dialer/${id}`);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to upload list');
     }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   const clearFile = () => {
@@ -113,13 +126,24 @@ export default function AutoDialerUploadList() {
 
           {/* List Name */}
           <div className="space-y-2">
-            <Label htmlFor="listName">List Name (Optional)</Label>
+            <Label htmlFor="listName">
+              List Name <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="listName"
               placeholder="My Contact List"
               value={listName}
-              onChange={(e) => setListName(e.target.value)}
+              onChange={(e) => {
+                setListName(e.target.value);
+                if (e.target.value.trim()) {
+                  setListNameError('');
+                }
+              }}
+              className={listNameError ? 'border-red-500' : ''}
             />
+            {listNameError && (
+              <p className="text-sm text-red-500">{listNameError}</p>
+            )}
           </div>
 
           {/* File Upload Area */}
@@ -135,20 +159,21 @@ export default function AutoDialerUploadList() {
               `}
             >
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".csv"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="csv-upload"
               />
-              <label htmlFor="csv-upload" className="cursor-pointer block">
+              <div className="cursor-pointer" onClick={triggerFileInput}>
                 <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-lg font-medium mb-1">Drop your CSV file here</p>
                 <p className="text-sm text-muted-foreground mb-4">or click to browse</p>
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" onClick={(e) => { e.stopPropagation(); triggerFileInput(); }}>
                   Select File
                 </Button>
-              </label>
+              </div>
             </div>
           ) : (
             <div className="border rounded-lg p-4">
@@ -180,7 +205,7 @@ export default function AutoDialerUploadList() {
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!file || uploadMutation.isPending}
+              disabled={!file || !listName.trim() || uploadMutation.isPending}
               className="flex-1"
             >
               {uploadMutation.isPending ? (
