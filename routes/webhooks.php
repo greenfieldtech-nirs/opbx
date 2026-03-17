@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Webhooks\AutoDialerWebhookController;
 use App\Http\Controllers\Webhooks\CloudonixWebhookController;
 use Illuminate\Support\Facades\Route;
 

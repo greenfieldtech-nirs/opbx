@@ -201,7 +201,8 @@ Route::prefix('v1')->group(function (): void {
         });
 
         // Auto Dialer Campaigns
-        Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class);
+        Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)
+            ->parameters(['auto-dialer-campaigns' => 'campaign']);
         Route::patch('auto-dialer-campaigns/{campaign}/start', [AutoDialerCampaignController::class, 'start'])
             ->name('auto-dialer-campaigns.start');
         Route::patch('auto-dialer-campaigns/{campaign}/pause', [AutoDialerCampaignController::class, 'pause'])
