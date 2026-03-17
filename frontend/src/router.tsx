@@ -37,6 +37,7 @@ const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSe
 const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
 const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
 const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
+const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
 
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
@@ -170,6 +171,10 @@ export const router = createBrowserRouter([
       {
         path: 'auto-dialer/:id/edit',
         element: <AutoDialerCampaignForm />,
+      },
+      {
+        path: 'auto-dialer/:id/upload',
+        element: <AutoDialerUploadList />,
       },
       // Platform Management routes (platform manager only)
 {
