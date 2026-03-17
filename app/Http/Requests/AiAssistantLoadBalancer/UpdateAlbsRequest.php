@@ -8,7 +8,7 @@ use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
-use App\Models\AiAssistant;
+use App\Enums\AiAssistantStatus;use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\Extension;
 use App\Models\IvrMenu;
@@ -232,7 +232,7 @@ class UpdateAlbsRequest extends FormRequest
 
                 // Validate that all AI assistants are active
                 foreach ($validAiAssistants as $aiAssistant) {
-                    if ($aiAssistant->status !== UserStatus::ACTIVE) {
+                    if ($aiAssistant->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'members',
                             'Only active AI assistants can be added to load balancers. "'.$aiAssistant->name.'" is not active.'
@@ -272,7 +272,7 @@ class UpdateAlbsRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackExtension->status !== UserStatus::ACTIVE) {
+                    if ($fallbackExtension->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_extension_id',
                             'Fallback extension must be active.'
@@ -332,7 +332,7 @@ class UpdateAlbsRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackAiAssistant->status !== UserStatus::ACTIVE) {
+                    if ($fallbackAiAssistant->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_ai_assistant_id',
                             'Fallback AI assistant must be active.'

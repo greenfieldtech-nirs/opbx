@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserStatus;
+use App\Enums\AiAssistantStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Resources\AiAssistantResource;
 use App\Models\AiAssistant;
@@ -77,7 +77,7 @@ class AiAssistantController extends AbstractApiCrudController
         return [
             'status' => [
                 'type' => 'enum',
-                'enum' => UserStatus::class,
+                'enum' => AiAssistantStatus::class,
                 'scope' => 'withStatus',
             ],
             'protocol' => [

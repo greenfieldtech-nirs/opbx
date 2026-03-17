@@ -9,7 +9,7 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
-use App\Models\Extension;
+use App\Enums\AiAssistantStatus;use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
@@ -259,7 +259,7 @@ class StoreRingGroupRequest extends FormRequest
 
                 // Validate that all extensions are active
                 foreach ($validExtensions as $extension) {
-                    if ($extension->status !== UserStatus::ACTIVE) {
+                    if ($extension->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'members',
                             'Only active extensions can be added to ring groups. Extension '.$extension->extension_number.' is not active.'
@@ -280,7 +280,7 @@ class StoreRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackExtension->status !== UserStatus::ACTIVE) {
+                    if ($fallbackExtension->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_extension_id',
                             'Fallback extension must be active.'
@@ -340,7 +340,7 @@ class StoreRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackAiAssistant->status !== UserStatus::ACTIVE) {
+                    if ($fallbackAiAssistant->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_ai_assistant_id',
                             'Fallback AI assistant must be active.'
@@ -367,7 +367,7 @@ class StoreRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackAiLoadBalancer->status !== UserStatus::ACTIVE) {
+                    if ($fallbackAiLoadBalancer->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_ai_load_balancer_id',
                             'Fallback AI load balancer must be active.'

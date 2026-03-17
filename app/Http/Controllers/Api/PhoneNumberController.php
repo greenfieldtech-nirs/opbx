@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
-use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
@@ -418,7 +418,7 @@ class PhoneNumberController extends Controller
         // Batch load AI assistants
         if (! empty($aiAssistantIds)) {
             $aiAssistants = AiAssistant::whereIn('id', array_filter($aiAssistantIds))
-                ->where('status', UserStatus::ACTIVE)
+                ->where('status', AiAssistantStatus::ACTIVE)
                 ->get()
                 ->keyBy('id');
             foreach ($phoneNumbersByType['ai_assistant'] as $phoneNumber) {
@@ -519,7 +519,7 @@ class PhoneNumberController extends Controller
         $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
         if ($aiAssistantId) {
             $aiAssistant = AiAssistant::where('id', $aiAssistantId)
-                ->where('status', \App\Enums\UserStatus::ACTIVE)
+                ->where('status', \App\Enums\AiAssistantStatus::ACTIVE)
                 ->first();
             if ($aiAssistant) {
                 $phoneNumber->setAiAssistant($aiAssistant);
@@ -535,7 +535,7 @@ class PhoneNumberController extends Controller
         $aiLoadBalancerId = $phoneNumber->getTargetAiLoadBalancerId();
         if ($aiLoadBalancerId) {
             $aiLoadBalancer = AiAssistantLoadBalancer::where('id', $aiLoadBalancerId)
-                ->where('status', 'active')
+                ->where('status', AlbsStatus::ACTIVE)
                 ->first();
             if ($aiLoadBalancer) {
                 $phoneNumber->setAiLoadBalancer($aiLoadBalancer);
