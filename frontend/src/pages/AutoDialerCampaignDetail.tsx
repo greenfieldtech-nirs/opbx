@@ -58,7 +58,7 @@ import {
   useArchiveCampaign,
   useDeleteCampaignList,
 } from '@/hooks/useAutoDialerCampaigns';
-import type { AutoDialerCampaign } from '@/services/autoDialerCampaignsApi';
+import type { AutoDialerCampaign, CampaignDestination } from '@/services/autoDialerCampaignsApi';
 import { cn } from '@/lib/utils';
 
 function getStatusBadge(status: string) {
@@ -207,7 +207,11 @@ export default function AutoDialerCampaignDetail() {
     );
   }
 
-  const destinations = destinationsData?.data || [];
+  // Handle both paginated response structures
+  // Backend returns { data: { data: [...], current_page, ... } } for paginated responses
+  // @ts-expect-error - API returns nested data structure that's not fully typed
+  const destinations = (destinationsData?.data?.data as CampaignDestination[]) || 
+                       (destinationsData?.data as CampaignDestination[]) || [];
 
   return (
     <div className="container mx-auto p-6 space-y-6">
