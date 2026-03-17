@@ -713,7 +713,7 @@ class VoiceRoutingManager
                                     $aiAssistant = \App\Models\AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
                                         ->where('id', $aiAssistantId)
                                         ->where('organization_id', $did->organization_id)
-                                        ->where('status', \App\Enums\UserStatus::ACTIVE)
+                                        ->where('status', \App\Enums\AiAssistantStatus::ACTIVE)
                                         ->first();
                                     if ($aiAssistant) {
                                         $destination['ai_assistant'] = $aiAssistant;

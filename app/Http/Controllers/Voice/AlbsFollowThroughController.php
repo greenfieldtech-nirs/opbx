@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Voice;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
 use App\Enums\RingGroupFallbackAction;
-use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
@@ -134,7 +134,7 @@ class AlbsFollowThroughController extends Controller
                 $query->where('status', 'active')
                     ->whereHas('aiAssistant', function ($q) {
                         $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-                            ->where('status', UserStatus::ACTIVE->value);
+                            ->where('status', AiAssistantStatus::ACTIVE->value);
                     })
                     ->with(['aiAssistant' => function ($q) {
                         $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
@@ -675,7 +675,7 @@ class AlbsFollowThroughController extends Controller
         $aiAssistant = AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('id', $aiAssistantId)
             ->where('organization_id', $albs->organization_id)
-            ->where('status', UserStatus::ACTIVE->value)
+            ->where('status', AiAssistantStatus::ACTIVE->value)
             ->first();
 
         if (! $aiAssistant) {
