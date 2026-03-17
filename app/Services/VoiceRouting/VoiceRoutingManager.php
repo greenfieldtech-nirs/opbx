@@ -713,7 +713,7 @@ class VoiceRoutingManager
                                     $aiAssistant = \App\Models\AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
                                         ->where('id', $aiAssistantId)
                                         ->where('organization_id', $did->organization_id)
-                                        ->where('status', 'active')
+                                        ->where('status', \App\Enums\UserStatus::ACTIVE)
                                         ->first();
                                     if ($aiAssistant) {
                                         $destination['ai_assistant'] = $aiAssistant;
@@ -734,7 +734,7 @@ class VoiceRoutingManager
                                     $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
                                         ->where('id', $albsId)
                                         ->where('organization_id', $did->organization_id)
-                                        ->where('status', 'active')
+                                        ->where('status', \App\Enums\AlbsStatus::ACTIVE)
                                         ->first();
                                     if ($aiLoadBalancer) {
                                         $destination['ai_load_balancer'] = $aiLoadBalancer;
