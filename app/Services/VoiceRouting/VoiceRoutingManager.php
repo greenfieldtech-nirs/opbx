@@ -634,7 +634,7 @@ class VoiceRoutingManager
                     'schedule_is_object' => is_object($schedule),
                 ]);
                 if ($schedule) {
-                    // For business hours, route based on current status
+                    Log::info('VoiceRoutingManager: ENTERED if($schedule) block');                    // For business hours, route based on current status
                     $actionType = $schedule->getCurrentRoutingType();
                     $targetId = $schedule->getCurrentRoutingTargetId();
 
@@ -644,6 +644,10 @@ class VoiceRoutingManager
                         'action_type' => $actionType->value,
                         'target_id' => $targetId,
                         'is_open' => $schedule->isCurrentlyOpen(),
+                    ]);
+
+                    Log::info('VoiceRoutingManager: About to enter switch for action type', [
+                        'action_type' => $actionType->value,
                     ]);
 
                     // Route based on action type
@@ -737,6 +741,7 @@ class VoiceRoutingManager
                             break;
 
                         case \App\Enums\BusinessHoursActionType::AI_LOAD_BALANCER:
+                            Log::info('VoiceRoutingManager: AI_LOAD_BALANCER case matched');
                             Log::debug('VoiceRoutingManager: Business Hours routing to AI_LOAD_BALANCER', [
                                 'target_id' => $targetId,
                                 'org_id' => $did->organization_id,
@@ -779,6 +784,7 @@ class VoiceRoutingManager
                             break;
 
                         default:
+                            Log::error('VoiceRoutingManager: DEFAULT CASE HIT - action type not matched');
                             Log::warning('VoiceRoutingManager: Business Hours action type not handled', [
                                 'did_id' => $did->id,
                                 'action_type' => $actionType->value,
