@@ -760,9 +760,9 @@ class VoiceRoutingManager
                                 'org_id' => $did->organization_id,
                             ]);
                             if ($targetId) {
-                                // Support both "albs-1" format and plain "1" format
+                                // Support both "alb-1", "albs-1" formats and plain "1" format
                                 $albsId = is_numeric($targetId) ? (int) $targetId : null;
-                                if (preg_match('/^albs-(\d+)$/', $targetId, $matches)) {
+                                if (preg_match('/^alb[s]?-(\d+)$/', $targetId, $matches)) {
                                     $albsId = (int) $matches[1];
                                 }
 
@@ -1658,9 +1658,9 @@ class VoiceRoutingManager
 
             case \App\Enums\BusinessHoursActionType::AI_LOAD_BALANCER:
                 if ($targetId) {
-                    // Support both "albs-1" format and plain "1" format
+                    // Support both "alb-1", "albs-1" formats and plain "1" format
                     $albsId = is_numeric($targetId) ? (int) $targetId : null;
-                    if (preg_match('/^albs-(\d+)$/', $targetId, $matches)) {
+                    if (preg_match('/^alb[s]?-(\d+)$/', $targetId, $matches)) {
                         $albsId = (int) $matches[1];
                     }
 
@@ -1668,7 +1668,7 @@ class VoiceRoutingManager
                         $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
                             ->where('id', $albsId)
                             ->where('organization_id', $organizationId)
-                            ->where('status', 'active')
+                            ->where('status', \App\Enums\AlbsStatus::ACTIVE)
                             ->first();
 
                         if ($aiLoadBalancer) {
