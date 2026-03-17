@@ -76,7 +76,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::debug('VoiceRoutingManager: Handling call routing', [
+        Log::info('VoiceRoutingManager: Handling call routing', [
             'direction' => $direction,
             'to' => $to,
             'from' => $from,
@@ -193,7 +193,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::debug('VoiceRoutingManager: Inbound direction call', [
+        Log::info('VoiceRoutingManager: Inbound direction call', [
             'to' => $to,
             'from' => $from,
             'org_id' => $orgId,
@@ -211,8 +211,15 @@ class VoiceRoutingManager
         }
 
         // Determine call type: check if From is an assigned phone number
-        if ($this->isAssignedPhoneNumber($from, $orgId)) {
-            Log::debug('VoiceRoutingManager: Detected internal call from DID', [
+        $isFromAssigned = $this->isAssignedPhoneNumber($from, $orgId);
+        Log::info('VoiceRoutingManager: Call type determination', [
+            'from' => $from,
+            'is_from_assigned' => $isFromAssigned,
+            'org_id' => $orgId,
+        ]);
+
+        if ($isFromAssigned) {
+            Log::info('VoiceRoutingManager: Detected internal call from DID', [
                 'from_did' => $from,
                 'to' => $to,
                 'org_id' => $orgId,
@@ -220,7 +227,7 @@ class VoiceRoutingManager
 
             return $this->handleInternalCallFromDid($request);
         } else {
-            Log::debug('VoiceRoutingManager: Detected external inbound call to DID', [
+            Log::info('VoiceRoutingManager: Detected external inbound call to DID', [
                 'from_external' => $from,
                 'to_did' => $to,
                 'org_id' => $orgId,
@@ -294,7 +301,7 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
-        Log::debug('VoiceRoutingManager: Processing external inbound call to DID', [
+        Log::info('VoiceRoutingManager: Processing external inbound call to DID', [
             'from_external' => $from,
             'to_did' => $to,
             'org_id' => $orgId,
@@ -501,11 +508,13 @@ class VoiceRoutingManager
             ->where('status', 'active')
             ->first();
 
-        Log::debug('VoiceRoutingManager: DID lookup result', [
+        Log::info('VoiceRoutingManager: DID lookup result', [
             'did_found' => $did !== null,
             'did_id' => $did?->id,
             'did_phone_number' => $did?->phone_number,
             'did_routing_type' => $did?->routing_type,
+            'search_to' => $to,
+            'search_org_id' => $orgId,
         ]);
 
         // If DID found, route according to DID configuration
@@ -531,6 +540,14 @@ class VoiceRoutingManager
     private function routeDidCall(Request $request, DidNumber $did): Response
     {
         $destination = [];
+
+        Log::info('VoiceRoutingManager: routeDidCall started', [
+            'did_id' => $did->id,
+            'did_phone_number' => $did->phone_number,
+            'routing_type' => $did->routing_type,
+            'routing_type_raw' => $did->getAttributes()['routing_type'] ?? null,
+            'routing_config' => $did->routing_config,
+        ]);
 
         // Load the appropriate destination based on routing type
         switch ($did->routing_type) {
@@ -564,9 +581,21 @@ class VoiceRoutingManager
                 break;
 
             case 'ai_assistant':
+                // AI Assistant routing follows the same pattern as IVR Menu routing.
+                // The ai_assistant is stored in $destination['ai_assistant'] (not 'extension')
+                // and determineExtensionType() returns ExtensionType::AI_ASSISTANT when present.
+                // This ensures consistent routing behavior across all DID routing types.
                 $aiAssistant = $did->getAiAssistantAttribute();
+
+                Log::info('VoiceRoutingManager: AI assistant routing lookup', [
+                    'did_id' => $did->id,
+                    'ai_assistant_id_in_config' => $did->routing_config['ai_assistant_id'] ?? null,
+                    'ai_assistant_found' => $aiAssistant !== null,
+                    'ai_assistant_id' => $aiAssistant?->id,
+                ]);
+
                 if ($aiAssistant) {
-                    $destination['extension'] = $aiAssistant;
+                    $destination['ai_assistant'] = $aiAssistant;
                 }
                 break;
 
@@ -670,6 +699,12 @@ class VoiceRoutingManager
 
             return $this->createCxmlErrorResponse('Destination not configured');
         }
+
+        Log::info('VoiceRoutingManager: Routing destination populated', [
+            'did_id' => $did->id,
+            'routing_type' => $did->routing_type,
+            'destination_keys' => array_keys($destination),
+        ]);
 
         // Determine extension type from destination
         $extensionType = $this->determineExtensionType($did, $destination);
@@ -1824,10 +1859,23 @@ class VoiceRoutingManager
 
     /**
      * Determine the extension type from a DID destination.
+     *
+     * Routing Type Mapping:
+     * - extension routing: $destination['extension'] contains Extension model, uses its type property
+     * - ring_group routing: $destination['ring_group'] contains RingGroup model, returns RING_GROUP
+     * - conference_room routing: $destination['conference_room'] contains ConferenceRoom model, returns CONFERENCE
+     * - ivr_menu routing: $destination['ivr_menu'] contains IvrMenu model, returns IVR
+     * - ai_assistant routing: $destination['ai_assistant'] contains AiAssistant model, returns AI_ASSISTANT
+     * - ai_load_balancer routing: $destination['ai_load_balancer'] contains AiAssistantLoadBalancer model, returns AI_LOAD_BALANCER
+     *
+     * Note: For AI assistant routing, we return ExtensionType::AI_ASSISTANT directly (like IVR)
+     * rather than using the 'extension' key, to maintain consistency with other non-extension routings.
      */
     private function determineExtensionType(DidNumber $did, array $destination): ?ExtensionType
     {
         // If destination contains extension, use its type
+        // Note: This is for actual Extension model routing (USER, RING_GROUP, CONFERENCE, IVR types)
+        // AI assistants are handled separately below via 'ai_assistant' key
         if (isset($destination['extension'])) {
             return $destination['extension']->type;
         }
@@ -1845,6 +1893,18 @@ class VoiceRoutingManager
         // If destination contains ivr_menu, return IVR
         if (isset($destination['ivr_menu'])) {
             return ExtensionType::IVR;
+        }
+
+        // If destination contains ai_assistant, return AI_ASSISTANT
+        // Note: AI assistant routing stores the AiAssistant model in 'ai_assistant' key
+        // (not 'extension' key) to maintain consistent routing patterns
+        if (isset($destination['ai_assistant'])) {
+            return ExtensionType::AI_ASSISTANT;
+        }
+
+        // If destination contains ai_load_balancer, return AI_LOAD_BALANCER
+        if (isset($destination['ai_load_balancer'])) {
+            return ExtensionType::AI_LOAD_BALANCER;
         }
 
         Log::warning('VoiceRoutingManager: Could not determine extension type from destination', [
