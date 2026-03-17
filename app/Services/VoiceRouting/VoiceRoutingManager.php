@@ -618,7 +618,16 @@ class VoiceRoutingManager
                 break;
 
             case 'business_hours':
+                Log::info('VoiceRoutingManager: Processing business_hours routing', [
+                    'did_id' => $did->id,
+                    'routing_config' => $did->routing_config,
+                ]);
                 $schedule = $did->getBusinessHoursScheduleAttribute();
+                Log::info('VoiceRoutingManager: Business Hours schedule lookup', [
+                    'did_id' => $did->id,
+                    'schedule_found' => $schedule !== null,
+                    'schedule_id' => $schedule?->id,
+                ]);
                 if ($schedule) {
                     // For business hours, route based on current status
                     $actionType = $schedule->getCurrentRoutingType();
@@ -765,12 +774,24 @@ class VoiceRoutingManager
                             break;
 
                         default:
+                            Log::warning('VoiceRoutingManager: Business Hours action type not handled', [
+                                'did_id' => $did->id,
+                                'action_type' => $actionType->value,
+                            ]);
+
                             // Legacy action format - return error
                             return $this->createCxmlErrorResponse('Business hours configuration needs update');
                     }
                 }
                 break;
         }
+
+        Log::info('VoiceRoutingManager: About to check destination', [
+            'did_id' => $did->id,
+            'routing_type' => $did->routing_type,
+            'destination' => $destination,
+            'destination_empty' => empty($destination),
+        ]);
 
         if (empty($destination)) {
             Log::warning('VoiceRoutingManager: No valid destination found for DID routing', [
