@@ -723,6 +723,10 @@ class VoiceRoutingManager
                             break;
 
                         case \App\Enums\BusinessHoursActionType::AI_LOAD_BALANCER:
+                            Log::debug('VoiceRoutingManager: Business Hours routing to AI_LOAD_BALANCER', [
+                                'target_id' => $targetId,
+                                'org_id' => $did->organization_id,
+                            ]);
                             if ($targetId) {
                                 // Support both "albs-1" format and plain "1" format
                                 $albsId = is_numeric($targetId) ? (int) $targetId : null;
@@ -730,14 +734,31 @@ class VoiceRoutingManager
                                     $albsId = (int) $matches[1];
                                 }
 
+                                Log::debug('VoiceRoutingManager: Parsed ALBS ID', [
+                                    'target_id' => $targetId,
+                                    'albs_id' => $albsId,
+                                ]);
+
                                 if ($albsId) {
                                     $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
                                         ->where('id', $albsId)
                                         ->where('organization_id', $did->organization_id)
                                         ->where('status', \App\Enums\AlbsStatus::ACTIVE)
                                         ->first();
+
+                                    Log::debug('VoiceRoutingManager: ALBS lookup result', [
+                                        'albs_id' => $albsId,
+                                        'org_id' => $did->organization_id,
+                                        'found' => $aiLoadBalancer !== null,
+                                    ]);
+
                                     if ($aiLoadBalancer) {
                                         $destination['ai_load_balancer'] = $aiLoadBalancer;
+                                    } else {
+                                        Log::warning('VoiceRoutingManager: AI Load Balancer not found', [
+                                            'albs_id' => $albsId,
+                                            'org_id' => $did->organization_id,
+                                        ]);
                                     }
                                 }
                             }
