@@ -46,13 +46,16 @@ import {
   useUpdateAutoDialerCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
 import type { CreateCampaignRequest, UpdateCampaignRequest } from '@/services/autoDialerCampaignsApi';
+import aiAssistantsService from '@/services/aiAssistants.service';
+import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
+import { useQuery } from '@tanstack/react-query';
 
 // Validation schema
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   description: z.string().max(1000, 'Description is too long').optional(),
   routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'hangup']),
-  routing_destination_id: z.string().optional(),
+  routing_destination_id: z.string().optional().nullable(),
   dial_timeout: z.number().min(1).max(300).default(60),
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
   caller_id: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format'),
@@ -114,6 +117,20 @@ export default function AutoDialerCampaignForm() {
   const createMutation = useCreateAutoDialerCampaign();
   const updateMutation = useUpdateAutoDialerCampaign();
 
+  // Fetch AI Assistants and Load Balancers
+  const { data: aiAssistantsData } = useQuery({
+    queryKey: ['ai-assistants', { status: 'active' }],
+    queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  const { data: aiLoadBalancersData } = useQuery({
+    queryKey: ['ai-assistant-load-balancers', { status: 'active' }],
+    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  const aiAssistants = aiAssistantsData?.data || [];
+  const aiLoadBalancers = aiLoadBalancersData?.data || [];
+
   const {
     register,
     handleSubmit,
@@ -153,6 +170,11 @@ export default function AutoDialerCampaignForm() {
   const amdEnabled = watch('amd_enabled');
   const startTime = watch('start_time');
   const endTime = watch('end_time');
+
+  // Clear routing_destination_id when routing type changes
+  useEffect(() => {
+    setValue('routing_destination_id', null);
+  }, [routingType, setValue]);
 
   // Load existing data when editing
   useEffect(() => {
@@ -216,11 +238,16 @@ export default function AutoDialerCampaignForm() {
         await updateMutation.mutateAsync({ id, data: updateData });
         toast.success('Campaign updated successfully');
       } else {
+        // Only include routing_destination_id when not using hangup
+        const routingDestinationId = data.routing_destination_type === 'hangup' 
+          ? undefined 
+          : (data.routing_destination_id ? parseInt(data.routing_destination_id, 10) : undefined);
+
         const createData: CreateCampaignRequest = {
           name: data.name,
           description: data.description,
           routing_destination_type: data.routing_destination_type,
-          routing_destination_id: data.routing_destination_id,
+          ...(routingDestinationId && { routing_destination_id: String(routingDestinationId) }),
           dial_timeout: data.dial_timeout,
           destination_connect: data.destination_connect,
           caller_id: data.caller_id,
@@ -350,9 +377,11 @@ export default function AutoDialerCampaignForm() {
                   </Label>
                   <Select
                     value={watch('routing_destination_type')}
-                    onValueChange={(value: 'ai_assistant' | 'ai_load_balancer' | 'hangup') =>
-                      setValue('routing_destination_type', value)
-                    }
+                    onValueChange={(value: 'ai_assistant' | 'ai_load_balancer' | 'hangup') => {
+                      setValue('routing_destination_type', value);
+                      // Clear the destination ID when changing types
+                      setValue('routing_destination_id', null);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select routing destination" />
@@ -365,20 +394,71 @@ export default function AutoDialerCampaignForm() {
                   </Select>
                 </div>
 
-                {routingType !== 'hangup' && (
+                {routingType === 'ai_assistant' && (
                   <div className="space-y-2">
                     <Label htmlFor="routing_destination_id">
-                      Destination ID <span className="text-red-500">*</span>
+                      AI Assistant <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="routing_destination_id"
-                      {...register('routing_destination_id')}
-                      placeholder={`Select ${routingType === 'ai_assistant' ? 'AI Assistant' : 'Load Balancer'}`}
-                      className={errors.routing_destination_id ? 'border-red-500' : ''}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Enter the ID of the {routingType === 'ai_assistant' ? 'AI Assistant' : 'Load Balancer'} to use
-                    </p>
+                    <Select
+                      value={watch('routing_destination_id')}
+                      onValueChange={(value) => setValue('routing_destination_id', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an AI Assistant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {aiAssistants.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No AI Assistants available
+                          </SelectItem>
+                        ) : (
+                          aiAssistants.map((assistant) => (
+                            <SelectItem key={assistant.id} value={String(assistant.id)}>
+                              {assistant.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {aiAssistants.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No active AI Assistants found. Create one first.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {routingType === 'ai_load_balancer' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="routing_destination_id">
+                      AI Load Balancer <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={watch('routing_destination_id')}
+                      onValueChange={(value) => setValue('routing_destination_id', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a Load Balancer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {aiLoadBalancers.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No Load Balancers available
+                          </SelectItem>
+                        ) : (
+                          aiLoadBalancers.map((balancer) => (
+                            <SelectItem key={balancer.id} value={String(balancer.id)}>
+                              {balancer.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {aiLoadBalancers.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No active Load Balancers found. Create one first.
+                      </p>
+                    )}
                   </div>
                 )}
 
