@@ -701,6 +701,48 @@ class VoiceRoutingManager
                             }
                             break;
 
+                        case \App\Enums\BusinessHoursActionType::AI_ASSISTANT:
+                            if ($targetId) {
+                                // Support both "ai-1" format and plain "1" format
+                                $aiAssistantId = is_numeric($targetId) ? (int) $targetId : null;
+                                if (preg_match('/^ai-(\d+)$/', $targetId, $matches)) {
+                                    $aiAssistantId = (int) $matches[1];
+                                }
+
+                                if ($aiAssistantId) {
+                                    $aiAssistant = \App\Models\AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $aiAssistantId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($aiAssistant) {
+                                        $destination['ai_assistant'] = $aiAssistant;
+                                    }
+                                }
+                            }
+                            break;
+
+                        case \App\Enums\BusinessHoursActionType::AI_LOAD_BALANCER:
+                            if ($targetId) {
+                                // Support both "albs-1" format and plain "1" format
+                                $albsId = is_numeric($targetId) ? (int) $targetId : null;
+                                if (preg_match('/^albs-(\d+)$/', $targetId, $matches)) {
+                                    $albsId = (int) $matches[1];
+                                }
+
+                                if ($albsId) {
+                                    $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                                        ->where('id', $albsId)
+                                        ->where('organization_id', $did->organization_id)
+                                        ->where('status', 'active')
+                                        ->first();
+                                    if ($aiLoadBalancer) {
+                                        $destination['ai_load_balancer'] = $aiLoadBalancer;
+                                    }
+                                }
+                            }
+                            break;
+
                         default:
                             // Legacy action format - return error
                             return $this->createCxmlErrorResponse('Business hours configuration needs update');
