@@ -599,6 +599,24 @@ class VoiceRoutingManager
                 }
                 break;
 
+            case 'ai_load_balancer':
+                // AI Load Balancer routing - routes to an AI assistant load balancer
+                // The ai_load_balancer is stored in $destination['ai_load_balancer']
+                // and determineExtensionType() returns ExtensionType::AI_LOAD_BALANCER when present.
+                $aiLoadBalancer = $did->getAiLoadBalancerAttribute();
+
+                Log::info('VoiceRoutingManager: AI load balancer routing lookup', [
+                    'did_id' => $did->id,
+                    'ai_load_balancer_id_in_config' => $did->routing_config['ai_load_balancer_id'] ?? null,
+                    'ai_load_balancer_found' => $aiLoadBalancer !== null,
+                    'ai_load_balancer_id' => $aiLoadBalancer?->id,
+                ]);
+
+                if ($aiLoadBalancer) {
+                    $destination['ai_load_balancer'] = $aiLoadBalancer;
+                }
+                break;
+
             case 'business_hours':
                 $schedule = $did->getBusinessHoursScheduleAttribute();
                 if ($schedule) {
