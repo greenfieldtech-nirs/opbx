@@ -634,9 +634,22 @@ class VoiceRoutingManager
                     'schedule_is_object' => is_object($schedule),
                 ]);
                 if ($schedule) {
-                    Log::info('VoiceRoutingManager: ENTERED if($schedule) block');                    // For business hours, route based on current status
-                    $actionType = $schedule->getCurrentRoutingType();
-                    $targetId = $schedule->getCurrentRoutingTargetId();
+                    Log::info('VoiceRoutingManager: STEP 1 - Inside if block');
+                    try {
+                        Log::info('VoiceRoutingManager: STEP 2 - About to call getCurrentRoutingType');
+                        $actionType = $schedule->getCurrentRoutingType();
+                        Log::info('VoiceRoutingManager: STEP 3 - Got action type', ['type' => $actionType->value]);
+
+                        Log::info('VoiceRoutingManager: STEP 4 - About to call getCurrentRoutingTargetId');
+                        $targetId = $schedule->getCurrentRoutingTargetId();
+                        Log::info('VoiceRoutingManager: STEP 5 - Got target ID', ['target_id' => $targetId]);
+                    } catch (\Exception $e) {
+                        Log::error('VoiceRoutingManager: EXCEPTION in schedule methods', [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                        throw $e;
+                    }
 
                     Log::debug('VoiceRoutingManager: Business hours routing', [
                         'did_id' => $did->id,
