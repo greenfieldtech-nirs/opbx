@@ -88,10 +88,10 @@ const sidebarSections: SidebarSection[] = [
     accentColor: 'default',
     items: [
       { name: 'Auto Dialer', href: '/ui/auto-dialer', icon: 'codicon-radio-tower', roles: ['owner', 'pbx_admin'] },
-      { name: 'AI Configuration', href: '', icon: 'codicon-copilot', isHeader: true },
+      { name: 'AI Configuration', href: '', icon: '', isHeader: true },
       { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },
-      { name: 'Security', href: '', icon: 'codicon-shield', isHeader: true },
+      { name: 'Security', href: '', icon: '', isHeader: true },
       { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
       { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
     ],
@@ -223,9 +223,8 @@ export function Sidebar() {
       return (
         <div
           key={item.name}
-          className="flex items-center gap-2 px-3 py-2 mt-2 text-[11px] font-semibold uppercase tracking-wide text-[#858585]"
+          className="px-3 py-2 mt-2 text-[11px] font-semibold uppercase tracking-wide text-[#858585]"
         >
-          <i className={cn('codicon', item.icon)} style={{ fontSize: '24px' }} />
           <span className="truncate">{item.name}</span>
         </div>
       );
