@@ -185,9 +185,13 @@ export default function AutoDialerCampaigns() {
     setSelectedCampaign(null);
   };
 
-  const campaigns = data?.data || [];
-  const totalCampaigns = data?.meta?.total || 0;
-  const totalPages = data?.meta?.last_page || 1;
+  // Filter campaigns client-side when excluding archived
+  const allCampaigns = data?.data || [];
+  const campaigns = statusFilter === 'not-archived'
+    ? allCampaigns.filter(c => c.status !== 'archived')
+    : allCampaigns;
+  const totalCampaigns = statusFilter === 'not-archived' ? campaigns.length : (data?.meta?.total || 0);
+  const totalPages = statusFilter === 'not-archived' ? 1 : (data?.meta?.last_page || 1);
 
   // Check if filters are active
   const hasActiveFilters = searchQuery || statusFilter !== 'not-archived';
@@ -478,7 +482,7 @@ export default function AutoDialerCampaigns() {
           />
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {(statusFilter === 'not-archived' ? campaigns.length > perPage : totalPages > 1) && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCampaigns)} of {totalCampaigns} campaigns
