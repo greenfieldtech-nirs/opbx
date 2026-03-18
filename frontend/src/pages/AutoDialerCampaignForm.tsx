@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -48,17 +47,20 @@ import {
 import type { CreateCampaignRequest, UpdateCampaignRequest } from '@/services/autoDialerCampaignsApi';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
+import { phoneNumbersService } from '@/services/createResourceService';
 import { useQuery } from '@tanstack/react-query';
+import { DestinationTypeAndSelector } from '@/components/destinations';
+import type { DestinationType } from '@/components/destinations/types/destination.types';
+import { cn } from '@/lib/utils';
 
 // Validation schema
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
-  description: z.string().max(1000, 'Description is too long').optional(),
   routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'hangup']),
   routing_destination_id: z.string().optional().nullable(),
   dial_timeout: z.number().min(1).max(300).default(60),
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
-  caller_id: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format'),
+  caller_id: z.string().min(1, 'Caller ID is required'),
   max_dial_attempts: z.number().min(1).max(5).default(1),
   calls_per_second: z.number().min(1).max(5).default(1),
   days_active: z.array(z.string()).min(1, 'Select at least one day'),
@@ -67,7 +69,7 @@ const campaignSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   timezone: z.string().default('UTC'),
-  time_limit: z.number().min(30).max(14400).optional(),
+  time_limit: z.number().min(30).max(14400).default(3600),
   record_calls: z.boolean().default(false),
   amd_enabled: z.boolean().default(false),
   amd_mode: z.enum(['Enabled', 'DetectMessageEnd']).optional(),
@@ -128,8 +130,15 @@ export default function AutoDialerCampaignForm() {
     queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
   });
 
+  // Fetch Phone Numbers for Caller ID
+  const { data: phoneNumbersData } = useQuery({
+    queryKey: ['phone-numbers', { status: 'active' }],
+    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
+  });
+
   const aiAssistants = aiAssistantsData?.data || [];
   const aiLoadBalancers = aiLoadBalancersData?.data || [];
+  const phoneNumbers = phoneNumbersData?.data || [];
 
   const {
     register,
@@ -142,7 +151,6 @@ export default function AutoDialerCampaignForm() {
     resolver: zodResolver(campaignSchema),
     defaultValues: {
       name: '',
-      description: '',
       routing_destination_type: 'ai_assistant',
       dial_timeout: 60,
       destination_connect: 'connected',
@@ -155,6 +163,7 @@ export default function AutoDialerCampaignForm() {
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       timezone: 'UTC',
+      time_limit: 3600,
       record_calls: false,
       amd_enabled: false,
       amd_timeout: 30,
@@ -181,7 +190,6 @@ export default function AutoDialerCampaignForm() {
     if (existingCampaign && isEditing) {
       reset({
         name: existingCampaign.name,
-        description: existingCampaign.description || '',
         routing_destination_type: existingCampaign.routing_destination_type,
         routing_destination_id: existingCampaign.routing_destination_id || undefined,
         dial_timeout: existingCampaign.dial_timeout,
@@ -195,7 +203,7 @@ export default function AutoDialerCampaignForm() {
         start_date: existingCampaign.start_date,
         end_date: existingCampaign.end_date,
         timezone: existingCampaign.timezone,
-        time_limit: undefined,
+
         record_calls: existingCampaign.record_calls,
         amd_enabled: existingCampaign.amd_enabled,
         amd_mode: existingCampaign.amd_mode || undefined,
@@ -214,7 +222,6 @@ export default function AutoDialerCampaignForm() {
         // Only include fields that can be updated
         const updateData: UpdateCampaignRequest = {
           name: data.name,
-          description: data.description,
           dial_timeout: data.dial_timeout,
           destination_connect: data.destination_connect,
           caller_id: data.caller_id,
@@ -245,7 +252,6 @@ export default function AutoDialerCampaignForm() {
 
         const createData: CreateCampaignRequest = {
           name: data.name,
-          description: data.description,
           routing_destination_type: data.routing_destination_type,
           ...(routingDestinationId && { routing_destination_id: String(routingDestinationId) }),
           dial_timeout: data.dial_timeout,
@@ -341,16 +347,6 @@ export default function AutoDialerCampaignForm() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    {...register('description')}
-                    placeholder="Enter campaign description (optional)"
-                    rows={3}
-                  />
-                </div>
-
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="auto_start"
@@ -370,114 +366,54 @@ export default function AutoDialerCampaignForm() {
                 <CardTitle>Routing Configuration</CardTitle>
                 <CardDescription>Configure where calls should be connected</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="routing_destination_type">
-                    Routing Destination <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={watch('routing_destination_type')}
-                    onValueChange={(value: 'ai_assistant' | 'ai_load_balancer' | 'hangup') => {
-                      setValue('routing_destination_type', value);
-                      // Clear the destination ID when changing types
-                      setValue('routing_destination_id', null);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select routing destination" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ai_assistant">AI Assistant</SelectItem>
-                      <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
-                      <SelectItem value="hangup">Hangup</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {routingType === 'ai_assistant' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="routing_destination_id">
-                      AI Assistant <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={watch('routing_destination_id')}
-                      onValueChange={(value) => setValue('routing_destination_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select an AI Assistant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {aiAssistants.length === 0 ? (
-                          <SelectItem value="" disabled>
-                            No AI Assistants available
-                          </SelectItem>
-                        ) : (
-                          aiAssistants.map((assistant) => (
-                            <SelectItem key={assistant.id} value={String(assistant.id)}>
-                              {assistant.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {aiAssistants.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No active AI Assistants found. Create one first.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {routingType === 'ai_load_balancer' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="routing_destination_id">
-                      AI Load Balancer <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={watch('routing_destination_id')}
-                      onValueChange={(value) => setValue('routing_destination_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a Load Balancer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {aiLoadBalancers.length === 0 ? (
-                          <SelectItem value="" disabled>
-                            No Load Balancers available
-                          </SelectItem>
-                        ) : (
-                          aiLoadBalancers.map((balancer) => (
-                            <SelectItem key={balancer.id} value={String(balancer.id)}>
-                              {balancer.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {aiLoadBalancers.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No active Load Balancers found. Create one first.
-                      </p>
-                    )}
-                  </div>
-                )}
+              <CardContent className="space-y-6">
+                <DestinationTypeAndSelector
+                  typeValue={watch('routing_destination_type') as DestinationType}
+                  destinationValue={watch('routing_destination_id') || ''}
+                  onChange={(type, destinationId) => {
+                    setValue('routing_destination_type', type as 'ai_assistant' | 'ai_load_balancer' | 'hangup');
+                    setValue('routing_destination_id', destinationId || null);
+                  }}
+                  layout="vertical"
+                  typeLabel="Routing Destination"
+                  destinationLabel="Select Destination"
+                  allowedTypes={['ai_assistant', 'ai_load_balancer']}
+                  includeHangup={true}
+                />
 
                 <div className="space-y-2">
                   <Label htmlFor="caller_id">
                     Caller ID <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="caller_id"
-                    {...register('caller_id')}
-                    placeholder="+14155551212"
-                    className={errors.caller_id ? 'border-red-500' : ''}
-                  />
+                  <Select
+                    value={watch('caller_id')}
+                    onValueChange={(value) => setValue('caller_id', value)}
+                  >
+                    <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select a phone number" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {phoneNumbers.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          No phone numbers available
+                        </SelectItem>
+                      ) : (
+                        phoneNumbers.map((number) => (
+                          <SelectItem key={number.id} value={number.phone_number}>
+                            {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                   {errors.caller_id && (
                     <p className="text-sm text-red-500">{errors.caller_id.message}</p>
                   )}
-                  <p className="text-sm text-muted-foreground">
-                    Phone number to display on outbound calls (E.164 format)
-                  </p>
+                  {phoneNumbers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No active phone numbers found. <a href="/ui/phone-numbers" className="text-blue-600 hover:underline">Add phone numbers</a> first.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -522,31 +458,34 @@ export default function AutoDialerCampaignForm() {
                 <CardDescription>When should the campaign run?</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label>Active Days</Label>
-                  <div className="flex flex-wrap gap-4">
-                    {daysOfWeek.map((day) => (
-                      <div key={day.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={day.id}
-                          checked={watch('days_active')?.includes(day.id)}
-                          onCheckedChange={(checked) => {
+                  <div className="flex flex-wrap gap-2">
+                    {daysOfWeek.map((day) => {
+                      const isActive = watch('days_active')?.includes(day.id);
+                      return (
+                        <button
+                          key={day.id}
+                          type="button"
+                          onClick={() => {
                             const current = watch('days_active') || [];
-                            if (checked) {
-                              setValue('days_active', [...current, day.id]);
+                            if (isActive) {
+                              setValue('days_active', current.filter((d) => d !== day.id));
                             } else {
-                              setValue(
-                                'days_active',
-                                current.filter((d) => d !== day.id)
-                              );
+                              setValue('days_active', [...current, day.id]);
                             }
                           }}
-                        />
-                        <Label htmlFor={day.id} className="text-sm font-normal">
-                          {day.label}
-                        </Label>
-                      </div>
-                    ))}
+                          className={cn(
+                            'px-4 py-2 rounded-md text-sm font-medium transition-all border',
+                            isActive
+                              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          )}
+                        >
+                          {day.label.substring(0, 3)}
+                        </button>
+                      );
+                    })}
                   </div>
                   {errors.days_active && (
                     <p className="text-sm text-red-500">{errors.days_active.message}</p>
