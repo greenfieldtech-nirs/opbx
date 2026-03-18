@@ -317,106 +317,102 @@ export default function AutoDialerCampaignForm() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="routing">Routing</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
           </TabsList>
 
-          {/* Basic Info Tab */}
+          {/* Basic Info Tab - Combined with Routing */}
           <TabsContent value="basic" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Information</CardTitle>
-                <CardDescription>Basic details about your campaign</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">
-                    Campaign Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="name"
-                    {...register('name')}
-                    placeholder="Enter campaign name"
-                    className={errors.name ? 'border-red-500' : ''}
-                  />
-                  {errors.name && (
-                    <p className="text-sm text-red-500">{errors.name.message}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="auto_start"
-                    checked={watch('auto_start')}
-                    onCheckedChange={(checked) => setValue('auto_start', checked)}
-                  />
-                  <Label htmlFor="auto_start">Auto-start campaign when scheduled</Label>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Routing Tab */}
-          <TabsContent value="routing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Routing Configuration</CardTitle>
-                <CardDescription>Configure where calls should be connected</CardDescription>
+                <CardDescription>Basic details and routing configuration</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <DestinationTypeAndSelector
-                  typeValue={watch('routing_destination_type') as DestinationType}
-                  destinationValue={watch('routing_destination_id') || ''}
-                  onChange={(type, destinationId) => {
-                    setValue('routing_destination_type', type as 'ai_assistant' | 'ai_load_balancer' | 'hangup');
-                    setValue('routing_destination_id', destinationId || null);
-                  }}
-                  layout="vertical"
-                  typeLabel="Routing Destination"
-                  destinationLabel="Select Destination"
-                  allowedTypes={['ai_assistant', 'ai_load_balancer']}
-                  includeHangup={true}
-                />
+                {/* Campaign Name and Auto-Start side by side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">
+                      Campaign Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      {...register('name')}
+                      placeholder="Enter campaign name"
+                      className={errors.name ? 'border-red-500' : ''}
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-red-500">{errors.name.message}</p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="caller_id">
-                    Caller ID <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={watch('caller_id')}
-                    onValueChange={(value) => setValue('caller_id', value)}
-                  >
-                    <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Select a phone number" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {phoneNumbers.length === 0 ? (
-                        <SelectItem value="" disabled>
-                          No phone numbers available
-                        </SelectItem>
-                      ) : (
-                        phoneNumbers.map((number) => (
-                          <SelectItem key={number.id} value={number.phone_number}>
-                            {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {errors.caller_id && (
-                    <p className="text-sm text-red-500">{errors.caller_id.message}</p>
-                  )}
-                  {phoneNumbers.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No active phone numbers found. <a href="/ui/phone-numbers" className="text-blue-600 hover:underline">Add phone numbers</a> first.
-                    </p>
-                  )}
+                  <div className="flex items-center space-x-2 h-full pt-8">
+                    <Switch
+                      id="auto_start"
+                      checked={watch('auto_start')}
+                      onCheckedChange={(checked) => setValue('auto_start', checked)}
+                    />
+                    <Label htmlFor="auto_start">Auto-start campaign when scheduled</Label>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Routing Destination - side by side layout */}
+                <div className="pt-4 border-t">
+                  <DestinationTypeAndSelector
+                    typeValue={watch('routing_destination_type') as DestinationType}
+                    destinationValue={watch('routing_destination_id') || ''}
+                    onChange={(type, destinationId) => {
+                      setValue('routing_destination_type', type as 'ai_assistant' | 'ai_load_balancer' | 'hangup');
+                      setValue('routing_destination_id', destinationId || null);
+                    }}
+                    layout="grid"
+                    gridColumns={{ type: 4, destination: 8 }}
+                    typeLabel="Routing Destination"
+                    destinationLabel="Select Destination"
+                    allowedTypes={['ai_assistant', 'ai_load_balancer']}
+                    includeHangup={true}
+                  />
+                </div>
+
+                {/* Caller ID, Dial Timeout, and Connect When - side by side */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="caller_id">
+                      Caller ID <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={watch('caller_id')}
+                      onValueChange={(value) => setValue('caller_id', value)}
+                    >
+                      <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
+                        <SelectValue placeholder="Select a phone number" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {phoneNumbers.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No phone numbers available
+                          </SelectItem>
+                        ) : (
+                          phoneNumbers.map((number) => (
+                            <SelectItem key={number.id} value={number.phone_number}>
+                              {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {errors.caller_id && (
+                      <p className="text-sm text-red-500">{errors.caller_id.message}</p>
+                    )}
+                    {phoneNumbers.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No active phone numbers found. <a href="/ui/phone-numbers" className="text-blue-600 hover:underline">Add phone numbers</a> first.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="dial_timeout">Dial Timeout (seconds)</Label>
                     <Input
