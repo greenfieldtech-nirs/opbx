@@ -21,12 +21,7 @@ interface NavItem {
   href: string;
   icon: string;
   roles?: string[];
-}
-
-interface NavSubsection {
-  name: string;
-  icon: string;
-  items: NavItem[];
+  isHeader?: boolean;
 }
 
 interface SidebarSection {
@@ -34,7 +29,6 @@ interface SidebarSection {
   title: string;
   icon: string;
   items: NavItem[];
-  subsections?: NavSubsection[];
   accentColor?: 'default' | 'amber';
 }
 
@@ -94,24 +88,12 @@ const sidebarSections: SidebarSection[] = [
     accentColor: 'default',
     items: [
       { name: 'Auto Dialer', href: '/ui/auto-dialer', icon: 'codicon-radio-tower', roles: ['owner', 'pbx_admin'] },
-    ],
-    subsections: [
-      {
-        name: 'AI Configuration',
-        icon: 'codicon-copilot',
-        items: [
-          { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-          { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },
-        ],
-      },
-      {
-        name: 'Security',
-        icon: 'codicon-shield',
-        items: [
-          { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
-          { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
-        ],
-      },
+      { name: 'AI Configuration', href: '', icon: 'codicon-copilot', isHeader: true },
+      { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Security', href: '', icon: 'codicon-shield', isHeader: true },
+      { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
+      { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
     ],
   },
 ];
@@ -141,8 +123,7 @@ export function Sidebar() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
 
-  // Subsection expansion state
-  const [expandedSubsections, setExpandedSubsections] = useState<string[]>(['AI Configuration', 'Security']);
+
 
   const resizeRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
@@ -229,23 +210,28 @@ export function Sidebar() {
     return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 
-  // Toggle subsection expansion
-  const toggleSubsection = (subsectionName: string) => {
-    setExpandedSubsections(prev =>
-      prev.includes(subsectionName)
-        ? prev.filter(name => name !== subsectionName)
-        : [...prev, subsectionName]
-    );
-  };
+
 
   // Get the currently selected section
   const allSections = [...sidebarSections, ...(isPlatformManager ? [platformSection] : [])];
   const selectedSection = allSections.find(s => s.id === selectedSectionId) || sidebarSections[0];
 
   // Render a navigation item
-  const renderNavItem = (item: NavItem, level: number = 0) => {
+  const renderNavItem = (item: NavItem) => {
+    // Render non-clickable header
+    if (item.isHeader) {
+      return (
+        <div
+          key={item.name}
+          className="flex items-center gap-2 px-3 py-2 mt-2 text-[11px] font-semibold uppercase tracking-wide text-[#858585]"
+        >
+          <i className={cn('codicon', item.icon)} style={{ fontSize: '24px' }} />
+          <span className="truncate">{item.name}</span>
+        </div>
+      );
+    }
+
     const isActive = isItemActive(item.href);
-    const paddingLeft = level === 0 ? '12px' : '24px';
 
     return (
       <NavLink
@@ -258,46 +244,13 @@ export function Sidebar() {
             : 'text-[#cccccc] hover:text-white hover:bg-[#2a2d2e]'
         )}
         style={{
-          paddingLeft,
+          paddingLeft: '12px',
           borderLeft: isActive ? '2px solid #007acc' : '2px solid transparent',
         }}
       >
         <i className={cn('codicon', item.icon)} style={{ fontSize: '24px' }} />
         <span className="truncate">{item.name}</span>
       </NavLink>
-    );
-  };
-
-  // Render a subsection
-  const renderSubsection = (subsection: NavSubsection) => {
-    const visibleItems = getVisibleItems(subsection.items);
-    if (visibleItems.length === 0) return null;
-
-    const isExpanded = expandedSubsections.includes(subsection.name);
-
-    return (
-      <div key={subsection.name}>
-        <button
-          onClick={() => toggleSubsection(subsection.name)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#bbbbbb] hover:text-white hover:bg-[#2a2d2e] transition-colors"
-        >
-          <i
-            className={cn(
-              'codicon codicon-chevron-right transition-transform',
-              isExpanded && 'rotate-90'
-            )}
-            style={{ fontSize: '14px' }}
-          />
-          <i className={cn('codicon', subsection.icon)} style={{ fontSize: '18px' }} />
-          <span className="flex-1 text-left truncate">{subsection.name}</span>
-        </button>
-
-        {isExpanded && (
-          <div className="py-0.5">
-            {visibleItems.map(item => renderNavItem(item, 1))}
-          </div>
-        )}
-      </div>
     );
   };
 
@@ -330,10 +283,8 @@ export function Sidebar() {
           <div className="flex-1 py-3 space-y-2">
             {sidebarSections.map(section => {
               const isSelected = selectedSectionId === section.id;
-              const hasAccess = section.items.some(item => !item.roles) ||
-                section.items.some(item => item.roles?.includes(user?.role || '')) ||
-                section.subsections?.some(sub => sub.items.some(item => !item.roles)) ||
-                section.subsections?.some(sub => sub.items.some(item => item.roles?.includes(user?.role || '')));
+              const hasAccess = section.items.some(item => !item.roles || item.isHeader) ||
+                section.items.some(item => item.roles?.includes(user?.role || ''));
 
               if (!hasAccess) return null;
 
@@ -418,11 +369,9 @@ export function Sidebar() {
 
           {/* Navigation Items */}
           <nav className="flex-1 overflow-y-auto py-2">
-            {getVisibleItems(selectedSection.items).map(item => renderNavItem(item, 0))}
-            {selectedSection.subsections?.map(renderSubsection)}
+            {getVisibleItems(selectedSection.items).map(item => renderNavItem(item))}
             
-            {getVisibleItems(selectedSection.items).length === 0 && 
-             !selectedSection.subsections?.some(s => getVisibleItems(s.items).length > 0) && (
+            {getVisibleItems(selectedSection.items).length === 0 && (
               <div className="px-3 py-4 text-[12px] text-[#858585] text-center">
                 No items available
               </div>
