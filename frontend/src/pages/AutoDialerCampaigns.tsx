@@ -11,16 +11,13 @@ import { toast } from 'sonner';
 import {
   Plus,
   Search,
-  MoreVertical,
-  Play,
-  Pause,
-  RotateCcw,
+  Edit,
   Archive,
   PhoneCall,
   RefreshCw,
   X,
   Target,
-  Calendar,
+  List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,35 +42,44 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   StandardDataTable,
   EmptyState,
 } from '@/components/design-system';
 import type { AutoDialerCampaign } from '@/services/autoDialerCampaignsApi';
 import { formatDateTime } from '@/utils/formatters';
 
-// Status badge helper
-const getStatusBadge = (status: string) => {
-  const configs: Record<string, { color: string; label: string }> = {
-    draft: { color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'Draft' },
-    active: { color: 'bg-green-100 text-green-800 border-green-200', label: 'Active' },
-    paused: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Paused' },
-    completed: { color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Completed' },
-    archived: { color: 'bg-red-100 text-red-800 border-red-200', label: 'Archived' },
-  };
-
-  const config = configs[status] || { color: 'bg-gray-100 text-gray-800 border-gray-200', label: status };
-
-  return (
-    <Badge variant="outline" className={cn('text-xs', config.color)}>
-      {config.label}
-    </Badge>
-  );
+// Status configurations
+const statusConfigs: Record<string, { color: string; label: string; nextStatus: string | null; nextLabel: string }> = {
+  draft: { 
+    color: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200', 
+    label: 'Draft',
+    nextStatus: 'active',
+    nextLabel: 'Start'
+  },
+  active: { 
+    color: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200', 
+    label: 'Running',
+    nextStatus: 'paused',
+    nextLabel: 'Pause'
+  },
+  paused: { 
+    color: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200', 
+    label: 'Paused',
+    nextStatus: 'active',
+    nextLabel: 'Resume'
+  },
+  completed: { 
+    color: 'bg-blue-100 text-blue-800 border-blue-200', 
+    label: 'Completed',
+    nextStatus: null,
+    nextLabel: ''
+  },
+  archived: { 
+    color: 'bg-red-100 text-red-800 border-red-200', 
+    label: 'Archived',
+    nextStatus: null,
+    nextLabel: ''
+  },
 };
 
 export default function AutoDialerCampaigns() {
@@ -84,13 +90,13 @@ export default function AutoDialerCampaigns() {
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'paused' | 'completed' | 'archived'>('all');
+  // Default: show all except archived
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'paused' | 'completed' | 'archived' | 'not-archived'>('not-archived');
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
   const [selectedCampaign, setSelectedCampaign] = useState<AutoDialerCampaign | null>(null);
-  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
-  const [actionType, setActionType] = useState<'start' | 'pause' | 'resume' | 'archive' | null>(null);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
 
   // Permission checks
   const canManage = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
@@ -112,50 +118,38 @@ export default function AutoDialerCampaigns() {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch || undefined,
-      status: statusFilter !== 'all' ? statusFilter : undefined,
+      status: statusFilter !== 'all' && statusFilter !== 'not-archived' ? statusFilter : undefined,
     }],
     queryFn: () => autoDialerCampaignsApi.getAll({
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch || undefined,
-      status: statusFilter !== 'all' ? statusFilter : undefined,
+      status: statusFilter !== 'all' && statusFilter !== 'not-archived' ? statusFilter : undefined,
     }),
   });
 
-  // Mutations
-  const startMutation = useMutation({
-    mutationFn: (id: string) => autoDialerCampaignsApi.start(id),
+  // Status toggle mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, newStatus }: { id: string; newStatus: string }) => {
+      switch (newStatus) {
+        case 'active':
+          return autoDialerCampaignsApi.start(id);
+        case 'paused':
+          return autoDialerCampaignsApi.pause(id);
+        default:
+          throw new Error('Invalid status transition');
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
-      toast.success('Campaign started successfully');
+      toast.success('Campaign status updated');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to start campaign');
+      toast.error(error?.response?.data?.message || 'Failed to update campaign status');
     },
   });
 
-  const pauseMutation = useMutation({
-    mutationFn: (id: string) => autoDialerCampaignsApi.pause(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
-      toast.success('Campaign paused successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to pause campaign');
-    },
-  });
-
-  const resumeMutation = useMutation({
-    mutationFn: (id: string) => autoDialerCampaignsApi.resume(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
-      toast.success('Campaign resumed successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to resume campaign');
-    },
-  });
-
+  // Archive mutation
   const archiveMutation = useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.archive(id),
     onSuccess: () => {
@@ -167,69 +161,28 @@ export default function AutoDialerCampaigns() {
     },
   });
 
-  const handleAction = (campaign: AutoDialerCampaign, action: 'start' | 'pause' | 'resume' | 'archive') => {
+  const handleStatusToggle = (campaign: AutoDialerCampaign) => {
+    if (!canManage) return;
+    
+    const config = statusConfigs[campaign.status];
+    if (!config.nextStatus) return; // Cannot toggle (completed/archived)
+
+    toggleStatusMutation.mutate({
+      id: campaign.id,
+      newStatus: config.nextStatus,
+    });
+  };
+
+  const handleArchive = (campaign: AutoDialerCampaign) => {
     setSelectedCampaign(campaign);
-    setActionType(action);
-    setIsActionDialogOpen(true);
+    setIsArchiveDialogOpen(true);
   };
 
-  const confirmAction = async () => {
-    if (!selectedCampaign || !actionType) return;
-
-    switch (actionType) {
-      case 'start':
-        await startMutation.mutateAsync(selectedCampaign.id);
-        break;
-      case 'pause':
-        await pauseMutation.mutateAsync(selectedCampaign.id);
-        break;
-      case 'resume':
-        await resumeMutation.mutateAsync(selectedCampaign.id);
-        break;
-      case 'archive':
-        await archiveMutation.mutateAsync(selectedCampaign.id);
-        break;
-    }
-
-    setIsActionDialogOpen(false);
+  const confirmArchive = async () => {
+    if (!selectedCampaign) return;
+    await archiveMutation.mutateAsync(selectedCampaign.id);
+    setIsArchiveDialogOpen(false);
     setSelectedCampaign(null);
-    setActionType(null);
-  };
-
-  const getActionIcon = () => {
-    switch (actionType) {
-      case 'start': return <Play className="h-5 w-5" />;
-      case 'pause': return <Pause className="h-5 w-5" />;
-      case 'resume': return <RotateCcw className="h-5 w-5" />;
-      case 'archive': return <Archive className="h-5 w-5" />;
-      default: return null;
-    }
-  };
-
-  const getActionTitle = () => {
-    switch (actionType) {
-      case 'start': return 'Start Campaign';
-      case 'pause': return 'Pause Campaign';
-      case 'resume': return 'Resume Campaign';
-      case 'archive': return 'Archive Campaign';
-      default: return '';
-    }
-  };
-
-  const getActionDescription = () => {
-    if (!selectedCampaign) return '';
-    switch (actionType) {
-      case 'start':
-        return `Are you sure you want to start "${selectedCampaign.name}"? This will begin dialing calls.`;
-      case 'pause':
-        return `Are you sure you want to pause "${selectedCampaign.name}"? Active calls will complete but no new calls will be made.`;
-      case 'resume':
-        return `Are you sure you want to resume "${selectedCampaign.name}"?`;
-      case 'archive':
-        return `Are you sure you want to archive "${selectedCampaign.name}"? This action cannot be undone.`;
-      default:
-        return '';
-    }
   };
 
   const campaigns = data?.data || [];
@@ -237,12 +190,12 @@ export default function AutoDialerCampaigns() {
   const totalPages = data?.meta?.last_page || 1;
 
   // Check if filters are active
-  const hasActiveFilters = searchQuery || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery || statusFilter !== 'not-archived';
 
   // Clear all filters
   const clearFilters = () => {
     setSearchQuery('');
-    setStatusFilter('all');
+    setStatusFilter('not-archived');
     setCurrentPage(1);
   };
 
@@ -372,9 +325,10 @@ export default function AutoDialerCampaigns() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="not-archived">All (except Archived)</SelectItem>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="active">Running</SelectItem>
                 <SelectItem value="paused">Paused</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
@@ -403,28 +357,46 @@ export default function AutoDialerCampaigns() {
             identityIconBg="bg-purple-100"
             identityIconColor="text-purple-600"
             getIdentityPrimary={(campaign) => campaign.name}
-            getIdentitySecondary={(campaign) => campaign.description || 'No description'}
+            getIdentitySecondary={() => ''}
             onIdentityClick={canManage ? ((campaign) => navigate(`/ui/auto-dialer/campaigns/${campaign.id}`)) : undefined}
             canView={false}
             canEdit={false}
-            onDelete={canManage ? ((campaign) => handleAction(campaign, 'archive')) : undefined}
-            canDelete={canManage}
+            canDelete={false}
             columns={[
               {
                 header: 'Status',
-                cell: (campaign) => (
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(campaign.status)}
-                    {campaign.auto_start && (
-                      <Badge variant="outline" className="text-xs">Auto-start</Badge>
-                    )}
-                  </div>
-                )
+                cell: (campaign) => {
+                  const config = statusConfigs[campaign.status];
+                  const canToggle = canManage && config.nextStatus !== null && campaign.status !== 'archived';
+                  
+                  return (
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        'text-xs cursor-default',
+                        config.color,
+                        canToggle && 'cursor-pointer'
+                      )}
+                      onClick={(e) => {
+                        if (canToggle) {
+                          e.stopPropagation();
+                          handleStatusToggle(campaign);
+                        }
+                      }}
+                      title={canToggle ? `Click to ${config.nextLabel.toLowerCase()}` : undefined}
+                    >
+                      {config.label}
+                      {canToggle && (
+                        <span className="ml-1 opacity-70">({config.nextLabel})</span>
+                      )}
+                    </Badge>
+                  );
+                }
               },
               {
-                header: 'Destinations',
+                header: 'Lists',
                 cell: (campaign) => (
-                  <span className="text-sm">{campaign.statistics.total_destinations} destinations</span>
+                  <span className="text-sm">{campaign.has_list ? '1 list' : 'No lists'}</span>
                 )
               },
               {
@@ -446,31 +418,55 @@ export default function AutoDialerCampaigns() {
                 )
               },
               {
-                header: 'Progress',
-                cell: (campaign) => campaign.statistics.total_destinations > 0 ? (
-                  <div className="w-32">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>{campaign.statistics.progress_percentage}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all"
-                        style={{ width: `${campaign.statistics.progress_percentage}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs mt-1 text-muted-foreground">
-                      <span>{campaign.statistics.completed_calls} done</span>
-                      <span>{campaign.statistics.pending_calls} left</span>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-sm text-muted-foreground">-</span>
-                )
+                header: 'Actions',
+                className: 'w-[120px]',
+                cell: (campaign) => {
+                  if (!canManage) return null;
+                  
+                  // Archived campaigns cannot be edited or archived again
+                  if (campaign.status === 'archived') {
+                    return <span className="text-xs text-muted-foreground">-</span>;
+                  }
+                  
+                  // Completed campaigns can only be archived
+                  if (campaign.status === 'completed') {
+                    return (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleArchive(campaign);
+                        }}
+                      >
+                        <Archive className="h-3.5 w-3.5 mr-1" />
+                        Archive
+                      </Button>
+                    );
+                  }
+                  
+                  // All other statuses can be edited
+                  return (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
+                      }}
+                    >
+                      <Edit className="h-3.5 w-3.5 mr-1" />
+                      Edit
+                    </Button>
+                  );
+                }
               },
             ]}
             emptyState={
               <EmptyState
-                icon={PhoneCall}
+                icon={List}
                 title="No campaigns found"
                 description={hasActiveFilters ? 'Try adjusting your filters' : 'Create your first campaign to get started'}
                 action={canManage && !hasActiveFilters ? {
@@ -513,32 +509,31 @@ export default function AutoDialerCampaigns() {
         </CardContent>
       </Card>
 
-      {/* Action Confirmation Dialog */}
-      <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {getActionIcon()}
-              {getActionTitle()}
+              <Archive className="h-5 w-5" />
+              Archive Campaign
             </DialogTitle>
             <DialogDescription>
-              {getActionDescription()}
+              {selectedCampaign && (
+                <>Are you sure you want to archive "{selectedCampaign.name}"? This action cannot be undone.</>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)}>
               Cancel
             </Button>
             <Button
-              variant={actionType === 'archive' ? 'destructive' : 'default'}
-              onClick={confirmAction}
-              disabled={startMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || archiveMutation.isPending}
+              variant="destructive"
+              onClick={confirmArchive}
+              disabled={archiveMutation.isPending}
             >
-              {actionType === 'start' && startMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              {actionType === 'pause' && pauseMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              {actionType === 'resume' && resumeMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              {actionType === 'archive' && archiveMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              Confirm
+              {archiveMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+              Archive
             </Button>
           </DialogFooter>
         </DialogContent>
