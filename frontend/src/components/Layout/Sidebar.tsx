@@ -85,7 +85,6 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Business Hours', href: '/ui/business-hours', icon: 'codicon-clock', roles: ['owner', 'pbx_admin'] },
       { name: 'Announcements', href: '/ui/announcements', icon: 'codicon-megaphone', roles: ['owner', 'pbx_admin'] },
       { name: 'Phone Numbers', href: '/ui/phone-numbers', icon: 'codicon-arrow-right', roles: ['owner', 'pbx_admin', 'reporter'] },
-      { name: 'Auto Dialer', href: '/ui/auto-dialer', icon: 'codicon-radio-tower', roles: ['owner', 'pbx_admin'] },
     ],
   },
   {
@@ -93,6 +92,9 @@ const sidebarSections: SidebarSection[] = [
     title: 'Apps and Security',
     icon: 'codicon-shield',
     accentColor: 'default',
+    items: [
+      { name: 'Auto Dialer', href: '/ui/auto-dialer', icon: 'codicon-radio-tower', roles: ['owner', 'pbx_admin'] },
+    ],
     subsections: [
       {
         name: 'AI Configuration',
@@ -111,7 +113,6 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
     ],
-    items: [],
   },
 ];
 
