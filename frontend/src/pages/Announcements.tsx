@@ -1,10 +1,12 @@
 /**
- * Recordings Page
+ * Announcements Page
+ * 
+ * Manage audio files for IVR and announcements (previously called Recordings)
  */
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Mic, RefreshCw } from 'lucide-react';
+import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
@@ -21,7 +23,7 @@ import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
 
-export default function Recordings() {
+export default function Announcements() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
@@ -42,17 +44,17 @@ export default function Recordings() {
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
-  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Recording | null>(null);
 
   const queryClient = useQueryClient();
 
-  // Fetch recordings with filters
+  // Fetch announcements with filters
   const {
-    data: recordingsData,
-    isLoading: recordingsIsLoading,
-    refetch: refetchRecordings,
+    data: announcementsData,
+    isLoading: announcementsIsLoading,
+    refetch: refetchAnnouncements,
   } = useQuery({
-    queryKey: ['recordings', currentPage, filterForm],
+    queryKey: ['announcements', currentPage, filterForm],
     queryFn: () => recordingsService.getAll({
       ...filterForm,
       search: filterForm.search || undefined,
@@ -62,21 +64,21 @@ export default function Recordings() {
     }),
   });
 
-  // Create recording mutation
-  const createRecordingMutation = useMutation({
+  // Create announcement mutation
+  const createAnnouncementMutation = useMutation({
     mutationFn: recordingsService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recordings'] });
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
       setShowUploadDialog(false);
       setShowRemoteDialog(false);
-      toast.success('Recording created successfully');
+      toast.success('Announcement created successfully');
     },
     onError: (error: any) => {
       // Extract detailed error message from backend response
       const backendMessage = error.response?.data?.message;
       const backendErrors = error.response?.data?.errors;
 
-      let errorMessage = 'Failed to create recording';
+      let errorMessage = 'Failed to create announcement';
 
       if (backendMessage) {
         errorMessage = backendMessage;
@@ -94,11 +96,11 @@ export default function Recordings() {
     },
   });
 
-  // Download recording mutation
-  const downloadRecordingMutation = useMutation({
-    mutationFn: async (recording: any) => {
+  // Download announcement mutation
+  const downloadAnnouncementMutation = useMutation({
+    mutationFn: async (announcement: any) => {
       // Step 1: Get the secure download URL and filename from API
-      const response = await fetch(`/api/v1/recordings/${recording.id}/download`, {
+      const response = await fetch(`/api/v1/recordings/${announcement.id}/download`, {
         headers: {
           'Authorization': `Bearer ${storage.getToken()}`,
         },
@@ -129,42 +131,42 @@ export default function Recordings() {
       document.body.removeChild(a);
     },
     onError: (error: any) => {
-      toast.error('Failed to download recording: ' + error.message);
+      toast.error('Failed to download announcement: ' + error.message);
     },
   });
 
-  // Delete recording mutation
-  const deleteRecordingMutation = useMutation({
+  // Delete announcement mutation
+  const deleteAnnouncementMutation = useMutation({
     mutationFn: recordingsService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recordings'] });
-      toast.success('Recording deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      toast.success('Announcement deleted successfully');
     },
     onError: (error: any) => {
-      toast.error('Failed to delete recording: ' + error.message);
+      toast.error('Failed to delete announcement: ' + error.message);
     },
   });
 
-  const handleDownload = (recording: any) => {
-    downloadRecordingMutation.mutate(recording);
+  const handleDownload = (announcement: any) => {
+    downloadAnnouncementMutation.mutate(announcement);
   };
 
-  const handleDelete = (recording: any) => {
-    if (confirm(`Are you sure you want to delete "${recording.name}"? This action cannot be undone.`)) {
-      deleteRecordingMutation.mutate(recording.id);
+  const handleDelete = (announcement: any) => {
+    if (confirm(`Are you sure you want to delete "${announcement.name}"? This action cannot be undone.`)) {
+      deleteAnnouncementMutation.mutate(announcement.id);
     }
   };
 
-  const handlePlayback = async (recording: Recording) => {
-    if (isPlaying(recording.id)) {
+  const handlePlayback = async (announcement: Recording) => {
+    if (isPlaying(announcement.id)) {
       pause();
     } else {
-      const audioSrc = recording.type === 'upload'
-        ? recording.playback_url
-        : recording.remote_url;
+      const audioSrc = announcement.type === 'upload'
+        ? announcement.playback_url
+        : announcement.remote_url;
 
       if (audioSrc) {
-        await play(recording.id, audioSrc);
+        await play(announcement.id, audioSrc);
       }
     }
   };
@@ -180,12 +182,12 @@ export default function Recordings() {
     setCurrentPage(1);
   };
 
-  if (recordingsData?.data === undefined) {
+  if (announcementsData?.data === undefined) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Loading recordings...</p>
+          <p className="text-muted-foreground">Loading announcements...</p>
         </div>
       </div>
     );
@@ -196,14 +198,14 @@ export default function Recordings() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Mic className="h-8 w-8" />
-            Recordings
+            <Megaphone className="h-8 w-8" />
+            Announcements
           </h1>
           <p className="text-muted-foreground mt-1">Manage audio files for IVR and announcements</p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
             <span>/</span>
-            <span className="text-foreground">Recordings</span>
+            <span className="text-foreground">Announcements</span>
           </div>
         </div>
         <div className="flex gap-2">
@@ -225,7 +227,7 @@ export default function Recordings() {
             <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search recordings..."
+                placeholder="Search announcements..."
                 value={filterForm.search}
                 onChange={(e) => {
                   setFilterForm({ ...filterForm, search: e.target.value });
@@ -238,11 +240,11 @@ export default function Recordings() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => refetchRecordings()}
-              disabled={recordingsIsLoading}
+              onClick={() => refetchAnnouncements()}
+              disabled={announcementsIsLoading}
               title="Refresh"
             >
-              <RefreshCw className={cn('h-4 w-4', recordingsIsLoading && 'animate-spin')} />
+              <RefreshCw className={cn('h-4 w-4', announcementsIsLoading && 'animate-spin')} />
             </Button>
 
             {/* Type Filter */}
@@ -297,21 +299,21 @@ export default function Recordings() {
         </CardContent>
       </Card>
 
-      {/* Recordings Table */}
+      {/* Announcements Table */}
       <Card>
         <CardContent className="pt-6">
 
-          {/* Recordings Table */}
+          {/* Announcements Table */}
           <StandardDataTable<Recording>
-            data={recordingsData?.data || []}
-            isLoading={recordingsIsLoading}
-            onRowClick={(recording) => setSelectedRecording(recording)}
+            data={announcementsData?.data || []}
+            isLoading={announcementsIsLoading}
+            onRowClick={(announcement) => setSelectedAnnouncement(announcement)}
             identityIcon={Database}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
-            getIdentityPrimary={(recording) => recording.name}
-            getIdentitySecondary={(recording) => recording.type === 'upload' ? '📁 Local' : '🔗 Remote'}
-            onIdentityClick={(recording) => setSelectedRecording(recording)}
+            getIdentityPrimary={(announcement) => announcement.name}
+            getIdentitySecondary={(announcement) => announcement.type === 'upload' ? '📁 Local' : '🔗 Remote'}
+            onIdentityClick={(announcement) => setSelectedAnnouncement(announcement)}
             canView={false}
             canEdit={false}
             onDelete={handleDelete}
@@ -319,9 +321,9 @@ export default function Recordings() {
               {
                 header: 'Status',
                 accessorKey: 'status',
-                cell: (recording) => (
-                  <Badge variant={recording.status === 'active' ? 'default' : 'secondary'}>
-                    {recording.status}
+                cell: (announcement) => (
+                  <Badge variant={announcement.status === 'active' ? 'default' : 'secondary'}>
+                    {announcement.status}
                   </Badge>
                 )
               },
@@ -332,12 +334,12 @@ export default function Recordings() {
               {
                 header: 'Created At',
                 accessorKey: 'created_at',
-                cell: (recording) => formatDateTime(recording.created_at)
+                cell: (announcement) => formatDateTime(announcement.created_at)
               },
               {
                 header: 'Actions',
                 className: 'w-[180px]',
-                cell: (recording) => (
+                cell: (announcement) => (
                   <div className="flex gap-2">
                     <Button
                       size="icon"
@@ -345,26 +347,26 @@ export default function Recordings() {
                       className="h-8 w-8"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handlePlayback(recording);
+                        handlePlayback(announcement);
                       }}
-                      title={currentlyPlaying === recording.id ? 'Pause' : 'Play'}
+                      title={currentlyPlaying === announcement.id ? 'Pause' : 'Play'}
                     >
-                      {currentlyPlaying === recording.id ? (
+                      {currentlyPlaying === announcement.id ? (
                         <Pause className="h-4 w-4 text-blue-600" />
                       ) : (
                         <Play className="h-4 w-4 text-blue-600" />
                       )}
                     </Button>
-                    {recording.type === 'upload' && (
+                    {announcement.type === 'upload' && (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDownload(recording);
+                          handleDownload(announcement);
                         }}
-                        disabled={downloadRecordingMutation.isPending}
+                        disabled={downloadAnnouncementMutation.isPending}
                         title="Download"
                       >
                         <Download className="h-4 w-4" />
@@ -377,7 +379,7 @@ export default function Recordings() {
             emptyState={
               <EmptyState
                 icon={Database}
-                title="No recordings found"
+                title="No announcements found"
                 description={filterForm.search || filterForm.type || filterForm.status ? 'Try adjusting your filters' : 'Get started by uploading a file or adding a remote URL'}
                 action={!filterForm.search && !filterForm.type && !filterForm.status ? {
                   label: "Upload File",
@@ -388,11 +390,11 @@ export default function Recordings() {
           />
 
           {/* Pagination */}
-          {recordingsData?.data && recordingsData.data.length > 0 && (
+          {announcementsData?.data && announcementsData.data.length > 0 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
-                Showing {recordingsData.meta?.from || 0} to {recordingsData.meta?.to || 0} of{' '}
-                {recordingsData.meta?.total} recordings
+                Showing {announcementsData.meta?.from || 0} to {announcementsData.meta?.to || 0} of{' '}
+                {announcementsData.meta?.total} announcements
               </div>
               <div className="flex gap-2">
                 <Button
@@ -404,13 +406,13 @@ export default function Recordings() {
                   Previous
                 </Button>
                 <div className="flex items-center px-3 text-sm">
-                  Page {recordingsData.meta?.current_page} of {recordingsData.meta?.last_page}
+                  Page {announcementsData.meta?.current_page} of {announcementsData.meta?.last_page}
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage >= (recordingsData.meta?.last_page || 1)}
+                  disabled={currentPage >= (announcementsData.meta?.last_page || 1)}
                 >
                   Next
                 </Button>
@@ -424,16 +426,16 @@ export default function Recordings() {
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload Recording</DialogTitle>
+            <DialogTitle>Upload Announcement</DialogTitle>
             <DialogDescription>
               Upload an MP3 or WAV file (max 5MB)
             </DialogDescription>
           </DialogHeader>
 
           <UploadForm
-            onSubmit={(data) => createRecordingMutation.mutate(data as unknown as Partial<Recording>)}
+            onSubmit={(data) => createAnnouncementMutation.mutate(data as unknown as Partial<Recording>)}
             onCancel={() => setShowUploadDialog(false)}
-            isLoading={createRecordingMutation.isPending}
+            isLoading={createAnnouncementMutation.isPending}
           />
         </DialogContent>
       </Dialog>
@@ -442,32 +444,32 @@ export default function Recordings() {
       <Dialog open={showRemoteDialog} onOpenChange={setShowRemoteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Remote Recording</DialogTitle>
+            <DialogTitle>Add Remote Announcement</DialogTitle>
             <DialogDescription>
-              Add a recording from a remote URL (HTTP/HTTPS)
+              Add an announcement from a remote URL (HTTP/HTTPS)
             </DialogDescription>
           </DialogHeader>
 
           <RemoteUrlForm
-            onSubmit={(data) => createRecordingMutation.mutate(data as unknown as Partial<Recording>)}
+            onSubmit={(data) => createAnnouncementMutation.mutate(data as unknown as Partial<Recording>)}
             onCancel={() => setShowRemoteDialog(false)}
-            isLoading={createRecordingMutation.isPending}
+            isLoading={createAnnouncementMutation.isPending}
           />
         </DialogContent>
       </Dialog>
 
       {/* Details Dialog */}
-      <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
+      <Dialog open={!!selectedAnnouncement} onOpenChange={() => setSelectedAnnouncement(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedRecording?.name}</DialogTitle>
+            <DialogTitle>{selectedAnnouncement?.name}</DialogTitle>
             <DialogDescription>
-              Recording details and metadata
+              Announcement details and metadata
             </DialogDescription>
           </DialogHeader>
 
-          {selectedRecording && (
-            <RecordingDetails recording={selectedRecording} />
+          {selectedAnnouncement && (
+            <AnnouncementDetails announcement={selectedAnnouncement} />
           )}
         </DialogContent>
       </Dialog>
@@ -508,11 +510,11 @@ function UploadForm({ onSubmit, onCancel, isLoading }: UploadFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">Recording Name</label>
+        <label className="block text-sm font-medium mb-2">Announcement Name</label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Enter recording name"
+          placeholder="Enter announcement name"
           required
         />
       </div>
@@ -562,11 +564,11 @@ function RemoteUrlForm({ onSubmit, onCancel, isLoading }: RemoteUrlFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">Recording Name</label>
+        <label className="block text-sm font-medium mb-2">Announcement Name</label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Enter recording name"
+          placeholder="Enter announcement name"
           required
         />
       </div>
@@ -591,57 +593,57 @@ function RemoteUrlForm({ onSubmit, onCancel, isLoading }: RemoteUrlFormProps) {
         </Button>
         <Button type="submit" disabled={isLoading || !url || !name.trim()}>
           {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Add Recording
+          Add Announcement
         </Button>
       </div>
     </form>
   );
 }
 
-// Recording Details Component
-function RecordingDetails({ recording }: { recording: Recording }) {
+// Announcement Details Component
+function AnnouncementDetails({ announcement }: { announcement: Recording }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="min-w-0">
           <div className="text-sm font-medium text-muted-foreground">Type</div>
-          <p className="capitalize text-base break-words">{recording.type}</p>
+          <p className="capitalize text-base break-words">{announcement.type}</p>
         </div>
         <div className="min-w-0">
           <div className="text-sm font-medium text-muted-foreground">Status</div>
-          <Badge variant={recording.status === 'active' ? 'default' : 'secondary'}>
-            {recording.status}
+          <Badge variant={announcement.status === 'active' ? 'default' : 'secondary'}>
+            {announcement.status}
           </Badge>
         </div>
 
         <div className="min-w-0">
           <div className="text-sm font-medium text-muted-foreground">MIME Type</div>
-          <p className="text-base break-words">{recording.mime_type || 'Unknown'}</p>
+          <p className="text-base break-words">{announcement.mime_type || 'Unknown'}</p>
         </div>
         <div className="min-w-0">
           <div className="text-sm font-medium text-muted-foreground">Created</div>
-          <p className="text-base break-words">{formatDateTime(recording.created_at)}</p>
+          <p className="text-base break-words">{formatDateTime(announcement.created_at)}</p>
         </div>
       </div>
 
-      {recording.type === 'remote' && (
+      {announcement.type === 'remote' && (
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">Remote URL</label>
           <a
-            href={recording.remote_url}
+            href={announcement.remote_url}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:text-blue-800 break-all"
           >
-            {recording.remote_url}
+            {announcement.remote_url}
           </a>
         </div>
       )}
 
-      {recording.type === 'upload' && (
+      {announcement.type === 'upload' && (
         <div>
           <label className="block text-sm font-medium text-muted-foreground mb-2">Original Filename</label>
-          <p className="break-all">{recording.original_filename || 'Unknown'}</p>
+          <p className="break-all">{announcement.original_filename || 'Unknown'}</p>
         </div>
       )}
     </div>

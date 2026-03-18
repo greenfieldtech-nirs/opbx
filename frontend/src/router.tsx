@@ -28,7 +28,7 @@ const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
 const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
-const Recordings = lazy(() => import('@/pages/Recordings'));
+const Announcements = lazy(() => import('@/pages/Announcements'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
@@ -120,10 +120,14 @@ export const router = createBrowserRouter([
         path: 'call-logs',
         element: <CallLogs />,
       },
-      {
-        path: 'recordings',
-        element: <Recordings />,
-      },
+       {
+         path: 'announcements',
+         element: <Announcements />,
+       },
+       {
+         path: 'recordings',
+         element: <Navigate to="/ui/announcements" replace />,
+       },
        {
          path: 'live-calls',
          element: <LiveCalls />,
