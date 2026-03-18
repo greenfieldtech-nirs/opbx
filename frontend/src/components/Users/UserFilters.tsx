@@ -61,14 +61,14 @@ export function UserFiltersComponent({
           <div className="space-y-2">
             <label className="text-sm font-medium">Role</label>
             <Select
-              value={filters.role || ''}
-              onValueChange={(value) => onFiltersChange({ role: value || undefined })}
+              value={filters.role || 'all'}
+              onValueChange={(value) => onFiltersChange({ role: value === 'all' ? undefined : value as any })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="All roles" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All roles</SelectItem>
+                <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="owner">Owner</SelectItem>
                 <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                 <SelectItem value="pbx_user">PBX User</SelectItem>
@@ -81,14 +81,14 @@ export function UserFiltersComponent({
           <div className="space-y-2">
             <label className="text-sm font-medium">Status</label>
             <Select
-              value={filters.status || ''}
-              onValueChange={(value) => onFiltersChange({ status: value || undefined })}
+              value={filters.status || 'all'}
+              onValueChange={(value) => onFiltersChange({ status: value === 'all' ? undefined : value as any })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All statuses</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>

@@ -51,6 +51,9 @@ import { phoneNumbersService } from '@/services/createResourceService';
 import { useQuery } from '@tanstack/react-query';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
+import { WeeklyCalendarView } from '@/pages/BusinessHours/components';
+import type { WeeklySchedule, DayOfWeek } from '@/types';
+import { getNextTimeRangeId } from '@/utils/businessHours';
 import { cn } from '@/lib/utils';
 
 // Validation schema
@@ -106,12 +109,66 @@ const timezones = [
   'Australia/Sydney',
 ];
 
+// Helper functions to convert between campaign schedule and WeeklySchedule
+function createEmptyWeeklySchedule(): WeeklySchedule {
+  return {
+    monday: { enabled: false, time_ranges: [] },
+    tuesday: { enabled: false, time_ranges: [] },
+    wednesday: { enabled: false, time_ranges: [] },
+    thursday: { enabled: false, time_ranges: [] },
+    friday: { enabled: false, time_ranges: [] },
+    saturday: { enabled: false, time_ranges: [] },
+    sunday: { enabled: false, time_ranges: [] },
+  };
+}
+
+function convertCampaignToWeeklySchedule(daysActive: string[], startTime: number, endTime: number): WeeklySchedule {
+  const schedule = createEmptyWeeklySchedule();
+  const startTimeStr = `${startTime.toString().padStart(2, '0')}:00`;
+  const endTimeStr = `${endTime.toString().padStart(2, '0')}:00`;
+
+  daysActive.forEach((day) => {
+    if (day in schedule) {
+      schedule[day as DayOfWeek] = {
+        enabled: true,
+        time_ranges: [{
+          id: getNextTimeRangeId(),
+          start_time: startTimeStr,
+          end_time: endTimeStr,
+        }],
+      };
+    }
+  });
+
+  return schedule;
+}
+
+function convertWeeklyScheduleToCampaign(schedule: WeeklySchedule): { daysActive: string[]; startTime: number; endTime: number } {
+  const daysActive: string[] = [];
+  let startTime = 9;
+  let endTime = 17;
+
+  (Object.keys(schedule) as DayOfWeek[]).forEach((day) => {
+    const daySchedule = schedule[day];
+    if (daySchedule.enabled && daySchedule.time_ranges.length > 0) {
+      daysActive.push(day);
+      // Use the first time range to determine start/end times
+      const firstRange = daySchedule.time_ranges[0];
+      startTime = parseInt(firstRange.start_time.split(':')[0]);
+      endTime = parseInt(firstRange.end_time.split(':')[0]);
+    }
+  });
+
+  return { daysActive, startTime, endTime };
+}
+
 export default function AutoDialerCampaignForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEditing = !!id;
 
   const [activeTab, setActiveTab] = useState('basic');
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>(createEmptyWeeklySchedule());
 
   // Fetch existing campaign if editing
   const { data: existingCampaign, isLoading: isLoadingCampaign } = useAutoDialerCampaign(id || '');
@@ -213,11 +270,32 @@ export default function AutoDialerCampaignForm() {
         amd_silence_timeout: existingCampaign.amd_silence_timeout,
         auto_start: false,
       });
+      // Convert campaign schedule to WeeklySchedule for the calendar view
+      setWeeklySchedule(convertCampaignToWeeklySchedule(
+        existingCampaign.days_active,
+        existingCampaign.start_time,
+        existingCampaign.end_time
+      ));
     }
   }, [existingCampaign, isEditing, reset]);
 
+  // Initialize weekly schedule from form defaults when creating new
+  useEffect(() => {
+    if (!isEditing) {
+      const defaultSchedule = convertCampaignToWeeklySchedule(
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        9,
+        17
+      );
+      setWeeklySchedule(defaultSchedule);
+    }
+  }, [isEditing]);
+
   const onSubmit = async (data: CampaignFormData) => {
     try {
+      // Convert weekly schedule back to campaign format
+      const { daysActive, startTime, endTime } = convertWeeklyScheduleToCampaign(weeklySchedule);
+      
       if (isEditing && id) {
         // Only include fields that can be updated
         const updateData: UpdateCampaignRequest = {
@@ -227,9 +305,9 @@ export default function AutoDialerCampaignForm() {
           caller_id: data.caller_id,
           max_dial_attempts: data.max_dial_attempts,
           calls_per_second: data.calls_per_second,
-          days_active: data.days_active,
-          start_time: data.start_time,
-          end_time: data.end_time,
+          days_active: daysActive,
+          start_time: startTime,
+          end_time: endTime,
           start_date: data.start_date,
           end_date: data.end_date,
           timezone: data.timezone,
@@ -246,8 +324,8 @@ export default function AutoDialerCampaignForm() {
         toast.success('Campaign updated successfully');
       } else {
         // Only include routing_destination_id when not using hangup
-        const routingDestinationId = data.routing_destination_type === 'hangup' 
-          ? undefined 
+        const routingDestinationId = data.routing_destination_type === 'hangup'
+          ? undefined
           : (data.routing_destination_id ? parseInt(data.routing_destination_id, 10) : undefined);
 
         const createData: CreateCampaignRequest = {
@@ -259,9 +337,9 @@ export default function AutoDialerCampaignForm() {
           caller_id: data.caller_id,
           max_dial_attempts: data.max_dial_attempts,
           calls_per_second: data.calls_per_second,
-          days_active: data.days_active,
-          start_time: data.start_time,
-          end_time: data.end_time,
+          days_active: daysActive,
+          start_time: startTime,
+          end_time: endTime,
           start_date: data.start_date,
           end_date: data.end_date,
           timezone: data.timezone,
@@ -277,7 +355,7 @@ export default function AutoDialerCampaignForm() {
         };
         const result = await createMutation.mutateAsync(createData);
         toast.success('Campaign created successfully');
-        navigate(`/ui/auto-dialer/${result.data.id}`);
+        navigate(`/ui/auto-dialer/campaigns/${result.data.id}`);
         return;
       }
       navigate('/ui/auto-dialer');
@@ -297,7 +375,7 @@ export default function AutoDialerCampaignForm() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6 max-w-4xl">
+    <div className="container mx-auto p-6 space-y-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/ui/auto-dialer')}>
@@ -362,13 +440,14 @@ export default function AutoDialerCampaignForm() {
                 <div className="pt-4 border-t">
                   <DestinationTypeAndSelector
                     typeValue={watch('routing_destination_type') as DestinationType}
-                    destinationValue={watch('routing_destination_id') || ''}
+                    destinationValue={watch('routing_destination_id') || undefined}
                     onChange={(type, destinationId) => {
                       setValue('routing_destination_type', type as 'ai_assistant' | 'ai_load_balancer' | 'hangup');
                       setValue('routing_destination_id', destinationId || null);
                     }}
-                    layout="grid"
-                    gridColumns={{ type: 4, destination: 8 }}
+                    layout="horizontal"
+                    typeClassName="w-full md:w-[220px] flex-none"
+                    destinationClassName="flex-1 min-w-0"
                     typeLabel="Routing Destination"
                     destinationLabel="Select Destination"
                     allowedTypes={['ai_assistant', 'ai_load_balancer']}
@@ -391,9 +470,9 @@ export default function AutoDialerCampaignForm() {
                       </SelectTrigger>
                       <SelectContent>
                         {phoneNumbers.length === 0 ? (
-                          <SelectItem value="" disabled>
-                            No phone numbers available
-                          </SelectItem>
+                          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                            No active phone numbers found
+                          </div>
                         ) : (
                           phoneNumbers.map((number) => (
                             <SelectItem key={number.id} value={number.phone_number}>
@@ -451,71 +530,30 @@ export default function AutoDialerCampaignForm() {
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Schedule</CardTitle>
-                <CardDescription>When should the campaign run?</CardDescription>
+                <CardDescription>Configure when the campaign should run</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Label>Active Days</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {daysOfWeek.map((day) => {
-                      const isActive = watch('days_active')?.includes(day.id);
-                      return (
-                        <button
-                          key={day.id}
-                          type="button"
-                          onClick={() => {
-                            const current = watch('days_active') || [];
-                            if (isActive) {
-                              setValue('days_active', current.filter((d) => d !== day.id));
-                            } else {
-                              setValue('days_active', [...current, day.id]);
-                            }
-                          }}
-                          className={cn(
-                            'px-4 py-2 rounded-md text-sm font-medium transition-all border',
-                            isActive
-                              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                          )}
-                        >
-                          {day.label.substring(0, 3)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {errors.days_active && (
-                    <p className="text-sm text-red-500">{errors.days_active.message}</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                {/* Date and Timezone Row */}
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="start_time">Start Time (hour)</Label>
-                    <Input
-                      id="start_time"
-                      type="number"
-                      {...register('start_time', { valueAsNumber: true })}
-                      min={0}
-                      max={23}
-                    />
+                    <Label htmlFor="timezone">Timezone</Label>
+                    <Select
+                      value={watch('timezone')}
+                      onValueChange={(value) => setValue('timezone', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timezones.map((tz) => (
+                          <SelectItem key={tz} value={tz}>
+                            {tz}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="end_time">End Time (hour)</Label>
-                    <Input
-                      id="end_time"
-                      type="number"
-                      {...register('end_time', { valueAsNumber: true })}
-                      min={0}
-                      max={23}
-                    />
-                  </div>
-                </div>
-                {endTime <= startTime && (
-                  <p className="text-sm text-red-500">End time must be after start time</p>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start_date">Start Date</Label>
                     <Input id="start_date" type="date" {...register('start_date')} />
@@ -527,47 +565,22 @@ export default function AutoDialerCampaignForm() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Select
-                    value={watch('timezone')}
-                    onValueChange={(value) => setValue('timezone', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timezones.map((tz) => (
-                        <SelectItem key={tz} value={tz}>
-                          {tz}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="calls_per_second">Calls Per Second</Label>
-                    <Input
-                      id="calls_per_second"
-                      type="number"
-                      {...register('calls_per_second', { valueAsNumber: true })}
-                      min={1}
-                      max={5}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="max_dial_attempts">Max Dial Attempts</Label>
-                    <Input
-                      id="max_dial_attempts"
-                      type="number"
-                      {...register('max_dial_attempts', { valueAsNumber: true })}
-                      min={1}
-                      max={5}
-                    />
-                  </div>
+                {/* Active Hours Calendar */}
+                <div className="space-y-3 pt-4 border-t">
+                  <Label>Active Hours</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Click on time slots to toggle active hours. Green = Active, Empty = Inactive.
+                  </p>
+                  <WeeklyCalendarView
+                    schedule={weeklySchedule}
+                    onScheduleChange={setWeeklySchedule}
+                    onDayScheduleChange={() => {}}
+                    onTimeRangeChange={() => {}}
+                    onAddTimeRange={() => {}}
+                    onRemoveTimeRange={() => {}}
+                    onOpenCopyHours={() => {}}
+                    errors={{}}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -581,6 +594,37 @@ export default function AutoDialerCampaignForm() {
                 <CardDescription>Additional configuration options</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Calls Per Second and Max Dial Attempts */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="calls_per_second">Calls Per Second</Label>
+                    <Input
+                      id="calls_per_second"
+                      type="number"
+                      {...register('calls_per_second', { valueAsNumber: true })}
+                      min={1}
+                      max={5}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Rate at which calls are initiated
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="max_dial_attempts">Max Dial Attempts</Label>
+                    <Input
+                      id="max_dial_attempts"
+                      type="number"
+                      {...register('max_dial_attempts', { valueAsNumber: true })}
+                      min={1}
+                      max={5}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Maximum retry attempts per destination
+                    </p>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="record_calls">Record Calls</Label>
@@ -719,8 +763,7 @@ export default function AutoDialerCampaignForm() {
             type="submit"
             disabled={
               createMutation.isPending ||
-              updateMutation.isPending ||
-              (isEditing && !isDirty)
+              updateMutation.isPending
             }
           >
             {(createMutation.isPending || updateMutation.isPending) && (

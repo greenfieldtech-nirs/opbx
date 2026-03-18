@@ -75,7 +75,7 @@ export default function AutoDialerUploadList() {
         name: listName.trim(),
       });
       toast.success('List uploaded successfully');
-      navigate(`/ui/auto-dialer/${id}`);
+      navigate(`/ui/auto-dialer/campaigns/${id}`);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to upload list');
     }
@@ -94,7 +94,7 @@ export default function AutoDialerUploadList() {
     <div className="container mx-auto p-6 max-w-2xl">
       {/* Header */}
       <div className="mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/ui/auto-dialer/${id}`)} className="mb-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}`)} className="mb-2">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Campaign
         </Button>
@@ -198,7 +198,7 @@ export default function AutoDialerUploadList() {
           <div className="flex gap-3">
             <Button
               variant="outline"
-              onClick={() => navigate(`/ui/auto-dialer/${id}`)}
+              onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}`)}
               className="flex-1"
             >
               Cancel

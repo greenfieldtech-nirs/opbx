@@ -461,13 +461,13 @@ export default function AutoDialerCampaignDetail() {
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete List
                       </Button>
-                      <Button onClick={() => navigate(`/ui/auto-dialer/${id}/upload`)}>
+                      <Button onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/upload`)}>
                         <Upload className="h-4 w-4 mr-2" />
                         Replace List
                       </Button>
                     </>
                   ) : (
-                    <Button onClick={() => navigate(`/ui/auto-dialer/${id}/upload`)}>
+                    <Button onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/upload`)}>
                       <Upload className="h-4 w-4 mr-2" />
                       Upload List
                     </Button>
@@ -535,7 +535,7 @@ export default function AutoDialerCampaignDetail() {
                 )}
               </p>
               {campaign.status === 'draft' && canManageCampaigns && (
-                <Button className="mt-4" onClick={() => navigate(`/ui/auto-dialer/${id}/edit`)}>
+                  <Button className="mt-4" onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}>
                   Edit Campaign
                 </Button>
               )}

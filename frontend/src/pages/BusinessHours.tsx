@@ -94,11 +94,11 @@ import type {
 } from '@/types';
 import {
   isValidTimeFormat,
-  isEndTimeAfterStart,
+  isEndTimeAfter,
   formatExceptionDate,
   getNextExceptionId,
   getNextTimeRangeId,
-} from '@/mock/businessHours';
+} from '@/utils/businessHours';
 
 
 // ============================================================================
@@ -1123,7 +1123,7 @@ const BusinessHours: React.FC = () => {
           if (!isValidTimeFormat(range.end_time)) {
             errors[`${day}_${index}_end`] = 'Invalid time format';
           }
-          if (!isEndTimeAfterStart(range.start_time, range.end_time)) {
+          if (!isEndTimeAfter(range.start_time, range.end_time)) {
             errors[`${day}_${index}_range`] = 'End time must be after start time';
           }
         });
