@@ -87,7 +87,10 @@ const sidebarSections: SidebarSection[] = [
     icon: 'codicon-shield',
     accentColor: 'default',
     items: [
-      { name: 'Auto Dialer', href: '/ui/auto-dialer', icon: 'codicon-radio-tower', roles: ['owner', 'pbx_admin'] },
+      { name: 'Auto Dialer', href: '', icon: '', isHeader: true },
+      { name: 'Campaign Manager', href: '/ui/auto-dialer/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin'] },
+      { name: 'Distribution Lists', href: '/ui/auto-dialer/distribution-lists', icon: 'codicon-list-unordered', roles: ['owner', 'pbx_admin'] },
+      { name: 'Real Time Monitor', href: '/ui/auto-dialer/monitor', icon: 'codicon-pulse', roles: ['owner', 'pbx_admin'] },
       { name: 'AI Configuration', href: '', icon: '', isHeader: true },
       { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },

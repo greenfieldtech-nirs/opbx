@@ -162,23 +162,35 @@ export const router = createBrowserRouter([
       },
       {
         path: 'auto-dialer',
+        element: <Navigate to="/ui/auto-dialer/campaigns" replace />,
+      },
+      {
+        path: 'auto-dialer/campaigns',
         element: <AutoDialerCampaigns />,
       },
       {
-        path: 'auto-dialer/new',
+        path: 'auto-dialer/campaigns/new',
         element: <AutoDialerCampaignForm />,
       },
       {
-        path: 'auto-dialer/:id',
+        path: 'auto-dialer/campaigns/:id',
         element: <AutoDialerCampaignDetail />,
       },
       {
-        path: 'auto-dialer/:id/edit',
+        path: 'auto-dialer/campaigns/:id/edit',
         element: <AutoDialerCampaignForm />,
       },
       {
-        path: 'auto-dialer/:id/upload',
+        path: 'auto-dialer/campaigns/:id/upload',
         element: <AutoDialerUploadList />,
+      },
+      {
+        path: 'auto-dialer/distribution-lists',
+        element: <AutoDialerCampaigns />, // Placeholder - will be replaced with DistributionLists component
+      },
+      {
+        path: 'auto-dialer/monitor',
+        element: <AutoDialerCampaigns />, // Placeholder - will be replaced with RealTimeMonitor component
       },
       // Platform Management routes (platform manager only)
 {
