@@ -465,42 +465,48 @@ export default function AutoDialerCampaignForm() {
                     <Label htmlFor="caller_id">
                       Caller ID <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={watch('caller_id') || ''}
-                      onValueChange={(value) => setValue('caller_id', value)}
-                    >
-                      <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
-                        <SelectValue placeholder="Select a phone number" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {phoneNumbers.length === 0 && !watch('caller_id') ? (
-                          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                            No active phone numbers found
-                          </div>
-                        ) : (
-                          <>
-                            {/* Show current caller_id if not in active list */}
-                            {watch('caller_id') && !phoneNumbers.some(n => n.phone_number === watch('caller_id')) && (
-                              <SelectItem value={watch('caller_id')!}>
-                                {watch('caller_id')} (currently selected)
-                              </SelectItem>
-                            )}
-                            {phoneNumbers.map((number) => (
+                    {isEditing && existingCampaign?.caller_id ? (
+                      // Editing: Show current value with option to change
+                      <Select
+                        defaultValue={existingCampaign.caller_id}
+                        onValueChange={(value) => setValue('caller_id', value)}
+                      >
+                        <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
+                          <SelectValue placeholder="Select a phone number" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={existingCampaign.caller_id}>
+                            {existingCampaign.caller_id} (current)
+                          </SelectItem>
+                          {phoneNumbers
+                            .filter(n => n.phone_number !== existingCampaign.caller_id)
+                            .map((number) => (
                               <SelectItem key={number.id} value={number.phone_number}>
                                 {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
                               </SelectItem>
                             ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      // Creating new: Simple select from available numbers
+                      <Select
+                        value={watch('caller_id') || ''}
+                        onValueChange={(value) => setValue('caller_id', value)}
+                      >
+                        <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
+                          <SelectValue placeholder="Select a phone number" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {phoneNumbers.map((number) => (
+                            <SelectItem key={number.id} value={number.phone_number}>
+                              {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {errors.caller_id && (
                       <p className="text-sm text-red-500">{errors.caller_id.message}</p>
-                    )}
-                    {phoneNumbers.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No active phone numbers found. <a href="/ui/phone-numbers" className="text-blue-600 hover:underline">Add phone numbers</a> first.
-                      </p>
                     )}
                   </div>
 
