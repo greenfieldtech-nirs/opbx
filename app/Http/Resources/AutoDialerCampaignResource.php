@@ -43,6 +43,7 @@ class AutoDialerCampaignResource extends JsonResource
             'start_date' => $this->start_date?->format('Y-m-d'),
             'end_date' => $this->end_date?->format('Y-m-d'),
             'timezone' => $this->timezone,
+            'schedule' => $this->schedule, // New full schedule field
 
             // Recording & AMD
             'record_calls' => $this->record_calls,

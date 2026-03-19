@@ -269,12 +269,16 @@ export default function AutoDialerCampaignForm() {
         amd_silence_timeout: existingCampaign.amd_silence_timeout,
         auto_start: false,
       });
-      // Convert campaign schedule to WeeklySchedule for the calendar view
-      setWeeklySchedule(convertCampaignToWeeklySchedule(
-        existingCampaign.days_active,
-        existingCampaign.start_time,
-        existingCampaign.end_time
-      ));
+      // Use schedule from campaign if available, otherwise convert from legacy format
+      if (existingCampaign.schedule) {
+        setWeeklySchedule(existingCampaign.schedule as WeeklySchedule);
+      } else {
+        setWeeklySchedule(convertCampaignToWeeklySchedule(
+          existingCampaign.days_active,
+          existingCampaign.start_time,
+          existingCampaign.end_time
+        ));
+      }
     }
   }, [existingCampaign, isEditing, reset]);
 
@@ -292,16 +296,13 @@ export default function AutoDialerCampaignForm() {
 
   const onSubmit = async (data: CampaignFormData) => {
     try {
-      // Convert weekly schedule back to campaign format
-      const { daysActive, startTime, endTime } = convertWeeklyScheduleToCampaign(weeklySchedule);
-      
       // Handle routing destination ID - ensure it's a string for the API
       const routingDestinationId = data.routing_destination_type === 'hangup'
         ? undefined
         : data.routing_destination_id;
       
       if (isEditing && id) {
-        // Only include fields that can be updated
+        // Build update data with schedule
         const updateData: UpdateCampaignRequest = {
           name: data.name,
           dial_timeout: data.dial_timeout,
@@ -309,9 +310,7 @@ export default function AutoDialerCampaignForm() {
           caller_id: data.caller_id,
           max_dial_attempts: data.max_dial_attempts,
           calls_per_second: data.calls_per_second,
-          days_active: daysActive,
-          start_time: startTime,
-          end_time: endTime,
+          schedule: weeklySchedule,
           start_date: data.start_date,
           end_date: data.end_date,
           timezone: data.timezone,
@@ -324,21 +323,26 @@ export default function AutoDialerCampaignForm() {
           amd_speech_end_threshold: data.amd_speech_end_threshold,
           amd_silence_timeout: data.amd_silence_timeout,
         };
+        
+        // Add routing fields only if provided
+        if (data.routing_destination_type) {
+          updateData.routing_destination_type = data.routing_destination_type;
+          updateData.routing_destination_id = routingDestinationId;
+        }
+        
         await updateMutation.mutateAsync({ id, data: updateData });
         toast.success('Campaign updated successfully');
       } else {
         const createData: CreateCampaignRequest = {
           name: data.name,
           routing_destination_type: data.routing_destination_type,
-          ...(routingDestinationId ? { routing_destination_id: String(routingDestinationId) } : {}),
+          ...(routingDestinationId ? { routing_destination_id: routingDestinationId } : {}),
           dial_timeout: data.dial_timeout,
           destination_connect: data.destination_connect,
           caller_id: data.caller_id,
           max_dial_attempts: data.max_dial_attempts,
           calls_per_second: data.calls_per_second,
-          days_active: daysActive,
-          start_time: startTime,
-          end_time: endTime,
+          schedule: weeklySchedule,
           start_date: data.start_date,
           end_date: data.end_date,
           timezone: data.timezone,

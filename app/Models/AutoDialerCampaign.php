@@ -44,6 +44,7 @@ class AutoDialerCampaign extends Model
         'start_date',
         'end_date',
         'timezone',
+        'schedule', // New field for full weekly schedule
         'time_limit',
         'record_calls',
         'amd_enabled',
@@ -69,6 +70,7 @@ class AutoDialerCampaign extends Model
         'destination_connect' => 'string',
         'auto_start' => 'boolean',
         'days_active' => 'array',
+        'schedule' => 'array', // New field for full weekly schedule
         'start_date' => 'date',
         'end_date' => 'date',
         'record_calls' => 'boolean',

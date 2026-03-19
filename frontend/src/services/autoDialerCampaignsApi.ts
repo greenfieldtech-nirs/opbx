@@ -6,6 +6,7 @@
 
 import api from './api';
 import type { PaginatedResponse } from '@/types';
+import type { WeeklySchedule } from '@/types';
 
 // Campaign Types
 export interface AutoDialerCampaign {
@@ -29,13 +30,7 @@ export interface AutoDialerCampaign {
   start_date: string;
   end_date: string;
   timezone: string;
-  record_calls: boolean;
-  amd_enabled: boolean;
-  amd_mode: 'Enabled' | 'DetectMessageEnd' | null;
-  amd_timeout: number;
-  amd_speech_threshold: number;
-  amd_speech_end_threshold: number;
-  amd_silence_timeout: number;
+  schedule?: WeeklySchedule; // New full schedule field
   statistics: {
     total_destinations: number;
     completed_calls: number;
@@ -59,9 +54,12 @@ export interface CreateCampaignRequest {
   caller_id: string;
   max_dial_attempts: number;
   calls_per_second: number;
-  days_active: string[];
-  start_time: number;
-  end_time: number;
+  // New schedule format - full weekly schedule
+  schedule: WeeklySchedule;
+  // Legacy fields (optional)
+  days_active?: string[];
+  start_time?: number;
+  end_time?: number;
   start_date: string;
   end_date: string;
   timezone: string;
@@ -79,11 +77,16 @@ export interface CreateCampaignRequest {
 export interface UpdateCampaignRequest {
   name?: string;
   description?: string;
+  routing_destination_type?: 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+  routing_destination_id?: string;
   dial_timeout?: number;
   destination_connect?: 'connected' | 'immediately';
   caller_id?: string;
   max_dial_attempts?: number;
   calls_per_second?: number;
+  // New schedule format
+  schedule?: WeeklySchedule;
+  // Legacy fields
   days_active?: string[];
   start_time?: number;
   end_time?: number;
