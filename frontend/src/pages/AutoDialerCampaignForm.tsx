@@ -248,7 +248,7 @@ export default function AutoDialerCampaignForm() {
       reset({
         name: existingCampaign.name,
         routing_destination_type: existingCampaign.routing_destination_type,
-        routing_destination_id: existingCampaign.routing_destination_id || undefined,
+        routing_destination_id: existingCampaign.routing_destination_id ? String(existingCampaign.routing_destination_id) : undefined,
         dial_timeout: existingCampaign.dial_timeout,
         destination_connect: existingCampaign.destination_connect,
         caller_id: existingCampaign.caller_id,
@@ -260,7 +260,6 @@ export default function AutoDialerCampaignForm() {
         start_date: existingCampaign.start_date,
         end_date: existingCampaign.end_date,
         timezone: existingCampaign.timezone,
-
         record_calls: existingCampaign.record_calls,
         amd_enabled: existingCampaign.amd_enabled,
         amd_mode: existingCampaign.amd_mode || undefined,
@@ -296,6 +295,11 @@ export default function AutoDialerCampaignForm() {
       // Convert weekly schedule back to campaign format
       const { daysActive, startTime, endTime } = convertWeeklyScheduleToCampaign(weeklySchedule);
       
+      // Handle routing destination ID - ensure it's a string for the API
+      const routingDestinationId = data.routing_destination_type === 'hangup'
+        ? undefined
+        : data.routing_destination_id;
+      
       if (isEditing && id) {
         // Only include fields that can be updated
         const updateData: UpdateCampaignRequest = {
@@ -323,15 +327,10 @@ export default function AutoDialerCampaignForm() {
         await updateMutation.mutateAsync({ id, data: updateData });
         toast.success('Campaign updated successfully');
       } else {
-        // Only include routing_destination_id when not using hangup
-        const routingDestinationId = data.routing_destination_type === 'hangup'
-          ? undefined
-          : (data.routing_destination_id ? parseInt(data.routing_destination_id, 10) : undefined);
-
         const createData: CreateCampaignRequest = {
           name: data.name,
           routing_destination_type: data.routing_destination_type,
-          ...(routingDestinationId && { routing_destination_id: String(routingDestinationId) }),
+          ...(routingDestinationId ? { routing_destination_id: String(routingDestinationId) } : {}),
           dial_timeout: data.dial_timeout,
           destination_connect: data.destination_connect,
           caller_id: data.caller_id,

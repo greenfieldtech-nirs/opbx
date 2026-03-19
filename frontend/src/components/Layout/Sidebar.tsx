@@ -135,12 +135,23 @@ export function Sidebar() {
   // Check if user is a platform manager
   const isPlatformManager = user?.is_platform_manager === true;
 
-  // Load saved state from localStorage
+  // Load saved state from localStorage and sync with current URL
   useEffect(() => {
     const savedSection = localStorage.getItem(SELECTED_SECTION_KEY);
-    if (savedSection) {
-      const sectionExists = [...sidebarSections, ...(isPlatformManager ? [platformSection] : [])]
-        .some(s => s.id === savedSection);
+    const allSectionsList = [...sidebarSections, ...(isPlatformManager ? [platformSection] : [])];
+    
+    // First, check if current URL matches any section's items
+    const currentPath = location.pathname;
+    let matchingSection = allSectionsList.find(section => 
+      section.items.some(item => !item.isHeader && currentPath.startsWith(item.href))
+    );
+    
+    if (matchingSection) {
+      // URL matches a section, use that
+      setSelectedSectionId(matchingSection.id);
+    } else if (savedSection) {
+      // Fall back to saved section if it exists
+      const sectionExists = allSectionsList.some(s => s.id === savedSection);
       if (sectionExists) {
         setSelectedSectionId(savedSection);
       }
@@ -153,7 +164,7 @@ export function Sidebar() {
         setSidebarWidth(width);
       }
     }
-  }, [isPlatformManager]);
+  }, [isPlatformManager, location.pathname]);
 
   // Save selected section to localStorage
   useEffect(() => {

@@ -38,6 +38,15 @@ class UpdateCampaignRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
 
+            // Routing Configuration - can be updated when campaign is draft or paused
+            'routing_destination_type' => ['sometimes', Rule::enum(\App\Enums\RoutingDestinationType::class)],
+            'routing_destination_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::requiredIf(fn () => $this->input('routing_destination_type') !== 'hangup'),
+            ],
+
             // Can only update if campaign is draft or paused
             'dial_timeout' => ['sometimes', 'integer', 'min:1', 'max:300'],
             'destination_connect' => ['sometimes', 'in:connected,immediately'],
