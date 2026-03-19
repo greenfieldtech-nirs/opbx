@@ -45,10 +45,15 @@ class AutoDialerCampaignResource extends JsonResource
             'timezone' => $this->timezone,
             'schedule' => $this->schedule, // New full schedule field
 
-            // Recording & AMD
+            // Recording, Time Limit & AMD
+            'time_limit' => $this->time_limit,
             'record_calls' => $this->record_calls,
             'amd_enabled' => $this->amd_enabled,
             'amd_mode' => $this->amd_mode?->value,
+            'amd_timeout' => $this->amd_timeout,
+            'amd_speech_threshold' => $this->amd_speech_threshold,
+            'amd_speech_end_threshold' => $this->amd_speech_end_threshold,
+            'amd_silence_timeout' => $this->amd_silence_timeout,
 
             // Statistics
             'statistics' => [

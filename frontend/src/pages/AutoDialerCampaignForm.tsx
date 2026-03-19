@@ -260,6 +260,7 @@ export default function AutoDialerCampaignForm() {
         start_date: existingCampaign.start_date,
         end_date: existingCampaign.end_date,
         timezone: existingCampaign.timezone,
+        time_limit: existingCampaign.time_limit,
         record_calls: existingCampaign.record_calls,
         amd_enabled: existingCampaign.amd_enabled,
         amd_mode: existingCampaign.amd_mode || undefined,
