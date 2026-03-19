@@ -466,23 +466,31 @@ export default function AutoDialerCampaignForm() {
                       Caller ID <span className="text-red-500">*</span>
                     </Label>
                     <Select
-                      value={watch('caller_id')}
+                      value={watch('caller_id') || ''}
                       onValueChange={(value) => setValue('caller_id', value)}
                     >
                       <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Select a phone number" />
                       </SelectTrigger>
                       <SelectContent>
-                        {phoneNumbers.length === 0 ? (
+                        {phoneNumbers.length === 0 && !watch('caller_id') ? (
                           <div className="px-2 py-4 text-center text-sm text-muted-foreground">
                             No active phone numbers found
                           </div>
                         ) : (
-                          phoneNumbers.map((number) => (
-                            <SelectItem key={number.id} value={number.phone_number}>
-                              {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
-                            </SelectItem>
-                          ))
+                          <>
+                            {/* Show current caller_id if not in active list */}
+                            {watch('caller_id') && !phoneNumbers.some(n => n.phone_number === watch('caller_id')) && (
+                              <SelectItem value={watch('caller_id')!}>
+                                {watch('caller_id')} (currently selected)
+                              </SelectItem>
+                            )}
+                            {phoneNumbers.map((number) => (
+                              <SelectItem key={number.id} value={number.phone_number}>
+                                {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
+                              </SelectItem>
+                            ))}
+                          </>
                         )}
                       </SelectContent>
                     </Select>
