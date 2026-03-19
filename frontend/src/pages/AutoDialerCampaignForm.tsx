@@ -268,7 +268,7 @@ export default function AutoDialerCampaignForm() {
         amd_speech_threshold: existingCampaign.amd_speech_threshold,
         amd_speech_end_threshold: existingCampaign.amd_speech_end_threshold,
         amd_silence_timeout: existingCampaign.amd_silence_timeout,
-        auto_start: false,
+        auto_start: existingCampaign.auto_start,
       });
       // Use schedule from campaign if available, otherwise convert from legacy format
       if (existingCampaign.schedule) {
@@ -316,6 +316,7 @@ export default function AutoDialerCampaignForm() {
           end_date: data.end_date,
           timezone: data.timezone,
           time_limit: data.time_limit,
+          auto_start: data.auto_start,
           record_calls: data.record_calls,
           amd_enabled: data.amd_enabled,
           amd_mode: data.amd_mode,
