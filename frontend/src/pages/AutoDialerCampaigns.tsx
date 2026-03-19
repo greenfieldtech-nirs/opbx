@@ -13,6 +13,7 @@ import {
   Search,
   Edit,
   Archive,
+  Trash2,
   PhoneCall,
   RefreshCw,
   X,
@@ -97,6 +98,7 @@ export default function AutoDialerCampaigns() {
 
   const [selectedCampaign, setSelectedCampaign] = useState<AutoDialerCampaign | null>(null);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Permission checks
   const canManage = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
@@ -161,6 +163,19 @@ export default function AutoDialerCampaigns() {
     },
   });
 
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => autoDialerCampaignsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      toast.success('Campaign deleted successfully');
+      setIsDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete campaign');
+    },
+  });
+
   const handleStatusToggle = (campaign: AutoDialerCampaign) => {
     if (!canManage) return;
     
@@ -183,6 +198,17 @@ export default function AutoDialerCampaigns() {
     await archiveMutation.mutateAsync(selectedCampaign.id);
     setIsArchiveDialogOpen(false);
     setSelectedCampaign(null);
+  };
+
+  const handleDelete = (campaign: AutoDialerCampaign) => {
+    setSelectedCampaign(campaign);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (selectedCampaign) {
+      deleteMutation.mutate(selectedCampaign.id);
+    }
   };
 
   // Filter campaigns client-side when excluding archived
@@ -432,6 +458,36 @@ export default function AutoDialerCampaigns() {
                     return <span className="text-xs text-muted-foreground">-</span>;
                   }
                   
+                  // Draft campaigns can be deleted or edited
+                  if (campaign.status === 'draft') {
+                    return (
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs px-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
+                          }}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(campaign);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    );
+                  }
+                  
                   // Completed campaigns can only be archived
                   if (campaign.status === 'completed') {
                     return (
@@ -538,6 +594,36 @@ export default function AutoDialerCampaigns() {
             >
               {archiveMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
               Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Delete Campaign
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCampaign && (
+                <>Are you sure you want to delete "{selectedCampaign.name}"? This action cannot be undone. Associated lists will remain in the system.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -62,11 +62,16 @@ class AutoDialerCampaignPolicy
     /**
      * Determine whether the user can delete the campaign.
      *
-     * Only Owner can delete campaigns.
+     * Only Owner can delete campaigns, and only if they are in draft status.
      */
     public function delete(User $user, AutoDialerCampaign $campaign): bool
     {
         if ($user->organization_id !== $campaign->organization_id) {
+            return false;
+        }
+
+        // Only draft campaigns can be deleted
+        if ($campaign->status !== CampaignStatus::DRAFT) {
             return false;
         }
 
