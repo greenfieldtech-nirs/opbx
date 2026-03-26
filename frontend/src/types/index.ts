@@ -1025,7 +1025,7 @@ export interface VoiceTrunksResponse {
 // Call Notifications Types
 // ============================================================================
 
-export type CallNotificationAuthMethod = 'hmac_sha256' | 'bearer_token' | 'basic_auth' | 'none';
+export type CallNotificationAuthMethod = 'none' | 'bearer_token' | 'basic_auth';
 export type CallNotificationEvent = 'new' | 'ringing' | 'connected' | 'answered' | 'busy' | 'cancel' | 'failed' | 'congestion';
 
 export interface CallNotificationsSettings {
