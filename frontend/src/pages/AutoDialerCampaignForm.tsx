@@ -363,7 +363,7 @@ export default function AutoDialerCampaignForm() {
         navigate(`/ui/auto-dialer/campaigns/${result.data.id}`);
         return;
       }
-      navigate('/ui/auto-dialer');
+      navigate(-1);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
     }
@@ -383,7 +383,7 @@ export default function AutoDialerCampaignForm() {
     <div className="container mx-auto p-6 space-y-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/ui/auto-dialer')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -774,7 +774,7 @@ export default function AutoDialerCampaignForm() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/ui/auto-dialer')}
+            onClick={() => navigate(-1)}
           >
             Cancel
           </Button>

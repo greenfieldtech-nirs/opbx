@@ -70,6 +70,15 @@ class AutoDialerCampaignController extends Controller
         $data['failed_calls'] = 0;
         $data['pending_calls'] = 0;
 
+        // Extract days_active and legacy time fields from schedule
+        $schedule = $data['schedule'] ?? [];
+        $data['days_active'] = $this->extractDaysActiveFromSchedule($schedule);
+
+        // Extract start_time and end_time from first enabled day's first time range
+        $timeRange = $this->extractTimeRangeFromSchedule($schedule);
+        $data['start_time'] = $timeRange['start_time'] ?? 9;
+        $data['end_time'] = $timeRange['end_time'] ?? 17;
+
         $campaign = AutoDialerCampaign::create($data);
 
         return response()->json([
@@ -85,7 +94,19 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
-        $campaign->update($request->validated());
+        $data = $request->validated();
+
+        // Extract days_active and legacy time fields from schedule if provided
+        if (isset($data['schedule'])) {
+            $data['days_active'] = $this->extractDaysActiveFromSchedule($data['schedule']);
+
+            // Extract start_time and end_time from first enabled day's first time range
+            $timeRange = $this->extractTimeRangeFromSchedule($data['schedule']);
+            $data['start_time'] = $timeRange['start_time'] ?? 9;
+            $data['end_time'] = $timeRange['end_time'] ?? 17;
+        }
+
+        $campaign->update($data);
 
         return response()->json([
             'message' => 'Campaign updated successfully',
@@ -380,5 +401,50 @@ class AutoDialerCampaignController extends Controller
             $ids->shift();
             AutoDialerDestination::whereIn('id', $ids)->delete();
         }
+    }
+
+    /**
+     * Extract days_active array from schedule data.
+     *
+     * @param  array<string, mixed>  $schedule
+     * @return array<string>
+     */
+    private function extractDaysActiveFromSchedule(array $schedule): array
+    {
+        $daysActive = [];
+
+        foreach ($schedule as $day => $config) {
+            if (is_array($config) && ($config['enabled'] ?? false)) {
+                $daysActive[] = strtolower($day);
+            }
+        }
+
+        return $daysActive;
+    }
+
+    /**
+     * Extract start_time and end_time from first enabled day's first time range.
+     *
+     * @param  array<string, mixed>  $schedule
+     * @return array<string, int|null>
+     */
+    private function extractTimeRangeFromSchedule(array $schedule): array
+    {
+        foreach ($schedule as $config) {
+            if (is_array($config) && ($config['enabled'] ?? false)) {
+                $timeRanges = $config['time_ranges'] ?? [];
+                if (! empty($timeRanges) && is_array($timeRanges[0])) {
+                    $startTime = $timeRanges[0]['start_time'] ?? '09:00';
+                    $endTime = $timeRanges[0]['end_time'] ?? '17:00';
+
+                    return [
+                        'start_time' => (int) substr($startTime, 0, 2),
+                        'end_time' => (int) substr($endTime, 0, 2),
+                    ];
+                }
+            }
+        }
+
+        return ['start_time' => 9, 'end_time' => 17];
     }
 }
