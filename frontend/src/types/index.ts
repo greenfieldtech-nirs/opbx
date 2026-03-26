@@ -1207,3 +1207,63 @@ export interface BlockedCallLogFilterParams extends PaginationParams {
   to_date?: string;
   rejection_strategy?: InboundBlacklistRejectionStrategy;
 }
+
+// ============================================================================
+// Distribution Lists
+// ============================================================================
+
+export type DistributionListStatus =
+  | 'draft'
+  | 'pending'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+  | 'in_use'
+  | 'used'
+  | 'archived';
+
+export interface AutoDialerList {
+  id: number;
+  name: string;
+  description: string | null;
+  version_number: number;
+  is_latest_version: boolean;
+  status: DistributionListStatus;
+  status_label: string;
+  status_color: string;
+  campaign_id: number | null;
+  used_by_campaign_id: number | null;
+  used_at: string | null;
+  statistics: {
+    total_rows: number;
+    valid_rows: number;
+    invalid_rows: number;
+  };
+  parent_list_id: number | null;
+  has_versions: boolean;
+  can_archive: boolean;
+  can_assign: boolean;
+  can_upload: boolean;
+  can_copy: boolean;
+  created_at: string;
+  processed_at: string | null;
+  archived_at: string | null;
+  campaign?: {
+    id: number;
+    name: string;
+  };
+  used_by_campaign?: {
+    id: number;
+    name: string;
+  };
+}
+
+export interface CreateListRequest {
+  name: string;
+  description?: string;
+}
+
+export interface DistributionListParams extends PaginationParams {
+  status?: DistributionListStatus;
+  search?: string;
+}
