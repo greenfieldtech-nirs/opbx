@@ -38,6 +38,7 @@ const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
 const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
 const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
 const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
+const DistributionLists = lazy(() => import('@/pages/DistributionLists'));
 
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
@@ -185,8 +186,8 @@ export const router = createBrowserRouter([
         element: <AutoDialerUploadList />,
       },
       {
-        path: 'auto-dialer/distribution-lists',
-        element: <AutoDialerCampaigns />, // Placeholder - will be replaced with DistributionLists component
+        path: 'auto-dialer/lists',
+        element: <DistributionLists />,
       },
       {
         path: 'auto-dialer/monitor',
