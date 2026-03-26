@@ -136,6 +136,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\InboundBlacklist::class, \App\Policies\InboundBlacklistPolicy::class);
         Gate::policy(\App\Models\BlockedCallLog::class, \App\Policies\InboundBlacklistPolicy::class);
         Gate::policy(\App\Models\AutoDialerCampaign::class, \App\Policies\AutoDialerCampaignPolicy::class);
+        Gate::policy(\App\Models\AutoDialerList::class, \App\Policies\DistributionListPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes
