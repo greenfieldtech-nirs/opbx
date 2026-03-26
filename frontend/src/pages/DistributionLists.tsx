@@ -225,11 +225,9 @@ export default function DistributionLists() {
                 </TableHeader>
                 <TableBody>
                   {lists.map((list) => (
-                    <TableRow
-                      key={list.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/ui/auto-dialer/lists/${list.id}`)}
-                    >
+                  <TableRow
+                    key={list.id}
+                  >
                       <TableCell className="font-medium">
                         {list.name}
                         {!list.is_latest_version && (
@@ -264,11 +262,8 @@ export default function DistributionLists() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/ui/auto-dialer/lists/${list.id}`);
-                            }}>
-                              View Details
+                            <DropdownMenuItem disabled>
+                              View Details (Coming Soon)
                             </DropdownMenuItem>
                             {list.can_upload && canManage && (
                               <DropdownMenuItem onClick={(e) => {
