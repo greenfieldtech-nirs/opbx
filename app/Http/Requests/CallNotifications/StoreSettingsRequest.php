@@ -34,20 +34,20 @@ class StoreSettingsRequest extends FormRequest
                 'required',
                 'url',
                 'max:2048',
-                // Must be HTTPS for security
+                // Must be HTTP or HTTPS
                 function ($attribute, $value, $fail) {
-                    if (! str_starts_with($value, 'https://')) {
-                        $fail('The webhook URL must use HTTPS for security.');
+                    if (! str_starts_with($value, 'http://') && ! str_starts_with($value, 'https://')) {
+                        $fail('The webhook URL must use HTTP or HTTPS.');
                     }
                 },
             ],
             'auth_method' => [
                 'required',
                 'string',
-                Rule::in(['hmac_sha256', 'bearer_token', 'basic_auth', 'none']),
+                Rule::in(['bearer_token', 'basic_auth', 'none']),
             ],
             'auth_secret' => [
-                Rule::requiredIf(fn () => in_array($this->input('auth_method'), ['hmac_sha256', 'bearer_token'])),
+                Rule::requiredIf(fn () => $this->input('auth_method') === 'bearer_token'),
                 'nullable',
                 'string',
                 'min:16',

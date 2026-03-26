@@ -64,7 +64,7 @@ class CallNotificationsSettings extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'auth_method' => 'hmac_sha256',
+        'auth_method' => 'none',
         'retry_attempts' => 3,
         'retry_backoff_seconds' => 60,
         'request_timeout_seconds' => 30,
@@ -123,15 +123,6 @@ class CallNotificationsSettings extends Model
         $headers = [];
 
         switch ($this->auth_method) {
-            case 'hmac_sha256':
-                $timestamp = time();
-                $payloadJson = json_encode($payload);
-                $signedPayload = $timestamp.'.'.$payloadJson;
-                $signature = hash_hmac('sha256', $signedPayload, $this->auth_secret ?? '');
-                $headers['X-Cloudonix-Timestamp'] = $timestamp;
-                $headers['X-Cloudonix-Signature'] = 'sha256='.$signature;
-                break;
-
             case 'bearer_token':
                 $headers['Authorization'] = 'Bearer '.($this->auth_secret ?? '');
                 break;
