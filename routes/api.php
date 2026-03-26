@@ -220,6 +220,39 @@ Route::prefix('v1')->group(function (): void {
         Route::get('auto-dialer-campaigns/{campaign}/destinations', [AutoDialerCampaignController::class, 'getDestinations'])
             ->name('auto-dialer-campaigns.destinations');
 
+        // Distribution Lists Management
+        Route::prefix('auto-dialer-campaigns')->group(function (): void {
+            // Lists
+            Route::get('lists', [\App\Http\Controllers\DistributionListController::class, 'index'])
+                ->name('distribution-lists.index');
+            Route::post('lists', [\App\Http\Controllers\DistributionListController::class, 'store'])
+                ->name('distribution-lists.store');
+            Route::get('lists/example-csv', [\App\Http\Controllers\DistributionListController::class, 'downloadExample'])
+                ->name('distribution-lists.example');
+            Route::get('lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'show'])
+                ->name('distribution-lists.show');
+            Route::post('lists/{list}/upload', [\App\Http\Controllers\DistributionListController::class, 'upload'])
+                ->name('distribution-lists.upload');
+            Route::get('lists/upload-progress/{jobId}', [\App\Http\Controllers\DistributionListController::class, 'uploadProgress'])
+                ->name('distribution-lists.progress');
+            Route::post('lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'addDestination'])
+                ->name('distribution-lists.destinations.add');
+            Route::post('lists/{list}/destinations/batch', [\App\Http\Controllers\DistributionListController::class, 'addDestinationsBatch'])
+                ->name('distribution-lists.destinations.batch');
+            Route::get('lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'getDestinations'])
+                ->name('distribution-lists.destinations');
+            Route::get('lists/{list}/versions', [\App\Http\Controllers\DistributionListController::class, 'getVersions'])
+                ->name('distribution-lists.versions');
+            Route::post('lists/{list}/copy', [\App\Http\Controllers\DistributionListController::class, 'copy'])
+                ->name('distribution-lists.copy');
+            Route::patch('lists/{list}/archive', [\App\Http\Controllers\DistributionListController::class, 'archive'])
+                ->name('distribution-lists.archive');
+            Route::get('lists/{list}/download', [\App\Http\Controllers\DistributionListController::class, 'download'])
+                ->name('distribution-lists.download');
+            Route::get('lists/{list}/validation-errors', [\App\Http\Controllers\DistributionListController::class, 'getValidationErrors'])
+                ->name('distribution-lists.errors');
+        });
+
         // Extensions - CRUD (using ExtensionCrudController)
         Route::apiResource('extensions', ExtensionCrudController::class);
 
