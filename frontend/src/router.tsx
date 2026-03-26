@@ -186,7 +186,7 @@ export const router = createBrowserRouter([
         element: <AutoDialerUploadList />,
       },
       {
-        path: 'auto-dialer/lists',
+        path: 'auto-dialer/distribution-lists',
         element: <DistributionLists />,
       },
       {
