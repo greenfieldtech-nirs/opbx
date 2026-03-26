@@ -21,54 +21,97 @@ class AuditLogger
      * Log levels for audit events
      */
     public const LEVEL_INFO = 'info';
+
     public const LEVEL_WARNING = 'warning';
+
     public const LEVEL_ERROR = 'error';
+
     public const LEVEL_CRITICAL = 'critical';
 
     /**
      * Common audit event types
      */
     public const EVENT_USER_LOGIN = 'user.login';
+
     public const EVENT_USER_LOGOUT = 'user.logout';
+
     public const EVENT_USER_CREATED = 'user.created';
+
     public const EVENT_USER_UPDATED = 'user.updated';
+
     public const EVENT_USER_DELETED = 'user.deleted';
+
     public const EVENT_USER_PASSWORD_CHANGED = 'user.password_changed';
 
     public const EVENT_EXTENSION_CREATED = 'extension.created';
+
     public const EVENT_EXTENSION_UPDATED = 'extension.updated';
+
     public const EVENT_EXTENSION_DELETED = 'extension.deleted';
 
     public const EVENT_DID_CREATED = 'did.created';
+
     public const EVENT_DID_UPDATED = 'did.updated';
+
     public const EVENT_DID_DELETED = 'did.deleted';
 
     public const EVENT_RING_GROUP_CREATED = 'ring_group.created';
+
     public const EVENT_RING_GROUP_UPDATED = 'ring_group.updated';
+
     public const EVENT_RING_GROUP_DELETED = 'ring_group.deleted';
 
     public const EVENT_IVR_CREATED = 'ivr.created';
+
     public const EVENT_IVR_UPDATED = 'ivr.updated';
+
     public const EVENT_IVR_DELETED = 'ivr.deleted';
 
     public const EVENT_BUSINESS_HOURS_UPDATED = 'business_hours.updated';
+
     public const EVENT_OUTBOUND_WHITELIST_UPDATED = 'outbound_whitelist.updated';
 
     public const EVENT_SETTINGS_UPDATED = 'settings.updated';
+
     public const EVENT_CLOUDONIX_CONFIG_UPDATED = 'cloudonix_config.updated';
 
     public const EVENT_SECURITY_VIOLATION = 'security.violation';
+
     public const EVENT_RATE_LIMIT_EXCEEDED = 'rate_limit.exceeded';
+
     public const EVENT_WEBHOOK_FAILED = 'webhook.failed';
+
+    // Auto Dialer List Events
+    public const EVENT_AUTO_DIALER_LIST_CREATED = 'auto_dialer.list.created';
+
+    public const EVENT_AUTO_DIALER_LIST_UPLOADED = 'auto_dialer.list.uploaded';
+
+    public const EVENT_AUTO_DIALER_LIST_PROCESSED = 'auto_dialer.list.processed';
+
+    public const EVENT_AUTO_DIALER_LIST_VALIDATION_FAILED = 'auto_dialer.list.validation_failed';
+
+    public const EVENT_AUTO_DIALER_LIST_ARCHIVED = 'auto_dialer.list.archived';
+
+    public const EVENT_AUTO_DIALER_LIST_COPIED = 'auto_dialer.list.copied';
+
+    public const EVENT_AUTO_DIALER_LIST_VERSION_CREATED = 'auto_dialer.list.version_created';
+
+    public const EVENT_AUTO_DIALER_LIST_ASSIGNED = 'auto_dialer.list.assigned';
+
+    public const EVENT_AUTO_DIALER_LIST_MARKED_USED = 'auto_dialer.list.marked_used';
+
+    public const EVENT_AUTO_DIALER_DESTINATION_ADDED = 'auto_dialer.destination.added';
+
+    public const EVENT_AUTO_DIALER_DESTINATIONS_BATCH_ADDED = 'auto_dialer.destinations.batch_added';
 
     /**
      * Log an audit event
      *
-     * @param string $event Event type constant
-     * @param array<string, mixed> $data Event-specific data
-     * @param string $level Log level (info, warning, error, critical)
-     * @param Request|null $request HTTP request context
-     * @param mixed $user User performing the action (if available)
+     * @param  string  $event  Event type constant
+     * @param  array<string, mixed>  $data  Event-specific data
+     * @param  string  $level  Log level (info, warning, error, critical)
+     * @param  Request|null  $request  HTTP request context
+     * @param  mixed  $user  User performing the action (if available)
      */
     public static function log(
         string $event,
