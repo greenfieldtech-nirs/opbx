@@ -52,6 +52,9 @@ import { DistributionListsEmpty } from './DistributionLists/components/Distribut
 import { CreateListDialog } from './DistributionLists/components/CreateListDialog';
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
+import { UploadDestinationsDialog } from './DistributionLists/components/UploadDestinationsDialog';
+import { NewVersionDialog } from './DistributionLists/components/NewVersionDialog';
+import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { toast } from 'sonner';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
 
@@ -77,6 +80,9 @@ export default function DistributionLists() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [copyList, setCopyList] = useState<AutoDialerList | null>(null);
   const [archiveList, setArchiveList] = useState<AutoDialerList | null>(null);
+  const [uploadList, setUploadList] = useState<AutoDialerList | null>(null);
+  const [versionList, setVersionList] = useState<AutoDialerList | null>(null);
+  const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
 
   const { data, isLoading, error } = useDistributionLists({
     page,
@@ -267,7 +273,7 @@ export default function DistributionLists() {
                             {list.can_upload && canManage && (
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/ui/auto-dialer/lists/${list.id}/upload`);
+                                setUploadList(list);
                               }}>
                                 <Upload className="h-4 w-4 mr-2" />
                                 Upload Destinations
@@ -280,6 +286,15 @@ export default function DistributionLists() {
                               }}>
                                 <Copy className="h-4 w-4 mr-2" />
                                 Copy List
+                              </DropdownMenuItem>
+                            )}
+                            {list.status === 'failed' && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setErrorsList(list);
+                              }}>
+                                <AlertCircle className="h-4 w-4 mr-2" />
+                                View Errors
                               </DropdownMenuItem>
                             )}
                             {list.can_archive && canManage && (
@@ -349,6 +364,30 @@ export default function DistributionLists() {
           onOpenChange={() => setArchiveList(null)}
           onConfirm={handleArchive}
           isArchiving={archiveMutation.isPending}
+        />
+      )}
+
+      {uploadList && (
+        <UploadDestinationsDialog
+          list={uploadList}
+          open={!!uploadList}
+          onOpenChange={() => setUploadList(null)}
+        />
+      )}
+
+      {versionList && (
+        <NewVersionDialog
+          list={versionList}
+          open={!!versionList}
+          onOpenChange={() => setVersionList(null)}
+        />
+      )}
+
+      {errorsList && (
+        <ValidationErrorsDialog
+          list={errorsList}
+          open={!!errorsList}
+          onOpenChange={() => setErrorsList(null)}
         />
       )}
     </div>
