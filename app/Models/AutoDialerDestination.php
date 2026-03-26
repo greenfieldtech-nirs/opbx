@@ -33,6 +33,7 @@ class AutoDialerDestination extends Model
         'last_disposition',
         'duration',
         'billsec',
+        'total_duration',
         'last_cdr_id',
         'last_error',
     ];
