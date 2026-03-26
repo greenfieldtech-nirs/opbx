@@ -47,11 +47,11 @@ import { Badge } from '@/components/ui/badge';
 // Pagination component - simple implementation
 import { useAuth } from '@/hooks/useAuth';
 import { useDistributionLists, useArchiveList, useDownloadExample } from '@/hooks/useDistributionLists';
-import { DistributionListsLoading } from './components/DistributionListsLoading';
-import { DistributionListsEmpty } from './components/DistributionListsEmpty';
-import { CreateListDialog } from './components/CreateListDialog';
-import { CopyListDialog } from './components/CopyListDialog';
-import { ArchiveListDialog } from './components/ArchiveListDialog';
+import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
+import { DistributionListsEmpty } from './DistributionLists/components/DistributionListsEmpty';
+import { CreateListDialog } from './DistributionLists/components/CreateListDialog';
+import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
+import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
 import { toast } from 'sonner';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
 
