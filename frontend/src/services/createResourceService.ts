@@ -82,7 +82,15 @@ export function createResourceService<T>(resource: string): ServiceInstance<T> {
  * Pre-configured service instances for common resources
  */
 export const extensionsService = createResourceService<Extension>('extensions');
-export const usersService = createResourceService<User>('users');
+
+// Users service with additional password update method
+export const usersService = {
+  ...createResourceService<User>('users'),
+  updatePassword: async (id: string | number, data: { password: string; password_confirmation: string }) => {
+    const response = await api.patch<{ success: boolean; message: string; data: { id: string } }>(`/users/${id}/password`, data);
+    return response.data;
+  },
+};
 export const conferenceRoomsService = createResourceService<ConferenceRoom>('conference-rooms');
 export const callLogsService = createResourceService<CallLog>('call-logs');
 

@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
+  Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,7 @@ import {
   useDeletePlatformUser,
   useCreatePlatformUser,
   useUpdatePlatformUser,
+  useUpdateUserPassword,
 } from '@/hooks/platform';
 import type { PlatformUser } from '@/types/platform';
 
@@ -126,12 +128,15 @@ export default function PlatformUsers() {
 
   const setManagerMutation = useSetPlatformManager();
   const deleteMutation = useDeletePlatformUser();
+  const updatePasswordMutation = useUpdateUserPassword();
 
   // Dialog states
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
   const [editFormData, setEditFormData] = useState({ name: '', email: '', role: 'pbx_user' });
+  const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
 
   const hasActiveFilters =
     debouncedSearch || statusFilter !== 'all' || pmFilter !== 'all';
@@ -179,6 +184,39 @@ export default function PlatformUsers() {
     setSelectedUser(user);
     setEditFormData({ name: user.name, email: user.email, role: user.role });
     setShowEditDialog(true);
+  };
+
+  const openPasswordDialog = (user: PlatformUser) => {
+    setSelectedUser(user);
+    setPasswordFormData({ password: '', password_confirmation: '' });
+    setShowPasswordDialog(true);
+  };
+
+  const handlePasswordChange = async () => {
+    if (!selectedUser) return;
+
+    if (passwordFormData.password !== passwordFormData.password_confirmation) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (passwordFormData.password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    try {
+      await updatePasswordMutation.mutateAsync({
+        id: selectedUser.id,
+        data: passwordFormData,
+      });
+      toast.success('Password updated successfully');
+      setShowPasswordDialog(false);
+      setPasswordFormData({ password: '', password_confirmation: '' });
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to update password';
+      toast.error(message);
+    }
   };
 
   // Get role badge
@@ -441,6 +479,19 @@ export default function PlatformUsers() {
                   <div className="text-sm text-muted-foreground">Status:</div>
                   {getStatusBadge(selectedUser.status)}
                 </div>
+
+                <div className="pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowEditDialog(false);
+                      openPasswordDialog(selectedUser);
+                    }}
+                  >
+                    <Key className="h-4 w-4 mr-2" />
+                    Change Password
+                  </Button>
+                </div>
               </div>
             )}
             <DialogFooter>
@@ -449,6 +500,50 @@ export default function PlatformUsers() {
               </Button>
               <Button onClick={() => setShowEditDialog(false)}>
                 Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Password Change Dialog */}
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change Password</DialogTitle>
+              <DialogDescription>
+                Set a new password for {selectedUser?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">New Password</label>
+                <Input
+                  type="password"
+                  value={passwordFormData.password}
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, password: e.target.value })}
+                  placeholder="Enter new password"
+                />
+                <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Confirm Password</label>
+                <Input
+                  type="password"
+                  value={passwordFormData.password_confirmation}
+                  onChange={(e) => setPasswordFormData({ ...passwordFormData, password_confirmation: e.target.value })}
+                  placeholder="Confirm new password"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePasswordChange}
+                disabled={updatePasswordMutation.isPending || !passwordFormData.password || !passwordFormData.password_confirmation}
+              >
+                {updatePasswordMutation.isPending ? 'Updating...' : 'Update Password'}
               </Button>
             </DialogFooter>
           </DialogContent>

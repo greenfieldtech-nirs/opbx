@@ -299,4 +299,57 @@ class UsersController extends AbstractApiCrudController
     {
         return true;
     }
+
+    /**
+     * Update user password.
+     *
+     * Dedicated endpoint for password changes with proper authorization and audit logging.
+     *
+     * @param  User  $user  The user whose password is being changed
+     */
+    public function updatePassword(User $user, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $currentUser = $this->getAuthenticatedUser();
+
+        // Check authorization
+        if ($currentUser->cannot('updatePassword', $user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to change this user\'s password.',
+                'error_code' => 'UNAUTHORIZED_PASSWORD_CHANGE',
+            ], 403);
+        }
+
+        // Validate request
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        // Update password
+        $user->password = bcrypt($validated['password']);
+        $user->save();
+
+        // Audit log with dedicated action for password changes
+        try {
+            AuditLogger::log('user.password.changed', [
+                'target_user_id' => $user->id,
+                'target_user_email' => $user->email,
+                'changed_by_user_id' => $currentUser->id,
+                'changed_by_user_email' => $currentUser->email,
+            ], AuditLogger::LEVEL_WARNING, $request, $currentUser);
+        } catch (\Exception $auditException) {
+            Log::error('Failed to log password change audit', [
+                'user_id' => $user->id,
+                'error' => $auditException->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully.',
+            'data' => [
+                'id' => $user->id,
+            ],
+        ]);
+    }
 }

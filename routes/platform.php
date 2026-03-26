@@ -35,6 +35,7 @@ Route::prefix('v1/platform')
         Route::put('/users/{user}', [\App\Http\Controllers\Platform\PlatformUserController::class, 'update']);
         Route::delete('/users/{user}', [\App\Http\Controllers\Platform\PlatformUserController::class, 'destroy']);
         Route::patch('/users/{user}/platform-manager', [\App\Http\Controllers\Platform\PlatformUserController::class, 'setPlatformManager']);
+        Route::patch('/users/{user}/password', [\App\Http\Controllers\Platform\PlatformUserController::class, 'updatePassword']);
 
         // Audit Logs
         Route::get('/audit-logs', [\App\Http\Controllers\Platform\PlatformAuditLogController::class, 'index']);

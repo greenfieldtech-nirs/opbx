@@ -154,6 +154,13 @@ export function useSetPlatformManager() {
   });
 }
 
+export function useUpdateUserPassword() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { password: string; password_confirmation: string } }) =>
+      platformApi.users.updatePassword(id, data),
+  });
+}
+
 /**
  * Audit Logs
  */

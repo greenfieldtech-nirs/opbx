@@ -38,6 +38,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import {
   Bell,
+  BellOff,
   Webhook,
   Shield,
   History,
@@ -48,6 +49,8 @@ import {
   AlertCircle,
   Settings,
   Bug,
+  Link,
+  Timer,
 } from 'lucide-react';
 import api from '@/services/api';
 import { DebugDialog } from './CallNotificationsSettings/components/DebugDialog';
@@ -132,7 +135,7 @@ export default function CallNotificationsSettingsPage() {
     if (settingsData) {
       setFormData({
         webhook_url: settingsData.webhook_url || '',
-        auth_method: settingsData.auth_method || 'hmac_sha256',
+        auth_method: settingsData.auth_method || 'none',
         auth_secret: '',
         auth_username: settingsData.auth_username || '',
         retry_attempts: settingsData.retry_attempts || 3,
@@ -172,21 +175,6 @@ export default function CallNotificationsSettingsPage() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Failed to update settings');
-    },
-  });
-
-  // Delete settings mutation
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      await api.delete('/call-notifications/settings');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-notifications-settings'] });
-      setFormData(DEFAULT_FORM_DATA);
-      toast.success('Notification settings deleted successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to delete settings');
     },
   });
 
@@ -288,256 +276,284 @@ export default function CallNotificationsSettingsPage() {
         </TabsList>
 
         <TabsContent value="settings" className="space-y-6">
-          {/* Webhook Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Webhook className="h-5 w-5" />
-                Webhook Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure the endpoint where call events will be sent
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="webhook_url">Webhook URL (HTTPS)</Label>
-                <Input
-                  id="webhook_url"
-                  placeholder="https://your-endpoint.com/webhook"
-                  value={formData.webhook_url}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, webhook_url: e.target.value }))
-                  }
-                  disabled={!canManage}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Must be a valid HTTPS URL
-                </p>
-              </div>
+          {/* Two-column layout */}
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Left column: Webhook Configuration (50%) */}
+            <div className="md:w-1/2">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Webhook className="h-5 w-5" />
+                    Webhook Configuration
+                  </CardTitle>
+                  <CardDescription>
+                    Configure the endpoint and authentication
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Webhook URL and Authentication side by side */}
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Webhook URL */}
+                    <div className="space-y-2 md:w-1/2">
+                      <div className="flex items-center gap-2">
+                        <Link className="h-4 w-4 text-muted-foreground" />
+                        <Label htmlFor="webhook_url">Webhook URL</Label>
+                      </div>
+                      <Input
+                        id="webhook_url"
+                        placeholder="https://your-endpoint.com/webhook"
+                        value={formData.webhook_url}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, webhook_url: e.target.value }))
+                        }
+                        disabled={!canManage}
+                      />
+                      {formData.webhook_url && formData.webhook_url.startsWith('http://') && (
+                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <span>Warning: HTTP is insecure. Use HTTPS in production environments.</span>
+                        </div>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        Must be a valid HTTP or HTTPS URL
+                      </p>
+                    </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Enable Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Toggle to enable or disable webhook delivery
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({ ...prev, is_active: checked }))
-                  }
-                  disabled={!canManage}
-                />
-              </div>
-            </CardContent>
-          </Card>
+                    {/* Authentication */}
+                    <div className="space-y-2 md:w-1/2">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <Label>Authentication Method</Label>
+                      </div>
+                      <Select
+                        value={formData.auth_method}
+                        onValueChange={(value: CallNotificationAuthMethod) =>
+                          setFormData((prev) => ({ ...prev, auth_method: value }))
+                        }
+                        disabled={!canManage}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AUTH_METHODS.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-          {/* Authentication */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Authentication
-              </CardTitle>
-              <CardDescription>
-                Configure how webhook requests are authenticated
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Authentication Method</Label>
-                <Select
-                  value={formData.auth_method}
-                  onValueChange={(value: CallNotificationAuthMethod) =>
-                    setFormData((prev) => ({ ...prev, auth_method: value }))
-                  }
-                  disabled={!canManage}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AUTH_METHODS.map((method) => (
-                      <SelectItem key={method.value} value={method.value}>
-                        {method.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                      {formData.auth_method === 'basic_auth' && (
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="auth_username">Username</Label>
+                          <Input
+                            id="auth_username"
+                            value={formData.auth_username}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, auth_username: e.target.value }))
+                            }
+                            disabled={!canManage}
+                          />
+                        </div>
+                      )}
 
-              {formData.auth_method === 'basic_auth' && (
-                <div className="space-y-2">
-                  <Label htmlFor="auth_username">Username</Label>
-                  <Input
-                    id="auth_username"
-                    value={formData.auth_username}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, auth_username: e.target.value }))
-                    }
-                    disabled={!canManage}
-                  />
-                </div>
-              )}
-
-              {formData.auth_method !== 'none' && (
-                <div className="space-y-2">
-                  <Label htmlFor="auth_secret">
-                    {formData.auth_method === 'hmac_sha256'
-                      ? 'Secret Key'
-                      : formData.auth_method === 'bearer_token'
-                      ? 'Bearer Token'
-                      : 'Password'}
-                    {settingsData?.has_auth_secret && ' (Leave blank to keep current)'}
-                  </Label>
-                  <Input
-                    id="auth_secret"
-                    type="password"
-                    value={formData.auth_secret}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, auth_secret: e.target.value }))
-                    }
-                    disabled={!canManage}
-                    placeholder={
-                      settingsData?.has_auth_secret ? '••••••••' : 'Enter secret'
-                    }
-                  />
-                  {formData.auth_method === 'hmac_sha256' && (
-                    <p className="text-sm text-muted-foreground">
-                      Used to sign webhook payloads with HMAC-SHA256
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Event Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Event Types
-              </CardTitle>
-              <CardDescription>
-                Select which call events trigger webhook notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {EVENT_OPTIONS.map((event) => (
-                  <div
-                    key={event.value}
-                    className="flex items-center space-x-2"
-                  >
-                    <Switch
-                      id={`event-${event.value}`}
-                      checked={formData.enabled_events.includes(event.value)}
-                      onCheckedChange={() => handleEventToggle(event.value)}
-                      disabled={!canManage}
-                    />
-                    <Label htmlFor={`event-${event.value}`} className="text-sm">
-                      {event.label}
-                    </Label>
+                      {formData.auth_method !== 'none' && (
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="auth_secret">
+                            {formData.auth_method === 'bearer_token'
+                              ? 'Bearer Token'
+                              : 'Password'}
+                            {settingsData?.has_auth_secret && ' (Leave blank to keep current)'}
+                          </Label>
+                          <Input
+                            id="auth_secret"
+                            type="password"
+                            value={formData.auth_secret}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, auth_secret: e.target.value }))
+                            }
+                            disabled={!canManage}
+                            placeholder={
+                              settingsData?.has_auth_secret ? '••••••••' : 'Enter secret'
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Advanced Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Advanced Settings</CardTitle>
-              <CardDescription>
-                Configure retry behavior and rate limiting
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="retry_attempts">Retry Attempts</Label>
-                  <Input
-                    id="retry_attempts"
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={formData.retry_attempts}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        retry_attempts: parseInt(e.target.value) || 3,
-                      }))
-                    }
-                    disabled={!canManage}
-                  />
-                </div>
+                  <Separator />
 
-                <div className="space-y-2">
-                  <Label htmlFor="retry_backoff">Retry Backoff (seconds)</Label>
-                  <Input
-                    id="retry_backoff"
-                    type="number"
-                    min={10}
-                    max={3600}
-                    value={formData.retry_backoff_seconds}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        retry_backoff_seconds: parseInt(e.target.value) || 60,
-                      }))
-                    }
-                    disabled={!canManage}
-                  />
-                </div>
+                  {/* Retry & Timeout Settings - all in one row */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-medium">Retry & Timeout Settings</h4>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="retry_attempts" className="text-xs">Retry Attempts</Label>
+                        <Input
+                          id="retry_attempts"
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={formData.retry_attempts}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              retry_attempts: parseInt(e.target.value) || 3,
+                            }))
+                          }
+                          disabled={!canManage}
+                          className="h-9"
+                        />
+                        <p className="text-xs text-muted-foreground leading-tight">Times to retry failed deliveries</p>
+                      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="timeout">Request Timeout (seconds)</Label>
-                  <Input
-                    id="timeout"
-                    type="number"
-                    min={5}
-                    max={120}
-                    value={formData.request_timeout_seconds}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        request_timeout_seconds: parseInt(e.target.value) || 30,
-                      }))
-                    }
-                    disabled={!canManage}
-                  />
-                </div>
-              </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="retry_backoff" className="text-xs">Retry Backoff</Label>
+                        <Input
+                          id="retry_backoff"
+                          type="number"
+                          min={10}
+                          max={3600}
+                          value={formData.retry_backoff_seconds}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              retry_backoff_seconds: parseInt(e.target.value) || 60,
+                            }))
+                          }
+                          disabled={!canManage}
+                          className="h-9"
+                        />
+                        <p className="text-xs text-muted-foreground leading-tight">Seconds between retries</p>
+                      </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="rate_limit">Rate Limit (per minute)</Label>
-                <Input
-                  id="rate_limit"
-                  type="number"
-                  min={100}
-                  max={5000}
-                  value={formData.rate_limit_per_minute}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      rate_limit_per_minute: parseInt(e.target.value) || 500,
-                    }))
-                  }
-                  disabled={!canManage}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Maximum number of webhook requests per minute
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                      <div className="space-y-1">
+                        <Label htmlFor="timeout" className="text-xs">Timeout</Label>
+                        <Input
+                          id="timeout"
+                          type="number"
+                          min={5}
+                          max={120}
+                          value={formData.request_timeout_seconds}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              request_timeout_seconds: parseInt(e.target.value) || 30,
+                            }))
+                          }
+                          disabled={!canManage}
+                          className="h-9"
+                        />
+                        <p className="text-xs text-muted-foreground leading-tight">Seconds to wait for response</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="rate_limit" className="text-xs">Rate Limit</Label>
+                        <Input
+                          id="rate_limit"
+                          type="number"
+                          min={100}
+                          max={5000}
+                          value={formData.rate_limit_per_minute}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              rate_limit_per_minute: parseInt(e.target.value) || 500,
+                            }))
+                          }
+                          disabled={!canManage}
+                          className="h-9"
+                        />
+                        <p className="text-xs text-muted-foreground leading-tight">Max requests per minute</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right column: Event Types (50%) */}
+            <div className="md:w-1/2">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="h-5 w-5" />
+                    Event Types
+                  </CardTitle>
+                  <CardDescription>
+                    Select which call events trigger webhook notifications
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {EVENT_OPTIONS.map((event) => (
+                      <div
+                        key={event.value}
+                        className="flex items-start gap-2 p-2 rounded hover:bg-muted/50"
+                      >
+                        <Switch
+                          id={`event-${event.value}`}
+                          checked={formData.enabled_events.includes(event.value)}
+                          onCheckedChange={() => handleEventToggle(event.value)}
+                          disabled={!canManage}
+                          className="mt-0.5"
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <Label htmlFor={`event-${event.value}`} className="text-sm font-medium cursor-pointer truncate">
+                            {event.label}
+                          </Label>
+                          <span className="text-xs text-muted-foreground">
+                            {event.description}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
           {/* Actions */}
           {canManage && (
             <div className="flex items-center gap-4">
+              {settingsData && (
+                <Button
+                  variant={formData.is_active ? 'default' : 'outline'}
+                  onClick={() => {
+                    const newValue = !formData.is_active;
+                    setFormData((prev) => ({ ...prev, is_active: newValue }));
+                    // Immediately save the toggle change
+                    updateMutation.mutate({ ...formData, is_active: newValue });
+                  }}
+                  disabled={updateMutation.isPending}
+                  className={
+                    formData.is_active
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'text-muted-foreground'
+                  }
+                >
+                  {updateMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : formData.is_active ? (
+                    <>
+                      <Bell className="h-4 w-4 mr-2" />
+                      Notifications Enabled
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="h-4 w-4 mr-2" />
+                      Notifications Disabled
+                    </>
+                  )}
+                </Button>
+              )}
+
               <Button
                 onClick={handleSave}
                 disabled={
@@ -555,33 +571,18 @@ export default function CallNotificationsSettingsPage() {
               </Button>
 
               {settingsData && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => testMutation.mutate()}
-                    disabled={testMutation.isPending}
-                  >
-                    {testMutation.isPending ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4 mr-2" />
-                    )}
-                    Test Webhook
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    onClick={() => deleteMutation.mutate()}
-                    disabled={deleteMutation.isPending}
-                  >
-                    {deleteMutation.isPending ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <X className="h-4 w-4 mr-2" />
-                    )}
-                    Delete Settings
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  onClick={() => testMutation.mutate()}
+                  disabled={testMutation.isPending}
+                >
+                  {testMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Test Webhook
+                </Button>
               )}
             </div>
           )}

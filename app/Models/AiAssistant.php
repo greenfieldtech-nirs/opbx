@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\UserStatus;
+use App\Enums\AiAssistantStatus;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderDefinition;
 use App\Services\AiAssistant\ProviderRegistry;
@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $organization_id
  * @property string $name
  * @property string|null $description
- * @property UserStatus $status
+ * @property AiAssistantStatus $status
  * @property string $provider
  * @property string $protocol
  * @property array $configuration
@@ -69,7 +69,7 @@ class AiAssistant extends Model
     protected function casts(): array
     {
         return [
-            'status' => UserStatus::class,
+            'status' => AiAssistantStatus::class,
             'configuration' => 'array',
         ];
     }
@@ -123,7 +123,7 @@ class AiAssistant extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('status', UserStatus::ACTIVE);
+        return $query->where('status', AiAssistantStatus::ACTIVE);
     }
 
     /**
@@ -131,7 +131,7 @@ class AiAssistant extends Model
      */
     public function scopeInactive($query)
     {
-        return $query->where('status', UserStatus::INACTIVE);
+        return $query->where('status', AiAssistantStatus::INACTIVE);
     }
 
     /**
@@ -163,15 +163,15 @@ class AiAssistant extends Model
     }
 
     /**
-     * Scope a query to filter by status using UserStatus enum.
+     * Scope a query to filter by status using AiAssistantStatus enum.
      */
     public function scopeWithStatus($query, $status)
     {
-        if ($status instanceof UserStatus) {
+        if ($status instanceof AiAssistantStatus) {
             return $query->where('status', $status);
         }
 
-        return $query->where('status', UserStatus::from($status));
+        return $query->where('status', AiAssistantStatus::from($status));
     }
 
     /**
