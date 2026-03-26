@@ -35,9 +35,10 @@ class UpdateSettingsRequest extends FormRequest
                 'required',
                 'url',
                 'max:2048',
+                // Must be HTTP or HTTPS
                 function ($attribute, $value, $fail) {
-                    if (! str_starts_with($value, 'https://')) {
-                        $fail('The webhook URL must use HTTPS for security.');
+                    if (! str_starts_with($value, 'http://') && ! str_starts_with($value, 'https://')) {
+                        $fail('The webhook URL must use HTTP or HTTPS.');
                     }
                 },
             ],
@@ -45,7 +46,7 @@ class UpdateSettingsRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                Rule::in(['hmac_sha256', 'bearer_token', 'basic_auth', 'none']),
+                Rule::in(['bearer_token', 'basic_auth', 'none']),
             ],
             'auth_secret' => [
                 'nullable',
