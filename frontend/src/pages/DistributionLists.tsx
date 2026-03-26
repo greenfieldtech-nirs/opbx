@@ -72,7 +72,7 @@ export default function DistributionLists() {
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<DistributionListStatus | ''>('');
+  const [status, setStatus] = useState<DistributionListStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [copyList, setCopyList] = useState<AutoDialerList | null>(null);
@@ -82,7 +82,7 @@ export default function DistributionLists() {
     page,
     per_page: 25,
     search: search || undefined,
-    status: status || undefined,
+    status: status && status !== 'all' ? status : undefined,
   });
 
   const archiveMutation = useArchiveList();
@@ -169,13 +169,16 @@ export default function DistributionLists() {
                 className="pl-9"
               />
             </div>
-            <Select value={status} onValueChange={(v) => setStatus(v as DistributionListStatus)}>
+            <Select
+              value={status || 'all'}
+              onValueChange={(v) => setStatus(v as DistributionListStatus | 'all')}
+            >
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="ready">Ready</SelectItem>
                 <SelectItem value="processing">Processing</SelectItem>
