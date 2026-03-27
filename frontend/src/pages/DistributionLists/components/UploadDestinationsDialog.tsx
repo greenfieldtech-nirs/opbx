@@ -19,12 +19,14 @@ interface UploadDestinationsDialogProps {
   list: AutoDialerList;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 export function UploadDestinationsDialog({
   list,
   open,
   onOpenChange,
+  onSuccess,
 }: UploadDestinationsDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -60,13 +62,17 @@ export function UploadDestinationsDialog({
   };
 
   const handleClose = () => {
+    // Call onSuccess callback if upload completed or failed (to refresh the list)
+    if ((isComplete || isFailed) && onSuccess) {
+      onSuccess();
+    }
     setFile(null);
     setJobId(null);
     onOpenChange(false);
   };
 
   const isComplete = progressData?.data?.status === 'completed';
-  const isFailed = progressData?.data?.status === 'failed' || progressData?.data?.status === 'error';
+  const isFailed = progressData?.data?.status === 'failed' || progressData?.data?.status === 'error' || progressData?.data?.status === 'validation_failed';
   const progress = progressData?.data?.percentage || 0;
 
   return (
@@ -158,7 +164,9 @@ export function UploadDestinationsDialog({
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Upload failed. Please check the validation errors.
+                  {progressData?.data?.status === 'validation_failed'
+                    ? 'CSV validation failed. Please check the file format and try again.'
+                    : 'Upload failed. Please check the validation errors.'}
                 </AlertDescription>
               </Alert>
             )}

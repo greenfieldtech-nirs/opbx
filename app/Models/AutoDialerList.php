@@ -289,7 +289,7 @@ class AutoDialerList extends Model
             'description' => $this->description,
             'version_number' => 1,
             'is_latest_version' => true,
-            'status' => ListStatus::DRAFT,
+            'status' => ListStatus::READY,
         ]);
 
         // Copy destinations with reset statuses

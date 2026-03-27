@@ -153,16 +153,23 @@ class DistributionListPolicy
     /**
      * Determine whether the user can delete the list.
      *
-     * Note: Lists should be archived, not deleted.
-     * Only Owners can delete in special circumstances.
+     * Note: Lists should normally be archived, not deleted.
+     * Failed lists can be deleted by Owners and PBX Admins.
+     * Only Owners can delete lists in other statuses.
      */
     public function delete(User $user, AutoDialerList $list): bool
     {
-        // Must be Owner
+        // Must be in same organization
         if ($user->organization_id !== $list->organization_id) {
             return false;
         }
 
+        // Failed lists can be deleted by Owners and PBX Admins
+        if ($list->status->value === 'failed') {
+            return $user->isOwner() || $user->isPBXAdmin();
+        }
+
+        // Other lists can only be deleted by Owners
         return $user->isOwner();
     }
 

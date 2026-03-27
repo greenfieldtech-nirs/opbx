@@ -300,7 +300,7 @@ class AutoDialerCampaignController extends Controller
         }
 
         // Read header
-        $header = fgetcsv($handle);
+        $header = fgetcsv($handle, escape: '\\');
         if (! $header) {
             fclose($handle);
 
@@ -312,7 +312,7 @@ class AutoDialerCampaignController extends Controller
         $invalidRows = 0;
         $destinations = [];
 
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, escape: '\\')) !== false) {
             $totalRows++;
 
             if (count($row) < 1) {

@@ -1240,6 +1240,10 @@ export interface AutoDialerList {
     invalid_rows: number;
   };
   parent_list_id: number | null;
+  parent_list?: {
+    id: number;
+    version_number: number;
+  };
   has_versions: boolean;
   can_archive: boolean;
   can_assign: boolean;
@@ -1248,6 +1252,7 @@ export interface AutoDialerList {
   created_at: string;
   processed_at: string | null;
   archived_at: string | null;
+  original_filename: string | null;
   campaign?: {
     id: number;
     name: string;
@@ -1255,7 +1260,27 @@ export interface AutoDialerList {
   used_by_campaign?: {
     id: number;
     name: string;
+    status: string;
   };
+  versions?: AutoDialerList[];
+}
+
+export interface ListDestination {
+  id: number;
+  phone_number: string;
+  description: string | null;
+  status: string;
+  status_label: string;
+  dial_attempts: number;
+  last_dialed_at: string | null;
+  last_disposition: string | null;
+  duration: number;
+  billsec: number;
+  total_duration: number;
+  last_error: string | null;
+  is_invalid: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateListRequest {

@@ -69,9 +69,9 @@ class ListManagementService
             throw new \InvalidArgumentException('List cannot accept uploads in current status: '.$list->status->label());
         }
 
-        // Store file temporarily
+        // Store file temporarily (default disk is 'local' which uses storage/app/private)
         $tempPath = $file->store('temp/list_uploads');
-        $fullPath = storage_path('app/'.$tempPath);
+        $fullPath = storage_path('app/private/'.$tempPath);
 
         // Generate job ID
         $jobId = Str::uuid()->toString();
@@ -79,6 +79,17 @@ class ListManagementService
         // Count rows to determine if large file
         $rowCount = $this->countCsvRows($fullPath);
         $isLargeFile = $rowCount > self::MAX_ENTRIES_PER_LIST;
+
+        // Write initial progress to cache so frontend doesn't get "not found"
+        Cache::put(
+            "list_upload_progress:{$jobId}",
+            [
+                'percentage' => 0,
+                'status' => 'queued',
+                'updated_at' => now()->toIso8601String(),
+            ],
+            now()->addHours(2)
+        );
 
         if ($isLargeFile) {
             // Dispatch large file job
@@ -364,14 +375,19 @@ class ListManagementService
         $list = AutoDialerList::findOrFail($listId);
 
         $filename = tempnam(sys_get_temp_dir(), 'list_export_').'.csv';
+        $handle = fopen($filename, 'w');
 
-        $writer = \League\Csv\Writer::createFromPath($filename, 'w+');
-        $writer->insertOne(['phone_number', 'description', 'status', 'dial_attempts']);
+        if ($handle === false) {
+            throw new \RuntimeException('Failed to create export file');
+        }
+
+        // Write header
+        fputcsv($handle, ['phone_number', 'description', 'status', 'dial_attempts']);
 
         // Stream destinations to avoid memory issues with large lists
-        $list->destinations()->chunk(1000, function ($destinations) use ($writer) {
+        $list->destinations()->chunk(1000, function ($destinations) use ($handle) {
             foreach ($destinations as $destination) {
-                $writer->insertOne([
+                fputcsv($handle, [
                     $destination->phone_number,
                     $destination->description,
                     $destination->status->value,
@@ -379,6 +395,8 @@ class ListManagementService
                 ]);
             }
         });
+
+        fclose($handle);
 
         return $filename;
     }
@@ -389,10 +407,22 @@ class ListManagementService
     private function countCsvRows(string $filePath): int
     {
         try {
-            $reader = \League\Csv\Reader::createFromPath($filePath, 'r');
-            $reader->setHeaderOffset(0);
+            $handle = fopen($filePath, 'r');
+            if ($handle === false) {
+                return 0;
+            }
 
-            return count($reader);
+            // Skip header
+            fgetcsv($handle, escape: '\\');
+
+            $count = 0;
+            while (fgetcsv($handle, escape: '\\') !== false) {
+                $count++;
+            }
+
+            fclose($handle);
+
+            return $count;
         } catch (\Exception $e) {
             return 0;
         }

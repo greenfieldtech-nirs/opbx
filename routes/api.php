@@ -229,6 +229,8 @@ Route::prefix('v1')->group(function (): void {
             ->name('distribution-lists.download');
         Route::get('auto-dialer-campaigns/lists/{list}/validation-errors', [\App\Http\Controllers\DistributionListController::class, 'getValidationErrors'])
             ->name('distribution-lists.errors');
+        Route::delete('auto-dialer-campaigns/lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'destroy'])
+            ->name('distribution-lists.destroy');
 
         // Auto Dialer Campaigns
         Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)

@@ -89,7 +89,7 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: opbx_queue_worker
-    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90
+    command: php artisan queue:work redis --queue=auto-dialer,default --sleep=3 --tries=3 --timeout=90
     volumes:
       - ./:/var/www/html
     environment:

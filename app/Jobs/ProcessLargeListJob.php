@@ -183,25 +183,45 @@ class ProcessLargeListJob implements ShouldQueue
      */
     private function splitCsvFile(string $filePath, int $maxRows): array
     {
-        $reader = \League\Csv\Reader::createFromPath($filePath, 'r');
-        $reader->setHeaderOffset(0);
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            return [];
+        }
 
-        $headers = $reader->getHeader();
-        $records = iterator_to_array($reader->getRecords());
+        // Read header
+        $headers = fgetcsv($handle, escape: '\\');
+        if ($headers === false) {
+            fclose($handle);
+
+            return [];
+        }
+
+        $records = [];
+        while (($row = fgetcsv($handle, escape: '\\')) !== false) {
+            $records[] = array_combine($headers, $row);
+        }
+        fclose($handle);
 
         $chunks = array_chunk($records, $maxRows);
         $files = [];
 
-        foreach ($chunks as $index => $chunk) {
+        foreach ($chunks as $chunk) {
             $tempFile = tempnam(sys_get_temp_dir(), 'list_chunk_').'.csv';
+            $chunkHandle = fopen($tempFile, 'w');
 
-            $writer = \League\Csv\Writer::createFromPath($tempFile, 'w+');
-            $writer->insertOne($headers);
-
-            foreach ($chunk as $record) {
-                $writer->insertOne($record);
+            if ($chunkHandle === false) {
+                continue;
             }
 
+            // Write header
+            fputcsv($chunkHandle, $headers);
+
+            // Write records
+            foreach ($chunk as $record) {
+                fputcsv($chunkHandle, $record);
+            }
+
+            fclose($chunkHandle);
             $files[] = $tempFile;
         }
 

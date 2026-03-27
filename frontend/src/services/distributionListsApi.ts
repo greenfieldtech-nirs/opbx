@@ -188,4 +188,12 @@ export const distributionListsApi = {
     const response = await api.get(`/auto-dialer-campaigns/lists/${listId}/validation-errors`);
     return response.data;
   },
+
+  /**
+   * Delete a list (only allowed for failed lists or by Owners)
+   */
+  delete: async (listId: string | number): Promise<{ message: string }> => {
+    const response = await api.delete(`/auto-dialer-campaigns/lists/${listId}`);
+    return response.data;
+  },
 };

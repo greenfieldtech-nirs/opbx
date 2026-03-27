@@ -224,3 +224,17 @@ export function useValidationErrors(listId: string | number) {
     enabled: !!listId,
   });
 }
+
+/**
+ * Hook to delete a list
+ */
+export function useDeleteList() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (listId: string | number) => distributionListsApi.delete(listId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
+    },
+  });
+}

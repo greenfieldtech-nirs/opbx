@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   RefreshCw,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +47,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 // Pagination component - simple implementation
 import { useAuth } from '@/hooks/useAuth';
-import { useDistributionLists, useArchiveList, useDownloadExample } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList } from '@/hooks/useDistributionLists';
+import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { DistributionListsEmpty } from './DistributionLists/components/DistributionListsEmpty';
 import { CreateListDialog } from './DistributionLists/components/CreateListDialog';
@@ -55,6 +57,7 @@ import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDia
 import { UploadDestinationsDialog } from './DistributionLists/components/UploadDestinationsDialog';
 import { NewVersionDialog } from './DistributionLists/components/NewVersionDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
+import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { toast } from 'sonner';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
 
@@ -80,6 +83,7 @@ export default function DistributionLists() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [copyList, setCopyList] = useState<AutoDialerList | null>(null);
   const [archiveList, setArchiveList] = useState<AutoDialerList | null>(null);
+  const [deleteList, setDeleteList] = useState<AutoDialerList | null>(null);
   const [uploadList, setUploadList] = useState<AutoDialerList | null>(null);
   const [versionList, setVersionList] = useState<AutoDialerList | null>(null);
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
@@ -92,7 +96,9 @@ export default function DistributionLists() {
   });
 
   const archiveMutation = useArchiveList();
+  const deleteMutation = useDeleteList();
   const downloadExampleMutation = useDownloadExample();
+  const queryClient = useQueryClient();
 
   const handleDownloadExample = async () => {
     try {
@@ -118,6 +124,23 @@ export default function DistributionLists() {
     } catch {
       toast.error('Failed to archive list');
     }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteList) return;
+
+    try {
+      await deleteMutation.mutateAsync(deleteList.id);
+      toast.success('List deleted successfully');
+      setDeleteList(null);
+    } catch {
+      toast.error('Failed to delete list');
+    }
+  };
+
+  const handleUploadSuccess = () => {
+    // Refresh the list to show updated status
+    queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
   };
 
   if (isLoading) {
@@ -225,9 +248,11 @@ export default function DistributionLists() {
                 </TableHeader>
                 <TableBody>
                   {lists.map((list) => (
-                  <TableRow
-                    key={list.id}
-                  >
+                    <TableRow
+                      key={list.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.id}`)}
+                    >
                       <TableCell className="font-medium">
                         {list.name}
                         {!list.is_latest_version && (
@@ -262,8 +287,11 @@ export default function DistributionLists() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled>
-                              View Details (Coming Soon)
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/ui/auto-dialer/distribution-lists/${list.id}`);
+                            }}>
+                              View Details
                             </DropdownMenuItem>
                             {list.can_upload && canManage && (
                               <DropdownMenuItem onClick={(e) => {
@@ -292,7 +320,7 @@ export default function DistributionLists() {
                                 View Errors
                               </DropdownMenuItem>
                             )}
-                            {list.can_archive && canManage && (
+                            {list.can_archive && canManage && list.status !== 'failed' && (
                               <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={(e) => {
@@ -302,6 +330,18 @@ export default function DistributionLists() {
                               >
                                 <Archive className="h-4 w-4 mr-2" />
                                 Archive
+                              </DropdownMenuItem>
+                            )}
+                            {list.status === 'failed' && canManage && (
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteList(list);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -367,6 +407,7 @@ export default function DistributionLists() {
           list={uploadList}
           open={!!uploadList}
           onOpenChange={() => setUploadList(null)}
+          onSuccess={handleUploadSuccess}
         />
       )}
 
@@ -383,6 +424,16 @@ export default function DistributionLists() {
           list={errorsList}
           open={!!errorsList}
           onOpenChange={() => setErrorsList(null)}
+        />
+      )}
+
+      {deleteList && (
+        <DeleteListDialog
+          list={deleteList}
+          open={!!deleteList}
+          onOpenChange={() => setDeleteList(null)}
+          onConfirm={handleDelete}
+          isDeleting={deleteMutation.isPending}
         />
       )}
     </div>

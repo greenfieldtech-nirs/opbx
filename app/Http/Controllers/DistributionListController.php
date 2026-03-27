@@ -286,12 +286,12 @@ class DistributionListController extends Controller
      */
     public function downloadExample(): BinaryFileResponse
     {
-        $content = "phone_number,description\n" .
-            "+14155551212,John Doe - Sales Lead\n" .
-            "+14155551213,Jane Smith - Support Case\n" .
+        $content = "phone_number,description\n".
+            "+14155551212,John Doe - Sales Lead\n".
+            "+14155551213,Jane Smith - Support Case\n".
             "+14155551214,Bob Johnson - Follow-up Call\n";
 
-        $filePath = tempnam(sys_get_temp_dir(), 'list_example_') . '.csv';
+        $filePath = tempnam(sys_get_temp_dir(), 'list_example_').'.csv';
         file_put_contents($filePath, $content);
 
         return response()->download($filePath, 'distribution_list_example.csv');
@@ -313,5 +313,29 @@ class DistributionListController extends Controller
         return response()->json([
             'data' => $list->validation_errors ?? [],
         ]);
+    }
+
+    /**
+     * Delete a list (only allowed for failed lists or by Owners).
+     */
+    public function destroy(AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('delete', $list);
+
+        try {
+            // Delete associated destinations first
+            $list->destinations()->delete();
+
+            // Delete the list
+            $list->delete();
+
+            return response()->json([
+                'message' => 'List deleted successfully',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to delete list: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

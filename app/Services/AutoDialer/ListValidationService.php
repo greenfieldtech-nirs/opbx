@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\AutoDialer;
 
-use League\Csv\Reader;
 use libphonenumber\NumberParseException;
 use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberType;
@@ -107,13 +106,37 @@ class ListValidationService
         ?string $defaultRegion = 'US',
     ): CsvValidationResult {
         try {
-            $reader = Reader::createFromPath($filePath, 'r');
-            $reader->setHeaderOffset(0);
+            $handle = fopen($filePath, 'r');
+            if ($handle === false) {
+                return new CsvValidationResult(
+                    totalRows: 0,
+                    validRows: [],
+                    invalidRows: [],
+                    duplicates: [],
+                    success: false,
+                    error: 'Failed to open CSV file',
+                );
+            }
 
-            $headers = $reader->getHeader();
+            // Read header
+            $headers = fgetcsv($handle, escape: '\\');
+            if ($headers === false) {
+                fclose($handle);
+
+                return new CsvValidationResult(
+                    totalRows: 0,
+                    validRows: [],
+                    invalidRows: [],
+                    duplicates: [],
+                    success: false,
+                    error: 'CSV file is empty or has no headers',
+                );
+            }
 
             // Validate required columns
             if (! in_array('phone_number', $headers, true)) {
+                fclose($handle);
+
                 return new CsvValidationResult(
                     totalRows: 0,
                     validRows: [],
@@ -124,15 +147,20 @@ class ListValidationService
                 );
             }
 
-            $records = $reader->getRecords();
             $validRows = [];
             $invalidRows = [];
             $seenNumbers = []; // Track duplicates
             $duplicates = [];
             $rowNumber = 0;
 
-            foreach ($records as $record) {
+            while (($rowData = fgetcsv($handle, escape: '\\')) !== false) {
                 $rowNumber++;
+
+                // Combine headers with row data
+                $record = array_combine($headers, $rowData);
+                if ($record === false) {
+                    continue; // Skip malformed rows
+                }
 
                 // Skip empty rows
                 if (empty($record['phone_number'])) {
@@ -172,6 +200,8 @@ class ListValidationService
                     ];
                 }
             }
+
+            fclose($handle);
 
             return new CsvValidationResult(
                 totalRows: $rowNumber,
@@ -247,9 +277,11 @@ class ListValidationService
     /**
      * Get human-readable number type.
      */
-    private function getNumberTypeString(int $numberType): string
+    private function getNumberTypeString(PhoneNumberType|int $numberType): string
     {
-        return match ($numberType) {
+        $value = $numberType instanceof PhoneNumberType ? $numberType->value : $numberType;
+
+        return match ($value) {
             PhoneNumberType::MOBILE => 'MOBILE',
             PhoneNumberType::FIXED_LINE => 'FIXED_LINE',
             PhoneNumberType::FIXED_LINE_OR_MOBILE => 'FIXED_LINE_OR_MOBILE',
