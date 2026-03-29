@@ -292,7 +292,7 @@ export default function DistributionLists() {
                         )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        {(list.campaign?.name || list.campaign_id) ? (
+                        {(list.campaign?.name || list.campaign_id || list.status === 'in_use') ? (
                           <div className="flex items-center gap-2">
                             {canManage && (
                               <button
@@ -308,7 +308,7 @@ export default function DistributionLists() {
                             )}
                             <span className="text-sm">{list.campaign?.name || 'Assigned'}</span>
                           </div>
-                        ) : list.can_assign && canManage ? (
+                        ) : list.can_assign && list.status === 'ready' && canManage ? (
                           <Button
                             variant="outline"
                             size="sm"
