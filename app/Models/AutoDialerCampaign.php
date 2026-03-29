@@ -187,6 +187,14 @@ class AutoDialerCampaign extends Model
     }
 
     /**
+     * Check if the campaign can accept a list assignment.
+     */
+    public function canAcceptList(): bool
+    {
+        return $this->status->canAcceptList();
+    }
+
+    /**
      * Check if the campaign is currently runnable.
      */
     public function isRunnable(): bool

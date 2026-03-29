@@ -48,6 +48,7 @@ import { Badge } from '@/components/ui/badge';
 // Pagination component - simple implementation
 import { useAuth } from '@/hooks/useAuth';
 import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList } from '@/hooks/useDistributionLists';
+import { useAutoDialerCampaigns } from '@/hooks/useAutoDialerCampaigns';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { DistributionListsEmpty } from './DistributionLists/components/DistributionListsEmpty';
@@ -58,6 +59,7 @@ import { UploadDestinationsDialog } from './DistributionLists/components/UploadD
 import { NewVersionDialog } from './DistributionLists/components/NewVersionDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
+import { AssignCampaignDialog } from './DistributionLists/components/AssignCampaignDialog';
 import { toast } from 'sonner';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
 
@@ -87,6 +89,7 @@ export default function DistributionLists() {
   const [uploadList, setUploadList] = useState<AutoDialerList | null>(null);
   const [versionList, setVersionList] = useState<AutoDialerList | null>(null);
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
+  const [assignList, setAssignList] = useState<AutoDialerList | null>(null);
 
   const { data, isLoading, error } = useDistributionLists({
     page,
@@ -99,6 +102,9 @@ export default function DistributionLists() {
   const deleteMutation = useDeleteList();
   const downloadExampleMutation = useDownloadExample();
   const queryClient = useQueryClient();
+
+  // Fetch campaigns for assignment dialog
+  const { data: campaignsData } = useAutoDialerCampaigns({ per_page: 100 });
 
   const handleDownloadExample = async () => {
     try {
@@ -273,8 +279,23 @@ export default function DistributionLists() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {list.used_by_campaign?.name || list.campaign?.name || '-'}
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {list.campaign?.name ? (
+                          <span className="text-sm">{list.campaign.name}</span>
+                        ) : list.can_assign && canManage ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssignList(list);
+                            }}
+                          >
+                            Assign Campaign
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {new Date(list.created_at).toLocaleDateString()}
@@ -434,6 +455,15 @@ export default function DistributionLists() {
           onOpenChange={() => setDeleteList(null)}
           onConfirm={handleDelete}
           isDeleting={deleteMutation.isPending}
+        />
+      )}
+
+      {assignList && (
+        <AssignCampaignDialog
+          list={assignList}
+          open={!!assignList}
+          onOpenChange={() => setAssignList(null)}
+          campaigns={campaignsData?.data || []}
         />
       )}
     </div>

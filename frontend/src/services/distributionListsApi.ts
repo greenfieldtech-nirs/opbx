@@ -196,4 +196,17 @@ export const distributionListsApi = {
     const response = await api.delete(`/auto-dialer-campaigns/lists/${listId}`);
     return response.data;
   },
+
+  /**
+   * Assign a list to a campaign
+   */
+  assignToCampaign: async (
+    listId: string | number,
+    campaignId: number
+  ): Promise<{ message: string; data: { list_id: number; campaign_id: number; campaign_name: string } }> => {
+    const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/assign`, {
+      campaign_id: campaignId,
+    });
+    return response.data;
+  },
 };

@@ -338,4 +338,60 @@ class DistributionListController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Assign a list to a campaign.
+     */
+    public function assignToCampaign(Request $request, AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('assign', $list);
+
+        $validated = $request->validate([
+            'campaign_id' => ['required', 'exists:auto_dialer_campaigns,id'],
+        ]);
+
+        $campaign = AutoDialerCampaign::findOrFail($validated['campaign_id']);
+
+        // Check if campaign belongs to the same organization
+        if ($campaign->organization_id !== $list->organization_id) {
+            return response()->json([
+                'error' => 'Campaign does not belong to this organization',
+            ], 403);
+        }
+
+        // Check if campaign can accept a list
+        if (! $campaign->canAcceptList()) {
+            return response()->json([
+                'error' => 'Campaign cannot accept a list in its current status',
+            ], 422);
+        }
+
+        // Check if list is ready for assignment
+        if (! $list->isReady()) {
+            return response()->json([
+                'error' => 'List is not ready for assignment',
+            ], 422);
+        }
+
+        try {
+            $this->listService->assignListToCampaign($list->id, $campaign->id);
+
+            return response()->json([
+                'message' => 'List assigned to campaign successfully',
+                'data' => [
+                    'list_id' => $list->id,
+                    'campaign_id' => $campaign->id,
+                    'campaign_name' => $campaign->name,
+                ],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to assign list to campaign: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }

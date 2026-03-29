@@ -238,3 +238,18 @@ export function useDeleteList() {
     },
   });
 }
+
+/**
+ * Hook to assign a list to a campaign
+ */
+export function useAssignListToCampaign() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ listId, campaignId }: { listId: string | number; campaignId: number }) =>
+      distributionListsApi.assignToCampaign(listId, campaignId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
+    },
+  });
+}

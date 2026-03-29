@@ -68,4 +68,12 @@ enum CampaignStatus: string
     {
         return $this === self::ACTIVE;
     }
+
+    /**
+     * Check if the campaign can accept a list assignment.
+     */
+    public function canAcceptList(): bool
+    {
+        return in_array($this, [self::DRAFT, self::ACTIVE], true);
+    }
 }

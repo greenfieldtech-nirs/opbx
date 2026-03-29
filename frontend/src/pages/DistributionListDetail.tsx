@@ -11,20 +11,14 @@ import {
   Phone,
   Clock,
   BarChart3,
-  TrendingUp,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   XCircle,
   RotateCcw,
   ExternalLink,
-  MoreVertical,
   Filter,
   Search,
   History,
-  Calendar,
-  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,12 +39,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -66,6 +54,7 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { useDistributionList, useListDestinations, useDownloadList } from '@/hooks/useDistributionLists';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
@@ -97,10 +86,9 @@ interface MetricCardProps {
   value: string | number;
   subtitle?: string;
   icon: React.ReactNode;
-  trend?: { value: number; positive: boolean };
 }
 
-function MetricCard({ title, value, subtitle, icon, trend }: MetricCardProps) {
+function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
   return (
     <Card>
       <CardContent className="p-6">
@@ -109,12 +97,6 @@ function MetricCard({ title, value, subtitle, icon, trend }: MetricCardProps) {
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
             <p className="text-3xl font-bold mt-2">{value}</p>
             {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
-            {trend && (
-              <p className={`text-sm mt-1 flex items-center gap-1 ${trend.positive ? 'text-green-600' : 'text-red-600'}`}>
-                <TrendingUp className="h-4 w-4" />
-                {trend.positive ? '+' : ''}{trend.value}%
-              </p>
-            )}
           </div>
           <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
             {icon}
@@ -136,7 +118,6 @@ export default function DistributionListDetail() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [selectedDestinations, setSelectedDestinations] = useState<number[]>([]);
-  const [editingDestination, setEditingDestination] = useState<ListDestination | null>(null);
   const [cdrPhoneNumber, setCdrPhoneNumber] = useState<string | null>(null);
 
   // Dialog states
@@ -210,6 +191,16 @@ export default function DistributionListDetail() {
     toast.info('Retry functionality coming soon');
   };
 
+  const handleResetDialAttempts = (destinationId: number) => {
+    // TODO: Implement reset dial attempts
+    toast.info('Reset dial attempts functionality coming soon');
+  };
+
+  const handleDeleteDestination = (destinationId: number) => {
+    // TODO: Implement delete destination
+    toast.info('Delete destination functionality coming soon');
+  };
+
   const handleBulkDelete = () => {
     // TODO: Implement bulk delete
     toast.info(`Deleting ${selectedDestinations.length} destinations...`);
@@ -274,7 +265,7 @@ export default function DistributionListDetail() {
           {canManage && (
             <Button variant="outline" onClick={() => setIsVersionOpen(true)}>
               <FileSpreadsheet className="h-4 w-4 mr-2" />
-              New Version
+              Upload New List
             </Button>
           )}
           {list.can_copy && canManage && (
@@ -315,7 +306,6 @@ export default function DistributionListDetail() {
           value={`${connectionRate}%`}
           subtitle="Successfully connected"
           icon={<CheckCircle className="h-6 w-6 text-green-600" />}
-          trend={{ value: 12, positive: true }}
         />
         <MetricCard
           title="Avg. Call Duration"
@@ -336,7 +326,7 @@ export default function DistributionListDetail() {
         <Card className="border-purple-200 bg-purple-50/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+              <BarChart3 className="h-5 w-5 text-purple-600" />
               Campaign Assignment
             </CardTitle>
           </CardHeader>
@@ -374,18 +364,18 @@ export default function DistributionListDetail() {
           {/* Filters */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search phone numbers or descriptions..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 h-10"
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[180px] h-10">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -399,11 +389,11 @@ export default function DistributionListDetail() {
                 </Select>
                 {selectedDestinations.length > 0 && (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleRetryFailed}>
+                    <Button variant="outline" className="h-10" onClick={handleRetryFailed}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Retry ({selectedDestinations.length})
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                    <Button variant="destructive" className="h-10" onClick={handleBulkDelete}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
                     </Button>
@@ -492,28 +482,44 @@ export default function DistributionListDetail() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
+                          <div className="flex items-center gap-2">
+                            {destination.dial_attempts > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleResetDialAttempts(destination.id)}
+                                    >
+                                      <RotateCcw className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Reset Dial Attempts</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {destination.status === 'failed' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRetryFailed()}
+                              >
+                                <RotateCcw className="h-4 w-4 mr-1" />
+                                Retry
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setEditingDestination(destination)}>
-                                Edit Description
-                              </DropdownMenuItem>
-                              {destination.status === 'failed' && (
-                                <DropdownMenuItem onClick={() => handleRetryFailed()}>
-                                  <RotateCcw className="h-4 w-4 mr-2" />
-                                  Retry
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem className="text-red-600">
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteDestination(destination.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

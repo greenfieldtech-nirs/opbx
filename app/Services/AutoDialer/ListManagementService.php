@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\AutoDialer;
 
+use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
+use App\Events\AutoDialer\ListAssignedToCampaign;
 use App\Jobs\ProcessLargeListJob;
 use App\Jobs\ProcessListUploadJob;
+use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use Illuminate\Http\UploadedFile;
@@ -426,5 +429,49 @@ class ListManagementService
         } catch (\Exception $e) {
             return 0;
         }
+    }
+
+    /**
+     * Assign a list to a campaign.
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function assignListToCampaign(int $listId, int $campaignId): void
+    {
+        $list = AutoDialerList::findOrFail($listId);
+        $campaign = AutoDialerCampaign::findOrFail($campaignId);
+
+        // Check if list is ready
+        if (! $list->isReady()) {
+            throw new \InvalidArgumentException('List is not ready for assignment');
+        }
+
+        // Check if campaign can accept list
+        if (! $campaign->canAcceptList()) {
+            throw new \InvalidArgumentException('Campaign cannot accept a list in its current status');
+        }
+
+        // Update the list
+        $list->update([
+            'campaign_id' => $campaignId,
+            'status' => ListStatus::IN_USE,
+            'used_by_campaign_id' => $campaignId,
+            'used_at' => now(),
+        ]);
+
+        // Update campaign status if it's in draft
+        if ($campaign->status === CampaignStatus::DRAFT) {
+            $campaign->update([
+                'status' => CampaignStatus::READY,
+            ]);
+        }
+
+        // Dispatch event
+        event(new ListAssignedToCampaign($list, $campaign));
+
+        Log::info('ListManagementService: Assigned list to campaign', [
+            'list_id' => $listId,
+            'campaign_id' => $campaignId,
+        ]);
     }
 }

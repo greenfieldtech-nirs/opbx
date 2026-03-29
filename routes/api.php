@@ -231,6 +231,8 @@ Route::prefix('v1')->group(function (): void {
             ->name('distribution-lists.errors');
         Route::delete('auto-dialer-campaigns/lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'destroy'])
             ->name('distribution-lists.destroy');
+        Route::post('auto-dialer-campaigns/lists/{list}/assign', [\App\Http\Controllers\DistributionListController::class, 'assignToCampaign'])
+            ->name('distribution-lists.assign');
 
         // Auto Dialer Campaigns
         Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)
