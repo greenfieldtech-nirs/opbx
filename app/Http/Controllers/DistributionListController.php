@@ -31,6 +31,7 @@ class DistributionListController extends Controller
         $lists = AutoDialerList::where('organization_id', Auth::user()->organization_id)
             ->with(['campaign', 'usedByCampaign'])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->campaign_id, fn ($q) => $q->where('campaign_id', $request->campaign_id))
             ->when($request->search, function ($q, $search) {
                 $q->where('name', 'like', "%{$search}%");
             })

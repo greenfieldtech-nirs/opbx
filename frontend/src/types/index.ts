@@ -1291,4 +1291,5 @@ export interface CreateListRequest {
 export interface DistributionListParams extends PaginationParams {
   status?: DistributionListStatus;
   search?: string;
+  campaign_id?: number;
 }
