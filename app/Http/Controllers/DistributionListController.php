@@ -395,4 +395,43 @@ class DistributionListController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Unassign a list from its campaign.
+     */
+    public function unassignFromCampaign(AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('unassign', $list);
+
+        // Check if list is assigned to a campaign
+        if (! $list->campaign_id) {
+            return response()->json([
+                'error' => 'List is not assigned to any campaign',
+            ], 422);
+        }
+
+        try {
+            $campaignName = $list->campaign?->name;
+
+            // Update the list to unassign it
+            $list->update([
+                'campaign_id' => null,
+                'status' => ListStatus::READY,
+                'used_by_campaign_id' => null,
+                'used_at' => null,
+            ]);
+
+            return response()->json([
+                'message' => 'List unassigned from campaign successfully',
+                'data' => [
+                    'list_id' => $list->id,
+                    'previous_campaign_name' => $campaignName,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to unassign list from campaign: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }

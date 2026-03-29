@@ -209,4 +209,14 @@ export const distributionListsApi = {
     });
     return response.data;
   },
+
+  /**
+   * Unassign a list from its campaign
+   */
+  unassignFromCampaign: async (
+    listId: string | number
+  ): Promise<{ message: string; data: { list_id: number; previous_campaign_name: string | null } }> => {
+    const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/unassign`);
+    return response.data;
+  },
 };

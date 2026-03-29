@@ -13,6 +13,8 @@ import {
   RefreshCw,
   AlertCircle,
   Trash2,
+  Link2,
+  Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +49,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 // Pagination component - simple implementation
 import { useAuth } from '@/hooks/useAuth';
-import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList, useUnassignListFromCampaign } from '@/hooks/useDistributionLists';
 import { useAutoDialerCampaigns } from '@/hooks/useAutoDialerCampaigns';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
@@ -100,6 +102,7 @@ export default function DistributionLists() {
 
   const archiveMutation = useArchiveList();
   const deleteMutation = useDeleteList();
+  const unassignMutation = useUnassignListFromCampaign();
   const downloadExampleMutation = useDownloadExample();
   const queryClient = useQueryClient();
 
@@ -129,6 +132,15 @@ export default function DistributionLists() {
       setArchiveList(null);
     } catch {
       toast.error('Failed to archive list');
+    }
+  };
+
+  const handleUnassign = async (listId: number) => {
+    try {
+      await unassignMutation.mutateAsync(listId);
+      toast.success('List unassigned from campaign successfully');
+    } catch {
+      toast.error('Failed to unassign list from campaign');
     }
   };
 
@@ -281,7 +293,21 @@ export default function DistributionLists() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {(list.campaign?.name || list.campaign_id) ? (
-                          <span className="text-sm">{list.campaign?.name || 'Assigned'}</span>
+                          <div className="flex items-center gap-2">
+                            {canManage && (
+                              <button
+                                className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnassign(list.id);
+                                }}
+                                disabled={unassignMutation.isPending}
+                              >
+                                Unassign
+                              </button>
+                            )}
+                            <span className="text-sm">{list.campaign?.name || 'Assigned'}</span>
+                          </div>
                         ) : list.can_assign && canManage ? (
                           <Button
                             variant="outline"

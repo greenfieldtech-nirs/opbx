@@ -233,6 +233,8 @@ Route::prefix('v1')->group(function (): void {
             ->name('distribution-lists.destroy');
         Route::post('auto-dialer-campaigns/lists/{list}/assign', [\App\Http\Controllers\DistributionListController::class, 'assignToCampaign'])
             ->name('distribution-lists.assign');
+        Route::post('auto-dialer-campaigns/lists/{list}/unassign', [\App\Http\Controllers\DistributionListController::class, 'unassignFromCampaign'])
+            ->name('distribution-lists.unassign');
 
         // Auto Dialer Campaigns
         Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)

@@ -253,3 +253,17 @@ export function useAssignListToCampaign() {
     },
   });
 }
+
+/**
+ * Hook to unassign a list from its campaign
+ */
+export function useUnassignListFromCampaign() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (listId: string | number) => distributionListsApi.unassignFromCampaign(listId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
+    },
+  });
+}

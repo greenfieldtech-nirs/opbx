@@ -151,6 +151,24 @@ class DistributionListPolicy
     }
 
     /**
+     * Determine whether the user can unassign the list from a campaign.
+     */
+    public function unassign(User $user, AutoDialerList $list): bool
+    {
+        // Must be in same organization and have management role
+        if ($user->organization_id !== $list->organization_id) {
+            return false;
+        }
+
+        if (! $user->isOwner() && ! $user->isPBXAdmin()) {
+            return false;
+        }
+
+        // List must be assigned to a campaign (in_use status)
+        return $list->campaign_id !== null;
+    }
+
+    /**
      * Determine whether the user can delete the list.
      *
      * Note: Lists should normally be archived, not deleted.
