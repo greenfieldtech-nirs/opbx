@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
+use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerList;
 use App\Services\AutoDialer\ListManagementService;
 use Illuminate\Http\JsonResponse;
