@@ -467,7 +467,7 @@ class ListManagementService
         }
 
         // Dispatch event
-        event(new ListAssignedToCampaign($list, $campaign));
+        event(new ListAssignedToCampaign($list, $campaign, Auth::id()));
 
         Log::info('ListManagementService: Assigned list to campaign', [
             'list_id' => $listId,
