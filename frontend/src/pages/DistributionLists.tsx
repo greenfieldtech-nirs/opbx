@@ -280,8 +280,8 @@ export default function DistributionLists() {
                         )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        {list.campaign?.name ? (
-                          <span className="text-sm">{list.campaign.name}</span>
+                        {(list.campaign?.name || list.campaign_id) ? (
+                          <span className="text-sm">{list.campaign?.name || 'Assigned'}</span>
                         ) : list.can_assign && canManage ? (
                           <Button
                             variant="outline"
