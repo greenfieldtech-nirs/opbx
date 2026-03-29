@@ -462,7 +462,7 @@ class ListManagementService
         // Update campaign status if it's in draft
         if ($campaign->status === CampaignStatus::DRAFT) {
             $campaign->update([
-                'status' => CampaignStatus::READY,
+                'status' => CampaignStatus::ACTIVE,
             ]);
         }
 
