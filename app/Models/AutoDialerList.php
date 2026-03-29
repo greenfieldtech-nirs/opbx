@@ -176,6 +176,10 @@ class AutoDialerList extends Model
      */
     public function isReady(): bool
     {
+        if (! $this->status instanceof ListStatus) {
+            return false;
+        }
+
         return $this->status === ListStatus::READY;
     }
 
