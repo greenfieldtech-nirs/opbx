@@ -82,7 +82,7 @@ export default function DistributionLists() {
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<DistributionListStatus | 'all'>('all');
+  const [status, setStatus] = useState<string>('active');
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [copyList, setCopyList] = useState<AutoDialerList | null>(null);
@@ -97,7 +97,7 @@ export default function DistributionLists() {
     page,
     per_page: 25,
     search: search || undefined,
-    status: status && status !== 'all' ? status : undefined,
+    status: status && status !== 'all' && status !== 'active' ? status as DistributionListStatus : undefined,
   });
 
   const archiveMutation = useArchiveList();
@@ -178,7 +178,7 @@ export default function DistributionLists() {
     );
   }
 
-  const lists = data?.data || [];
+  const lists = data?.data.filter(list => status !== 'active' || list.status !== 'archived') || [];
   const meta = data?.meta;
 
   return (
@@ -217,14 +217,15 @@ export default function DistributionLists() {
               />
             </div>
             <Select
-              value={status || 'all'}
-              onValueChange={(v) => setStatus(v as DistributionListStatus | 'all')}
+              value={status || 'active'}
+              onValueChange={(v) => setStatus(v)}
             >
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="active">Active (All Except Archived)</SelectItem>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="ready">Ready</SelectItem>
@@ -295,16 +296,19 @@ export default function DistributionLists() {
                         {(list.campaign?.name || list.campaign_id || list.status === 'in_use') ? (
                           <div className="flex items-center gap-2">
                             {canManage && (
-                              <button
-                                className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-red-600 hover:text-red-800"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleUnassign(list.id);
                                 }}
                                 disabled={unassignMutation.isPending}
+                                title="Unassign from campaign"
                               >
-                                Unassign
-                              </button>
+                                <Unlink className="h-4 w-4" />
+                              </Button>
                             )}
                             <span className="text-sm">{list.campaign?.name || 'Assigned'}</span>
                           </div>
