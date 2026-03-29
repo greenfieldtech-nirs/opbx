@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ListStatus;
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
 use App\Models\AutoDialerCampaign;
