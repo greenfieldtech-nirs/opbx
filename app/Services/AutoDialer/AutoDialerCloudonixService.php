@@ -109,7 +109,7 @@ class AutoDialerCloudonixService
 
             return [
                 'success' => true,
-                'call_id' => $result['callId'] ?? null,
+                'call_id' => $result['id'] ?? null,
                 'session_token' => $result['token'] ?? null,
                 'error' => null,
             ];
