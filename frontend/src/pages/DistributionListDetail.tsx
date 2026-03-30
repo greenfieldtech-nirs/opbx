@@ -260,7 +260,7 @@ export default function DistributionListDetail() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canManage && (
+          {canManage && list.status !== 'in_use' && (
             <Button variant="outline" onClick={() => setIsUploadOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
               Upload
