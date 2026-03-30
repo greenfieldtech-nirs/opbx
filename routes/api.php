@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\AutoDialerCampaignController;
+use App\Http\Controllers\DialerWorkerController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
