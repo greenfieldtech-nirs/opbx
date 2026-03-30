@@ -292,5 +292,18 @@ class AppServiceProvider extends ServiceProvider
                     ], 429, $headers);
                 });
         });
+
+        // Dialer Worker API - High rate limit for automated worker processes
+        RateLimiter::for('dialer-worker', function (Request $request) {
+            return Limit::perMinute(config('services.dialer_worker.rate_limit_per_minute', 1000))
+                ->by($request->ip())
+                ->response(function (Request $request, array $headers) {
+                    return response()->json([
+                        'error' => 'Too Many Requests',
+                        'message' => 'Dialer worker rate limit exceeded.',
+                        'retry_after' => $headers['Retry-After'] ?? null,
+                    ], 429, $headers);
+                });
+        });
     }
 }

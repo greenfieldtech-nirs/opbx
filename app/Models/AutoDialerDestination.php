@@ -30,6 +30,7 @@ class AutoDialerDestination extends Model
         'last_session_token',
         'last_call_id',
         'last_dialed_at',
+        'next_retry_at',
         'last_disposition',
         'duration',
         'billsec',

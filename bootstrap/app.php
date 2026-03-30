@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'rate_limit_org' => \App\Http\Middleware\RateLimitPerOrganization::class,
             'sensitive-operations' => \App\Http\Middleware\RateLimitSensitiveOperations::class,
             'platform.manager' => \App\Http\Middleware\EnsurePlatformManager::class,
+            'dialer.worker.auth' => \App\Http\Middleware\DialerWorkerAuth::class,
         ]);
 
         // Configure authentication to return JSON for API routes instead of redirecting

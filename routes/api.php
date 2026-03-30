@@ -57,6 +57,37 @@ Route::get('/health', function () {
     ]);
 })->name('health');
 
+// Auto Dialer Worker API Routes (separate authentication)
+// These routes are for the Go-based worker service to execute outbound campaigns
+Route::prefix('v1/dialer/worker')->middleware(['dialer.worker.auth', 'throttle:dialer-worker'])->group(function (): void {
+    // Health check
+    Route::get('/health', [DialerWorkerController::class, 'health'])->name('dialer.worker.health');
+
+    // Campaign management
+    Route::get('/campaigns/active', [DialerWorkerController::class, 'getActiveCampaigns'])
+        ->name('dialer.worker.campaigns.active');
+    Route::post('/campaigns/{campaign}/pause', [DialerWorkerController::class, 'pauseCampaign'])
+        ->name('dialer.worker.campaigns.pause');
+
+    // Destination management
+    Route::get('/campaigns/{campaign}/destinations/pending', [DialerWorkerController::class, 'getPendingDestinations'])
+        ->name('dialer.worker.destinations.pending');
+    Route::get('/campaigns/{campaign}/destinations/retry', [DialerWorkerController::class, 'getRetryDestinations'])
+        ->name('dialer.worker.destinations.retry');
+
+    // Call session management
+    Route::post('/calls/initiate', [DialerWorkerController::class, 'initiateCall'])
+        ->name('dialer.worker.calls.initiate');
+    Route::patch('/calls/{session}/status', [DialerWorkerController::class, 'updateCallStatus'])
+        ->name('dialer.worker.calls.status');
+
+    // State persistence
+    Route::post('/state/persist', [DialerWorkerController::class, 'persistState'])
+        ->name('dialer.worker.state.persist');
+    Route::get('/state/{workerId}', [DialerWorkerController::class, 'getState'])
+        ->name('dialer.worker.state.get');
+});
+
 // Detailed health checks - behind authentication to prevent internal info leakage
 Route::middleware(['auth:sanctum'])->group(function (): void {
     Route::get('/storage/health', function () {
