@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Upload,
@@ -110,8 +110,12 @@ function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
 export default function DistributionListDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+
+  // Get return URL from location state, default to distribution lists
+  const returnUrl = (location.state as { from?: string })?.from || '/ui/auto-dialer/distribution-lists';
 
   const [activeTab, setActiveTab] = useState('destinations');
   const [search, setSearch] = useState('');
@@ -161,9 +165,9 @@ export default function DistributionListDetail() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <p className="text-red-600">List not found</p>
-            <Button variant="outline" className="mt-4" onClick={() => navigate('/ui/auto-dialer/distribution-lists')}>
+            <Button variant="outline" className="mt-4" onClick={() => navigate(returnUrl)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Lists
+              Back
             </Button>
           </CardContent>
         </Card>
@@ -230,9 +234,9 @@ export default function DistributionListDetail() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="space-y-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/ui/auto-dialer/distribution-lists')}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(returnUrl)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Lists
+            Back
           </Button>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl font-bold tracking-tight">{list.name}</h1>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Play,
@@ -59,6 +59,7 @@ function getStatusBadge(status: string) {
 export default function AutoDialerCampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: currentUser } = useAuth();
 
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
@@ -312,65 +313,6 @@ export default function AutoDialerCampaignDetail() {
                 </div>
               </div>
 
-              {/* Distribution Lists */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <List className="h-4 w-4 text-muted-foreground" />
-                  Distribution Lists
-                </h3>
-                <div className="space-y-3">
-                  {isListsLoading ? (
-                    <div className="py-4 text-center text-muted-foreground">
-                      <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
-                      Loading lists...
-                    </div>
-                  ) : distributionLists.length === 0 ? (
-                    <div className="py-4 text-center text-muted-foreground">
-                      <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No distribution lists assigned</p>
-                    </div>
-                  ) : (
-                    distributionLists.map((list) => (
-                      <div
-                        key={list.id}
-                        className="flex items-center justify-between py-3 px-3 bg-muted/50 rounded-lg border border-border/50 hover:bg-muted transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <FileSpreadsheet className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <span className="font-medium truncate">{list.name}</span>
-                            <Badge variant="outline" className="text-xs flex-shrink-0">
-                              v{list.version_number}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                            <span>{list.statistics.valid_rows.toLocaleString()} records</span>
-                            {list.statistics.invalid_rows > 0 && (
-                              <span className="text-red-500">
-                                {list.statistics.invalid_rows} invalid
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-4">
-                          <div className="text-sm font-medium">
-                            {list.statistics.total_rows > 0
-                              ? Math.round(
-                                  ((list.statistics.valid_rows - list.statistics.invalid_rows) /
-                                    list.statistics.total_rows) *
-                                    100
-                                )
-                              : 0}
-                            %
-                          </div>
-                          <div className="text-xs text-muted-foreground">processed</div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
               {/* Routing Configuration */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -418,6 +360,53 @@ export default function AutoDialerCampaignDetail() {
 
             {/* Schedule & Advanced Settings */}
             <div className="space-y-6">
+              {/* Distribution Lists */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <List className="h-4 w-4 text-muted-foreground" />
+                  Distribution Lists
+                </h3>
+                <div className="space-y-3">
+                  {isListsLoading ? (
+                    <div className="py-4 text-center text-muted-foreground">
+                      <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
+                      Loading lists...
+                    </div>
+                  ) : distributionLists.length === 0 ? (
+                    <div className="py-4 text-center text-muted-foreground">
+                      <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No distribution lists assigned</p>
+                    </div>
+                  ) : (
+                    distributionLists.map((list) => (
+                      <div
+                        key={list.id}
+                        className="flex items-center py-3 px-3 bg-muted/50 rounded-lg border border-border/50 hover:bg-muted transition-colors cursor-pointer"
+                        onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.id}`, { state: { from: location.pathname } })}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="font-medium truncate">{list.name}</span>
+                            <Badge variant="outline" className="text-xs flex-shrink-0">
+                              v{list.version_number}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                            <span>{list.statistics.valid_rows.toLocaleString()} records</span>
+                            {list.statistics.invalid_rows > 0 && (
+                              <span className="text-red-500">
+                                {list.statistics.invalid_rows} invalid
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               {/* Schedule */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
