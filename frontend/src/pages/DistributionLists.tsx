@@ -57,8 +57,7 @@ import { DistributionListsEmpty } from './DistributionLists/components/Distribut
 import { CreateListDialog } from './DistributionLists/components/CreateListDialog';
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
-import { UploadDestinationsDialog } from './DistributionLists/components/UploadDestinationsDialog';
-import { NewVersionDialog } from './DistributionLists/components/NewVersionDialog';
+import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { AssignCampaignDialog } from './DistributionLists/components/AssignCampaignDialog';
@@ -89,7 +88,6 @@ export default function DistributionLists() {
   const [archiveList, setArchiveList] = useState<AutoDialerList | null>(null);
   const [deleteList, setDeleteList] = useState<AutoDialerList | null>(null);
   const [uploadList, setUploadList] = useState<AutoDialerList | null>(null);
-  const [versionList, setVersionList] = useState<AutoDialerList | null>(null);
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
   const [assignList, setAssignList] = useState<AutoDialerList | null>(null);
 
@@ -454,19 +452,17 @@ export default function DistributionLists() {
       )}
 
       {uploadList && (
-        <UploadDestinationsDialog
+        <UnifiedUploadDialog
           list={uploadList}
           open={!!uploadList}
           onOpenChange={() => setUploadList(null)}
-          onSuccess={handleUploadSuccess}
-        />
-      )}
-
-      {versionList && (
-        <NewVersionDialog
-          list={versionList}
-          open={!!versionList}
-          onOpenChange={() => setVersionList(null)}
+          onSuccess={(newListId) => {
+            handleUploadSuccess();
+            // If new version was created, navigate to it
+            if (newListId && newListId !== uploadList.id) {
+              navigate(`/ui/auto-dialer/distribution-lists/${newListId}`);
+            }
+          }}
         />
       )}
 

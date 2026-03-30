@@ -72,12 +72,26 @@ export const distributionListsApi = {
   },
 
   /**
-   * Upload CSV file to list
+   * Upload CSV file to list (unified endpoint)
+   * 
+   * If list can upload: uploads to current list
+   * If list can create version: creates new version then uploads
    */
   uploadCsv: async (
     listId: string | number,
     file: File,
-  ): Promise<{ message: string; data: { job_id: string; list_id: number; is_large_file: boolean; total_rows: number } }> => {
+  ): Promise<{
+    message: string;
+    data: {
+      job_id: string;
+      list_id: number;
+      is_large_file: boolean;
+      total_rows: number;
+      action: 'upload' | 'new_version';
+      previous_list_id?: number;
+      new_version_number?: number;
+    }
+  }> => {
     const formData = new FormData();
     formData.append('file', file);
 

@@ -88,25 +88,69 @@ class DistributionListController extends Controller
     }
 
     /**
-     * Upload CSV file to populate list.
+     * Upload CSV file to populate list (unified endpoint).
+     *
+     * If list is in DRAFT/PENDING/FAILED: uploads to current list.
+     * If list is in READY/USED: creates new version then uploads.
      */
     public function upload(Request $request, AutoDialerList $list): JsonResponse
     {
-        $this->authorize('upload', $list);
-
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
         ]);
 
-        $result = $this->listService->uploadCsv(
-            $list->id,
-            $validated['file'],
-        );
+        $file = $validated['file'];
 
-        return response()->json([
-            'message' => 'File uploaded successfully. Processing started.',
-            'data' => $result,
-        ]);
+        // Determine action based on list status
+        $canUploadToCurrent = $list->status->canUpload();
+        $canCreateVersion = $list->status->canCreateVersion();
+
+        if (! $canUploadToCurrent && ! $canCreateVersion) {
+            return response()->json([
+                'error' => 'Cannot upload to list in status: '.$list->status->label(),
+            ], 422);
+        }
+
+        try {
+            if ($canUploadToCurrent) {
+                // Upload to current list
+                $this->authorize('upload', $list);
+
+                $result = $this->listService->uploadCsv($list->id, $file);
+
+                return response()->json([
+                    'message' => 'File uploaded successfully. Processing started.',
+                    'data' => [
+                        ...$result,
+                        'action' => 'upload',
+                        'list_id' => $list->id,
+                    ],
+                ]);
+            } else {
+                // Create new version then upload
+                $this->authorize('createVersion', $list);
+
+                $result = $this->listService->createNewVersion($list->id, $file);
+
+                return response()->json([
+                    'message' => 'New version created and file uploaded. Processing started.',
+                    'data' => [
+                        ...$result,
+                        'action' => 'new_version',
+                        'previous_list_id' => $list->id,
+                        'new_version_number' => $list->version_number + 1,
+                    ],
+                ]);
+            }
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to process upload: '.$e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

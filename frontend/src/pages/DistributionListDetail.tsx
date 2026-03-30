@@ -56,13 +56,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
-import { useDistributionList, useListDestinations, useDownloadList } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList } from '@/hooks/useDistributionLists';
+import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
-import { UploadDestinationsDialog } from './DistributionLists/components/UploadDestinationsDialog';
+import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
-import { NewVersionDialog } from './DistributionLists/components/NewVersionDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { toast } from 'sonner';
 import type { AutoDialerList, ListDestination } from '@/types';
@@ -129,7 +129,6 @@ export default function DistributionListDetail() {
   const [isCopyOpen, setIsCopyOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isVersionOpen, setIsVersionOpen] = useState(false);
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
 
   const { data: listData, isLoading: isListLoading } = useDistributionList(id!);
@@ -138,6 +137,7 @@ export default function DistributionListDetail() {
     { page, per_page: 25, status: statusFilter !== 'all' ? statusFilter : undefined, search: search || undefined }
   );
   const downloadMutation = useDownloadList();
+  const queryClient = useQueryClient();
 
   const list = listData?.data;
   const destinations = destinationsData?.data || [];
@@ -260,16 +260,10 @@ export default function DistributionListDetail() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {list.can_upload && canManage && (
+          {canManage && (
             <Button variant="outline" onClick={() => setIsUploadOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
               Upload
-            </Button>
-          )}
-          {canManage && (
-            <Button variant="outline" onClick={() => setIsVersionOpen(true)}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Upload New List
             </Button>
           )}
           {list.can_copy && canManage && (
@@ -663,10 +657,25 @@ export default function DistributionListDetail() {
       </Tabs>
 
       {/* Dialogs */}
-      <UploadDestinationsDialog
+      <UnifiedUploadDialog
         list={list}
         open={isUploadOpen}
         onOpenChange={setIsUploadOpen}
+        onSuccess={(newListId) => {
+          // Refresh current list data
+          queryClient.invalidateQueries({ queryKey: distributionListKeys.detail(list.id) });
+          queryClient.invalidateQueries({ queryKey: distributionListKeys.destinations(list.id) });
+          
+          // If new version was created, navigate to it
+          if (newListId && newListId !== list.id) {
+            navigate(`/ui/auto-dialer/distribution-lists/${newListId}`, { 
+              state: { from: returnUrl }
+            });
+            toast.success(`Switched to version ${list.version_number + 1}`);
+          } else {
+            toast.success('Upload completed successfully');
+          }
+        }}
       />
 
       <CopyListDialog
@@ -696,12 +705,6 @@ export default function DistributionListDetail() {
           navigate('/ui/auto-dialer/distribution-lists');
         }}
         isDeleting={false}
-      />
-
-      <NewVersionDialog
-        list={list}
-        open={isVersionOpen}
-        onOpenChange={setIsVersionOpen}
       />
 
       <ValidationErrorsDialog
