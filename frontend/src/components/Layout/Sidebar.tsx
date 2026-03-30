@@ -110,7 +110,7 @@ const platformSection: SidebarSection = {
   items: [
     { name: 'Dashboard', href: '/ui/platform/dashboard', icon: 'codicon-dashboard' },
     { name: 'Organizations', href: '/ui/platform/organizations', icon: 'codicon-organization' },
-    { name: 'Users', href: '/ui/platform/users', icon: 'codicon-people' },
+    { name: 'Users', href: '/ui/platform/users', icon: 'codicon-account' },
     { name: 'Audit Log', href: '/ui/platform/audit-log', icon: 'codicon-output' },
   ],
 };
