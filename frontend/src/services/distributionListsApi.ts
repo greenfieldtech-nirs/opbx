@@ -75,7 +75,7 @@ export const distributionListsApi = {
    * Upload CSV file to list (unified endpoint)
    * 
    * If list can upload: uploads to current list
-   * If list can create version: creates new version then uploads
+   * If list can update: backs up old data and updates same list
    */
   uploadCsv: async (
     listId: string | number,
@@ -87,9 +87,9 @@ export const distributionListsApi = {
       list_id: number;
       is_large_file: boolean;
       total_rows: number;
-      action: 'upload' | 'new_version';
-      previous_list_id?: number;
+      action: 'upload' | 'update';
       new_version_number?: number;
+      backup_path?: string;
     }
   }> => {
     const formData = new FormData();

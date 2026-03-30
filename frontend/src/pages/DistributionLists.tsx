@@ -456,12 +456,9 @@ export default function DistributionLists() {
           list={uploadList}
           open={!!uploadList}
           onOpenChange={() => setUploadList(null)}
-          onSuccess={(newListId) => {
+          onSuccess={() => {
             handleUploadSuccess();
-            // If new version was created, navigate to it
-            if (newListId && newListId !== uploadList.id) {
-              navigate(`/ui/auto-dialer/distribution-lists/${newListId}`);
-            }
+            // Same list is updated, no navigation needed
           }}
         />
       )}

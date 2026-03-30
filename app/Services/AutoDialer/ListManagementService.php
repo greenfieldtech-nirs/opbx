@@ -352,6 +352,89 @@ class ListManagementService
     }
 
     /**
+     * Update list with new CSV - backup old destinations first.
+     *
+     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int}
+     */
+    public function updateListWithBackup(int $listId, UploadedFile $file): array
+    {
+        $list = AutoDialerList::findOrFail($listId);
+
+        // Check if list can be updated
+        if (! $list->status->canCreateVersion()) {
+            throw new \InvalidArgumentException('Cannot update list in status: '.$list->status->label());
+        }
+
+        // Backup old destinations to JSON file
+        $backupPath = $this->backupDestinations($list);
+
+        // Delete old destinations
+        $deletedCount = $list->destinations()->delete();
+
+        // Reset list statistics
+        $list->update([
+            'total_rows' => 0,
+            'valid_rows' => 0,
+            'invalid_rows' => 0,
+            'status' => ListStatus::PENDING,
+            'version_number' => $list->version_number + 1,
+        ]);
+
+        Log::info('ListManagementService: Backed up and cleared old destinations', [
+            'list_id' => $listId,
+            'backup_path' => $backupPath,
+            'deleted_count' => $deletedCount,
+            'new_version' => $list->version_number,
+        ]);
+
+        // Upload new CSV
+        $result = $this->uploadCsv($listId, $file);
+
+        return [
+            ...$result,
+            'version_number' => $list->version_number,
+            'backup_path' => $backupPath,
+        ];
+    }
+
+    /**
+     * Backup destinations to a JSON file.
+     */
+    private function backupDestinations(AutoDialerList $list): string
+    {
+        $backupDir = storage_path('app/backups/lists');
+        if (! is_dir($backupDir)) {
+            mkdir($backupDir, 0755, true);
+        }
+
+        $filename = "list_{$list->id}_v{$list->version_number}_".now()->format('Y-m-d_His').'.json';
+        $filepath = $backupDir.'/'.$filename;
+
+        $destinations = $list->destinations()->get()->map(function ($dest) {
+            return [
+                'phone_number' => $dest->phone_number,
+                'description' => $dest->description,
+                'status' => $dest->status->value,
+                'dial_attempts' => $dest->dial_attempts,
+                'duration' => $dest->duration,
+                'last_dialed_at' => $dest->last_dialed_at?->toIso8601String(),
+                'last_disposition' => $dest->last_disposition,
+                'created_at' => $dest->created_at->toIso8601String(),
+            ];
+        });
+
+        file_put_contents($filepath, json_encode([
+            'list_id' => $list->id,
+            'list_name' => $list->name,
+            'version_number' => $list->version_number,
+            'backed_up_at' => now()->toIso8601String(),
+            'destinations' => $destinations,
+        ], JSON_PRETTY_PRINT));
+
+        return $filepath;
+    }
+
+    /**
      * Archive a list.
      */
     public function archiveList(int $listId): AutoDialerList

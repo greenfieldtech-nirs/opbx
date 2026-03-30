@@ -661,20 +661,11 @@ export default function DistributionListDetail() {
         list={list}
         open={isUploadOpen}
         onOpenChange={setIsUploadOpen}
-        onSuccess={(newListId) => {
-          // Refresh current list data
+        onSuccess={() => {
+          // Refresh current list data - same list is updated
           queryClient.invalidateQueries({ queryKey: distributionListKeys.detail(list.id) });
           queryClient.invalidateQueries({ queryKey: distributionListKeys.destinations(list.id) });
-          
-          // If new version was created, navigate to it
-          if (newListId && newListId !== list.id) {
-            navigate(`/ui/auto-dialer/distribution-lists/${newListId}`, { 
-              state: { from: returnUrl }
-            });
-            toast.success(`Switched to version ${list.version_number + 1}`);
-          } else {
-            toast.success('Upload completed successfully');
-          }
+          toast.success('Upload completed successfully');
         }}
       />
 

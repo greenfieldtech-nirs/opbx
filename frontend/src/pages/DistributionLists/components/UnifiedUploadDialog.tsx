@@ -30,8 +30,8 @@ export function UnifiedUploadDialog({
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{
-    action?: 'upload' | 'new_version';
-    newListId?: number;
+    action?: 'upload' | 'update';
+    listId?: number;
     newVersionNumber?: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,13 +67,13 @@ export function UnifiedUploadDialog({
       setJobId(result.data.job_id);
       setUploadResult({
         action: result.data.action,
-        newListId: result.data.list_id,
+        listId: result.data.list_id,
         newVersionNumber: result.data.new_version_number,
       });
       
       toast.success(
-        result.data.action === 'new_version'
-          ? `Version ${result.data.new_version_number} created. Processing...`
+        result.data.action === 'update'
+          ? `Version ${result.data.new_version_number} created. Old data backed up. Processing...`
           : 'Upload started. Processing...'
       );
     } catch {
@@ -100,11 +100,9 @@ export function UnifiedUploadDialog({
   }, [progressData?.data?.status, uploadResult]);
 
   const handleClose = (completed = false) => {
-    // Call onSuccess callback with new list ID if version was created
-    if (completed && onSuccess && uploadResult?.action === 'new_version' && uploadResult.newListId) {
-      onSuccess(uploadResult.newListId);
-    } else if (completed && onSuccess) {
-      onSuccess();
+    // Call onSuccess callback - same list ID is updated, no navigation needed
+    if (completed && onSuccess) {
+      onSuccess(list.id);
     }
     
     // Reset state
@@ -214,8 +212,8 @@ export function UnifiedUploadDialog({
               <Alert className="bg-green-50 border-green-200">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
-                  {uploadResult?.action === 'new_version'
-                    ? `Version ${uploadResult.newVersionNumber} created and uploaded successfully! Redirecting...`
+                  {uploadResult?.action === 'update'
+                    ? `Version ${uploadResult.newVersionNumber} created and uploaded successfully! Old data backed up.`
                     : 'Upload completed successfully! Refreshing...'}
                 </AlertDescription>
               </Alert>

@@ -29,6 +29,7 @@ class DistributionListController extends Controller
         $this->authorize('viewAny', AutoDialerList::class);
 
         $lists = AutoDialerList::where('organization_id', Auth::user()->organization_id)
+            ->where('is_latest_version', true) // Only show latest versions
             ->with(['campaign', 'usedByCampaign'])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->campaign_id, fn ($q) => $q->where('campaign_id', $request->campaign_id))
@@ -91,7 +92,7 @@ class DistributionListController extends Controller
      * Upload CSV file to populate list (unified endpoint).
      *
      * If list is in DRAFT/PENDING/FAILED: uploads to current list.
-     * If list is in READY/USED: creates new version then uploads.
+     * If list is in READY/USED: backs up old destinations, updates same list.
      */
     public function upload(Request $request, AutoDialerList $list): JsonResponse
     {
@@ -103,9 +104,9 @@ class DistributionListController extends Controller
 
         // Determine action based on list status
         $canUploadToCurrent = $list->status->canUpload();
-        $canCreateVersion = $list->status->canCreateVersion();
+        $canUpdateList = $list->status->canCreateVersion(); // READY/USED can be updated
 
-        if (! $canUploadToCurrent && ! $canCreateVersion) {
+        if (! $canUploadToCurrent && ! $canUpdateList) {
             return response()->json([
                 'error' => 'Cannot upload to list in status: '.$list->status->label(),
             ], 422);
@@ -127,18 +128,19 @@ class DistributionListController extends Controller
                     ],
                 ]);
             } else {
-                // Create new version then upload
+                // Update existing list - backup old destinations first
                 $this->authorize('createVersion', $list);
 
-                $result = $this->listService->createNewVersion($list->id, $file);
+                // Backup old destinations and update same list
+                $result = $this->listService->updateListWithBackup($list->id, $file);
 
                 return response()->json([
-                    'message' => 'New version created and file uploaded. Processing started.',
+                    'message' => 'List updated with new data. Old destinations backed up. Processing started.',
                     'data' => [
                         ...$result,
-                        'action' => 'new_version',
-                        'previous_list_id' => $list->id,
-                        'new_version_number' => $list->version_number + 1,
+                        'action' => 'update',
+                        'list_id' => $list->id,
+                        'new_version_number' => $result['version_number'],
                     ],
                 ]);
             }
