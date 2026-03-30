@@ -59,7 +59,8 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\AutoDialer\AutoDialerCloudonixService::class,
             function ($app) {
                 return new \App\Services\AutoDialer\AutoDialerCloudonixService(
-                    $app->make(\App\Services\CloudonixClient\CloudonixClient::class)
+                    $app->make(\App\Services\VoiceRouting\OutboundRoutingService::class),
+                    $app->make(\App\Services\PhoneNumberService::class)
                 );
             }
         );
