@@ -132,14 +132,31 @@ Returns all campaigns that should be currently running (respecting schedule).
       "time_limit": 3600,
       "record_calls": true,
       "amd_enabled": false,
-      "destination_type": "ai_assistant",
-      "destination_id": 5,
+      "routing_destination_type": "ai_assistant",
+      "routing_destination_id": 5,
       "timezone": "America/New_York",
-      "days_active": ["monday", "tuesday", "wednesday", "thursday", "friday"],
       "start_date": "2026-03-01",
       "end_date": "2026-12-31",
-      "start_time": "09:00",
-      "end_time": "17:00"
+      "schedule": {
+        "monday": {
+          "enabled": true,
+          "time_ranges": [
+            {"id": "1", "start_time": "09:00", "end_time": "12:00"},
+            {"id": "2", "start_time": "13:00", "end_time": "17:00"}
+          ]
+        },
+        "tuesday": {
+          "enabled": true,
+          "time_ranges": [
+            {"id": "1", "start_time": "09:00", "end_time": "17:00"}
+          ]
+        },
+        "wednesday": {"enabled": false, "time_ranges": []},
+        "thursday": {"enabled": true, "time_ranges": [{"start_time": "09:00", "end_time": "17:00"}]},
+        "friday": {"enabled": true, "time_ranges": [{"start_time": "09:00", "end_time": "17:00"}]},
+        "saturday": {"enabled": false, "time_ranges": []},
+        "sunday": {"enabled": false, "time_ranges": []}
+      }
     }
   ]
 }
@@ -160,8 +177,13 @@ Returns pending destinations for dialing (paginated).
       "id": 123,
       "phone_number": "+12025551234",
       "description": "John Doe",
+      "status": "pending",
       "dial_attempts": 0,
-      "last_dialed_at": null
+      "last_dialed_at": null,
+      "last_disposition": null,
+      "duration": 0,
+      "billsec": 0,
+      "last_call_id": null
     }
   ],
   "meta": {
@@ -483,16 +505,18 @@ Proxy endpoint for Cloudonix webhooks. Laravel validates the signature and forwa
 
 ### 6.2 Retry Eligibility
 
-**Retryable Dispositions:**
-- `BUSY` - Line was busy
-- `NO_ANSWER` - No answer within timeout
-- `CANCEL` - Call was cancelled/failed to connect
+**Retryable Dispositions** (from `last_disposition` field):
+- `busy` - Line was busy
+- `no-answer` - No answer within timeout
+- `cancelled` - Call was cancelled/failed to connect
 
 **Non-Retryable Dispositions:**
-- `ANSWERED` - Call connected successfully
-- `VOICEMAIL` - AMD detected voicemail
-- `INVALID_NUMBER` - Number format invalid
-- `BLOCKED` - Call blocked by carrier
+- `answered` - Call connected successfully
+- `completed` - Call completed normally
+- `failed` - Call failed (permanent failure)
+- `congestion` - Network congestion
+
+**Note:** Dispositions come directly from Cloudonix CDR webhook. The worker uses `destination.last_disposition` to determine retry eligibility.
 
 ### 6.3 Retry State Machine
 
@@ -586,35 +610,51 @@ When circuit opens:
 ```go
 // Campaign represents an active dialing campaign
 type Campaign struct {
-    ID                    int       `json:"id"`
-    OrganizationID        int       `json:"organization_id"`
-    Name                  string    `json:"name"`
-    Status                string    `json:"status"`
-    CallerID              string    `json:"caller_id"`
-    CallsPerSecond        int       `json:"calls_per_second"`
-    ConcurrentActiveCalls int       `json:"concurrent_active_calls"`
-    MaxDialAttempts       int       `json:"max_dial_attempts"`
-    DialTimeout           int       `json:"dial_timeout"`
-    TimeLimit             int       `json:"time_limit"`
-    RecordCalls           bool      `json:"record_calls"`
-    AMDEnabled            bool      `json:"amd_enabled"`
-    DestinationType       string    `json:"destination_type"`
-    DestinationID         int       `json:"destination_id"`
-    Timezone              string    `json:"timezone"`
-    DaysActive            []string  `json:"days_active"`
-    StartDate             string    `json:"start_date"`
-    EndDate               string    `json:"end_date"`
-    StartTime             string    `json:"start_time"`
-    EndTime               string    `json:"end_time"`
+    ID                      int                    `json:"id"`
+    OrganizationID          int                    `json:"organization_id"`
+    Name                    string                 `json:"name"`
+    Status                  string                 `json:"status"`
+    CallerID                string                 `json:"caller_id"`
+    CallsPerSecond          int                    `json:"calls_per_second"`
+    ConcurrentActiveCalls   int                    `json:"concurrent_active_calls"`
+    MaxDialAttempts         int                    `json:"max_dial_attempts"`
+    DialTimeout             int                    `json:"dial_timeout"`
+    TimeLimit               int                    `json:"time_limit"`
+    RecordCalls             bool                   `json:"record_calls"`
+    AMDEnabled              bool                   `json:"amd_enabled"`
+    RoutingDestinationType  string                 `json:"routing_destination_type"`  // ai_assistant, extension, ring_group, conference_room, ivr_menu
+    RoutingDestinationID    int                    `json:"routing_destination_id"`
+    Timezone                string                 `json:"timezone"`
+    StartDate               string                 `json:"start_date"`  // YYYY-MM-DD
+    EndDate                 string                 `json:"end_date"`    // YYYY-MM-DD
+    Schedule                map[string]DaySchedule `json:"schedule"`    // Full weekly schedule with multiple time ranges
+}
+
+// DaySchedule represents a single day's schedule configuration
+type DaySchedule struct {
+    Enabled    bool          `json:"enabled"`
+    TimeRanges []TimeRange   `json:"time_ranges"`
+}
+
+// TimeRange represents a single time range within a day
+type TimeRange struct {
+    ID        string `json:"id"`
+    StartTime string `json:"start_time"`  // HH:MM format (24h)
+    EndTime   string `json:"end_time"`    // HH:MM format (24h)
 }
 
 // Destination represents a phone number to dial
 type Destination struct {
-    ID           int       `json:"id"`
-    PhoneNumber  string    `json:"phone_number"`
-    Description  string    `json:"description"`
-    DialAttempts int       `json:"dial_attempts"`
-    LastDialedAt *time.Time `json:"last_dialed_at"`
+    ID              int        `json:"id"`
+    PhoneNumber     string     `json:"phone_number"`
+    Description     string     `json:"description"`
+    Status          string     `json:"status"`           // pending, dialing, connected, failed, completed, invalid
+    DialAttempts    int        `json:"dial_attempts"`
+    LastDialedAt    *time.Time `json:"last_dialed_at"`
+    LastDisposition string     `json:"last_disposition"` // answered, busy, no-answer, failed, cancelled, congestion, null
+    Duration        int        `json:"duration"`         // Call duration in seconds
+    Billsec         int        `json:"billsec"`          // Billable seconds
+    LastCallID      string     `json:"last_call_id"`     // Cloudonix call ID
 }
 
 // CallSession represents an active or completed call
@@ -644,9 +684,106 @@ type CampaignState struct {
     PauseReason       string
     ResumeAt          *time.Time
 }
+
+// RetryState tracks a destination waiting for retry
+type RetryState struct {
+    DestinationID    int
+    PhoneNumber      string
+    AttemptNumber    int
+    NextRetryAt      time.Time
+    LastDisposition  string
+}
 ```
 
-### 8.2 Worker State
+### 8.3 Schedule Checking
+
+The worker must check if current time falls within the campaign's schedule using the full schedule object:
+
+```go
+func isWithinSchedule(campaign Campaign, now time.Time) bool {
+    loc, err := time.LoadLocation(campaign.Timezone)
+    if err != nil {
+        log.Error().Err(err).Str("timezone", campaign.Timezone).Msg("Invalid timezone")
+        return false
+    }
+    
+    now = now.In(loc)
+    
+    // Check date range
+    today := now.Format("2006-01-02")
+    if today < campaign.StartDate || today > campaign.EndDate {
+        return false
+    }
+    
+    // Get day name in lowercase
+    dayName := strings.ToLower(now.Format("l")) // monday, tuesday, etc.
+    daySchedule, ok := campaign.Schedule[dayName]
+    if !ok || !daySchedule.Enabled {
+        return false
+    }
+    
+    // Check if current time falls within any time range
+    currentTime := now.Format("15:04")
+    for _, tr := range daySchedule.TimeRanges {
+        if currentTime >= tr.StartTime && currentTime <= tr.EndTime {
+            return true
+        }
+    }
+    
+    return false
+}
+```
+
+### 8.4 Disposition Handling
+
+**Cloudonix Disposition Values:**
+- `answered` - Call was answered by human
+- `completed` - Call completed normally
+- `busy` - Line was busy
+- `no-answer` - No answer within timeout
+- `failed` - Call failed (network error, invalid number, etc.)
+- `cancelled` - Call was cancelled
+- `congestion` - Network congestion
+
+**Disposition Mapping (handled by Laravel):**
+The Laravel webhook controller maps Cloudonix dispositions to destination statuses:
+
+```php
+$dispositionMap = [
+    'answered'   => 'completed',
+    'completed'  => 'completed',
+    'busy'       => 'failed',
+    'no-answer'  => 'failed',
+    'failed'     => 'failed',
+    'cancelled'  => 'failed',
+    'congestion' => 'failed',
+];
+```
+
+**Retry Eligibility:**
+The worker uses `last_disposition` to determine if a destination should be retried:
+
+```go
+func shouldRetry(disposition string) bool {
+    retryableDispositions := []string{"busy", "no-answer", "cancelled"}
+    for _, d := range retryableDispositions {
+        if disposition == d {
+            return true
+        }
+    }
+    return false
+}
+```
+
+**Destination Status Values:**
+- `pending` - Ready to be dialed
+- `dialing` - Currently being dialed
+- `connected` - Call connected
+- `failed` - Dial failed (busy, no answer, etc.) - may be retried
+- `completed` - Call completed successfully
+- `invalid` - Invalid phone number - never retried
+
+### 8.5 Worker State
 
 ```go
 type WorkerState struct {
@@ -716,15 +853,19 @@ func (c *CloudonixAPIClient) InitiateCall(ctx context.Context, req InitiateCallR
     }
     
     // Add destination routing based on type
-    switch req.DestinationType {
+    // Note: routing_destination_type comes from campaign.routing_destination_type
+    // Valid values: ai_assistant, extension, ring_group, conference_room, ivr_menu
+    switch req.RoutingDestinationType {
     case "ai_assistant":
-        payload["application"] = fmt.Sprintf("ai:%d", req.DestinationID)
+        payload["application"] = fmt.Sprintf("ai:%d", req.RoutingDestinationID)
     case "extension":
-        payload["extension"] = req.DestinationID
+        payload["extension"] = req.RoutingDestinationID
     case "ring_group":
-        payload["ring_group"] = req.DestinationID
+        payload["ring_group"] = req.RoutingDestinationID
     case "conference_room":
-        payload["conference"] = req.DestinationID
+        payload["conference"] = req.RoutingDestinationID
+    case "ivr_menu":
+        payload["ivr"] = req.RoutingDestinationID
     }
     
     // Send request...
