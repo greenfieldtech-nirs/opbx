@@ -31,6 +31,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -64,6 +72,8 @@ export default function AutoDialerCampaignDetail() {
 
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'start' | 'pause' | 'resume' | 'archive' | null>(null);
+  const [listsPage, setListsPage] = useState(1);
+  const LISTS_PER_PAGE = 5;
 
   const canManageCampaigns = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
 
@@ -366,43 +376,95 @@ export default function AutoDialerCampaignDetail() {
                   <List className="h-4 w-4 text-muted-foreground" />
                   Distribution Lists
                 </h3>
-                <div className="space-y-3">
+                <div className="border rounded-md">
                   {isListsLoading ? (
-                    <div className="py-4 text-center text-muted-foreground">
+                    <div className="py-8 text-center text-muted-foreground">
                       <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
                       Loading lists...
                     </div>
                   ) : distributionLists.length === 0 ? (
-                    <div className="py-4 text-center text-muted-foreground">
+                    <div className="py-8 text-center text-muted-foreground">
                       <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p>No distribution lists assigned</p>
                     </div>
                   ) : (
-                    distributionLists.map((list) => (
-                      <div
-                        key={list.id}
-                        className="flex items-center py-3 px-3 bg-muted/50 rounded-lg border border-border/50 hover:bg-muted transition-colors cursor-pointer"
-                        onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.id}`, { state: { from: location.pathname } })}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <FileSpreadsheet className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <span className="font-medium truncate">{list.name}</span>
-                            <Badge variant="outline" className="text-xs flex-shrink-0">
-                              v{list.version_number}
-                            </Badge>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-left">Name</TableHead>
+                            <TableHead className="text-center">Version</TableHead>
+                            <TableHead className="text-right">Records</TableHead>
+                            <TableHead className="text-right">Invalid</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {distributionLists
+                            .slice((listsPage - 1) * LISTS_PER_PAGE, listsPage * LISTS_PER_PAGE)
+                            .map((list) => (
+                              <TableRow
+                                key={list.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() =>
+                                  navigate(`/ui/auto-dialer/distribution-lists/${list.id}`, {
+                                    state: { from: location.pathname },
+                                  })
+                                }
+                              >
+                                <TableCell className="font-medium">{list.name}</TableCell>
+                                <TableCell className="text-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    v{list.version_number}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {list.statistics.valid_rows.toLocaleString()}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {list.statistics.invalid_rows > 0 ? (
+                                    <span className="text-red-500">
+                                      {list.statistics.invalid_rows}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                      {distributionLists.length > LISTS_PER_PAGE && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
+                          <div className="text-sm text-muted-foreground">
+                            Showing {(listsPage - 1) * LISTS_PER_PAGE + 1} to{' '}
+                            {Math.min(listsPage * LISTS_PER_PAGE, distributionLists.length)} of{' '}
+                            {distributionLists.length} lists
                           </div>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                            <span>{list.statistics.valid_rows.toLocaleString()} records</span>
-                            {list.statistics.invalid_rows > 0 && (
-                              <span className="text-red-500">
-                                {list.statistics.invalid_rows} invalid
-                              </span>
-                            )}
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setListsPage((p) => Math.max(1, p - 1))}
+                              disabled={listsPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setListsPage((p) =>
+                                  Math.min(Math.ceil(distributionLists.length / LISTS_PER_PAGE), p + 1)
+                                )
+                              }
+                              disabled={listsPage >= Math.ceil(distributionLists.length / LISTS_PER_PAGE)}
+                            >
+                              Next
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      )}
+                    </>
                   )}
                 </div>
               </div>
