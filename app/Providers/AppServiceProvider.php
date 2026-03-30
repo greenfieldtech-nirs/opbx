@@ -54,6 +54,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Cloudonix\CloudonixVoiceService::class
         );
 
+        // Register Auto Dialer Cloudonix Service
+        $this->app->singleton(
+            \App\Services\AutoDialer\AutoDialerCloudonixService::class,
+            function ($app) {
+                return new \App\Services\AutoDialer\AutoDialerCloudonixService(
+                    $app->make(\App\Services\CloudonixClient\CloudonixClient::class)
+                );
+            }
+        );
+
         $this->app->singleton(
             \App\Services\PasswordGenerator::class
         );
