@@ -258,6 +258,98 @@ Health check endpoint for worker monitoring.
 }
 ```
 
+### 4.4 State Persistence Endpoints
+
+#### `POST /api/v1/dialer/worker/state/persist`
+Persist worker runtime state to database for failure recovery.
+
+**Request:**
+```json
+{
+  "worker_id": "dialer-worker-1",
+  "active_calls": {
+    "call_abc123": {
+      "id": "call_abc123",
+      "campaign_id": 1,
+      "destination_id": 123,
+      "phone_number": "+12025551234",
+      "cloudonix_call_id": "cix_xyz789",
+      "status": "connected",
+      "started_at": "2026-03-29T14:30:00Z"
+    }
+  },
+  "retry_queue": [
+    {
+      "destination_id": 456,
+      "attempt_number": 2,
+      "next_retry_at": "2026-03-29T15:00:00Z",
+      "last_disposition": "no_answer"
+    }
+  ],
+  "campaign_states": {
+    "1": {
+      "active_calls": 5,
+      "is_paused": false,
+      "last_dial_time": "2026-03-29T14:30:00Z"
+    }
+  },
+  "last_updated": "2026-03-29T14:30:30Z"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "State persisted successfully"
+}
+```
+
+#### `GET /api/v1/dialer/worker/state/{worker_id}`
+Retrieve persisted worker state for recovery.
+
+**Response:**
+```json
+{
+  "data": {
+    "worker_id": "dialer-worker-1",
+    "active_calls": { ... },
+    "retry_queue": [ ... ],
+    "campaign_states": { ... },
+    "last_updated": "2026-03-29T14:30:30Z"
+  }
+}
+```
+
+### 4.5 Webhook Proxy Endpoint
+
+#### `POST /api/v1/dialer/webhooks/cloudonix`
+Proxy endpoint for Cloudonix webhooks. Laravel validates the signature and forwards to the worker.
+
+**Request (from Cloudonix):**
+```json
+{
+  "type": "call.completed",
+  "call_id": "cix_xyz789",
+  "from": "+1234567890",
+  "to": "+12025551234",
+  "status": "completed",
+  "disposition": "answered",
+  "duration": 45,
+  "billsec": 42,
+  "custom_data": {
+    "campaign_id": 1,
+    "destination_id": 123,
+    "session_id": "sess_abc123"
+  }
+}
+```
+
+**Processing:**
+1. Validate Cloudonix webhook signature
+2. Find active worker handling this campaign
+3. Forward to worker's internal webhook endpoint
+4. Return 200 OK to Cloudonix
+
 ---
 
 ## 5. Core Workflows
@@ -928,20 +1020,377 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 
 ---
 
-## 15. Questions for You
+## 15. Design Decisions Confirmed
 
-Before I finalize this specification, please confirm:
+The following design decisions have been confirmed:
 
-1. **Should the worker be stateless** (all state in Laravel DB) or can it maintain in-memory state (active calls, retry queue)?
+| Decision | Status | Implementation |
+|----------|--------|----------------|
+| **State Management** | ✅ Confirmed | In-memory state with periodic DB persistence for failure recovery |
+| **Active Calls on Pause** | ✅ Confirmed | Let active calls complete naturally |
+| **Worker API Exposure** | ✅ Confirmed | Laravel API only (no direct worker REST API) |
+| **Logging Destination** | ✅ Confirmed | Local rsyslog (not stdout or external service) |
+| **Alerting** | ✅ Confirmed | Log alerts only (no email/Slack) |
+| **Webhook Routing** | ✅ Confirmed | Through Laravel proxy (not direct to worker) |
 
-2. **What happens to active calls** when a campaign is paused or goes outside schedule? (Let them complete, or force hangup?)
+---
 
-3. **Should the worker expose a REST API** for manual control (pause/resume campaign, check status) or is Laravel API sufficient?
+## 16. State Management & Persistence
 
-4. **Logging destination**: Should logs go to stdout (Docker handles) or directly to a log service (ELK, etc.)?
+### 16.1 In-Memory State with DB Persistence
 
-5. **Alerting**: When circuit breaker opens, should worker send email/Slack alert or just log?
+The worker maintains in-memory state for performance, but periodically persists critical state to the database for failure recovery:
 
-6. **Cloudonix webhook URL**: What URL should Cloudonix call? `https://worker:8080/webhooks/cloudonix` or through Laravel proxy?
+```go
+type PersistentState struct {
+    ActiveCalls       map[string]*CallSession    `json:"active_calls"`
+    RetryQueue        []RetryState               `json:"retry_queue"`
+    CampaignStates    map[int]*CampaignRuntimeState `json:"campaign_states"`
+    LastUpdated       time.Time                  `json:"last_updated"`
+    WorkerID          string                     `json:"worker_id"`
+}
 
-Please review and let me know any changes or clarifications needed!
+// PersistState saves critical state to Laravel API
+type StatePersister struct {
+    client *LaravelAPIClient
+    ticker *time.Ticker
+}
+
+func (sp *StatePersister) Start(ctx context.Context, state *WorkerState) {
+    sp.ticker = time.NewTicker(30 * time.Second) // Persist every 30s
+    
+    go func() {
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            case <-sp.ticker.C:
+                if err := sp.persist(state); err != nil {
+                    log.Error().Err(err).Msg("Failed to persist state")
+                }
+            }
+        }
+    }()
+}
+
+func (sp *StatePersister) persist(state *WorkerState) error {
+    state.mu.RLock()
+    defer state.mu.RUnlock()
+    
+    persistent := PersistentState{
+        ActiveCalls:    make(map[string]*CallSession),
+        RetryQueue:     []RetryState{},
+        CampaignStates: make(map[int]*CampaignRuntimeState),
+        LastUpdated:    time.Now().UTC(),
+        WorkerID:       state.WorkerID,
+    }
+    
+    // Copy active calls
+    for id, call := range state.ActiveCalls {
+        persistent.ActiveCalls[id] = call
+    }
+    
+    // Copy retry queue
+    for _, retry := range state.RetryQueue {
+        persistent.RetryQueue = append(persistent.RetryQueue, retry)
+    }
+    
+    // Copy campaign runtime state
+    for id, cs := range state.Campaigns {
+        persistent.CampaignStates[id] = &CampaignRuntimeState{
+            ActiveCalls:    cs.ActiveCalls,
+            IsPaused:       cs.IsPaused,
+            PauseReason:    cs.PauseReason,
+            LastDialTime:   cs.LastDialTime,
+        }
+    }
+    
+    // Send to Laravel API
+    return sp.client.PersistWorkerState(persistent)
+}
+```
+
+### 16.2 Recovery on Startup
+
+When worker starts, it checks for persisted state:
+
+```go
+func (w *Worker) RecoverState() error {
+    persisted, err := w.laravelClient.GetWorkerState(w.WorkerID)
+    if err != nil {
+        log.Warn().Err(err).Msg("No persisted state found, starting fresh")
+        return nil
+    }
+    
+    // Check if state is stale (> 5 minutes old)
+    if time.Since(persisted.LastUpdated) > 5*time.Minute {
+        log.Warn().Time("last_updated", persisted.LastUpdated).Msg("Persisted state is stale, not recovering active calls")
+        // Only recover retry queue
+        w.state.RetryQueue = persisted.RetryQueue
+        return nil
+    }
+    
+    // Recover active calls (validate with Cloudonix)
+    for callID, call := range persisted.ActiveCalls {
+        // Check call status with Cloudonix
+        status, err := w.cloudonixClient.GetCallStatus(call.CloudonixCallID)
+        if err != nil || status == "completed" {
+            // Call already ended or error checking - update disposition
+            w.updateCallDisposition(call, "unknown", 0)
+            continue
+        }
+        
+        // Call still active - add to tracking
+        w.state.ActiveCalls[callID] = call
+        w.state.GlobalActiveCalls++
+    }
+    
+    log.Info().
+        Int("recovered_calls", len(w.state.ActiveCalls)).
+        Int("recovered_retries", len(persisted.RetryQueue)).
+        Msg("State recovered successfully")
+    
+    return nil
+}
+```
+
+### 16.3 Laravel API State Endpoints
+
+**`POST /api/v1/dialer/worker/state/persist`**
+
+Persist worker state to database.
+
+**Request:**
+```json
+{
+  "worker_id": "dialer-worker-1",
+  "active_calls": {
+    "call_abc123": {
+      "id": "call_abc123",
+      "campaign_id": 1,
+      "destination_id": 123,
+      "phone_number": "+12025551234",
+      "cloudonix_call_id": "cix_xyz789",
+      "status": "connected",
+      "started_at": "2026-03-29T14:30:00Z"
+    }
+  },
+  "retry_queue": [
+    {
+      "destination_id": 456,
+      "attempt_number": 2,
+      "next_retry_at": "2026-03-29T15:00:00Z",
+      "last_disposition": "no_answer"
+    }
+  ],
+  "campaign_states": {
+    "1": {
+      "active_calls": 5,
+      "is_paused": false,
+      "last_dial_time": "2026-03-29T14:30:00Z"
+    }
+  },
+  "last_updated": "2026-03-29T14:30:30Z"
+}
+```
+
+**`GET /api/v1/dialer/worker/state/{worker_id}`**
+
+Retrieve persisted worker state.
+
+---
+
+## 17. Active Calls on Campaign Pause
+
+When a campaign is paused (circuit breaker, outside schedule, or manual):
+
+```go
+func (w *Worker) pauseCampaign(campaignID int, reason string) {
+    state := w.state.Campaigns[campaignID]
+    state.IsPaused = true
+    state.PauseReason = reason
+    
+    log.Info().
+        Int("campaign_id", campaignID).
+        Str("reason", reason).
+        Int("active_calls", state.ActiveCalls).
+        Msg("Campaign paused - letting active calls complete")
+    
+    // Note: We do NOT hangup active calls
+    // They will complete naturally and be dispositioned normally
+}
+```
+
+**Behavior:**
+- Campaign stops accepting new destinations
+- Active calls continue until natural completion
+- Call dispositions are still processed and recorded
+- Once all active calls complete, campaign is fully paused
+
+---
+
+## 18. Logging Configuration (rsyslog)
+
+### 18.1 Go ZeroLog to rsyslog
+
+```go
+import (
+    "github.com/rs/zerolog"
+    "github.com/rs/zerolog/log"
+    "gopkg.in/mcuadros/go-syslog.v2"
+)
+
+func setupLogging() {
+    // Configure zerolog to write to rsyslog via UDP
+    syslogWriter, err := syslog.Dial("udp", "localhost:514", syslog.LOG_INFO, "dialer-worker")
+    if err != nil {
+        // Fallback to stdout
+        log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Timestamp().Logger()
+        return
+    }
+    
+    log.Logger = zerolog.New(syslogWriter).With().Timestamp().Logger()
+}
+```
+
+### 18.2 Docker Compose rsyslog Configuration
+
+```yaml
+  dialer-worker:
+    # ... existing config ...
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://localhost:514"
+        tag: "dialer-worker"
+```
+
+### 18.3 Log Format
+
+```
+Mar 29 14:30:15 dialer-worker[1]: {"level":"info","component":"campaign_scheduler","campaign_id":1,"campaign_name":"Test Campaign","pending_destinations":150,"message":"Starting campaign dialing"}
+Mar 29 14:30:16 dialer-worker[1]: {"level":"info","component":"call_executor","campaign_id":1,"destination_id":123,"phone_number":"+12025551234","cloudonix_call_id":"cix_xyz789","message":"Call initiated successfully"}
+Mar 29 14:30:45 dialer-worker[1]: {"level":"error","component":"circuit_breaker","campaign_id":1,"destination_type":"ai_assistant","consecutive_errors":5,"message":"Circuit breaker opened - pausing campaign"}
+```
+
+---
+
+## 19. Webhook Routing via Laravel Proxy
+
+Cloudonix webhooks go through Laravel, which validates and forwards to the worker:
+
+```
+Cloudonix ──► Laravel ──► Worker
+              (validate)  (process)
+```
+
+### 19.1 Laravel Webhook Endpoint
+
+**`POST /api/v1/dialer/webhooks/cloudonix`**
+
+Laravel validates the webhook signature, then forwards to the active worker(s).
+
+```php
+// Laravel controller
+public function handleCloudonixWebhook(Request $request) {
+    // Validate Cloudonix signature
+    if (!$this->validateSignature($request)) {
+        return response()->json(['error' => 'Invalid signature'], 401);
+    }
+    
+    // Find which worker is handling this campaign
+    $campaignId = $request->input('custom_data.campaign_id');
+    $worker = $this->getActiveWorkerForCampaign($campaignId);
+    
+    // Forward to worker
+    $response = Http::post($worker->url . '/internal/webhooks/cloudonix', $request->all());
+    
+    return response()->json(['status' => 'ok']);
+}
+```
+
+### 19.2 Worker Internal Webhook Handler
+
+The worker exposes an internal endpoint (not publicly accessible) for Laravel to forward webhooks:
+
+```go
+// Internal handler - only accepts from Laravel
+func (w *Worker) InternalWebhookHandler(wr http.ResponseWriter, r *http.Request) {
+    // Verify request is from Laravel (internal network or shared secret)
+    if !w.verifyLaravelOrigin(r) {
+        http.Error(wr, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    
+    var event CloudonixEvent
+    if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+        http.Error(wr, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+    
+    w.processCloudonixEvent(event)
+    wr.WriteHeader(http.StatusOK)
+}
+```
+
+---
+
+## 20. Complete Implementation Summary
+
+### Phase 1: Core Worker
+1. Go project setup with dependency management
+2. HTTP client for Laravel API
+3. HTTP client for Cloudonix API
+4. Webhook receiver (internal)
+5. Basic campaign scheduler
+6. Call executor with rate limiting
+
+### Phase 2: Advanced Features
+1. Circuit breaker for AI Agent monitoring
+2. Exponential backoff retry queue
+3. State persistence to Laravel API
+4. Recovery on startup
+5. rsyslog integration
+
+### Phase 3: Laravel Backend
+1. Implement all `/api/v1/dialer/worker/*` endpoints
+2. Webhook proxy endpoint
+3. State persistence endpoints
+4. Metrics aggregation
+
+### Phase 4: Testing & Deployment
+1. Unit tests for core logic
+2. Integration tests with mocked APIs
+3. Load testing
+4. Docker deployment
+5. Production monitoring
+
+---
+
+## 21. Final Notes
+
+### Success Criteria
+- ✅ Handles multiple concurrent campaigns
+- ✅ Respects campaign schedules and limits
+- ✅ Circuit breaker pauses campaigns on AI errors
+- ✅ Exponential backoff for retries
+- ✅ No direct database access
+- ✅ State persistence for failure recovery
+- ✅ Graceful shutdown (lets calls complete)
+- ✅ Laravel API only (no direct worker API)
+- ✅ rsyslog for logging
+- ✅ Alerts go to logs only
+- ✅ Webhooks through Laravel proxy
+
+### Performance Targets
+- 100+ concurrent calls per worker instance
+- < 100ms latency for call initiation
+- 99.9% uptime (excluding planned maintenance)
+- State persistence every 30 seconds
+- Recovery time < 60 seconds after crash
+
+---
+
+**Specification Version:** 1.0  
+**Last Updated:** 2026-03-29  
+**Status:** Ready for Implementation
