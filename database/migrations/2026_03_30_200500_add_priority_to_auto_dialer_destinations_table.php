@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,11 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('auto_dialer_destinations', function (Blueprint $table) {
-            if (! Schema::hasColumn('auto_dialer_destinations', 'next_retry_at')) {
-                $table->timestamp('next_retry_at')->nullable()->after('last_dialed_at');
-
-                // Add index for retry queries
-                $table->index(['status', 'next_retry_at'], 'add_retry_at_idx');
+            if (! Schema::hasColumn('auto_dialer_destinations', 'priority')) {
+                $table->unsignedInteger('priority')->default(1)->after('dial_attempts')
+                    ->comment('Priority for dialing order (1 is highest)');
             }
         });
     }
@@ -29,9 +25,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('auto_dialer_destinations', function (Blueprint $table) {
-            if (Schema::hasColumn('auto_dialer_destinations', 'next_retry_at')) {
-                $table->dropIndex('add_retry_at_idx');
-                $table->dropColumn('next_retry_at');
+            if (Schema::hasColumn('auto_dialer_destinations', 'priority')) {
+                $table->dropColumn('priority');
             }
         });
     }

@@ -18,6 +18,9 @@ class ListDestinationResource extends JsonResource
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
 
+            // Priority for dialing order
+            'priority' => $this->priority ?? 1,
+
             // Metrics
             'dial_attempts' => $this->dial_attempts,
             'last_dialed_at' => $this->last_dialed_at?->format('Y-m-d H:i:s'),

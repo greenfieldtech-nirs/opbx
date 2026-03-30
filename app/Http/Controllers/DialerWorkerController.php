@@ -12,6 +12,7 @@ use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Scopes\OrganizationScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -274,6 +275,118 @@ class DialerWorkerController extends Controller
     }
 
     /**
+     * Set final disposition for a call and handle retry logic.
+     *
+     * This endpoint is used by the worker to explicitly set disposition
+     * and control retry behavior.
+     */
+    public function setDisposition(Request $request, int $session): JsonResponse
+    {
+        $this->authorizeWorker($request);
+
+        $validated = $request->validate([
+            'disposition' => ['required', 'string', 'in:answered,completed,busy,no-answer,failed,cancelled,congestion'],
+            'should_retry' => ['required', 'boolean'],
+            'next_retry_at' => ['nullable', 'date'],
+            'attempt_number' => ['required', 'integer', 'min:1'],
+            'duration' => ['nullable', 'integer'],
+            'billsec' => ['nullable', 'integer'],
+        ]);
+
+        // Bypass organization scope for worker API calls
+        $sessionModel = OrganizationScope::bypass(function () use ($session): ?AutoDialerCallSession {
+            return AutoDialerCallSession::with(['campaign', 'destination'])->find($session);
+        });
+
+        if (! $sessionModel) {
+            return response()->json([
+                'error' => 'Session not found',
+            ], 404);
+        }
+
+        $session = $sessionModel;
+        $campaign = $session->campaign;
+        $destination = $session->destination;
+
+        if (! $campaign || ! $destination) {
+            return response()->json([
+                'error' => 'Campaign or destination not found',
+            ], 404);
+        }
+
+        // Perform updates within scope bypass and get destination status
+        $destinationStatus = OrganizationScope::bypass(function () use ($session, $campaign, $destination, $validated): DestinationStatus {
+            // Update session
+            $session->update([
+                'disposition' => $validated['disposition'],
+                'duration' => $validated['duration'] ?? 0,
+                'billsec' => $validated['billsec'] ?? 0,
+                'completed_at' => now(),
+            ]);
+
+            // Build destination update data
+            $destinationData = [
+                'last_disposition' => $validated['disposition'],
+                'duration' => $validated['duration'] ?? 0,
+                'billsec' => $validated['billsec'] ?? 0,
+            ];
+
+            // Determine status based on disposition and retry settings
+            $completedDispositions = ['answered', 'completed'];
+
+            if (in_array($validated['disposition'], $completedDispositions, true)) {
+                // Successful call
+                $destinationData['status'] = DestinationStatus::COMPLETED;
+                $session->update(['status' => 'completed']);
+                $campaign->increment('completed_calls');
+            } elseif ($validated['should_retry'] && $validated['next_retry_at']) {
+                // Schedule for retry
+                $destinationData['status'] = DestinationStatus::PENDING;
+                $destinationData['next_retry_at'] = $validated['next_retry_at'];
+                $session->update(['status' => 'failed']);
+
+                Log::info('DialerWorker: Destination scheduled for retry', [
+                    'session_id' => $session->id,
+                    'destination_id' => $destination->id,
+                    'attempt_number' => $validated['attempt_number'],
+                    'next_retry_at' => $validated['next_retry_at'],
+                ]);
+            } else {
+                // Permanent failure
+                $destinationData['status'] = DestinationStatus::FAILED;
+                $session->update(['status' => 'failed']);
+                $campaign->increment('failed_calls');
+            }
+
+            $destination->update($destinationData);
+
+            // Decrement pending calls if not already done
+            if ($campaign->pending_calls > 0) {
+                $campaign->decrement('pending_calls');
+            }
+
+            return $destinationData['status'];
+        });
+
+        Log::info('DialerWorker: Disposition set', [
+            'session_id' => $session->id,
+            'disposition' => $validated['disposition'],
+            'should_retry' => $validated['should_retry'],
+            'attempt_number' => $validated['attempt_number'],
+        ]);
+
+        return response()->json([
+            'message' => 'Disposition set successfully',
+            'data' => [
+                'session_id' => $session->id,
+                'disposition' => $validated['disposition'],
+                'destination_status' => $destinationStatus->value,
+                'will_retry' => $validated['should_retry'] && isset($validated['next_retry_at']),
+            ],
+        ]);
+    }
+
+    /**
      * Pause a campaign (used by circuit breaker or schedule).
      */
     public function pauseCampaign(Request $request, AutoDialerCampaign $campaign): JsonResponse
@@ -296,7 +409,7 @@ class DialerWorkerController extends Controller
             [
                 'reason' => $validated['reason'],
                 'paused_by' => $validated['paused_by'],
-                'resume_at' => $validated['resume_at'],
+                'resume_at' => $validated['resume_at'] ?? null,
                 'paused_at' => now()->toIso8601String(),
             ],
             now()->addHours(24)

@@ -57,6 +57,7 @@ class AutoDialerCampaign extends Model
         'completed_calls',
         'failed_calls',
         'pending_calls',
+        'concurrent_active_calls',
     ];
 
     /**
@@ -78,6 +79,7 @@ class AutoDialerCampaign extends Model
         'amd_mode' => AmdMode::class,
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'concurrent_active_calls' => 'integer',
     ];
 
     /**

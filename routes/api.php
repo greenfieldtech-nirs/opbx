@@ -81,6 +81,8 @@ Route::prefix('v1/dialer/worker')->middleware(['dialer.worker.auth', 'throttle:d
         ->name('dialer.worker.calls.initiate');
     Route::patch('/calls/{session}/status', [DialerWorkerController::class, 'updateCallStatus'])
         ->name('dialer.worker.calls.status');
+    Route::post('/calls/{session}/disposition', [DialerWorkerController::class, 'setDisposition'])
+        ->name('dialer.worker.calls.disposition');
 
     // State persistence
     Route::post('/state/persist', [DialerWorkerController::class, 'persistState'])

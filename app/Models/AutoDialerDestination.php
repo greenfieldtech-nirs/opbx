@@ -37,6 +37,7 @@ class AutoDialerDestination extends Model
         'total_duration',
         'last_cdr_id',
         'last_error',
+        'priority',
     ];
 
     /**
@@ -47,6 +48,7 @@ class AutoDialerDestination extends Model
     protected $casts = [
         'status' => DestinationStatus::class,
         'last_dialed_at' => 'datetime',
+        'next_retry_at' => 'datetime',
     ];
 
     /**

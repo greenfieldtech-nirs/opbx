@@ -831,46 +831,76 @@ func (c *LaravelAPIClient) GetActiveCampaigns(ctx context.Context) ([]Campaign, 
 
 ### 9.2 Cloudonix API Integration
 
-Using the Cloudonix API endpoint: `POST /v1/calls`
+Using the Cloudonix API endpoint: `POST /calls/{domain}/application`
+
+See: https://developers.cloudonix.com/Documentation/apiWorkflow/callControlAndSessionManagement#outbound-call-from-application
 
 ```go
 func (c *CloudonixAPIClient) InitiateCall(ctx context.Context, req InitiateCallRequest) (*InitiateCallResponse, error) {
+    // Build the URL with domain in the path
+    url := fmt.Sprintf("%s/calls/%s/application", c.BaseURL, c.Domain)
+    
+    // Build the JSON payload according to Cloudonix API documentation
     payload := map[string]interface{}{
-        "domain":       c.Domain,
-        "from":         req.CallerID,
-        "to":           req.PhoneNumber,
-        "timeout":      req.Timeout,
-        "call_id":      req.InternalCallID,
-        "webhook_url":  req.WebhookURL,
+        "destination":  req.PhoneNumber,      // Destination to dial (E.164)
+        "caller-id":    req.CallerID,        // Caller ID to present
+        "timeout":      req.Timeout,         // Seconds to wait for answer (default: 60)
+        "callback":     req.WebhookURL,      // URL for session status callbacks
     }
     
+    // Optional: Enable call recording
     if req.Record {
         payload["record"] = true
     }
     
+    // Optional: Enable Answering Machine Detection
+    // Valid values: "Enable" or "DetectMessageEnd"
     if req.AMDEnabled {
-        payload["amd"] = true
+        payload["machineDetection"] = "Enable"
     }
     
-    // Add destination routing based on type
+    // Optional: Maximum call duration in seconds
+    if req.TimeLimit > 0 {
+        payload["timeLimit"] = req.TimeLimit
+    }
+    
+    // Optional: Schedule the call for a future time (ISO-8601 timestamp)
+    if req.ScheduleAt != "" {
+        payload["schedule"] = req.ScheduleAt
+    }
+    
+    // Add destination routing - specify ONE of: application, url, or cxml
     // Note: routing_destination_type comes from campaign.routing_destination_type
-    // Valid values: ai_assistant, extension, ring_group, conference_room, ivr_menu
     switch req.RoutingDestinationType {
     case "ai_assistant":
-        payload["application"] = fmt.Sprintf("ai:%d", req.RoutingDestinationID)
-    case "extension":
-        payload["extension"] = req.RoutingDestinationID
-    case "ring_group":
-        payload["ring_group"] = req.RoutingDestinationID
-    case "conference_room":
-        payload["conference"] = req.RoutingDestinationID
-    case "ivr_menu":
-        payload["ivr"] = req.RoutingDestinationID
+        // Application ID from Cloudonix voice application configuration
+        payload["application"] = req.RoutingDestinationID
+    case "url":
+        // URL to CXML application
+        payload["url"] = req.RoutingURL
+    case "cxml":
+        // Inline CXML code
+        payload["cxml"] = req.RoutingCXML
     }
     
-    // Send request...
+    // Send request with Bearer token authorization
+    // Authorization: Bearer {CLOUDONIX_API_KEY}
+    //
+    // Expected response (200 OK):
+    // {
+    //   "domainId": 3,
+    //   "subscriberId": 372,
+    //   "destination": "15551234567",
+    //   "direction": "outbound-api",
+    //   "token": "16a7294c989b11e7b3d32b9edb8660c7"
+    // }
+    //
+    // The 'token' in the response is the session token that will be sent
+    // in webhook callbacks via the 'call_id' field.
 }
 ```
+
+**Important:** The session token returned in the response (`token` field) should be stored and correlated with our internal session. This token will be included in webhook callbacks as `call_id`.
 
 ### 9.3 Webhook Handler
 

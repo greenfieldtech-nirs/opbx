@@ -40,8 +40,10 @@ return new class extends Migration
             $table->index(['organization_id', 'is_latest_version'], 'idx_latest');
         });
 
-        // Modify status enum to include new values
-        DB::statement("ALTER TABLE auto_dialer_lists MODIFY COLUMN status ENUM('draft', 'pending', 'processing', 'ready', 'failed', 'in_use', 'used', 'archived') DEFAULT 'draft'");
+        // Modify status enum to include new values (MySQL only - SQLite doesn't support MODIFY)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE auto_dialer_lists MODIFY COLUMN status ENUM('draft', 'pending', 'processing', 'ready', 'failed', 'in_use', 'used', 'archived') DEFAULT 'draft'");
+        }
 
         // Add foreign key for parent_list_id
         Schema::table('auto_dialer_lists', function (Blueprint $table) {
@@ -75,7 +77,9 @@ return new class extends Migration
             ]);
         });
 
-        // Restore original enum
-        DB::statement("ALTER TABLE auto_dialer_lists MODIFY COLUMN status ENUM('pending', 'processing', 'ready', 'failed') DEFAULT 'pending'");
+        // Restore original enum (MySQL only - SQLite doesn't support MODIFY)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE auto_dialer_lists MODIFY COLUMN status ENUM('pending', 'processing', 'ready', 'failed') DEFAULT 'pending'");
+        }
     }
 };
