@@ -4,20 +4,30 @@ import "time"
 
 // Campaign represents an auto-dialer campaign
 type Campaign struct {
-	ID               int64                  `json:"id"`
-	Name             string                 `json:"name"`
-	OrganizationID   int64                  `json:"organization_id"`
-	AIAgentID        int64                  `json:"ai_agent_id"`
-	ApplicationID    string                 `json:"application_id"`
-	FromNumber       string                 `json:"from_number"`
-	IsRunning        bool                   `json:"is_running"`
-	Schedule         map[string]DaySchedule `json:"schedule"`
-	MaxConcurrent    int                    `json:"max_concurrent_calls"`
-	DefaultTimeout   int                    `json:"default_timeout_seconds"`
-	AMDEnabled       bool                   `json:"amd_enabled"`
-	AMDTimeout       int                    `json:"amd_timeout_ms,omitempty"`
-	AMDIntroTimeout  int                    `json:"amd_intro_timeout_ms,omitempty"`
-	CustomParameters map[string]interface{} `json:"custom_parameters,omitempty"`
+	ID                     int64                  `json:"id"`
+	Name                   string                 `json:"name"`
+	OrganizationID         int64                  `json:"organization_id"`
+	AIAgentID              int64                  `json:"ai_agent_id"`
+	ApplicationID          string                 `json:"application_id"`
+	FromNumber             string                 `json:"from_number"`
+	CallerID               string                 `json:"caller_id,omitempty"` // Caller ID to present
+	IsRunning              bool                   `json:"is_running"`
+	Status                 string                 `json:"status,omitempty"`     // active, paused, completed
+	Timezone               string                 `json:"timezone"`             // e.g., "America/New_York"
+	StartDate              string                 `json:"start_date,omitempty"` // YYYY-MM-DD format
+	EndDate                string                 `json:"end_date,omitempty"`   // YYYY-MM-DD format
+	Schedule               map[string]DaySchedule `json:"schedule"`
+	MaxConcurrent          int                    `json:"max_concurrent_calls"`
+	CallsPerSecond         int                    `json:"calls_per_second,omitempty"` // Rate limit per second
+	DefaultTimeout         int                    `json:"default_timeout_seconds"`
+	MaxDialAttempts        int                    `json:"max_dial_attempts,omitempty"`
+	RecordCalls            bool                   `json:"record_calls,omitempty"`
+	AMDEnabled             bool                   `json:"amd_enabled"`
+	AMDTimeout             int                    `json:"amd_timeout_ms,omitempty"`
+	AMDIntroTimeout        int                    `json:"amd_intro_timeout_ms,omitempty"`
+	RoutingDestinationType string                 `json:"routing_destination_type,omitempty"` // ai_assistant, url, cxml
+	RoutingDestinationID   string                 `json:"routing_destination_id,omitempty"`
+	CustomParameters       map[string]interface{} `json:"custom_parameters,omitempty"`
 }
 
 // DaySchedule represents a day's schedule

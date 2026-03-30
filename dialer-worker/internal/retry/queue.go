@@ -3,6 +3,7 @@ package retry
 import (
 	"container/heap"
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -67,11 +68,13 @@ type Config struct {
 }
 
 // DefaultConfig returns default retry configuration
+// Per spec: exponential backoff with 60 minute cap
+// Attempt 1: 5 min, Attempt 2: 10 min, Attempt 3: 20 min, Attempt 4: 40 min, Attempt 5+: 60 min
 func DefaultConfig() Config {
 	return Config{
-		MaxRetries: 3,
-		BaseDelay:  5 * time.Minute,
-		MaxDelay:   4 * time.Hour,
+		MaxRetries: 5,               // Up to 5 attempts
+		BaseDelay:  5 * time.Minute, // 5 minute base
+		MaxDelay:   60 * time.Minute, // 60 minute cap per spec
 	}
 }
 
@@ -251,11 +254,24 @@ func (q *Queue) processRetries(ctx context.Context) {
 }
 
 // calculateNextRetry calculates the next retry time with exponential backoff
+// Formula: delay = baseDelay * 2^(attempt-1), capped at maxDelay (60 minutes per spec)
 func (q *Queue) calculateNextRetry(attempt int) time.Time {
-	delay := q.baseDelay * time.Duration(1<>(uint(attempt-1)))
+	// Exponential backoff: base * 2^(attempt-1)
+	// Attempt 1: base * 2^0 = base * 1 = 5 min
+	// Attempt 2: base * 2^1 = base * 2 = 10 min
+	// Attempt 3: base * 2^2 = base * 4 = 20 min
+	// Attempt 4: base * 2^3 = base * 8 = 40 min
+	// Attempt 5+: capped at 60 min per specification
+	multiplier := math.Pow(2, float64(attempt-1))
+	delay := time.Duration(float64(q.baseDelay) * multiplier)
+
+	// Cap at maxDelay (per spec: 60 minutes)
 	if delay > q.maxDelay {
 		delay = q.maxDelay
 	}
+
+	return time.Now().Add(delay)
+}
 	return time.Now().Add(delay)
 }
 

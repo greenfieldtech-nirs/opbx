@@ -241,6 +241,45 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # Auto Dialer Worker - Go-based service for outbound campaigns
+  dialer-worker:
+    build:
+      context: ./dialer-worker
+      dockerfile: Dockerfile
+    container_name: opbx_dialer_worker
+    environment:
+      - WORKER_ID=${DIALER_WORKER_ID:-dialer-worker-1}
+      - WORKER_API_PORT=${DIALER_WORKER_PORT:-8080}
+      - METRICS_PORT=${DIALER_WORKER_METRICS_PORT:-9090}
+      - LARAVEL_API_URL=${DIALER_LARAVEL_API_URL:-http://nginx/api/v1}
+      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN}
+      - CLOUDONIX_API_URL=${CLOUDONIX_API_URL:-https://api.cloudonix.io}
+      - CLOUDONIX_API_KEY=${CLOUDONIX_API_KEY}
+      - CLOUDONIX_DOMAIN=${CLOUDONIX_DOMAIN}
+      - MAX_CONCURRENT_CALLS_GLOBAL=${DIALER_MAX_CONCURRENT:-100}
+      - DEFAULT_CALL_TIMEOUT=${DIALER_CALL_TIMEOUT:-30}
+      - CIRCUIT_BREAKER_THRESHOLD=${DIALER_CIRCUIT_THRESHOLD:-5}
+      - CIRCUIT_BREAKER_TIMEOUT=${DIALER_CIRCUIT_TIMEOUT:-5}
+      - LOG_LEVEL=${DIALER_LOG_LEVEL:-info}
+      - STATE_DIR=/app/state
+    ports:
+      - "${DIALER_WORKER_PORT:-8080}:8080"   # API / Webhooks
+      - "${DIALER_WORKER_METRICS_PORT:-9090}:9090"   # Prometheus metrics
+    volumes:
+      - dialer_worker_state:/app/state
+    networks:
+      - opbx
+    depends_on:
+      - app
+      - nginx
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   ngrok:
     image: ngrok/ngrok:latest
     container_name: opbx_ngrok
@@ -265,4 +304,6 @@ volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  dialer_worker_state:
     driver: local

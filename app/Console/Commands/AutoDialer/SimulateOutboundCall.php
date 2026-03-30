@@ -108,14 +108,26 @@ class SimulateOutboundCall extends Command
         ]);
         $destination->id = 999999; // Mock ID
 
-        // Build webhook URL
-        $webhookBase = config('app.url', 'https://localhost');
-        $webhookUrl = "{$webhookBase}/api/webhooks/cloudonix/call-status";
+        // Build webhook URL using organization's webhook_base_url
+        $webhookBase = $settings->webhook_base_url ?? config('app.url', 'https://localhost');
+        if (empty($webhookBase) || str_contains($webhookBase, 'localhost')) {
+            $this->error("❌ Invalid webhook base URL: {$webhookBase}");
+            $this->error("   Please configure webhook_base_url in CloudonixSettings for organization {$campaign->organization_id}");
+            $this->error('   Or set a proper WEBHOOK_BASE_URL in your .env file');
+            $this->error('   For local testing with ngrok:');
+            $this->error('   1. Run: ngrok http 80');
+            $this->error('   2. Update CloudonixSettings.webhook_base_url to your ngrok URL');
+
+            return self::FAILURE;
+        }
+
+        $webhookBase = rtrim($webhookBase, '/');
+        $webhookUrl = "{$webhookBase}/api/webhooks/cloudonix/dialer";
 
         $this->info("\n📤 Initiating call via Cloudonix API...");
         $this->info("   From: {$campaign->caller_id}");
         $this->info("   To: {$phoneNumber}");
-        $this->info("   Webhook: {$webhookUrl}");
+        $this->info("   Callback URL: {$webhookUrl}");
 
         // Check outbound whitelist
         $this->info("\n🔍 Checking outbound whitelist rules...");

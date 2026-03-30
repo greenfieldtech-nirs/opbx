@@ -102,9 +102,9 @@ func TestQueueMaxRetries(t *testing.T) {
 
 func TestCalculateNextRetry(t *testing.T) {
 	cfg := Config{
-		MaxRetries: 3,
+		MaxRetries: 5,
 		BaseDelay:  5 * time.Minute,
-		MaxDelay:   4 * time.Hour,
+		MaxDelay:   60 * time.Minute,
 	}
 	q := NewQueue(cfg, nil)
 
@@ -151,7 +151,32 @@ func TestPriorityQueue(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	assert.Equal(t, 3, cfg.MaxRetries)
-	assert.Equal(t, 5*time.Minute, cfg.BaseDelay)
-	assert.Equal(t, 4*time.Hour, cfg.MaxDelay)
+	assert.Equal(t, 5, cfg.MaxRetries)            // Per spec: up to 5 attempts
+	assert.Equal(t, 5*time.Minute, cfg.BaseDelay) // 5 minute base
+	assert.Equal(t, 60*time.Minute, cfg.MaxDelay) // 60 minute cap per spec
+}
+
+func TestCalculateNextRetryExponentialBackoff(t *testing.T) {
+	cfg := Config{
+		MaxRetries: 5,
+		BaseDelay:  5 * time.Minute,
+		MaxDelay:   60 * time.Minute,
+	}
+	q := NewQueue(cfg, nil)
+
+	now := time.Now()
+
+	// Test exponential backoff calculation
+	next1 := q.calculateNextRetry(1)
+	next2 := q.calculateNextRetry(2)
+	next3 := q.calculateNextRetry(3)
+	next4 := q.calculateNextRetry(4)
+	next5 := q.calculateNextRetry(5)
+
+	// Check delays match spec: 5min, 10min, 20min, 40min, 60min (capped)
+	assert.WithinDuration(t, now.Add(5*time.Minute), next1, time.Second)
+	assert.WithinDuration(t, now.Add(10*time.Minute), next2, time.Second)
+	assert.WithinDuration(t, now.Add(20*time.Minute), next3, time.Second)
+	assert.WithinDuration(t, now.Add(40*time.Minute), next4, time.Second)
+	assert.WithinDuration(t, now.Add(60*time.Minute), next5, time.Second) // Capped at 60min
 }

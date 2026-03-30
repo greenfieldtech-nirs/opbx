@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -119,6 +120,9 @@ func (s *Scheduler) scheduleCampaignLocked(ctx context.Context, campaign *models
 	log.Info().
 		Int64("campaign_id", campaign.ID).
 		Str("campaign_name", campaign.Name).
+		Str("timezone", campaign.Timezone).
+		Str("start_date", campaign.StartDate).
+		Str("end_date", campaign.EndDate).
 		Msg("Scheduling campaign")
 
 	// Schedule based on business hours
@@ -179,10 +183,10 @@ func (s *Scheduler) removeCampaignLocked(campaignID int64) {
 
 // executeCampaignIfInHours checks if campaign is within business hours and executes
 func (s *Scheduler) executeCampaignIfInHours(ctx context.Context, campaign *models.Campaign) {
-	if !s.isWithinBusinessHours(campaign) {
+	if !s.isWithinSchedule(campaign) {
 		log.Debug().
 			Int64("campaign_id", campaign.ID).
-			Msg("Campaign outside business hours, skipping")
+			Msg("Campaign outside schedule, skipping")
 		return
 	}
 
@@ -196,22 +200,66 @@ func (s *Scheduler) executeCampaignIfInHours(ctx context.Context, campaign *mode
 	s.executor.ExecuteCampaign(ctx, campaign)
 }
 
-// isWithinBusinessHours checks if current time is within campaign business hours
-func (s *Scheduler) isWithinBusinessHours(campaign *models.Campaign) bool {
-	now := time.Now()
-	dayName := now.Weekday().String()
+// isWithinSchedule checks if current time is within campaign schedule
+// including date range, timezone, day of week, and time ranges
+func (s *Scheduler) isWithinSchedule(campaign *models.Campaign) bool {
+	// Load campaign timezone
+	loc, err := time.LoadLocation(campaign.Timezone)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("timezone", campaign.Timezone).
+			Int64("campaign_id", campaign.ID).
+			Msg("Invalid timezone, using UTC")
+		loc = time.UTC
+	}
+
+	now := time.Now().In(loc)
+
+	// Check date range (start_date to end_date)
+	if campaign.StartDate != "" && campaign.EndDate != "" {
+		today := now.Format("2006-01-02")
+		if today < campaign.StartDate || today > campaign.EndDate {
+			log.Debug().
+				Int64("campaign_id", campaign.ID).
+				Str("today", today).
+				Str("start_date", campaign.StartDate).
+				Str("end_date", campaign.EndDate).
+				Msg("Current date outside campaign date range")
+			return false
+		}
+	}
+
+	// Get day name in lowercase (monday, tuesday, etc.)
+	dayName := strings.ToLower(now.Format("Monday"))
 
 	schedule, exists := campaign.Schedule[dayName]
 	if !exists || !schedule.Enabled {
+		log.Debug().
+			Int64("campaign_id", campaign.ID).
+			Str("day", dayName).
+			Msg("Day not enabled in schedule")
 		return false
 	}
 
+	// Check if current time falls within any time range
 	currentTime := now.Format("15:04")
 	for _, tr := range schedule.TimeRanges {
 		if currentTime >= tr.Start && currentTime <= tr.End {
+			log.Debug().
+				Int64("campaign_id", campaign.ID).
+				Str("current_time", currentTime).
+				Str("range_start", tr.Start).
+				Str("range_end", tr.End).
+				Msg("Within schedule time range")
 			return true
 		}
 	}
+
+	log.Debug().
+		Int64("campaign_id", campaign.ID).
+		Str("current_time", currentTime).
+		Msg("Current time not within any schedule range")
 
 	return false
 }
@@ -219,15 +267,15 @@ func (s *Scheduler) isWithinBusinessHours(campaign *models.Campaign) bool {
 // Helper functions
 func dayToInt(day string) int {
 	days := map[string]int{
-		"Sunday":    0,
-		"Monday":    1,
-		"Tuesday":   2,
-		"Wednesday": 3,
-		"Thursday":  4,
-		"Friday":    5,
-		"Saturday":  6,
+		"sunday":    0,
+		"monday":    1,
+		"tuesday":   2,
+		"wednesday": 3,
+		"thursday":  4,
+		"friday":    5,
+		"saturday":  6,
 	}
-	if d, ok := days[day]; ok {
+	if d, ok := days[strings.ToLower(day)]; ok {
 		return d
 	}
 	return 1 // Default to Monday
