@@ -164,6 +164,7 @@ class DialerWorkerController extends Controller
             'organization_id' => $campaign->organization_id,
             'campaign_id' => $campaign->id,
             'destination_id' => $destination->id,
+            'session_token' => 'sess-'.uniqid(),
             'phone_number' => $validated['phone_number'],
             'worker_id' => $validated['worker_id'],
             'status' => 'initiated',
