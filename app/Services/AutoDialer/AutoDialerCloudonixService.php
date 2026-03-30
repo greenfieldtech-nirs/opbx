@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\AmdMode;
+use App\Enums\RoutingDestinationType;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\CloudonixSettings;
-use App\Services\CloudonixClient\CloudonixClient;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\OutboundRoutingService;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\Log;
  *
  * Handles outbound call initiation and management via Cloudonix API.
  * Uses organization-specific Cloudonix credentials and outbound whitelist routing.
+ *
+ * @see https://developers.cloudonix.com/Documentation/apiWorkflow/callControlAndSessionManagement#outbound-call-from-application
  */
 class AutoDialerCloudonixService
 {
@@ -38,6 +41,8 @@ class AutoDialerCloudonixService
      *
      * Uses organization's Cloudonix credentials and outbound whitelist rules
      * to determine the appropriate trunk.
+     *
+     * @see https://developers.cloudonix.com/Documentation/apiWorkflow/callControlAndSessionManagement#outbound-call-from-application
      *
      * @param  AutoDialerCampaign  $campaign  The campaign initiating the call
      * @param  AutoDialerDestination  $destination  The destination to call
@@ -67,35 +72,8 @@ class AutoDialerCloudonixService
                 ];
             }
 
-            // Create Cloudonix client with organization's credentials
-            $client = $this->createClient($settings);
-
-            // Determine outbound trunk based on whitelist rules
-            $trunk = $this->determineOutboundTrunk($campaign, $destination);
-
-            // Build routing configuration based on campaign settings
-            $routingOptions = $this->buildRoutingOptions($campaign);
-
-            // Build call options
-            $options = [
-                'timeout' => $campaign->dial_timeout,
-                'timeLimit' => $campaign->time_limit,
-                'recording' => $campaign->record_calls,
-                'recordingStatusCallback' => $webhookUrl,
-                'recordingStatusCallbackEvent' => 'completed',
-            ];
-
-            // Add AMD if enabled
-            if ($campaign->amd_enabled) {
-                $options['machineDetection'] = $this->mapAmdMode($campaign->amd_mode);
-                $options['machineDetectionTimeout'] = $campaign->amd_timeout;
-                $options['machineDetectionSpeechThreshold'] = $campaign->amd_speech_threshold;
-                $options['machineDetectionSpeechEndThreshold'] = $campaign->amd_speech_end_threshold;
-                $options['machineDetectionSilenceTimeout'] = $campaign->amd_silence_timeout;
-            }
-
-            // Merge routing options
-            $options = array_merge($options, $routingOptions);
+            // Build the payload according to Cloudonix API specification
+            $payload = $this->buildPayload($campaign, $destination, $webhookUrl);
 
             Log::info('AutoDialer: Initiating call via Cloudonix', [
                 'campaign_id' => $campaign->id,
@@ -103,23 +81,10 @@ class AutoDialerCloudonixService
                 'phone_number' => substr($destination->phone_number, 0, 8).'...',
                 'routing_type' => $campaign->routing_destination_type,
                 'amd_enabled' => $campaign->amd_enabled,
-                'has_trunk' => $trunk !== null,
-                'trunk' => $trunk,
             ]);
 
-            // Initiate the call - only include trunk if determined by whitelist
-            if ($trunk !== null) {
-                $result = $client->initiateCall(
-                    from: $campaign->caller_id,
-                    to: $destination->phone_number,
-                    trunk: $trunk,
-                    options: $options
-                );
-            } else {
-                // No whitelist rule matched - let Cloudonix determine trunk
-                // by not providing the trunk parameter
-                $result = $this->initiateCallWithoutTrunk($client, $campaign, $destination, $options);
-            }
+            // Make the API call
+            $result = $this->makeApiCall($settings, $payload);
 
             if ($result === null) {
                 Log::error('AutoDialer: Failed to initiate call', [
@@ -139,12 +104,13 @@ class AutoDialerCloudonixService
                 'campaign_id' => $campaign->id,
                 'destination_id' => $destination->id,
                 'call_id' => $result['callId'] ?? null,
+                'session_token' => $result['token'] ?? null,
             ]);
 
             return [
                 'success' => true,
                 'call_id' => $result['callId'] ?? null,
-                'session_token' => $result['sessionToken'] ?? null,
+                'session_token' => $result['token'] ?? null,
                 'error' => null,
             ];
 
@@ -163,6 +129,165 @@ class AutoDialerCloudonixService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Build the API payload according to Cloudonix specification.
+     *
+     * @see https://developers.cloudonix.com/Documentation/apiWorkflow/callControlAndSessionManagement#outbound-call-from-application
+     *
+     * @return array<string, mixed>
+     */
+    private function buildPayload(
+        AutoDialerCampaign $campaign,
+        AutoDialerDestination $destination,
+        string $webhookUrl
+    ): array {
+        // Mandatory fields
+        $payload = [
+            'destination' => $destination->phone_number,
+            'caller-id' => $campaign->caller_id,
+        ];
+
+        // Add routing destination (application, url, or cxml)
+        $routingPayload = $this->buildRoutingPayload($campaign);
+        $payload = array_merge($payload, $routingPayload);
+
+        // Optional: Trunk (from outbound whitelist rules)
+        $trunk = $this->determineOutboundTrunk($campaign, $destination);
+        if ($trunk !== null) {
+            $payload['trunk'] = $trunk;
+        }
+
+        // Optional: Timeout
+        if ($campaign->dial_timeout) {
+            $payload['timeout'] = $campaign->dial_timeout;
+        }
+
+        // Optional: Time limit
+        if ($campaign->time_limit) {
+            $payload['timeLimit'] = $campaign->time_limit;
+        }
+
+        // Optional: Recording
+        if ($campaign->record_calls) {
+            $payload['record'] = true;
+            $payload['recordingStatusCallback'] = $webhookUrl;
+            $payload['recordingStatusCallbackEvent'] = 'completed';
+        }
+
+        // Optional: AMD (Answering Machine Detection)
+        if ($campaign->amd_enabled) {
+            $payload['machineDetection'] = $this->mapAmdMode($campaign->amd_mode);
+
+            if ($campaign->amd_timeout) {
+                $payload['machineDetectionTimeout'] = $campaign->amd_timeout;
+            }
+
+            if ($campaign->amd_speech_threshold) {
+                $payload['machineDetectionSpeechThreshold'] = $campaign->amd_speech_threshold;
+            }
+
+            if ($campaign->amd_speech_end_threshold) {
+                $payload['machineDetectionSpeechEndThreshold'] = $campaign->amd_speech_end_threshold;
+            }
+
+            if ($campaign->amd_silence_timeout) {
+                $payload['machineDetectionSilenceTimeout'] = $campaign->amd_silence_timeout;
+            }
+        }
+
+        // Optional: Callback URL for session status updates
+        $payload['callback'] = $webhookUrl;
+
+        return $payload;
+    }
+
+    /**
+     * Build routing payload (application, url, or cxml).
+     *
+     * @return array<string, mixed>
+     */
+    private function buildRoutingPayload(AutoDialerCampaign $campaign): array
+    {
+        // Handle both enum and string values
+        $routingType = $campaign->routing_destination_type;
+        if ($routingType instanceof RoutingDestinationType) {
+            $routingType = $routingType->value;
+        } elseif (is_object($routingType)) {
+            // Handle enum objects that may be passed from database
+            $routingType = (string) $routingType;
+        }
+
+        switch ($routingType) {
+            case 'ai_assistant':
+                // Route to AI assistant using the voice application ID
+                return ['application' => $campaign->routing_destination_id];
+
+            case 'ai_load_balancer':
+                // Route to AI load balancer application
+                return ['application' => $campaign->routing_destination_id];
+
+            case 'extension':
+                // For extension, we need to route to a CXML that dials the extension
+                // This would be handled by a CXML application
+                return ['application' => $this->getDialerApplicationId($campaign)];
+
+            case 'ring_group':
+                return ['application' => $this->getDialerApplicationId($campaign)];
+
+            case 'conference_room':
+                return ['application' => $this->getDialerApplicationId($campaign)];
+
+            case 'ivr_menu':
+                return ['application' => $this->getDialerApplicationId($campaign)];
+
+            case 'hangup':
+                // Use inline CXML to hangup
+                return ['cxml' => $this->buildHangupCxml()];
+
+            default:
+                Log::warning('AutoDialer: Unknown routing destination type', [
+                    'campaign_id' => $campaign->id,
+                    'routing_type' => $routingType,
+                ]);
+
+                return ['cxml' => $this->buildHangupCxml()];
+        }
+    }
+
+    /**
+     * Get the dialer application ID for the campaign's organization.
+     */
+    private function getDialerApplicationId(AutoDialerCampaign $campaign): int
+    {
+        // For now, return the default application from Cloudonix settings
+        // This should be the application's voice application ID
+        // In a real implementation, you might want to store this per-campaign
+        // or use a specific dialer application
+
+        // Get the organization's default voice application
+        $settings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+
+        if ($settings && $settings->voice_application_id) {
+            return $settings->voice_application_id;
+        }
+
+        // Fallback - this should be configured
+        Log::warning('AutoDialer: No voice application configured for organization', [
+            'campaign_id' => $campaign->id,
+            'organization_id' => $campaign->organization_id,
+        ]);
+
+        return 0;
+    }
+
+    /**
+     * Build hangup CXML for invalid/unknown routing types.
+     */
+    private function buildHangupCxml(): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>';
     }
 
     /**
@@ -209,177 +334,44 @@ class AutoDialerCloudonixService
     }
 
     /**
-     * Initiate call without specifying trunk (let Cloudonix determine).
-     *
-     * @param  array<string, mixed>  $options
-     * @return array<string, mixed>|null
-     */
-    private function initiateCallWithoutTrunk(
-        CloudonixClient $client,
-        AutoDialerCampaign $campaign,
-        AutoDialerDestination $destination,
-        array $options
-    ): ?array {
-        // Use reflection to call the protected client method with custom payload
-        // that doesn't include the trunk parameter
-        $payload = [
-            'from' => $campaign->caller_id,
-            'to' => $destination->phone_number,
-        ];
-
-        // Add optional parameters
-        if (isset($options['timeout'])) {
-            $payload['timeout'] = $options['timeout'];
-        }
-
-        if (isset($options['timeLimit'])) {
-            $payload['timeLimit'] = $options['timeLimit'];
-        }
-
-        if (isset($options['recording']) && $options['recording']) {
-            $payload['recording'] = true;
-
-            if (isset($options['recordingStatusCallback'])) {
-                $payload['recordingStatusCallback'] = $options['recordingStatusCallback'];
-            }
-
-            if (isset($options['recordingStatusCallbackEvent'])) {
-                $payload['recordingStatusCallbackEvent'] = $options['recordingStatusCallbackEvent'];
-            }
-        }
-
-        // Add AMD if enabled
-        if (isset($options['machineDetection'])) {
-            $payload['machineDetection'] = $options['machineDetection'];
-
-            if (isset($options['machineDetectionTimeout'])) {
-                $payload['machineDetectionTimeout'] = $options['machineDetectionTimeout'];
-            }
-
-            if (isset($options['machineDetectionSpeechThreshold'])) {
-                $payload['machineDetectionSpeechThreshold'] = $options['machineDetectionSpeechThreshold'];
-            }
-
-            if (isset($options['machineDetectionSpeechEndThreshold'])) {
-                $payload['machineDetectionSpeechEndThreshold'] = $options['machineDetectionSpeechEndThreshold'];
-            }
-
-            if (isset($options['machineDetectionSilenceTimeout'])) {
-                $payload['machineDetectionSilenceTimeout'] = $options['machineDetectionSilenceTimeout'];
-            }
-        }
-
-        // Add routing
-        $payload = array_merge($payload, $this->buildRoutingOptions($campaign));
-
-        Log::info('AutoDialer: Initiating call without trunk parameter', [
-            'campaign_id' => $campaign->id,
-            'destination_id' => $destination->id,
-            'payload_keys' => array_keys($payload),
-        ]);
-
-        // Make direct API call without trunk
-        return $this->makeDirectApiCall($client, $payload);
-    }
-
-    /**
-     * Make direct API call to Cloudonix.
+     * Make the API call to Cloudonix.
      *
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>|null
      */
-    private function makeDirectApiCall(CloudonixClient $client, array $payload): ?array
+    private function makeApiCall(CloudonixSettings $settings, array $payload): ?array
     {
-        // Access the client's HTTP client using reflection
-        $reflection = new \ReflectionClass($client);
-        $method = $reflection->getMethod('withCircuitBreaker');
-        $method->setAccessible(true);
+        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
+        $domain = $settings->domain_uuid;
+        $endpoint = "{$baseUrl}/calls/{$domain}/application";
 
-        return $method->invoke($client, function () use ($client, $payload) {
-            // Get the HTTP client from CloudonixClient
-            $clientReflection = new \ReflectionClass($client);
-            $clientMethod = $clientReflection->getMethod('client');
-            $clientMethod->setAccessible(true);
+        Log::debug('AutoDialer: Making Cloudonix API call', [
+            'endpoint' => $endpoint,
+            'payload' => $payload,
+        ]);
 
-            $httpClient = $clientMethod->invoke($client);
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$settings->domain_api_key,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ])->timeout(30)->post($endpoint, $payload);
 
-            $response = $httpClient->post('/calls', $payload);
+        if ($response->successful()) {
+            $data = $response->json();
 
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            Log::warning('AutoDialer: Failed to initiate call without trunk', [
-                'status' => $response->status(),
-                'body' => $response->body(),
+            Log::info('AutoDialer: Cloudonix API call successful', [
+                'response' => $data,
             ]);
 
-            return null;
-        }, null, null);
-    }
-
-    /**
-     * Create a Cloudonix client with organization's credentials.
-     */
-    private function createClient(CloudonixSettings $settings): CloudonixClient
-    {
-        return new CloudonixClient($settings, true);
-    }
-
-    /**
-     * Build routing options based on campaign destination type.
-     *
-     * @return array<string, mixed>
-     */
-    private function buildRoutingOptions(AutoDialerCampaign $campaign): array
-    {
-        $options = [];
-
-        // Handle both enum and string values
-        $routingType = $campaign->routing_destination_type;
-        if ($routingType instanceof \App\Enums\RoutingDestinationType) {
-            $routingType = $routingType->value;
+            return $data;
         }
 
-        switch ($routingType) {
-            case 'ai_assistant':
-                $options['application'] = "ai:{$campaign->routing_destination_id}";
-                break;
+        Log::error('AutoDialer: Cloudonix API call failed', [
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
 
-            case 'ai_load_balancer':
-                $options['application'] = "ai_lb:{$campaign->routing_destination_id}";
-                break;
-
-            case 'extension':
-                $options['extension'] = $campaign->routing_destination_id;
-                break;
-
-            case 'ring_group':
-                $options['ring_group'] = $campaign->routing_destination_id;
-                break;
-
-            case 'conference_room':
-                $options['conference'] = $campaign->routing_destination_id;
-                break;
-
-            case 'ivr_menu':
-                $options['ivr'] = $campaign->routing_destination_id;
-                break;
-
-            case 'hangup':
-                $options['hangup'] = true;
-                break;
-
-            default:
-                Log::warning('AutoDialer: Unknown routing destination type', [
-                    'campaign_id' => $campaign->id,
-                    'routing_type' => $routingType,
-                ]);
-                $options['hangup'] = true;
-                break;
-        }
-
-        return $options;
+        return null;
     }
 
     /**
@@ -394,9 +386,10 @@ class AutoDialerCloudonixService
         }
 
         return match ($mode) {
-            'detect_beep', 'DetectMessageEnd' => 'DetectMessageEnd',
-            'detect_wait', 'Enabled' => 'Enabled',
-            default => 'Enabled',
+            'detect_beep' => 'DetectMessageEnd',
+            'detect' => 'Enable',
+            'detect_wait' => 'Enable',
+            default => 'Enable',
         };
     }
 
@@ -407,9 +400,19 @@ class AutoDialerCloudonixService
      */
     public function getCallStatus(CloudonixSettings $settings, string $callId): ?array
     {
-        $client = $this->createClient($settings);
+        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
+        $domain = $settings->domain_uuid;
 
-        return $client->getCallStatus($callId);
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$settings->domain_api_key,
+            'Accept' => 'application/json',
+        ])->timeout(30)->get("{$baseUrl}/calls/{$domain}/sessions/{$callId}");
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        return null;
     }
 
     /**
@@ -417,9 +420,15 @@ class AutoDialerCloudonixService
      */
     public function hangupCall(CloudonixSettings $settings, string $callId): bool
     {
-        $client = $this->createClient($settings);
+        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
+        $domain = $settings->domain_uuid;
 
-        return $client->hangupCall($callId);
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$settings->domain_api_key,
+            'Accept' => 'application/json',
+        ])->timeout(30)->delete("{$baseUrl}/calls/{$domain}/sessions/{$callId}");
+
+        return $response->successful();
     }
 
     /**
@@ -429,9 +438,9 @@ class AutoDialerCloudonixService
      */
     public function getCallCdr(CloudonixSettings $settings, string $callId): ?array
     {
-        $client = $this->createClient($settings);
-
-        return $client->getCallCdr($callId);
+        // CDR is typically retrieved via webhook or a separate endpoint
+        // For now, return session details which include call information
+        return $this->getCallStatus($settings, $callId);
     }
 
     /**
@@ -441,6 +450,29 @@ class AutoDialerCloudonixService
      */
     public static function validateCredentials(string $domainUuid, string $apiKey): array
     {
-        return CloudonixClient::validateDomainCredentials($domainUuid, $apiKey);
+        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$apiKey,
+                'Accept' => 'application/json',
+            ])->timeout(30)->get("{$baseUrl}/customers/self/domains/{$domainUuid}");
+
+            $success = $response->successful();
+
+            return [
+                'valid' => $success,
+                'profile' => $success ? $response->json() : null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('AutoDialer: Credential validation failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'valid' => false,
+                'profile' => null,
+            ];
+        }
     }
 }

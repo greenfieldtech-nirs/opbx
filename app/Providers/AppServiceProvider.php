@@ -56,13 +56,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Register Auto Dialer Cloudonix Service
         $this->app->singleton(
-            \App\Services\AutoDialer\AutoDialerCloudonixService::class,
-            function ($app) {
-                return new \App\Services\AutoDialer\AutoDialerCloudonixService(
-                    $app->make(\App\Services\VoiceRouting\OutboundRoutingService::class),
-                    $app->make(\App\Services\PhoneNumberService::class)
-                );
-            }
+            \App\Services\AutoDialer\AutoDialerCloudonixService::class
         );
 
         $this->app->singleton(
