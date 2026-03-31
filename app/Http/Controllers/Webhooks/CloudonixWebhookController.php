@@ -32,7 +32,8 @@ class CloudonixWebhookController extends Controller
     public function __construct(
         private readonly WebhookDispatcher $webhookDispatcher,
         private readonly NotificationPayloadBuilder $payloadBuilder,
-        private readonly PhoneNumberService $phoneNumberService
+        private readonly PhoneNumberService $phoneNumberService,
+        private readonly CDRPublisher $cdrPublisher
     ) {}
 
     /**
@@ -645,6 +646,18 @@ class CloudonixWebhookController extends Controller
             $campaign->increment('completed_calls');
             $campaign->decrement('pending_calls');
         }
+
+        // Publish CDR event to Redis for the dialer worker
+        // This notifies the worker to decrement the concurrency counter
+        $this->cdrPublisher->publish(
+            sessionToken: $sessionToken,
+            campaignId: $session->campaign_id,
+            destinationId: $destination ? $destination->id : $session->destination_id,
+            sessionId: $session->id,
+            disposition: $request->input('disposition', 'unknown'),
+            duration: (int) $request->input('duration', 0),
+            billsec: (int) $request->input('billsec', 0)
+        );
     }
 
     /**
