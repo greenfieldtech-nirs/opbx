@@ -65,7 +65,7 @@ const campaignSchema = z.object({
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
   caller_id: z.string().min(1, 'Caller ID is required'),
   max_dial_attempts: z.number().min(1).max(5).default(1),
-  calls_per_second: z.number().min(1).max(5).default(1),
+  concurrent_active_calls: z.number().min(2).max(20).default(5),
   days_active: z.array(z.string()).min(1, 'Select at least one day'),
   start_time: z.number().min(0).max(23).default(9),
   end_time: z.number().min(0).max(23).default(17),
@@ -213,7 +213,7 @@ export default function AutoDialerCampaignForm() {
       destination_connect: 'connected',
       caller_id: '',
       max_dial_attempts: 1,
-      calls_per_second: 1,
+      concurrent_active_calls: 5,
       days_active: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
       start_time: 9,
       end_time: 17,
@@ -253,7 +253,7 @@ export default function AutoDialerCampaignForm() {
         destination_connect: existingCampaign.destination_connect,
         caller_id: existingCampaign.caller_id,
         max_dial_attempts: existingCampaign.max_dial_attempts,
-        calls_per_second: existingCampaign.calls_per_second,
+        concurrent_active_calls: existingCampaign.concurrent_active_calls,
         days_active: existingCampaign.days_active,
         start_time: existingCampaign.start_time,
         end_time: existingCampaign.end_time,
@@ -310,7 +310,7 @@ export default function AutoDialerCampaignForm() {
           destination_connect: data.destination_connect,
           caller_id: data.caller_id,
           max_dial_attempts: data.max_dial_attempts,
-          calls_per_second: data.calls_per_second,
+          concurrent_active_calls: data.concurrent_active_calls,
           schedule: weeklySchedule,
           start_date: data.start_date,
           end_date: data.end_date,
@@ -343,7 +343,7 @@ export default function AutoDialerCampaignForm() {
           destination_connect: data.destination_connect,
           caller_id: data.caller_id,
           max_dial_attempts: data.max_dial_attempts,
-          calls_per_second: data.calls_per_second,
+          concurrent_active_calls: data.concurrent_active_calls,
           schedule: weeklySchedule,
           start_date: data.start_date,
           end_date: data.end_date,
@@ -613,19 +613,27 @@ export default function AutoDialerCampaignForm() {
                 <CardDescription>Additional configuration options</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Calls Per Second and Max Dial Attempts */}
+                {/* Concurrent Active Calls and Max Dial Attempts */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="calls_per_second">Calls Per Second</Label>
-                    <Input
-                      id="calls_per_second"
-                      type="number"
-                      {...register('calls_per_second', { valueAsNumber: true })}
-                      min={1}
-                      max={5}
-                    />
+                    <Label htmlFor="concurrent_active_calls">Concurrent Active Calls</Label>
+                    <Select
+                      value={String(watch('concurrent_active_calls'))}
+                      onValueChange={(value) => setValue('concurrent_active_calls', parseInt(value))}
+                    >
+                      <SelectTrigger id="concurrent_active_calls">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2, 3, 4, 6, 10, 15, 20].map((value) => (
+                          <SelectItem key={value} value={String(value)}>
+                            {value} calls (API every {60 / value}s)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p className="text-sm text-muted-foreground">
-                      Rate at which calls are initiated
+                      Max simultaneous calls. API rate: 60/CAC seconds.
                     </p>
                   </div>
 

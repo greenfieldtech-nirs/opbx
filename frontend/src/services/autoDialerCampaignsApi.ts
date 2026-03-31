@@ -23,7 +23,7 @@ export interface AutoDialerCampaign {
   destination_connect: 'connected' | 'immediately';
   caller_id: string;
   max_dial_attempts: number;
-  calls_per_second: number;
+  concurrent_active_calls: number;
   days_active: string[];
   start_time: number;
   end_time: number;
@@ -62,7 +62,7 @@ export interface CreateCampaignRequest {
   destination_connect: 'connected' | 'immediately';
   caller_id: string;
   max_dial_attempts: number;
-  calls_per_second: number;
+  concurrent_active_calls: number;
   // New schedule format - full weekly schedule
   schedule: WeeklySchedule;
   // Legacy fields (optional)
@@ -92,7 +92,7 @@ export interface UpdateCampaignRequest {
   destination_connect?: 'connected' | 'immediately';
   caller_id?: string;
   max_dial_attempts?: number;
-  calls_per_second?: number;
+  concurrent_active_calls?: number;
   // New schedule format
   schedule?: WeeklySchedule;
   // Legacy fields
