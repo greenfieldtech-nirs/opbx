@@ -169,8 +169,8 @@ func (c *Client) InitiateCallSession(ctx context.Context, campaignID int64, req 
 }
 
 // UpdateCallStatus updates the status of a call session
-func (c *Client) UpdateCallStatus(ctx context.Context, sessionID string, req *models.UpdateCallStatusRequest) error {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/%s/status", c.baseURL, sessionID)
+func (c *Client) UpdateCallStatus(ctx context.Context, sessionID int64, req *models.UpdateCallStatusRequest) error {
+	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/%d/status", c.baseURL, sessionID)
 
 	body, err := json.Marshal(req)
 	if err != nil {

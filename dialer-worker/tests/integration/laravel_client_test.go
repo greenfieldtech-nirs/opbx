@@ -42,7 +42,6 @@ func MockLaravelServer(t *testing.T) *httptest.Server {
 					ApplicationID:          "app-123",
 					FromNumber:             "+1234567890",
 					CallerID:               "+1234567890",
-					IsRunning:              true,
 					Status:                 "active",
 					Timezone:               "America/New_York",
 					StartDate:              time.Now().Format("2006-01-02"),
@@ -128,7 +127,7 @@ func MockLaravelServer(t *testing.T) *httptest.Server {
 
 		response := map[string]interface{}{
 			"data": models.InitiateCallResponse{
-				SessionID:   "test-session-123",
+				SessionID:   123,
 				CallbackURL: "http://localhost:8080/webhooks/cloudonix",
 			},
 		}
@@ -224,14 +223,15 @@ func TestLaravelAPIClient_InitiateCallSession(t *testing.T) {
 	req := &models.InitiateCallRequest{
 		CampaignID:    1,
 		DestinationID: 1,
-		ToNumber:      "+12025551234",
-		FromNumber:    "+1234567890",
+		PhoneNumber:   "+12025551234",
+		WorkerID:      "test-worker-1",
+		InitiatedAt:   time.Now().UTC(),
 	}
 
 	resp, err := client.InitiateCallSession(ctx, 1, req)
 
 	require.NoError(t, err)
-	assert.Equal(t, "test-session-123", resp.SessionID)
+	assert.Equal(t, int64(123), resp.SessionID)
 	assert.NotEmpty(t, resp.CallbackURL)
 }
 

@@ -10,9 +10,8 @@ type Campaign struct {
 	AIAgentID              int64                  `json:"ai_agent_id"`
 	ApplicationID          string                 `json:"application_id"`
 	FromNumber             string                 `json:"from_number"`
-	CallerID               string                 `json:"caller_id,omitempty"` // Caller ID to present
-	IsRunning              bool                   `json:"is_running"`
-	Status                 string                 `json:"status,omitempty"`     // active, paused, completed
+	CallerID               string                 `json:"caller_id,omitempty"`  // Caller ID to present
+	Status                 string                 `json:"status,omitempty"`     // active, paused, completed - PRIMARY control flag
 	Timezone               string                 `json:"timezone"`             // e.g., "America/New_York"
 	StartDate              string                 `json:"start_date,omitempty"` // YYYY-MM-DD format
 	EndDate                string                 `json:"end_date,omitempty"`   // YYYY-MM-DD format
@@ -43,8 +42,9 @@ type DaySchedule struct {
 
 // TimeRange represents a time range
 type TimeRange struct {
-	Start string `json:"start"` // HH:MM format
-	End   string `json:"end"`   // HH:MM format
+	ID    string `json:"id,omitempty"`
+	Start string `json:"start_time"` // HH:MM format (matches Laravel API)
+	End   string `json:"end_time"`   // HH:MM format (matches Laravel API)
 }
 
 // Destination represents a call destination
@@ -63,7 +63,7 @@ type Destination struct {
 // CallSession represents an active call session
 type CallSession struct {
 	ID              int64                  `json:"id"`
-	SessionID       string                 `json:"session_id"`
+	SessionID       int64                  `json:"session_id"`
 	CampaignID      int64                  `json:"campaign_id"`
 	DestinationID   int64                  `json:"destination_id"`
 	CallID          string                 `json:"call_id,omitempty"`
@@ -80,22 +80,18 @@ type CallSession struct {
 
 // InitiateCallRequest represents a request to initiate a call
 type InitiateCallRequest struct {
-	DestinationID    int64                  `json:"destination_id"`
-	CampaignID       int64                  `json:"campaign_id"`
-	OrganizationID   int64                  `json:"organization_id"`
-	AIAgentID        int64                  `json:"ai_agent_id"`
-	FromNumber       string                 `json:"from_number"`
-	ToNumber         string                 `json:"to_number"`
-	CustomParameters map[string]interface{} `json:"custom_parameters,omitempty"`
-	AMDEnabled       bool                   `json:"amd_enabled"`
-	AMDTimeout       int                    `json:"amd_timeout,omitempty"`
-	AMDIntroTimeout  int                    `json:"amd_intro_timeout,omitempty"`
+	CampaignID    int64     `json:"campaign_id"`
+	DestinationID int64     `json:"destination_id"`
+	PhoneNumber   string    `json:"phone_number"`
+	WorkerID      string    `json:"worker_id"`
+	InitiatedAt   time.Time `json:"initiated_at"`
 }
 
 // InitiateCallResponse represents the response from initiating a call
 type InitiateCallResponse struct {
-	SessionID   string `json:"session_id"`
-	CallbackURL string `json:"callback_url"`
+	SessionID   int64   `json:"session_id"`
+	CallID      *string `json:"call_id,omitempty"`
+	CallbackURL string  `json:"callback_url"`
 }
 
 // UpdateCallStatusRequest represents a request to update call status
@@ -107,7 +103,7 @@ type UpdateCallStatusRequest struct {
 
 // DispositionRequest represents a request to set call disposition
 type DispositionRequest struct {
-	SessionID       string     `json:"session_id"`
+	SessionID       int64      `json:"session_id"`
 	Status          string     `json:"status"`
 	DurationSeconds int        `json:"duration_seconds,omitempty"`
 	AMDResult       *AMDResult `json:"amd_result,omitempty"`

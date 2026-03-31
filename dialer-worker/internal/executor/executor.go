@@ -22,6 +22,7 @@ type Executor struct {
 	retryQueue    *retry.Queue
 	breaker       *circuitbreaker.Breaker
 	metrics       *metrics.Collector
+	workerID      string
 
 	// Concurrency control
 	globalLimiter *rate.Limiter
@@ -35,7 +36,7 @@ type Executor struct {
 type CallContext struct {
 	CampaignID      int64
 	DestinationID   int64
-	SessionID       string
+	SessionID       int64
 	CallID          string
 	StartedAt       time.Time
 	CloudonixDomain string // Domain for hangup (from campaign credentials)
@@ -56,12 +57,14 @@ func NewExecutor(
 	breaker *circuitbreaker.Breaker,
 	metrics *metrics.Collector,
 	cfg Config,
+	workerID string,
 ) *Executor {
 	return &Executor{
 		laravelClient: laravelClient,
 		retryQueue:    retryQueue,
 		breaker:       breaker,
 		metrics:       metrics,
+		workerID:      workerID,
 		globalLimiter: rate.NewLimiter(rate.Limit(cfg.RateLimitPerSecond), cfg.RateLimitPerSecond),
 		activeCalls:   make(map[string]*CallContext),
 		campaignCalls: make(map[int64]map[string]bool),
@@ -123,7 +126,7 @@ func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaig
 			continue
 		}
 
-		go e.executeCall(ctx, campaign, &dest)
+		go e.executeCall(ctx, campaign, &dest, e.workerID)
 	}
 }
 
@@ -176,19 +179,14 @@ func (e *Executor) StopCampaign(campaignID int64) {
 }
 
 // executeCall initiates a single outbound call
-func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, dest *models.Destination) {
+func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, dest *models.Destination, workerID string) {
 	// Initiate call session in Laravel
 	initReq := &models.InitiateCallRequest{
-		DestinationID:    dest.ID,
-		CampaignID:       campaign.ID,
-		OrganizationID:   campaign.OrganizationID,
-		AIAgentID:        campaign.AIAgentID,
-		FromNumber:       campaign.FromNumber,
-		ToNumber:         dest.PhoneNumber,
-		CustomParameters: campaign.CustomParameters,
-		AMDEnabled:       campaign.AMDEnabled,
-		AMDTimeout:       campaign.AMDTimeout,
-		AMDIntroTimeout:  campaign.AMDIntroTimeout,
+		CampaignID:    campaign.ID,
+		DestinationID: dest.ID,
+		PhoneNumber:   dest.PhoneNumber,
+		WorkerID:      workerID,
+		InitiatedAt:   time.Now().UTC(),
 	}
 
 	initResp, err := e.laravelClient.InitiateCallSession(ctx, campaign.ID, initReq)
@@ -202,7 +200,7 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 	}
 
 	log.Info().
-		Str("session_id", initResp.SessionID).
+		Int64("session_id", initResp.SessionID).
 		Int64("destination_id", dest.ID).
 		Str("to_number", dest.PhoneNumber).
 		Msg("Call session initiated")
@@ -232,7 +230,7 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("session_id", initResp.SessionID).
+			Int64("session_id", initResp.SessionID).
 			Msg("Failed to make outbound call")
 
 		// Update call status to failed
@@ -271,7 +269,7 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 
 	log.Info().
 		Str("call_id", callResp.CallID).
-		Str("session_id", initResp.SessionID).
+		Int64("session_id", initResp.SessionID).
 		Int64("campaign_id", campaign.ID).
 		Msg("Outbound call initiated successfully")
 }
@@ -323,7 +321,7 @@ func (e *Executor) handleCallCompleted(ctx context.Context, callCtx *CallContext
 	if err := e.laravelClient.SetDisposition(ctx, callCtx.CampaignID, dispReq); err != nil {
 		log.Error().
 			Err(err).
-			Str("session_id", callCtx.SessionID).
+			Int64("session_id", callCtx.SessionID).
 			Msg("Failed to set disposition")
 		return err
 	}
@@ -331,7 +329,7 @@ func (e *Executor) handleCallCompleted(ctx context.Context, callCtx *CallContext
 	e.metrics.RecordCallCompleted(callCtx.CampaignID, duration)
 
 	log.Info().
-		Str("session_id", callCtx.SessionID).
+		Int64("session_id", callCtx.SessionID).
 		Str("status", event.Status).
 		Float64("duration", duration).
 		Msg("Call completed")
@@ -350,7 +348,7 @@ func (e *Executor) handleCallFailed(ctx context.Context, callCtx *CallContext, e
 	if err := e.laravelClient.UpdateCallStatus(ctx, callCtx.SessionID, updateReq); err != nil {
 		log.Error().
 			Err(err).
-			Str("session_id", callCtx.SessionID).
+			Int64("session_id", callCtx.SessionID).
 			Msg("Failed to update call status")
 	}
 
@@ -364,7 +362,7 @@ func (e *Executor) handleCallFailed(ctx context.Context, callCtx *CallContext, e
 	}
 
 	log.Warn().
-		Str("session_id", callCtx.SessionID).
+		Int64("session_id", callCtx.SessionID).
 		Str("error", event.Error).
 		Msg("Call failed")
 
@@ -382,13 +380,13 @@ func (e *Executor) handleAMDCompleted(ctx context.Context, callCtx *CallContext,
 	if err := e.laravelClient.UpdateCallStatus(ctx, callCtx.SessionID, updateReq); err != nil {
 		log.Error().
 			Err(err).
-			Str("session_id", callCtx.SessionID).
+			Int64("session_id", callCtx.SessionID).
 			Msg("Failed to update AMD result")
 		return err
 	}
 
 	log.Info().
-		Str("session_id", callCtx.SessionID).
+		Int64("session_id", callCtx.SessionID).
 		Str("amd_result", event.AMDResult.Result).
 		Msg("AMD completed")
 

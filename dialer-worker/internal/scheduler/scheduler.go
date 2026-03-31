@@ -181,19 +181,31 @@ func (s *Scheduler) removeCampaignLocked(campaignID int64) {
 
 // executeCampaignIfInHours checks if campaign is within business hours and executes
 func (s *Scheduler) executeCampaignIfInHours(ctx context.Context, campaign *models.Campaign) {
+	log.Info().
+		Int64("campaign_id", campaign.ID).
+		Str("status", campaign.Status).
+		Msg("Checking campaign execution eligibility")
+
+	// Check if campaign status is active (the primary control flag)
+	if campaign.Status != "active" {
+		log.Info().
+			Int64("campaign_id", campaign.ID).
+			Str("status", campaign.Status).
+			Msg("Campaign not active, skipping")
+		return
+	}
+
 	if !s.isWithinSchedule(campaign) {
-		log.Debug().
+		log.Info().
 			Int64("campaign_id", campaign.ID).
 			Msg("Campaign outside schedule, skipping")
 		return
 	}
 
-	if !campaign.IsRunning {
-		log.Debug().
-			Int64("campaign_id", campaign.ID).
-			Msg("Campaign not running, skipping")
-		return
-	}
+	log.Info().
+		Int64("campaign_id", campaign.ID).
+		Str("campaign_name", campaign.Name).
+		Msg("Executing campaign - within schedule and active")
 
 	s.executor.ExecuteCampaign(ctx, campaign)
 }
@@ -218,7 +230,7 @@ func (s *Scheduler) isWithinSchedule(campaign *models.Campaign) bool {
 	if campaign.StartDate != "" && campaign.EndDate != "" {
 		today := now.Format("2006-01-02")
 		if today < campaign.StartDate || today > campaign.EndDate {
-			log.Debug().
+			log.Info().
 				Int64("campaign_id", campaign.ID).
 				Str("today", today).
 				Str("start_date", campaign.StartDate).
@@ -230,21 +242,47 @@ func (s *Scheduler) isWithinSchedule(campaign *models.Campaign) bool {
 
 	// Get day name in lowercase (monday, tuesday, etc.)
 	dayName := strings.ToLower(now.Format("Monday"))
+	currentTime := now.Format("15:04")
+
+	log.Info().
+		Int64("campaign_id", campaign.ID).
+		Str("day", dayName).
+		Str("current_time", currentTime).
+		Int("schedule_days", len(campaign.Schedule)).
+		Msg("Checking schedule for day")
 
 	schedule, exists := campaign.Schedule[dayName]
-	if !exists || !schedule.Enabled {
-		log.Debug().
+	if !exists {
+		log.Info().
 			Int64("campaign_id", campaign.ID).
 			Str("day", dayName).
+			Msg("Day not found in schedule")
+		return false
+	}
+	if !schedule.Enabled {
+		log.Info().
+			Int64("campaign_id", campaign.ID).
+			Str("day", dayName).
+			Bool("enabled", schedule.Enabled).
 			Msg("Day not enabled in schedule")
 		return false
 	}
 
 	// Check if current time falls within any time range
-	currentTime := now.Format("15:04")
+	log.Info().
+		Int64("campaign_id", campaign.ID).
+		Int("time_ranges", len(schedule.TimeRanges)).
+		Msg("Checking time ranges")
+
 	for _, tr := range schedule.TimeRanges {
+		log.Info().
+			Int64("campaign_id", campaign.ID).
+			Str("current_time", currentTime).
+			Str("range_start", tr.Start).
+			Str("range_end", tr.End).
+			Msg("Comparing with time range")
 		if currentTime >= tr.Start && currentTime <= tr.End {
-			log.Debug().
+			log.Info().
 				Int64("campaign_id", campaign.ID).
 				Str("current_time", currentTime).
 				Str("range_start", tr.Start).
@@ -254,7 +292,7 @@ func (s *Scheduler) isWithinSchedule(campaign *models.Campaign) bool {
 		}
 	}
 
-	log.Debug().
+	log.Info().
 		Int64("campaign_id", campaign.ID).
 		Str("current_time", currentTime).
 		Msg("Current time not within any schedule range")

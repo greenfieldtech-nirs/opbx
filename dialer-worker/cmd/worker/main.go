@@ -81,7 +81,7 @@ func main() {
 		DefaultCallTimeout:  cfg.DefaultCallTimeout,
 		RateLimitPerSecond:  10, // Configurable
 	}
-	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, execCfg)
+	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, execCfg, cfg.WorkerID)
 
 	// Update retry queue handler to use executor
 	retryQueue = retry.NewQueue(retryCfg, func(destinationID int64) error {
