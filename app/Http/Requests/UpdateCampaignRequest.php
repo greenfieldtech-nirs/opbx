@@ -52,7 +52,7 @@ class UpdateCampaignRequest extends FormRequest
             'destination_connect' => ['sometimes', 'in:connected,immediately'],
             'caller_id' => ['sometimes', 'string', 'regex:/^\+[1-9]\d{1,14}$/'],
             'max_dial_attempts' => ['sometimes', 'integer', 'min:1', 'max:5'],
-            'calls_per_second' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'concurrent_active_calls' => ['sometimes', 'integer', 'in:2,3,4,6,10,15,20'],
 
             // Scheduling - new format with full schedule object
             'schedule' => ['sometimes', 'array'],
@@ -64,7 +64,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.monday.time_ranges.*.id' => ['required', 'string'],
             'schedule.monday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.monday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.monday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.tuesday' => ['sometimes', 'array'],
             'schedule.tuesday.enabled' => ['sometimes', 'boolean'],
             'schedule.tuesday.time_ranges' => [
@@ -73,7 +73,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.tuesday.time_ranges.*.id' => ['required', 'string'],
             'schedule.tuesday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.tuesday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.tuesday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.wednesday' => ['sometimes', 'array'],
             'schedule.wednesday.enabled' => ['sometimes', 'boolean'],
             'schedule.wednesday.time_ranges' => [
@@ -82,7 +82,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.wednesday.time_ranges.*.id' => ['required', 'string'],
             'schedule.wednesday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.wednesday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.wednesday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.thursday' => ['sometimes', 'array'],
             'schedule.thursday.enabled' => ['sometimes', 'boolean'],
             'schedule.thursday.time_ranges' => [
@@ -91,7 +91,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.thursday.time_ranges.*.id' => ['required', 'string'],
             'schedule.thursday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.thursday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.thursday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.friday' => ['sometimes', 'array'],
             'schedule.friday.enabled' => ['sometimes', 'boolean'],
             'schedule.friday.time_ranges' => [
@@ -100,7 +100,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.friday.time_ranges.*.id' => ['required', 'string'],
             'schedule.friday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.friday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.friday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.saturday' => ['sometimes', 'array'],
             'schedule.saturday.enabled' => ['sometimes', 'boolean'],
             'schedule.saturday.time_ranges' => [
@@ -109,7 +109,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.saturday.time_ranges.*.id' => ['required', 'string'],
             'schedule.saturday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.saturday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.saturday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.sunday' => ['sometimes', 'array'],
             'schedule.sunday.enabled' => ['sometimes', 'boolean'],
             'schedule.sunday.time_ranges' => [
@@ -118,7 +118,7 @@ class UpdateCampaignRequest extends FormRequest
             ],
             'schedule.sunday.time_ranges.*.id' => ['required', 'string'],
             'schedule.sunday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'schedule.sunday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'schedule.sunday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
 
             // Legacy scheduling fields (optional, for backward compatibility)
             'days_active' => ['nullable', 'array'],
