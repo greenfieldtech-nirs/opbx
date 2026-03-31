@@ -17,7 +17,8 @@ type Campaign struct {
 	EndDate                string                 `json:"end_date,omitempty"`   // YYYY-MM-DD format
 	Schedule               map[string]DaySchedule `json:"schedule"`
 	MaxConcurrent          int                    `json:"max_concurrent_calls"`
-	CallsPerSecond         int                    `json:"calls_per_second,omitempty"` // Rate limit per second
+	ConcurrentActiveCalls  int                    `json:"concurrent_active_calls"` // CAC: Max concurrent active calls
+	ApiIntervalSeconds     float64                `json:"api_interval_seconds"`    // 60 / CAC
 	DefaultTimeout         int                    `json:"default_timeout_seconds"`
 	MaxDialAttempts        int                    `json:"max_dial_attempts,omitempty"`
 	RecordCalls            bool                   `json:"record_calls,omitempty"`
@@ -32,6 +33,26 @@ type Campaign struct {
 	CloudonixAPIKey string `json:"cloudonix_api_key"`           // Organization's Cloudonix API key
 	CloudonixDomain string `json:"cloudonix_domain"`            // Organization's Cloudonix domain
 	CloudonixAPIURL string `json:"cloudonix_api_url,omitempty"` // Optional custom API URL
+}
+
+// GetApiIntervalSeconds returns the time between API calls in seconds.
+//
+// The interval is calculated as 60 / CAC (Concurrent Active Calls).
+// This ensures calls are spaced out to maintain the CAC limit.
+//
+// Examples:
+//   - CAC = 2  → Interval = 30 seconds
+//   - CAC = 5  → Interval = 12 seconds
+//   - CAC = 10 → Interval = 6 seconds
+//   - CAC = 20 → Interval = 3 seconds
+//
+// Returns the API interval in seconds as a float64.
+func (c *Campaign) GetApiIntervalSeconds() float64 {
+	cac := c.ConcurrentActiveCalls
+	if cac <= 0 {
+		cac = 5 // Default to 5 if not set
+	}
+	return 60.0 / float64(cac)
 }
 
 // DaySchedule represents a day's schedule
