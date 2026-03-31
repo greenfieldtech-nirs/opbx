@@ -25,6 +25,22 @@ class AutoDialerCampaign extends Model
      *
      * @var array<int, string>
      */
+    /**
+     * Valid CAC (Concurrent Active Calls) values.
+     *
+     * CAC determines the maximum number of calls that can be active
+     * (ringing or connected) at the same time. API request interval
+     * is calculated as: 60 / CAC seconds.
+     *
+     * @var array<int>
+     */
+    public const VALID_CAC_VALUES = [2, 3, 4, 6, 10, 15, 20];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'organization_id',
         'name',
@@ -37,14 +53,14 @@ class AutoDialerCampaign extends Model
         'destination_connect',
         'caller_id',
         'max_dial_attempts',
-        'calls_per_second',
+        'concurrent_active_calls', // Max concurrent active calls (CAC)
         'days_active',
         'start_time',
         'end_time',
         'start_date',
         'end_date',
         'timezone',
-        'schedule', // New field for full weekly schedule
+        'schedule', // Full weekly schedule
         'time_limit',
         'record_calls',
         'amd_enabled',
@@ -57,7 +73,6 @@ class AutoDialerCampaign extends Model
         'completed_calls',
         'failed_calls',
         'pending_calls',
-        'concurrent_active_calls',
     ];
 
     /**
@@ -71,7 +86,7 @@ class AutoDialerCampaign extends Model
         'destination_connect' => 'string',
         'auto_start' => 'boolean',
         'days_active' => 'array',
-        'schedule' => 'array', // New field for full weekly schedule
+        'schedule' => 'array',
         'start_date' => 'date',
         'end_date' => 'date',
         'record_calls' => 'boolean',
@@ -264,5 +279,74 @@ class AutoDialerCampaign extends Model
     public function getRoutingDestinationLabel(): string
     {
         return $this->routing_destination_type->label();
+    }
+
+    /**
+     * Calculate the API request interval in seconds.
+     *
+     * The dialer worker spaces out Cloudonix API requests based on the CAC
+     * setting. The formula is: 60 / CAC = interval in seconds.
+     *
+     * Examples:
+     *   CAC = 2  → Interval = 30 seconds
+     *   CAC = 5  → Interval = 12 seconds
+     *   CAC = 10 → Interval = 6 seconds
+     *   CAC = 20 → Interval = 3 seconds
+     *
+     * @return float The interval in seconds between API requests
+     */
+    public function getApiIntervalSeconds(): float
+    {
+        $cac = $this->concurrent_active_calls ?? 5;
+
+        // Prevent division by zero
+        if ($cac <= 0) {
+            $cac = 5;
+        }
+
+        return 60 / $cac;
+    }
+
+    /**
+     * Check if the current CAC value is valid.
+     *
+     * Valid CAC values are: 2, 3, 4, 6, 10, 15, 20
+     *
+     * @return bool True if CAC is valid
+     */
+    public function hasValidCac(): bool
+    {
+        return in_array($this->concurrent_active_calls, self::VALID_CAC_VALUES, true);
+    }
+
+    /**
+     * Get the nearest valid CAC value.
+     *
+     * If the current CAC is not in the valid list, returns the closest
+     * valid value. Used for validation and normalization.
+     *
+     * @return int The nearest valid CAC value
+     */
+    public function getNearestValidCac(): int
+    {
+        $current = $this->concurrent_active_calls ?? 5;
+
+        if ($this->hasValidCac()) {
+            return $current;
+        }
+
+        // Find the nearest valid value
+        $nearest = self::VALID_CAC_VALUES[0];
+        $minDiff = abs($current - $nearest);
+
+        foreach (self::VALID_CAC_VALUES as $value) {
+            $diff = abs($current - $value);
+            if ($diff < $minDiff) {
+                $minDiff = $diff;
+                $nearest = $value;
+            }
+        }
+
+        return $nearest;
     }
 }
