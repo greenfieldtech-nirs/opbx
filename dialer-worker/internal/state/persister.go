@@ -89,6 +89,13 @@ func (p *Persister) Stop() {
 func (p *Persister) Save(ctx context.Context) error {
 	p.mu.RLock()
 	p.state.UpdatedAt = time.Now()
+
+	// Populate API-specific fields for Laravel compatibility
+	p.state.ActiveCalls = []interface{}{}
+	p.state.RetryQueue = []interface{}{}
+	p.state.CampaignStates = []interface{}{}
+	p.state.LastUpdated = p.state.UpdatedAt
+
 	stateCopy := *p.state
 	p.mu.RUnlock()
 
@@ -145,6 +152,7 @@ func (p *Persister) loadState(ctx context.Context) error {
 	if err == nil {
 		p.mu.Lock()
 		p.state = state
+		p.ensureAPIFields()
 		p.mu.Unlock()
 		log.Info().Msg("Loaded state from API")
 		return nil
@@ -157,11 +165,30 @@ func (p *Persister) loadState(ctx context.Context) error {
 		if err := p.loadFromFile(); err != nil {
 			return fmt.Errorf("failed to load from file: %w", err)
 		}
+		p.mu.Lock()
+		p.ensureAPIFields()
+		p.mu.Unlock()
 		log.Info().Msg("Loaded state from local file")
 		return nil
 	}
 
 	return fmt.Errorf("no state available")
+}
+
+// ensureAPIFields ensures all API-required fields are populated
+func (p *Persister) ensureAPIFields() {
+	if p.state.ActiveCalls == nil {
+		p.state.ActiveCalls = []interface{}{}
+	}
+	if p.state.RetryQueue == nil {
+		p.state.RetryQueue = []interface{}{}
+	}
+	if p.state.CampaignStates == nil {
+		p.state.CampaignStates = []interface{}{}
+	}
+	if p.state.LastUpdated.IsZero() {
+		p.state.LastUpdated = time.Now()
+	}
 }
 
 // saveToFile saves state to local file

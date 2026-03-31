@@ -155,10 +155,16 @@ type CampaignState struct {
 // WorkerState represents the full state of a worker
 type WorkerState struct {
 	WorkerID        string                   `json:"worker_id"`
-	ActiveCampaigns map[int64]*CampaignState `json:"active_campaigns"`
-	RetryQueueState map[string]*RetryState   `json:"retry_queue_state"`
+	ActiveCampaigns map[int64]*CampaignState `json:"active_campaigns"`  // Internal use
+	RetryQueueState map[string]*RetryState   `json:"retry_queue_state"` // Internal use
 	LastProcessedAt time.Time                `json:"last_processed_at,omitempty"`
 	UpdatedAt       time.Time                `json:"updated_at"`
+
+	// Fields for API persistence (match Laravel's expected format)
+	ActiveCalls    []interface{} `json:"active_calls"`    // Required by Laravel
+	RetryQueue     []interface{} `json:"retry_queue"`     // Required by Laravel
+	CampaignStates []interface{} `json:"campaign_states"` // Required by Laravel
+	LastUpdated    time.Time     `json:"last_updated"`    // Required by Laravel
 }
 
 // PersistedState represents state to be persisted
