@@ -291,6 +291,8 @@ Route::prefix('v1')->group(function (): void {
             ->name('auto-dialer-campaigns.list.delete');
         Route::get('auto-dialer-campaigns/{campaign}/destinations', [AutoDialerCampaignController::class, 'getDestinations'])
             ->name('auto-dialer-campaigns.destinations');
+        Route::get('auto-dialer-campaigns/{campaign}/concurrency', [AutoDialerCampaignController::class, 'concurrency'])
+            ->name('auto-dialer-campaigns.concurrency');
 
         // Extensions - CRUD (using ExtensionCrudController)
         Route::apiResource('extensions', ExtensionCrudController::class);

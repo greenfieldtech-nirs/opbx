@@ -447,4 +447,75 @@ class AutoDialerCampaignController extends Controller
 
         return ['start_time' => 9, 'end_time' => 17];
     }
+
+    /**
+     * Get real-time concurrency status for a campaign.
+     *
+     * Returns the current CAC (Concurrent Active Calls) utilization,
+     * active sessions, and API rate information for real-time monitoring.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign to get status for
+     */
+    public function concurrency(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $cac = $campaign->concurrent_active_calls;
+
+        // Get current active count from Redis
+        $counterKey = "campaign:{$campaign->id}:concurrency_counter";
+        $activeCount = (int) Redis::get($counterKey) ?? 0;
+
+        // Ensure non-negative
+        if ($activeCount < 0) {
+            $activeCount = 0;
+        }
+
+        // Get active sessions from Redis
+        $sessionsKey = "campaign:{$campaign->id}:active_sessions";
+        $sessionTokens = Redis::smembers($sessionsKey) ?? [];
+
+        // Get active session details from database
+        $activeSessions = [];
+        if (! empty($sessionTokens)) {
+            $sessions = AutoDialerCallSession::whereIn('session_token', $sessionTokens)
+                ->with('destination')
+                ->where('campaign_id', $campaign->id)
+                ->get();
+
+            foreach ($sessions as $session) {
+                $activeSessions[] = [
+                    'session_id' => $session->id,
+                    'session_token' => $session->session_token,
+                    'destination_id' => $session->destination_id,
+                    'phone_number' => $session->destination?->phone_number ?? 'unknown',
+                    'started_at' => $session->started_at?->toIso8601String(),
+                    'duration_seconds' => $session->started_at ? now()->diffInSeconds($session->started_at) : 0,
+                ];
+            }
+        }
+
+        // Calculate utilization percentage
+        $utilizationPercentage = $cac > 0 ? round(($activeCount / $cac) * 100, 1) : 0;
+
+        // Calculate API interval
+        $apiIntervalSeconds = $campaign->getApiIntervalSeconds();
+
+        return response()->json([
+            'data' => [
+                'cac_limit' => $cac,
+                'active_calls' => $activeCount,
+                'available_slots' => max(0, $cac - $activeCount),
+                'utilization_percentage' => $utilizationPercentage,
+                'api_interval_seconds' => $apiIntervalSeconds,
+                'active_sessions' => $activeSessions,
+                'rate_limit_status' => [
+                    'is_rate_limited' => $campaign->status === CampaignStatus::PAUSED &&
+                                         $campaign->pause_reason === 'cloudonix_rate_limit',
+                    'rate_limited_at' => null,
+                    'resumes_at' => null,
+                ],
+            ],
+        ]);
+    }
 }
