@@ -35,7 +35,12 @@ class AutoDialerCampaignResource extends JsonResource
             'destination_connect' => $this->destination_connect,
             'caller_id' => $this->caller_id,
             'max_dial_attempts' => $this->max_dial_attempts,
-            'calls_per_second' => $this->calls_per_second,
+
+            // Concurrent Active Calls (CAC) Configuration
+            // Replaces the old calls_per_second (CPS) model
+            'concurrent_active_calls' => $this->concurrent_active_calls,
+            'valid_cac_values' => $this::VALID_CAC_VALUES, // For frontend dropdown
+            'api_interval_seconds' => $this->getApiIntervalSeconds(), // 60 / CAC
 
             // Schedule
             'days_active' => $this->days_active,
