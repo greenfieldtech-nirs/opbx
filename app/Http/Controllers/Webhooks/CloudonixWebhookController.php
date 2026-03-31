@@ -15,6 +15,7 @@ use App\Models\CallNotificationsSettings;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
+use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
 use App\Services\CallNotifications\WebhookDispatcher;
 use App\Services\PhoneNumberService;
