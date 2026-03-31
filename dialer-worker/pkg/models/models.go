@@ -169,3 +169,17 @@ type PersistedState struct {
 	State     WorkerState `json:"state"`
 	Timestamp time.Time   `json:"timestamp"`
 }
+
+// GenerateCXMLRequest represents a request to generate CXML for outbound call routing
+type GenerateCXMLRequest struct {
+	CampaignID  int64  `json:"campaign_id"`
+	SessionID   int64  `json:"session_id"`
+	PhoneNumber string `json:"phone_number"`
+	CallSid     string `json:"call_sid"`
+}
+
+// GenerateCXMLResponse represents the response from generating CXML
+type GenerateCXMLResponse struct {
+	CXML        string `json:"cxml"`
+	RoutingType string `json:"routing_type"`
+}

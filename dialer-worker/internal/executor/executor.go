@@ -205,6 +205,43 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 		Str("to_number", dest.PhoneNumber).
 		Msg("Call session initiated")
 
+	// Generate a unique call SID for this outbound call
+	callSid := fmt.Sprintf("call_%d_%d_%d", campaign.ID, dest.ID, time.Now().Unix())
+
+	// Fetch CXML for routing from Laravel API
+	cxmlReq := &models.GenerateCXMLRequest{
+		CampaignID:  campaign.ID,
+		SessionID:   initResp.SessionID,
+		PhoneNumber: dest.PhoneNumber,
+		CallSid:     callSid,
+	}
+
+	cxmlResp, err := e.laravelClient.GenerateCXML(ctx, cxmlReq)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Int64("session_id", initResp.SessionID).
+			Msg("Failed to generate CXML for outbound call")
+
+		// Update call status to failed
+		updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		e.laravelClient.UpdateCallStatus(updateCtx, initResp.SessionID, &models.UpdateCallStatusRequest{
+			Status: "failed",
+			Error:  err.Error(),
+		})
+		cancel()
+
+		e.retryQueue.Add(dest.ID, "cxml_generation_failed")
+		e.metrics.RecordCallFailed(campaign.ID)
+		return
+	}
+
+	log.Info().
+		Int64("session_id", initResp.SessionID).
+		Str("routing_type", cxmlResp.RoutingType).
+		Str("cxml_preview", fmt.Sprintf("%.50s...", cxmlResp.CXML)).
+		Msg("Generated CXML for outbound call routing")
+
 	// Make the actual outbound call via Cloudonix
 	// Create a client using this campaign's organization-specific credentials
 	log.Info().
@@ -224,12 +261,13 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 			"campaign_id":    campaign.ID,
 			"destination_id": dest.ID,
 			"ai_agent_id":    campaign.AIAgentID,
+			"call_sid":       callSid,
 		},
 		Timeout:                campaign.DefaultTimeout,
 		AMDEnabled:             campaign.AMDEnabled,
 		AMDTimeout:             campaign.AMDTimeout,
-		RoutingDestinationType: campaign.RoutingDestinationType,
-		RoutingDestinationID:   campaign.RoutingDestinationID,
+		RoutingDestinationType: "cxml", // Use CXML routing
+		RoutingCXML:            cxmlResp.CXML,
 	}
 
 	callResp, err := cloudonixClient.MakeOutboundCall(ctx, cloudonixReq)

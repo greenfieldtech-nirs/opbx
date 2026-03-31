@@ -79,6 +79,8 @@ Route::prefix('v1/dialer/worker')->middleware(['dialer.worker.auth', 'throttle:d
     // Call session management
     Route::post('/calls/initiate', [DialerWorkerController::class, 'initiateCall'])
         ->name('dialer.worker.calls.initiate');
+    Route::post('/calls/generate-cxml', [DialerWorkerController::class, 'generateCxml'])
+        ->name('dialer.worker.calls.generate-cxml');
     Route::patch('/calls/{session}/status', [DialerWorkerController::class, 'updateCallStatus'])
         ->name('dialer.worker.calls.status');
     Route::post('/calls/{session}/disposition', [DialerWorkerController::class, 'setDisposition'])

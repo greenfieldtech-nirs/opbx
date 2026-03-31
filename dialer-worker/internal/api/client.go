@@ -325,6 +325,45 @@ func (c *Client) GetState(ctx context.Context, workerID string) (*models.WorkerS
 	return &result.Data, nil
 }
 
+// GenerateCXML fetches CXML for outbound call routing from Laravel API
+func (c *Client) GenerateCXML(ctx context.Context, req *models.GenerateCXMLRequest) (*models.GenerateCXMLResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/generate-cxml", c.baseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Data models.GenerateCXMLResponse `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result.Data, nil
+}
+
 // Health checks the Laravel API health endpoint
 func (c *Client) Health(ctx context.Context) error {
 	url := fmt.Sprintf("%s/api/v1/dialer/worker/health", c.baseURL)
