@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -301,6 +302,27 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 
 	callResp, err := cloudonixClient.MakeOutboundCall(ctx, cloudonixReq)
 	if err != nil {
+		// Handle Cloudonix rate limiting (HTTP 429)
+		if errors.Is(err, cloudonix.ErrRateLimited) {
+			log.Error().
+				Int64("campaign_id", campaign.ID).
+				Int64("organization_id", campaign.OrganizationID).
+				Str("to", dest.PhoneNumber).
+				Msg("Cloudonix rate limit exceeded (HTTP 429) - pausing campaign for 300 seconds")
+
+			// Update call status to indicate rate limiting
+			updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			e.laravelClient.UpdateCallStatus(updateCtx, initResp.SessionID, &models.UpdateCallStatusRequest{
+				Status: "failed",
+				Error:  "rate_limited_by_cloudonix",
+			})
+			cancel()
+
+			// Pause campaign for 300 seconds to allow Cloudonix rate limiter to reset
+			e.pauseCampaignWithDelay(ctx, campaign.ID, "cloudonix_rate_limit", 300*time.Second)
+			return
+		}
+
 		log.Error().
 			Err(err).
 			Int64("session_id", initResp.SessionID).
@@ -480,5 +502,24 @@ func (e *Executor) pauseCampaign(ctx context.Context, campaignID int64, reason s
 			Err(err).
 			Int64("campaign_id", campaignID).
 			Msg("Failed to pause campaign")
+	}
+}
+
+// pauseCampaignWithDelay pauses a campaign after a specified delay
+// Used for rate limiting scenarios where we need to wait before pausing
+func (e *Executor) pauseCampaignWithDelay(ctx context.Context, campaignID int64, reason string, delay time.Duration) {
+	log.Info().
+		Int64("campaign_id", campaignID).
+		Dur("delay", delay).
+		Str("reason", reason).
+		Msg("Scheduling campaign pause after delay")
+
+	time.Sleep(delay)
+
+	if err := e.laravelClient.PauseCampaign(ctx, campaignID, reason); err != nil {
+		log.Error().
+			Err(err).
+			Int64("campaign_id", campaignID).
+			Msg("Failed to pause campaign after delay")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 )
+
+// ErrRateLimited is returned when Cloudonix API returns HTTP 429 (Too Many Requests)
+var ErrRateLimited = errors.New("rate limited by Cloudonix API")
 
 // Client handles all communication with the Cloudonix API
 type Client struct {
@@ -154,6 +158,12 @@ func (c *Client) MakeOutboundCall(ctx context.Context, req *OutboundCallRequest)
 			Str("response", string(respBody)).
 			Str("to", req.To).
 			Msg("Cloudonix API returned error")
+
+		// Detect rate limiting (HTTP 429) - caller should pause campaign
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, ErrRateLimited
+		}
+
 		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
