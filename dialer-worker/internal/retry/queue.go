@@ -50,14 +50,14 @@ func (pq *PriorityQueue) Pop() interface{} {
 
 // Queue manages retry attempts with exponential backoff
 type Queue struct {
-	items       PriorityQueue
-	mu          sync.RWMutex
-	maxRetries  int
-	baseDelay   time.Duration
-	maxDelay    time.Duration
-	handler     func(destinationID int64) error
-	done        chan struct{}
-	isRunning   bool
+	items      PriorityQueue
+	mu         sync.RWMutex
+	maxRetries int
+	baseDelay  time.Duration
+	maxDelay   time.Duration
+	handler    func(destinationID int64) error
+	done       chan struct{}
+	isRunning  bool
 }
 
 // Config holds retry queue configuration
@@ -72,8 +72,8 @@ type Config struct {
 // Attempt 1: 5 min, Attempt 2: 10 min, Attempt 3: 20 min, Attempt 4: 40 min, Attempt 5+: 60 min
 func DefaultConfig() Config {
 	return Config{
-		MaxRetries: 5,               // Up to 5 attempts
-		BaseDelay:  5 * time.Minute, // 5 minute base
+		MaxRetries: 5,                // Up to 5 attempts
+		BaseDelay:  5 * time.Minute,  // 5 minute base
 		MaxDelay:   60 * time.Minute, // 60 minute cap per spec
 	}
 }
@@ -270,8 +270,6 @@ func (q *Queue) calculateNextRetry(attempt int) time.Time {
 		delay = q.maxDelay
 	}
 
-	return time.Now().Add(delay)
-}
 	return time.Now().Add(delay)
 }
 

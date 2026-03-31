@@ -18,11 +18,10 @@ import (
 
 // Executor handles the execution of outbound calls for campaigns
 type Executor struct {
-	laravelClient   *api.Client
-	cloudonixClient *cloudonix.Client
-	retryQueue      *retry.Queue
-	breaker         *circuitbreaker.Breaker
-	metrics         *metrics.Collector
+	laravelClient *api.Client
+	retryQueue    *retry.Queue
+	breaker       *circuitbreaker.Breaker
+	metrics       *metrics.Collector
 
 	// Concurrency control
 	globalLimiter *rate.Limiter
@@ -34,11 +33,13 @@ type Executor struct {
 
 // CallContext holds context for an active call
 type CallContext struct {
-	CampaignID    int64
-	DestinationID int64
-	SessionID     string
-	CallID        string
-	StartedAt     time.Time
+	CampaignID      int64
+	DestinationID   int64
+	SessionID       string
+	CallID          string
+	StartedAt       time.Time
+	CloudonixDomain string // Domain for hangup (from campaign credentials)
+	CloudonixAPIKey string // API key for hangup (from campaign credentials)
 }
 
 // Config holds executor configuration
@@ -51,23 +52,31 @@ type Config struct {
 // NewExecutor creates a new call executor
 func NewExecutor(
 	laravelClient *api.Client,
-	cloudonixClient *cloudonix.Client,
 	retryQueue *retry.Queue,
 	breaker *circuitbreaker.Breaker,
 	metrics *metrics.Collector,
 	cfg Config,
 ) *Executor {
 	return &Executor{
-		laravelClient:   laravelClient,
-		cloudonixClient: cloudonixClient,
-		retryQueue:      retryQueue,
-		breaker:         breaker,
-		metrics:         metrics,
-		globalLimiter:   rate.NewLimiter(rate.Limit(cfg.RateLimitPerSecond), cfg.RateLimitPerSecond),
-		activeCalls:     make(map[string]*CallContext),
-		campaignCalls:   make(map[int64]map[string]bool),
-		maxConcurrent:   cfg.MaxConcurrentGlobal,
+		laravelClient: laravelClient,
+		retryQueue:    retryQueue,
+		breaker:       breaker,
+		metrics:       metrics,
+		globalLimiter: rate.NewLimiter(rate.Limit(cfg.RateLimitPerSecond), cfg.RateLimitPerSecond),
+		activeCalls:   make(map[string]*CallContext),
+		campaignCalls: make(map[int64]map[string]bool),
+		maxConcurrent: cfg.MaxConcurrentGlobal,
 	}
+}
+
+// createCloudonixClient creates a Cloudonix client for the given campaign
+func (e *Executor) createCloudonixClient(campaign *models.Campaign) *cloudonix.Client {
+	// Use campaign-specific credentials from Laravel backend
+	apiURL := campaign.CloudonixAPIURL
+	if apiURL == "" {
+		apiURL = "https://api.cloudonix.io"
+	}
+	return cloudonix.NewClient(apiURL, campaign.CloudonixAPIKey, campaign.CloudonixDomain)
 }
 
 // ExecuteCampaign begins executing calls for a campaign
@@ -141,10 +150,22 @@ func (e *Executor) StopCampaign(campaignID int64) {
 		Int("call_count", len(callsToStop)).
 		Msg("Stopping campaign calls")
 
-	// Hangup active calls
+	// Hangup active calls - each call may have different credentials
 	for _, callID := range callsToStop {
+		callCtx, exists := e.activeCalls[callID]
+		if !exists {
+			continue
+		}
+
+		// Create client with this call's stored credentials
+		cloudonixClient := cloudonix.NewClient(
+			"https://api.cloudonix.io",
+			callCtx.CloudonixAPIKey,
+			callCtx.CloudonixDomain,
+		)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		if err := e.cloudonixClient.HangupCall(ctx, callID); err != nil {
+		if err := cloudonixClient.HangupCall(ctx, callID); err != nil {
 			log.Error().
 				Err(err).
 				Str("call_id", callID).
@@ -187,24 +208,27 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 		Msg("Call session initiated")
 
 	// Make the actual outbound call via Cloudonix
+	// Create a client using this campaign's organization-specific credentials
+	cloudonixClient := e.createCloudonixClient(campaign)
+
 	cloudonixReq := &cloudonix.OutboundCallRequest{
-		From:          campaign.FromNumber,
-		To:            dest.PhoneNumber,
-		ApplicationID: campaign.ApplicationID,
-		CallbackURL:   initResp.CallbackURL,
+		From:        campaign.FromNumber,
+		To:          dest.PhoneNumber,
+		CallbackURL: initResp.CallbackURL,
 		CustomParameters: map[string]interface{}{
 			"session_id":     initResp.SessionID,
 			"campaign_id":    campaign.ID,
 			"destination_id": dest.ID,
 			"ai_agent_id":    campaign.AIAgentID,
 		},
-		Timeout:         campaign.DefaultTimeout,
-		AMDEnabled:      campaign.AMDEnabled,
-		AMDTimeout:      campaign.AMDTimeout,
-		AMDIntroTimeout: campaign.AMDIntroTimeout,
+		Timeout:                campaign.DefaultTimeout,
+		AMDEnabled:             campaign.AMDEnabled,
+		AMDTimeout:             campaign.AMDTimeout,
+		RoutingDestinationType: campaign.RoutingDestinationType,
+		RoutingDestinationID:   campaign.RoutingDestinationID,
 	}
 
-	callResp, err := e.cloudonixClient.MakeOutboundCall(ctx, cloudonixReq)
+	callResp, err := cloudonixClient.MakeOutboundCall(ctx, cloudonixReq)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -224,13 +248,15 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 		return
 	}
 
-	// Track active call
+	// Track active call (store credentials for hangup)
 	callCtx := &CallContext{
-		CampaignID:    campaign.ID,
-		DestinationID: dest.ID,
-		SessionID:     initResp.SessionID,
-		CallID:        callResp.CallID,
-		StartedAt:     time.Now(),
+		CampaignID:      campaign.ID,
+		DestinationID:   dest.ID,
+		SessionID:       initResp.SessionID,
+		CallID:          callResp.CallID,
+		StartedAt:       time.Now(),
+		CloudonixDomain: campaign.CloudonixDomain,
+		CloudonixAPIKey: campaign.CloudonixAPIKey,
 	}
 
 	e.mu.Lock()
@@ -289,7 +315,7 @@ func (e *Executor) handleCallCompleted(ctx context.Context, callCtx *CallContext
 		SessionID:       callCtx.SessionID,
 		Status:          event.Status,
 		DurationSeconds: int(duration),
-		AMDResult:       event.AMDResult,
+		AMDResult:       &event.AMDResult,
 		RecordingURL:    event.RecordingURL,
 		Transcript:      event.Transcript,
 	}

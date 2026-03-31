@@ -62,7 +62,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	_, err := s.scheduler.NewJob(
 		gocron.DurationJob(time.Minute),
 		gocron.NewTask(s.refreshCampaigns, ctx),
-		gocron.WithIdentifier("refresh_campaigns"),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to schedule refresh job: %w", err)
@@ -139,13 +138,12 @@ func (s *Scheduler) scheduleCampaignLocked(ctx context.Context, campaign *models
 					1,
 					gocron.NewWeekdays(time.Weekday(dayToInt(day))),
 					gocron.NewAtTimes(gocron.NewAtTime(
-						parseHour(tr.Start),
-						parseMinute(tr.Start),
+						uint(parseHour(tr.Start)),
+						uint(parseMinute(tr.Start)),
 						0,
 					)),
 				),
 				gocron.NewTask(s.executeCampaignIfInHours, ctx, campaign),
-				gocron.WithIdentifier(jobID),
 			)
 
 			if err != nil {

@@ -81,7 +81,7 @@ func (c *Client) MakeOutboundCall(ctx context.Context, req *OutboundCallRequest)
 	switch req.RoutingDestinationType {
 	case "ai_assistant", "application":
 		// Application ID from Cloudonix voice application configuration
-		if req.RoutingDestinationID != "" {
+		if req.RoutingDestinationID != 0 {
 			payload["application"] = req.RoutingDestinationID
 		}
 	case "url":
@@ -252,7 +252,7 @@ type OutboundCallRequest struct {
 	TimeLimit              int                    `json:"time_limit,omitempty"`
 	ScheduleAt             string                 `json:"schedule_at,omitempty"`
 	RoutingDestinationType string                 `json:"routing_destination_type,omitempty"` // ai_assistant, url, cxml
-	RoutingDestinationID   string                 `json:"routing_destination_id,omitempty"`
+	RoutingDestinationID   int64                  `json:"routing_destination_id,omitempty"`
 	RoutingURL             string                 `json:"routing_url,omitempty"`
 	RoutingCXML            string                 `json:"routing_cxml,omitempty"`
 	CustomParameters       map[string]interface{} `json:"custom_parameters,omitempty"`

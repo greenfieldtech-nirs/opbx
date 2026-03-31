@@ -12,18 +12,12 @@ type Config struct {
 	// Worker identity
 	WorkerID string
 
-	// Server ports
+	// Server port
 	WorkerAPIPort int
-	MetricsPort   int
 
 	// Laravel API
 	LaravelAPIURL   string
 	LaravelAPIToken string
-
-	// Cloudonix API
-	CloudonixAPIURL string
-	CloudonixAPIKey string
-	CloudonixDomain string
 
 	// Worker settings
 	MaxConcurrentCalls int
@@ -41,12 +35,8 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		WorkerID:                     getEnv("WORKER_ID", "dialer-worker-1"),
 		WorkerAPIPort:                getEnvInt("WORKER_API_PORT", 8080),
-		MetricsPort:                  getEnvInt("METRICS_PORT", 9090),
 		LaravelAPIURL:                getEnv("LARAVEL_API_URL", "http://localhost:8000"),
 		LaravelAPIToken:              getEnv("LARAVEL_API_TOKEN", ""),
-		CloudonixAPIURL:              getEnv("CLOUDONIX_API_URL", "https://api.cloudonix.io"),
-		CloudonixAPIKey:              getEnv("CLOUDONIX_API_KEY", ""),
-		CloudonixDomain:              getEnv("CLOUDONIX_DOMAIN", ""),
 		MaxConcurrentCalls:           getEnvInt("MAX_CONCURRENT_CALLS_GLOBAL", 10),
 		DefaultCallTimeout:           getEnvInt("DEFAULT_CALL_TIMEOUT", 30),
 		StateDir:                     getEnv("STATE_DIR", "/app/state"),
@@ -61,12 +51,6 @@ func Load() (*Config, error) {
 	}
 	if cfg.LaravelAPIToken == "" {
 		return nil, fmt.Errorf("LARAVEL_API_TOKEN is required")
-	}
-	if cfg.CloudonixAPIKey == "" {
-		return nil, fmt.Errorf("CLOUDONIX_API_KEY is required")
-	}
-	if cfg.CloudonixDomain == "" {
-		return nil, fmt.Errorf("CLOUDONIX_DOMAIN is required")
 	}
 
 	return cfg, nil

@@ -26,8 +26,13 @@ type Campaign struct {
 	AMDTimeout             int                    `json:"amd_timeout_ms,omitempty"`
 	AMDIntroTimeout        int                    `json:"amd_intro_timeout_ms,omitempty"`
 	RoutingDestinationType string                 `json:"routing_destination_type,omitempty"` // ai_assistant, url, cxml
-	RoutingDestinationID   string                 `json:"routing_destination_id,omitempty"`
+	RoutingDestinationID   int64                  `json:"routing_destination_id,omitempty"`
 	CustomParameters       map[string]interface{} `json:"custom_parameters,omitempty"`
+
+	// Cloudonix credentials - provided by Laravel backend per organization
+	CloudonixAPIKey string `json:"cloudonix_api_key"`           // Organization's Cloudonix API key
+	CloudonixDomain string `json:"cloudonix_domain"`            // Organization's Cloudonix domain
+	CloudonixAPIURL string `json:"cloudonix_api_url,omitempty"` // Optional custom API URL
 }
 
 // DaySchedule represents a day's schedule

@@ -7,14 +7,14 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Set working directory
 WORKDIR /build
 
-# Copy go.mod first
-COPY go.mod ./
+# Copy go.mod and go.sum (if exists)
+COPY go.mod go.sum* ./
 
-# Download dependencies and generate go.sum
-RUN go mod download && go mod tidy
-
-# Copy source code
+# Copy source code first (needed for go mod tidy to work)
 COPY . .
+
+# Download dependencies and tidy
+RUN go mod download && go mod tidy
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o worker \
@@ -43,8 +43,8 @@ RUN mkdir -p /app/state && chown -R dialer:dialer /app
 # Switch to non-root user
 USER dialer
 
-# Expose ports
-EXPOSE 8080 9090
+# Expose port (webhooks and status endpoint)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

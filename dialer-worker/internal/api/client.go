@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nirsolutions/opbx-dialer-worker/pkg/models"
-	"github.com/rs/zerolog/log"
 )
 
 // Client handles all communication with the Laravel API

@@ -11,7 +11,7 @@ The Dialer Worker is responsible for:
 - Handling webhook callbacks for call events
 - Managing retry queues with exponential backoff
 - Circuit breaker pattern for AI agent error handling
-- Metrics collection via Prometheus
+- Simple JSON status endpoint for monitoring
 
 ## Architecture
 
@@ -71,7 +71,7 @@ dialer-worker/
 │   ├── executor/             # Call execution
 │   │   ├── executor.go
 │   │   └── executor_test.go
-│   ├── metrics/              # Prometheus metrics
+│   ├── metrics/              # Simple metrics collection
 │   │   └── metrics.go
 │   ├── retry/                # Retry queue
 │   │   ├── queue.go
@@ -98,13 +98,9 @@ The worker is configured via environment variables:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `WORKER_ID` | Yes | `dialer-worker-1` | Unique worker identifier |
-| `WORKER_API_PORT` | No | `8080` | HTTP API port |
-| `METRICS_PORT` | No | `9090` | Prometheus metrics port |
+| `WORKER_API_PORT` | No | `8080` | HTTP API port (webhooks + status) |
 | `LARAVEL_API_URL` | Yes | - | Laravel API base URL |
 | `LARAVEL_API_TOKEN` | Yes | - | Laravel API token |
-| `CLOUDONIX_API_URL` | Yes | - | Cloudonix API URL |
-| `CLOUDONIX_API_KEY` | Yes | - | Cloudonix API key |
-| `CLOUDONIX_DOMAIN` | Yes | - | Cloudonix domain |
 | `MAX_CONCURRENT_CALLS_GLOBAL` | No | `10` | Max concurrent calls |
 | `DEFAULT_CALL_TIMEOUT` | No | `30` | Default call timeout (seconds) |
 | `STATE_DIR` | No | `/app/state` | State persistence directory |
@@ -156,27 +152,30 @@ GET /health
 POST /webhooks/cloudonix
 ```
 
-### Metrics (Prometheus)
+### Status
 ```
-GET /metrics
+GET /status
 ```
 
-## Metrics
-
-The worker exposes the following Prometheus metrics:
-
-- `dialer_calls_initiated_total` - Total outbound calls initiated
-- `dialer_calls_completed_total` - Total calls completed
-- `dialer_calls_failed_total` - Total calls failed
-- `dialer_call_duration_seconds` - Call duration histogram
-- `dialer_active_calls` - Currently active calls
-- `dialer_active_campaigns` - Currently active campaigns
-- `dialer_retry_attempts_total` - Retry attempts
-- `dialer_retry_failures_total` - Retry failures
-- `dialer_circuit_breaker_state` - Circuit breaker state
-- `dialer_circuit_breaker_trips_total` - Circuit breaker trips
-- `dialer_api_latency_seconds` - API call latency
-- `dialer_errors_total` - Total errors
+Returns JSON with current metrics:
+```json
+{
+  "status": "healthy",
+  "uptime": "2h15m30s",
+  "started_at": "2026-03-31T09:00:00Z",
+  "metrics": {
+    "calls_initiated": 150,
+    "calls_completed": 145,
+    "calls_failed": 5,
+    "active_calls": 3,
+    "active_campaigns": 2,
+    "circuit_breaker_state": "closed",
+    "circuit_breaker_trips": 0,
+    "retry_attempts": 10,
+    "retry_failures": 2
+  }
+}
+```
 
 ## Development
 

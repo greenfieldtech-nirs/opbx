@@ -14,7 +14,6 @@ import (
 
 	"github.com/nirsolutions/opbx-dialer-worker/internal/api"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/circuitbreaker"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/cloudonix"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/config"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/executor"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/metrics"
@@ -50,7 +49,6 @@ func main() {
 
 	// Initialize components
 	laravelClient := api.NewClient(cfg.LaravelAPIURL, cfg.LaravelAPIToken)
-	cloudonixClient := cloudonix.NewClient(cfg.CloudonixAPIURL, cfg.CloudonixAPIKey, cfg.CloudonixDomain)
 	metricsCollector := metrics.NewCollector()
 
 	// Initialize circuit breaker
@@ -83,7 +81,7 @@ func main() {
 		DefaultCallTimeout:  cfg.DefaultCallTimeout,
 		RateLimitPerSecond:  10, // Configurable
 	}
-	exec := executor.NewExecutor(laravelClient, cloudonixClient, retryQueue, cb, metricsCollector, execCfg)
+	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, execCfg)
 
 	// Update retry queue handler to use executor
 	retryQueue = retry.NewQueue(retryCfg, func(destinationID int64) error {
@@ -108,6 +106,9 @@ func main() {
 	webhookMux := http.NewServeMux()
 	webhookHandler.RegisterRoutes(webhookMux)
 
+	// Add status endpoint to main server (replaces separate metrics server)
+	webhookMux.HandleFunc("/status", metricsCollector.StatusHandler)
+
 	// Start webhook server
 	webhookServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.WorkerAPIPort),
@@ -122,9 +123,6 @@ func main() {
 			log.Fatal().Err(err).Msg("Webhook server error")
 		}
 	}()
-
-	// Start metrics server
-	go metricsCollector.StartMetricsServer(fmt.Sprintf(":%d", cfg.MetricsPort))
 
 	// Start scheduler
 	go func() {
