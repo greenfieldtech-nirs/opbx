@@ -439,3 +439,66 @@ func (e *Executor) HandleCDR(ctx context.Context, campaignID int64, sessionToken
 		Str("disposition", disposition).
 		Msg("CDR processed - call completed")
 }
+
+// HandleCallEvent processes incoming webhook events from Cloudonix.
+//
+// This method is called by the webhook handler when Cloudonix sends
+// a webhook event. It handles various event types such as call status
+// updates and call completions.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - event: The webhook event from Cloudonix
+//
+// Returns an error if the event cannot be processed.
+func (e *Executor) HandleCallEvent(ctx context.Context, event *models.CloudonixWebhookEvent) error {
+	log.Debug().
+		Str("event_type", event.EventType).
+		Str("call_id", event.CallID).
+		Str("status", event.Status).
+		Msg("Processing webhook event")
+
+	switch event.EventType {
+	case "call.completed", "call.ended", "call.failed":
+		// Handle call completion - decrement counter if we have this call tracked
+		if event.CallID != "" {
+			e.mu.Lock()
+			_, exists := e.activeCalls[event.CallID]
+			e.mu.Unlock()
+
+			if exists {
+				// Find campaign ID from call context
+				e.mu.Lock()
+				callCtx, hasCall := e.activeCalls[event.CallID]
+				e.mu.Unlock()
+
+				if hasCall {
+					e.HandleCDR(ctx, callCtx.CampaignID, event.CallID, event.Status)
+				}
+			}
+		}
+
+	case "call.status", "call.updated":
+		// Handle status updates - could trigger retries or other actions
+		log.Debug().
+			Str("call_id", event.CallID).
+			Str("status", event.Status).
+			Msg("Call status update received")
+
+	case "call.started", "call.initiated":
+		// Log call start event
+		log.Debug().
+			Str("call_id", event.CallID).
+			Str("session_id", event.SessionID).
+			Msg("Call started event received")
+
+	default:
+		// Log unknown event types but don't error
+		log.Warn().
+			Str("event_type", event.EventType).
+			Str("call_id", event.CallID).
+			Msg("Unknown webhook event type received")
+	}
+
+	return nil
+}
