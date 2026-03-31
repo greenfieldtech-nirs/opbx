@@ -216,6 +216,9 @@ class AutoDialerCampaign extends Model
 
     /**
      * Check if the campaign is currently runnable.
+     *
+     * Uses the schedule object to check if current time falls within
+     * any of the configured time ranges for today.
      */
     public function isRunnable(): bool
     {
@@ -229,19 +232,33 @@ class AutoDialerCampaign extends Model
             return false;
         }
 
-        // Check day of week
-        $currentDay = strtolower($now->format('l'));
-        if (! in_array($currentDay, $this->days_active ?? [], true)) {
+        // Get current day and time
+        $currentDay = strtolower($now->format('l')); // monday, tuesday, etc.
+        $currentTime = $now->format('H:i'); // 24-hour format: 20:43
+
+        // Check schedule for current day
+        $schedule = $this->schedule ?? [];
+        if (! isset($schedule[$currentDay])) {
             return false;
         }
 
-        // Check time range
-        $currentHour = (int) $now->format('G');
-        if ($currentHour < $this->start_time || $currentHour >= $this->end_time) {
+        $daySchedule = $schedule[$currentDay];
+        if (! ($daySchedule['enabled'] ?? false)) {
             return false;
         }
 
-        return true;
+        // Check if current time falls within any time range
+        $timeRanges = $daySchedule['time_ranges'] ?? [];
+        foreach ($timeRanges as $range) {
+            $startTime = $range['start_time'] ?? '00:00';
+            $endTime = $range['end_time'] ?? '00:00';
+
+            if ($currentTime >= $startTime && $currentTime <= $endTime) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
