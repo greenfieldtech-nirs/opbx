@@ -17,6 +17,9 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// MaxConcurrentActiveCalls is the maximum number of concurrent active calls per organization
+const MaxConcurrentActiveCalls = 5
+
 // Executor handles the execution of outbound calls for campaigns
 type Executor struct {
 	laravelClient *api.Client
@@ -25,13 +28,17 @@ type Executor struct {
 	metrics       *metrics.Collector
 	workerID      string
 
-	// Concurrency control
-	globalLimiter    *rate.Limiter
+	// Rate limiting per campaign
 	campaignLimiters map[int64]*rate.Limiter // campaignID -> rate limiter
-	activeCalls      map[string]*CallContext
-	campaignCalls    map[int64]map[string]bool // campaignID -> set of callIDs
-	mu               sync.RWMutex
-	maxConcurrent    int
+
+	// Active call tracking
+	activeCalls       map[string]*CallContext   // callID -> context
+	campaignCalls     map[int64]map[string]bool // campaignID -> set of callIDs
+	orgActiveCalls    map[int64]int             // organizationID -> count of active calls
+	orgCallSemaphores map[int64]chan struct{}   // organizationID -> semaphore for limiting concurrent calls
+
+	mu            sync.RWMutex
+	maxConcurrent int
 }
 
 // CallContext holds context for an active call
@@ -62,16 +69,17 @@ func NewExecutor(
 	workerID string,
 ) *Executor {
 	return &Executor{
-		laravelClient:    laravelClient,
-		retryQueue:       retryQueue,
-		breaker:          breaker,
-		metrics:          metrics,
-		workerID:         workerID,
-		globalLimiter:    rate.NewLimiter(rate.Limit(cfg.RateLimitPerSecond), cfg.RateLimitPerSecond),
-		campaignLimiters: make(map[int64]*rate.Limiter),
-		activeCalls:      make(map[string]*CallContext),
-		campaignCalls:    make(map[int64]map[string]bool),
-		maxConcurrent:    cfg.MaxConcurrentGlobal,
+		laravelClient:     laravelClient,
+		retryQueue:        retryQueue,
+		breaker:           breaker,
+		metrics:           metrics,
+		workerID:          workerID,
+		campaignLimiters:  make(map[int64]*rate.Limiter),
+		activeCalls:       make(map[string]*CallContext),
+		campaignCalls:     make(map[int64]map[string]bool),
+		orgActiveCalls:    make(map[int64]int),
+		orgCallSemaphores: make(map[int64]chan struct{}),
+		maxConcurrent:     cfg.MaxConcurrentGlobal,
 	}
 }
 
@@ -99,6 +107,83 @@ func (e *Executor) getCampaignLimiter(campaign *models.Campaign) *rate.Limiter {
 	return limiter
 }
 
+// getOrgSemaphore returns the semaphore for an organization, creating it if needed
+// The semaphore limits concurrent active calls to MaxConcurrentActiveCalls (5)
+func (e *Executor) getOrgSemaphore(orgID int64) chan struct{} {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	sem, exists := e.orgCallSemaphores[orgID]
+	if !exists {
+		// Create buffered channel with capacity of MaxConcurrentActiveCalls
+		sem = make(chan struct{}, MaxConcurrentActiveCalls)
+		e.orgCallSemaphores[orgID] = sem
+		log.Info().
+			Int64("organization_id", orgID).
+			Int("max_concurrent", MaxConcurrentActiveCalls).
+			Msg("Created organization call semaphore")
+	}
+	return sem
+}
+
+// acquireOrgCallSlot attempts to acquire a slot for an organization
+// Returns true if a slot was acquired, false if at max capacity
+func (e *Executor) acquireOrgCallSlot(orgID int64) bool {
+	sem := e.getOrgSemaphore(orgID)
+
+	select {
+	case sem <- struct{}{}:
+		// Acquired slot
+		e.mu.Lock()
+		e.orgActiveCalls[orgID]++
+		count := e.orgActiveCalls[orgID]
+		e.mu.Unlock()
+
+		log.Debug().
+			Int64("organization_id", orgID).
+			Int("active_calls", count).
+			Msg("Acquired organization call slot")
+		return true
+	default:
+		// Channel is full (at max capacity)
+		return false
+	}
+}
+
+// releaseOrgCallSlot releases a slot for an organization
+func (e *Executor) releaseOrgCallSlot(orgID int64) {
+	sem := e.getOrgSemaphore(orgID)
+
+	select {
+	case <-sem:
+		// Released slot
+		e.mu.Lock()
+		e.orgActiveCalls[orgID]--
+		if e.orgActiveCalls[orgID] < 0 {
+			e.orgActiveCalls[orgID] = 0
+		}
+		count := e.orgActiveCalls[orgID]
+		e.mu.Unlock()
+
+		log.Debug().
+			Int64("organization_id", orgID).
+			Int("active_calls", count).
+			Msg("Released organization call slot")
+	default:
+		// Channel was empty (shouldn't happen, but log it)
+		log.Warn().
+			Int64("organization_id", orgID).
+			Msg("Attempted to release org call slot but none held")
+	}
+}
+
+// getOrgActiveCallCount returns the current number of active calls for an organization
+func (e *Executor) getOrgActiveCallCount(orgID int64) int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.orgActiveCalls[orgID]
+}
+
 // createCloudonixClient creates a Cloudonix client for the given campaign
 func (e *Executor) createCloudonixClient(campaign *models.Campaign) *cloudonix.Client {
 	// Use campaign-specific credentials from Laravel backend
@@ -114,6 +199,7 @@ func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaig
 	log.Info().
 		Int64("campaign_id", campaign.ID).
 		Str("campaign_name", campaign.Name).
+		Int64("organization_id", campaign.OrganizationID).
 		Msg("Starting campaign execution")
 
 	// Get pending destinations
@@ -131,9 +217,6 @@ func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaig
 		Int("destination_count", len(destinations)).
 		Msg("Fetched pending destinations")
 
-	// Get campaign-specific rate limiter
-	campaignLimiter := e.getCampaignLimiter(campaign)
-
 	// Execute calls for each destination
 	for _, dest := range destinations {
 		// Check circuit breaker
@@ -143,19 +226,20 @@ func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaig
 			return
 		}
 
-		// Wait for campaign-specific rate limiter (CPS)
-		if err := campaignLimiter.Wait(ctx); err != nil {
-			log.Error().Err(err).Int64("campaign_id", campaign.ID).Msg("Campaign rate limiter wait failed")
-			continue
-		}
-
-		// Check concurrency limit
-		if !e.canStartNewCall() {
-			log.Debug().Msg("At max concurrent calls, waiting")
+		// Check if organization has capacity for another call
+		if !e.acquireOrgCallSlot(campaign.OrganizationID) {
+			activeCount := e.getOrgActiveCallCount(campaign.OrganizationID)
+			log.Debug().
+				Int64("campaign_id", campaign.ID).
+				Int64("organization_id", campaign.OrganizationID).
+				Int("active_calls", activeCount).
+				Int("max_concurrent", MaxConcurrentActiveCalls).
+				Msg("Organization at max concurrent calls, waiting")
 			time.Sleep(time.Second)
 			continue
 		}
 
+		// Launch call execution (rate limiting happens inside executeCall)
 		go e.executeCall(ctx, campaign, &dest, e.workerID)
 	}
 }
@@ -210,6 +294,26 @@ func (e *Executor) StopCampaign(campaignID int64) {
 
 // executeCall initiates a single outbound call
 func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, dest *models.Destination, workerID string) {
+	// Release the org slot when done (even if call fails)
+	defer e.releaseOrgCallSlot(campaign.OrganizationID)
+
+	// Wait for campaign rate limiter before making API call
+	// This enforces the CPS (calls per second) limit
+	campaignLimiter := e.getCampaignLimiter(campaign)
+	if err := campaignLimiter.Wait(ctx); err != nil {
+		log.Error().
+			Err(err).
+			Int64("campaign_id", campaign.ID).
+			Msg("Campaign rate limiter wait failed")
+		e.retryQueue.Add(dest.ID, "rate_limit_wait_failed")
+		return
+	}
+
+	log.Debug().
+		Int64("campaign_id", campaign.ID).
+		Int64("destination_id", dest.ID).
+		Msg("Rate limiter passed, initiating call")
+
 	// Initiate call session in Laravel
 	initReq := &models.InitiateCallRequest{
 		CampaignID:    campaign.ID,
@@ -302,13 +406,13 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 
 	callResp, err := cloudonixClient.MakeOutboundCall(ctx, cloudonixReq)
 	if err != nil {
-		// Handle Cloudonix rate limiting (HTTP 429)
+		// Handle Cloudonix rate limiting (HTTP 429) - PAUSE IMMEDIATELY
 		if errors.Is(err, cloudonix.ErrRateLimited) {
 			log.Error().
 				Int64("campaign_id", campaign.ID).
 				Int64("organization_id", campaign.OrganizationID).
 				Str("to", dest.PhoneNumber).
-				Msg("Cloudonix rate limit exceeded (HTTP 429) - pausing campaign for 300 seconds")
+				Msg("Cloudonix rate limit exceeded (HTTP 429) - PAUSING CAMPAIGN IMMEDIATELY")
 
 			// Update call status to indicate rate limiting
 			updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -318,8 +422,10 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 			})
 			cancel()
 
-			// Pause campaign for 300 seconds to allow Cloudonix rate limiter to reset
-			e.pauseCampaignWithDelay(ctx, campaign.ID, "cloudonix_rate_limit", 300*time.Second)
+			// PAUSE CAMPAIGN IMMEDIATELY (not after delay)
+			pauseCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			e.pauseCampaign(pauseCtx, campaign.ID, "cloudonix_rate_limit")
+			cancel()
 			return
 		}
 
@@ -360,132 +466,13 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 	e.campaignCalls[campaign.ID][callResp.CallID] = true
 	e.mu.Unlock()
 
-	e.metrics.RecordCallInitiated(campaign.ID)
-
 	log.Info().
-		Str("call_id", callResp.CallID).
 		Int64("session_id", initResp.SessionID).
-		Int64("campaign_id", campaign.ID).
+		Str("call_id", callResp.CallID).
+		Str("to", dest.PhoneNumber).
 		Msg("Outbound call initiated successfully")
-}
 
-// HandleCallEvent processes webhook events from Cloudonix
-func (e *Executor) HandleCallEvent(ctx context.Context, event *models.CloudonixWebhookEvent) error {
-	e.mu.Lock()
-	callCtx, exists := e.activeCalls[event.CallID]
-	if !exists {
-		e.mu.Unlock()
-		return fmt.Errorf("call %s not found in active calls", event.CallID)
-	}
-	delete(e.activeCalls, event.CallID)
-	delete(e.campaignCalls[callCtx.CampaignID], event.CallID)
-	e.mu.Unlock()
-
-	// Process based on event type
-	switch event.EventType {
-	case "call.completed":
-		return e.handleCallCompleted(ctx, callCtx, event)
-	case "call.failed":
-		return e.handleCallFailed(ctx, callCtx, event)
-	case "amd.completed":
-		return e.handleAMDCompleted(ctx, callCtx, event)
-	default:
-		log.Debug().
-			Str("event_type", event.EventType).
-			Str("call_id", event.CallID).
-			Msg("Unhandled event type")
-	}
-
-	return nil
-}
-
-// handleCallCompleted processes completed calls
-func (e *Executor) handleCallCompleted(ctx context.Context, callCtx *CallContext, event *models.CloudonixWebhookEvent) error {
-	duration := time.Since(callCtx.StartedAt).Seconds()
-
-	// Record disposition
-	dispReq := &models.DispositionRequest{
-		SessionID:       callCtx.SessionID,
-		Status:          event.Status,
-		DurationSeconds: int(duration),
-		AMDResult:       &event.AMDResult,
-		RecordingURL:    event.RecordingURL,
-		Transcript:      event.Transcript,
-	}
-
-	if err := e.laravelClient.SetDisposition(ctx, callCtx.CampaignID, dispReq); err != nil {
-		log.Error().
-			Err(err).
-			Int64("session_id", callCtx.SessionID).
-			Msg("Failed to set disposition")
-		return err
-	}
-
-	e.metrics.RecordCallCompleted(callCtx.CampaignID, duration)
-
-	log.Info().
-		Int64("session_id", callCtx.SessionID).
-		Str("status", event.Status).
-		Float64("duration", duration).
-		Msg("Call completed")
-
-	return nil
-}
-
-// handleCallFailed processes failed calls
-func (e *Executor) handleCallFailed(ctx context.Context, callCtx *CallContext, event *models.CloudonixWebhookEvent) error {
-	// Update status
-	updateReq := &models.UpdateCallStatusRequest{
-		Status: event.Status,
-		Error:  event.Error,
-	}
-
-	if err := e.laravelClient.UpdateCallStatus(ctx, callCtx.SessionID, updateReq); err != nil {
-		log.Error().
-			Err(err).
-			Int64("session_id", callCtx.SessionID).
-			Msg("Failed to update call status")
-	}
-
-	// Add to retry queue if applicable
-	e.retryQueue.Add(callCtx.DestinationID, event.Status)
-	e.metrics.RecordCallFailed(callCtx.CampaignID)
-
-	// Check if we should open circuit breaker
-	if event.Error == "ai_agent_error" {
-		e.breaker.RecordFailure()
-	}
-
-	log.Warn().
-		Int64("session_id", callCtx.SessionID).
-		Str("error", event.Error).
-		Msg("Call failed")
-
-	return nil
-}
-
-// handleAMDCompleted processes AMD results
-func (e *Executor) handleAMDCompleted(ctx context.Context, callCtx *CallContext, event *models.CloudonixWebhookEvent) error {
-	// Update call with AMD result
-	updateReq := &models.UpdateCallStatusRequest{
-		Status:    "amd_completed",
-		AMDResult: &event.AMDResult,
-	}
-
-	if err := e.laravelClient.UpdateCallStatus(ctx, callCtx.SessionID, updateReq); err != nil {
-		log.Error().
-			Err(err).
-			Int64("session_id", callCtx.SessionID).
-			Msg("Failed to update AMD result")
-		return err
-	}
-
-	log.Info().
-		Int64("session_id", callCtx.SessionID).
-		Str("amd_result", event.AMDResult.Result).
-		Msg("AMD completed")
-
-	return nil
+	e.metrics.RecordCallInitiated(campaign.ID)
 }
 
 // canStartNewCall checks if we can start a new call
@@ -495,8 +482,13 @@ func (e *Executor) canStartNewCall() bool {
 	return len(e.activeCalls) < e.maxConcurrent
 }
 
-// pauseCampaign pauses a campaign
+// pauseCampaign pauses a campaign immediately
 func (e *Executor) pauseCampaign(ctx context.Context, campaignID int64, reason string) {
+	log.Error().
+		Int64("campaign_id", campaignID).
+		Str("reason", reason).
+		Msg("PAUSING CAMPAIGN due to rate limiting or errors")
+
 	if err := e.laravelClient.PauseCampaign(ctx, campaignID, reason); err != nil {
 		log.Error().
 			Err(err).
@@ -505,7 +497,7 @@ func (e *Executor) pauseCampaign(ctx context.Context, campaignID int64, reason s
 	}
 }
 
-// pauseCampaignWithDelay pauses a campaign after a specified delay
+// pauseCampaignWithDelay pauses a campaign after a specified delay (kept for compatibility)
 // Used for rate limiting scenarios where we need to wait before pausing
 func (e *Executor) pauseCampaignWithDelay(ctx context.Context, campaignID int64, reason string, delay time.Duration) {
 	log.Info().
