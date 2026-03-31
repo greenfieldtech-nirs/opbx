@@ -34,27 +34,31 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Step 1: Add the new CAC column
-        Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
-            $table->unsignedTinyInteger('concurrent_active_calls')
-                ->default(5)  // Default to middle value
-                ->after('max_dial_attempts')
-                ->comment('Max concurrent active calls (2,3,4,6,10,15,20)');
-        });
+        // Step 1: Add the new CAC column (check if doesn't exist)
+        if (! Schema::hasColumn('auto_dialer_campaigns', 'concurrent_active_calls')) {
+            Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
+                $table->unsignedTinyInteger('concurrent_active_calls')
+                    ->default(5)  // Default to middle value
+                    ->after('max_dial_attempts')
+                    ->comment('Max concurrent active calls (2,3,4,6,10,15,20)');
+            });
+        }
 
-        // Step 2: Migrate existing CPS values to CAC values
-        // Mapping logic: CPS 1-2 → CAC 2, CPS 3-4 → CAC 4, CPS 5 → CAC 6
-        DB::table('auto_dialer_campaigns')->cursor()->each(function ($campaign) {
-            $cac = $this->mapCpsToCac($campaign->calls_per_second);
-            DB::table('auto_dialer_campaigns')
-                ->where('id', $campaign->id)
-                ->update(['concurrent_active_calls' => $cac]);
-        });
+        // Step 2: Migrate existing CPS values to CAC values (only if calls_per_second exists)
+        if (Schema::hasColumn('auto_dialer_campaigns', 'calls_per_second')) {
+            // Mapping logic: CPS 1-2 → CAC 2, CPS 3-4 → CAC 4, CPS 5 → CAC 6
+            DB::table('auto_dialer_campaigns')->cursor()->each(function ($campaign) {
+                $cac = $this->mapCpsToCac($campaign->calls_per_second);
+                DB::table('auto_dialer_campaigns')
+                    ->where('id', $campaign->id)
+                    ->update(['concurrent_active_calls' => $cac]);
+            });
 
-        // Step 3: Remove the old CPS column
-        Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
-            $table->dropColumn('calls_per_second');
-        });
+            // Step 3: Remove the old CPS column
+            Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
+                $table->dropColumn('calls_per_second');
+            });
+        }
     }
 
     /**
@@ -67,26 +71,30 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Step 1: Add back the CPS column
-        Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
-            $table->unsignedTinyInteger('calls_per_second')
-                ->default(1)
-                ->after('max_dial_attempts')
-                ->comment('Deprecated: Use concurrent_active_calls');
-        });
+        // Step 1: Add back the CPS column (check if doesn't exist)
+        if (! Schema::hasColumn('auto_dialer_campaigns', 'calls_per_second')) {
+            Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
+                $table->unsignedTinyInteger('calls_per_second')
+                    ->default(1)
+                    ->after('max_dial_attempts')
+                    ->comment('Deprecated: Use concurrent_active_calls');
+            });
+        }
 
-        // Step 2: Migrate CAC values back to CPS
-        DB::table('auto_dialer_campaigns')->cursor()->each(function ($campaign) {
-            $cps = $this->mapCacToCps($campaign->concurrent_active_calls);
-            DB::table('auto_dialer_campaigns')
-                ->where('id', $campaign->id)
-                ->update(['calls_per_second' => $cps]);
-        });
+        // Step 2: Migrate CAC values back to CPS (only if concurrent_active_calls exists)
+        if (Schema::hasColumn('auto_dialer_campaigns', 'concurrent_active_calls')) {
+            DB::table('auto_dialer_campaigns')->cursor()->each(function ($campaign) {
+                $cps = $this->mapCacToCps($campaign->concurrent_active_calls);
+                DB::table('auto_dialer_campaigns')
+                    ->where('id', $campaign->id)
+                    ->update(['calls_per_second' => $cps]);
+            });
 
-        // Step 3: Remove CAC column
-        Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
-            $table->dropColumn('concurrent_active_calls');
-        });
+            // Step 3: Remove CAC column
+            Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
+                $table->dropColumn('concurrent_active_calls');
+            });
+        }
     }
 
     /**
