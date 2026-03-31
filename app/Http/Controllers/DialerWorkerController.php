@@ -246,9 +246,19 @@ class DialerWorkerController extends Controller
             'worker_id' => $validated['worker_id'],
         ]);
 
-        // Generate webhook callback URL for Cloudonix
-        $webhookBaseUrl = config('app.webhook_base_url') ?? config('app.url');
+        // Generate webhook callback URL for Cloudonix using organization settings
+        // This ensures Cloudonix can reach the callback (not localhost)
+        $cloudonixSettings = $campaign->organization->cloudonixSettings;
+        $webhookBaseUrl = $cloudonixSettings?->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
         $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
+
+        Log::debug('DialerWorker: Generated callback URL', [
+            'session_id' => $session->id,
+            'campaign_id' => $campaign->id,
+            'webhook_base_url' => $webhookBaseUrl,
+            'callback_url' => $callbackUrl,
+            'using_org_settings' => $cloudonixSettings?->webhook_base_url !== null,
+        ]);
 
         return response()->json([
             'message' => 'Call initiated',

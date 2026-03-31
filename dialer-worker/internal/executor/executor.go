@@ -25,11 +25,12 @@ type Executor struct {
 	workerID      string
 
 	// Concurrency control
-	globalLimiter *rate.Limiter
-	activeCalls   map[string]*CallContext
-	campaignCalls map[int64]map[string]bool // campaignID -> set of callIDs
-	mu            sync.RWMutex
-	maxConcurrent int
+	globalLimiter    *rate.Limiter
+	campaignLimiters map[int64]*rate.Limiter // campaignID -> rate limiter
+	activeCalls      map[string]*CallContext
+	campaignCalls    map[int64]map[string]bool // campaignID -> set of callIDs
+	mu               sync.RWMutex
+	maxConcurrent    int
 }
 
 // CallContext holds context for an active call
@@ -60,16 +61,41 @@ func NewExecutor(
 	workerID string,
 ) *Executor {
 	return &Executor{
-		laravelClient: laravelClient,
-		retryQueue:    retryQueue,
-		breaker:       breaker,
-		metrics:       metrics,
-		workerID:      workerID,
-		globalLimiter: rate.NewLimiter(rate.Limit(cfg.RateLimitPerSecond), cfg.RateLimitPerSecond),
-		activeCalls:   make(map[string]*CallContext),
-		campaignCalls: make(map[int64]map[string]bool),
-		maxConcurrent: cfg.MaxConcurrentGlobal,
+		laravelClient:    laravelClient,
+		retryQueue:       retryQueue,
+		breaker:          breaker,
+		metrics:          metrics,
+		workerID:         workerID,
+		globalLimiter:    rate.NewLimiter(rate.Limit(cfg.RateLimitPerSecond), cfg.RateLimitPerSecond),
+		campaignLimiters: make(map[int64]*rate.Limiter),
+		activeCalls:      make(map[string]*CallContext),
+		campaignCalls:    make(map[int64]map[string]bool),
+		maxConcurrent:    cfg.MaxConcurrentGlobal,
 	}
+}
+
+// getCampaignLimiter returns the rate limiter for a campaign, creating it if needed
+// Uses the campaign's calls_per_second setting, with a minimum of 1 CPS
+func (e *Executor) getCampaignLimiter(campaign *models.Campaign) *rate.Limiter {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	limiter, exists := e.campaignLimiters[campaign.ID]
+	if !exists {
+		// Use campaign CPS, default to 1 if not set
+		cps := campaign.CallsPerSecond
+		if cps < 1 {
+			cps = 1
+		}
+		// Burst is 1 to enforce strict CPS - no burst allowed
+		limiter = rate.NewLimiter(rate.Limit(cps), 1)
+		e.campaignLimiters[campaign.ID] = limiter
+		log.Info().
+			Int64("campaign_id", campaign.ID).
+			Int("calls_per_second", cps).
+			Msg("Created campaign rate limiter")
+	}
+	return limiter
 }
 
 // createCloudonixClient creates a Cloudonix client for the given campaign
@@ -104,6 +130,9 @@ func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaig
 		Int("destination_count", len(destinations)).
 		Msg("Fetched pending destinations")
 
+	// Get campaign-specific rate limiter
+	campaignLimiter := e.getCampaignLimiter(campaign)
+
 	// Execute calls for each destination
 	for _, dest := range destinations {
 		// Check circuit breaker
@@ -113,9 +142,9 @@ func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaig
 			return
 		}
 
-		// Wait for rate limiter
-		if err := e.globalLimiter.Wait(ctx); err != nil {
-			log.Error().Err(err).Msg("Rate limiter wait failed")
+		// Wait for campaign-specific rate limiter (CPS)
+		if err := campaignLimiter.Wait(ctx); err != nil {
+			log.Error().Err(err).Int64("campaign_id", campaign.ID).Msg("Campaign rate limiter wait failed")
 			continue
 		}
 
