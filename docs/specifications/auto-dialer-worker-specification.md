@@ -10,6 +10,7 @@ The Auto Dialer Worker is a Go-based service responsible for executing outbound 
 - **Scaling**: Horizontal scaling via multiple worker instances
 - **Database Access**: NONE - Only via Laravel REST API
 - **Telephony Provider**: Cloudonix
+- **State Storage**: Redis (shared across worker instances)
 
 ---
 
@@ -24,12 +25,17 @@ The Auto Dialer Worker is a Go-based service responsible for executing outbound 
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
 │  │   Laravel    │    │     Go       │    │   Cloudonix      │  │
 │  │   Backend    │◄──►│   Worker     │◄──►│     API          │  │
-│  │  (API Server)│    │  (Dialer)    │    │                  │  │
-│  └──────────────┘    └──────────────┘    └──────────────────┘  │
-│         ▲                     │                                 │
-│         │                     │                                 │
-│         └─────────────────────┘                                 │
-│            Webhooks (call status)                               │
+│  │  (API/CRD)   │    │  (Dialer)    │    │                  │  │
+│  └──────────────┘    └──────┬───────┘    └──────────────────┘  │
+│         ▲                   │                                   │
+│         │                   │                                   │
+│         │            ┌──────▼──────┐                           │
+│         └────────────┤    Redis    │                           │
+│                      │   (State)   │                           │
+│                      └─────────────┘                           │
+│                                                                 │
+│  CDR Flow: Cloudonix ──► Laravel CDR Endpoint                  │
+│            (Async webhook with session token)                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -46,35 +52,74 @@ The Auto Dialer Worker is a Go-based service responsible for executing outbound 
 │         │                 │                    │             │
 │         ▼                 ▼                    ▼             │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │                  State Manager                         │ │
-│  │  (Active Campaigns, Call Slots, Metrics, Circuit)     │ │
+│  │              Concurrency Manager (Redis)               │ │
+│  │  - Campaign Concurrency Counters                      │ │
+│  │  - Active Sessions Lists (per campaign)               │ │
+│  │  - Rate Limiting (60/CAC seconds interval)            │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                              │                               │
 │  ┌───────────────────────────┴────────────────────────────┐ │
 │  │                 HTTP Client Layer                      │ │
-│  │   (Laravel API, Cloudonix API, Webhook Receiver)      │ │
+│  │   (Laravel API, Cloudonix API, CDR Webhook)           │ │
 │  └────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Go Worker Specification
+## 3. Core Concept: Concurrent Active Calls (CAC)
 
-### 3.1 Technology Stack
+### 3.1 CAC vs CPS
+
+The system uses **Concurrent Active Calls (CAC)** instead of Calls Per Second (CPS):
+
+| Metric | Description | Control |
+|--------|-------------|---------|
+| **CAC** | Maximum number of active (in-progress) calls per campaign | Hard limit - never exceeded |
+| **API Rate** | Time between Cloudonix API requests | Calculated as `60 / CAC` seconds |
+
+### 3.2 CAC Values
+
+Valid CAC values: **2, 3, 4, 6, 10, 15, 20**
+
+| CAC | API Interval | Max Concurrent Calls |
+|-----|--------------|---------------------|
+| 2 | 30 seconds | 2 |
+| 3 | 20 seconds | 3 |
+| 4 | 15 seconds | 4 |
+| 6 | 10 seconds | 6 |
+| 10 | 6 seconds | 10 |
+| 15 | 4 seconds | 15 |
+| 20 | 3 seconds | 20 |
+
+### 3.3 Concurrency Management
+
+Each campaign maintains:
+
+1. **Concurrency Counter**: Integer tracking current active calls
+2. **Active Sessions List**: Set of Cloudonix session tokens for active calls
+
+Stored in Redis with keys:
+- `campaign:{campaign_id}:concurrency_counter` → integer
+- `campaign:{campaign_id}:active_sessions` → set of session tokens
+
+---
+
+## 4. Go Worker Specification
+
+### 4.1 Technology Stack
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | Language | Go 1.21+ | Core implementation |
-| HTTP Server | Standard `net/http` | Webhook receiver, health checks |
+| HTTP Server | Standard `net/http` | Health checks, internal API |
 | HTTP Client | `net/http` with custom retry | API calls to Laravel & Cloudonix |
+| Redis Client | `github.com/redis/go-redis` | State storage (concurrency, sessions) |
 | Scheduling | `github.com/go-co-op/gocron/v2` | Campaign scheduling |
-| Circuit Breaker | `github.com/sony/gobreaker` | AI Agent error handling |
 | Metrics | `github.com/prometheus/client_golang` | Observability |
 | Logging | `github.com/rs/zerolog` | Structured logging |
-| Configuration | Environment variables + API polling | Dynamic configuration |
 
-### 3.2 Configuration (Environment Variables)
+### 4.2 Configuration (Environment Variables)
 
 ```env
 # Worker Identity
@@ -88,16 +133,11 @@ LARAVEL_POLL_INTERVAL=30s
 
 # Cloudonix API
 CLOUDONIX_API_URL=https://api.cloudonix.io
-CLOUDONIX_API_KEY=${CLOUDONIX_API_KEY}
-CLOUDONIX_DOMAIN=${CLOUDONIX_DOMAIN}
 
-# Worker Behavior
-MAX_CONCURRENT_CALLS_GLOBAL=1000
-DEFAULT_CALL_TIMEOUT=30s
-RETRY_QUEUE_PROCESS_INTERVAL=60s
-CIRCUIT_BREAKER_THRESHOLD=5
-CIRCUIT_BREAKER_TIMEOUT=60s
-CAMPAIGN_ERROR_PAUSE_DURATION=15s
+# Redis (for shared state)
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=0
 
 # Observability
 METRICS_PORT=9090
@@ -106,11 +146,9 @@ LOG_LEVEL=info
 
 ---
 
-## 4. API Endpoints (Laravel Backend)
+## 5. API Endpoints (Laravel Backend)
 
-The Laravel backend must expose the following REST API endpoints for the worker:
-
-### 4.1 Campaign Management Endpoints
+### 5.1 Campaign Management Endpoints
 
 #### `GET /api/v1/dialer/worker/campaigns/active`
 Returns all campaigns that should be currently running (respecting schedule).
@@ -121,12 +159,11 @@ Returns all campaigns that should be currently running (respecting schedule).
   "data": [
     {
       "id": 1,
-      "name": "Campaign Name",
       "organization_id": 4,
+      "name": "Campaign Name",
       "status": "active",
       "caller_id": "+1234567890",
-      "calls_per_second": 2,
-      "concurrent_active_calls": 10,
+      "concurrent_active_calls": 5,
       "max_dial_attempts": 3,
       "dial_timeout": 30,
       "time_limit": 3600,
@@ -144,65 +181,27 @@ Returns all campaigns that should be currently running (respecting schedule).
             {"id": "1", "start_time": "09:00", "end_time": "12:00"},
             {"id": "2", "start_time": "13:00", "end_time": "17:00"}
           ]
-        },
-        "tuesday": {
-          "enabled": true,
-          "time_ranges": [
-            {"id": "1", "start_time": "09:00", "end_time": "17:00"}
-          ]
-        },
-        "wednesday": {"enabled": false, "time_ranges": []},
-        "thursday": {"enabled": true, "time_ranges": [{"start_time": "09:00", "end_time": "17:00"}]},
-        "friday": {"enabled": true, "time_ranges": [{"start_time": "09:00", "end_time": "17:00"}]},
-        "saturday": {"enabled": false, "time_ranges": []},
-        "sunday": {"enabled": false, "time_ranges": []}
-      }
+        }
+      },
+      "cloudonix_api_key": "XI...",
+      "cloudonix_domain": "uuid-or-name",
+      "cloudonix_api_url": "https://api.cloudonix.io"
     }
   ]
 }
 ```
 
+**Note:** `concurrent_active_calls` replaces the old `calls_per_second` field.
+
 #### `GET /api/v1/dialer/worker/campaigns/{campaign}/destinations/pending`
-Returns pending destinations for dialing (paginated).
+Returns pending destinations for dialing.
 
-**Query Parameters:**
-- `limit` (int): Number of records (default: 50)
-- `offset` (int): Pagination offset
+**Response:** Same as before.
 
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": 123,
-      "phone_number": "+12025551234",
-      "description": "John Doe",
-      "status": "pending",
-      "dial_attempts": 0,
-      "last_dialed_at": null,
-      "last_disposition": null,
-      "duration": 0,
-      "billsec": 0,
-      "last_call_id": null
-    }
-  ],
-  "meta": {
-    "total": 150,
-    "limit": 50,
-    "offset": 0
-  }
-}
-```
-
-#### `GET /api/v1/dialer/worker/campaigns/{campaign}/destinations/retry`
-Returns destinations that need retry (based on exponential backoff schedule).
-
-**Response:** Same as pending endpoint.
-
-### 4.2 Call Session Management Endpoints
+### 5.2 Call Session Management Endpoints
 
 #### `POST /api/v1/dialer/worker/calls/initiate`
-Called by worker when initiating a call to create a session record.
+Called by worker when initiating a call.
 
 **Request:**
 ```json
@@ -219,139 +218,61 @@ Called by worker when initiating a call to create a session record.
 ```json
 {
   "data": {
-    "session_id": "sess_abc123",
-    "call_id": "call_xyz789"
+    "session_id": 12345,
+    "callback_url": "https://webhook.example.com/api/webhooks/cloudonix/call-status"
   }
 }
 ```
 
-#### `PATCH /api/v1/dialer/worker/calls/{session}/status`
-Update call status from Cloudonix webhooks.
+### 5.3 CXML Generation Endpoint
+
+#### `POST /api/v1/dialer/worker/calls/generate-cxml`
+Generates CXML for outbound call routing.
 
 **Request:**
 ```json
 {
-  "status": "connected",
-  "disposition": "answered",
-  "duration": 45,
-  "billsec": 42,
-  "recording_url": "https://...",
-  "ended_at": "2026-03-29T14:30:47Z"
+  "campaign_id": 1,
+  "session_id": 12345,
+  "phone_number": "+12025551234",
+  "call_sid": "call_1_123_1712345678"
 }
 ```
-
-#### `POST /api/v1/dialer/worker/calls/{session}/disposition`
-Set final disposition and handle retry logic.
-
-**Request:**
-```json
-{
-  "disposition": "no_answer",
-  "should_retry": true,
-  "next_retry_at": "2026-03-29T15:00:00Z",
-  "attempt_number": 2
-}
-```
-
-### 4.3 Circuit Breaker / Health Endpoints
-
-#### `POST /api/v1/dialer/worker/campaigns/{campaign}/pause`
-Pause campaign (used when AI Agent errors detected).
-
-**Request:**
-```json
-{
-  "reason": "ai_agent_errors",
-  "paused_by": "dialer-worker-1",
-  "resume_at": "2026-03-29T14:45:00Z"
-}
-```
-
-#### `GET /api/v1/dialer/worker/health`
-Health check endpoint for worker monitoring.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "active_campaigns": 3,
-  "active_calls": 15,
-  "queue_depth": 234
-}
-```
-
-### 4.4 State Persistence Endpoints
-
-#### `POST /api/v1/dialer/worker/state/persist`
-Persist worker runtime state to database for failure recovery.
-
-**Request:**
-```json
-{
-  "worker_id": "dialer-worker-1",
-  "active_calls": {
-    "call_abc123": {
-      "id": "call_abc123",
-      "campaign_id": 1,
-      "destination_id": 123,
-      "phone_number": "+12025551234",
-      "cloudonix_call_id": "cix_xyz789",
-      "status": "connected",
-      "started_at": "2026-03-29T14:30:00Z"
-    }
-  },
-  "retry_queue": [
-    {
-      "destination_id": 456,
-      "attempt_number": 2,
-      "next_retry_at": "2026-03-29T15:00:00Z",
-      "last_disposition": "no_answer"
-    }
-  ],
-  "campaign_states": {
-    "1": {
-      "active_calls": 5,
-      "is_paused": false,
-      "last_dial_time": "2026-03-29T14:30:00Z"
-    }
-  },
-  "last_updated": "2026-03-29T14:30:30Z"
-}
-```
-
-**Response:**
-```json
-{
-  "message": "State persisted successfully"
-}
-```
-
-#### `GET /api/v1/dialer/worker/state/{worker_id}`
-Retrieve persisted worker state for recovery.
 
 **Response:**
 ```json
 {
   "data": {
-    "worker_id": "dialer-worker-1",
-    "active_calls": { ... },
-    "retry_queue": [ ... ],
-    "campaign_states": { ... },
-    "last_updated": "2026-03-29T14:30:30Z"
+    "cxml": "<?xml version=\"1.0\"?><Response><Connect><Stream url=\"wss://...\"/></Connect></Response>",
+    "routing_type": "ai_assistant"
   }
 }
 ```
 
-### 4.5 Webhook Proxy Endpoint
+### 5.4 Campaign Control Endpoints
 
-#### `POST /api/v1/dialer/webhooks/cloudonix`
-Proxy endpoint for Cloudonix webhooks. Laravel validates the signature and forwards to the worker.
+#### `POST /api/v1/dialer/worker/campaigns/{campaign}/pause`
+Pause campaign immediately (used for rate limiting or errors).
+
+**Request:**
+```json
+{
+  "reason": "cloudonix_rate_limit",
+  "paused_by": "dialer-worker-1",
+  "resume_at": "2026-03-29T14:45:00Z"
+}
+```
+
+### 5.5 CDR Webhook Endpoint (Laravel Receives)
+
+#### `POST /api/webhooks/cloudonix/cdr`
+Cloudonix sends CDR (Call Detail Record) when call completes.
 
 **Request (from Cloudonix):**
 ```json
 {
   "type": "call.completed",
-  "call_id": "cix_xyz789",
+  "call_id": "16a7294c989b11e7b3d32b9edb8660c7",
   "from": "+1234567890",
   "to": "+12025551234",
   "status": "completed",
@@ -361,1207 +282,559 @@ Proxy endpoint for Cloudonix webhooks. Laravel validates the signature and forwa
   "custom_data": {
     "campaign_id": 1,
     "destination_id": 123,
-    "session_id": "sess_abc123"
+    "session_id": 12345
   }
 }
 ```
 
-**Processing:**
-1. Validate Cloudonix webhook signature
-2. Find active worker handling this campaign
-3. Forward to worker's internal webhook endpoint
-4. Return 200 OK to Cloudonix
+**Laravel Processing:**
+1. Update call session with final status
+2. Update destination status in distribution list
+3. **Notify worker via Redis** to decrement concurrency counter
+4. Remove session token from active sessions list
 
 ---
 
-## 5. Core Workflows
+## 6. Core Workflows
 
-### 5.1 Campaign Execution Flow
+### 6.1 Campaign Execution Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Campaign Execution Loop                      │
-│                     (Runs every 30 seconds)                     │
+│              Campaign Execution Loop (60/CAC interval)          │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │  Fetch Active Campaigns       │
-              │  (Respecting schedule)        │
-              └───────────────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-      ┌───────────┐  ┌───────────┐  ┌───────────────┐
-      │  Active   │  │  Outside  │  │   Paused      │
-      │  Hours    │  │  Schedule │  │  (Errors)     │
-      └─────┬─────┘  └─────┬─────┘  └───────┬───────┘
-            │              │                │
-            ▼              ▼                ▼
-    ┌──────────────┐  ┌────────┐  ┌────────────────┐
-    │ Start/Resume │  │  Stop  │  │ Check Resume   │
-    │   Dialing    │  │        │  │     Time       │
-    └──────────────┘  └────────┘  └────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │  Check Campaign Schedule      │
+               │  (Within active hours?)       │
+               └───────────────────────────────┘
+                               │
+               ┌───────────────┴───────────────┐
+               │ Active        │ Inactive      │
+               ▼               ▼               ▼
+       ┌───────────┐  ┌──────────────┐  ┌──────────────┐
+       │ Check CAC │  │   Stop       │  │   Wait       │
+       │ Counter   │  │   Campaign   │  │   60s        │
+       │ < CAC?    │  │              │  │              │
+       └─────┬─────┘  └──────────────┘  └──────────────┘
+             │
+     ┌───────┴───────┐
+     │ Yes           │ No (at limit)
+     ▼               ▼
+┌─────────────┐  ┌──────────────────────────┐
+│ Get Next    │  │ Wait 60/CAC seconds      │
+│ Pending     │  │ (next cycle)             │
+│ Destination │  │                          │
+└──────┬──────┘  └──────────────────────────┘
+       │
+       ▼
+┌──────────────────┐
+│ Wait for API     │
+│ Rate Limit       │
+│ (60/CAC seconds) │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Initiate Call    │
+│ (Cloudonix API)  │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Increment CAC    │
+│ Add to Active    │
+│ Sessions         │
+└──────────────────┘
 ```
 
-### 5.2 Call Initiation Flow
+### 6.2 Call Initiation Flow (Detailed)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Call Initiation                           │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │ Check Concurrent Calls        │
-              │ (Active < Campaign Limit?)    │
-              └───────────────────────────────┘
-                              │
-                  ┌───────────┴───────────┐
-                  │ Yes                   │ No
-                  ▼                       ▼
-        ┌──────────────────┐    ┌──────────────────┐
-        │ Check CPS Limit  │    │ Wait 15 Seconds  │
-        │ (Calls/sec)      │    │ Then Retry       │
-        └────────┬─────────┘    └──────────────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │ Reserve Slot     │
-        │ (Increment       │
-        │ Active Calls)    │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │ Create Session   │
-        │ (Laravel API)    │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │ Call Cloudonix   │
-        │ InitiateCall API │
-        └────────┬─────────┘
-                 │
-                 ▼
-        ┌──────────────────┐
-        │ Update Session   │
-        │ with Cloudonix   │
-        │ Call ID          │
-        └──────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │  Check CAC Counter            │
+               │  (Redis: campaign:X:counter)  │
+               └───────────────────────────────┘
+                               │
+                   ┌───────────┴───────────┐
+                   │ < CAC                 │ >= CAC
+                   ▼                       ▼
+         ┌──────────────────┐    ┌──────────────────┐
+         │ Wait for API     │    │ Skip This Cycle  │
+         │ Interval         │    │ (Wait 60/CAC)    │
+         │ (60/CAC seconds) │    │                  │
+         └────────┬─────────┘    └──────────────────┘
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ Create Laravel   │
+         │ Session          │
+         └────────┬─────────┘
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ Generate CXML    │
+         │ (Laravel API)    │
+         └────────┬─────────┘
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ Call Cloudonix   │
+         │ InitiateCall API │
+         └────────┬─────────┘
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ HTTP 429?        │
+         │ (Rate Limited)   │
+         └────────┬─────────┘
+                  │
+       ┌──────────┴──────────┐
+       │ Yes                 │ No
+       ▼                     ▼
+┌──────────────────┐  ┌──────────────────┐
+│ PAUSE CAMPAIGN   │  │ Increment CAC    │
+│ IMMEDIATELY      │  │ Counter (Redis)  │
+│ (300s cooldown)  │  │                  │
+└──────────────────┘  └────────┬─────────┘
+                               │
+                               ▼
+                      ┌──────────────────┐
+                      │ Add Session      │
+                      │ Token to Active  │
+                      │ Sessions (Redis) │
+                      └──────────────────┘
 ```
 
-### 5.3 Call Status Handling Flow
+### 6.3 CDR Processing Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Cloudonix Webhook                           │
-│                    (Call Status Update)                         │
+│                     CDR Processing (Async)                      │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │ Receive Webhook               │
-              │ (call.completed, etc.)        │
-              └───────────────────────────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────┐
-              │ Parse Disposition             │
-              │ (answered, busy, no_answer,   │
-              │ failed, voicemail)            │
-              └───────────────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-      ┌───────────┐  ┌───────────┐  ┌───────────────┐
-      │ Answered  │  │   Busy    │  │   No Answer   │
-      │           │  │           │  │               │
-      └─────┬─────┘  └─────┬─────┘  └───────┬───────┘
-            │              │                │
-            ▼              └────────┬───────┘
-    ┌──────────────┐                │
-    │ Route to AI  │                ▼
-    │ Destination  │    ┌───────────────────────┐
-    └──────────────┘    │ Schedule Retry        │
-                        │ (Exponential Backoff) │
-                        └───────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Cloudonix Sends CDR           │
+               │ to Laravel /api/webhooks/...  │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Laravel Validates Webhook     │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Update Database               │
+               │ - Session status              │
+               │ - Destination status          │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Publish to Redis Channel      │
+               │ channel: "cdr:completed"      │
+               │ payload: {session_token, ...} │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Worker Receives Redis Event   │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Decrement CAC Counter         │
+               │ (Redis: campaign:X:counter)   │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Remove from Active Sessions   │
+               │ (Redis: campaign:X:sessions)  │
+               └───────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │ Trigger Retry if Needed       │
+               │ (Based on disposition)        │
+               └───────────────────────────────┘
 ```
 
 ---
 
-## 6. Retry Logic Specification
+## 7. Redis State Management
 
-### 6.1 Exponential Backoff Schedule
+### 7.1 Key Structure
+
+```
+# Campaign Concurrency Counter (integer)
+campaign:{campaign_id}:concurrency_counter → int
+
+# Campaign Active Sessions (set of session tokens)
+campaign:{campaign_id}:active_sessions → set<string>
+
+# Campaign State (hash)
+campaign:{campaign_id}:state → {
+  "status": "running|paused",
+  "paused_at": "2026-03-29T14:30:00Z",
+  "pause_reason": "cloudonix_rate_limit",
+  "resume_at": "2026-03-29T14:35:00Z"
+}
+
+# Global Worker State
+worker:{worker_id}:campaigns → set<campaign_ids>
+worker:{worker_id}:last_heartbeat → timestamp
+
+# CDR Pub/Sub Channel
+cdr:completed → channel for CDR events
+```
+
+### 7.2 Concurrency Operations
+
+```go
+// Check if we can start a new call
+func (cm *ConcurrencyManager) CanStartCall(campaignID int64, cac int) bool {
+    counter, err := cm.redis.Get(ctx, fmt.Sprintf("campaign:%d:concurrency_counter", campaignID)).Int()
+    if err != nil {
+        return false
+    }
+    return counter < cac
+}
+
+// Increment counter and add to active sessions
+func (cm *ConcurrencyManager) StartCall(campaignID int64, sessionToken string) error {
+    pipe := cm.redis.Pipeline()
+    
+    // Increment counter
+    pipe.Incr(ctx, fmt.Sprintf("campaign:%d:concurrency_counter", campaignID))
+    
+    // Add to active sessions
+    pipe.SAdd(ctx, fmt.Sprintf("campaign:%d:active_sessions", campaignID), sessionToken)
+    
+    _, err := pipe.Exec(ctx)
+    return err
+}
+
+// Decrement counter and remove from active sessions (called on CDR)
+func (cm *ConcurrencyManager) CompleteCall(campaignID int64, sessionToken string) error {
+    pipe := cm.redis.Pipeline()
+    
+    // Decrement counter (never below 0)
+    pipe.Decr(ctx, fmt.Sprintf("campaign:%d:concurrency_counter", campaignID))
+    
+    // Remove from active sessions
+    pipe.SRem(ctx, fmt.Sprintf("campaign:%d:active_sessions", campaignID), sessionToken)
+    
+    _, err := pipe.Exec(ctx)
+    return err
+}
+
+// Get current active count
+func (cm *ConcurrencyManager) GetActiveCount(campaignID int64) int {
+    count, _ := cm.redis.Get(ctx, fmt.Sprintf("campaign:%d:concurrency_counter", campaignID)).Int()
+    if count < 0 {
+        return 0
+    }
+    return count
+}
+```
+
+---
+
+## 8. HTTP 429 Rate Limiting Handler
+
+### 8.1 Detection and Response
+
+```go
+// In cloudonix client
+if resp.StatusCode == http.StatusTooManyRequests {
+    return ErrRateLimited
+}
+
+// In executor
+if errors.Is(err, cloudonix.ErrRateLimited) {
+    log.Error().
+        Int64("campaign_id", campaign.ID).
+        Int64("organization_id", campaign.OrganizationID).
+        Msg("Cloudonix rate limit exceeded (HTTP 429) - PAUSING CAMPAIGN IMMEDIATELY")
+
+    // Update call status
+    updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    e.laravelClient.UpdateCallStatus(updateCtx, initResp.SessionID, &models.UpdateCallStatusRequest{
+        Status: "failed",
+        Error:  "rate_limited_by_cloudonix",
+    })
+    cancel()
+
+    // PAUSE CAMPAIGN IMMEDIATELY
+    pauseCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    e.pauseCampaign(pauseCtx, campaign.ID, "cloudonix_rate_limit")
+    cancel()
+    
+    // Set resume time to 300 seconds from now
+    resumeAt := time.Now().Add(300 * time.Second)
+    cm.redis.Set(ctx, 
+        fmt.Sprintf("campaign:%d:resume_at", campaign.ID),
+        resumeAt.Format(time.RFC3339),
+        0)
+    
+    return
+}
+```
+
+### 8.2 Pause Duration
+
+- **Immediate pause**: Campaign stops accepting new calls right away
+- **Cooldown period**: 300 seconds (5 minutes)
+- **Resume check**: Before each cycle, check if `resume_at` time has passed
+
+---
+
+## 9. Data Structures
+
+### 9.1 Campaign Model (Go)
+
+```go
+type Campaign struct {
+    ID                     int64                  `json:"id"`
+    OrganizationID         int64                  `json:"organization_id"`
+    Name                   string                 `json:"name"`
+    Status                 string                 `json:"status"`
+    CallerID               string                 `json:"caller_id"`
+    
+    // CAC Configuration (replaces calls_per_second)
+    ConcurrentActiveCalls  int                    `json:"concurrent_active_calls"`
+    
+    MaxDialAttempts        int                    `json:"max_dial_attempts"`
+    DialTimeout            int                    `json:"dial_timeout"`
+    TimeLimit              int                    `json:"time_limit"`
+    RecordCalls            bool                   `json:"record_calls"`
+    AMDEnabled             bool                   `json:"amd_enabled"`
+    
+    RoutingDestinationType string                 `json:"routing_destination_type"`
+    RoutingDestinationID   int64                  `json:"routing_destination_id"`
+    
+    Timezone               string                 `json:"timezone"`
+    StartDate              string                 `json:"start_date"`
+    EndDate                string                 `json:"end_date"`
+    Schedule               map[string]DaySchedule `json:"schedule"`
+    
+    // Cloudonix Credentials (per-organization)
+    CloudonixAPIKey        string                 `json:"cloudonix_api_key"`
+    CloudonixDomain        string                 `json:"cloudonix_domain"`
+    CloudonixAPIURL        string                 `json:"cloudonix_api_url"`
+}
+```
+
+### 9.2 Active Session Tracking
+
+```go
+type ActiveSession struct {
+    CampaignID      int64     `json:"campaign_id"`
+    DestinationID   int64     `json:"destination_id"`
+    SessionID       int64     `json:"session_id"`
+    SessionToken    string    `json:"session_token"`  // Cloudonix token
+    PhoneNumber     string    `json:"phone_number"`
+    StartedAt       time.Time `json:"started_at"`
+    WorkerID        string    `json:"worker_id"`
+}
+```
+
+### 9.3 CDR Event (from Laravel via Redis)
+
+```go
+type CDREvent struct {
+    Type          string    `json:"type"`           // "call.completed"
+    SessionToken  string    `json:"session_token"`  // Cloudonix token
+    CampaignID    int64     `json:"campaign_id"`
+    DestinationID int64     `json:"destination_id"`
+    SessionID     int64     `json:"session_id"`
+    Disposition   string    `json:"disposition"`    // answered, busy, no-answer, failed
+    Duration      int       `json:"duration"`
+    Billsec       int       `json:"billsec"`
+    Timestamp     time.Time `json:"timestamp"`
+}
+```
+
+---
+
+## 10. Retry Logic Specification
+
+### 10.1 Exponential Backoff Schedule
 
 | Attempt | Delay | Formula |
 |---------|-------|---------|
-| 1 | 5 minutes | base (5 min) |
+| 1 | 5 minutes | base |
 | 2 | 10 minutes | base × 2 |
 | 3 | 20 minutes | base × 4 |
 | 4 | 40 minutes | base × 8 |
 | 5 | 60 minutes | cap at 60 min |
 
-### 6.2 Retry Eligibility
+### 10.2 Retry Eligibility
 
-**Retryable Dispositions** (from `last_disposition` field):
-- `busy` - Line was busy
-- `no-answer` - No answer within timeout
-- `cancelled` - Call was cancelled/failed to connect
+**Retryable Dispositions:**
+- `busy`
+- `no-answer`
+- `cancelled`
 
 **Non-Retryable Dispositions:**
-- `answered` - Call connected successfully
-- `completed` - Call completed normally
-- `failed` - Call failed (permanent failure)
-- `congestion` - Network congestion
-
-**Note:** Dispositions come directly from Cloudonix CDR webhook. The worker uses `destination.last_disposition` to determine retry eligibility.
-
-### 6.3 Retry State Machine
-
-```go
-type RetryState struct {
-    DestinationID    int
-    AttemptNumber    int
-    NextRetryAt      time.Time
-    LastDisposition  string
-}
-
-// Retry calculation
-func calculateNextRetry(attempt int, baseDelay time.Duration) time.Time {
-    delay := baseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
-    if delay > 60*time.Minute {
-        delay = 60 * time.Minute
-    }
-    return time.Now().Add(delay)
-}
-```
+- `answered`
+- `completed`
+- `failed`
+- `congestion`
 
 ---
 
-## 7. Circuit Breaker Pattern (AI Agent Error Handling)
+## 11. Monitoring & Observability
 
-### 7.1 Circuit Breaker States
-
-```
-┌──────────┐     Threshold     ┌──────────┐
-│  CLOSED  │ ────────────────► │   OPEN   │
-│ (Normal) │   (5 errors)      │ (Paused) │
-└──────────┘                   └─────┬────┘
-      ▲                              │
-      │                              │ Timeout
-      │      Half-Open Test          │ (60s)
-      └──────────────────────────────┘
-```
-
-### 7.2 Implementation
-
-```go
-// Circuit breaker for AI Agent destinations
-type AICircuitBreaker struct {
-    breaker *gobreaker.CircuitBreaker
-}
-
-func NewAICircuitBreaker() *AICircuitBreaker {
-    settings := gobreaker.Settings{
-        Name:        "ai-agent-circuit",
-        MaxRequests: 5,              // Trip after 5 consecutive errors
-        Interval:    30 * time.Second,
-        Timeout:     60 * time.Second, // Stay open for 60s
-        ReadyToTrip: func(counts gobreaker.Counts) bool {
-            return counts.ConsecutiveFailures >= 5
-        },
-        OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
-            log.Info().Str("circuit", name).Str("from", from.String()).Str("to", to.String()).Msg("Circuit state changed")
-        },
-    }
-    
-    return &AICircuitBreaker{
-        breaker: gobreaker.NewCircuitBreaker(settings),
-    }
-}
-
-// Execute call with circuit breaker
-func (cb *AICircuitBreaker) Execute(call func() error) error {
-    _, err := cb.breaker.Execute(func() (interface{}, error) {
-        return nil, call()
-    })
-    return err
-}
-```
-
-### 7.3 Circuit Open Action
-
-When circuit opens:
-1. Immediately pause the campaign via API
-2. Log the error with full context
-3. Alert (if alerting configured)
-4. Resume after 60 seconds (half-open test)
-5. If test succeeds, resume normal dialing
-6. If test fails, extend pause by another 60s
-
----
-
-## 8. Data Structures
-
-### 8.1 Core Domain Types
-
-```go
-// Campaign represents an active dialing campaign
-type Campaign struct {
-    ID                      int                    `json:"id"`
-    OrganizationID          int                    `json:"organization_id"`
-    Name                    string                 `json:"name"`
-    Status                  string                 `json:"status"`
-    CallerID                string                 `json:"caller_id"`
-    CallsPerSecond          int                    `json:"calls_per_second"`
-    ConcurrentActiveCalls   int                    `json:"concurrent_active_calls"`
-    MaxDialAttempts         int                    `json:"max_dial_attempts"`
-    DialTimeout             int                    `json:"dial_timeout"`
-    TimeLimit               int                    `json:"time_limit"`
-    RecordCalls             bool                   `json:"record_calls"`
-    AMDEnabled              bool                   `json:"amd_enabled"`
-    RoutingDestinationType  string                 `json:"routing_destination_type"`  // ai_assistant, extension, ring_group, conference_room, ivr_menu
-    RoutingDestinationID    int                    `json:"routing_destination_id"`
-    Timezone                string                 `json:"timezone"`
-    StartDate               string                 `json:"start_date"`  // YYYY-MM-DD
-    EndDate                 string                 `json:"end_date"`    // YYYY-MM-DD
-    Schedule                map[string]DaySchedule `json:"schedule"`    // Full weekly schedule with multiple time ranges
-}
-
-// DaySchedule represents a single day's schedule configuration
-type DaySchedule struct {
-    Enabled    bool          `json:"enabled"`
-    TimeRanges []TimeRange   `json:"time_ranges"`
-}
-
-// TimeRange represents a single time range within a day
-type TimeRange struct {
-    ID        string `json:"id"`
-    StartTime string `json:"start_time"`  // HH:MM format (24h)
-    EndTime   string `json:"end_time"`    // HH:MM format (24h)
-}
-
-// Destination represents a phone number to dial
-type Destination struct {
-    ID              int        `json:"id"`
-    PhoneNumber     string     `json:"phone_number"`
-    Description     string     `json:"description"`
-    Status          string     `json:"status"`           // pending, dialing, connected, failed, completed, invalid
-    DialAttempts    int        `json:"dial_attempts"`
-    LastDialedAt    *time.Time `json:"last_dialed_at"`
-    LastDisposition string     `json:"last_disposition"` // answered, busy, no-answer, failed, cancelled, congestion, null
-    Duration        int        `json:"duration"`         // Call duration in seconds
-    Billsec         int        `json:"billsec"`          // Billable seconds
-    LastCallID      string     `json:"last_call_id"`     // Cloudonix call ID
-}
-
-// CallSession represents an active or completed call
-type CallSession struct {
-    ID            string    `json:"id"`
-    CampaignID    int       `json:"campaign_id"`
-    DestinationID int       `json:"destination_id"`
-    PhoneNumber   string    `json:"phone_number"`
-    CloudonixCallID string  `json:"cloudonix_call_id"`
-    Status        string    `json:"status"`
-    Disposition   string    `json:"disposition"`
-    Duration      int       `json:"duration"`
-    Billsec       int       `json:"billsec"`
-    StartedAt     time.Time `json:"started_at"`
-    ConnectedAt   *time.Time `json:"connected_at"`
-    EndedAt       *time.Time `json:"ended_at"`
-}
-
-// CampaignState tracks runtime state per campaign
-type CampaignState struct {
-    Campaign          Campaign
-    ActiveCalls       int
-    LastDialTime      time.Time
-    CircuitBreaker    *AICircuitBreaker
-    RetryQueue        []RetryState
-    IsPaused          bool
-    PauseReason       string
-    ResumeAt          *time.Time
-}
-
-// RetryState tracks a destination waiting for retry
-type RetryState struct {
-    DestinationID    int
-    PhoneNumber      string
-    AttemptNumber    int
-    NextRetryAt      time.Time
-    LastDisposition  string
-}
-```
-
-### 8.3 Schedule Checking
-
-The worker must check if current time falls within the campaign's schedule using the full schedule object:
-
-```go
-func isWithinSchedule(campaign Campaign, now time.Time) bool {
-    loc, err := time.LoadLocation(campaign.Timezone)
-    if err != nil {
-        log.Error().Err(err).Str("timezone", campaign.Timezone).Msg("Invalid timezone")
-        return false
-    }
-    
-    now = now.In(loc)
-    
-    // Check date range
-    today := now.Format("2006-01-02")
-    if today < campaign.StartDate || today > campaign.EndDate {
-        return false
-    }
-    
-    // Get day name in lowercase
-    dayName := strings.ToLower(now.Format("l")) // monday, tuesday, etc.
-    daySchedule, ok := campaign.Schedule[dayName]
-    if !ok || !daySchedule.Enabled {
-        return false
-    }
-    
-    // Check if current time falls within any time range
-    currentTime := now.Format("15:04")
-    for _, tr := range daySchedule.TimeRanges {
-        if currentTime >= tr.StartTime && currentTime <= tr.EndTime {
-            return true
-        }
-    }
-    
-    return false
-}
-```
-
-### 8.4 Disposition Handling
-
-**Cloudonix Disposition Values:**
-- `answered` - Call was answered by human
-- `completed` - Call completed normally
-- `busy` - Line was busy
-- `no-answer` - No answer within timeout
-- `failed` - Call failed (network error, invalid number, etc.)
-- `cancelled` - Call was cancelled
-- `congestion` - Network congestion
-
-**Disposition Mapping (handled by Laravel):**
-The Laravel webhook controller maps Cloudonix dispositions to destination statuses:
-
-```php
-$dispositionMap = [
-    'answered'   => 'completed',
-    'completed'  => 'completed',
-    'busy'       => 'failed',
-    'no-answer'  => 'failed',
-    'failed'     => 'failed',
-    'cancelled'  => 'failed',
-    'congestion' => 'failed',
-];
-```
-
-**Retry Eligibility:**
-The worker uses `last_disposition` to determine if a destination should be retried:
-
-```go
-func shouldRetry(disposition string) bool {
-    retryableDispositions := []string{"busy", "no-answer", "cancelled"}
-    for _, d := range retryableDispositions {
-        if disposition == d {
-            return true
-        }
-    }
-    return false
-}
-```
-
-**Destination Status Values:**
-- `pending` - Ready to be dialed
-- `dialing` - Currently being dialed
-- `connected` - Call connected
-- `failed` - Dial failed (busy, no answer, etc.) - may be retried
-- `completed` - Call completed successfully
-- `invalid` - Invalid phone number - never retried
-
-### 8.5 Worker State
-
-```go
-type WorkerState struct {
-    mu                sync.RWMutex
-    Campaigns         map[int]*CampaignState
-    GlobalActiveCalls int
-    Metrics           MetricsCollector
-    LaravelClient     *LaravelAPIClient
-    CloudonixClient   *CloudonixAPIClient
-}
-```
-
----
-
-## 9. API Integration Details
-
-### 9.1 Laravel API Client
-
-```go
-type LaravelAPIClient struct {
-    BaseURL    string
-    APIToken   string
-    HTTPClient *http.Client
-}
-
-func (c *LaravelAPIClient) GetActiveCampaigns(ctx context.Context) ([]Campaign, error) {
-    req, err := http.NewRequestWithContext(ctx, "GET", 
-        fmt.Sprintf("%s/dialer/worker/campaigns/active", c.BaseURL), nil)
-    if err != nil {
-        return nil, err
-    }
-    
-    req.Header.Set("Authorization", "Bearer "+c.APIToken)
-    req.Header.Set("Accept", "application/json")
-    
-    resp, err := c.HTTPClient.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
-    
-    // Parse response...
-}
-```
-
-### 9.2 Cloudonix API Integration
-
-Using the Cloudonix API endpoint: `POST /calls/{domain}/application`
-
-See: https://developers.cloudonix.com/Documentation/apiWorkflow/callControlAndSessionManagement#outbound-call-from-application
-
-```go
-func (c *CloudonixAPIClient) InitiateCall(ctx context.Context, req InitiateCallRequest) (*InitiateCallResponse, error) {
-    // Build the URL with domain in the path
-    url := fmt.Sprintf("%s/calls/%s/application", c.BaseURL, c.Domain)
-    
-    // Build the JSON payload according to Cloudonix API documentation
-    payload := map[string]interface{}{
-        "destination":  req.PhoneNumber,      // Destination to dial (E.164)
-        "caller-id":    req.CallerID,        // Caller ID to present
-        "timeout":      req.Timeout,         // Seconds to wait for answer (default: 60)
-        "callback":     req.WebhookURL,      // URL for session status callbacks
-    }
-    
-    // Optional: Enable call recording
-    if req.Record {
-        payload["record"] = true
-    }
-    
-    // Optional: Enable Answering Machine Detection
-    // Valid values: "Enable" or "DetectMessageEnd"
-    if req.AMDEnabled {
-        payload["machineDetection"] = "Enable"
-    }
-    
-    // Optional: Maximum call duration in seconds
-    if req.TimeLimit > 0 {
-        payload["timeLimit"] = req.TimeLimit
-    }
-    
-    // Optional: Schedule the call for a future time (ISO-8601 timestamp)
-    if req.ScheduleAt != "" {
-        payload["schedule"] = req.ScheduleAt
-    }
-    
-    // Add destination routing - specify ONE of: application, url, or cxml
-    // Note: routing_destination_type comes from campaign.routing_destination_type
-    switch req.RoutingDestinationType {
-    case "ai_assistant":
-        // Application ID from Cloudonix voice application configuration
-        payload["application"] = req.RoutingDestinationID
-    case "url":
-        // URL to CXML application
-        payload["url"] = req.RoutingURL
-    case "cxml":
-        // Inline CXML code
-        payload["cxml"] = req.RoutingCXML
-    }
-    
-    // Send request with Bearer token authorization
-    // Authorization: Bearer {CLOUDONIX_API_KEY}
-    //
-    // Expected response (200 OK):
-    // {
-    //   "domainId": 3,
-    //   "subscriberId": 372,
-    //   "destination": "15551234567",
-    //   "direction": "outbound-api",
-    //   "token": "16a7294c989b11e7b3d32b9edb8660c7"
-    // }
-    //
-    // The 'token' in the response is the session token that will be sent
-    // in webhook callbacks via the 'call_id' field.
-}
-```
-
-**Important:** The session token returned in the response (`token` field) should be stored and correlated with our internal session. This token will be included in webhook callbacks as `call_id`.
-
-### 9.3 Webhook Handler
-
-```go
-func (w *Worker) HandleCloudonixWebhook(wr http.ResponseWriter, r *http.Request) {
-    var event CloudonixEvent
-    if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-        http.Error(wr, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    
-    // Route to appropriate handler
-    switch event.Type {
-    case "call.completed":
-        w.handleCallCompleted(event)
-    case "call.connected":
-        w.handleCallConnected(event)
-    case "call.failed":
-        w.handleCallFailed(event)
-    case "call.voicemail":
-        w.handleCallVoicemail(event)
-    }
-    
-    wr.WriteHeader(http.StatusOK)
-}
-```
-
----
-
-## 10. Monitoring & Observability
-
-### 10.1 Prometheus Metrics
+### 11.1 Key Metrics
 
 ```go
 var (
-    // Campaign metrics
-    activeCampaignsGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-        Name: "dialer_active_campaigns",
-        Help: "Number of active campaigns",
-    })
+    // Concurrency metrics
+    campaignConcurrencyGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+        Name: "dialer_campaign_concurrency",
+        Help: "Current active calls per campaign",
+    }, []string{"campaign_id"})
     
-    activeCallsGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-        Name: "dialer_active_calls",
-        Help: "Number of active calls",
+    campaignCACLimitGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+        Name: "dialer_campaign_cac_limit",
+        Help: "CAC limit for campaign",
+    }, []string{"campaign_id"})
+    
+    // API rate metrics
+    apiIntervalGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+        Name: "dialer_api_interval_seconds",
+        Help: "Seconds between API calls (60/CAC)",
+    }, []string{"campaign_id"})
+    
+    // Rate limiting events
+    rateLimitPauseCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+        Name: "dialer_rate_limit_pauses_total",
+        Help: "Number of times campaign was paused due to HTTP 429",
     }, []string{"campaign_id", "organization_id"})
     
+    // Standard call metrics
     callsTotalCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
         Name: "dialer_calls_total",
         Help: "Total calls initiated",
     }, []string{"campaign_id", "disposition"})
-    
-    callDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-        Name:    "dialer_call_duration_seconds",
-        Help:    "Call duration in seconds",
-        Buckets: prometheus.DefBuckets,
-    }, []string{"campaign_id"})
-    
-    retryQueueGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-        Name: "dialer_retry_queue_depth",
-        Help: "Number of destinations waiting for retry",
-    })
-    
-    circuitBreakerStateGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-        Name: "dialer_circuit_breaker_state",
-        Help: "Circuit breaker state (0=closed, 1=half-open, 2=open)",
-    }, []string{"campaign_id"})
-    
-    // API metrics
-    laravelAPIRequestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-        Name:    "dialer_laravel_api_request_duration_seconds",
-        Help:    "Laravel API request duration",
-        Buckets: prometheus.DefBuckets,
-    }, []string{"endpoint", "status"})
-    
-    cloudonixAPIRequestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-        Name:    "dialer_cloudonix_api_request_duration_seconds",
-        Help:    "Cloudonix API request duration",
-        Buckets: prometheus.DefBuckets,
-    }, []string{"endpoint", "status"})
 )
 ```
 
-### 10.2 Health Check Endpoint
+### 11.2 Log Events
 
 ```go
-func (w *Worker) HealthHandler(wr http.ResponseWriter, r *http.Request) {
-    health := struct {
-        Status          string            `json:"status"`
-        Version         string            `json:"version"`
-        Uptime          time.Duration     `json:"uptime"`
-        ActiveCampaigns int               `json:"active_campaigns"`
-        ActiveCalls     int               `json:"active_calls"`
-        QueueDepth      int               `json:"queue_depth"`
-        CircuitBreakers map[string]string `json:"circuit_breakers"`
-    }{
-        Status:          "healthy",
-        Version:         version,
-        Uptime:          time.Since(startTime),
-        ActiveCampaigns: len(w.state.Campaigns),
-        ActiveCalls:     w.state.GlobalActiveCalls,
-        QueueDepth:      w.getTotalRetryQueueDepth(),
-        CircuitBreakers: w.getCircuitBreakerStates(),
-    }
-    
-    json.NewEncoder(wr).Encode(health)
-}
-```
+// CAC check
+log.Debug().
+    Int64("campaign_id", campaign.ID).
+    Int("active_calls", activeCount).
+    Int("cac_limit", campaign.ConcurrentActiveCalls).
+    Bool("can_start", canStart).
+    Msg("Checked campaign concurrency")
 
-### 10.3 Structured Logging
-
-```go
-// Example log entries
+// API rate limiting
 log.Info().
-    Str("component", "campaign_scheduler").
-    Int("campaign_id", campaign.ID).
-    Int("organization_id", campaign.OrganizationID).
-    Str("campaign_name", campaign.Name).
-    Int("pending_destinations", len(pending)).
-    Msg("Starting campaign dialing")
+    Int64("campaign_id", campaign.ID).
+    Float64("interval_seconds", interval.Seconds()).
+    Int("cac", campaign.ConcurrentActiveCalls).
+    Msg("Waiting for API rate limit interval")
 
+// CDR received
 log.Info().
-    Str("component", "call_executor").
-    Int("campaign_id", campaign.ID).
-    Int("destination_id", dest.ID).
-    Str("phone_number", dest.PhoneNumber).
-    Str("cloudonix_call_id", callID).
-    Msg("Call initiated successfully")
+    Int64("campaign_id", cdr.CampaignID).
+    Str("session_token", cdr.SessionToken).
+    Str("disposition", cdr.Disposition).
+    Msg("CDR received - decrementing concurrency")
 
+// HTTP 429
 log.Error().
-    Str("component", "circuit_breaker").
-    Int("campaign_id", campaign.ID).
-    Str("destination_type", campaign.DestinationType).
-    Int("consecutive_errors", counts.ConsecutiveFailures).
-    Msg("Circuit breaker opened - pausing campaign")
+    Int64("campaign_id", campaign.ID).
+    Int64("organization_id", campaign.OrganizationID).
+    Msg("Cloudonix rate limit exceeded (HTTP 429) - PAUSING CAMPAIGN")
 ```
 
 ---
 
-## 11. Docker Configuration
-
-### 11.1 Dockerfile
-
-```dockerfile
-# Build stage
-FROM golang:1.21-alpine AS builder
-
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dialer-worker ./cmd/worker
-
-# Runtime stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-
-COPY --from=builder /app/dialer-worker .
-
-EXPOSE 8080 9090
-
-CMD ["./dialer-worker"]
-```
-
-### 11.2 docker-compose.yml Addition
-
-```yaml
-  dialer-worker:
-    build:
-      context: ./dialer-worker
-      dockerfile: Dockerfile
-    container_name: opbx-dialer-worker
-    environment:
-      - WORKER_ID=dialer-worker-1
-      - WORKER_API_PORT=8080
-      - LARAVEL_API_URL=http://nginx/api/v1
-      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN}
-      - CLOUDONIX_API_URL=https://api.cloudonix.io
-      - CLOUDONIX_API_KEY=${CLOUDONIX_API_KEY}
-      - CLOUDONIX_DOMAIN=${CLOUDONIX_DOMAIN}
-      - MAX_CONCURRENT_CALLS_GLOBAL=1000
-      - LOG_LEVEL=info
-    ports:
-      - "8080:8080"   # API / Webhooks
-      - "9090:9090"   # Metrics
-    networks:
-      - opbx-network
-    restart: unless-stopped
-    depends_on:
-      - app
-      - nginx
-```
-
----
-
-## 12. Deployment & Scaling
-
-### 12.1 Single Worker
-- One worker instance handles all campaigns
-- Simple deployment, single point of failure
-- Good for small scale (< 100 concurrent calls)
-
-### 12.2 Multiple Workers (Horizontal Scaling)
-
-For high volume, deploy multiple workers:
-
-```yaml
-  dialer-worker-1:
-    # ... config ...
-    environment:
-      - WORKER_ID=dialer-worker-1
-      
-  dialer-worker-2:
-    # ... config ...
-    environment:
-      - WORKER_ID=dialer-worker-2
-```
-
-**Campaign Partitioning:**
-- Workers coordinate via Laravel API
-- Each worker claims campaigns (distributed locking)
-- Or: Static partitioning (Worker 1 = Campaigns 1-10, Worker 2 = 11-20)
-
-### 12.3 Graceful Shutdown
-
-```go
-func (w *Worker) Shutdown(ctx context.Context) error {
-    log.Info().Msg("Starting graceful shutdown...")
-    
-    // Stop accepting new calls
-    w.state.mu.Lock()
-    for _, campaign := range w.state.Campaigns {
-        campaign.IsPaused = true
-    }
-    w.state.mu.Unlock()
-    
-    // Wait for active calls to complete (with timeout)
-    ticker := time.NewTicker(5 * time.Second)
-    defer ticker.Stop()
-    
-    for {
-        select {
-        case <-ctx.Done():
-            return fmt.Errorf("shutdown timeout exceeded")
-        case <-ticker.C:
-            if w.state.GlobalActiveCalls == 0 {
-                log.Info().Msg("All calls completed, shutting down")
-                return nil
-            }
-            log.Info().Int("active_calls", w.state.GlobalActiveCalls).Msg("Waiting for calls to complete...")
-        }
-    }
-}
-```
-
----
-
-## 13. Security Considerations
-
-1. **API Token Security**: Store `DIALER_WORKER_API_TOKEN` in Docker secrets or environment, never in code
-2. **Webhook Validation**: Verify Cloudonix webhook signatures
-3. **Rate Limiting**: Respect Cloudonix API rate limits
-4. **No Direct DB Access**: Worker never connects to MySQL directly
-5. **Network Isolation**: Worker runs in isolated Docker network, only API access
-6. **Audit Logging**: All call actions logged via Laravel API
-
----
-
-## 14. Testing Strategy
-
-### 14.1 Unit Tests
-- Circuit breaker logic
-- Retry calculation
-- Campaign schedule validation
-- Rate limiting
-
-### 14.2 Integration Tests
-- Laravel API client
-- Cloudonix API mocking
-- Webhook handling
-
-### 14.3 Load Tests
-- Simulate 1000 concurrent calls
-- Measure CPS (calls per second)
-- Verify no race conditions
-
----
-
-## 15. Design Decisions Confirmed
-
-The following design decisions have been confirmed:
-
-| Decision | Status | Implementation |
-|----------|--------|----------------|
-| **State Management** | ✅ Confirmed | In-memory state with periodic DB persistence for failure recovery |
-| **Active Calls on Pause** | ✅ Confirmed | Let active calls complete naturally |
-| **Worker API Exposure** | ✅ Confirmed | Laravel API only (no direct worker REST API) |
-| **Logging Destination** | ✅ Confirmed | Local rsyslog (not stdout or external service) |
-| **Alerting** | ✅ Confirmed | Log alerts only (no email/Slack) |
-| **Webhook Routing** | ✅ Confirmed | Through Laravel proxy (not direct to worker) |
-
----
-
-## 16. State Management & Persistence
-
-### 16.1 In-Memory State with DB Persistence
-
-The worker maintains in-memory state for performance, but periodically persists critical state to the database for failure recovery:
-
-```go
-type PersistentState struct {
-    ActiveCalls       map[string]*CallSession    `json:"active_calls"`
-    RetryQueue        []RetryState               `json:"retry_queue"`
-    CampaignStates    map[int]*CampaignRuntimeState `json:"campaign_states"`
-    LastUpdated       time.Time                  `json:"last_updated"`
-    WorkerID          string                     `json:"worker_id"`
-}
-
-// PersistState saves critical state to Laravel API
-type StatePersister struct {
-    client *LaravelAPIClient
-    ticker *time.Ticker
-}
-
-func (sp *StatePersister) Start(ctx context.Context, state *WorkerState) {
-    sp.ticker = time.NewTicker(30 * time.Second) // Persist every 30s
-    
-    go func() {
-        for {
-            select {
-            case <-ctx.Done():
-                return
-            case <-sp.ticker.C:
-                if err := sp.persist(state); err != nil {
-                    log.Error().Err(err).Msg("Failed to persist state")
-                }
-            }
-        }
-    }()
-}
-
-func (sp *StatePersister) persist(state *WorkerState) error {
-    state.mu.RLock()
-    defer state.mu.RUnlock()
-    
-    persistent := PersistentState{
-        ActiveCalls:    make(map[string]*CallSession),
-        RetryQueue:     []RetryState{},
-        CampaignStates: make(map[int]*CampaignRuntimeState),
-        LastUpdated:    time.Now().UTC(),
-        WorkerID:       state.WorkerID,
-    }
-    
-    // Copy active calls
-    for id, call := range state.ActiveCalls {
-        persistent.ActiveCalls[id] = call
-    }
-    
-    // Copy retry queue
-    for _, retry := range state.RetryQueue {
-        persistent.RetryQueue = append(persistent.RetryQueue, retry)
-    }
-    
-    // Copy campaign runtime state
-    for id, cs := range state.Campaigns {
-        persistent.CampaignStates[id] = &CampaignRuntimeState{
-            ActiveCalls:    cs.ActiveCalls,
-            IsPaused:       cs.IsPaused,
-            PauseReason:    cs.PauseReason,
-            LastDialTime:   cs.LastDialTime,
-        }
-    }
-    
-    // Send to Laravel API
-    return sp.client.PersistWorkerState(persistent)
-}
-```
-
-### 16.2 Recovery on Startup
-
-When worker starts, it checks for persisted state:
-
-```go
-func (w *Worker) RecoverState() error {
-    persisted, err := w.laravelClient.GetWorkerState(w.WorkerID)
-    if err != nil {
-        log.Warn().Err(err).Msg("No persisted state found, starting fresh")
-        return nil
-    }
-    
-    // Check if state is stale (> 5 minutes old)
-    if time.Since(persisted.LastUpdated) > 5*time.Minute {
-        log.Warn().Time("last_updated", persisted.LastUpdated).Msg("Persisted state is stale, not recovering active calls")
-        // Only recover retry queue
-        w.state.RetryQueue = persisted.RetryQueue
-        return nil
-    }
-    
-    // Recover active calls (validate with Cloudonix)
-    for callID, call := range persisted.ActiveCalls {
-        // Check call status with Cloudonix
-        status, err := w.cloudonixClient.GetCallStatus(call.CloudonixCallID)
-        if err != nil || status == "completed" {
-            // Call already ended or error checking - update disposition
-            w.updateCallDisposition(call, "unknown", 0)
-            continue
-        }
-        
-        // Call still active - add to tracking
-        w.state.ActiveCalls[callID] = call
-        w.state.GlobalActiveCalls++
-    }
-    
-    log.Info().
-        Int("recovered_calls", len(w.state.ActiveCalls)).
-        Int("recovered_retries", len(persisted.RetryQueue)).
-        Msg("State recovered successfully")
-    
-    return nil
-}
-```
-
-### 16.3 Laravel API State Endpoints
-
-**`POST /api/v1/dialer/worker/state/persist`**
-
-Persist worker state to database.
-
-**Request:**
-```json
-{
-  "worker_id": "dialer-worker-1",
-  "active_calls": {
-    "call_abc123": {
-      "id": "call_abc123",
-      "campaign_id": 1,
-      "destination_id": 123,
-      "phone_number": "+12025551234",
-      "cloudonix_call_id": "cix_xyz789",
-      "status": "connected",
-      "started_at": "2026-03-29T14:30:00Z"
-    }
-  },
-  "retry_queue": [
-    {
-      "destination_id": 456,
-      "attempt_number": 2,
-      "next_retry_at": "2026-03-29T15:00:00Z",
-      "last_disposition": "no_answer"
-    }
-  ],
-  "campaign_states": {
-    "1": {
-      "active_calls": 5,
-      "is_paused": false,
-      "last_dial_time": "2026-03-29T14:30:00Z"
-    }
-  },
-  "last_updated": "2026-03-29T14:30:30Z"
-}
-```
-
-**`GET /api/v1/dialer/worker/state/{worker_id}`**
-
-Retrieve persisted worker state.
-
----
-
-## 17. Active Calls on Campaign Pause
-
-When a campaign is paused (circuit breaker, outside schedule, or manual):
-
-```go
-func (w *Worker) pauseCampaign(campaignID int, reason string) {
-    state := w.state.Campaigns[campaignID]
-    state.IsPaused = true
-    state.PauseReason = reason
-    
-    log.Info().
-        Int("campaign_id", campaignID).
-        Str("reason", reason).
-        Int("active_calls", state.ActiveCalls).
-        Msg("Campaign paused - letting active calls complete")
-    
-    // Note: We do NOT hangup active calls
-    // They will complete naturally and be dispositioned normally
-}
-```
-
-**Behavior:**
-- Campaign stops accepting new destinations
-- Active calls continue until natural completion
-- Call dispositions are still processed and recorded
-- Once all active calls complete, campaign is fully paused
-
----
-
-## 18. Logging Configuration (rsyslog)
-
-### 18.1 Go ZeroLog to rsyslog
-
-```go
-import (
-    "github.com/rs/zerolog"
-    "github.com/rs/zerolog/log"
-    "gopkg.in/mcuadros/go-syslog.v2"
-)
-
-func setupLogging() {
-    // Configure zerolog to write to rsyslog via UDP
-    syslogWriter, err := syslog.Dial("udp", "localhost:514", syslog.LOG_INFO, "dialer-worker")
-    if err != nil {
-        // Fallback to stdout
-        log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Timestamp().Logger()
-        return
-    }
-    
-    log.Logger = zerolog.New(syslogWriter).With().Timestamp().Logger()
-}
-```
-
-### 18.2 Docker Compose rsyslog Configuration
-
-```yaml
-  dialer-worker:
-    # ... existing config ...
-    logging:
-      driver: syslog
-      options:
-        syslog-address: "udp://localhost:514"
-        tag: "dialer-worker"
-```
-
-### 18.3 Log Format
-
-```
-Mar 29 14:30:15 dialer-worker[1]: {"level":"info","component":"campaign_scheduler","campaign_id":1,"campaign_name":"Test Campaign","pending_destinations":150,"message":"Starting campaign dialing"}
-Mar 29 14:30:16 dialer-worker[1]: {"level":"info","component":"call_executor","campaign_id":1,"destination_id":123,"phone_number":"+12025551234","cloudonix_call_id":"cix_xyz789","message":"Call initiated successfully"}
-Mar 29 14:30:45 dialer-worker[1]: {"level":"error","component":"circuit_breaker","campaign_id":1,"destination_type":"ai_assistant","consecutive_errors":5,"message":"Circuit breaker opened - pausing campaign"}
-```
-
----
-
-## 19. Webhook Routing via Laravel Proxy
-
-Cloudonix webhooks go through Laravel, which validates and forwards to the worker:
-
-```
-Cloudonix ──► Laravel ──► Worker
-              (validate)  (process)
-```
-
-### 19.1 Laravel Webhook Endpoint
-
-**`POST /api/v1/dialer/webhooks/cloudonix`**
-
-Laravel validates the webhook signature, then forwards to the active worker(s).
-
-```php
-// Laravel controller
-public function handleCloudonixWebhook(Request $request) {
-    // Validate Cloudonix signature
-    if (!$this->validateSignature($request)) {
-        return response()->json(['error' => 'Invalid signature'], 401);
-    }
-    
-    // Find which worker is handling this campaign
-    $campaignId = $request->input('custom_data.campaign_id');
-    $worker = $this->getActiveWorkerForCampaign($campaignId);
-    
-    // Forward to worker
-    $response = Http::post($worker->url . '/internal/webhooks/cloudonix', $request->all());
-    
-    return response()->json(['status' => 'ok']);
-}
-```
-
-### 19.2 Worker Internal Webhook Handler
-
-The worker exposes an internal endpoint (not publicly accessible) for Laravel to forward webhooks:
-
-```go
-// Internal handler - only accepts from Laravel
-func (w *Worker) InternalWebhookHandler(wr http.ResponseWriter, r *http.Request) {
-    // Verify request is from Laravel (internal network or shared secret)
-    if !w.verifyLaravelOrigin(r) {
-        http.Error(wr, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-    
-    var event CloudonixEvent
-    if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-        http.Error(wr, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    
-    w.processCloudonixEvent(event)
-    wr.WriteHeader(http.StatusOK)
-}
-```
-
----
-
-## 20. Complete Implementation Summary
-
-### Phase 1: Core Worker
-1. Go project setup with dependency management
-2. HTTP client for Laravel API
-3. HTTP client for Cloudonix API
-4. Webhook receiver (internal)
-5. Basic campaign scheduler
-6. Call executor with rate limiting
-
-### Phase 2: Advanced Features
-1. Circuit breaker for AI Agent monitoring
-2. Exponential backoff retry queue
-3. State persistence to Laravel API
-4. Recovery on startup
-5. rsyslog integration
-
-### Phase 3: Laravel Backend
-1. Implement all `/api/v1/dialer/worker/*` endpoints
-2. Webhook proxy endpoint
-3. State persistence endpoints
-4. Metrics aggregation
+## 12. Implementation Phases
+
+### Phase 1: Core CAC Implementation
+1. Remove CPS configuration, add CAC to Campaign model
+2. Implement Redis concurrency counter and active sessions
+3. Implement API rate limiting (60/CAC interval)
+4. Update call initiation flow with CAC check
+
+### Phase 2: CDR Processing
+1. Laravel CDR endpoint integration
+2. Redis pub/sub for CDR events
+3. Worker CDR handler (decrement counter, remove from sessions)
+4. Update destination status from CDR
+
+### Phase 3: HTTP 429 Handling
+1. Detect HTTP 429 in Cloudonix client
+2. Implement immediate campaign pause
+3. 300-second cooldown period
+4. Resume logic with timestamp check
 
 ### Phase 4: Testing & Deployment
-1. Unit tests for core logic
-2. Integration tests with mocked APIs
-3. Load testing
-4. Docker deployment
-5. Production monitoring
+1. Unit tests for concurrency manager
+2. Integration tests with mocked CDRs
+3. Load testing at various CAC levels
+4. Production deployment
 
 ---
 
-## 21. Final Notes
+## 13. Migration Notes
+
+### From CPS to CAC
+
+**Database Migration:**
+```sql
+-- Remove CPS field
+ALTER TABLE auto_dialer_campaigns DROP COLUMN calls_per_second;
+
+-- Add CAC field with default value
+ALTER TABLE auto_dialer_campaigns ADD COLUMN concurrent_active_calls INT DEFAULT 5;
+
+-- Map existing values (if any migration needed)
+-- CPS=2 → CAC=2
+-- CPS=5 → CAC=5
+```
+
+**API Response Changes:**
+- Remove `calls_per_second` from campaign response
+- Add `concurrent_active_calls` to campaign response
+
+**Worker Configuration:**
+- Remove CPS-based configuration
+- Read CAC from campaign API response
+- Calculate API interval as `60 / CAC`
+
+---
+
+## 14. Final Notes
 
 ### Success Criteria
-- ✅ Handles multiple concurrent campaigns
-- ✅ Respects campaign schedules and limits
-- ✅ Circuit breaker pauses campaigns on AI errors
-- ✅ Exponential backoff for retries
-- ✅ No direct database access
-- ✅ State persistence for failure recovery
-- ✅ Graceful shutdown (lets calls complete)
-- ✅ Laravel API only (no direct worker API)
-- ✅ rsyslog for logging
-- ✅ Alerts go to logs only
-- ✅ Webhooks through Laravel proxy
 
-### Performance Targets
-- 100+ concurrent calls per worker instance
-- < 100ms latency for call initiation
-- 99.9% uptime (excluding planned maintenance)
-- State persistence every 30 seconds
-- Recovery time < 60 seconds after crash
+- ✅ CAC never exceeded for any campaign
+- ✅ API calls spaced at exactly `60/CAC` second intervals
+- ✅ CDR processing decrements counter within 1 second
+- ✅ HTTP 429 triggers immediate pause with 300s cooldown
+- ✅ Retry logic works with CAC-based scheduling
+- ✅ Multiple workers coordinate via Redis without conflicts
 
----
+### Key Design Decisions
 
-**Specification Version:** 1.0  
-**Last Updated:** 2026-03-29  
-**Status:** Ready for Implementation
+1. **Redis for State**: Enables horizontal scaling across multiple workers
+2. **Laravel CDR Endpoint**: Centralized CDR processing, worker notified via Redis
+3. **CAC over CPS**: More predictable resource usage and call patterns
+4. **Strict API Interval**: Enforced wait between Cloudonix API calls
+5. **Immediate Pause on 429**: Prevents further rate limit violations
