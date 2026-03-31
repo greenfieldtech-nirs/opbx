@@ -105,9 +105,284 @@ Stored in Redis with keys:
 
 ---
 
-## 4. Go Worker Specification
+## 4. UI/UX Specification
 
-### 4.1 Technology Stack
+### 5.1 Campaign Configuration Changes
+
+#### Field Replacement: CPS → CAC
+
+**Current (CPS):**
+- Field: "Calls Per Second"
+- Type: Number input
+- Range: 1-10
+
+**New (CAC):**
+- Field: "Concurrent Active Calls"
+- Type: Select dropdown
+- Values: 2, 3, 4, 6, 10, 15, 20
+- Default: 5
+
+**UI Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Concurrent Active Calls (CAC)                              │
+│                                                             │
+│  [▼] 5                                    [?]               │
+│                                                             │
+│  API Request Rate: Every 12 seconds                         │
+│  Max simultaneous calls: 5                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Help Text (tooltip):**
+> CAC = Concurrent Active Calls. This is the maximum number of calls that can be active (ringing or connected) at the same time. The dialer will automatically space out API requests to maintain this limit. Higher CAC = more concurrent calls but faster API rate.
+
+**Dynamic Calculation Display:**
+When user selects a CAC value, show calculated values:
+- **API Interval**: 60/CAC seconds (e.g., "Every 12 seconds")
+- **Max Concurrent**: CAC value (e.g., "5 simultaneous calls")
+
+#### Campaign Form Validation
+
+```javascript
+const cacOptions = [2, 3, 4, 6, 10, 15, 20];
+
+// Validation rules:
+// - Must select one of the predefined values
+// - Cannot exceed organization's max CAC limit
+// - Warning if CAC > 10 for new campaigns
+```
+
+### 5.2 Campaign List/Overview Page
+
+#### Column Updates
+
+**Remove:**
+- Calls Per Second column
+
+**Add:**
+- CAC column showing "Current/Max"
+- Active Calls column with progress bar
+
+**New Columns:**
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Name    │ Status │ CAC       │ Active Calls        │ Progress │ Actions   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Campaign│ Active │ 3/5       │ ████████░░ 60%      │ 45%      │ [Edit]    │
+│ Test A  │        │           │ 3 active / 5 max    │          │ [Pause]   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Q2 Sales│ Active │ 5/10      │ ██████░░░░ 50%      │ 78%      │ [Edit]    │
+│         │        │           │ 5 active / 10 max   │          │ [Pause]   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Support │ Paused │ 0/4       │ ░░░░░░░░░░ 0%       │ 23%      │ [Edit]    │
+│ Tickets │ (429)  │           │ 0 active / 4 max    │          │ [Resume]  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**CAC Progress Bar Colors:**
+- Green: < 60% of CAC (e.g., 0-2 of 5)
+- Yellow: 60-80% of CAC (e.g., 3-4 of 5)
+- Red: > 80% of CAC (e.g., 4-5 of 5)
+
+#### Status Badges
+
+Add new status reasons for paused campaigns:
+- "Paused (Rate Limited)" - Red badge with clock icon
+- "Paused (429 Error)" - Red badge with warning icon
+
+### 5.3 Campaign Detail Page
+
+#### Real-Time Concurrency Monitor
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  CONCURRENCY STATUS                                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  CAC Limit:          5 concurrent calls                     │
+│  Currently Active:   3 concurrent calls                     │
+│  Available Slots:    2 slots open                           │
+│                                                             │
+│  [████████████████████░░░░░░░░░░] 60%                       │
+│                                                             │
+│  API Request Rate:   Every 12 seconds                       │
+│  Last API Call:      8 seconds ago                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Active Sessions List
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ACTIVE SESSIONS (3)                                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Phone Number    │ Session Token    │ Duration │ Status    │
+├──────────────────┼──────────────────┼──────────┼───────────┤
+│ +1 555-0123      │ 16a7294c989b...  │ 00:45    │ Connected │
+│ +1 555-0456      │ 17b8305d090c...  │ 00:12    │ Ringing   │
+│ +1 555-0789      │ 18c9416e1a0d...  │ 01:23    │ Connected │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Rate Limiting History
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  RATE LIMITING EVENTS                                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  [2026-03-31 14:30:15]  ⚠️  Rate limit hit (HTTP 429)       │
+│                           Campaign paused for 5 minutes     │
+│                                                             │
+│  [2026-03-31 14:25:00]  ✅  Campaign resumed                │
+│                           Rate limit cooldown completed       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.4 Dashboard Updates
+
+#### Campaign Performance Cards
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Campaign: Q2 Sales                                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   3/5        │  │    45%       │  │  Every 12s   │      │
+│  │   Active     │  │  Complete    │  │   API Rate   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  CAC: 5 concurrent calls                                    │
+│  Status: Running (3 slots available)                        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Alerts Section
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ACTIVE ALERTS                                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ⚠️  Campaign "Support Tickets" paused due to rate limiting │
+│      Will auto-resume in 4 minutes 32 seconds               │
+│                                                             │
+│  ℹ️  Campaign "Q2 Sales" approaching CAC limit (4/5 calls)  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.5 Settings Page Updates
+
+#### Organization Dialer Settings
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  DIALER DEFAULTS                                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Default CAC:  [▼] 5                                        │
+│                                                             │
+│  Maximum CAC:  [▼] 20                                       │
+│  (Organization limit)                                       │
+│                                                             │
+│  Rate Limit Cooldown:  [300] seconds  (5 minutes)           │
+│  (When HTTP 429 received)                                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.6 Tooltips and Help Text
+
+#### CAC Field Tooltip
+```
+Concurrent Active Calls (CAC) determines how many calls can be 
+active at the same time for this campaign.
+
+- Each active call counts toward the limit
+- API requests are spaced to maintain this limit
+- CDRs free up slots when calls complete
+- Higher CAC = more calls but faster API rate
+```
+
+#### API Interval Display
+```
+API Interval: Every 12 seconds
+
+This is calculated as 60 seconds ÷ CAC (5) = 12 seconds
+between each Cloudonix API request.
+```
+
+### 5.7 Error Messages
+
+#### Validation Errors
+```
+"CAC must be one of: 2, 3, 4, 6, 10, 15, 20"
+"CAC cannot exceed organization maximum of 20"
+"Cannot increase CAC while campaign is rate limited"
+```
+
+#### Rate Limiting Notifications
+```
+Toast (Error): "Campaign paused - Cloudonix rate limit exceeded"
+Toast (Info): "Campaign will resume in 5 minutes"
+Toast (Success): "Campaign resumed - Rate limit cooldown complete"
+```
+
+### 5.8 API Endpoint Updates
+
+#### Campaign Resource Response
+```json
+{
+  "data": {
+    "id": 1,
+    "concurrent_active_calls": 5,
+    "current_active_calls": 3,
+    "api_interval_seconds": 12,
+    "cac_utilization_percentage": 60,
+    "rate_limited_until": null,
+    "status": "active"
+  }
+}
+```
+
+#### New Endpoint: GET /api/v1/auto-dialer/campaigns/{id}/concurrency
+```json
+{
+  "data": {
+    "cac_limit": 5,
+    "active_calls": 3,
+    "available_slots": 2,
+    "api_interval_seconds": 12,
+    "active_sessions": [
+      {
+        "session_token": "16a7294c989b11e7b3d32b9edb8660c7",
+        "phone_number": "+12025551234",
+        "started_at": "2026-03-31T14:30:00Z",
+        "duration_seconds": 45
+      }
+    ],
+    "rate_limit_status": {
+      "is_rate_limited": false,
+      "rate_limited_at": null,
+      "resumes_at": null
+    }
+  }
+}
+```
+
+---
+
+## 14. Go Worker Specification
+
+### 14.1 Technology Stack
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
@@ -119,7 +394,7 @@ Stored in Redis with keys:
 | Metrics | `github.com/prometheus/client_golang` | Observability |
 | Logging | `github.com/rs/zerolog` | Structured logging |
 
-### 4.2 Configuration (Environment Variables)
+### 5.2 Configuration (Environment Variables)
 
 ```env
 # Worker Identity
@@ -146,9 +421,9 @@ LOG_LEVEL=info
 
 ---
 
-## 5. API Endpoints (Laravel Backend)
+## 14. API Endpoints (Laravel Backend)
 
-### 5.1 Campaign Management Endpoints
+### 14.1 Campaign Management Endpoints
 
 #### `GET /api/v1/dialer/worker/campaigns/active`
 Returns all campaigns that should be currently running (respecting schedule).
@@ -198,7 +473,7 @@ Returns pending destinations for dialing.
 
 **Response:** Same as before.
 
-### 5.2 Call Session Management Endpoints
+### 14.2 Call Session Management Endpoints
 
 #### `POST /api/v1/dialer/worker/calls/initiate`
 Called by worker when initiating a call.
@@ -224,7 +499,7 @@ Called by worker when initiating a call.
 }
 ```
 
-### 5.3 CXML Generation Endpoint
+### 14.3 CXML Generation Endpoint
 
 #### `POST /api/v1/dialer/worker/calls/generate-cxml`
 Generates CXML for outbound call routing.
@@ -249,7 +524,7 @@ Generates CXML for outbound call routing.
 }
 ```
 
-### 5.4 Campaign Control Endpoints
+### 14.4 Campaign Control Endpoints
 
 #### `POST /api/v1/dialer/worker/campaigns/{campaign}/pause`
 Pause campaign immediately (used for rate limiting or errors).
@@ -263,7 +538,7 @@ Pause campaign immediately (used for rate limiting or errors).
 }
 ```
 
-### 5.5 CDR Webhook Endpoint (Laravel Receives)
+### 14.5 CDR Webhook Endpoint (Laravel Receives)
 
 #### `POST /api/webhooks/cloudonix/cdr`
 Cloudonix sends CDR (Call Detail Record) when call completes.
@@ -295,9 +570,9 @@ Cloudonix sends CDR (Call Detail Record) when call completes.
 
 ---
 
-## 6. Core Workflows
+## 14. Core Workflows
 
-### 6.1 Campaign Execution Flow
+### 14.1 Campaign Execution Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -349,7 +624,7 @@ Cloudonix sends CDR (Call Detail Record) when call completes.
 └──────────────────┘
 ```
 
-### 6.2 Call Initiation Flow (Detailed)
+### 14.2 Call Initiation Flow (Detailed)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -412,7 +687,7 @@ Cloudonix sends CDR (Call Detail Record) when call completes.
                       └──────────────────┘
 ```
 
-### 6.3 CDR Processing Flow
+### 14.3 CDR Processing Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -470,9 +745,9 @@ Cloudonix sends CDR (Call Detail Record) when call completes.
 
 ---
 
-## 7. Redis State Management
+## 14. Redis State Management
 
-### 7.1 Key Structure
+### 14.1 Key Structure
 
 ```
 # Campaign Concurrency Counter (integer)
@@ -497,7 +772,7 @@ worker:{worker_id}:last_heartbeat → timestamp
 cdr:completed → channel for CDR events
 ```
 
-### 7.2 Concurrency Operations
+### 14.2 Concurrency Operations
 
 ```go
 // Check if we can start a new call
@@ -549,9 +824,9 @@ func (cm *ConcurrencyManager) GetActiveCount(campaignID int64) int {
 
 ---
 
-## 8. HTTP 429 Rate Limiting Handler
+## 14. HTTP 429 Rate Limiting Handler
 
-### 8.1 Detection and Response
+### 14.1 Detection and Response
 
 ```go
 // In cloudonix client
@@ -590,7 +865,7 @@ if errors.Is(err, cloudonix.ErrRateLimited) {
 }
 ```
 
-### 8.2 Pause Duration
+### 14.2 Pause Duration
 
 - **Immediate pause**: Campaign stops accepting new calls right away
 - **Cooldown period**: 300 seconds (5 minutes)
@@ -598,9 +873,9 @@ if errors.Is(err, cloudonix.ErrRateLimited) {
 
 ---
 
-## 9. Data Structures
+## 14. Data Structures
 
-### 9.1 Campaign Model (Go)
+### 14.1 Campaign Model (Go)
 
 ```go
 type Campaign struct {
@@ -634,7 +909,7 @@ type Campaign struct {
 }
 ```
 
-### 9.2 Active Session Tracking
+### 14.2 Active Session Tracking
 
 ```go
 type ActiveSession struct {
@@ -648,7 +923,7 @@ type ActiveSession struct {
 }
 ```
 
-### 9.3 CDR Event (from Laravel via Redis)
+### 14.3 CDR Event (from Laravel via Redis)
 
 ```go
 type CDREvent struct {
@@ -666,9 +941,9 @@ type CDREvent struct {
 
 ---
 
-## 10. Retry Logic Specification
+## 14. Retry Logic Specification
 
-### 10.1 Exponential Backoff Schedule
+### 14.1 Exponential Backoff Schedule
 
 | Attempt | Delay | Formula |
 |---------|-------|---------|
@@ -678,7 +953,7 @@ type CDREvent struct {
 | 4 | 40 minutes | base × 8 |
 | 5 | 60 minutes | cap at 60 min |
 
-### 10.2 Retry Eligibility
+### 14.2 Retry Eligibility
 
 **Retryable Dispositions:**
 - `busy`
@@ -693,9 +968,9 @@ type CDREvent struct {
 
 ---
 
-## 11. Monitoring & Observability
+## 14. Monitoring & Observability
 
-### 11.1 Key Metrics
+### 14.1 Key Metrics
 
 ```go
 var (
@@ -730,7 +1005,7 @@ var (
 )
 ```
 
-### 11.2 Log Events
+### 14.2 Log Events
 
 ```go
 // CAC check
@@ -764,7 +1039,7 @@ log.Error().
 
 ---
 
-## 12. Implementation Phases
+## 14. Implementation Phases
 
 ### Phase 1: Core CAC Implementation
 1. Remove CPS configuration, add CAC to Campaign model
@@ -792,7 +1067,7 @@ log.Error().
 
 ---
 
-## 13. Migration Notes
+## 14. Migration Notes
 
 ### From CPS to CAC
 
