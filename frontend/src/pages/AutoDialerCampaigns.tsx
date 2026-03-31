@@ -430,9 +430,9 @@ export default function AutoDialerCampaigns() {
                 )
               },
               {
-                header: 'CPS',
+                header: 'CAC',
                 cell: (campaign) => (
-                  <span className="text-sm">{campaign.calls_per_second} CPS</span>
+                  <span className="text-sm">{campaign.concurrent_active_calls} concurrent</span>
                 )
               },
               {

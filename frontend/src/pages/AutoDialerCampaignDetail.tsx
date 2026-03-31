@@ -361,8 +361,8 @@ export default function AutoDialerCampaignDetail() {
                     <span className="font-medium">{campaign.max_dial_attempts}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Calls Per Second</span>
-                    <span className="font-medium">{campaign.calls_per_second}</span>
+                    <span className="text-muted-foreground">Concurrent Active Calls</span>
+                    <span className="font-medium">{campaign.concurrent_active_calls}</span>
                   </div>
                 </div>
               </div>
