@@ -207,10 +207,16 @@ func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, d
 
 	// Make the actual outbound call via Cloudonix
 	// Create a client using this campaign's organization-specific credentials
+	log.Info().
+		Int64("campaign_id", campaign.ID).
+		Str("cloudonix_domain", campaign.CloudonixDomain).
+		Str("api_key_set", fmt.Sprintf("%t", campaign.CloudonixAPIKey != "")).
+		Msg("Creating Cloudonix client with credentials")
+
 	cloudonixClient := e.createCloudonixClient(campaign)
 
 	cloudonixReq := &cloudonix.OutboundCallRequest{
-		From:        campaign.FromNumber,
+		From:        campaign.CallerID,
 		To:          dest.PhoneNumber,
 		CallbackURL: initResp.CallbackURL,
 		CustomParameters: map[string]interface{}{

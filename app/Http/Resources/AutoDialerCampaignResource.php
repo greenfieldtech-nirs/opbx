@@ -72,7 +72,7 @@ class AutoDialerCampaignResource extends JsonResource
 
             // Cloudonix credentials from organization settings
             'cloudonix_api_key' => $this->organization->cloudonixSettings?->domain_api_key,
-            'cloudonix_domain' => $this->organization->cloudonixSettings?->domain_name ?? $this->organization->cloudonixSettings?->domain_uuid,
+            'cloudonix_domain' => $this->organization->cloudonixSettings?->domain_uuid ?? $this->organization->cloudonixSettings?->domain_name,
             'cloudonix_api_url' => config('services.cloudonix.api_url', 'https://api.cloudonix.io'),
 
             // Computed
