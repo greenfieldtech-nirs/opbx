@@ -40,7 +40,8 @@ class DialerWorkerController extends Controller
 
         // Bypass organization scope for worker API
         $campaigns = OrganizationScope::bypass(function () {
-            return AutoDialerCampaign::where('status', CampaignStatus::ACTIVE)
+            return AutoDialerCampaign::with('organization.cloudonixSettings')
+                ->where('status', CampaignStatus::ACTIVE)
                 ->whereDate('start_date', '<=', now())
                 ->whereDate('end_date', '>=', now())
                 ->get()

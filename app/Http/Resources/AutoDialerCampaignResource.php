@@ -70,6 +70,11 @@ class AutoDialerCampaignResource extends JsonResource
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
 
+            // Cloudonix credentials from organization settings
+            'cloudonix_api_key' => $this->organization->cloudonixSettings?->domain_api_key,
+            'cloudonix_domain' => $this->organization->cloudonixSettings?->domain_name ?? $this->organization->cloudonixSettings?->domain_uuid,
+            'cloudonix_api_url' => config('services.cloudonix.api_url', 'https://api.cloudonix.io'),
+
             // Computed
             'is_runnable' => $this->isRunnable(),
             'has_list' => $this->hasList(),
