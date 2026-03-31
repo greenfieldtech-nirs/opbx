@@ -106,6 +106,21 @@ func (c *Client) MakeOutboundCall(ctx context.Context, req *OutboundCallRequest)
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	// Log the full request for debugging
+	log.Info().
+		Str("url", url).
+		Str("method", "POST").
+		Str("payload", string(body)).
+		Str("routing_type", req.RoutingDestinationType).
+		Str("has_cxml", fmt.Sprintf("%t", req.RoutingCXML != "")).
+		Str("cxml_preview", func() string {
+			if req.RoutingCXML != "" && len(req.RoutingCXML) > 100 {
+				return req.RoutingCXML[:100] + "..."
+			}
+			return req.RoutingCXML
+		}()).
+		Msg("Cloudonix API request payload")
+
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
