@@ -95,10 +95,6 @@ func main() {
 	concurrencyManager := concurrency.NewManager(redisClient)
 
 	// Initialize executor
-	execCfg := executor.Config{
-		MaxConcurrentGlobal: cfg.MaxConcurrentCalls,
-		DefaultCallTimeout:  cfg.DefaultCallTimeout,
-	}
 	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, concurrencyManager, cfg.WorkerID)
 
 	// Initialize CDR consumer

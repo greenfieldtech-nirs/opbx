@@ -54,12 +54,6 @@ type CallContext struct {
 	CloudonixAPIKey string // API key for hangup (from campaign credentials)
 }
 
-// Config holds executor configuration.
-type Config struct {
-	MaxConcurrentGlobal int
-	DefaultCallTimeout  int
-}
-
 // NewExecutor creates a new call executor.
 //
 // Parameters:
