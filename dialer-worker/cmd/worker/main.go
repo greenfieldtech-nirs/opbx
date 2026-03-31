@@ -12,8 +12,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/api"
+	"github.com/nirsolutions/opbx-dialer-worker/internal/cdr"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/circuitbreaker"
+	"github.com/nirsolutions/opbx-dialer-worker/internal/concurrency"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/config"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/executor"
 	"github.com/nirsolutions/opbx-dialer-worker/internal/metrics"
@@ -75,13 +78,42 @@ func main() {
 		return nil
 	})
 
+	// Initialize Redis client
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
+
+	// Test Redis connection
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		log.Fatal().Err(err).Str("addr", cfg.RedisAddr).Msg("Failed to connect to Redis")
+	}
+	log.Info().Str("addr", cfg.RedisAddr).Msg("Connected to Redis")
+
+	// Initialize concurrency manager
+	concurrencyManager := concurrency.NewManager(redisClient)
+
 	// Initialize executor
 	execCfg := executor.Config{
 		MaxConcurrentGlobal: cfg.MaxConcurrentCalls,
 		DefaultCallTimeout:  cfg.DefaultCallTimeout,
-		RateLimitPerSecond:  10, // Configurable
 	}
-	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, execCfg, cfg.WorkerID)
+	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, concurrencyManager, cfg.WorkerID)
+
+	// Initialize CDR consumer
+	cdrConsumer := cdr.NewConsumer(redisClient, concurrencyManager, func(ctx context.Context, event cdr.Event) error {
+		// Custom CDR handler - update executor state
+		exec.HandleCDR(ctx, event.CampaignID, event.SessionToken, event.Disposition)
+		return nil
+	})
+
+	// Start CDR consumer
+	go func() {
+		if err := cdrConsumer.Start(ctx); err != nil {
+			log.Error().Err(err).Msg("CDR consumer error")
+		}
+	}()
 
 	// Update retry queue handler to use executor
 	retryQueue = retry.NewQueue(retryCfg, func(destinationID int64) error {

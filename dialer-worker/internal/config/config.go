@@ -19,6 +19,11 @@ type Config struct {
 	LaravelAPIURL   string
 	LaravelAPIToken string
 
+	// Redis
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
+
 	// Worker settings
 	MaxConcurrentCalls int
 	DefaultCallTimeout int
@@ -37,6 +42,9 @@ func Load() (*Config, error) {
 		WorkerAPIPort:                getEnvInt("WORKER_API_PORT", 8080),
 		LaravelAPIURL:                getEnv("LARAVEL_API_URL", "http://localhost:8000"),
 		LaravelAPIToken:              getEnv("LARAVEL_API_TOKEN", ""),
+		RedisAddr:                    getEnv("REDIS_ADDR", "redis:6379"),
+		RedisPassword:                getEnv("REDIS_PASSWORD", ""),
+		RedisDB:                      getEnvInt("REDIS_DB", 0),
 		MaxConcurrentCalls:           getEnvInt("MAX_CONCURRENT_CALLS_GLOBAL", 10),
 		DefaultCallTimeout:           getEnvInt("DEFAULT_CALL_TIMEOUT", 30),
 		StateDir:                     getEnv("STATE_DIR", "/app/state"),
