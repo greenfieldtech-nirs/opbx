@@ -73,6 +73,8 @@ class AutoDialerCampaign extends Model
         'completed_calls',
         'failed_calls',
         'pending_calls',
+        'pause_reason',      // Reason for pause: cloudonix_rate_limit, manual, etc.
+        'resume_at',         // When rate-limited campaign can resume
     ];
 
     /**
@@ -95,6 +97,7 @@ class AutoDialerCampaign extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'concurrent_active_calls' => 'integer',
+        'resume_at' => 'datetime',
     ];
 
     /**

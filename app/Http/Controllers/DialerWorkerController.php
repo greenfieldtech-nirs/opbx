@@ -507,9 +507,11 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        OrganizationScope::bypass(function () use ($campaignModel) {
+        OrganizationScope::bypass(function () use ($campaignModel, $validated) {
             $campaignModel->update([
                 'status' => CampaignStatus::PAUSED,
+                'pause_reason' => $validated['reason'],
+                'resume_at' => $validated['resume_at'] ?? null,
             ]);
         });
 

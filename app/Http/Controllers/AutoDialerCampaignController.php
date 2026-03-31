@@ -512,8 +512,9 @@ class AutoDialerCampaignController extends Controller
                 'rate_limit_status' => [
                     'is_rate_limited' => $campaign->status === CampaignStatus::PAUSED &&
                                          $campaign->pause_reason === 'cloudonix_rate_limit',
-                    'rate_limited_at' => null,
-                    'resumes_at' => null,
+                    'pause_reason' => $campaign->pause_reason,
+                    'resumes_at' => $campaign->resume_at?->toIso8601String(),
+                    'can_resume_now' => $campaign->resume_at ? now()->gte($campaign->resume_at) : true,
                 ],
             ],
         ]);
