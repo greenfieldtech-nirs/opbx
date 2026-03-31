@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
+use App\Enums\RoutingDestinationType;
 use App\Http\Resources\AutoDialerCampaignResource;
 use App\Http\Resources\ListDestinationResource;
 use App\Models\AutoDialerCallSession;
