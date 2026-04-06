@@ -19,6 +19,8 @@ import {
   RefreshCw,
   List,
   FileSpreadsheet,
+  Pencil,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -188,6 +190,15 @@ export default function AutoDialerCampaignDetail() {
 
         {canManageCampaigns && (
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              disabled={campaign.status === 'active'}
+              onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}
+              title={campaign.status === 'active' ? 'Pause the campaign to edit' : undefined}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
             {campaign.status === 'draft' && (
               <Button onClick={() => handleAction('start')}>
                 <Play className="h-4 w-4 mr-2" />
@@ -215,7 +226,7 @@ export default function AutoDialerCampaignDetail() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Destinations</CardTitle>
@@ -255,32 +266,17 @@ export default function AutoDialerCampaignDetail() {
             <div className="text-2xl font-bold text-yellow-600">{campaign.statistics.pending_calls}</div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Progress Bar */}
-      {campaign.statistics.total_destinations > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Progress</CardTitle>
-            <CardDescription>
-              {campaign.statistics.progress_percentage}% complete
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Progress</CardTitle>
+            <TrendingUp className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="w-full bg-gray-200 rounded-full h-4">
-              <div
-                className="bg-blue-600 h-4 rounded-full transition-all"
-                style={{ width: `${campaign.statistics.progress_percentage}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-sm mt-2 text-muted-foreground">
-              <span>{campaign.statistics.completed_calls} completed</span>
-              <span>{campaign.statistics.failed_calls} failed</span>
-              <span>{campaign.statistics.pending_calls} pending</span>
-            </div>
+            <div className="text-2xl font-bold text-blue-600">{campaign.statistics.progress_percentage}%</div>
           </CardContent>
         </Card>
-      )}
+      </div>
 
       {/* Settings Tab - Full Campaign Details */}
       <Card>
@@ -292,11 +288,7 @@ export default function AutoDialerCampaignDetail() {
             </CardTitle>
             <CardDescription>Full campaign configuration and details</CardDescription>
           </div>
-          {campaign.status === 'draft' && canManageCampaigns && (
-            <Button onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}>
-              Edit Campaign
-            </Button>
-          )}
+          {/* Edit button is in the page header */}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

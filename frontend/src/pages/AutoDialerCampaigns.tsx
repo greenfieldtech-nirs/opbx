@@ -132,10 +132,13 @@ export default function AutoDialerCampaigns() {
 
   // Status toggle mutation
   const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, newStatus }: { id: string; newStatus: string }) => {
+    mutationFn: ({ id, currentStatus, newStatus }: { id: string; currentStatus: string; newStatus: string }) => {
       switch (newStatus) {
         case 'active':
-          return autoDialerCampaignsApi.start(id);
+          // Use resume for paused→active, start for draft→active
+          return currentStatus === 'paused'
+            ? autoDialerCampaignsApi.resume(id)
+            : autoDialerCampaignsApi.start(id);
         case 'paused':
           return autoDialerCampaignsApi.pause(id);
         default:
@@ -184,6 +187,7 @@ export default function AutoDialerCampaigns() {
 
     toggleStatusMutation.mutate({
       id: campaign.id,
+      currentStatus: campaign.status,
       newStatus: config.nextStatus,
     });
   };
@@ -506,16 +510,21 @@ export default function AutoDialerCampaigns() {
                     );
                   }
                   
-                  // All other statuses can be edited
+                  // Active/paused campaigns: show Edit (disabled when active)
+                  const canEdit = campaign.status !== 'active';
                   return (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8 text-xs"
+                      disabled={!canEdit}
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
+                        if (canEdit) {
+                          navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
+                        }
                       }}
+                      title={!canEdit ? 'Pause the campaign to edit' : undefined}
                     >
                       <Edit className="h-3.5 w-3.5 mr-1" />
                       Edit
