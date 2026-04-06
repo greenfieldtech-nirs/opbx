@@ -17,8 +17,6 @@ import {
   RefreshCw,
   Pause,
   Play,
-  Archive,
-  MoreVertical,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -32,12 +30,10 @@ import {
   useMonitorSummary,
   useMonitorDetail,
   useRefreshMonitor,
-  monitorKeys,
 } from '@/hooks/useAutoDialerMonitor';
 import {
   usePauseCampaign,
   useResumeCampaign,
-  useArchiveCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,28 +46,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { MonitorCampaign, MonitorDetailResponse } from '@/services/autoDialerMonitorApi';
+import type { MonitorCampaign } from '@/services/autoDialerMonitorApi';
 
 // Constants
 const REFRESH_INTERVAL_KEY = 'monitor-refresh-interval';
@@ -119,19 +99,6 @@ function formatETA(minutes: number): string {
   return `${mins}m`;
 }
 
-function getWorkerHealthColor(status: string): string {
-  switch (status) {
-    case 'healthy':
-      return 'bg-green-500';
-    case 'degraded':
-      return 'bg-yellow-500';
-    case 'offline':
-      return 'bg-red-500';
-    default:
-      return 'bg-gray-400';
-  }
-}
-
 function getWorkerHealthBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'healthy':
@@ -162,26 +129,15 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destr
   }
 }
 
-function getStatusColorClass(status: string): string {
-  switch (status) {
-    case 'active':
-      return 'bg-green-500';
-    case 'paused':
-      return 'bg-yellow-500';
-    default:
-      return 'bg-gray-400';
-  }
-}
-
 // Disposition colors
 const DISPOSITION_COLORS: Record<string, string> = {
-  answered: 'bg-green-500',
-  completed: 'bg-blue-500',
-  busy: 'bg-yellow-500',
-  no_answer: 'bg-orange-500',
-  failed: 'bg-red-500',
-  cancelled: 'bg-gray-400',
-  congestion: 'bg-purple-500',
+  answered: '#22c55e',
+  completed: '#3b82f6',
+  busy: '#eab308',
+  no_answer: '#f97316',
+  failed: '#ef4444',
+  cancelled: '#9ca3af',
+  congestion: '#a855f7',
 };
 
 const DISPOSITION_LABELS: Record<string, string> = {
@@ -193,6 +149,100 @@ const DISPOSITION_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
   congestion: 'Congestion',
 };
+
+// Pie Chart component
+function PieChart({
+  data,
+  size = 200,
+}: {
+  data: { key: string; value: number; color: string; label: string }[];
+  size?: number;
+}) {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center" style={{ width: size, height: size }}>
+        <span className="text-sm text-muted-foreground">No data</span>
+      </div>
+    );
+  }
+
+  const radius = size / 2 - 10;
+  const center = size / 2;
+  let currentAngle = -Math.PI / 2; // Start at top
+
+  const slices = data
+    .filter((d) => d.value > 0)
+    .map((d) => {
+      const angle = (d.value / total) * 2 * Math.PI;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + angle;
+      currentAngle = endAngle;
+
+      const x1 = center + radius * Math.cos(startAngle);
+      const y1 = center + radius * Math.sin(startAngle);
+      const x2 = center + radius * Math.cos(endAngle);
+      const y2 = center + radius * Math.sin(endAngle);
+      const largeArc = angle > Math.PI ? 1 : 0;
+
+      const path = [
+        `M ${center} ${center}`,
+        `L ${x1} ${y1}`,
+        `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+        'Z',
+      ].join(' ');
+
+      // Label position at midpoint of arc
+      const midAngle = startAngle + angle / 2;
+      const labelRadius = radius * 0.65;
+      const labelX = center + labelRadius * Math.cos(midAngle);
+      const labelY = center + labelRadius * Math.sin(midAngle);
+      const percentage = Math.round((d.value / total) * 100);
+
+      return { ...d, path, labelX, labelY, percentage };
+    });
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg width={size} height={size}>
+        {slices.map((slice) => (
+          <g key={slice.key}>
+            <path
+              d={slice.path}
+              fill={slice.color}
+              stroke="white"
+              strokeWidth={2}
+              className="transition-opacity hover:opacity-80"
+            />
+            {slice.percentage >= 8 && (
+              <text
+                x={slice.labelX}
+                y={slice.labelY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-xs font-medium fill-white pointer-events-none"
+              >
+                {slice.percentage}%
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        {slices.map((slice) => (
+          <div key={slice.key} className="flex items-center gap-1.5 text-xs">
+            <div
+              className="h-2.5 w-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: slice.color }}
+            />
+            <span>{slice.label}</span>
+            <span className="text-muted-foreground font-medium">{slice.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Sparkline component
 function Sparkline({ data, width = 300, height = 80 }: { data: ActivityPoint[]; width?: number; height?: number }) {
@@ -218,12 +268,10 @@ function Sparkline({ data, width = 300, height = 80 }: { data: ActivityPoint[]; 
     return `${x},${y}`;
   });
 
-  // Y-axis labels
   const yLabels = [maxValue, (maxValue + minValue) / 2, minValue];
 
   return (
     <svg width={width} height={height} className="overflow-visible">
-      {/* Grid lines */}
       {[0, 0.5, 1].map((ratio, i) => {
         const y = padding.top + chartHeight * ratio;
         return (
@@ -239,127 +287,110 @@ function Sparkline({ data, width = 300, height = 80 }: { data: ActivityPoint[]; 
           />
         );
       })}
-
-      {/* Y-axis labels */}
       {yLabels.map((value, i) => {
         const y = padding.top + chartHeight * (1 - i / 2);
         return (
-          <text
-            key={i}
-            x={padding.left - 8}
-            y={y + 4}
-            textAnchor="end"
-            className="text-xs fill-muted-foreground"
-          >
+          <text key={i} x={padding.left - 8} y={y + 4} textAnchor="end" className="text-xs fill-muted-foreground">
             {Math.round(value)}
           </text>
         );
       })}
-
-      {/* X-axis labels */}
-      <text
-        x={padding.left}
-        y={height - 5}
-        textAnchor="middle"
-        className="text-xs fill-muted-foreground"
-      >
+      <text x={padding.left} y={height - 5} textAnchor="middle" className="text-xs fill-muted-foreground">
         -30m
       </text>
-      <text
-        x={width - padding.right}
-        y={height - 5}
-        textAnchor="middle"
-        className="text-xs fill-muted-foreground"
-      >
+      <text x={width - padding.right} y={height - 5} textAnchor="middle" className="text-xs fill-muted-foreground">
         Now
       </text>
-
-      {/* Area under the line */}
       <polygon
         points={`${points[0]} ${points.join(' ')} ${points[points.length - 1]} ${padding.left + chartWidth},${padding.top + chartHeight} ${padding.left},${padding.top + chartHeight}`}
         fill="currentColor"
         fillOpacity={0.1}
       />
-
-      {/* The line */}
-      <polyline
-        points={points.join(' ')}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Data points */}
+      <polyline points={points.join(' ')} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
       {points.map((point, i) => {
         const [x, y] = point.split(',').map(Number);
-        return (
-          <circle
-            key={i}
-            cx={x}
-            cy={y}
-            r={3}
-            fill="currentColor"
-            className="text-primary"
-          />
-        );
+        return <circle key={i} cx={x} cy={y} r={3} fill="currentColor" className="text-primary" />;
       })}
     </svg>
   );
 }
 
-// Confirmation Dialog Component
-interface ConfirmDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  confirmVariant?: 'default' | 'destructive';
-  onConfirm: () => void;
-  isLoading?: boolean;
+// Refresh interval selector with label (shared between views)
+function RefreshSelector({
+  refreshInterval,
+  onIntervalChange,
+  onManualRefresh,
+}: {
+  refreshInterval: number;
+  onIntervalChange: (value: string) => void;
+  onManualRefresh: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {refreshInterval === 0 && (
+        <Button variant="outline" size="default" onClick={onManualRefresh}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      )}
+      <span className="text-sm text-muted-foreground whitespace-nowrap">Refresh every:</span>
+      <Select value={refreshInterval.toString()} onValueChange={onIntervalChange}>
+        <SelectTrigger className="w-[100px] h-9">
+          <SelectValue placeholder="Interval" />
+        </SelectTrigger>
+        <SelectContent>
+          {REFRESH_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 }
 
-function ConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmLabel,
-  confirmVariant = 'default',
-  onConfirm,
+// Pause/Resume button (shared between views)
+function CampaignActionButton({
+  campaign,
+  onPause,
+  onResume,
   isLoading,
-}: ConfirmDialogProps) {
+}: {
+  campaign: MonitorCampaign;
+  onPause: (c: MonitorCampaign) => void;
+  onResume: (c: MonitorCampaign) => void;
+  isLoading: boolean;
+}) {
+  if (campaign.status === 'active') {
+    return (
+      <Button
+        size="default"
+        className="bg-red-600 hover:bg-red-700 text-white h-9"
+        disabled={isLoading}
+        onClick={(e) => {
+          e.stopPropagation();
+          onPause(campaign);
+        }}
+      >
+        {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Pause className="h-4 w-4 mr-2" />}
+        Pause
+      </Button>
+    );
+  }
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            {title}
-          </AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(e) => {
-              e.preventDefault();
-              onConfirm();
-            }}
-            disabled={isLoading}
-            className={cn(
-              confirmVariant === 'destructive' &&
-                'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-            )}
-          >
-            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {confirmLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Button
+      size="default"
+      className="bg-green-600 hover:bg-green-700 text-white h-9"
+      disabled={isLoading}
+      onClick={(e) => {
+        e.stopPropagation();
+        onResume(campaign);
+      }}
+    >
+      {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+      Resume
+    </Button>
   );
 }
 
@@ -378,13 +409,6 @@ export default function AutoDialerMonitor() {
   const [previousSnapshot, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
   const [callsPerMinute, setCallsPerMinute] = useState<Map<number, number | null>>(new Map());
 
-  // Dialog state
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    type: 'pause' | 'resume' | 'archive' | null;
-    campaign: MonitorCampaign | null;
-  }>({ open: false, type: null, campaign: null });
-
   // Queries
   const summaryQuery = useMonitorSummary(refreshInterval > 0 ? refreshInterval : false);
   const detailQuery = useMonitorDetail(
@@ -395,7 +419,6 @@ export default function AutoDialerMonitor() {
   // Mutations
   const pauseMutation = usePauseCampaign();
   const resumeMutation = useResumeCampaign();
-  const archiveMutation = useArchiveCampaign();
 
   // Persist refresh interval
   useEffect(() => {
@@ -432,18 +455,14 @@ export default function AutoDialerMonitor() {
       return newMap;
     });
 
-    // Update activity history
     setActivityHistory((history) => {
       const newHistory = new Map(history);
       const existing = newHistory.get(selectedCampaignId) || [];
       const newPoint: ActivityPoint = { timestamp: now, value: totalCalls };
-
-      // Add new point and trim to max
       const updated = [...existing, newPoint];
       if (updated.length > MAX_ACTIVITY_POINTS) {
         updated.shift();
       }
-
       newHistory.set(selectedCampaignId, updated);
       return newHistory;
     });
@@ -471,44 +490,26 @@ export default function AutoDialerMonitor() {
     setSelectedCampaignId(null);
   }, []);
 
-  const openConfirmDialog = useCallback((type: 'pause' | 'resume' | 'archive', campaign: MonitorCampaign) => {
-    setConfirmDialog({ open: true, type, campaign });
-  }, []);
-
-  const closeConfirmDialog = useCallback(() => {
-    setConfirmDialog({ open: false, type: null, campaign: null });
-  }, []);
-
-  const handleConfirmAction = useCallback(async () => {
-    if (!confirmDialog.campaign || !confirmDialog.type) return;
-
-    const campaignId = confirmDialog.campaign.id.toString();
-    const campaignName = confirmDialog.campaign.name;
-
+  // Direct action handlers (no confirmation dialog)
+  const handlePause = useCallback(async (campaign: MonitorCampaign) => {
     try {
-      switch (confirmDialog.type) {
-        case 'pause':
-          await pauseMutation.mutateAsync(campaignId);
-          toast.success(`Campaign "${campaignName}" paused`);
-          break;
-        case 'resume':
-          await resumeMutation.mutateAsync(campaignId);
-          toast.success(`Campaign "${campaignName}" resumed`);
-          break;
-        case 'archive':
-          await archiveMutation.mutateAsync(campaignId);
-          toast.success(`Campaign "${campaignName}" archived`);
-          // Return to overview if archived from detail view
-          if (selectedCampaignId === confirmDialog.campaign.id) {
-            setSelectedCampaignId(null);
-          }
-          break;
-      }
-      closeConfirmDialog();
-    } catch (error) {
-      toast.error(`Failed to ${confirmDialog.type} campaign`);
+      await pauseMutation.mutateAsync(campaign.id.toString());
+      toast.success(`Campaign "${campaign.name}" paused`);
+    } catch {
+      toast.error('Failed to pause campaign');
     }
-  }, [confirmDialog, pauseMutation, resumeMutation, archiveMutation, selectedCampaignId, closeConfirmDialog]);
+  }, [pauseMutation]);
+
+  const handleResume = useCallback(async (campaign: MonitorCampaign) => {
+    try {
+      await resumeMutation.mutateAsync(campaign.id.toString());
+      toast.success(`Campaign "${campaign.name}" resumed`);
+    } catch {
+      toast.error('Failed to resume campaign');
+    }
+  }, [resumeMutation]);
+
+  const isActionLoading = pauseMutation.isPending || resumeMutation.isPending;
 
   // Computed values
   const selectedCampaign = useMemo(() => {
@@ -595,34 +596,15 @@ export default function AutoDialerMonitor() {
               </h1>
               <p className="text-muted-foreground mt-1">Auto Dialer Campaign Command Center</p>
             </div>
-            <div className="flex items-center gap-2">
-              {refreshInterval === 0 && (
-                <Button variant="outline" size="sm" onClick={handleManualRefresh}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-              )}
-              <Select
-                value={refreshInterval.toString()}
-                onValueChange={handleRefreshIntervalChange}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Refresh interval" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REFRESH_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <RefreshSelector
+              refreshInterval={refreshInterval}
+              onIntervalChange={handleRefreshIntervalChange}
+              onManualRefresh={handleManualRefresh}
+            />
           </div>
 
           {/* Global Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Active Campaigns */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -636,8 +618,6 @@ export default function AutoDialerMonitor() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Total Active Calls */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -651,8 +631,6 @@ export default function AutoDialerMonitor() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* CAC Utilization */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -668,8 +646,6 @@ export default function AutoDialerMonitor() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Worker Health */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -724,62 +700,43 @@ export default function AutoDialerMonitor() {
                       className="grid grid-cols-1 md:grid-cols-12 gap-4 py-4 border-b last:border-0 items-center hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer transition-colors"
                       onClick={() => handleCampaignClick(campaign)}
                     >
-                      {/* Name */}
                       <div className="md:col-span-3">
                         <p className="font-medium text-primary hover:underline">{campaign.name}</p>
                         <p className="text-xs text-muted-foreground">{campaign.routing_destination_label}</p>
                       </div>
-
-                      {/* Status */}
                       <div className="md:col-span-1">
                         <Badge variant={getStatusBadgeVariant(campaign.status)} className="capitalize">
                           {campaign.status}
                         </Badge>
                       </div>
-
-                      {/* Progress */}
                       <div className="md:col-span-2">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all"
-                              style={{ width: `${campaign.progress_percentage}%` }}
-                            />
+                            <div className="h-full bg-primary transition-all" style={{ width: `${campaign.progress_percentage}%` }} />
                           </div>
                           <span className="text-xs font-medium w-10">{campaign.progress_percentage}%</span>
                         </div>
                       </div>
-
-                      {/* Active Calls */}
                       <div className="md:col-span-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm">
-                            {campaign.active_calls}/{campaign.concurrent_active_calls}
-                          </span>
+                          <span className="text-sm">{campaign.active_calls}/{campaign.concurrent_active_calls}</span>
                           <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden max-w-16">
                             <div
                               className={cn(
                                 'h-full transition-all',
-                                campaign.cac_utilization > 80
-                                  ? 'bg-red-500'
-                                  : campaign.cac_utilization > 50
-                                  ? 'bg-yellow-500'
-                                  : 'bg-green-500'
+                                campaign.cac_utilization > 80 ? 'bg-red-500' : campaign.cac_utilization > 50 ? 'bg-yellow-500' : 'bg-green-500'
                               )}
                               style={{ width: `${campaign.cac_utilization}%` }}
                             />
                           </div>
                         </div>
                       </div>
-
-                      {/* Stats */}
                       <div className="md:col-span-2">
                         <div className="flex items-center gap-3 text-xs">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="flex items-center gap-1 text-green-600">
-                                <CheckCircle className="h-3 w-3" />
-                                {campaign.completed_calls}
+                                <CheckCircle className="h-3 w-3" />{campaign.completed_calls}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>Completed</TooltipContent>
@@ -787,8 +744,7 @@ export default function AutoDialerMonitor() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="flex items-center gap-1 text-red-600">
-                                <XCircle className="h-3 w-3" />
-                                {campaign.failed_calls}
+                                <XCircle className="h-3 w-3" />{campaign.failed_calls}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>Failed</TooltipContent>
@@ -796,29 +752,19 @@ export default function AutoDialerMonitor() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="flex items-center gap-1 text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                {campaign.pending_calls}
+                                <Clock className="h-3 w-3" />{campaign.pending_calls}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>Pending</TooltipContent>
                           </Tooltip>
                         </div>
                       </div>
-
-                      {/* Rate Limit */}
                       <div className="md:col-span-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex items-center gap-1.5">
-                              <div
-                                className={cn(
-                                  'h-2.5 w-2.5 rounded-full',
-                                  campaign.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500'
-                                )}
-                              />
-                              <span className="text-xs">
-                                {campaign.rate_limit_status.is_rate_limited ? 'Limited' : 'OK'}
-                              </span>
+                              <div className={cn('h-2.5 w-2.5 rounded-full', campaign.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
+                              <span className="text-xs">{campaign.rate_limit_status.is_rate_limited ? 'Limited' : 'OK'}</span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -830,36 +776,13 @@ export default function AutoDialerMonitor() {
                           </TooltipContent>
                         </Tooltip>
                       </div>
-
-                      {/* Actions */}
                       <div className="md:col-span-1">
-                        {campaign.status === 'active' ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openConfirmDialog('pause', campaign);
-                            }}
-                          >
-                            <Pause className="h-3.5 w-3.5 mr-1" />
-                            Pause
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openConfirmDialog('resume', campaign);
-                            }}
-                          >
-                            <Play className="h-3.5 w-3.5 mr-1" />
-                            Resume
-                          </Button>
-                        )}
+                        <CampaignActionButton
+                          campaign={campaign}
+                          onPause={handlePause}
+                          onResume={handleResume}
+                          isLoading={isActionLoading}
+                        />
                       </div>
                     </div>
                   ))}
@@ -867,32 +790,6 @@ export default function AutoDialerMonitor() {
               )}
             </CardContent>
           </Card>
-
-          {/* Confirmation Dialog */}
-          <ConfirmDialog
-            open={confirmDialog.open}
-            onOpenChange={(open) => !open && closeConfirmDialog()}
-            title={
-              confirmDialog.type === 'pause'
-                ? `Pause Campaign`
-                : confirmDialog.type === 'resume'
-                ? `Resume Campaign`
-                : `Archive Campaign`
-            }
-            description={
-              confirmDialog.type === 'pause'
-                ? `Pause campaign "${confirmDialog.campaign?.name}"? Active calls will continue but no new calls will be initiated.`
-                : confirmDialog.type === 'resume'
-                ? `Resume campaign "${confirmDialog.campaign?.name}"? The dialer will begin initiating new calls.`
-                : `Archive campaign "${confirmDialog.campaign?.name}"? This action cannot be undone.`
-            }
-            confirmLabel={
-              confirmDialog.type === 'pause' ? 'Pause' : confirmDialog.type === 'resume' ? 'Resume' : 'Archive'
-            }
-            confirmVariant={confirmDialog.type === 'archive' ? 'destructive' : 'default'}
-            onConfirm={handleConfirmAction}
-            isLoading={pauseMutation.isPending || resumeMutation.isPending || archiveMutation.isPending}
-          />
         </div>
       </TooltipProvider>
     );
@@ -920,68 +817,23 @@ export default function AutoDialerMonitor() {
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
-                {selectedCampaign?.routing_destination_label}
-              </p>
+              <p className="text-sm text-muted-foreground">{selectedCampaign?.routing_destination_label}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {refreshInterval === 0 && (
-              <Button variant="outline" size="sm" onClick={handleManualRefresh}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+            <RefreshSelector
+              refreshInterval={refreshInterval}
+              onIntervalChange={handleRefreshIntervalChange}
+              onManualRefresh={handleManualRefresh}
+            />
+            {selectedCampaign && (
+              <CampaignActionButton
+                campaign={selectedCampaign}
+                onPause={handlePause}
+                onResume={handleResume}
+                isLoading={isActionLoading}
+              />
             )}
-            <Select
-              value={refreshInterval.toString()}
-              onValueChange={handleRefreshIntervalChange}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Refresh interval" />
-              </SelectTrigger>
-              <SelectContent>
-                {REFRESH_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedCampaign?.status === 'active' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openConfirmDialog('pause', selectedCampaign)}
-              >
-                <Pause className="h-4 w-4 mr-2" />
-                Pause
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openConfirmDialog('resume', selectedCampaign)}
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Resume
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => selectedCampaign && openConfirmDialog('archive', selectedCampaign)}
-                >
-                  <Archive className="h-4 w-4 mr-2" />
-                  Archive
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
@@ -997,215 +849,7 @@ export default function AutoDialerMonitor() {
           </div>
         ) : (
           <>
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Active Calls */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Active Calls</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {detail.campaign.active_calls} / {detail.campaign.concurrent_active_calls}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {Math.round((detail.campaign.active_calls / Math.max(detail.campaign.concurrent_active_calls, 1)) * 100)}% of capacity
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                      <PhoneCall className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* CAC Utilization */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">CAC Utilization</p>
-                      <p className={cn('text-2xl font-bold mt-1', getUtilizationColor(detail.campaign.cac_utilization))}>
-                        {detail.campaign.cac_utilization}%
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {detail.campaign.cac_utilization < 50
-                          ? 'Healthy'
-                          : detail.campaign.cac_utilization < 80
-                          ? 'Moderate'
-                          : 'High'}
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                      <BarChart3 className="h-6 w-6 text-purple-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Calls per Minute */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Calls per Minute</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {currentCPM !== null && currentCPM !== undefined ? currentCPM.toFixed(1) : '—'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {currentCPM !== null && currentCPM !== undefined ? 'Current rate' : 'Collecting data...'}
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Answer Rate */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Answer Rate</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {detail.statistics.completed_calls + detail.statistics.failed_calls > 0
-                          ? `${Math.round(
-                              (detail.statistics.completed_calls /
-                                Math.max(detail.statistics.completed_calls + detail.statistics.failed_calls, 1)) *
-                                100
-                            )}%`
-                          : '—'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Completed / Total attempts
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                      <CheckCircle className="h-6 w-6 text-yellow-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Avg Call Duration */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Avg Call Duration</p>
-                      <p className="text-2xl font-bold mt-1">
-                        {formatDuration(detail.statistics.avg_duration_seconds)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Avg billsec: {formatDuration(detail.statistics.avg_billsec_seconds)}
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Rate Limit */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Rate Limit</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div
-                          className={cn(
-                            'h-3 w-3 rounded-full',
-                            detail.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500'
-                          )}
-                        />
-                        <p className="text-2xl font-bold">
-                          {detail.rate_limit_status.is_rate_limited ? 'Throttled' : 'OK'}
-                        </p>
-                      </div>
-                      {detail.rate_limit_status.resumes_at && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Resumes at {new Date(detail.rate_limit_status.resumes_at).toLocaleTimeString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-                      <Activity className="h-6 w-6 text-red-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Disposition Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Disposition Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {(() => {
-                  const dispositions = detail.dispositions;
-                  const total = Object.values(dispositions).reduce((a, b) => a + b, 0);
-
-                  if (total === 0) {
-                    return (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No disposition data available yet
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="space-y-3">
-                      {Object.entries(dispositions)
-                        .filter(([, count]) => count > 0)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([key, count]) => {
-                          const percentage = (count / total) * 100;
-                          return (
-                            <div key={key} className="flex items-center gap-3">
-                              <div className="w-24 text-sm">{DISPOSITION_LABELS[key] || key}</div>
-                              <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                  className={cn('h-full transition-all', DISPOSITION_COLORS[key] || 'bg-gray-400')}
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                              <div className="w-20 text-right text-sm">
-                                <span className="font-medium">{count}</span>
-                                <span className="text-muted-foreground ml-1">({Math.round(percentage)}%)</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-
-            {/* Rolling Activity Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Rolling Activity (30 min)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-primary">
-                  <Sparkline data={currentActivity} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  Chart data accumulates while this page is open
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Progress & ETA */}
+            {/* Campaign Progress — at the top */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Campaign Progress</CardTitle>
@@ -1217,10 +861,7 @@ export default function AutoDialerMonitor() {
                     <span className="font-medium">{detail.statistics.progress_percentage}%</span>
                   </div>
                   <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${detail.statistics.progress_percentage}%` }}
-                    />
+                    <div className="h-full bg-primary transition-all" style={{ width: `${detail.statistics.progress_percentage}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-4">
@@ -1247,34 +888,177 @@ export default function AutoDialerMonitor() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Active Calls</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {detail.campaign.active_calls} / {detail.campaign.concurrent_active_calls}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {Math.round((detail.campaign.active_calls / Math.max(detail.campaign.concurrent_active_calls, 1)) * 100)}% of capacity
+                      </p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                      <PhoneCall className="h-6 w-6 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">CAC Utilization</p>
+                      <p className={cn('text-2xl font-bold mt-1', getUtilizationColor(detail.campaign.cac_utilization))}>
+                        {detail.campaign.cac_utilization}%
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {detail.campaign.cac_utilization < 50 ? 'Healthy' : detail.campaign.cac_utilization < 80 ? 'Moderate' : 'High'}
+                      </p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                      <BarChart3 className="h-6 w-6 text-purple-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Calls per Minute</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {currentCPM !== null && currentCPM !== undefined ? currentCPM.toFixed(1) : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {currentCPM !== null && currentCPM !== undefined ? 'Current rate' : 'Collecting data...'}
+                      </p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Answer Rate</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {detail.statistics.completed_calls + detail.statistics.failed_calls > 0
+                          ? `${Math.round(
+                              (detail.statistics.completed_calls /
+                                Math.max(detail.statistics.completed_calls + detail.statistics.failed_calls, 1)) *
+                                100
+                            )}%`
+                          : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Completed / Total attempts</p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <CheckCircle className="h-6 w-6 text-yellow-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Avg Call Duration</p>
+                      <p className="text-2xl font-bold mt-1">{formatDuration(detail.statistics.avg_duration_seconds)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Avg billsec: {formatDuration(detail.statistics.avg_billsec_seconds)}</p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-orange-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Rate Limit</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className={cn('h-3 w-3 rounded-full', detail.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
+                        <p className="text-2xl font-bold">{detail.rate_limit_status.is_rate_limited ? 'Throttled' : 'OK'}</p>
+                      </div>
+                      {detail.rate_limit_status.resumes_at && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Resumes at {new Date(detail.rate_limit_status.resumes_at).toLocaleTimeString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                      <Activity className="h-6 w-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Rolling Activity + Disposition Pie Chart side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Rolling Activity Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Rolling Activity (30 min)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-primary">
+                    <Sparkline data={currentActivity} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-4">
+                    Chart data accumulates while this page is open
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Disposition Pie Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Disposition Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 flex items-center justify-center">
+                  {(() => {
+                    const dispositions = detail.dispositions;
+                    const total = Object.values(dispositions).reduce((a, b) => a + b, 0);
+
+                    if (total === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No disposition data available yet
+                        </div>
+                      );
+                    }
+
+                    const chartData = Object.entries(dispositions)
+                      .filter(([, count]) => count > 0)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([key, count]) => ({
+                        key,
+                        value: count,
+                        color: DISPOSITION_COLORS[key] || '#9ca3af',
+                        label: DISPOSITION_LABELS[key] || key,
+                      }));
+
+                    return <PieChart data={chartData} size={220} />;
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
           </>
         )}
-
-        {/* Confirmation Dialog */}
-        <ConfirmDialog
-          open={confirmDialog.open}
-          onOpenChange={(open) => !open && closeConfirmDialog()}
-          title={
-            confirmDialog.type === 'pause'
-              ? `Pause Campaign`
-              : confirmDialog.type === 'resume'
-              ? `Resume Campaign`
-              : `Archive Campaign`
-          }
-          description={
-            confirmDialog.type === 'pause'
-              ? `Pause campaign "${confirmDialog.campaign?.name}"? Active calls will continue but no new calls will be initiated.`
-              : confirmDialog.type === 'resume'
-              ? `Resume campaign "${confirmDialog.campaign?.name}"? The dialer will begin initiating new calls.`
-              : `Archive campaign "${confirmDialog.campaign?.name}"? This action cannot be undone.`
-          }
-          confirmLabel={
-            confirmDialog.type === 'pause' ? 'Pause' : confirmDialog.type === 'resume' ? 'Resume' : 'Archive'
-          }
-          confirmVariant={confirmDialog.type === 'archive' ? 'destructive' : 'default'}
-          onConfirm={handleConfirmAction}
-          isLoading={pauseMutation.isPending || resumeMutation.isPending || archiveMutation.isPending}
-        />
       </div>
     </TooltipProvider>
   );
