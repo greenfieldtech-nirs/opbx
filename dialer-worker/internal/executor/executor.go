@@ -1,498 +1,226 @@
-// Package executor handles the execution of outbound calls for campaigns.
-//
-// The executor is responsible for:
-//   - Managing campaign execution cycles
-//   - Enforcing CAC (Concurrent Active Calls) limits via Redis
-//   - Rate limiting API calls to Cloudonix (60/CAC seconds)
-//   - Handling CDR events to release concurrency slots
-//   - Managing retries for failed calls
 package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
+	"log/slog"
+	"strconv"
 	"time"
 
-	"github.com/nirsolutions/opbx-dialer-worker/internal/api"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/circuitbreaker"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/cloudonix"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/concurrency"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/metrics"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/retry"
-	"github.com/nirsolutions/opbx-dialer-worker/pkg/models"
-	"github.com/rs/zerolog/log"
+	"opbx/dialer-worker/internal/api"
+	"opbx/dialer-worker/internal/limiter"
+	"opbx/dialer-worker/internal/models"
+	"opbx/dialer-worker/internal/redis"
+	"opbx/dialer-worker/pkg/retry"
 )
 
-// Executor handles the execution of outbound calls for campaigns.
-// It coordinates with the concurrency manager to enforce CAC limits
-// and manages the lifecycle of call execution.
+// Executor handles the execution of dialer calls
 type Executor struct {
-	laravelClient      *api.Client
-	retryQueue         *retry.Queue
-	breaker            *circuitbreaker.Breaker
-	metrics            *metrics.Collector
-	concurrencyManager *concurrency.Manager
-	workerID           string
-
-	// Active call tracking (local cache)
-	activeCalls   map[string]*CallContext   // callID -> context
-	campaignCalls map[int64]map[string]bool // campaignID -> set of callIDs
-	mu            sync.RWMutex
+	apiClient   *api.Client
+	redisClient *redis.Client
+	limiter     *limiter.CACRateLimiter
+	retryMgr    *retry.Manager
+	workerID    string
+	logger      *slog.Logger
 }
 
-// CallContext holds context for an active call.
-// This is stored locally while the call is active.
-type CallContext struct {
-	CampaignID      int64
-	DestinationID   int64
-	SessionID       int64
-	CallID          string
-	StartedAt       time.Time
-	CloudonixDomain string // Domain for hangup (from campaign credentials)
-	CloudonixAPIKey string // API key for hangup (from campaign credentials)
-}
-
-// NewExecutor creates a new call executor.
-//
-// Parameters:
-//   - laravelClient: Client for Laravel API communication
-//   - retryQueue: Queue for managing retry attempts
-//   - breaker: Circuit breaker for handling errors
-//   - metrics: Metrics collector
-//   - concurrencyManager: Redis-backed concurrency manager
-//   - workerID: Unique identifier for this worker
-//
-// Returns a new Executor instance.
+// NewExecutor creates a new call executor
 func NewExecutor(
-	laravelClient *api.Client,
-	retryQueue *retry.Queue,
-	breaker *circuitbreaker.Breaker,
-	metrics *metrics.Collector,
-	concurrencyManager *concurrency.Manager,
+	apiClient *api.Client,
+	redisClient *redis.Client,
+	limiter *limiter.CACRateLimiter,
+	retryMgr *retry.Manager,
 	workerID string,
+	logger *slog.Logger,
 ) *Executor {
 	return &Executor{
-		laravelClient:      laravelClient,
-		retryQueue:         retryQueue,
-		breaker:            breaker,
-		metrics:            metrics,
-		concurrencyManager: concurrencyManager,
-		workerID:           workerID,
-		activeCalls:        make(map[string]*CallContext),
-		campaignCalls:      make(map[int64]map[string]bool),
+		apiClient:   apiClient,
+		redisClient: redisClient,
+		limiter:     limiter,
+		retryMgr:    retryMgr,
+		workerID:    workerID,
+		logger:      logger,
 	}
 }
 
-// createCloudonixClient creates a Cloudonix client for the given campaign.
-// Uses campaign-specific credentials from the Laravel backend.
-func (e *Executor) createCloudonixClient(campaign *models.Campaign) *cloudonix.Client {
-	apiURL := campaign.CloudonixAPIURL
-	if apiURL == "" {
-		apiURL = "https://api.cloudonix.io"
+// ExecuteCall executes a single call to a destination
+func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, destination *models.Destination) error {
+	logger := e.logger.With(
+		"campaign_id", campaign.ID,
+		"destination_id", destination.ID,
+		"phone", destination.PhoneNumber,
+	)
+
+	// Acquire distributed lock for destination
+	lockKey := fmt.Sprintf("dest:%d", destination.ID)
+	acquired, err := e.redisClient.AcquireLock(ctx, lockKey, 30*time.Second)
+	if err != nil {
+		logger.Error("failed to acquire lock", "error", err)
+		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
-	return cloudonix.NewClient(apiURL, campaign.CloudonixAPIKey, campaign.CloudonixDomain)
-}
-
-// ExecuteCampaign begins executing calls for a campaign.
-//
-// This method runs the campaign execution loop which:
-//   1. Fetches pending destinations
-//   2. Waits for CAC slots to become available
-//   3. Waits for the API rate limit interval (60/CAC seconds)
-//   4. Initiates calls via Cloudonix API
-//   5. Updates Redis concurrency state
-//
-// Parameters:
-//   - ctx: Context for the execution
-//   - campaign: The campaign to execute
-func (e *Executor) ExecuteCampaign(ctx context.Context, campaign *models.Campaign) {
-	log.Info().
-		Int64("campaign_id", campaign.ID).
-		Str("campaign_name", campaign.Name).
-		Int("cac", campaign.ConcurrentActiveCalls).
-		Float64("api_interval", campaign.GetApiIntervalSeconds()).
-		Msg("Starting campaign execution")
-
-	// Calculate API interval: 60 / CAC seconds
-	apiInterval := time.Duration(campaign.GetApiIntervalSeconds() * float64(time.Second))
-
-	// Execution loop
-	for {
-		// Check if context is cancelled
-		if ctx.Err() != nil {
-			log.Info().
-				Int64("campaign_id", campaign.ID).
-				Msg("Campaign execution stopped due to context cancellation")
-			return
-		}
-
-		// Check circuit breaker
-		if e.breaker.IsOpen() {
-			log.Warn().Msg("Circuit breaker is open, pausing campaign execution")
-			e.pauseCampaign(ctx, campaign.ID, "ai_agent_errors")
-			return
-		}
-
-		// Check if we can start a new call (CAC limit)
-		if !e.concurrencyManager.CanStartCall(ctx, campaign.ID, campaign.ConcurrentActiveCalls) {
-			activeCount, _ := e.concurrencyManager.GetActiveCount(ctx, campaign.ID)
-			log.Debug().
-				Int64("campaign_id", campaign.ID).
-				Int("active_calls", activeCount).
-				Int("cac_limit", campaign.ConcurrentActiveCalls).
-				Msg("At CAC limit, waiting for slot")
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		// Get pending destinations
-		destinations, err := e.laravelClient.GetPendingDestinations(ctx, campaign.ID, 1)
-		if err != nil {
-			log.Error().
-				Err(err).
-				Int64("campaign_id", campaign.ID).
-				Msg("Failed to fetch pending destinations")
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		if len(destinations) == 0 {
-			log.Debug().
-				Int64("campaign_id", campaign.ID).
-				Msg("No pending destinations, sleeping")
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		// Execute the call
-		e.executeCall(ctx, campaign, &destinations[0])
-
-		// Wait for API rate limit interval before next call
-		log.Debug().
-			Int64("campaign_id", campaign.ID).
-			Dur("interval", apiInterval).
-			Msg("Waiting for API rate limit interval")
-		time.Sleep(apiInterval)
+	if !acquired {
+		logger.Info("destination already locked, skipping")
+		return nil
 	}
-}
+	defer e.redisClient.ReleaseLock(ctx, lockKey)
 
-// executeCall initiates a single outbound call.
-//
-// This method:
-//   1. Creates a Laravel session
-//   2. Generates CXML for routing
-//   3. Calls Cloudonix API
-//   4. Updates Redis concurrency counter on success
-//   5. Handles HTTP 429 by pausing campaign immediately
-//
-// Parameters:
-//   - ctx: Context for the execution
-//   - campaign: The campaign
-//   - dest: The destination to call
-func (e *Executor) executeCall(ctx context.Context, campaign *models.Campaign, dest *models.Destination) {
-	log.Info().
-		Int64("campaign_id", campaign.ID).
-		Int64("destination_id", dest.ID).
-		Str("phone_number", dest.PhoneNumber).
-		Msg("Executing call")
+	// Check CAC availability
+	canDial, err := e.limiter.CanDial(ctx, campaign.ID)
+	if err != nil {
+		logger.Error("failed to check CAC", "error", err)
+		return err
+	}
+	if !canDial {
+		logger.Info("CAC limit reached, cannot dial")
+		return nil
+	}
 
-	// Initiate call session in Laravel
-	initReq := &models.InitiateCallRequest{
+	// Initiate call via Laravel API
+	logger.Info("initiating call")
+	resp, err := e.apiClient.InitiateCall(ctx, campaign.ID, destination.ID, destination.PhoneNumber, e.workerID)
+	if err != nil {
+		logger.Error("failed to initiate call", "error", err)
+		return e.handleInitiationFailure(ctx, campaign, destination, err)
+	}
+
+	// Increment active call count
+	activeCount, err := e.limiter.IncrementActive(ctx, campaign.ID)
+	if err != nil {
+		logger.Error("failed to increment active count", "error", err)
+	}
+
+	// Parse session ID from response
+	sessionID := resp.SessionID
+	callID := resp.CallID
+	logger.Info("call initiated", "session_id", sessionID, "call_id", callID, "active_calls", activeCount)
+
+	// Record call state in Redis with initial 60 second TTL
+	// TTL will be extended or removed based on session status updates
+	callState := &redis.CallState{
+		SessionID:     sessionID,
 		CampaignID:    campaign.ID,
-		DestinationID: dest.ID,
-		PhoneNumber:   dest.PhoneNumber,
-		WorkerID:      e.workerID,
-		InitiatedAt:   time.Now().UTC(),
+		DestinationID: destination.ID,
+		Status:        string(models.CallStatusInitiated),
+		StartedAt:     time.Now(),
+	}
+	if err := e.redisClient.SetCallState(ctx, strconv.FormatInt(sessionID, 10), callState, 60*time.Second); err != nil {
+		logger.Error("failed to store call state", "error", err)
 	}
 
-	initResp, err := e.laravelClient.InitiateCallSession(ctx, campaign.ID, initReq)
+	// Record call timing in rate limiter
+	e.limiter.RecordCall(campaign.ID)
+
+	return nil
+}
+
+// HandleCDR processes a CDR event from Cloudonix (via Laravel webhook)
+func (e *Executor) HandleCDR(ctx context.Context, event *models.CDREvent) error {
+	logger := e.logger.With("session_id", event.SessionID)
+
+	// Get call state from Redis
+	callState, err := e.redisClient.GetCallState(ctx, event.SessionID)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Int64("destination_id", dest.ID).
-			Msg("Failed to initiate call session")
-		e.retryQueue.Add(dest.ID, "initiation_failed")
-		return
+		logger.Error("failed to get call state", "error", err)
+		return fmt.Errorf("failed to get call state: %w", err)
+	}
+	if callState == nil {
+		logger.Warn("call state not found, may be expired")
+		return nil
 	}
 
-	log.Info().
-		Int64("session_id", initResp.SessionID).
-		Msg("Call session initiated")
+	logger = logger.With(
+		"campaign_id", callState.CampaignID,
+		"destination_id", callState.DestinationID,
+	)
 
-	// Generate a unique call SID
-	callSid := fmt.Sprintf("call_%d_%d_%d", campaign.ID, dest.ID, time.Now().Unix())
-
-	// Fetch CXML for routing
-	cxmlReq := &models.GenerateCXMLRequest{
-		CampaignID:  campaign.ID,
-		SessionID:   initResp.SessionID,
-		PhoneNumber: dest.PhoneNumber,
-		CallSid:     callSid,
-	}
-
-	cxmlResp, err := e.laravelClient.GenerateCXML(ctx, cxmlReq)
+	// Decrement active call count
+	activeCount, err := e.limiter.DecrementActive(ctx, callState.CampaignID)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Int64("session_id", initResp.SessionID).
-			Msg("Failed to generate CXML")
-		e.updateCallStatus(ctx, initResp.SessionID, "failed", err.Error())
-		e.retryQueue.Add(dest.ID, "cxml_generation_failed")
-		return
+		logger.Error("failed to decrement active count", "error", err)
+	} else {
+		logger.Info("call completed", "active_calls_remaining", activeCount)
 	}
 
-	// Make the outbound call via Cloudonix
-	cloudonixClient := e.createCloudonixClient(campaign)
-
-	cloudonixReq := &cloudonix.OutboundCallRequest{
-		From:        campaign.CallerID,
-		To:          dest.PhoneNumber,
-		CallbackURL: initResp.CallbackURL,
-		CustomParameters: map[string]interface{}{
-			"session_id":     initResp.SessionID,
-			"campaign_id":    campaign.ID,
-			"destination_id": dest.ID,
-			"call_sid":       callSid,
-		},
-		Timeout:                campaign.DefaultTimeout,
-		AMDEnabled:             campaign.AMDEnabled,
-		AMDTimeout:             campaign.AMDTimeout,
-		RoutingDestinationType: "cxml",
-		RoutingCXML:            cxmlResp.CXML,
+	// Update call status in Laravel
+	statusReq := models.UpdateCallStatusRequest{
+		Status:       event.Status,
+		Disposition:  event.Disposition,
+		Duration:     event.Duration,
+		Billsec:      event.Billsec,
+		RecordingURL: event.RecordingURL,
+		CompletedAt:  event.CompletedAt,
+	}
+	if err := e.apiClient.UpdateCallStatus(ctx, callState.SessionID, statusReq); err != nil {
+		logger.Error("failed to update call status", "error", err)
 	}
 
-	callResp, err := cloudonixClient.MakeOutboundCall(ctx, cloudonixReq)
-	if err != nil {
-		// Handle Cloudonix rate limiting (HTTP 429) - PAUSE IMMEDIATELY
-		if errors.Is(err, cloudonix.ErrRateLimited) {
-			log.Error().
-				Int64("campaign_id", campaign.ID).
-				Msg("Cloudonix rate limit exceeded (HTTP 429) - PAUSING CAMPAIGN")
-
-			e.updateCallStatus(ctx, initResp.SessionID, "failed", "rate_limited_by_cloudonix")
-			e.pauseCampaign(ctx, campaign.ID, "cloudonix_rate_limit")
-			return
-		}
-
-		log.Error().
-			Err(err).
-			Int64("session_id", initResp.SessionID).
-			Msg("Failed to make outbound call")
-
-		e.updateCallStatus(ctx, initResp.SessionID, "failed", err.Error())
-		e.retryQueue.Add(dest.ID, "dial_failed")
-		return
+	// Handle disposition and retry logic
+	if err := e.handleDisposition(ctx, callState, event); err != nil {
+		logger.Error("failed to handle disposition", "error", err)
+		return err
 	}
 
-	// Call initiated successfully - increment concurrency counter in Redis
-	if err := e.concurrencyManager.StartCall(ctx, campaign.ID, callResp.CallID); err != nil {
-		log.Error().
-			Err(err).
-			Int64("campaign_id", campaign.ID).
-			Str("call_id", callResp.CallID).
-			Msg("Failed to increment concurrency counter, but call was initiated")
-		// Don't fail the call, just log the error
-	}
-
-	// Track active call locally
-	callCtx := &CallContext{
-		CampaignID:      campaign.ID,
-		DestinationID:   dest.ID,
-		SessionID:       initResp.SessionID,
-		CallID:          callResp.CallID,
-		StartedAt:       time.Now(),
-		CloudonixDomain: campaign.CloudonixDomain,
-		CloudonixAPIKey: campaign.CloudonixAPIKey,
-	}
-
-	e.mu.Lock()
-	e.activeCalls[callResp.CallID] = callCtx
-	if e.campaignCalls[campaign.ID] == nil {
-		e.campaignCalls[campaign.ID] = make(map[string]bool)
-	}
-	e.campaignCalls[campaign.ID][callResp.CallID] = true
-	e.mu.Unlock()
-
-	log.Info().
-		Int64("session_id", initResp.SessionID).
-		Str("call_id", callResp.CallID).
-		Str("to", dest.PhoneNumber).
-		Msg("Outbound call initiated successfully")
-
-	e.metrics.RecordCallInitiated(campaign.ID)
-}
-
-// updateCallStatus updates the call status in Laravel.
-func (e *Executor) updateCallStatus(ctx context.Context, sessionID int64, status, errMsg string) {
-	updateCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	e.laravelClient.UpdateCallStatus(updateCtx, sessionID, &models.UpdateCallStatusRequest{
-		Status: status,
-		Error:  errMsg,
-	})
-}
-
-// pauseCampaign pauses a campaign immediately.
-func (e *Executor) pauseCampaign(ctx context.Context, campaignID int64, reason string) {
-	log.Error().
-		Int64("campaign_id", campaignID).
-		Str("reason", reason).
-		Msg("PAUSING CAMPAIGN")
-
-	if err := e.laravelClient.PauseCampaign(ctx, campaignID, reason); err != nil {
-		log.Error().
-			Err(err).
-			Int64("campaign_id", campaignID).
-			Msg("Failed to pause campaign")
-	}
-}
-
-// StopCampaign stops all active calls for a campaign.
-func (e *Executor) StopCampaign(campaignID int64) {
-	e.mu.Lock()
-	callIDs, exists := e.campaignCalls[campaignID]
-	if !exists {
-		e.mu.Unlock()
-		return
-	}
-	delete(e.campaignCalls, campaignID)
-
-	// Copy call IDs to avoid holding lock during API calls
-	callsToStop := make([]string, 0, len(callIDs))
-	for callID := range callIDs {
-		callsToStop = append(callsToStop, callID)
-		delete(e.activeCalls, callID)
-	}
-	e.mu.Unlock()
-
-	log.Info().
-		Int64("campaign_id", campaignID).
-		Int("call_count", len(callsToStop)).
-		Msg("Stopping campaign calls")
-
-	// Hangup active calls
-	for _, callID := range callsToStop {
-		callCtx, exists := e.activeCalls[callID]
-		if !exists {
-			continue
-		}
-
-		cloudonixClient := cloudonix.NewClient(
-			"https://api.cloudonix.io",
-			callCtx.CloudonixAPIKey,
-			callCtx.CloudonixDomain,
-		)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		if err := cloudonixClient.HangupCall(ctx, callID); err != nil {
-			log.Error().
-				Err(err).
-				Str("call_id", callID).
-				Msg("Failed to hangup call")
-		}
-		cancel()
-	}
-}
-
-// HandleCDR handles a CDR event by decrementing the concurrency counter.
-//
-// This method is called by the CDR consumer when a CDR event is received.
-// It updates the local state and decrements the Redis concurrency counter.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - campaignID: The campaign ID
-//   - sessionToken: The Cloudonix session token (call_id)
-//   - disposition: The call disposition
-func (e *Executor) HandleCDR(ctx context.Context, campaignID int64, sessionToken, disposition string) {
-	// Decrement Redis concurrency counter
-	if err := e.concurrencyManager.CompleteCall(ctx, campaignID, sessionToken); err != nil {
-		log.Error().
-			Err(err).
-			Int64("campaign_id", campaignID).
-			Str("session_token", sessionToken).
-			Msg("Failed to decrement concurrency counter")
-	}
-
-	// Update local tracking
-	e.mu.Lock()
-	if callCtx, exists := e.activeCalls[sessionToken]; exists {
-		delete(e.activeCalls, sessionToken)
-		if campaignCalls, exists := e.campaignCalls[callCtx.CampaignID]; exists {
-			delete(campaignCalls, sessionToken)
-		}
-	}
-	e.mu.Unlock()
-
-	log.Info().
-		Int64("campaign_id", campaignID).
-		Str("session_token", sessionToken).
-		Str("disposition", disposition).
-		Msg("CDR processed - call completed")
-}
-
-// HandleCallEvent processes incoming webhook events from Cloudonix.
-//
-// This method is called by the webhook handler when Cloudonix sends
-// a webhook event. It handles various event types such as call status
-// updates and call completions.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - event: The webhook event from Cloudonix
-//
-// Returns an error if the event cannot be processed.
-func (e *Executor) HandleCallEvent(ctx context.Context, event *models.CloudonixWebhookEvent) error {
-	log.Debug().
-		Str("event_type", event.EventType).
-		Str("call_id", event.CallID).
-		Str("status", event.Status).
-		Msg("Processing webhook event")
-
-	switch event.EventType {
-	case "call.completed", "call.ended", "call.failed":
-		// Handle call completion - decrement counter if we have this call tracked
-		if event.CallID != "" {
-			e.mu.Lock()
-			_, exists := e.activeCalls[event.CallID]
-			e.mu.Unlock()
-
-			if exists {
-				// Find campaign ID from call context
-				e.mu.Lock()
-				callCtx, hasCall := e.activeCalls[event.CallID]
-				e.mu.Unlock()
-
-				if hasCall {
-					e.HandleCDR(ctx, callCtx.CampaignID, event.CallID, event.Status)
-				}
-			}
-		}
-
-	case "call.status", "call.updated":
-		// Handle status updates - could trigger retries or other actions
-		log.Debug().
-			Str("call_id", event.CallID).
-			Str("status", event.Status).
-			Msg("Call status update received")
-
-	case "call.started", "call.initiated":
-		// Log call start event
-		log.Debug().
-			Str("call_id", event.CallID).
-			Str("session_id", event.SessionID).
-			Msg("Call started event received")
-
-	default:
-		// Log unknown event types but don't error
-		log.Warn().
-			Str("event_type", event.EventType).
-			Str("call_id", event.CallID).
-			Msg("Unknown webhook event type received")
+	// Clean up call state
+	sessionKey := strconv.FormatInt(callState.SessionID, 10)
+	if err := e.redisClient.DeleteCallState(ctx, sessionKey); err != nil {
+		logger.Error("failed to delete call state", "error", err)
 	}
 
 	return nil
+}
+
+// handleDisposition handles call disposition and retry logic
+func (e *Executor) handleDisposition(ctx context.Context, callState *redis.CallState, event *models.CDREvent) error {
+	logger := e.logger.With(
+		"session_id", callState.SessionID,
+		"disposition", event.Disposition,
+	)
+
+	// Determine if should retry
+	shouldRetry := e.retryMgr.ShouldRetry(0, event.Disposition)
+	var nextRetryAt models.FlexTime
+	if shouldRetry {
+		nextRetryAt = models.FlexTime(time.Now().Add(e.retryMgr.GetRetryDelay(0)))
+	}
+
+	// Set disposition in Laravel
+	dispositionReq := models.SetDispositionRequest{
+		Disposition:   event.Disposition,
+		ShouldRetry:   shouldRetry,
+		AttemptNumber: 1, // TODO: Get actual attempt count
+		NextRetryAt:   nextRetryAt,
+		Duration:      event.Duration,
+		Billsec:       event.Billsec,
+	}
+	resp, err := e.apiClient.SetCallDisposition(ctx, callState.SessionID, dispositionReq)
+	if err != nil {
+		return fmt.Errorf("failed to set disposition: %w", err)
+	}
+
+	logger.Info("disposition set", "will_retry", resp.WillRetry, "destination_status", resp.DestinationStatus)
+	return nil
+}
+
+// handleInitiationFailure handles a failed call initiation
+func (e *Executor) handleInitiationFailure(ctx context.Context, campaign *models.Campaign, destination *models.Destination, err error) error {
+	logger := e.logger.With(
+		"campaign_id", campaign.ID,
+		"destination_id", destination.ID,
+	)
+
+	// Check if we should retry
+	if e.retryMgr.ShouldRetry(destination.DialAttempts, "failed") {
+		delay := e.retryMgr.GetRetryDelay(destination.DialAttempts)
+		if scheduleErr := e.redisClient.ScheduleRetry(ctx, destination.ID, campaign.ID, delay); scheduleErr != nil {
+			logger.Error("failed to schedule retry", "error", scheduleErr)
+		}
+		logger.Info("retry scheduled after initiation failure", "delay", delay)
+	}
+
+	return err
+}
+
+// GetPendingRetries gets destinations ready for retry
+func (e *Executor) GetPendingRetries(ctx context.Context, campaignID int64, limit int) ([]int64, error) {
+	return e.redisClient.GetRetryableDestinations(ctx, campaignID, limit)
 }

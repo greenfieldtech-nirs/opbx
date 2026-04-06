@@ -2,207 +2,220 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-
-	"github.com/go-redis/redis/v8"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/api"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/cdr"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/circuitbreaker"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/concurrency"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/config"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/executor"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/metrics"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/retry"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/scheduler"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/state"
-	"github.com/nirsolutions/opbx-dialer-worker/internal/webhook"
+	"github.com/gin-gonic/gin"
+	"opbx/dialer-worker/internal/api"
+	"opbx/dialer-worker/internal/config"
+	"opbx/dialer-worker/internal/executor"
+	"opbx/dialer-worker/internal/limiter"
+	"opbx/dialer-worker/internal/models"
+	"opbx/dialer-worker/internal/redis"
+	"opbx/dialer-worker/internal/webhook"
+	"opbx/dialer-worker/pkg/retry"
 )
+
+// Worker is the main dialer worker
+type Worker struct {
+	config      *config.Config
+	apiClient   *api.Client
+	redisClient *redis.Client
+	limiter     *limiter.CACRateLimiter
+	executor    *executor.Executor
+	retryMgr    *retry.Manager
+	logger      *slog.Logger
+
+	// State
+	activeCampaigns map[int64]*models.Campaign
+	shutdown        chan struct{}
+}
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load()
+	cfg := config.Load()
+
+	// Setup logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	logger.Info("starting dialer worker", "worker_id", cfg.WorkerID)
+
+	// Create Redis client
+	redisClient, err := redis.NewClient(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		logger.Error("failed to connect to Redis", "error", err)
+		os.Exit(1)
+	}
+	defer redisClient.Close()
+
+	// Create API client
+	apiClient := api.NewClient(cfg, logger)
+
+	// Create rate limiter
+	racLimiter := limiter.NewCACRateLimiter(redisClient)
+
+	// Create retry manager
+	retryMgr := retry.NewManager(cfg)
+
+	// Create executor
+	exec := executor.NewExecutor(apiClient, redisClient, racLimiter, retryMgr, cfg.WorkerID, logger)
+
+	// Create worker
+	worker := &Worker{
+		config:          cfg,
+		apiClient:       apiClient,
+		redisClient:     redisClient,
+		limiter:         racLimiter,
+		executor:        exec,
+		retryMgr:        retryMgr,
+		logger:          logger,
+		activeCampaigns: make(map[int64]*models.Campaign),
+		shutdown:        make(chan struct{}),
+	}
+
+	// Register worker in Redis
+	ctx := context.Background()
+	if err := redisClient.RegisterWorker(ctx, cfg.WorkerID, 30*time.Second); err != nil {
+		logger.Error("failed to register worker", "error", err)
 		os.Exit(1)
 	}
 
-	// Setup logging
-	setupLogging(cfg.LogLevel)
+	// Start webhook server
+	go worker.startWebhookServer()
 
-	log.Info().
-		Str("worker_id", cfg.WorkerID).
-		Str("version", "1.0.0").
-		Msg("Starting dialer worker")
+	// Start main loop
+	go worker.run()
 
-	// Create context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Setup signal handling
+	// Wait for shutdown signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Initialize components
-	laravelClient := api.NewClient(cfg.LaravelAPIURL, cfg.LaravelAPIToken)
-	metricsCollector := metrics.NewCollector()
-
-	// Initialize circuit breaker
-	cbCfg := circuitbreaker.DefaultConfig()
-	cbCfg.MaxFailures = cfg.CircuitBreakerThreshold
-	cbCfg.Timeout = time.Duration(cfg.CircuitBreakerTimeoutMinutes) * time.Minute
-
-	cb := circuitbreaker.NewBreaker(cbCfg,
-		func() {
-			log.Warn().Msg("Circuit breaker opened")
-			metricsCollector.SetCircuitBreakerState("open")
-			metricsCollector.RecordCircuitBreakerTrip("ai_agent_errors")
-		},
-		func() {
-			log.Info().Msg("Circuit breaker closed")
-			metricsCollector.SetCircuitBreakerState("closed")
-		},
-	)
-
-	// Initialize retry queue
-	retryCfg := retry.DefaultConfig()
-	retryQueue := retry.NewQueue(retryCfg, func(destinationID int64) error {
-		// Retry handler - will be called by executor
-		return nil
-	})
-
-	// Initialize Redis client
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     cfg.RedisAddr,
-		Password: cfg.RedisPassword,
-		DB:       cfg.RedisDB,
-	})
-
-	// Test Redis connection
-	if err := redisClient.Ping(context.Background()).Err(); err != nil {
-		log.Fatal().Err(err).Str("addr", cfg.RedisAddr).Msg("Failed to connect to Redis")
-	}
-	log.Info().Str("addr", cfg.RedisAddr).Msg("Connected to Redis")
-
-	// Initialize concurrency manager
-	concurrencyManager := concurrency.NewManager(redisClient)
-
-	// Initialize executor
-	exec := executor.NewExecutor(laravelClient, retryQueue, cb, metricsCollector, concurrencyManager, cfg.WorkerID)
-
-	// Initialize CDR consumer
-	cdrConsumer := cdr.NewConsumer(redisClient, concurrencyManager, func(ctx context.Context, event cdr.Event) error {
-		// Custom CDR handler - update executor state
-		exec.HandleCDR(ctx, event.CampaignID, event.SessionToken, event.Disposition)
-		return nil
-	})
-
-	// Start CDR consumer
-	go func() {
-		if err := cdrConsumer.Start(ctx); err != nil {
-			log.Error().Err(err).Msg("CDR consumer error")
-		}
-	}()
-
-	// Update retry queue handler to use executor
-	retryQueue = retry.NewQueue(retryCfg, func(destinationID int64) error {
-		// Get retry destinations from API
-		// This is a simplified version - full implementation would queue for execution
-		log.Info().Int64("destination_id", destinationID).Msg("Processing retry")
-		return nil
-	})
-
-	// Initialize state persister
-	statePersister := state.NewPersister(laravelClient, cfg.WorkerID, cfg.StateDir)
-	statePersister.Start(ctx)
-
-	// Initialize scheduler
-	sched, err := scheduler.NewScheduler(laravelClient, exec)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create scheduler")
-	}
-
-	// Initialize webhook handler
-	webhookHandler := webhook.NewHandler(exec)
-	webhookMux := http.NewServeMux()
-	webhookHandler.RegisterRoutes(webhookMux)
-
-	// Add status endpoint to main server (replaces separate metrics server)
-	webhookMux.HandleFunc("/status", metricsCollector.StatusHandler)
-
-	// Start webhook server
-	webhookServer := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.WorkerAPIPort),
-		Handler:      webhookMux,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
-
-	go func() {
-		log.Info().Int("port", cfg.WorkerAPIPort).Msg("Starting webhook server")
-		if err := webhookServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("Webhook server error")
-		}
-	}()
-
-	// Start scheduler
-	go func() {
-		if err := sched.Start(ctx); err != nil {
-			log.Error().Err(err).Msg("Scheduler error")
-		}
-	}()
-
-	// Start retry queue
-	go retryQueue.Start(ctx)
-
-	// Wait for shutdown signal
 	<-sigChan
-	log.Info().Msg("Shutdown signal received, gracefully shutting down...")
+	logger.Info("shutdown signal received, stopping worker...")
+	close(worker.shutdown)
 
 	// Graceful shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
-
-	// Stop all components
-	retryQueue.Stop()
-	statePersister.Stop()
-
-	if err := sched.Stop(); err != nil {
-		log.Error().Err(err).Msg("Error stopping scheduler")
-	}
-
-	if err := webhookServer.Shutdown(shutdownCtx); err != nil {
-		log.Error().Err(err).Msg("Error shutting down webhook server")
-	}
-
-	cancel()
-
-	log.Info().Msg("Shutdown complete")
+	time.Sleep(1 * time.Second)
+	logger.Info("worker stopped")
 }
 
-func setupLogging(level string) {
-	// Set log level
-	lvl, err := zerolog.ParseLevel(level)
+// run is the main worker loop
+func (w *Worker) run() {
+	ticker := time.NewTicker(w.config.PollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-w.shutdown:
+			return
+		case <-ticker.C:
+			w.processCampaigns()
+		}
+	}
+}
+
+// processCampaigns fetches and processes active campaigns
+func (w *Worker) processCampaigns() {
+	w.logger.Info("polling for campaigns")
+	ctx := context.Background()
+
+	// Get active campaigns from Laravel
+	campaigns, err := w.apiClient.GetActiveCampaigns(ctx)
 	if err != nil {
-		lvl = zerolog.InfoLevel
-	}
-	zerolog.SetGlobalLevel(lvl)
-
-	// Use pretty console output for development
-	if os.Getenv("ENV") == "development" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-		})
+		w.logger.Error("failed to get active campaigns", "error", err)
+		return
 	}
 
-	// Add caller info
-	log.Logger = log.With().Caller().Logger()
+	w.logger.Info("found active campaigns", "count", len(campaigns))
+
+	// Update active campaigns map
+	w.activeCampaigns = make(map[int64]*models.Campaign)
+	for i := range campaigns {
+		campaign := &campaigns[i]
+		w.activeCampaigns[campaign.ID] = campaign
+		w.logger.Info("processing campaign", "id", campaign.ID, "name", campaign.Name, "status", campaign.Status, "cac", campaign.CAC)
+
+		// Register with rate limiter
+		w.limiter.RegisterCampaign(campaign.ID, campaign.CAC)
+
+		// Process the campaign
+		go w.processCampaign(ctx, campaign)
+	}
+}
+
+// processCampaign handles dialing for a single campaign
+func (w *Worker) processCampaign(ctx context.Context, campaign *models.Campaign) {
+	logger := w.logger.With("campaign_id", campaign.ID, "campaign_name", campaign.Name)
+
+	// Check if campaign is runnable
+	logger.Info("checking campaign status", "status", campaign.Status, "cac", campaign.CAC)
+	if campaign.Status != "active" {
+		logger.Info("campaign not active, skipping", "status", campaign.Status)
+		return
+	}
+
+	// Get pending destinations
+	logger.Info("fetching pending destinations", "limit", campaign.CAC)
+	destinations, err := w.apiClient.GetPendingDestinations(ctx, campaign.ID, campaign.CAC)
+	if err != nil {
+		logger.Error("failed to get pending destinations", "error", err)
+		return
+	}
+
+	if len(destinations) == 0 {
+		logger.Info("no pending destinations")
+		return
+	}
+
+	logger.Info("processing destinations", "count", len(destinations))
+
+	// Process each destination
+	for i := range destinations {
+		dest := &destinations[i]
+		select {
+		case <-w.shutdown:
+			return
+		default:
+		}
+
+		// Wait for rate limiter
+		waitTime := w.limiter.WaitTime(campaign.ID)
+		if waitTime > 0 {
+			logger.Debug("rate limiting", "wait", waitTime)
+			time.Sleep(waitTime)
+		}
+
+		// Execute call
+		if err := w.executor.ExecuteCall(ctx, campaign, dest); err != nil {
+			logger.Error("failed to execute call", "destination_id", dest.ID, "error", err)
+			continue
+		}
+	}
+}
+
+// startWebhookServer starts the webhook HTTP server
+func (w *Worker) startWebhookServer() {
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+
+	// Create webhook handler
+	webhookHandler := webhook.NewHandler(w.executor, w.config.WebhookSecret)
+	webhookHandler.RegisterRoutes(router)
+
+	server := &http.Server{
+		Addr:    ":" + w.config.WebhookPort,
+		Handler: router,
+	}
+
+	w.logger.Info("starting webhook server", "port", w.config.WebhookPort)
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		w.logger.Error("webhook server error", "error", err)
+	}
 }

@@ -1,95 +1,114 @@
 package webhook
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/nirsolutions/opbx-dialer-worker/internal/executor"
-	"github.com/nirsolutions/opbx-dialer-worker/pkg/models"
-	"github.com/rs/zerolog/log"
+	"github.com/gin-gonic/gin"
+	"opbx/dialer-worker/internal/executor"
+	"opbx/dialer-worker/internal/models"
 )
 
-// Handler processes incoming webhooks from Cloudonix
+// Handler handles incoming webhooks from Laravel
 type Handler struct {
-	executor *executor.Executor
+	executor      *executor.Executor
+	webhookSecret string
 }
 
 // NewHandler creates a new webhook handler
-func NewHandler(executor *executor.Executor) *Handler {
+func NewHandler(exec *executor.Executor, webhookSecret string) *Handler {
 	return &Handler{
-		executor: executor,
+		executor:      exec,
+		webhookSecret: webhookSecret,
 	}
 }
 
-// RegisterRoutes registers webhook endpoints with the HTTP mux
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/webhooks/cloudonix", h.handleCloudonixWebhook)
-	mux.HandleFunc("/health", h.handleHealth)
+// RegisterRoutes registers webhook routes with the Gin router
+func (h *Handler) RegisterRoutes(router *gin.Engine) {
+	webhookGroup := router.Group("/webhooks")
+	{
+		// CDR webhook from Laravel (relayed from Cloudonix)
+		webhookGroup.POST("/cdr", h.handleCDR)
+
+		// Health check
+		webhookGroup.GET("/health", h.handleHealth)
+	}
 }
 
-// handleCloudonixWebhook processes Cloudonix webhook events
-func (h *Handler) handleCloudonixWebhook(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+// handleCDR processes CDR webhooks from Laravel
+func (h *Handler) handleCDR(c *gin.Context) {
+	// Verify webhook signature if secret is configured
+	if h.webhookSecret != "" {
+		if !h.verifySignature(c) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+			return
+		}
 	}
 
 	// Read body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to read webhook body")
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
 		return
 	}
-	defer r.Body.Close()
 
-	// Parse event
-	var event models.CloudonixWebhookEvent
+	// Parse CDR event
+	var event models.CDREvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		log.Error().Err(err).Str("body", string(body)).Msg("Failed to parse webhook event")
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
 
-	log.Info().
-		Str("event_type", event.EventType).
-		Str("call_id", event.CallID).
-		Str("session_id", event.SessionID).
-		Msg("Received Cloudonix webhook")
-
-	// Process the event
-	if err := h.executor.HandleCallEvent(r.Context(), &event); err != nil {
-		log.Error().
-			Err(err).
-			Str("event_type", event.EventType).
-			Str("call_id", event.CallID).
-			Msg("Failed to process webhook event")
-
-		// Return 500 so Cloudonix will retry
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+	// Validate required fields
+	if event.SessionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})
 		return
 	}
 
-	// Return success
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "processed",
+	// Process CDR asynchronously
+	go func() {
+		ctx := c.Request.Context()
+		if err := h.executor.HandleCDR(ctx, &event); err != nil {
+			// Log error but still return 200 to acknowledge receipt
+			// Laravel should handle retries if needed
+		}
+	}()
+
+	// Return 202 Accepted immediately
+	c.JSON(http.StatusAccepted, gin.H{
+		"status":     "accepted",
+		"session_id": event.SessionID,
 	})
 }
 
 // handleHealth returns health status
-func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+func (h *Handler) handleHealth(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "healthy",
+		"timestamp": time.Now().UTC(),
+	})
+}
+
+// verifySignature verifies the webhook signature
+func (h *Handler) verifySignature(c *gin.Context) bool {
+	signature := c.GetHeader("X-Webhook-Signature")
+	if signature == "" {
+		return false
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":    "healthy",
-		"service":   "dialer-worker",
-		"timestamp": time.Now().Unix(),
-	})
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(h.webhookSecret))
+	mac.Write(body)
+	expectedSignature := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }

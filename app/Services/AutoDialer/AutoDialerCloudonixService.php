@@ -6,9 +6,19 @@ namespace App\Services\AutoDialer;
 
 use App\Enums\AmdMode;
 use App\Enums\RoutingDestinationType;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\CloudonixSettings;
+use App\Models\ConferenceRoom;
+use App\Models\Extension;
+use App\Models\IvrMenu;
+use App\Models\RingGroup;
+use App\Scopes\OrganizationScope;
+use App\Services\AiAssistant\ProviderRegistry;
+use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\OutboundRoutingService;
 use Illuminate\Support\Facades\Http;
@@ -210,54 +220,503 @@ class AutoDialerCloudonixService
      */
     private function buildRoutingPayload(AutoDialerCampaign $campaign): array
     {
-        // Handle both enum and string values
-        $routingType = $campaign->routing_destination_type;
-        if ($routingType instanceof RoutingDestinationType) {
-            $routingType = $routingType->value;
-        } elseif (is_object($routingType)) {
-            // Handle enum objects that may be passed from database
-            $routingType = (string) $routingType;
-        }
+        // Generate CXML based on campaign routing type
+        $cxml = $this->generateCxmlForCampaign($campaign);
 
-        switch ($routingType) {
-            case 'ai_assistant':
-                // Route to AI assistant using the voice application ID
-                return ['application' => $campaign->routing_destination_id];
+        return ['cxml' => $cxml];
+    }
 
-            case 'ai_load_balancer':
-                // Route to AI load balancer application
-                return ['application' => $campaign->routing_destination_id];
+    /**
+     * Generate CXML for a campaign based on its routing destination type.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign to generate CXML for
+     * @return string The generated CXML
+     */
+    private function generateCxmlForCampaign(AutoDialerCampaign $campaign): string
+    {
+        try {
+            // Handle both enum and string values
+            $routingType = $campaign->routing_destination_type;
+            if ($routingType instanceof RoutingDestinationType) {
+                $routingType = $routingType->value;
+            } elseif (is_object($routingType)) {
+                // Handle enum objects that may be passed from database
+                $routingType = (string) $routingType;
+            }
 
-            case 'extension':
-                // For extension, we need to route to a CXML that dials the extension
-                // This would be handled by a CXML application
-                return ['application' => $this->getDialerApplicationId($campaign)];
+            switch ($routingType) {
+                case 'ai_assistant':
+                    return $this->generateAiAssistantCxml($campaign);
 
-            case 'ring_group':
-                return ['application' => $this->getDialerApplicationId($campaign)];
+                case 'ai_load_balancer':
+                    return $this->generateAiLoadBalancerCxml($campaign);
 
-            case 'conference_room':
-                return ['application' => $this->getDialerApplicationId($campaign)];
+                case 'extension':
+                    return $this->generateExtensionCxml($campaign);
 
-            case 'ivr_menu':
-                return ['application' => $this->getDialerApplicationId($campaign)];
+                case 'ring_group':
+                    return $this->generateRingGroupCxml($campaign);
 
-            case 'hangup':
-                // Use inline CXML to hangup
-                return ['cxml' => $this->buildHangupCxml()];
+                case 'conference_room':
+                    return $this->generateConferenceRoomCxml($campaign);
 
-            default:
-                Log::warning('AutoDialer: Unknown routing destination type', [
-                    'campaign_id' => $campaign->id,
-                    'routing_type' => $routingType,
-                ]);
+                case 'ivr_menu':
+                    return $this->generateIvrMenuCxml($campaign);
 
-                return ['cxml' => $this->buildHangupCxml()];
+                case 'hangup':
+                    return $this->buildHangupCxml();
+
+                default:
+                    Log::warning('AutoDialer: Unknown routing destination type', [
+                        'campaign_id' => $campaign->id,
+                        'routing_type' => $routingType,
+                    ]);
+
+                    return $this->buildHangupCxml();
+            }
+        } catch (\Exception $e) {
+            Log::error('AutoDialer: Failed to generate CXML for campaign', [
+                'campaign_id' => $campaign->id,
+                'routing_type' => $campaign->routing_destination_type?->value ?? 'unknown',
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->buildHangupCxml();
         }
     }
 
     /**
+     * Generate CXML for AI Assistant routing.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign
+     * @return string The generated CXML
+     */
+    private function generateAiAssistantCxml(AutoDialerCampaign $campaign): string
+    {
+        $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $campaign->routing_destination_id)
+            ->where('organization_id', $campaign->organization_id)
+            ->first();
+
+        if (! $aiAssistant) {
+            Log::error('AutoDialer: AI Assistant not found for campaign', [
+                'campaign_id' => $campaign->id,
+                'ai_assistant_id' => $campaign->routing_destination_id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        $config = $aiAssistant->configuration ?? [];
+        $protocol = $aiAssistant->protocol;
+        $provider = $aiAssistant->provider;
+
+        if ($protocol === 'websocket') {
+            return $this->generateWebSocketCxml($aiAssistant, $config, $provider);
+        }
+
+        return $this->generateSipCxml($aiAssistant, $config, $provider);
+    }
+
+    /**
+     * Generate CXML for WebSocket-based AI Assistant.
+     *
+     * @param  AiAssistant  $aiAssistant  The AI assistant
+     * @param  array<string, mixed>  $config  The assistant configuration
+     * @param  string|null  $provider  The provider name
+     * @return string The generated CXML
+     */
+    private function generateWebSocketCxml(AiAssistant $aiAssistant, array $config, ?string $provider): string
+    {
+        if (! $provider) {
+            Log::error('AutoDialer: AI Assistant provider not configured', [
+                'ai_assistant_id' => $aiAssistant->id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        // Get provider registry to resolve URL template
+        $providerRegistry = app(ProviderRegistry::class);
+        $providerDef = $providerRegistry->getProvider($provider);
+
+        if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
+            Log::error('AutoDialer: Invalid WebSocket provider configuration', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'provider' => $provider,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        // Build WebSocket URL using the URL builder
+        $urlBuilder = app(WebSocketUrlBuilder::class);
+        $websocketUrl = $urlBuilder->buildUrl(
+            $providerDef->urlTemplate,
+            $config,
+            []
+        );
+
+        Log::debug('AutoDialer: Generated WebSocket URL for AI Assistant', [
+            'ai_assistant_id' => $aiAssistant->id,
+            'provider' => $provider,
+            'websocket_url' => $websocketUrl,
+        ]);
+
+        // Generate CXML with Connect>Stream verb
+        return CxmlBuilder::streamToWebSocket($websocketUrl);
+    }
+
+    /**
+     * Generate CXML for SIP-based AI Assistant.
+     *
+     * @param  AiAssistant  $aiAssistant  The AI assistant
+     * @param  array<string, mixed>  $config  The assistant configuration
+     * @param  string|null  $provider  The provider name
+     * @return string The generated CXML
+     */
+    private function generateSipCxml(AiAssistant $aiAssistant, array $config, ?string $provider): string
+    {
+        // Check if AI Assistant has service URL (preferred for generic service URLs)
+        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('ai_assistant_id', $aiAssistant->id)
+            ->where('organization_id', $aiAssistant->organization_id)
+            ->first();
+
+        if ($extension && $extension->service_url) {
+            Log::debug('AutoDialer: Using extension service URL for SIP routing', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'extension_id' => $extension->id,
+                'service_url' => $extension->service_url,
+            ]);
+
+            return CxmlBuilder::dialService(
+                $extension->service_url,
+                $extension->service_token,
+                $extension->service_params ?? []
+            );
+        }
+
+        // Fall back to legacy provider + phone number format
+        $phoneNumber = $config['phone_number'] ?? null;
+
+        if (! $provider || ! $phoneNumber) {
+            Log::error('AutoDialer: SIP AI Assistant missing provider or phone number', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'provider' => $provider,
+                'has_phone_number' => ! empty($phoneNumber),
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        Log::debug('AutoDialer: Using provider format for SIP routing', [
+            'ai_assistant_id' => $aiAssistant->id,
+            'provider' => $provider,
+            'phone_number' => $phoneNumber,
+        ]);
+
+        return CxmlBuilder::dialServiceProvider($provider, $phoneNumber);
+    }
+
+    /**
+     * Generate CXML for AI Load Balancer routing.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign
+     * @return string The generated CXML
+     */
+    private function generateAiLoadBalancerCxml(AutoDialerCampaign $campaign): string
+    {
+        $loadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $campaign->routing_destination_id)
+            ->where('organization_id', $campaign->organization_id)
+            ->first();
+
+        if (! $loadBalancer) {
+            Log::error('AutoDialer: AI Load Balancer not found for campaign', [
+                'campaign_id' => $campaign->id,
+                'load_balancer_id' => $campaign->routing_destination_id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        // Get the active AI assistant from the load balancer
+        // Note: This uses round-robin strategy by default
+        $aiAssistant = $this->getActiveAssistantFromLoadBalancer($loadBalancer);
+
+        if (! $aiAssistant) {
+            Log::error('AutoDialer: No active AI Assistant found in load balancer', [
+                'campaign_id' => $campaign->id,
+                'load_balancer_id' => $loadBalancer->id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        $config = $aiAssistant->configuration ?? [];
+        $protocol = $aiAssistant->protocol;
+        $provider = $aiAssistant->provider;
+
+        if ($protocol === 'websocket') {
+            return $this->generateWebSocketCxml($aiAssistant, $config, $provider);
+        }
+
+        return $this->generateSipCxml($aiAssistant, $config, $provider);
+    }
+
+    /**
+     * Get active AI assistant from load balancer.
+     *
+     * @param  AiAssistantLoadBalancer  $loadBalancer  The load balancer
+     * @return AiAssistant|null The active AI assistant or null
+     */
+    private function getActiveAssistantFromLoadBalancer(AiAssistantLoadBalancer $loadBalancer): ?AiAssistant
+    {
+        // Get active members
+        $activeMembers = $loadBalancer->members()
+            ->where('status', 'active')
+            ->whereHas('aiAssistant', fn ($q) => $q->where('status', 'active'))
+            ->orderBy('position')
+            ->get();
+
+        if ($activeMembers->isEmpty()) {
+            return null;
+        }
+
+        // Simple round-robin: get the first active member
+        // In a production environment, you might want to track last used member
+        $member = $activeMembers->first();
+
+        return $member?->aiAssistant;
+    }
+
+    /**
+     * Generate CXML for Extension routing.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign
+     * @return string The generated CXML
+     */
+    private function generateExtensionCxml(AutoDialerCampaign $campaign): string
+    {
+        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $campaign->routing_destination_id)
+            ->where('organization_id', $campaign->organization_id)
+            ->first();
+
+        if (! $extension) {
+            Log::error('AutoDialer: Extension not found for campaign', [
+                'campaign_id' => $campaign->id,
+                'extension_id' => $campaign->routing_destination_id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        if (! $extension->isActive()) {
+            Log::error('AutoDialer: Extension is not active', [
+                'campaign_id' => $campaign->id,
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        $sipUri = $extension->getSipUri();
+
+        if (! $sipUri) {
+            Log::error('AutoDialer: Extension has no valid SIP URI', [
+                'campaign_id' => $campaign->id,
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        Log::debug('AutoDialer: Generated extension CXML', [
+            'campaign_id' => $campaign->id,
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+        ]);
+
+        return CxmlBuilder::dialExtension($sipUri, $campaign->dial_timeout ?? 30);
+    }
+
+    /**
+     * Generate CXML for Ring Group routing.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign
+     * @return string The generated CXML
+     */
+    private function generateRingGroupCxml(AutoDialerCampaign $campaign): string
+    {
+        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $campaign->routing_destination_id)
+            ->where('organization_id', $campaign->organization_id)
+            ->first();
+
+        if (! $ringGroup) {
+            Log::error('AutoDialer: Ring group not found for campaign', [
+                'campaign_id' => $campaign->id,
+                'ring_group_id' => $campaign->routing_destination_id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        if (! $ringGroup->isActive()) {
+            Log::error('AutoDialer: Ring group is not active', [
+                'campaign_id' => $campaign->id,
+                'ring_group_id' => $ringGroup->id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        // Get members' SIP URIs
+        $sipUris = [];
+        foreach ($ringGroup->members as $member) {
+            if ($member->extension && $member->extension->isActive()) {
+                $sipUri = $member->extension->getSipUri();
+                if ($sipUri) {
+                    $sipUris[] = $sipUri;
+                }
+            }
+        }
+
+        if (empty($sipUris)) {
+            Log::error('AutoDialer: Ring group has no active members', [
+                'campaign_id' => $campaign->id,
+                'ring_group_id' => $ringGroup->id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        Log::debug('AutoDialer: Generated ring group CXML', [
+            'campaign_id' => $campaign->id,
+            'ring_group_id' => $ringGroup->id,
+            'member_count' => count($sipUris),
+        ]);
+
+        // Generate webhook callback URL for ring group fallback
+        $webhookBaseUrl = config('app.webhook_base_url') ?? config('app.url');
+        $actionUrl = rtrim($webhookBaseUrl, '/').'/api/voice/ring-group-callback?ring_group_id='.$ringGroup->id;
+
+        return CxmlBuilder::dialRingGroup($sipUris, $campaign->dial_timeout ?? 30, $actionUrl);
+    }
+
+    /**
+     * Generate CXML for Conference Room routing.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign
+     * @return string The generated CXML
+     */
+    private function generateConferenceRoomCxml(AutoDialerCampaign $campaign): string
+    {
+        $conferenceRoom = ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $campaign->routing_destination_id)
+            ->where('organization_id', $campaign->organization_id)
+            ->first();
+
+        if (! $conferenceRoom) {
+            Log::error('AutoDialer: Conference room not found for campaign', [
+                'campaign_id' => $campaign->id,
+                'conference_room_id' => $campaign->routing_destination_id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        if (! $conferenceRoom->isActive()) {
+            Log::error('AutoDialer: Conference room is not active', [
+                'campaign_id' => $campaign->id,
+                'conference_room_id' => $conferenceRoom->id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        Log::debug('AutoDialer: Generated conference room CXML', [
+            'campaign_id' => $campaign->id,
+            'conference_room_id' => $conferenceRoom->id,
+            'conference_room_name' => $conferenceRoom->name,
+        ]);
+
+        return CxmlBuilder::joinConference(
+            'room_'.$conferenceRoom->id,
+            $conferenceRoom->max_participants,
+            $conferenceRoom->mute_on_entry,
+            $conferenceRoom->announce_join_leave
+        );
+    }
+
+    /**
+     * Generate CXML for IVR Menu routing.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign
+     * @return string The generated CXML
+     */
+    private function generateIvrMenuCxml(AutoDialerCampaign $campaign): string
+    {
+        $ivrMenu = IvrMenu::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $campaign->routing_destination_id)
+            ->where('organization_id', $campaign->organization_id)
+            ->first();
+
+        if (! $ivrMenu) {
+            Log::error('AutoDialer: IVR menu not found for campaign', [
+                'campaign_id' => $campaign->id,
+                'ivr_menu_id' => $campaign->routing_destination_id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        if (! $ivrMenu->isActive()) {
+            Log::error('AutoDialer: IVR menu is not active', [
+                'campaign_id' => $campaign->id,
+                'ivr_menu_id' => $ivrMenu->id,
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+
+        // Generate webhook URL for IVR input handling
+        $webhookBaseUrl = config('app.webhook_base_url') ?? config('app.url');
+        $actionUrl = rtrim($webhookBaseUrl, '/').'/api/voice/ivr-input?menu_id='.$ivrMenu->id;
+
+        // Build the IVR prompt
+        $nestedVerbs = '';
+        if ($ivrMenu->audio_file_path) {
+            $nestedVerbs .= CxmlBuilder::playXml($ivrMenu->audio_file_path);
+        } elseif ($ivrMenu->tts_text) {
+            $nestedVerbs .= CxmlBuilder::sayXml($ivrMenu->tts_text, $ivrMenu->tts_voice ?? null);
+        }
+
+        Log::debug('AutoDialer: Generated IVR menu CXML', [
+            'campaign_id' => $campaign->id,
+            'ivr_menu_id' => $ivrMenu->id,
+            'has_audio' => (bool) $ivrMenu->audio_file_path,
+        ]);
+
+        return CxmlBuilder::gather(
+            $nestedVerbs,
+            $actionUrl,
+            $ivrMenu->inter_digit_timeout ?? 5,
+            '#',
+            1,
+            1,
+            $ivrMenu->max_timeout ?? null
+        );
+    }
+
+    /**
      * Get the dialer application ID for the campaign's organization.
+     *
+     * @deprecated This method is no longer used. CXML is now generated inline.
      */
     private function getDialerApplicationId(AutoDialerCampaign $campaign): int
     {

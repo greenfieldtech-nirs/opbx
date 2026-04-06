@@ -20,6 +20,7 @@ use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -182,7 +183,7 @@ class DialerWorkerController extends Controller
     /**
      * Initiate a call - creates a call session record.
      */
-    public function initiateCall(Request $request): JsonResponse
+    public function initiateCall(Request $request, AutoDialerCloudonixService $cloudonixService): JsonResponse
     {
         $this->authorizeWorker($request);
 
@@ -213,13 +214,47 @@ class DialerWorkerController extends Controller
             ], 422);
         }
 
+        // Get Cloudonix settings for the organization
+        $cloudonixSettings = $campaign->organization->cloudonixSettings;
+
+        if (! $cloudonixSettings || ! $cloudonixSettings->isConfigured()) {
+            Log::error('DialerWorker: Cloudonix not configured for organization', [
+                'campaign_id' => $campaign->id,
+                'organization_id' => $campaign->organization_id,
+            ]);
+
+            return response()->json([
+                'message' => 'Cloudonix not configured for this organization',
+            ], 422);
+        }
+
+        // Generate webhook callback URL for Cloudonix
+        $webhookBaseUrl = $cloudonixSettings->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
+        $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
+
+        // Initiate the call via Cloudonix API
+        $result = $cloudonixService->initiateCall($campaign, $destination, $cloudonixSettings, $callbackUrl);
+
+        if (! $result['success']) {
+            Log::error('DialerWorker: Failed to initiate call via Cloudonix', [
+                'campaign_id' => $campaign->id,
+                'destination_id' => $destination->id,
+                'error' => $result['error'],
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to initiate call: '.$result['error'],
+            ], 500);
+        }
+
         // Create call session within scope bypass
-        $session = OrganizationScope::bypass(function () use ($campaign, $destination, $validated) {
+        $session = OrganizationScope::bypass(function () use ($campaign, $destination, $validated, $result) {
             return AutoDialerCallSession::create([
                 'organization_id' => $campaign->organization_id,
                 'campaign_id' => $campaign->id,
                 'destination_id' => $destination->id,
-                'session_token' => 'sess-'.uniqid(),
+                'session_token' => $result['session_token'] ?? 'sess-'.uniqid(),
+                'call_id' => $result['call_id'] ?? null,
                 'phone_number' => $validated['phone_number'],
                 'worker_id' => $validated['worker_id'],
                 'status' => 'initiated',
@@ -239,32 +274,19 @@ class DialerWorkerController extends Controller
         // Increment campaign pending calls counter
         OrganizationScope::bypass(fn () => $campaign->increment('pending_calls'));
 
-        Log::info('DialerWorker: Call initiated', [
+        Log::info('DialerWorker: Call initiated successfully', [
             'session_id' => $session->id,
             'campaign_id' => $campaign->id,
             'destination_id' => $destination->id,
             'worker_id' => $validated['worker_id'],
-        ]);
-
-        // Generate webhook callback URL for Cloudonix using organization settings
-        // This ensures Cloudonix can reach the callback (not localhost)
-        $cloudonixSettings = $campaign->organization->cloudonixSettings;
-        $webhookBaseUrl = $cloudonixSettings?->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
-        $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
-
-        Log::debug('DialerWorker: Generated callback URL', [
-            'session_id' => $session->id,
-            'campaign_id' => $campaign->id,
-            'webhook_base_url' => $webhookBaseUrl,
-            'callback_url' => $callbackUrl,
-            'using_org_settings' => $cloudonixSettings?->webhook_base_url !== null,
+            'call_id' => $result['call_id'],
         ]);
 
         return response()->json([
             'message' => 'Call initiated',
             'data' => [
                 'session_id' => $session->id,
-                'call_id' => $session->call_id ?? null,
+                'call_id' => $result['call_id'],
                 'callback_url' => $callbackUrl,
             ],
         ], 201);
@@ -709,7 +731,7 @@ class DialerWorkerController extends Controller
                     'cxml' => $cxml,
                     'routing_type' => $campaign->routing_destination_type?->value,
                 ],
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         } catch (\Exception $e) {
             Log::error('DialerWorker: Failed to generate CXML', [
                 'campaign_id' => $campaign->id,

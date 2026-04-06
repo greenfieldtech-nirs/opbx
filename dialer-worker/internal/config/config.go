@@ -1,98 +1,60 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"time"
 )
 
-// Config holds all configuration for the worker
+// Config holds all configuration for the dialer worker
 type Config struct {
-	// Worker identity
-	WorkerID string
-
-	// Server port
-	WorkerAPIPort int
-
-	// Laravel API
+	// Laravel API Configuration
 	LaravelAPIURL   string
 	LaravelAPIToken string
 
-	// Redis
-	RedisAddr     string
+	// Redis Configuration
+	RedisHost     string
+	RedisPort     string
 	RedisPassword string
 	RedisDB       int
 
-	// Worker settings
-	MaxConcurrentCalls int
-	DefaultCallTimeout int
-	StateDir           string
-	LogLevel           string
+	// Worker Configuration
+	WorkerID        string
+	PollInterval    time.Duration
+	HealthCheckPort string
+	WebhookPort     string
+	WebhookSecret   string
 
-	// Circuit breaker
-	CircuitBreakerThreshold      int
-	CircuitBreakerTimeoutMinutes int
+	// Retry Configuration (per spec)
+	RetryIntervals []time.Duration
+	MaxRetries     int
 }
 
 // Load loads configuration from environment variables
-func Load() (*Config, error) {
-	cfg := &Config{
-		WorkerID:                     getEnv("WORKER_ID", "dialer-worker-1"),
-		WorkerAPIPort:                getEnvInt("WORKER_API_PORT", 8080),
-		LaravelAPIURL:                getEnv("LARAVEL_API_URL", "http://localhost:8000"),
-		LaravelAPIToken:              getEnv("LARAVEL_API_TOKEN", ""),
-		RedisAddr:                    getEnv("REDIS_ADDR", "redis:6379"),
-		RedisPassword:                getEnv("REDIS_PASSWORD", ""),
-		RedisDB:                      getEnvInt("REDIS_DB", 0),
-		MaxConcurrentCalls:           getEnvInt("MAX_CONCURRENT_CALLS_GLOBAL", 10),
-		DefaultCallTimeout:           getEnvInt("DEFAULT_CALL_TIMEOUT", 30),
-		StateDir:                     getEnv("STATE_DIR", "/app/state"),
-		LogLevel:                     getEnv("LOG_LEVEL", "info"),
-		CircuitBreakerThreshold:      getEnvInt("CIRCUIT_BREAKER_THRESHOLD", 5),
-		CircuitBreakerTimeoutMinutes: getEnvInt("CIRCUIT_BREAKER_TIMEOUT", 5),
-	}
+func Load() *Config {
+	return &Config{
+		LaravelAPIURL:   getEnv("LARAVEL_API_URL", "http://localhost:8000"),
+		LaravelAPIToken: getEnv("LARAVEL_API_TOKEN", ""),
 
-	// Validate required fields
-	if cfg.WorkerID == "" {
-		return nil, fmt.Errorf("WORKER_ID is required")
-	}
-	if cfg.LaravelAPIToken == "" {
-		return nil, fmt.Errorf("LARAVEL_API_TOKEN is required")
-	}
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnv("REDIS_PORT", "6379"),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisDB:       getEnvInt("REDIS_DB", 0),
 
-	return cfg, nil
-}
+		WorkerID:        getEnv("WORKER_ID", "worker-1"),
+		PollInterval:    getEnvDuration("POLL_INTERVAL", 10*time.Second),
+		HealthCheckPort: getEnv("HEALTH_CHECK_PORT", "8080"),
+		WebhookPort:     getEnv("WEBHOOK_PORT", "8081"),
+		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
 
-// RetryConfig holds retry queue configuration
-type RetryConfig struct {
-	MaxRetries int
-	BaseDelay  time.Duration
-	MaxDelay   time.Duration
-}
-
-// GetRetryConfig returns retry configuration
-func (c *Config) GetRetryConfig() RetryConfig {
-	return RetryConfig{
-		MaxRetries: 3,
-		BaseDelay:  5 * time.Minute,
-		MaxDelay:   4 * time.Hour,
-	}
-}
-
-// CircuitBreakerConfig holds circuit breaker configuration
-type CircuitBreakerConfig struct {
-	MaxFailures int
-	Timeout     time.Duration
-	Interval    time.Duration
-}
-
-// GetCircuitBreakerConfig returns circuit breaker configuration
-func (c *Config) GetCircuitBreakerConfig() CircuitBreakerConfig {
-	return CircuitBreakerConfig{
-		MaxFailures: c.CircuitBreakerThreshold,
-		Timeout:     time.Duration(c.CircuitBreakerTimeoutMinutes) * time.Minute,
-		Interval:    10 * time.Second,
+		// Per spec: 5min → 15min → 60min → 24hr
+		RetryIntervals: []time.Duration{
+			5 * time.Minute,
+			15 * time.Minute,
+			60 * time.Minute,
+			24 * time.Hour,
+		},
+		MaxRetries: 4,
 	}
 }
 
@@ -107,6 +69,15 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
 		}
 	}
 	return defaultValue

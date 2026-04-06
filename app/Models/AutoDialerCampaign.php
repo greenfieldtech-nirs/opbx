@@ -253,6 +253,11 @@ class AutoDialerCampaign extends Model
             $startTime = $range['start_time'] ?? '00:00';
             $endTime = $range['end_time'] ?? '00:00';
 
+            // Handle special case where end_time is '24:00' (midnight at end of day)
+            if ($endTime === '24:00') {
+                $endTime = '23:59';
+            }
+
             if ($currentTime >= $startTime && $currentTime <= $endTime) {
                 return true;
             }

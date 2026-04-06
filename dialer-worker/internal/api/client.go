@@ -6,389 +6,217 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/nirsolutions/opbx-dialer-worker/pkg/models"
+	"opbx/dialer-worker/internal/config"
+	"opbx/dialer-worker/internal/models"
+	"opbx/dialer-worker/pkg/errors"
 )
 
-// Client handles all communication with the Laravel API
+// Client handles communication with the Laravel API
 type Client struct {
 	baseURL    string
-	token      string
+	apiToken   string
 	httpClient *http.Client
+	logger     *slog.Logger
 }
 
 // NewClient creates a new Laravel API client
-func NewClient(baseURL, token string) *Client {
+func NewClient(cfg *config.Config, logger *slog.Logger) *Client {
 	return &Client{
-		baseURL: baseURL,
-		token:   token,
+		baseURL:  cfg.LaravelAPIURL,
+		apiToken: cfg.LaravelAPIToken,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives: true, // Disable connection pooling to avoid DNS caching issues
+			},
 		},
+		logger: logger,
 	}
 }
 
-// GetActiveCampaigns fetches all active campaigns for this worker
+// GetActiveCampaigns fetches all active campaigns ready for dialing
 func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, error) {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/campaigns/active", c.baseURL)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	var response models.APIResponse
+	err := c.get(ctx, "/api/v1/dialer/worker/campaigns/active", &response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to get active campaigns: %w", err)
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	req.Header.Set("Accept", "application/json")
+	// Debug: log the data type
+	c.logger.Info("GetActiveCampaigns response", "data_type", fmt.Sprintf("%T", response.Data))
 
-	resp, err := c.httpClient.Do(req)
+	// Extract campaigns from data wrapper
+	campaignsData, err := json.Marshal(response.Data)
 	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("failed to marshal campaigns data: %w", err)
 	}
 
-	var result struct {
-		Data []models.Campaign `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	var campaigns []models.Campaign
+	if err := json.Unmarshal(campaignsData, &campaigns); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal campaigns: %w", err)
 	}
 
-	return result.Data, nil
+	c.logger.Info("GetActiveCampaigns result", "count", len(campaigns))
+	for i, camp := range campaigns {
+		c.logger.Info("Campaign details", "index", i, "id", camp.ID, "name", camp.Name, "status", camp.Status, "cac", camp.CAC)
+	}
+
+	return campaigns, nil
 }
 
 // GetPendingDestinations fetches pending destinations for a campaign
 func (c *Client) GetPendingDestinations(ctx context.Context, campaignID int64, limit int) ([]models.Destination, error) {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/campaigns/%d/destinations/pending?limit=%d", c.baseURL, campaignID, limit)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	var response models.APIResponse
+	url := fmt.Sprintf("/api/v1/dialer/worker/campaigns/%d/destinations/pending?limit=%d", campaignID, limit)
+	err := c.get(ctx, url, &response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to get pending destinations: %w", err)
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.httpClient.Do(req)
+	// Extract destinations from data wrapper
+	destinationsData, err := json.Marshal(response.Data)
 	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("failed to marshal destinations data: %w", err)
 	}
 
-	var result struct {
-		Data []models.Destination `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	var destinations []models.Destination
+	if err := json.Unmarshal(destinationsData, &destinations); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal destinations: %w", err)
 	}
 
-	return result.Data, nil
+	return destinations, nil
 }
 
-// GetRetryDestinations fetches destinations ready for retry
-func (c *Client) GetRetryDestinations(ctx context.Context, campaignID int64) ([]models.Destination, error) {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/campaigns/%d/destinations/retry", c.baseURL, campaignID)
+// InitiateCall creates a new call session via Laravel
+func (c *Client) InitiateCall(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string) (*models.InitiateCallResponse, error) {
+	req := models.InitiateCallRequest{
+		CampaignID:    campaignID,
+		DestinationID: destinationID,
+		PhoneNumber:   phoneNumber,
+		WorkerID:      workerID,
+		InitiatedAt:   models.FlexTime(time.Now()),
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	var response models.APIResponse
+	err := c.post(ctx, "/api/v1/dialer/worker/calls/initiate", req, &response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to initiate call: %w", err)
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.httpClient.Do(req)
+	// Extract response data
+	responseData, err := json.Marshal(response.Data)
 	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("failed to marshal response data: %w", err)
 	}
 
-	var result struct {
-		Data []models.Destination `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	var callResp models.InitiateCallResponse
+	if err := json.Unmarshal(responseData, &callResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	return result.Data, nil
-}
-
-// InitiateCallSession creates a new call session in Laravel
-func (c *Client) InitiateCallSession(ctx context.Context, campaignID int64, req *models.InitiateCallRequest) (*models.InitiateCallResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/initiate", c.baseURL)
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Data models.InitiateCallResponse `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &result.Data, nil
+	return &callResp, nil
 }
 
 // UpdateCallStatus updates the status of a call session
-func (c *Client) UpdateCallStatus(ctx context.Context, sessionID int64, req *models.UpdateCallStatusRequest) error {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/%d/status", c.baseURL, sessionID)
+func (c *Client) UpdateCallStatus(ctx context.Context, sessionID int64, req models.UpdateCallStatusRequest) error {
+	url := fmt.Sprintf("/api/v1/dialer/worker/calls/%d/status", sessionID)
+	return c.patch(ctx, url, req, nil)
+}
 
-	body, err := json.Marshal(req)
+// SetCallDisposition sets the disposition for a completed call
+func (c *Client) SetCallDisposition(ctx context.Context, sessionID int64, req models.SetDispositionRequest) (*models.SetDispositionResponse, error) {
+	url := fmt.Sprintf("/api/v1/dialer/worker/calls/%d/disposition", sessionID)
+
+	var response models.APIResponse
+	err := c.post(ctx, url, req, &response)
 	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("failed to set disposition: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewBuffer(body))
+	// Extract response data
+	responseData, err := json.Marshal(response.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal response data: %w", err)
+	}
+
+	var dispResp models.SetDispositionResponse
+	if err := json.Unmarshal(responseData, &dispResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &dispResp, nil
+}
+
+// HTTP helper methods
+
+func (c *Client) get(ctx context.Context, path string, result interface{}) error {
+	return c.doRequest(ctx, http.MethodGet, path, nil, result)
+}
+
+func (c *Client) post(ctx context.Context, path string, body, result interface{}) error {
+	return c.doRequest(ctx, http.MethodPost, path, body, result)
+}
+
+func (c *Client) patch(ctx context.Context, path string, body, result interface{}) error {
+	return c.doRequest(ctx, http.MethodPatch, path, body, result)
+}
+
+func (c *Client) doRequest(ctx context.Context, method, path string, body, result interface{}) error {
+	url := c.baseURL + path
+
+	var bodyReader io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(jsonBody)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// SetDisposition sets the final disposition of a call
-func (c *Client) SetDisposition(ctx context.Context, campaignID int64, req *models.DispositionRequest) error {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/%s/disposition", c.baseURL, req.SessionID)
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// PauseCampaign pauses a campaign
-func (c *Client) PauseCampaign(ctx context.Context, campaignID int64, reason string) error {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/campaigns/%d/pause", c.baseURL, campaignID)
-
-	body, err := json.Marshal(map[string]string{"reason": reason})
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// PersistState saves worker state to the API
-func (c *Client) PersistState(ctx context.Context, state *models.WorkerState) error {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/state/persist", c.baseURL)
-
-	body, err := json.Marshal(state)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// GetState retrieves worker state from the API
-func (c *Client) GetState(ctx context.Context, workerID string) (*models.WorkerState, error) {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/state/%s", c.baseURL, workerID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	req.Header.Set("Authorization", "Bearer "+c.apiToken)
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
+	// Handle rate limiting (HTTP 429)
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := resp.Header.Get("Retry-After")
+		duration := 300 * time.Second // Default 5 minutes per spec
+		if retryAfter != "" {
+			if seconds, err := time.ParseDuration(retryAfter + "s"); err == nil {
+				duration = seconds
+			}
+		}
+		return &errors.RetryableError{
+			Err:        errors.ErrRateLimitExceeded,
+			RetryAfter: duration,
+		}
 	}
 
-	var result struct {
-		Data models.WorkerState `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	return &result.Data, nil
-}
-
-// GenerateCXML fetches CXML for outbound call routing from Laravel API
-func (c *Client) GenerateCXML(ctx context.Context, req *models.GenerateCXMLRequest) (*models.GenerateCXMLResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/calls/generate-cxml", c.baseURL)
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Data models.GenerateCXMLResponse `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &result.Data, nil
-}
-
-// Health checks the Laravel API health endpoint
-func (c *Client) Health(ctx context.Context) error {
-	url := fmt.Sprintf("%s/api/v1/dialer/worker/health", c.baseURL)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("api returned status %d", resp.StatusCode)
+	if result != nil {
+		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
 	}
 
 	return nil
-}
-
-// SetHTTPClient sets a custom HTTP client (useful for testing)
-func (c *Client) SetHTTPClient(client *http.Client) {
-	c.httpClient = client
 }
