@@ -41,7 +41,8 @@ class DialerWebhookProxyController extends Controller
     {
         $eventType = $request->input('type', 'unknown');
         $callId = $request->input('call_id');
-        $sessionToken = $request->input('session_token');
+        // Cloudonix nests the session token at session.token, not session_token
+        $sessionToken = $request->input('session.token') ?? $request->input('session_token');
         $customData = $request->input('custom_data', []);
 
         // Log the webhook receipt

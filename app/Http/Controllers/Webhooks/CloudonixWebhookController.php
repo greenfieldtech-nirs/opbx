@@ -599,10 +599,16 @@ class CloudonixWebhookController extends Controller
      */
     private function processAutoDialerCDR(\Illuminate\Http\Request $request, \App\Models\CallDetailRecord $cdr): void
     {
-        $sessionToken = $request->input('session_token');
+        // Cloudonix CDR nests the session token at session.token, not session_token
+        $sessionToken = $request->input('session.token') ?? $request->input('session_token');
         $callId = $request->input('call_id');
 
         if (! $sessionToken) {
+            Log::debug('Auto-dialer CDR skipped: no session token found', [
+                'call_id' => $callId,
+                'has_session_object' => $request->has('session'),
+            ]);
+
             return;
         }
 
@@ -610,6 +616,7 @@ class CloudonixWebhookController extends Controller
         $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
 
         if (! $session) {
+            // Not an auto-dialer call — this is normal for regular inbound/outbound calls
             return;
         }
 
