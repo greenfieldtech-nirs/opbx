@@ -855,16 +855,23 @@ class AutoDialerCloudonixService
      *
      * @param  AmdMode|string|null  $mode
      */
+    /**
+     * Map AMD mode to Cloudonix API value.
+     *
+     * Cloudonix accepts: 'Enable' or 'DetectMessageEnd'
+     */
     private function mapAmdMode($mode): string
     {
         if ($mode instanceof AmdMode) {
-            return $mode->value;
+            return match ($mode) {
+                AmdMode::ENABLED => 'Enable',
+                AmdMode::DETECT_MESSAGE_END => 'DetectMessageEnd',
+            };
         }
 
         return match ($mode) {
-            'detect_beep' => 'DetectMessageEnd',
-            'detect' => 'Enable',
-            'detect_wait' => 'Enable',
+            'Enabled', 'detect', 'detect_wait' => 'Enable',
+            'DetectMessageEnd', 'detect_beep' => 'DetectMessageEnd',
             default => 'Enable',
         };
     }
