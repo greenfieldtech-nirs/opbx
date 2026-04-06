@@ -86,9 +86,12 @@ class WebSocketUrlBuilder
             }
         }
 
-        // Check for any unsubstituted placeholders
-        if (preg_match('/\{[a-z_]+\}/', $url)) {
-            throw new InvalidArgumentException('Template contains unsubstituted placeholders');
+        // Check for unsubstituted CONFIG placeholders (Cloudonix placeholders are
+        // left as-is since Cloudonix substitutes them at call runtime)
+        foreach (self::ALLOWED_CONFIG_PLACEHOLDERS as $placeholder) {
+            if (str_contains($url, '{'.$placeholder.'}')) {
+                throw new InvalidArgumentException("Template contains unsubstituted config placeholder: {{$placeholder}}");
+            }
         }
 
         // Final validation
