@@ -623,6 +623,17 @@ class CloudonixWebhookController extends Controller
                 return;
             }
 
+            // Update the session itself with CDR data
+            $disposition = $request->input('disposition', 'unknown');
+            $isCompleted = in_array(strtoupper($disposition), ['ANSWER', 'ANSWERED', 'COMPLETED'], true);
+            $session->update([
+                'status' => $isCompleted ? 'completed' : 'failed',
+                'disposition' => $disposition,
+                'duration' => (int) $request->input('duration', 0),
+                'billsec' => (int) $request->input('billsec', 0),
+                'completed_at' => now(),
+            ]);
+
             // Update destination record
             $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
 

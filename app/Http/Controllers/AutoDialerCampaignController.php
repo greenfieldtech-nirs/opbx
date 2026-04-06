@@ -169,6 +169,19 @@ class AutoDialerCampaignController extends Controller
             'status' => CampaignStatus::PAUSED,
         ]);
 
+        // Reset the CAC counter — any in-flight calls are no longer tracked
+        // by the worker once the campaign is paused, so the counter would
+        // otherwise stay stale until CDR webhooks (which may never arrive).
+        try {
+            $dialerRedis = Redis::connection('dialer');
+            $dialerRedis->set("dialer:cac:{$campaign->id}:active", 0);
+        } catch (\Exception $e) {
+            Log::error('Failed to reset CAC counter on pause', [
+                'campaign_id' => $campaign->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return response()->json([
             'message' => 'Campaign paused successfully',
             'data' => new AutoDialerCampaignResource($campaign),
