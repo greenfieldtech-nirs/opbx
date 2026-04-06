@@ -552,18 +552,10 @@ class AutoDialerCampaignController extends Controller
             $pausedCampaignCount = 0;
 
             foreach ($campaigns as $campaign) {
-                // Get active calls from both Redis keys, use max
-                $legacyKey = "campaign:{$campaign->id}:concurrency_counter";
+                // Read active calls from the Go worker's unprefixed Redis key
+                $dialerRedis = Redis::connection('dialer');
                 $workerKey = "dialer:cac:{$campaign->id}:active";
-
-                $legacyCount = (int) Redis::get($legacyKey) ?? 0;
-                $workerCount = (int) Redis::get($workerKey) ?? 0;
-                $activeCalls = max($legacyCount, $workerCount);
-
-                // Ensure non-negative
-                if ($activeCalls < 0) {
-                    $activeCalls = 0;
-                }
+                $activeCalls = max(0, (int) $dialerRedis->get($workerKey));
 
                 $cac = $campaign->concurrent_active_calls;
                 $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
@@ -642,17 +634,10 @@ class AutoDialerCampaignController extends Controller
         $cacheKey = "monitor:detail:campaign:{$campaign->id}";
 
         $data = Cache::remember($cacheKey, 10, function () use ($campaign): array {
-            // Get active calls from both Redis keys, use max
-            $legacyKey = "campaign:{$campaign->id}:concurrency_counter";
+            // Read active calls from the Go worker's unprefixed Redis key
+            $dialerRedis = Redis::connection('dialer');
             $workerKey = "dialer:cac:{$campaign->id}:active";
-
-            $legacyCount = (int) Redis::get($legacyKey) ?? 0;
-            $workerCount = (int) Redis::get($workerKey) ?? 0;
-            $activeCalls = max($legacyCount, $workerCount);
-
-            if ($activeCalls < 0) {
-                $activeCalls = 0;
-            }
+            $activeCalls = max(0, (int) $dialerRedis->get($workerKey));
 
             $cac = $campaign->concurrent_active_calls;
             $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;

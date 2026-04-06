@@ -702,29 +702,29 @@ class CloudonixWebhookController extends Controller
      * Laravel decrements it directly when processing CDR webhooks, since the
      * worker has no Pub/Sub subscriber for the cdr:completed channel.
      */
+    /**
+     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
+     *
+     * Uses the 'dialer' connection (no key prefix) because the Go worker
+     * writes raw keys like dialer:cac:{id}:active without any prefix.
+     * The default Laravel Redis connection adds a prefix, which would
+     * cause Laravel and the Go worker to read/write different keys.
+     */
     private function decrementCacCounter(int $campaignId): void
     {
         try {
+            $redis = Redis::connection('dialer');
+
             $workerKey = "dialer:cac:{$campaignId}:active";
-            $newCount = Redis::decr($workerKey);
+            $newCount = $redis->decr($workerKey);
 
             // Prevent counter from going negative
             if ($newCount < 0) {
-                Redis::set($workerKey, 0);
+                $redis->set($workerKey, 0);
                 $newCount = 0;
             }
 
-            // Also decrement the legacy key if it exists
-            $legacyKey = "campaign:{$campaignId}:concurrency_counter";
-            $legacyCount = Redis::get($legacyKey);
-            if ($legacyCount !== null) {
-                $legacyNewCount = Redis::decr($legacyKey);
-                if ($legacyNewCount < 0) {
-                    Redis::set($legacyKey, 0);
-                }
-            }
-
-            Log::debug('CAC counter decremented via CDR', [
+            Log::info('CAC counter decremented', [
                 'campaign_id' => $campaignId,
                 'active_calls' => $newCount,
             ]);
