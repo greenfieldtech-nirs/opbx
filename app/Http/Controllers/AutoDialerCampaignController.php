@@ -675,9 +675,25 @@ class AutoDialerCampaignController extends Controller
                     'congestion' => 0,
                 ];
 
+                // Map Cloudonix disposition values (uppercase) to our keys (lowercase)
+                $dispositionMap = [
+                    'answer' => 'answered',
+                    'answered' => 'answered',
+                    'completed' => 'completed',
+                    'busy' => 'busy',
+                    'no-answer' => 'no_answer',
+                    'no_answer' => 'no_answer',
+                    'noanswer' => 'no_answer',
+                    'failed' => 'failed',
+                    'cancelled' => 'cancelled',
+                    'cancel' => 'cancelled',
+                    'congestion' => 'congestion',
+                ];
+
                 foreach ($results as $disposition => $count) {
-                    if (array_key_exists($disposition, $allDispositions)) {
-                        $allDispositions[$disposition] = (int) $count;
+                    $normalized = $dispositionMap[strtolower($disposition)] ?? strtolower($disposition);
+                    if (array_key_exists($normalized, $allDispositions)) {
+                        $allDispositions[$normalized] += (int) $count;
                     }
                 }
 

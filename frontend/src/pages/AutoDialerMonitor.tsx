@@ -327,12 +327,6 @@ function RefreshSelector({
 }) {
   return (
     <div className="flex items-center gap-2">
-      {refreshInterval === 0 && (
-        <Button variant="outline" size="default" onClick={onManualRefresh}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      )}
       <span className="text-sm text-muted-foreground whitespace-nowrap">Refresh every:</span>
       <Select value={refreshInterval.toString()} onValueChange={onIntervalChange}>
         <SelectTrigger className="w-[100px] h-9">
@@ -455,10 +449,16 @@ export default function AutoDialerMonitor() {
       return newMap;
     });
 
+    // Record activity as calls-per-interval (delta), not cumulative totals
     setActivityHistory((history) => {
       const newHistory = new Map(history);
       const existing = newHistory.get(selectedCampaignId) || [];
-      const newPoint: ActivityPoint = { timestamp: now, value: totalCalls };
+
+      // Compute delta from the previous snapshot (if available)
+      const prev = previousSnapshot.get(selectedCampaignId);
+      const delta = prev ? Math.max(0, totalCalls - prev.total) : 0;
+
+      const newPoint: ActivityPoint = { timestamp: now, value: delta };
       const updated = [...existing, newPoint];
       if (updated.length > MAX_ACTIVITY_POINTS) {
         updated.shift();
@@ -490,24 +490,26 @@ export default function AutoDialerMonitor() {
     setSelectedCampaignId(null);
   }, []);
 
-  // Direct action handlers (no confirmation dialog)
+  // Direct action handlers — invalidate monitor queries so the button updates
   const handlePause = useCallback(async (campaign: MonitorCampaign) => {
     try {
       await pauseMutation.mutateAsync(campaign.id.toString());
       toast.success(`Campaign "${campaign.name}" paused`);
+      refreshMonitor();
     } catch {
       toast.error('Failed to pause campaign');
     }
-  }, [pauseMutation]);
+  }, [pauseMutation, refreshMonitor]);
 
   const handleResume = useCallback(async (campaign: MonitorCampaign) => {
     try {
       await resumeMutation.mutateAsync(campaign.id.toString());
       toast.success(`Campaign "${campaign.name}" resumed`);
+      refreshMonitor();
     } catch {
       toast.error('Failed to resume campaign');
     }
-  }, [resumeMutation]);
+  }, [resumeMutation, refreshMonitor]);
 
   const isActionLoading = pauseMutation.isPending || resumeMutation.isPending;
 
@@ -834,6 +836,10 @@ export default function AutoDialerMonitor() {
                 isLoading={isActionLoading}
               />
             )}
+            <Button variant="outline" className="h-9" onClick={handleManualRefresh}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </div>
         </div>
 
@@ -1011,7 +1017,7 @@ export default function AutoDialerMonitor() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />
-                    Rolling Activity (30 min)
+                    Calls per Interval
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
