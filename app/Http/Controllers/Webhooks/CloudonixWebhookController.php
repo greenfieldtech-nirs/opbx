@@ -612,65 +612,69 @@ class CloudonixWebhookController extends Controller
             return;
         }
 
-        // Find auto-dialer session by session token
-        $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+        // All auto-dialer queries must bypass OrganizationScope since
+        // webhooks have no authenticated user context.
+        \App\Scopes\OrganizationScope::bypass(function () use ($request, $cdr, $sessionToken, $callId): void {
+            // Find auto-dialer session by session token
+            $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
 
-        if (! $session) {
-            // Not an auto-dialer call — this is normal for regular inbound/outbound calls
-            return;
-        }
+            if (! $session) {
+                // Not an auto-dialer call — this is normal for regular inbound/outbound calls
+                return;
+            }
 
-        // Update destination record
-        $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
+            // Update destination record
+            $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
 
-        if ($destination) {
-            $destination->update([
-                'status' => $this->mapDispositionToStatus($request->input('disposition')),
-                'last_disposition' => $request->input('disposition'),
-                'duration' => $request->input('duration', 0),
-                'billsec' => $request->input('billsec', 0),
-                'last_cdr_id' => $cdr->id,
-            ]);
+            if ($destination) {
+                $destination->update([
+                    'status' => $this->mapDispositionToStatus($request->input('disposition')),
+                    'last_disposition' => $request->input('disposition'),
+                    'duration' => $request->input('duration', 0),
+                    'billsec' => $request->input('billsec', 0),
+                    'last_cdr_id' => $cdr->id,
+                ]);
 
-            // Increment dial attempts
-            $destination->incrementDialAttempts();
+                // Increment dial attempts
+                $destination->incrementDialAttempts();
 
-            // Update CDR to mark as auto-dialer call
-            $cdr->update([
-                'is_auto_dialer' => true,
-                'auto_dialer_campaign_id' => $session->campaign_id,
-            ]);
+                // Update CDR to mark as auto-dialer call
+                $cdr->update([
+                    'is_auto_dialer' => true,
+                    'auto_dialer_campaign_id' => $session->campaign_id,
+                ]);
 
-            Log::info('Auto-dialer CDR processed', [
-                'call_id' => $callId,
-                'session_token' => $sessionToken,
-                'destination_id' => $destination->id,
-                'campaign_id' => $session->campaign_id,
-            ]);
-        }
+                Log::info('Auto-dialer CDR processed', [
+                    'call_id' => $callId,
+                    'session_token' => $sessionToken,
+                    'destination_id' => $destination->id,
+                    'campaign_id' => $session->campaign_id,
+                ]);
+            }
 
-        // Update campaign statistics
-        $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
-        if ($campaign) {
-            $campaign->increment('completed_calls');
-            $campaign->decrement('pending_calls');
-        }
+            // Update campaign statistics
+            $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+            if ($campaign) {
+                $campaign->increment('completed_calls');
+                $campaign->decrement('pending_calls');
+            }
 
-        // Decrement the CAC counter directly in Redis.
-        // The Go worker increments this when initiating calls but has no
-        // Pub/Sub subscriber to decrement it — Laravel handles this directly.
-        $this->decrementCacCounter($session->campaign_id);
+            // Decrement the CAC counter directly in Redis.
+            // The Go worker increments this when initiating calls but has no
+            // Pub/Sub subscriber to decrement it — Laravel handles this directly.
+            $this->decrementCacCounter($session->campaign_id);
 
-        // Also publish CDR event to Redis channel for any future subscribers
-        $this->cdrPublisher->publish(
-            sessionToken: $sessionToken,
-            campaignId: $session->campaign_id,
-            destinationId: $destination ? $destination->id : $session->destination_id,
-            sessionId: $session->id,
-            disposition: $request->input('disposition', 'unknown'),
-            duration: (int) $request->input('duration', 0),
-            billsec: (int) $request->input('billsec', 0)
-        );
+            // Also publish CDR event to Redis channel for any future subscribers
+            $this->cdrPublisher->publish(
+                sessionToken: $sessionToken,
+                campaignId: $session->campaign_id,
+                destinationId: $destination ? $destination->id : $session->destination_id,
+                sessionId: $session->id,
+                disposition: $request->input('disposition', 'unknown'),
+                duration: (int) $request->input('duration', 0),
+                billsec: (int) $request->input('billsec', 0)
+            );
+        });
     }
 
     /**
