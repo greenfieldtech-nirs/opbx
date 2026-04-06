@@ -121,6 +121,62 @@ func (c *Client) GetActiveCalls(ctx context.Context, campaignID int64) (int64, e
 	return result, err
 }
 
+// ResetActiveCalls sets the active call counter to zero for a campaign
+func (c *Client) ResetActiveCalls(ctx context.Context, campaignID int64) error {
+	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
+	return c.client.Set(ctx, key, 0, 0).Err()
+}
+
+// CountCallStatesForCampaign counts how many dialer:call:* keys exist for a given campaign.
+// This scans all call state hashes and checks the campaign_id field.
+func (c *Client) CountCallStatesForCampaign(ctx context.Context, campaignID int64) (int64, error) {
+	pattern := fmt.Sprintf("%s:*", PrefixCallState)
+	var count int64
+	campaignStr := strconv.FormatInt(campaignID, 10)
+
+	iter := c.client.Scan(ctx, 0, pattern, 100).Iterator()
+	for iter.Next(ctx) {
+		key := iter.Val()
+		cid, err := c.client.HGet(ctx, key, "campaign_id").Result()
+		if err != nil {
+			continue
+		}
+		if cid == campaignStr {
+			count++
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return count, err
+	}
+	return count, nil
+}
+
+// ReconcileActiveCalls reconciles the CAC counter with actual call state keys.
+// If the counter is higher than the number of live call states, it resets the
+// counter to the actual count. Returns the reconciled count.
+func (c *Client) ReconcileActiveCalls(ctx context.Context, campaignID int64) (int64, bool, error) {
+	counter, err := c.GetActiveCalls(ctx, campaignID)
+	if err != nil {
+		return 0, false, err
+	}
+
+	actual, err := c.CountCallStatesForCampaign(ctx, campaignID)
+	if err != nil {
+		return counter, false, err
+	}
+
+	if counter > actual {
+		// Counter is inflated — reset to actual
+		key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
+		if err := c.client.Set(ctx, key, actual, 0).Err(); err != nil {
+			return counter, false, err
+		}
+		return actual, true, nil
+	}
+
+	return counter, false, nil
+}
+
 // === Lock Management ===
 
 // AcquireLock attempts to acquire a distributed lock
