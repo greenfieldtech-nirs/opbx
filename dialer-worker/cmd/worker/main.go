@@ -18,6 +18,7 @@ import (
 	"opbx/dialer-worker/internal/redis"
 	"opbx/dialer-worker/internal/webhook"
 	"opbx/dialer-worker/pkg/retry"
+	"sync"
 )
 
 // Worker is the main dialer worker
@@ -31,8 +32,9 @@ type Worker struct {
 	logger      *slog.Logger
 
 	// State
-	activeCampaigns map[int64]*models.Campaign
-	shutdown        chan struct{}
+	activeCampaigns     map[int64]*models.Campaign
+	processingCampaigns sync.Map // tracks campaign IDs currently being processed
+	shutdown            chan struct{}
 }
 
 func main() {
@@ -144,8 +146,17 @@ func (w *Worker) processCampaigns() {
 		// Register with rate limiter
 		w.limiter.RegisterCampaign(campaign.ID, campaign.CAC)
 
-		// Process the campaign
-		go w.processCampaign(ctx, campaign)
+		// Skip if this campaign is already being processed by a previous cycle's goroutine
+		if _, alreadyProcessing := w.processingCampaigns.LoadOrStore(campaign.ID, true); alreadyProcessing {
+			w.logger.Info("campaign already being processed, skipping", "id", campaign.ID)
+			continue
+		}
+
+		// Process the campaign in a goroutine, clearing the flag when done
+		go func(c *models.Campaign) {
+			defer w.processingCampaigns.Delete(c.ID)
+			w.processCampaign(ctx, c)
+		}(campaign)
 	}
 }
 

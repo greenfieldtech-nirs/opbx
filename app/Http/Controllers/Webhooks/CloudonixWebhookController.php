@@ -164,6 +164,29 @@ class CloudonixWebhookController extends Controller
             }
         }
 
+        // Update auto-dialer session status if applicable
+        $sessionToken = $request->input('token');
+        if ($sessionToken && $status) {
+            $statusMap = [
+                'ringing' => 'ringing',
+                'connected' => 'answered',
+                'completed' => 'completed',
+                'failed' => 'failed',
+                'busy' => 'failed',
+                'no-answer' => 'failed',
+            ];
+            $mappedStatus = $statusMap[strtolower($status)] ?? null;
+
+            if ($mappedStatus) {
+                \App\Scopes\OrganizationScope::bypass(function () use ($sessionToken, $mappedStatus) {
+                    $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+                    if ($session && in_array($session->status, ['initiated', 'ringing'], true)) {
+                        $session->update(['status' => $mappedStatus]);
+                    }
+                });
+            }
+        }
+
         return response()->json([
             'status' => 'accepted',
             'message' => 'Call status received',
