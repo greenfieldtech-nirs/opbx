@@ -181,6 +181,9 @@ class DialerWebhookProxyController extends Controller
         // Update destination based on disposition
         $this->updateDestinationFromDisposition($session, $disposition, $duration, $billsec);
 
+        // Decrement the CAC counter in Redis so the worker knows a slot freed up
+        $this->decrementCacCounter($session->campaign_id);
+
         Log::info('Dialer call completed', [
             'session_id' => $session->id,
             'disposition' => $disposition,
@@ -214,6 +217,9 @@ class DialerWebhookProxyController extends Controller
 
         // Update destination based on disposition (with retry logic)
         $this->updateDestinationFromDisposition($session, $disposition, 0, 0);
+
+        // Decrement the CAC counter in Redis so the worker knows a slot freed up
+        $this->decrementCacCounter($session->campaign_id);
 
         Log::info('Dialer call failed', [
             'session_id' => $session->id,
@@ -383,5 +389,50 @@ class DialerWebhookProxyController extends Controller
         }
 
         return now()->addMinutes($delay)->toIso8601String();
+    }
+
+    /**
+     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
+     *
+     * The Go dialer worker increments this counter when initiating a call
+     * but never receives the CDR event to decrement it. Laravel handles the
+     * decrement directly since it processes all Cloudonix webhooks.
+     *
+     * Uses both Redis key patterns for compatibility:
+     * - dialer:cac:{campaignId}:active (Go worker key)
+     * - campaign:{campaignId}:concurrency_counter (legacy key)
+     */
+    private function decrementCacCounter(int $campaignId): void
+    {
+        try {
+            $workerKey = "dialer:cac:{$campaignId}:active";
+            $newCount = Redis::decr($workerKey);
+
+            // Prevent counter from going negative
+            if ($newCount < 0) {
+                Redis::set($workerKey, 0);
+                $newCount = 0;
+            }
+
+            // Also decrement the legacy key if it exists
+            $legacyKey = "campaign:{$campaignId}:concurrency_counter";
+            $legacyCount = Redis::get($legacyKey);
+            if ($legacyCount !== null) {
+                $legacyNewCount = Redis::decr($legacyKey);
+                if ($legacyNewCount < 0) {
+                    Redis::set($legacyKey, 0);
+                }
+            }
+
+            Log::debug('CAC counter decremented', [
+                'campaign_id' => $campaignId,
+                'active_calls' => $newCount,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to decrement CAC counter', [
+                'campaign_id' => $campaignId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
