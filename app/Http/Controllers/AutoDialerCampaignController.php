@@ -736,24 +736,6 @@ class AutoDialerCampaignController extends Controller
                 ];
             });
 
-            // Get currently active call sessions (only recent — older than 5 min are stale)
-            $activeSessions = OrganizationScope::bypass(function () use ($campaign): array {
-                return AutoDialerCallSession::where('campaign_id', $campaign->id)
-                    ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                    ->where('initiated_at', '>=', now()->subMinutes(5))
-                    ->orderBy('initiated_at', 'desc')
-                    ->get(['id', 'phone_number', 'status', 'call_id', 'initiated_at'])
-                    ->map(fn ($s) => [
-                        'id' => $s->id,
-                        'phone_number' => $s->phone_number,
-                        'status' => $s->status,
-                        'call_id' => $s->call_id,
-                        'initiated_at' => $s->initiated_at?->toIso8601String(),
-                        'duration_seconds' => $s->initiated_at ? (int) now()->diffInSeconds($s->initiated_at) : 0,
-                    ])
-                    ->toArray();
-            });
-
             // Check rate limit status
             $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
                 $campaign->pause_reason === 'cloudonix_rate_limit';
@@ -778,7 +760,6 @@ class AutoDialerCampaignController extends Controller
                     'avg_billsec_seconds' => $statistics['avg_billsec_seconds'],
                 ],
                 'dispositions' => $dispositions,
-                'active_sessions' => $activeSessions,
                 'rate_limit_status' => [
                     'is_rate_limited' => $isRateLimited,
                     'pause_reason' => $campaign->pause_reason,
@@ -786,6 +767,25 @@ class AutoDialerCampaignController extends Controller
                     'can_resume_now' => $canResumeNow,
                 ],
             ];
+        });
+
+        // Active sessions are always queried fresh (never cached) since they
+        // are the most volatile data — status changes every few seconds.
+        $data['active_sessions'] = OrganizationScope::bypass(function () use ($campaign): array {
+            return AutoDialerCallSession::where('campaign_id', $campaign->id)
+                ->whereIn('status', ['initiated', 'ringing', 'answered'])
+                ->where('initiated_at', '>=', now()->subMinutes(5))
+                ->orderBy('initiated_at', 'desc')
+                ->get(['id', 'phone_number', 'status', 'call_id', 'initiated_at'])
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'phone_number' => $s->phone_number,
+                    'status' => $s->status,
+                    'call_id' => $s->call_id,
+                    'initiated_at' => $s->initiated_at?->toIso8601String(),
+                    'duration_seconds' => $s->initiated_at ? (int) now()->diffInSeconds($s->initiated_at) : 0,
+                ])
+                ->toArray();
         });
 
         return response()->json(['data' => $data]);
