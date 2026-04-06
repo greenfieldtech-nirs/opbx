@@ -169,9 +169,27 @@ class AutoDialerCampaignController extends Controller
             'status' => CampaignStatus::PAUSED,
         ]);
 
+        // Mark all in-flight sessions as failed/cancelled — once paused,
+        // these are orphans whose CDRs may never arrive.
+        $staleCount = OrganizationScope::bypass(function () use ($campaign): int {
+            return AutoDialerCallSession::where('campaign_id', $campaign->id)
+                ->whereIn('status', ['initiated', 'ringing', 'answered'])
+                ->update([
+                    'status' => 'failed',
+                    'disposition' => 'cancelled',
+                    'completed_at' => now(),
+                ]);
+        });
+
+        if ($staleCount > 0) {
+            Log::info('Cleaned up stale sessions on campaign pause', [
+                'campaign_id' => $campaign->id,
+                'stale_sessions' => $staleCount,
+            ]);
+        }
+
         // Reset the CAC counter — any in-flight calls are no longer tracked
-        // by the worker once the campaign is paused, so the counter would
-        // otherwise stay stale until CDR webhooks (which may never arrive).
+        // by the worker once the campaign is paused.
         try {
             $dialerRedis = Redis::connection('dialer');
             $dialerRedis->set("dialer:cac:{$campaign->id}:active", 0);
@@ -718,10 +736,11 @@ class AutoDialerCampaignController extends Controller
                 ];
             });
 
-            // Get currently active call sessions
+            // Get currently active call sessions (only recent — older than 5 min are stale)
             $activeSessions = OrganizationScope::bypass(function () use ($campaign): array {
                 return AutoDialerCallSession::where('campaign_id', $campaign->id)
                     ->whereIn('status', ['initiated', 'ringing', 'answered'])
+                    ->where('initiated_at', '>=', now()->subMinutes(5))
                     ->orderBy('initiated_at', 'desc')
                     ->get(['id', 'phone_number', 'status', 'call_id', 'initiated_at'])
                     ->map(fn ($s) => [
