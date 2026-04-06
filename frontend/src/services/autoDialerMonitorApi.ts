@@ -85,10 +85,20 @@ export interface MonitorDetailDispositions {
   congestion: number;
 }
 
+export interface MonitorActiveSession {
+  id: number;
+  phone_number: string;
+  status: string;
+  call_id: string;
+  initiated_at: string;
+  duration_seconds: number;
+}
+
 export interface MonitorDetailResponse {
   campaign: MonitorDetailCampaign;
   statistics: MonitorDetailStatistics;
   dispositions: MonitorDetailDispositions;
+  active_sessions: MonitorActiveSession[];
   rate_limit_status: RateLimitStatus;
 }
 

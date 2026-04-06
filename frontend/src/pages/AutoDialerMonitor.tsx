@@ -21,7 +21,6 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  TrendingUp,
   BarChart3,
   Loader2,
 } from 'lucide-react';
@@ -55,7 +54,6 @@ import type { MonitorCampaign } from '@/services/autoDialerMonitorApi';
 
 // Constants
 const REFRESH_INTERVAL_KEY = 'monitor-refresh-interval';
-const MAX_ACTIVITY_POINTS = 30;
 
 const REFRESH_OPTIONS = [
   { value: '0', label: 'Manual' },
@@ -68,11 +66,6 @@ const REFRESH_OPTIONS = [
 ];
 
 // Helper types
-interface ActivityPoint {
-  timestamp: number;
-  value: number;
-}
-
 interface SnapshotData {
   total: number;
   timestamp: number;
@@ -244,77 +237,6 @@ function PieChart({
   );
 }
 
-// Sparkline component
-function Sparkline({ data, width = 300, height = 80 }: { data: ActivityPoint[]; width?: number; height?: number }) {
-  if (data.length < 2) {
-    return (
-      <div className="flex items-center justify-center h-20 text-sm text-muted-foreground">
-        Collecting data...
-      </div>
-    );
-  }
-
-  const padding = { top: 10, right: 10, bottom: 20, left: 40 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-
-  const maxValue = Math.max(...data.map((d) => d.value), 1);
-  const minValue = Math.min(...data.map((d) => d.value), 0);
-  const valueRange = maxValue - minValue || 1;
-
-  const points = data.map((d, i) => {
-    const x = padding.left + (i / (data.length - 1)) * chartWidth;
-    const y = padding.top + chartHeight - ((d.value - minValue) / valueRange) * chartHeight;
-    return `${x},${y}`;
-  });
-
-  const yLabels = [maxValue, (maxValue + minValue) / 2, minValue];
-
-  return (
-    <svg width={width} height={height} className="overflow-visible">
-      {[0, 0.5, 1].map((ratio, i) => {
-        const y = padding.top + chartHeight * ratio;
-        return (
-          <line
-            key={i}
-            x1={padding.left}
-            y1={y}
-            x2={width - padding.right}
-            y2={y}
-            stroke="currentColor"
-            strokeOpacity={0.1}
-            strokeDasharray="2,2"
-          />
-        );
-      })}
-      {yLabels.map((value, i) => {
-        const y = padding.top + chartHeight * (1 - i / 2);
-        return (
-          <text key={i} x={padding.left - 8} y={y + 4} textAnchor="end" className="text-xs fill-muted-foreground">
-            {Math.round(value)}
-          </text>
-        );
-      })}
-      <text x={padding.left} y={height - 5} textAnchor="middle" className="text-xs fill-muted-foreground">
-        -30m
-      </text>
-      <text x={width - padding.right} y={height - 5} textAnchor="middle" className="text-xs fill-muted-foreground">
-        Now
-      </text>
-      <polygon
-        points={`${points[0]} ${points.join(' ')} ${points[points.length - 1]} ${padding.left + chartWidth},${padding.top + chartHeight} ${padding.left},${padding.top + chartHeight}`}
-        fill="currentColor"
-        fillOpacity={0.1}
-      />
-      <polyline points={points.join(' ')} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((point, i) => {
-        const [x, y] = point.split(',').map(Number);
-        return <circle key={i} cx={x} cy={y} r={3} fill="currentColor" className="text-primary" />;
-      })}
-    </svg>
-  );
-}
-
 // Refresh interval selector with label (shared between views)
 function RefreshSelector({
   refreshInterval,
@@ -399,7 +321,6 @@ export default function AutoDialerMonitor() {
     const saved = localStorage.getItem(REFRESH_INTERVAL_KEY);
     return saved ? parseInt(saved, 10) : 10000;
   });
-  const [activityHistory, setActivityHistory] = useState<Map<number, ActivityPoint[]>>(new Map());
   const [previousSnapshot, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
   const [callsPerMinute, setCallsPerMinute] = useState<Map<number, number | null>>(new Map());
 
@@ -449,23 +370,6 @@ export default function AutoDialerMonitor() {
       return newMap;
     });
 
-    // Record activity as calls-per-interval (delta), not cumulative totals
-    setActivityHistory((history) => {
-      const newHistory = new Map(history);
-      const existing = newHistory.get(selectedCampaignId) || [];
-
-      // Compute delta from the previous snapshot (if available)
-      const prev = previousSnapshot.get(selectedCampaignId);
-      const delta = prev ? Math.max(0, totalCalls - prev.total) : 0;
-
-      const newPoint: ActivityPoint = { timestamp: now, value: delta };
-      const updated = [...existing, newPoint];
-      if (updated.length > MAX_ACTIVITY_POINTS) {
-        updated.shift();
-      }
-      newHistory.set(selectedCampaignId, updated);
-      return newHistory;
-    });
   }, [detailQuery.data, selectedCampaignId]);
 
   // Handlers
@@ -520,7 +424,6 @@ export default function AutoDialerMonitor() {
   }, [selectedCampaignId, summaryQuery.data]);
 
   const currentCPM = selectedCampaignId ? callsPerMinute.get(selectedCampaignId) : null;
-  const currentActivity = selectedCampaignId ? activityHistory.get(selectedCampaignId) || [] : [];
 
   // Loading state
   if (summaryQuery.isLoading) {
@@ -946,7 +849,7 @@ export default function AutoDialerMonitor() {
                       </p>
                     </div>
                     <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-green-600" />
+                      <Activity className="h-6 w-6 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -1010,23 +913,49 @@ export default function AutoDialerMonitor() {
               </Card>
             </div>
 
-            {/* Rolling Activity + Disposition Pie Chart side by side */}
+            {/* Active Calls + Disposition Pie Chart side by side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Rolling Activity Chart */}
+              {/* Active Calls Table */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Calls per Interval
+                    <PhoneCall className="h-5 w-5" />
+                    Active Calls ({detail.active_sessions?.length || 0})
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-primary">
-                    <Sparkline data={currentActivity} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    Chart data accumulates while this page is open
-                  </p>
+                  {!detail.active_sessions || detail.active_sessions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No active calls at this time
+                    </div>
+                  ) : (
+                    <div className="overflow-auto max-h-[300px]">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-background">
+                          <tr className="border-b text-left text-muted-foreground">
+                            <th className="py-2 pr-3 font-medium">Phone Number</th>
+                            <th className="py-2 pr-3 font-medium">Status</th>
+                            <th className="py-2 font-medium text-right">Duration</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.active_sessions.map((session) => (
+                            <tr key={session.id} className="border-b last:border-0">
+                              <td className="py-2 pr-3 font-mono">{session.phone_number}</td>
+                              <td className="py-2 pr-3">
+                                <Badge variant="outline" className="capitalize text-xs">
+                                  {session.status}
+                                </Badge>
+                              </td>
+                              <td className="py-2 text-right text-muted-foreground">
+                                {formatDuration(session.duration_seconds)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
