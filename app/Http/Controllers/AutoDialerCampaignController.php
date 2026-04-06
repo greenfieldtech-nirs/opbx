@@ -697,8 +697,8 @@ class AutoDialerCampaignController extends Controller
                     ->avg('billsec');
 
                 return [
-                    'avg_duration_seconds' => $avgDuration ? (int) round($avgDuration) : 0,
-                    'avg_billsec_seconds' => $avgBillsec ? (int) round($avgBillsec) : 0,
+                    'avg_duration_seconds' => $avgDuration ? (int) round((float) $avgDuration) : 0,
+                    'avg_billsec_seconds' => $avgBillsec ? (int) round((float) $avgBillsec) : 0,
                 ];
             });
 
