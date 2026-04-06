@@ -9,12 +9,18 @@ use App\Http\Requests\CreateCampaignRequest;
 use App\Http\Requests\UpdateCampaignRequest;
 use App\Http\Requests\UploadListRequest;
 use App\Http\Resources\AutoDialerCampaignResource;
+use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Scopes\OrganizationScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 
 class AutoDialerCampaignController extends Controller
@@ -518,5 +524,265 @@ class AutoDialerCampaignController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Get real-time monitor summary for all active/paused campaigns.
+     *
+     * Returns a bird's-eye view of all campaigns with their concurrency data,
+     * progress statistics, and dialer worker health status.
+     */
+    public function monitorSummary(): JsonResponse
+    {
+        $this->authorize('viewAny', AutoDialerCampaign::class);
+
+        $organizationId = Auth::user()->organization_id;
+        $cacheKey = "monitor:summary:org:{$organizationId}";
+
+        $data = Cache::remember($cacheKey, 5, function () use ($organizationId): array {
+            // Query active and paused campaigns for this organization
+            $campaigns = AutoDialerCampaign::forOrganization($organizationId)
+                ->whereIn('status', [CampaignStatus::ACTIVE, CampaignStatus::PAUSED])
+                ->get();
+
+            $campaignData = [];
+            $totalActiveCalls = 0;
+            $totalCacCapacity = 0;
+            $activeCampaignCount = 0;
+            $pausedCampaignCount = 0;
+
+            foreach ($campaigns as $campaign) {
+                // Get active calls from both Redis keys, use max
+                $legacyKey = "campaign:{$campaign->id}:concurrency_counter";
+                $workerKey = "dialer:cac:{$campaign->id}:active";
+
+                $legacyCount = (int) Redis::get($legacyKey) ?? 0;
+                $workerCount = (int) Redis::get($workerKey) ?? 0;
+                $activeCalls = max($legacyCount, $workerCount);
+
+                // Ensure non-negative
+                if ($activeCalls < 0) {
+                    $activeCalls = 0;
+                }
+
+                $cac = $campaign->concurrent_active_calls;
+                $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
+
+                $totalActiveCalls += $activeCalls;
+                $totalCacCapacity += $cac;
+
+                if ($campaign->status === CampaignStatus::ACTIVE) {
+                    $activeCampaignCount++;
+                } else {
+                    $pausedCampaignCount++;
+                }
+
+                // Check rate limit status
+                $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
+                    $campaign->pause_reason === 'cloudonix_rate_limit';
+
+                $campaignData[] = [
+                    'id' => $campaign->id,
+                    'name' => $campaign->name,
+                    'status' => $campaign->status->value,
+                    'progress_percentage' => $campaign->getProgressPercentage(),
+                    'total_destinations' => $campaign->total_destinations,
+                    'completed_calls' => $campaign->completed_calls,
+                    'failed_calls' => $campaign->failed_calls,
+                    'pending_calls' => $campaign->pending_calls,
+                    'concurrent_active_calls' => $cac,
+                    'active_calls' => $activeCalls,
+                    'cac_utilization' => $cacUtilization,
+                    'rate_limit_status' => [
+                        'is_rate_limited' => $isRateLimited,
+                        'pause_reason' => $campaign->pause_reason,
+                        'resumes_at' => $campaign->resume_at?->toIso8601String(),
+                    ],
+                    'caller_id' => $campaign->caller_id,
+                    'routing_destination_type' => $campaign->routing_destination_type->value,
+                    'routing_destination_label' => $campaign->getRoutingDestinationLabel(),
+                    'start_date' => $campaign->start_date?->toDateString(),
+                    'end_date' => $campaign->end_date?->toDateString(),
+                ];
+            }
+
+            // Calculate overall utilization
+            $overallUtilization = $totalCacCapacity > 0
+                ? round(($totalActiveCalls / $totalCacCapacity) * 100, 1)
+                : 0;
+
+            // Get worker health status
+            $workerHealth = $this->getDialerWorkerHealth();
+
+            return [
+                'campaigns' => $campaignData,
+                'totals' => [
+                    'active_campaigns' => $activeCampaignCount,
+                    'paused_campaigns' => $pausedCampaignCount,
+                    'total_active_calls' => $totalActiveCalls,
+                    'total_cac_capacity' => $totalCacCapacity,
+                    'overall_utilization' => $overallUtilization,
+                ],
+                'worker_health' => $workerHealth,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get detailed monitor view for a single campaign.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign to get details for
+     */
+    public function monitorDetail(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $cacheKey = "monitor:detail:campaign:{$campaign->id}";
+
+        $data = Cache::remember($cacheKey, 10, function () use ($campaign): array {
+            // Get active calls from both Redis keys, use max
+            $legacyKey = "campaign:{$campaign->id}:concurrency_counter";
+            $workerKey = "dialer:cac:{$campaign->id}:active";
+
+            $legacyCount = (int) Redis::get($legacyKey) ?? 0;
+            $workerCount = (int) Redis::get($workerKey) ?? 0;
+            $activeCalls = max($legacyCount, $workerCount);
+
+            if ($activeCalls < 0) {
+                $activeCalls = 0;
+            }
+
+            $cac = $campaign->concurrent_active_calls;
+            $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
+
+            // Get disposition breakdown - bypass scope since campaign is already scoped
+            $dispositions = OrganizationScope::bypass(function () use ($campaign): array {
+                $results = AutoDialerCallSession::where('campaign_id', $campaign->id)
+                    ->whereNotNull('disposition')
+                    ->selectRaw('disposition, COUNT(*) as count')
+                    ->groupBy('disposition')
+                    ->pluck('count', 'disposition')
+                    ->toArray();
+
+                // Ensure all disposition keys exist with 0 if not present
+                $allDispositions = [
+                    'answered' => 0,
+                    'completed' => 0,
+                    'busy' => 0,
+                    'no_answer' => 0,
+                    'failed' => 0,
+                    'cancelled' => 0,
+                    'congestion' => 0,
+                ];
+
+                foreach ($results as $disposition => $count) {
+                    if (array_key_exists($disposition, $allDispositions)) {
+                        $allDispositions[$disposition] = (int) $count;
+                    }
+                }
+
+                return $allDispositions;
+            });
+
+            // Get average duration and billsec - bypass scope
+            $statistics = OrganizationScope::bypass(function () use ($campaign): array {
+                $avgDuration = AutoDialerCallSession::where('campaign_id', $campaign->id)
+                    ->where('status', 'completed')
+                    ->where('duration', '>', 0)
+                    ->avg('duration');
+
+                $avgBillsec = AutoDialerCallSession::where('campaign_id', $campaign->id)
+                    ->where('status', 'completed')
+                    ->where('billsec', '>', 0)
+                    ->avg('billsec');
+
+                return [
+                    'avg_duration_seconds' => $avgDuration ? (int) round($avgDuration) : 0,
+                    'avg_billsec_seconds' => $avgBillsec ? (int) round($avgBillsec) : 0,
+                ];
+            });
+
+            // Check rate limit status
+            $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
+                $campaign->pause_reason === 'cloudonix_rate_limit';
+            $canResumeNow = $campaign->resume_at ? now()->gte($campaign->resume_at) : true;
+
+            return [
+                'campaign' => [
+                    'id' => $campaign->id,
+                    'name' => $campaign->name,
+                    'status' => $campaign->status->value,
+                    'concurrent_active_calls' => $cac,
+                    'active_calls' => $activeCalls,
+                    'cac_utilization' => $cacUtilization,
+                ],
+                'statistics' => [
+                    'total_destinations' => $campaign->total_destinations,
+                    'completed_calls' => $campaign->completed_calls,
+                    'failed_calls' => $campaign->failed_calls,
+                    'pending_calls' => $campaign->pending_calls,
+                    'progress_percentage' => $campaign->getProgressPercentage(),
+                    'avg_duration_seconds' => $statistics['avg_duration_seconds'],
+                    'avg_billsec_seconds' => $statistics['avg_billsec_seconds'],
+                ],
+                'dispositions' => $dispositions,
+                'rate_limit_status' => [
+                    'is_rate_limited' => $isRateLimited,
+                    'pause_reason' => $campaign->pause_reason,
+                    'resumes_at' => $campaign->resume_at?->toIso8601String(),
+                    'can_resume_now' => $canResumeNow,
+                ],
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get dialer worker health status.
+     *
+     * @return array<string, mixed>
+     */
+    private function getDialerWorkerHealth(): array
+    {
+        $healthUrl = config('services.dialer_worker.health_url');
+
+        if (empty($healthUrl)) {
+            return [
+                'status' => 'unknown',
+                'active_campaigns' => 0,
+                'active_calls' => 0,
+                'queue_depth' => 0,
+            ];
+        }
+
+        try {
+            $response = Http::timeout(5)->get($healthUrl);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                return [
+                    'status' => $data['status'] ?? 'healthy',
+                    'active_campaigns' => $data['active_campaigns'] ?? 0,
+                    'active_calls' => $data['active_calls'] ?? 0,
+                    'queue_depth' => $data['queue_depth'] ?? 0,
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to fetch dialer worker health', [
+                'url' => $healthUrl,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [
+            'status' => 'offline',
+            'active_campaigns' => 0,
+            'active_calls' => 0,
+            'queue_depth' => 0,
+        ];
     }
 }

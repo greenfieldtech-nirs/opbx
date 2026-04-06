@@ -236,6 +236,12 @@ Route::prefix('v1')->group(function (): void {
                 ->name('extensions.sync.perform');
         });
 
+        // Auto Dialer Campaigns - Monitor (MUST be before apiResource to avoid 'monitor' matching {campaign})
+        Route::get('auto-dialer-campaigns/monitor/summary', [AutoDialerCampaignController::class, 'monitorSummary'])
+            ->name('auto-dialer-campaigns.monitor.summary');
+        Route::get('auto-dialer-campaigns/{campaign}/monitor/detail', [AutoDialerCampaignController::class, 'monitorDetail'])
+            ->name('auto-dialer-campaigns.monitor.detail');
+
         // Auto Dialer Campaigns - Distribution Lists (MUST be before apiResource to avoid route conflicts)
         Route::get('auto-dialer-campaigns/lists', [\App\Http\Controllers\DistributionListController::class, 'index'])
             ->name('distribution-lists.index');

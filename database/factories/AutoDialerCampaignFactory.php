@@ -36,7 +36,7 @@ class AutoDialerCampaignFactory extends Factory
             'destination_connect' => 'connected',
             'caller_id' => '+1'.$this->faker->numberBetween(2000000000, 9999999999),
             'max_dial_attempts' => 3,
-            'calls_per_second' => 1,
+            'concurrent_active_calls' => 5,
             'days_active' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
             'start_time' => 9,
             'end_time' => 17,

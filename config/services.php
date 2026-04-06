@@ -63,6 +63,9 @@ return [
 
         // Rate limiting
         'rate_limit_per_minute' => env('DIALER_WORKER_RATE_LIMIT', 1000),
+
+        // Health check endpoint URL
+        'health_url' => env('DIALER_WORKER_HEALTH_URL', 'http://dialer-worker:8081/webhooks/health'),
     ],
 
     /*
