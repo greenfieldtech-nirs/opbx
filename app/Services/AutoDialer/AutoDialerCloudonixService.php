@@ -160,7 +160,7 @@ class AutoDialerCloudonixService
         ];
 
         // Add routing destination (application, url, or cxml)
-        $routingPayload = $this->buildRoutingPayload($campaign);
+        $routingPayload = $this->buildRoutingPayload($campaign, $destination);
         $payload = array_merge($payload, $routingPayload);
 
         // Optional: Trunk (from outbound whitelist rules)
@@ -218,10 +218,10 @@ class AutoDialerCloudonixService
      *
      * @return array<string, mixed>
      */
-    private function buildRoutingPayload(AutoDialerCampaign $campaign): array
+    private function buildRoutingPayload(AutoDialerCampaign $campaign, AutoDialerDestination $destination): array
     {
         // Generate CXML based on campaign routing type
-        $cxml = $this->generateCxmlForCampaign($campaign);
+        $cxml = $this->generateCxmlForCampaign($campaign, $destination);
 
         return ['cxml' => $cxml];
     }
@@ -232,7 +232,7 @@ class AutoDialerCloudonixService
      * @param  AutoDialerCampaign  $campaign  The campaign to generate CXML for
      * @return string The generated CXML
      */
-    private function generateCxmlForCampaign(AutoDialerCampaign $campaign): string
+    private function generateCxmlForCampaign(AutoDialerCampaign $campaign, AutoDialerDestination $destination): string
     {
         try {
             // Handle both enum and string values
@@ -244,12 +244,19 @@ class AutoDialerCloudonixService
                 $routingType = (string) $routingType;
             }
 
+            // Build Cloudonix-style parameters for WebSocket URL substitution
+            $cloudonixParams = [
+                'session' => uniqid('ad-', true),
+                'from' => $campaign->caller_id ?? '',
+                'to' => $destination->phone_number ?? '',
+            ];
+
             switch ($routingType) {
                 case 'ai_assistant':
-                    return $this->generateAiAssistantCxml($campaign);
+                    return $this->generateAiAssistantCxml($campaign, $cloudonixParams);
 
                 case 'ai_load_balancer':
-                    return $this->generateAiLoadBalancerCxml($campaign);
+                    return $this->generateAiLoadBalancerCxml($campaign, $cloudonixParams);
 
                 case 'extension':
                     return $this->generateExtensionCxml($campaign);
@@ -291,7 +298,10 @@ class AutoDialerCloudonixService
      * @param  AutoDialerCampaign  $campaign  The campaign
      * @return string The generated CXML
      */
-    private function generateAiAssistantCxml(AutoDialerCampaign $campaign): string
+    /**
+     * @param  array<string, string>  $cloudonixParams  Runtime params (session, from, to)
+     */
+    private function generateAiAssistantCxml(AutoDialerCampaign $campaign, array $cloudonixParams): string
     {
         $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $campaign->routing_destination_id)
@@ -312,7 +322,7 @@ class AutoDialerCloudonixService
         $provider = $aiAssistant->provider;
 
         if ($protocol === 'websocket') {
-            return $this->generateWebSocketCxml($aiAssistant, $config, $provider);
+            return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $cloudonixParams);
         }
 
         return $this->generateSipCxml($aiAssistant, $config, $provider);
@@ -326,7 +336,11 @@ class AutoDialerCloudonixService
      * @param  string|null  $provider  The provider name
      * @return string The generated CXML
      */
-    private function generateWebSocketCxml(AiAssistant $aiAssistant, array $config, ?string $provider): string
+    /**
+     * @param  array<string, mixed>  $config  AI assistant configuration
+     * @param  array<string, string>  $cloudonixParams  Runtime params (session, from, to)
+     */
+    private function generateWebSocketCxml(AiAssistant $aiAssistant, array $config, ?string $provider, array $cloudonixParams): string
     {
         if (! $provider) {
             Log::error('AutoDialer: AI Assistant provider not configured', [
@@ -349,12 +363,12 @@ class AutoDialerCloudonixService
             return $this->buildHangupCxml();
         }
 
-        // Build WebSocket URL using the URL builder
+        // Build WebSocket URL — substitute both config values and Cloudonix params
         $urlBuilder = app(WebSocketUrlBuilder::class);
         $websocketUrl = $urlBuilder->buildUrl(
             $providerDef->urlTemplate,
             $config,
-            []
+            $cloudonixParams
         );
 
         Log::debug('AutoDialer: Generated WebSocket URL for AI Assistant', [
@@ -425,7 +439,10 @@ class AutoDialerCloudonixService
      * @param  AutoDialerCampaign  $campaign  The campaign
      * @return string The generated CXML
      */
-    private function generateAiLoadBalancerCxml(AutoDialerCampaign $campaign): string
+    /**
+     * @param  array<string, string>  $cloudonixParams  Runtime params (session, from, to)
+     */
+    private function generateAiLoadBalancerCxml(AutoDialerCampaign $campaign, array $cloudonixParams): string
     {
         $loadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $campaign->routing_destination_id)
@@ -459,7 +476,7 @@ class AutoDialerCloudonixService
         $provider = $aiAssistant->provider;
 
         if ($protocol === 'websocket') {
-            return $this->generateWebSocketCxml($aiAssistant, $config, $provider);
+            return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $cloudonixParams);
         }
 
         return $this->generateSipCxml($aiAssistant, $config, $provider);
