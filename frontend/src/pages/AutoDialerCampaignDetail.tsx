@@ -79,8 +79,8 @@ export default function AutoDialerCampaignDetail() {
 
   const canManageCampaigns = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
 
-  // Fetch campaign data
-  const { data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '');
+  // Fetch campaign data — poll every 10s when campaign is active
+  const { data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
 
   // Fetch distribution lists for this campaign
   const { data: distributionListsData, isLoading: isListsLoading } = useDistributionLists(

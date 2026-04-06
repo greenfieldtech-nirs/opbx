@@ -26,11 +26,13 @@ export function useAutoDialerCampaigns(params?: CampaignParams) {
   });
 }
 
-export function useAutoDialerCampaign(id: string) {
+export function useAutoDialerCampaign(id: string, refetchInterval?: number | false) {
   return useQuery({
     queryKey: autoDialerKeys.detail(id),
     queryFn: () => autoDialerCampaignsApi.getById(id),
     enabled: !!id,
+    refetchInterval: refetchInterval || false,
+    refetchIntervalInBackground: false,
   });
 }
 
