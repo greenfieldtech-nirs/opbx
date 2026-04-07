@@ -24,6 +24,7 @@ export interface AutoDialerCampaign {
   caller_id: string;
   max_dial_attempts: number;
   concurrent_active_calls: number;
+  calls_per_second: number;
   days_active: string[];
   start_time: number;
   end_time: number;
@@ -63,6 +64,7 @@ export interface CreateCampaignRequest {
   caller_id: string;
   max_dial_attempts: number;
   concurrent_active_calls: number;
+  calls_per_second: number;
   // New schedule format - full weekly schedule
   schedule: WeeklySchedule;
   // Legacy fields (optional)
@@ -93,6 +95,7 @@ export interface UpdateCampaignRequest {
   caller_id?: string;
   max_dial_attempts?: number;
   concurrent_active_calls?: number;
+  calls_per_second?: number;
   // New schedule format
   schedule?: WeeklySchedule;
   // Legacy fields
