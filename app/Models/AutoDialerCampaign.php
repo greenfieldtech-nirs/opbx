@@ -29,12 +29,16 @@ class AutoDialerCampaign extends Model
      * Valid CAC (Concurrent Active Calls) values.
      *
      * CAC determines the maximum number of calls that can be active
-     * (ringing or connected) at the same time. API request interval
-     * is calculated as: 60 / CAC seconds.
-     *
-     * @var array<int>
+     * (ringing or connected) at the same time. Valid range: 1–50.
+     * CPS (Calls Per Second) controls initiation rate. Valid range: 1–5.
      */
-    public const VALID_CAC_VALUES = [2, 3, 4, 6, 10, 15, 20];
+    public const MIN_CAC = 1;
+
+    public const MAX_CAC = 50;
+
+    public const MIN_CPS = 1;
+
+    public const MAX_CPS = 5;
 
     /**
      * The attributes that are mass assignable.
@@ -53,7 +57,8 @@ class AutoDialerCampaign extends Model
         'destination_connect',
         'caller_id',
         'max_dial_attempts',
-        'concurrent_active_calls', // Max concurrent active calls (CAC)
+        'concurrent_active_calls', // Max concurrent active calls (CAC, 1-50)
+        'calls_per_second',        // Call initiation rate (CPS, 1-5)
         'days_active',
         'start_time',
         'end_time',
@@ -97,6 +102,7 @@ class AutoDialerCampaign extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'concurrent_active_calls' => 'integer',
+        'calls_per_second' => 'integer',
         'resume_at' => 'datetime',
     ];
 
@@ -320,58 +326,44 @@ class AutoDialerCampaign extends Model
      *
      * @return float The interval in seconds between API requests
      */
-    public function getApiIntervalSeconds(): float
+    /**
+     * Get the API request interval in milliseconds based on CPS.
+     *
+     * CPS (Calls Per Second) determines how fast calls are initiated:
+     *   CPS = 1 → 1000ms between calls
+     *   CPS = 2 → 500ms between calls
+     *   CPS = 5 → 200ms between calls
+     *
+     * @return float The interval in milliseconds between call initiations
+     */
+    public function getApiIntervalMilliseconds(): float
     {
-        $cac = $this->concurrent_active_calls ?? 5;
+        $cps = $this->calls_per_second ?? 1;
 
-        // Prevent division by zero
-        if ($cac <= 0) {
-            $cac = 5;
+        if ($cps <= 0) {
+            $cps = 1;
         }
 
-        return 60 / $cac;
+        return 1000.0 / $cps;
     }
 
     /**
-     * Check if the current CAC value is valid.
-     *
-     * Valid CAC values are: 2, 3, 4, 6, 10, 15, 20
-     *
-     * @return bool True if CAC is valid
+     * Check if the current CAC value is valid (1–50).
      */
     public function hasValidCac(): bool
     {
-        return in_array($this->concurrent_active_calls, self::VALID_CAC_VALUES, true);
+        $cac = $this->concurrent_active_calls ?? 1;
+
+        return $cac >= self::MIN_CAC && $cac <= self::MAX_CAC;
     }
 
     /**
-     * Get the nearest valid CAC value.
-     *
-     * If the current CAC is not in the valid list, returns the closest
-     * valid value. Used for validation and normalization.
-     *
-     * @return int The nearest valid CAC value
+     * Check if the current CPS value is valid (1–5).
      */
-    public function getNearestValidCac(): int
+    public function hasValidCps(): bool
     {
-        $current = $this->concurrent_active_calls ?? 5;
+        $cps = $this->calls_per_second ?? 1;
 
-        if ($this->hasValidCac()) {
-            return $current;
-        }
-
-        // Find the nearest valid value
-        $nearest = self::VALID_CAC_VALUES[0];
-        $minDiff = abs($current - $nearest);
-
-        foreach (self::VALID_CAC_VALUES as $value) {
-            $diff = abs($current - $value);
-            if ($diff < $minDiff) {
-                $minDiff = $diff;
-                $nearest = $value;
-            }
-        }
-
-        return $nearest;
+        return $cps >= self::MIN_CPS && $cps <= self::MAX_CPS;
     }
 }

@@ -45,7 +45,8 @@ class CreateCampaignRequest extends FormRequest
 
             // Dialing Guidelines
             'max_dial_attempts' => ['required', 'integer', 'min:1', 'max:5'],
-            'concurrent_active_calls' => ['required', 'integer', 'in:2,3,4,6,10,15,20'],
+            'concurrent_active_calls' => ['required', 'integer', 'min:1', 'max:50'],
+            'calls_per_second' => ['sometimes', 'integer', 'min:1', 'max:5'],
 
             // Scheduling - new format with full schedule object
             'schedule' => ['required', 'array'],

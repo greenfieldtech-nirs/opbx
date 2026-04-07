@@ -52,7 +52,8 @@ class UpdateCampaignRequest extends FormRequest
             'destination_connect' => ['sometimes', 'in:connected,immediately'],
             'caller_id' => ['sometimes', 'string', 'regex:/^\+[1-9]\d{1,14}$/'],
             'max_dial_attempts' => ['sometimes', 'integer', 'min:1', 'max:5'],
-            'concurrent_active_calls' => ['sometimes', 'integer', 'in:2,3,4,6,10,15,20'],
+            'concurrent_active_calls' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'calls_per_second' => ['sometimes', 'integer', 'min:1', 'max:5'],
 
             // Scheduling - new format with full schedule object
             'schedule' => ['sometimes', 'array'],
