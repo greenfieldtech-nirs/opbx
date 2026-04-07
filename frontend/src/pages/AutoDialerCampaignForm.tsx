@@ -646,7 +646,7 @@ export default function AutoDialerCampaignForm() {
                       <SelectContent>
                         {[1, 2, 3, 4, 5].map((value) => (
                           <SelectItem key={value} value={String(value)}>
-                            {value} call{value > 1 ? 's' : ''}/sec ({1000 / value}ms)
+                            {value} call{value > 1 ? 's' : ''}/sec
                           </SelectItem>
                         ))}
                       </SelectContent>
