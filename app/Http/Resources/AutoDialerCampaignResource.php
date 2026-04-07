@@ -43,7 +43,7 @@ class AutoDialerCampaignResource extends JsonResource
             'calls_per_second' => $this->calls_per_second ?? 1,
             'max_cac' => AutoDialerCampaign::MAX_CAC,
             'max_cps' => AutoDialerCampaign::MAX_CPS,
-            'api_interval_seconds' => $this->getApiIntervalSeconds(), // 60 / CAC
+            'api_interval_ms' => $this->getApiIntervalMilliseconds(), // 1000 / CPS
 
             // Schedule
             'days_active' => $this->days_active,
