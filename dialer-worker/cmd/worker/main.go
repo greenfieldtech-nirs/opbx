@@ -141,10 +141,10 @@ func (w *Worker) processCampaigns() {
 	for i := range campaigns {
 		campaign := &campaigns[i]
 		w.activeCampaigns[campaign.ID] = campaign
-		w.logger.Info("processing campaign", "id", campaign.ID, "name", campaign.Name, "status", campaign.Status, "cac", campaign.CAC)
+		w.logger.Info("processing campaign", "id", campaign.ID, "name", campaign.Name, "status", campaign.Status, "cac", campaign.CAC, "cps", campaign.CPS)
 
 		// Register with rate limiter
-		w.limiter.RegisterCampaign(campaign.ID, campaign.CAC)
+		w.limiter.RegisterCampaign(campaign.ID, campaign.CAC, campaign.CPS)
 
 		// Skip if this campaign is already being processed by a previous cycle's goroutine
 		if _, alreadyProcessing := w.processingCampaigns.LoadOrStore(campaign.ID, true); alreadyProcessing {
@@ -165,15 +165,32 @@ func (w *Worker) processCampaign(ctx context.Context, campaign *models.Campaign)
 	logger := w.logger.With("campaign_id", campaign.ID, "campaign_name", campaign.Name)
 
 	// Check if campaign is runnable
-	logger.Info("checking campaign status", "status", campaign.Status, "cac", campaign.CAC)
+	logger.Info("checking campaign status", "status", campaign.Status, "cac", campaign.CAC, "cps", campaign.CPS)
 	if campaign.Status != "active" {
 		logger.Info("campaign not active, skipping", "status", campaign.Status)
 		return
 	}
 
+	// Calculate batch size: CPS × poll_interval, capped at CAC
+	cps := campaign.CPS
+	if cps < 1 {
+		cps = 1
+	}
+	pollIntervalSec := int(w.config.PollInterval.Seconds())
+	if pollIntervalSec < 1 {
+		pollIntervalSec = 10
+	}
+	batchSize := cps * pollIntervalSec
+	if batchSize > campaign.CAC {
+		batchSize = campaign.CAC
+	}
+	if batchSize < 1 {
+		batchSize = 1
+	}
+
 	// Get pending destinations
-	logger.Info("fetching pending destinations", "limit", campaign.CAC)
-	destinations, err := w.apiClient.GetPendingDestinations(ctx, campaign.ID, campaign.CAC)
+	logger.Info("fetching pending destinations", "limit", batchSize, "cps", cps, "poll_interval", pollIntervalSec)
+	destinations, err := w.apiClient.GetPendingDestinations(ctx, campaign.ID, batchSize)
 	if err != nil {
 		logger.Error("failed to get pending destinations", "error", err)
 		return

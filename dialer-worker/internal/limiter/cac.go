@@ -22,9 +22,10 @@ type CACRateLimiter struct {
 type CampaignLimiter struct {
 	CampaignID   int64
 	CAC          int
+	CPS          int
 	ActiveCalls  int
 	LastCallTime time.Time
-	MinInterval  time.Duration
+	MinInterval  time.Duration // Derived from CPS: 1000/CPS ms
 }
 
 // NewCACRateLimiter creates a new CAC-based rate limiter
@@ -35,18 +36,27 @@ func NewCACRateLimiter(redisClient *redis.Client) *CACRateLimiter {
 	}
 }
 
-// RegisterCampaign registers a campaign for rate limiting
-func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int) {
+// RegisterCampaign registers a campaign for rate limiting.
+// CAC = max concurrent active calls (1-50), CPS = calls per second (1-5).
+func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	// Calculate minimum interval between calls: 60/CAC seconds
-	// This ensures we don't exceed CAC calls per minute
-	minInterval := time.Duration(math.Round(60.0/float64(cac))) * time.Second
+	// Clamp CPS to valid range
+	if cps < 1 {
+		cps = 1
+	}
+	if cps > 5 {
+		cps = 5
+	}
+
+	// Calculate minimum interval between calls from CPS: 1000/CPS milliseconds
+	minInterval := time.Duration(math.Round(1000.0/float64(cps))) * time.Millisecond
 
 	rl.campaigns[campaignID] = &CampaignLimiter{
 		CampaignID:  campaignID,
 		CAC:         cac,
+		CPS:         cps,
 		MinInterval: minInterval,
 	}
 }
