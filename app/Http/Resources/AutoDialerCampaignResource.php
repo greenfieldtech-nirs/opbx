@@ -41,7 +41,8 @@ class AutoDialerCampaignResource extends JsonResource
             // Replaces the old calls_per_second (CPS) model
             'concurrent_active_calls' => $this->concurrent_active_calls,
             'calls_per_second' => $this->calls_per_second ?? 1,
-            'valid_cac_values' => AutoDialerCampaign::VALID_CAC_VALUES, // For frontend dropdown
+            'max_cac' => AutoDialerCampaign::MAX_CAC,
+            'max_cps' => AutoDialerCampaign::MAX_CPS,
             'api_interval_seconds' => $this->getApiIntervalSeconds(), // 60 / CAC
 
             // Schedule
