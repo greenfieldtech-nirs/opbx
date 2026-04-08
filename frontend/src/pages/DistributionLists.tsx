@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
-  Filter,
   MoreVertical,
   Download,
   Upload,
@@ -165,7 +164,18 @@ export default function DistributionLists() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="space-y-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <FileSpreadsheet className="h-8 w-8" />
+              Distribution Lists
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Manage phone number lists for auto-dialer campaigns
+            </p>
+          </div>
+        </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
@@ -180,12 +190,22 @@ export default function DistributionLists() {
   const meta = data?.meta;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Distribution Lists</h1>
-          <p className="text-muted-foreground">Manage phone number lists for auto-dialer campaigns</p>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <FileSpreadsheet className="h-8 w-8" />
+            Distribution Lists
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage phone number lists for auto-dialer campaigns
+          </p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Distribution Lists</span>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleDownloadExample}>
@@ -201,29 +221,41 @@ export default function DistributionLists() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search lists..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
+                autoComplete="off"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => queryClient.invalidateQueries({ queryKey: distributionListKeys.all })}
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+
+            {/* Status Filter */}
             <Select
               value={status || 'active'}
               onValueChange={(v) => setStatus(v)}
             >
               <SelectTrigger className="w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active (All Except Archived)</SelectItem>
+                <SelectItem value="active">All (except Archived)</SelectItem>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="ready">Ready</SelectItem>
@@ -240,12 +272,6 @@ export default function DistributionLists() {
 
       {/* Lists Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Lists</CardTitle>
-          <CardDescription>
-            {meta?.total || 0} total list{meta?.total !== 1 ? 's' : ''}
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           {lists.length === 0 ? (
             <DistributionListsEmpty />

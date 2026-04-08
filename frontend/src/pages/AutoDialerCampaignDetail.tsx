@@ -42,6 +42,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import {
   useAutoDialerCampaign,
@@ -49,6 +50,7 @@ import {
   usePauseCampaign,
   useResumeCampaign,
   useArchiveCampaign,
+  autoDialerKeys,
 } from '@/hooks/useAutoDialerCampaigns';
 import { useDistributionLists } from '@/hooks/useDistributionLists';
 import type { AutoDialerCampaign } from '@/services/autoDialerCampaignsApi';
@@ -70,7 +72,13 @@ export default function AutoDialerCampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+
+  const handleBackToCampaigns = () => {
+    queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+    navigate('/ui/auto-dialer');
+  };
 
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'start' | 'pause' | 'resume' | 'archive' | null>(null);
@@ -119,7 +127,7 @@ export default function AutoDialerCampaignDetail() {
         case 'archive':
           await archiveMutation.mutateAsync(id);
           toast.success('Campaign archived successfully');
-          navigate('/ui/auto-dialer');
+          handleBackToCampaigns();
           return;
       }
     } catch (error: any) {
@@ -162,7 +170,7 @@ export default function AutoDialerCampaignDetail() {
           <PhoneCall className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h2 className="text-xl font-semibold mb-2">Campaign not found</h2>
           <p className="text-muted-foreground mb-4">The campaign you're looking for doesn't exist or you don't have access.</p>
-          <Button onClick={() => navigate('/ui/auto-dialer')}>
+          <Button onClick={handleBackToCampaigns}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Campaigns
           </Button>
@@ -176,7 +184,7 @@ export default function AutoDialerCampaignDetail() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/ui/auto-dialer')} className="mb-2">
+          <Button variant="ghost" size="sm" onClick={handleBackToCampaigns} className="mb-2">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Campaigns
           </Button>
