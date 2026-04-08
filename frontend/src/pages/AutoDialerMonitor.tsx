@@ -595,11 +595,14 @@ export default function AutoDialerMonitor() {
                 <div className="space-y-4">
                   {/* Table Header */}
                   <div className="hidden md:grid md:grid-cols-12 gap-4 text-sm font-medium text-muted-foreground pb-2 border-b">
-                    <div className="col-span-3">Campaign</div>
+                    <div className="col-span-2">Campaign</div>
                     <div className="col-span-1">Status</div>
+                    <div className="col-span-1">Destinations</div>
                     <div className="col-span-2">Progress</div>
-                    <div className="col-span-2">Active Calls</div>
-                    <div className="col-span-2">Stats</div>
+                    <div className="col-span-1">Active</div>
+                    <div className="col-span-1">Completed</div>
+                    <div className="col-span-1">Failed</div>
+                    <div className="col-span-1">Pending</div>
                     <div className="col-span-1">Rate Limit</div>
                     <div className="col-span-1">Actions</div>
                   </div>
@@ -611,7 +614,7 @@ export default function AutoDialerMonitor() {
                       className="grid grid-cols-1 md:grid-cols-12 gap-4 py-4 border-b last:border-0 items-center hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer transition-colors"
                       onClick={() => handleCampaignClick(campaign)}
                     >
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <p className="font-medium text-primary hover:underline">{campaign.name}</p>
                         <p className="text-xs text-muted-foreground">{campaign.routing_destination_label}</p>
                       </div>
@@ -619,6 +622,9 @@ export default function AutoDialerMonitor() {
                         <Badge variant={getStatusBadgeVariant(campaign.status)} className="capitalize">
                           {campaign.status}
                         </Badge>
+                      </div>
+                      <div className="md:col-span-1">
+                        <span className="text-sm font-medium">{campaign.total_destinations}</span>
                       </div>
                       <div className="md:col-span-2">
                         <div className="flex items-center gap-2">
@@ -628,47 +634,17 @@ export default function AutoDialerMonitor() {
                           <span className="text-xs font-medium w-10">{campaign.progress_percentage}%</span>
                         </div>
                       </div>
-                      <div className="md:col-span-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">{campaign.active_calls}/{campaign.concurrent_active_calls}</span>
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden max-w-16">
-                            <div
-                              className={cn(
-                                'h-full transition-all',
-                                campaign.cac_utilization > 80 ? 'bg-red-500' : campaign.cac_utilization > 50 ? 'bg-yellow-500' : 'bg-green-500'
-                              )}
-                              style={{ width: `${campaign.cac_utilization}%` }}
-                            />
-                          </div>
-                        </div>
+                      <div className="md:col-span-1">
+                        <span className="text-sm">{campaign.active_calls}<span className="text-muted-foreground">/{campaign.concurrent_active_calls}</span></span>
                       </div>
-                      <div className="md:col-span-2">
-                        <div className="flex items-center gap-3 text-xs">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex items-center gap-1 text-green-600">
-                                <CheckCircle className="h-3 w-3" />{campaign.completed_calls}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>Completed</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex items-center gap-1 text-red-600">
-                                <XCircle className="h-3 w-3" />{campaign.failed_calls}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>Failed</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <Clock className="h-3 w-3" />{campaign.pending_calls}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>Pending</TooltipContent>
-                          </Tooltip>
-                        </div>
+                      <div className="md:col-span-1">
+                        <span className="text-sm text-green-600">{campaign.completed_calls}</span>
+                      </div>
+                      <div className="md:col-span-1">
+                        <span className="text-sm text-red-600">{campaign.failed_calls}</span>
+                      </div>
+                      <div className="md:col-span-1">
+                        <span className="text-sm text-muted-foreground">{campaign.pending_calls}</span>
                       </div>
                       <div className="md:col-span-1">
                         <Tooltip>
