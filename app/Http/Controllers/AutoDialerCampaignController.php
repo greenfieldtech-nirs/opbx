@@ -588,6 +588,12 @@ class AutoDialerCampaignController extends Controller
                 $workerKey = "dialer:cac:{$campaign->id}:active";
                 $activeCalls = max(0, (int) $dialerRedis->get($workerKey));
 
+                // Paused campaigns cannot have active calls — force to 0
+                if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
+                    $dialerRedis->set($workerKey, 0);
+                    $activeCalls = 0;
+                }
+
                 $cac = $campaign->concurrent_active_calls;
                 $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
 
@@ -669,6 +675,12 @@ class AutoDialerCampaignController extends Controller
             $dialerRedis = Redis::connection('dialer');
             $workerKey = "dialer:cac:{$campaign->id}:active";
             $activeCalls = max(0, (int) $dialerRedis->get($workerKey));
+
+            // Paused campaigns cannot have active calls — force to 0 and clean up
+            if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
+                $dialerRedis->set($workerKey, 0);
+                $activeCalls = 0;
+            }
 
             $cac = $campaign->concurrent_active_calls;
             $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
@@ -769,24 +781,37 @@ class AutoDialerCampaignController extends Controller
             ];
         });
 
-        // Active sessions are always queried fresh (never cached) since they
-        // are the most volatile data — status changes every few seconds.
-        $data['active_sessions'] = OrganizationScope::bypass(function () use ($campaign): array {
-            return AutoDialerCallSession::where('campaign_id', $campaign->id)
-                ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                ->where('initiated_at', '>=', now()->subMinutes(5))
-                ->orderBy('initiated_at', 'desc')
-                ->get(['id', 'phone_number', 'status', 'call_id', 'initiated_at'])
-                ->map(fn ($s) => [
-                    'id' => $s->id,
-                    'phone_number' => $s->phone_number,
-                    'status' => $s->status,
-                    'call_id' => $s->call_id,
-                    'initiated_at' => $s->initiated_at?->toIso8601String(),
-                    'duration_seconds' => $s->initiated_at ? (int) now()->diffInSeconds($s->initiated_at) : 0,
-                ])
-                ->toArray();
-        });
+        // Active sessions: queried fresh (never cached).
+        // Paused campaigns have no active calls — clean up any stale sessions.
+        if ($campaign->status === CampaignStatus::PAUSED) {
+            OrganizationScope::bypass(function () use ($campaign): void {
+                AutoDialerCallSession::where('campaign_id', $campaign->id)
+                    ->whereIn('status', ['initiated', 'ringing', 'answered'])
+                    ->update([
+                        'status' => 'failed',
+                        'disposition' => 'cancelled',
+                        'completed_at' => now(),
+                    ]);
+            });
+            $data['active_sessions'] = [];
+        } else {
+            $data['active_sessions'] = OrganizationScope::bypass(function () use ($campaign): array {
+                return AutoDialerCallSession::where('campaign_id', $campaign->id)
+                    ->whereIn('status', ['initiated', 'ringing', 'answered'])
+                    ->where('initiated_at', '>=', now()->subMinutes(5))
+                    ->orderBy('initiated_at', 'desc')
+                    ->get(['id', 'phone_number', 'status', 'call_id', 'initiated_at'])
+                    ->map(fn ($s) => [
+                        'id' => $s->id,
+                        'phone_number' => $s->phone_number,
+                        'status' => $s->status,
+                        'call_id' => $s->call_id,
+                        'initiated_at' => $s->initiated_at?->toIso8601String(),
+                        'duration_seconds' => $s->initiated_at ? (int) now()->diffInSeconds($s->initiated_at) : 0,
+                    ])
+                    ->toArray();
+            });
+        }
 
         return response()->json(['data' => $data]);
     }
