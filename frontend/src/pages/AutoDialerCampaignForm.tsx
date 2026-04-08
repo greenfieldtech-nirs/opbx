@@ -31,7 +31,9 @@ import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -53,6 +55,7 @@ import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 import { WeeklyCalendarView } from '@/pages/BusinessHours/components';
 import type { WeeklySchedule, DayOfWeek } from '@/types';
+import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
 import { cn } from '@/lib/utils';
 
@@ -96,19 +99,8 @@ const daysOfWeek = [
   { id: 'sunday', label: 'Sunday' },
 ];
 
-const timezones = [
-  'UTC',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Asia/Tokyo',
-  'Asia/Shanghai',
-  'Australia/Sydney',
-];
+const timezoneGroups = getTimezonesByRegion();
+const regionOrder = ['Americas', 'Europe', 'Asia', 'Africa', 'Australia', 'Pacific', 'UTC'];
 
 // Helper functions to convert between campaign schedule and WeeklySchedule
 function createEmptyWeeklySchedule(): WeeklySchedule {
@@ -566,14 +558,23 @@ export default function AutoDialerCampaignForm() {
                       onValueChange={(value) => setValue('timezone', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select a timezone" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {timezones.map((tz) => (
-                          <SelectItem key={tz} value={tz}>
-                            {tz}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="max-h-[300px]">
+                        {regionOrder.map((region) => {
+                          const tzs = timezoneGroups[region];
+                          if (!tzs || tzs.length === 0) return null;
+                          return (
+                            <SelectGroup key={region}>
+                              <SelectLabel>{region}</SelectLabel>
+                              {tzs.map((tz) => (
+                                <SelectItem key={tz.value} value={tz.value}>
+                                  {formatTimezoneLabel(tz)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
