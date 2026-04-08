@@ -610,12 +610,19 @@ class AutoDialerCampaignController extends Controller
                 $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
                     $campaign->pause_reason === 'cloudonix_rate_limit';
 
+                // Get actual destination count from distribution lists
+                $actualDestinations = OrganizationScope::bypass(function () use ($campaign): int {
+                    $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
+
+                    return $listIds->isEmpty() ? 0 : AutoDialerDestination::whereIn('list_id', $listIds)->count();
+                });
+
                 $campaignData[] = [
                     'id' => $campaign->id,
                     'name' => $campaign->name,
                     'status' => $campaign->status->value,
                     'progress_percentage' => $campaign->getProgressPercentage(),
-                    'total_destinations' => $campaign->total_destinations,
+                    'total_destinations' => $actualDestinations,
                     'completed_calls' => $campaign->completed_calls,
                     'failed_calls' => $campaign->failed_calls,
                     'pending_calls' => $campaign->pending_calls,
@@ -763,7 +770,11 @@ class AutoDialerCampaignController extends Controller
                     'cac_utilization' => $cacUtilization,
                 ],
                 'statistics' => [
-                    'total_destinations' => $campaign->total_destinations,
+                    'total_destinations' => OrganizationScope::bypass(function () use ($campaign): int {
+                        $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
+
+                        return $listIds->isEmpty() ? 0 : AutoDialerDestination::whereIn('list_id', $listIds)->count();
+                    }),
                     'completed_calls' => $campaign->completed_calls,
                     'failed_calls' => $campaign->failed_calls,
                     'pending_calls' => $campaign->pending_calls,
