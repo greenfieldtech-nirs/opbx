@@ -574,13 +574,10 @@ export default function AutoDialerMonitor() {
             </Card>
           </div>
 
-          {/* Campaign Grid */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Active Campaigns</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {campaigns.length === 0 ? (
+          {/* Campaign Cards */}
+          {campaigns.length === 0 ? (
+            <Card>
+              <CardContent className="p-6">
                 <div className="text-center py-12">
                   <Radio className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No active campaigns</h3>
@@ -591,79 +588,29 @@ export default function AutoDialerMonitor() {
                     Go to Campaigns
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Table Header */}
-                  <div className="hidden md:grid md:grid-cols-12 gap-4 text-sm font-medium text-muted-foreground pb-2 border-b">
-                    <div className="col-span-2">Campaign</div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-1">Destinations</div>
-                    <div className="col-span-2">Progress</div>
-                    <div className="col-span-1">Active</div>
-                    <div className="col-span-1">Completed</div>
-                    <div className="col-span-1">Failed</div>
-                    <div className="col-span-1">Pending</div>
-                    <div className="col-span-1">Rate Limit</div>
-                    <div className="col-span-1">Actions</div>
-                  </div>
-
-                  {/* Campaign Rows */}
-                  {campaigns.map((campaign) => (
-                    <div
-                      key={campaign.id}
-                      className="grid grid-cols-1 md:grid-cols-12 gap-4 py-4 border-b last:border-0 items-center hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer transition-colors"
-                      onClick={() => handleCampaignClick(campaign)}
-                    >
-                      <div className="md:col-span-2">
-                        <p className="font-medium text-primary hover:underline">{campaign.name}</p>
-                        <p className="text-xs text-muted-foreground">{campaign.routing_destination_label}</p>
-                      </div>
-                      <div className="md:col-span-1">
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {campaigns.map((campaign) => (
+                <Card
+                  key={campaign.id}
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCampaignClick(campaign)}
+                >
+                  {/* Campaign Header */}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CardTitle className="text-lg text-primary hover:underline">
+                          {campaign.name}
+                        </CardTitle>
                         <Badge variant={getStatusBadgeVariant(campaign.status)} className="capitalize">
                           {campaign.status}
                         </Badge>
+                        <span className="text-xs text-muted-foreground">{campaign.routing_destination_label}</span>
                       </div>
-                      <div className="md:col-span-1">
-                        <span className="text-sm font-medium">{campaign.total_destinations}</span>
-                      </div>
-                      <div className="md:col-span-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-primary transition-all" style={{ width: `${campaign.progress_percentage}%` }} />
-                          </div>
-                          <span className="text-xs font-medium w-10">{campaign.progress_percentage}%</span>
-                        </div>
-                      </div>
-                      <div className="md:col-span-1">
-                        <span className="text-sm">{campaign.active_calls}<span className="text-muted-foreground">/{campaign.concurrent_active_calls}</span></span>
-                      </div>
-                      <div className="md:col-span-1">
-                        <span className="text-sm text-green-600">{campaign.completed_calls}</span>
-                      </div>
-                      <div className="md:col-span-1">
-                        <span className="text-sm text-red-600">{campaign.failed_calls}</span>
-                      </div>
-                      <div className="md:col-span-1">
-                        <span className="text-sm text-muted-foreground">{campaign.pending_calls}</span>
-                      </div>
-                      <div className="md:col-span-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1.5">
-                              <div className={cn('h-2.5 w-2.5 rounded-full', campaign.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
-                              <span className="text-xs">{campaign.rate_limit_status.is_rate_limited ? 'Limited' : 'OK'}</span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {campaign.rate_limit_status.is_rate_limited
-                              ? campaign.rate_limit_status.resumes_at
-                                ? `Resumes at ${new Date(campaign.rate_limit_status.resumes_at).toLocaleTimeString()}`
-                                : 'Currently rate limited'
-                              : 'No rate limiting'}
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className="md:col-span-1">
+                      <div onClick={(e) => e.stopPropagation()}>
                         <CampaignActionButton
                           campaign={campaign}
                           onPause={handlePause}
@@ -672,11 +619,66 @@ export default function AutoDialerMonitor() {
                         />
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </CardHeader>
+
+                  <CardContent className="pt-0 space-y-4">
+                    {/* Metric Cards Row */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Destinations</p>
+                        <p className="text-xl font-bold">{campaign.total_destinations.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Active Calls</p>
+                        <p className="text-xl font-bold text-blue-600">
+                          {campaign.active_calls}<span className="text-sm text-muted-foreground font-normal">/{campaign.concurrent_active_calls}</span>
+                        </p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Completed</p>
+                        <p className="text-xl font-bold text-green-600">{campaign.completed_calls.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Failed</p>
+                        <p className="text-xl font-bold text-red-600">{campaign.failed_calls.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Pending</p>
+                        <p className="text-xl font-bold text-muted-foreground">{campaign.pending_calls.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar + Rate Limit */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 flex items-center gap-3">
+                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Progress</span>
+                        <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary transition-all rounded-full" style={{ width: `${campaign.progress_percentage}%` }} />
+                        </div>
+                        <span className="text-sm font-semibold w-12 text-right">{campaign.progress_percentage}%</span>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs text-muted-foreground">Rate:</span>
+                            <div className={cn('h-2.5 w-2.5 rounded-full', campaign.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
+                            <span className="text-xs font-medium">{campaign.rate_limit_status.is_rate_limited ? 'Limited' : 'OK'}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {campaign.rate_limit_status.is_rate_limited
+                            ? campaign.rate_limit_status.resumes_at
+                              ? `Resumes at ${new Date(campaign.rate_limit_status.resumes_at).toLocaleTimeString()}`
+                              : 'Currently rate limited'
+                            : 'No rate limiting'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </TooltipProvider>
     );
