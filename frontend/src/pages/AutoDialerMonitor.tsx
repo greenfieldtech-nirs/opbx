@@ -57,6 +57,8 @@ const REFRESH_INTERVAL_KEY = 'monitor-refresh-interval';
 
 const REFRESH_OPTIONS = [
   { value: '0', label: 'Manual' },
+  { value: '1000', label: '1s' },
+  { value: '5000', label: '5s' },
   { value: '10000', label: '10s' },
   { value: '20000', label: '20s' },
   { value: '30000', label: '30s' },
@@ -262,6 +264,10 @@ function RefreshSelector({
           ))}
         </SelectContent>
       </Select>
+      <Button variant="outline" className="h-9" onClick={onManualRefresh}>
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Refresh Now
+      </Button>
     </div>
   );
 }
@@ -739,10 +745,6 @@ export default function AutoDialerMonitor() {
                 isLoading={isActionLoading}
               />
             )}
-            <Button variant="outline" className="h-9" onClick={handleManualRefresh}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
           </div>
         </div>
 
