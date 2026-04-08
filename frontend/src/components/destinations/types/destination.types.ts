@@ -107,7 +107,7 @@ export interface DestinationSelectorProps {
   /** Selected destination type (determines what to show) */
   type: DestinationType | null;
   /** Currently selected destination ID */
-  value: string;
+  value?: string;
   /** Callback when destination changes */
   onChange: (value: string, option: DestinationOption) => void;
   /** Label for the field */
@@ -137,7 +137,7 @@ export interface DestinationTypeAndSelectorProps {
   /** Currently selected destination type */
   typeValue: DestinationType | null;
   /** Currently selected destination ID */
-  destinationValue: string;
+  destinationValue?: string;
   /** Callback when either type or destination changes */
   onChange: (type: DestinationType, destinationId: string) => void;
   /** Label for type field */

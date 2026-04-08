@@ -178,6 +178,19 @@ return [
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
+        // Prefix-free connection for Go dialer worker shared keys.
+        // The Go worker writes raw keys like dialer:cac:{id}:active
+        // without any prefix, so Laravel must use a matching connection.
+        'dialer' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_DB', '0'),
+            'prefix' => '',
+        ],
+
     ],
 
 ];

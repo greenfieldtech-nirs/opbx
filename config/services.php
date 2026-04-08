@@ -43,6 +43,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Auto Dialer Worker Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the Go-based auto dialer worker that executes
+    | outbound call campaigns via the Cloudonix platform.
+    |
+    */
+    'dialer_worker' => [
+        // Authentication token for worker API access
+        'token' => env('DIALER_WORKER_API_TOKEN'),
+
+        // Token rotation for zero-downtime deployments
+        'token_secondary' => env('DIALER_WORKER_API_TOKEN_SECONDARY'),
+
+        // Retry configuration
+        'max_retries' => env('DIALER_WORKER_MAX_RETRIES', 3),
+        'retry_delay_seconds' => env('DIALER_WORKER_RETRY_DELAY', 60),
+
+        // Rate limiting
+        'rate_limit_per_minute' => env('DIALER_WORKER_RATE_LIMIT', 1000),
+
+        // Health check endpoint URL
+        'health_url' => env('DIALER_WORKER_HEALTH_URL', 'http://dialer-worker:8081/webhooks/health'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | UserCheck Email Validation Service
     |--------------------------------------------------------------------------
     |

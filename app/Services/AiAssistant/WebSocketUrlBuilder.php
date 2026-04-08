@@ -86,9 +86,9 @@ class WebSocketUrlBuilder
             }
         }
 
-        // Check for any unsubstituted placeholders
-        if (preg_match('/\{[a-z_]+\}/', $url)) {
-            throw new InvalidArgumentException('Template contains unsubstituted placeholders');
+        // Check for any unsubstituted placeholders — all must be resolved
+        if (preg_match('/\{([a-z_]+)\}/', $url, $match)) {
+            throw new InvalidArgumentException("Template contains unsubstituted placeholder: {{$match[1]}}");
         }
 
         // Final validation

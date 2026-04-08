@@ -14,7 +14,10 @@ return new class extends Migration
         Schema::table('extensions', function (Blueprint $table) {
             // Add password column for SIP authentication
             // Stored as plain text as it needs to be shared with SIP clients
-            $table->string('password', 32)->after('extension_number');
+            // Check if column doesn't exist before adding (idempotent migration)
+            if (! Schema::hasColumn('extensions', 'password')) {
+                $table->string('password', 32)->after('extension_number');
+            }
         });
     }
 
@@ -24,7 +27,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('extensions', function (Blueprint $table) {
-            $table->dropColumn('password');
+            // Check if column exists before dropping (idempotent migration)
+            if (Schema::hasColumn('extensions', 'password')) {
+                $table->dropColumn('password');
+            }
         });
     }
 };

@@ -12,7 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Modify enum columns to include new AI action types
+        // Skip for SQLite - it doesn't support MODIFY COLUMN
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        // Modify enum columns to include new AI action types (MySQL only)
         DB::statement("ALTER TABLE business_hours_schedules MODIFY COLUMN open_hours_action_type ENUM('extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer') NOT NULL DEFAULT 'extension'");
         DB::statement("ALTER TABLE business_hours_schedules MODIFY COLUMN closed_hours_action_type ENUM('extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer') NOT NULL DEFAULT 'extension'");
     }
@@ -22,7 +27,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert to original enum values
+        // Skip for SQLite
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        // Revert to original enum values (MySQL only)
         DB::statement("ALTER TABLE business_hours_schedules MODIFY COLUMN open_hours_action_type ENUM('extension', 'ring_group', 'conference_room', 'ivr_menu') NOT NULL DEFAULT 'extension'");
         DB::statement("ALTER TABLE business_hours_schedules MODIFY COLUMN closed_hours_action_type ENUM('extension', 'ring_group', 'conference_room', 'ivr_menu') NOT NULL DEFAULT 'extension'");
     }

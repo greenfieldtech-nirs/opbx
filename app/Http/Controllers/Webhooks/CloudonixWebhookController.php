@@ -8,17 +8,19 @@ use App\Exceptions\Webhook\WebhookBusinessLogicException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
-use App\Http\Requests\Webhook\SessionUpdateRequest;
 use App\Http\Requests\Webhook\CdrRequest;
+use App\Http\Requests\Webhook\SessionUpdateRequest;
 use App\Jobs\ProcessInboundCallJob;
+use App\Models\CallNotificationsSettings;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
-use App\Models\CallNotificationsSettings;
-use App\Services\CallNotifications\WebhookDispatcher;
+use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
+use App\Services\CallNotifications\WebhookDispatcher;
 use App\Services\PhoneNumberService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 /**
  * Handles incoming webhooks from Cloudonix CPaaS.
@@ -32,7 +34,8 @@ class CloudonixWebhookController extends Controller
     public function __construct(
         private readonly WebhookDispatcher $webhookDispatcher,
         private readonly NotificationPayloadBuilder $payloadBuilder,
-        private readonly PhoneNumberService $phoneNumberService
+        private readonly PhoneNumberService $phoneNumberService,
+        private readonly CDRPublisher $cdrPublisher
     ) {}
 
     /**
@@ -158,6 +161,29 @@ class CloudonixWebhookController extends Controller
                         'updated_fields' => array_keys($updateData),
                     ]);
                 }
+            }
+        }
+
+        // Update auto-dialer session status if applicable
+        $sessionToken = $request->input('token');
+        if ($sessionToken && $status) {
+            $statusMap = [
+                'ringing' => 'ringing',
+                'connected' => 'answered',
+                'completed' => 'completed',
+                'failed' => 'failed',
+                'busy' => 'failed',
+                'no-answer' => 'failed',
+            ];
+            $mappedStatus = $statusMap[strtolower($status)] ?? null;
+
+            if ($mappedStatus) {
+                \App\Scopes\OrganizationScope::bypass(function () use ($sessionToken, $mappedStatus) {
+                    $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+                    if ($session && in_array($session->status, ['initiated', 'ringing'], true)) {
+                        $session->update(['status' => $mappedStatus]);
+                    }
+                });
             }
         }
 
@@ -372,6 +398,17 @@ class CloudonixWebhookController extends Controller
                 // Just log the error and continue
             }
 
+            // Check if this is an auto-dialer call and update destination
+            try {
+                $this->processAutoDialerCDR($request, $cdr);
+            } catch (\Exception $e) {
+                Log::error('Failed to process auto-dialer CDR', [
+                    'call_id' => $callId,
+                    'error' => $e->getMessage(),
+                ]);
+                // Don't fail the entire CDR processing
+            }
+
             // Return 204 No Content to indicate successful creation
             return response()->json(['message' => 'CDR Inserted successfully'], 200);
         } catch (\Exception $e) {
@@ -576,5 +613,160 @@ class CloudonixWebhookController extends Controller
         ];
 
         return $statusMap[strtolower($status)] ?? strtolower($status);
+    }
+
+    /**
+     * Process CDR for auto-dialer calls.
+     *
+     * Updates auto-dialer destination records when a CDR is received.
+     */
+    private function processAutoDialerCDR(\Illuminate\Http\Request $request, \App\Models\CallDetailRecord $cdr): void
+    {
+        // Cloudonix CDR nests the session token at session.token, not session_token
+        $sessionToken = $request->input('session.token') ?? $request->input('session_token');
+        $callId = $request->input('call_id');
+
+        if (! $sessionToken) {
+            Log::debug('Auto-dialer CDR skipped: no session token found', [
+                'call_id' => $callId,
+                'has_session_object' => $request->has('session'),
+            ]);
+
+            return;
+        }
+
+        // All auto-dialer queries must bypass OrganizationScope since
+        // webhooks have no authenticated user context.
+        \App\Scopes\OrganizationScope::bypass(function () use ($request, $cdr, $sessionToken, $callId): void {
+            // Find auto-dialer session by session token
+            $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+
+            if (! $session) {
+                // Not an auto-dialer call — this is normal for regular inbound/outbound calls
+                return;
+            }
+
+            // Update the session itself with CDR data
+            $disposition = $request->input('disposition', 'unknown');
+            $isCompleted = in_array(strtoupper($disposition), ['ANSWER', 'ANSWERED', 'COMPLETED'], true);
+            $session->update([
+                'status' => $isCompleted ? 'completed' : 'failed',
+                'disposition' => $disposition,
+                'duration' => (int) $request->input('duration', 0),
+                'billsec' => (int) $request->input('billsec', 0),
+                'completed_at' => now(),
+            ]);
+
+            // Update destination record
+            $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
+
+            if ($destination) {
+                $destination->update([
+                    'status' => $this->mapDispositionToStatus($request->input('disposition')),
+                    'last_disposition' => $request->input('disposition'),
+                    'duration' => $request->input('duration', 0),
+                    'billsec' => $request->input('billsec', 0),
+                    'last_cdr_id' => $cdr->id,
+                ]);
+
+                // Increment dial attempts
+                $destination->incrementDialAttempts();
+
+                // Update CDR to mark as auto-dialer call
+                $cdr->update([
+                    'is_auto_dialer' => true,
+                    'auto_dialer_campaign_id' => $session->campaign_id,
+                ]);
+
+                Log::info('Auto-dialer CDR processed', [
+                    'call_id' => $callId,
+                    'session_token' => $sessionToken,
+                    'destination_id' => $destination->id,
+                    'campaign_id' => $session->campaign_id,
+                ]);
+            }
+
+            // Update campaign statistics
+            $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+            if ($campaign) {
+                $campaign->increment('completed_calls');
+                $campaign->decrement('pending_calls');
+            }
+
+            // Decrement the CAC counter directly in Redis.
+            // The Go worker increments this when initiating calls but has no
+            // Pub/Sub subscriber to decrement it — Laravel handles this directly.
+            $this->decrementCacCounter($session->campaign_id);
+
+            // Also publish CDR event to Redis channel for any future subscribers
+            $this->cdrPublisher->publish(
+                sessionToken: $sessionToken,
+                campaignId: $session->campaign_id,
+                destinationId: $destination ? $destination->id : $session->destination_id,
+                sessionId: $session->id,
+                disposition: $request->input('disposition', 'unknown'),
+                duration: (int) $request->input('duration', 0),
+                billsec: (int) $request->input('billsec', 0)
+            );
+        });
+    }
+
+    /**
+     * Map CDR disposition to destination status.
+     */
+    private function mapDispositionToStatus(?string $disposition): string
+    {
+        $dispositionMap = [
+            'answered' => 'completed',
+            'completed' => 'completed',
+            'busy' => 'failed',
+            'no-answer' => 'failed',
+            'failed' => 'failed',
+            'cancelled' => 'failed',
+            'congestion' => 'failed',
+        ];
+
+        return $dispositionMap[strtolower($disposition ?? '')] ?? 'completed';
+    }
+
+    /**
+     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
+     *
+     * The Go dialer worker increments this counter when initiating a call.
+     * Laravel decrements it directly when processing CDR webhooks, since the
+     * worker has no Pub/Sub subscriber for the cdr:completed channel.
+     */
+    /**
+     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
+     *
+     * Uses the 'dialer' connection (no key prefix) because the Go worker
+     * writes raw keys like dialer:cac:{id}:active without any prefix.
+     * The default Laravel Redis connection adds a prefix, which would
+     * cause Laravel and the Go worker to read/write different keys.
+     */
+    private function decrementCacCounter(int $campaignId): void
+    {
+        try {
+            $redis = Redis::connection('dialer');
+
+            $workerKey = "dialer:cac:{$campaignId}:active";
+            $newCount = $redis->decr($workerKey);
+
+            // Prevent counter from going negative
+            if ($newCount < 0) {
+                $redis->set($workerKey, 0);
+                $newCount = 0;
+            }
+
+            Log::info('CAC counter decremented', [
+                'campaign_id' => $campaignId,
+                'active_calls' => $newCount,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to decrement CAC counter', [
+                'campaign_id' => $campaignId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

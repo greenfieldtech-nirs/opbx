@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Webhooks\AutoDialerWebhookController;
 use App\Http\Controllers\Webhooks\CloudonixWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -74,6 +75,33 @@ Route::prefix('callbacks')->group(function (): void {
         ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
         ->name('voice.albs-follow-through');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Auto Dialer Webhook Routes
+|--------------------------------------------------------------------------
+|
+| These routes handle webhooks specific to auto-dialer campaigns.
+|
+*/
+
+use App\Http\Controllers\Webhooks\DialerWebhookProxyController;
+
+Route::prefix('webhooks/auto-dialer')->group(function (): void {
+    Route::post('/call-status', [AutoDialerWebhookController::class, 'callStatus'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
+        ->name('webhooks.auto-dialer.call-status');
+
+    Route::post('/amd-result', [AutoDialerWebhookController::class, 'amdResult'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
+        ->name('webhooks.auto-dialer.amd-result');
+});
+
+// Dialer Webhook Proxy Endpoint
+// Receives Cloudonix webhooks and processes them for the auto-dialer
+Route::post('/webhooks/cloudonix/dialer', [DialerWebhookProxyController::class, 'handleCloudonixWebhook'])
+    ->middleware(['webhook.signature', 'webhook.idempotency', 'rate_limit_org:webhook'])
+    ->name('webhooks.cloudonix.dialer');
 
 // Health check endpoint
 Route::get('/health', function () {

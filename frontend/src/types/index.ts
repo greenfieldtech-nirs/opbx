@@ -1207,3 +1207,89 @@ export interface BlockedCallLogFilterParams extends PaginationParams {
   to_date?: string;
   rejection_strategy?: InboundBlacklistRejectionStrategy;
 }
+
+// ============================================================================
+// Distribution Lists
+// ============================================================================
+
+export type DistributionListStatus =
+  | 'draft'
+  | 'pending'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+  | 'in_use'
+  | 'used'
+  | 'archived';
+
+export interface AutoDialerList {
+  id: number;
+  name: string;
+  description: string | null;
+  version_number: number;
+  is_latest_version: boolean;
+  status: DistributionListStatus;
+  status_label: string;
+  status_color: string;
+  campaign_id: number | null;
+  used_by_campaign_id: number | null;
+  used_at: string | null;
+  statistics: {
+    total_rows: number;
+    valid_rows: number;
+    invalid_rows: number;
+  };
+  parent_list_id: number | null;
+  parent_list?: {
+    id: number;
+    version_number: number;
+  };
+  has_versions: boolean;
+  can_archive: boolean;
+  can_assign: boolean;
+  can_upload: boolean;
+  can_copy: boolean;
+  created_at: string;
+  processed_at: string | null;
+  archived_at: string | null;
+  original_filename: string | null;
+  campaign?: {
+    id: number;
+    name: string;
+  };
+  used_by_campaign?: {
+    id: number;
+    name: string;
+    status: string;
+  };
+  versions?: AutoDialerList[];
+}
+
+export interface ListDestination {
+  id: number;
+  phone_number: string;
+  description: string | null;
+  status: string;
+  status_label: string;
+  dial_attempts: number;
+  last_dialed_at: string | null;
+  last_disposition: string | null;
+  duration: number;
+  billsec: number;
+  total_duration: number;
+  last_error: string | null;
+  is_invalid: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateListRequest {
+  name: string;
+  description?: string;
+}
+
+export interface DistributionListParams extends PaginationParams {
+  status?: DistributionListStatus;
+  search?: string;
+  campaign_id?: number;
+}

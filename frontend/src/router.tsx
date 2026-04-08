@@ -28,12 +28,19 @@ const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
 const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
-const Recordings = lazy(() => import('@/pages/Recordings'));
+const Announcements = lazy(() => import('@/pages/Announcements'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
+const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
+const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
+const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
+const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
+const AutoDialerMonitor = lazy(() => import('@/pages/AutoDialerMonitor'));
+const DistributionLists = lazy(() => import('@/pages/DistributionLists'));
+const DistributionListDetail = lazy(() => import('@/pages/DistributionListDetail'));
 
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
@@ -116,10 +123,14 @@ export const router = createBrowserRouter([
         path: 'call-logs',
         element: <CallLogs />,
       },
-      {
-        path: 'recordings',
-        element: <Recordings />,
-      },
+       {
+         path: 'announcements',
+         element: <Announcements />,
+       },
+       {
+         path: 'recordings',
+         element: <Navigate to="/ui/announcements" replace />,
+       },
        {
          path: 'live-calls',
          element: <LiveCalls />,
@@ -148,11 +159,47 @@ export const router = createBrowserRouter([
             </OwnerRoute>
           ),
         },
-{
-  path: 'call-notifications',
-  element: <CallNotificationsSettings />,
-},
-// Platform Management routes (platform manager only)
+      {
+        path: 'call-notifications',
+        element: <CallNotificationsSettings />,
+      },
+      {
+        path: 'auto-dialer',
+        element: <Navigate to="/ui/auto-dialer/campaigns" replace />,
+      },
+      {
+        path: 'auto-dialer/campaigns',
+        element: <AutoDialerCampaigns />,
+      },
+      {
+        path: 'auto-dialer/campaigns/new',
+        element: <AutoDialerCampaignForm />,
+      },
+      {
+        path: 'auto-dialer/campaigns/:id',
+        element: <AutoDialerCampaignDetail />,
+      },
+      {
+        path: 'auto-dialer/campaigns/:id/edit',
+        element: <AutoDialerCampaignForm />,
+      },
+      {
+        path: 'auto-dialer/campaigns/:id/upload',
+        element: <AutoDialerUploadList />,
+      },
+      {
+        path: 'auto-dialer/distribution-lists',
+        element: <DistributionLists />,
+      },
+      {
+        path: 'auto-dialer/distribution-lists/:id',
+        element: <DistributionListDetail />,
+      },
+      {
+        path: 'auto-dialer/monitor',
+        element: <AutoDialerMonitor />,
+      },
+      // Platform Management routes (platform manager only)
 {
   path: 'platform',
   element: (

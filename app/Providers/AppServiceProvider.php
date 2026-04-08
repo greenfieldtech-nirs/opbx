@@ -54,6 +54,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Cloudonix\CloudonixVoiceService::class
         );
 
+        // Register Auto Dialer Cloudonix Service
+        $this->app->singleton(
+            \App\Services\AutoDialer\AutoDialerCloudonixService::class
+        );
+
         $this->app->singleton(
             \App\Services\PasswordGenerator::class
         );
@@ -135,6 +140,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\AiAssistantLoadBalancer::class, \App\Policies\AiAssistantLoadBalancerPolicy::class);
         Gate::policy(\App\Models\InboundBlacklist::class, \App\Policies\InboundBlacklistPolicy::class);
         Gate::policy(\App\Models\BlockedCallLog::class, \App\Policies\InboundBlacklistPolicy::class);
+        Gate::policy(\App\Models\AutoDialerCampaign::class, \App\Policies\AutoDialerCampaignPolicy::class);
+        Gate::policy(\App\Models\AutoDialerList::class, \App\Policies\DistributionListPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes
@@ -287,6 +294,19 @@ class AppServiceProvider extends ServiceProvider
                             'message' => 'Too many registration attempts. Please try again in 1 hour.',
                             'retry_after' => $headers['Retry-After'] ?? 3600,
                         ],
+                    ], 429, $headers);
+                });
+        });
+
+        // Dialer Worker API - High rate limit for automated worker processes
+        RateLimiter::for('dialer-worker', function (Request $request) {
+            return Limit::perMinute(config('services.dialer_worker.rate_limit_per_minute', 1000))
+                ->by($request->ip())
+                ->response(function (Request $request, array $headers) {
+                    return response()->json([
+                        'error' => 'Too Many Requests',
+                        'message' => 'Dialer worker rate limit exceeded.',
+                        'retry_after' => $headers['Retry-After'] ?? null,
                     ], 429, $headers);
                 });
         });
