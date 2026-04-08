@@ -550,8 +550,8 @@ export default function AutoDialerCampaignForm() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Date and Timezone Row */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
+                <div className="flex gap-4">
+                  <div className="space-y-2" style={{ width: '40%' }}>
                     <Label htmlFor="timezone">Timezone</Label>
                     <Select
                       value={watch('timezone')}
@@ -579,12 +579,12 @@ export default function AutoDialerCampaignForm() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" style={{ width: '30%' }}>
                     <Label htmlFor="start_date">Start Date</Label>
                     <Input id="start_date" type="date" {...register('start_date')} />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" style={{ width: '30%' }}>
                     <Label htmlFor="end_date">End Date</Label>
                     <Input id="end_date" type="date" {...register('end_date')} />
                   </div>
@@ -605,6 +605,7 @@ export default function AutoDialerCampaignForm() {
                     onRemoveTimeRange={() => {}}
                     onOpenCopyHours={() => {}}
                     errors={{}}
+                    expandHeight
                   />
                 </div>
               </CardContent>

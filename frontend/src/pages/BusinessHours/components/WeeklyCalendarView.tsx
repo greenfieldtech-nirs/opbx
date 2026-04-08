@@ -20,6 +20,8 @@ interface WeeklyCalendarViewProps {
   onRemoveTimeRange: (day: DayOfWeek, rangeId: string) => void;
   onOpenCopyHours: (day: DayOfWeek) => void;
   errors: Record<string, string>;
+  /** Remove the max-height constraint to show the full calendar */
+  expandHeight?: boolean;
 }
 
 const days: { key: DayOfWeek; label: string; shortLabel: string }[] = [
@@ -44,6 +46,7 @@ const timeSlots = Array.from({ length: 24 }, (_, i) => {
 export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
   schedule,
   onScheduleChange,
+  expandHeight = false,
 }) => {
   const getTimeSlotStatus = (day: DayOfWeek, hour: number): 'open' | 'closed' => {
     const daySchedule = schedule[day];
@@ -156,7 +159,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="max-h-96 overflow-y-auto">
+      <div className={expandHeight ? 'overflow-y-auto' : 'max-h-96 overflow-y-auto'}>
         <div className="grid grid-cols-8 bg-muted/50 border-b">
           <div className="p-3 font-medium text-sm border-r">Time</div>
           {days.map(({ key, shortLabel }) => (
