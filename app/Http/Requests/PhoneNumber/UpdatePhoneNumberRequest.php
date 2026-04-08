@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\PhoneNumber;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\UserStatus;
-use App\Enums\AlbsStatus;
-use App\Models\BusinessHoursSchedule;
-use App\Models\ConferenceRoom;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\BusinessHoursSchedule;
+use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
@@ -26,14 +26,12 @@ class UpdatePhoneNumberRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
         $user = $this->user();
 
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -58,12 +56,12 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'string',
                 'max:255',
             ],
-             'routing_type' => [
-                 'sometimes',
-                 'required',
-                 'string',
-                 Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu']),
-             ],
+            'routing_type' => [
+                'sometimes',
+                'required',
+                'string',
+                Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu']),
+            ],
             'routing_config' => [
                 'sometimes',
                 'required',
@@ -89,7 +87,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             'phone_number.prohibited' => 'Phone number cannot be changed after creation.',
             'friendly_name.max' => 'Friendly name must not exceed 255 characters.',
             'routing_type.required' => 'Routing type is required.',
-             'routing_type.in' => 'Invalid routing type. Must be one of: extension, ring_group, business_hours, conference_room, ai_assistant, ivr_menu.',
+            'routing_type.in' => 'Invalid routing type. Must be one of: extension, ring_group, business_hours, conference_room, ai_assistant, ivr_menu.',
             'routing_config.required' => 'Routing configuration is required when changing routing type.',
             'routing_config.array' => 'Routing configuration must be an object.',
             'status.required' => 'Status is required.',
@@ -103,8 +101,7 @@ class UpdatePhoneNumberRequest extends FormRequest
      * Performs custom validation for routing configuration based on routing_type.
      * Validates that target resources exist, are active, and belong to the same organization.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -112,7 +109,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             $user = $this->user();
 
             // Only validate routing if routing_type is being changed
-            if (!$this->has('routing_type')) {
+            if (! $this->has('routing_type')) {
                 return;
             }
 
@@ -120,11 +117,12 @@ class UpdatePhoneNumberRequest extends FormRequest
             $routingConfig = $this->input('routing_config', []);
 
             // Validate routing_config is provided when routing_type is changed
-            if (!$this->has('routing_config')) {
+            if (! $this->has('routing_config')) {
                 $validator->errors()->add(
                     'routing_config',
                     'Routing configuration is required when changing routing type.'
                 );
+
                 return;
             }
 
@@ -145,28 +143,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate extension routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateExtensionRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['extension_id'])) {
+        if (! isset($routingConfig['extension_id'])) {
             $validator->errors()->add(
                 'routing_config.extension_id',
                 'Extension ID is required when routing type is extension.'
             );
+
             return;
         }
 
         $extension = Extension::find($routingConfig['extension_id']);
 
-        if (!$extension) {
+        if (! $extension) {
             $validator->errors()->add(
                 'routing_config.extension_id',
                 'The selected extension does not exist.'
             );
+
             return;
         }
 
@@ -175,13 +174,14 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.extension_id',
                 'The selected extension does not belong to your organization.'
             );
+
             return;
         }
 
         if ($extension->status !== UserStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.extension_id',
-                'The selected extension must be active. Extension ' . $extension->extension_number . ' is currently ' . $extension->status->value . '.'
+                'The selected extension must be active. Extension '.$extension->extension_number.' is currently '.$extension->status->value.'.'
             );
         }
     }
@@ -189,28 +189,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate ring group routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateRingGroupRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['ring_group_id'])) {
+        if (! isset($routingConfig['ring_group_id'])) {
             $validator->errors()->add(
                 'routing_config.ring_group_id',
                 'Ring group ID is required when routing type is ring_group.'
             );
+
             return;
         }
 
         $ringGroup = RingGroup::find($routingConfig['ring_group_id']);
 
-        if (!$ringGroup) {
+        if (! $ringGroup) {
             $validator->errors()->add(
                 'routing_config.ring_group_id',
                 'The selected ring group does not exist.'
             );
+
             return;
         }
 
@@ -219,14 +220,16 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.ring_group_id',
                 'The selected ring group does not belong to your organization.'
             );
+
             return;
         }
 
-        if (!$ringGroup->isActive()) {
+        if (! $ringGroup->isActive()) {
             $validator->errors()->add(
                 'routing_config.ring_group_id',
-                'The selected ring group must be active. Ring group "' . $ringGroup->name . '" is currently inactive.'
+                'The selected ring group must be active. Ring group "'.$ringGroup->name.'" is currently inactive.'
             );
+
             return;
         }
 
@@ -235,7 +238,7 @@ class UpdatePhoneNumberRequest extends FormRequest
         if ($activeMemberCount === 0) {
             $validator->errors()->add(
                 'routing_config.ring_group_id',
-                'The selected ring group must have at least one active member. Ring group "' . $ringGroup->name . '" has no active members.'
+                'The selected ring group must have at least one active member. Ring group "'.$ringGroup->name.'" has no active members.'
             );
         }
     }
@@ -243,28 +246,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate business hours routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateBusinessHoursRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['business_hours_schedule_id'])) {
+        if (! isset($routingConfig['business_hours_schedule_id'])) {
             $validator->errors()->add(
                 'routing_config.business_hours_schedule_id',
                 'Business hours schedule ID is required when routing type is business_hours.'
             );
+
             return;
         }
 
         $schedule = BusinessHoursSchedule::find($routingConfig['business_hours_schedule_id']);
 
-        if (!$schedule) {
+        if (! $schedule) {
             $validator->errors()->add(
                 'routing_config.business_hours_schedule_id',
                 'The selected business hours schedule does not exist.'
             );
+
             return;
         }
 
@@ -273,13 +277,14 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.business_hours_schedule_id',
                 'The selected business hours schedule does not belong to your organization.'
             );
+
             return;
         }
 
-        if (!$schedule->isActive()) {
+        if (! $schedule->isActive()) {
             $validator->errors()->add(
                 'routing_config.business_hours_schedule_id',
-                'The selected business hours schedule must be active. Schedule "' . $schedule->name . '" is currently inactive.'
+                'The selected business hours schedule must be active. Schedule "'.$schedule->name.'" is currently inactive.'
             );
         }
     }
@@ -287,28 +292,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate conference room routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateConferenceRoomRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['conference_room_id'])) {
+        if (! isset($routingConfig['conference_room_id'])) {
             $validator->errors()->add(
                 'routing_config.conference_room_id',
                 'Conference room ID is required when routing type is conference_room.'
             );
+
             return;
         }
 
         $conferenceRoom = ConferenceRoom::find($routingConfig['conference_room_id']);
 
-        if (!$conferenceRoom) {
+        if (! $conferenceRoom) {
             $validator->errors()->add(
                 'routing_config.conference_room_id',
                 'The selected conference room does not exist.'
             );
+
             return;
         }
 
@@ -317,13 +323,14 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.conference_room_id',
                 'The selected conference room does not belong to your organization.'
             );
+
             return;
         }
 
         if ($conferenceRoom->status !== UserStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.conference_room_id',
-                'The selected conference room must be active. Conference room "' . $conferenceRoom->name . '" is currently ' . $conferenceRoom->status->value . '.'
+                'The selected conference room must be active. Conference room "'.$conferenceRoom->name.'" is currently '.$conferenceRoom->status->value.'.'
             );
         }
     }
@@ -331,28 +338,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate AI assistant routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateAiAssistantRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['ai_assistant_id'])) {
+        if (! isset($routingConfig['ai_assistant_id'])) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
                 'AI assistant ID is required when routing type is ai_assistant.'
             );
+
             return;
         }
 
         $aiAssistant = AiAssistant::find($routingConfig['ai_assistant_id']);
 
-        if (!$aiAssistant) {
+        if (! $aiAssistant) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
                 'The selected AI assistant does not exist.'
             );
+
             return;
         }
 
@@ -361,13 +369,14 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.ai_assistant_id',
                 'The selected AI assistant does not belong to your organization.'
             );
+
             return;
         }
 
-        if ($aiAssistant->status !== UserStatus::ACTIVE) {
+        if ($aiAssistant->status !== AiAssistantStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
-                'The selected AI assistant must be active. AI assistant "' . $aiAssistant->name . '" is currently ' . $aiAssistant->status->value . '.'
+                'The selected AI assistant must be active. AI assistant "'.$aiAssistant->name.'" is currently '.$aiAssistant->status->value.'.'
             );
         }
     }
@@ -375,28 +384,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate AI load balancer routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateAiLoadBalancerRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['ai_load_balancer_id'])) {
+        if (! isset($routingConfig['ai_load_balancer_id'])) {
             $validator->errors()->add(
                 'routing_config.ai_load_balancer_id',
                 'AI load balancer ID is required when routing type is ai_load_balancer.'
             );
+
             return;
         }
 
         $albs = AiAssistantLoadBalancer::find($routingConfig['ai_load_balancer_id']);
 
-        if (!$albs) {
+        if (! $albs) {
             $validator->errors()->add(
                 'routing_config.ai_load_balancer_id',
                 'The selected AI load balancer does not exist.'
             );
+
             return;
         }
 
@@ -405,13 +415,14 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.ai_load_balancer_id',
                 'The selected AI load balancer does not belong to your organization.'
             );
+
             return;
         }
 
         if ($albs->status !== \App\Enums\AlbsStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.ai_load_balancer_id',
-                'The selected AI load balancer must be active. AI load balancer "' . $albs->name . '" is currently ' . $albs->status->value . '.'
+                'The selected AI load balancer must be active. AI load balancer "'.$albs->name.'" is currently '.$albs->status->value.'.'
             );
         }
     }
@@ -419,28 +430,29 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate IVR menu routing configuration.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @param \App\Models\User $user
-     * @param array<string, mixed> $routingConfig
-     * @return void
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
      */
     private function validateIvrMenuRouting($validator, $user, array $routingConfig): void
     {
-        if (!isset($routingConfig['ivr_menu_id'])) {
+        if (! isset($routingConfig['ivr_menu_id'])) {
             $validator->errors()->add(
                 'routing_config.ivr_menu_id',
                 'IVR menu ID is required when routing type is ivr_menu.'
             );
+
             return;
         }
 
         $ivrMenu = IvrMenu::find($routingConfig['ivr_menu_id']);
 
-        if (!$ivrMenu) {
+        if (! $ivrMenu) {
             $validator->errors()->add(
                 'routing_config.ivr_menu_id',
                 'The selected IVR menu does not exist.'
             );
+
             return;
         }
 
@@ -449,13 +461,14 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'routing_config.ivr_menu_id',
                 'The selected IVR menu does not belong to your organization.'
             );
+
             return;
         }
 
-        if (!$ivrMenu->isActive()) {
+        if (! $ivrMenu->isActive()) {
             $validator->errors()->add(
                 'routing_config.ivr_menu_id',
-                'The selected IVR menu must be active. IVR menu "' . $ivrMenu->name . '" is currently inactive.'
+                'The selected IVR menu must be active. IVR menu "'.$ivrMenu->name.'" is currently inactive.'
             );
         }
     }

@@ -17,7 +17,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { getActionDisplayName } from '../utils/helpers';
-import { formatExceptionDate } from '@/mock/businessHours';
+import { formatExceptionDate } from '@/utils/businessHours';
 import type { BusinessHoursSchedule } from '@/types';
 import type { Extension, RingGroup } from '@/types';
 

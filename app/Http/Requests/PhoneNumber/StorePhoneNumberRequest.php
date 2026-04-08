@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\PhoneNumber;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
@@ -382,7 +383,7 @@ class StorePhoneNumberRequest extends FormRequest
             return;
         }
 
-        if ($aiAssistant->status !== UserStatus::ACTIVE) {
+        if ($aiAssistant->status !== AiAssistantStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.ai_assistant_id',
                 'The selected AI assistant must be active. AI assistant "'.$aiAssistant->name.'" is currently '.$aiAssistant->status->value.'.'

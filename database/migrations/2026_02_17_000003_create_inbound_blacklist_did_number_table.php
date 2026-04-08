@@ -38,7 +38,8 @@ return new class extends Migration
         $this->migrateExistingData();
 
         // Drop the old did_number_id column from inbound_blacklists (if it still exists)
-        if (Schema::hasColumn('inbound_blacklists', 'did_number_id')) {
+        // Skip for SQLite - it has limited ALTER TABLE support
+        if (DB::getDriverName() !== 'sqlite' && Schema::hasColumn('inbound_blacklists', 'did_number_id')) {
             Schema::table('inbound_blacklists', function (Blueprint $table) {
                 $table->dropForeign(['did_number_id']);
                 $table->dropColumn('did_number_id');

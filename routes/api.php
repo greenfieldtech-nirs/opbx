@@ -26,6 +26,8 @@ use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\AutoDialerCampaignController;
+use App\Http\Controllers\DialerWorkerController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +57,41 @@ Route::get('/health', function () {
         'timestamp' => now()->toIso8601String(),
     ]);
 })->name('health');
+
+// Auto Dialer Worker API Routes (separate authentication)
+// These routes are for the Go-based worker service to execute outbound campaigns
+Route::prefix('v1/dialer/worker')->middleware(['dialer.worker.auth', 'throttle:dialer-worker'])->group(function (): void {
+    // Health check
+    Route::get('/health', [DialerWorkerController::class, 'health'])->name('dialer.worker.health');
+
+    // Campaign management
+    Route::get('/campaigns/active', [DialerWorkerController::class, 'getActiveCampaigns'])
+        ->name('dialer.worker.campaigns.active');
+    Route::post('/campaigns/{campaign}/pause', [DialerWorkerController::class, 'pauseCampaign'])
+        ->name('dialer.worker.campaigns.pause');
+
+    // Destination management
+    Route::get('/campaigns/{campaign}/destinations/pending', [DialerWorkerController::class, 'getPendingDestinations'])
+        ->name('dialer.worker.destinations.pending');
+    Route::get('/campaigns/{campaign}/destinations/retry', [DialerWorkerController::class, 'getRetryDestinations'])
+        ->name('dialer.worker.destinations.retry');
+
+    // Call session management
+    Route::post('/calls/initiate', [DialerWorkerController::class, 'initiateCall'])
+        ->name('dialer.worker.calls.initiate');
+    Route::post('/calls/generate-cxml', [DialerWorkerController::class, 'generateCxml'])
+        ->name('dialer.worker.calls.generate-cxml');
+    Route::patch('/calls/{session}/status', [DialerWorkerController::class, 'updateCallStatus'])
+        ->name('dialer.worker.calls.status');
+    Route::post('/calls/{session}/disposition', [DialerWorkerController::class, 'setDisposition'])
+        ->name('dialer.worker.calls.disposition');
+
+    // State persistence
+    Route::post('/state/persist', [DialerWorkerController::class, 'persistState'])
+        ->name('dialer.worker.state.persist');
+    Route::get('/state/{workerId}', [DialerWorkerController::class, 'getState'])
+        ->name('dialer.worker.state.get');
+});
 
 // Detailed health checks - behind authentication to prevent internal info leakage
 Route::middleware(['auth:sanctum'])->group(function (): void {
@@ -198,6 +235,70 @@ Route::prefix('v1')->group(function (): void {
             Route::post('sync', [ExtensionCloudonixController::class, 'performSync'])
                 ->name('extensions.sync.perform');
         });
+
+        // Auto Dialer Campaigns - Monitor (MUST be before apiResource to avoid 'monitor' matching {campaign})
+        Route::get('auto-dialer-campaigns/monitor/summary', [AutoDialerCampaignController::class, 'monitorSummary'])
+            ->name('auto-dialer-campaigns.monitor.summary');
+        Route::get('auto-dialer-campaigns/{campaign}/monitor/detail', [AutoDialerCampaignController::class, 'monitorDetail'])
+            ->name('auto-dialer-campaigns.monitor.detail');
+
+        // Auto Dialer Campaigns - Distribution Lists (MUST be before apiResource to avoid route conflicts)
+        Route::get('auto-dialer-campaigns/lists', [\App\Http\Controllers\DistributionListController::class, 'index'])
+            ->name('distribution-lists.index');
+        Route::post('auto-dialer-campaigns/lists', [\App\Http\Controllers\DistributionListController::class, 'store'])
+            ->name('distribution-lists.store');
+        Route::get('auto-dialer-campaigns/lists/example-csv', [\App\Http\Controllers\DistributionListController::class, 'downloadExample'])
+            ->name('distribution-lists.example');
+        Route::get('auto-dialer-campaigns/lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'show'])
+            ->name('distribution-lists.show');
+        Route::post('auto-dialer-campaigns/lists/{list}/upload', [\App\Http\Controllers\DistributionListController::class, 'upload'])
+            ->name('distribution-lists.upload');
+        Route::get('auto-dialer-campaigns/lists/upload-progress/{jobId}', [\App\Http\Controllers\DistributionListController::class, 'uploadProgress'])
+            ->name('distribution-lists.progress');
+        Route::post('auto-dialer-campaigns/lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'addDestination'])
+            ->name('distribution-lists.destinations.add');
+        Route::post('auto-dialer-campaigns/lists/{list}/destinations/batch', [\App\Http\Controllers\DistributionListController::class, 'addDestinationsBatch'])
+            ->name('distribution-lists.destinations.batch');
+        Route::get('auto-dialer-campaigns/lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'getDestinations'])
+            ->name('distribution-lists.destinations');
+        Route::get('auto-dialer-campaigns/lists/{list}/versions', [\App\Http\Controllers\DistributionListController::class, 'getVersions'])
+            ->name('distribution-lists.versions');
+        Route::post('auto-dialer-campaigns/lists/{list}/copy', [\App\Http\Controllers\DistributionListController::class, 'copy'])
+            ->name('distribution-lists.copy');
+        Route::patch('auto-dialer-campaigns/lists/{list}/archive', [\App\Http\Controllers\DistributionListController::class, 'archive'])
+            ->name('distribution-lists.archive');
+        Route::get('auto-dialer-campaigns/lists/{list}/download', [\App\Http\Controllers\DistributionListController::class, 'download'])
+            ->name('distribution-lists.download');
+        Route::get('auto-dialer-campaigns/lists/{list}/validation-errors', [\App\Http\Controllers\DistributionListController::class, 'getValidationErrors'])
+            ->name('distribution-lists.errors');
+        Route::delete('auto-dialer-campaigns/lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'destroy'])
+            ->name('distribution-lists.destroy');
+        Route::post('auto-dialer-campaigns/lists/{list}/assign', [\App\Http\Controllers\DistributionListController::class, 'assignToCampaign'])
+            ->name('distribution-lists.assign');
+        Route::post('auto-dialer-campaigns/lists/{list}/unassign', [\App\Http\Controllers\DistributionListController::class, 'unassignFromCampaign'])
+            ->name('distribution-lists.unassign');
+
+        // Auto Dialer Campaigns
+        Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)
+            ->parameters(['auto-dialer-campaigns' => 'campaign']);
+        Route::patch('auto-dialer-campaigns/{campaign}/start', [AutoDialerCampaignController::class, 'start'])
+            ->name('auto-dialer-campaigns.start');
+        Route::patch('auto-dialer-campaigns/{campaign}/pause', [AutoDialerCampaignController::class, 'pause'])
+            ->name('auto-dialer-campaigns.pause');
+        Route::patch('auto-dialer-campaigns/{campaign}/resume', [AutoDialerCampaignController::class, 'resume'])
+            ->name('auto-dialer-campaigns.resume');
+        Route::patch('auto-dialer-campaigns/{campaign}/archive', [AutoDialerCampaignController::class, 'archive'])
+            ->name('auto-dialer-campaigns.archive');
+        Route::post('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'uploadList'])
+            ->name('auto-dialer-campaigns.list.upload');
+        Route::get('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'getList'])
+            ->name('auto-dialer-campaigns.list.get');
+        Route::delete('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'deleteList'])
+            ->name('auto-dialer-campaigns.list.delete');
+        Route::get('auto-dialer-campaigns/{campaign}/destinations', [AutoDialerCampaignController::class, 'getDestinations'])
+            ->name('auto-dialer-campaigns.destinations');
+        Route::get('auto-dialer-campaigns/{campaign}/concurrency', [AutoDialerCampaignController::class, 'concurrency'])
+            ->name('auto-dialer-campaigns.concurrency');
 
         // Extensions - CRUD (using ExtensionCrudController)
         Route::apiResource('extensions', ExtensionCrudController::class);

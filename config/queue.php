@@ -89,6 +89,24 @@ return [
             ],
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Dialer Queue
+        |--------------------------------------------------------------------------
+        |
+        | Dedicated queue connection for auto-dialer campaigns to ensure
+        | calls are processed with proper rate limiting and isolation.
+        |
+        */
+        'auto-dialer' => [
+            'driver' => env('AUTO_DIALER_QUEUE_DRIVER', 'redis'),
+            'connection' => env('AUTO_DIALER_QUEUE_CONNECTION', 'default'),
+            'queue' => env('AUTO_DIALER_QUEUE', 'auto-dialer'),
+            'retry_after' => (int) env('AUTO_DIALER_QUEUE_RETRY_AFTER', 3600),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
     ],
 
     /*

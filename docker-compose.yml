@@ -70,6 +70,8 @@ services:
       - MINIO_BUCKET=recordings
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_USE_PATH_STYLE=true
+      # Auto Dialer Worker authentication (must match DIALER_WORKER_API_TOKEN env var)
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
     depends_on:
       mysql:
         condition: service_healthy
@@ -89,7 +91,7 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: opbx_queue_worker
-    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90
+    command: php artisan queue:work redis --queue=auto-dialer,default --sleep=3 --tries=3 --timeout=90
     volumes:
       - ./:/var/www/html
     environment:
@@ -103,6 +105,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
+      # Auto Dialer Worker authentication
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
     depends_on:
       - app
       - redis
@@ -129,6 +133,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
+      # Auto Dialer Worker authentication
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
     depends_on:
       - app
     networks:
@@ -240,6 +246,41 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+
+  # Auto Dialer Worker - Go-based service for outbound campaigns
+  # Receives CDR events from Laravel via webhook at /webhooks/cdr
+  dialer-worker:
+    build:
+      context: ./dialer-worker
+      dockerfile: Dockerfile
+    container_name: opbx_dialer_worker
+    environment:
+      - WORKER_ID=${DIALER_WORKER_ID:-worker-1}
+      - LARAVEL_API_URL=${DIALER_LARAVEL_API_URL:-http://nginx}
+      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=0
+      - POLL_INTERVAL=${DIALER_POLL_INTERVAL:-10s}
+      - HEALTH_CHECK_PORT=${DIALER_HEALTH_PORT:-8080}
+      - WEBHOOK_PORT=${DIALER_WEBHOOK_PORT:-8081}
+      - WEBHOOK_SECRET=${DIALER_WEBHOOK_SECRET:-}
+    ports:
+      - "${DIALER_WEBHOOK_PORT:-8081}:8081"  # Webhook endpoint for CDR
+    networks:
+      - opbx
+    depends_on:
+      - app
+      - nginx
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/webhooks/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   ngrok:
     image: ngrok/ngrok:latest

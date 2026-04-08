@@ -148,7 +148,7 @@ class Extension extends Model
         // For PBX User extensions, Cloudonix handles routing internally
         // Just return the extension number
         if ($this->type === ExtensionType::USER) {
-            return $this->extension_number;
+            return (string) $this->extension_number;
         }
 
         // For other extension types, check configuration for SIP URI

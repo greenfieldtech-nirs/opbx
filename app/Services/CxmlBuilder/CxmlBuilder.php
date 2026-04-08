@@ -587,7 +587,9 @@ class CxmlBuilder
 
         $connect = $this->document->createElement('Connect');
         $stream = $this->document->createElement('Stream');
-        $stream->setAttribute('url', htmlspecialchars($websocketUrl, self::XML_ENCODING, 'UTF-8'));
+        // DOMDocument::setAttribute handles XML escaping automatically —
+        // do NOT pre-encode with htmlspecialchars (causes double-encoding of &)
+        $stream->setAttribute('url', $websocketUrl);
 
         $connect->appendChild($stream);
         $this->response->appendChild($connect);

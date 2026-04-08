@@ -40,7 +40,7 @@ import {
   getStrategyDisplayName,
   getStrategyDescription,
   getFallbackDisplayText,
-} from '@/mock/ringGroups';
+} from '@/utils/ringGroups';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
