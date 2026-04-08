@@ -1,0 +1,161 @@
+---
+sidebar_position: 2
+title: Ring Groups
+description: Distributing calls across multiple extensions
+---
+
+# Ring Groups
+
+Ring groups distribute incoming calls to multiple extensions. They ensure calls reach available agents and provide coverage for departments.
+
+## What Is a Ring Group
+
+A ring group is a collection of extensions that ring simultaneously or sequentially when a call comes in. Ring groups are used to:
+
+- Distribute calls across a team
+- Ensure coverage during busy periods
+- Provide backup when primary agents are unavailable
+
+## Ring Strategies
+
+OPBX supports three ring strategies:
+
+| Strategy | Behavior | Best For |
+|----------|----------|----------|
+| Simultaneous | All members ring at once | Small teams, urgent calls |
+| Round Robin | Distributes calls evenly | Load balancing |
+| Sequential | Tries members one by one | Priority-based routing |
+
+### Simultaneous
+
+All members of the ring group receive the call at the same time. The first person to answer takes the call.
+
+**Best for**: Small teams where any member can handle the call, urgent situations where speed matters.
+
+### Round Robin
+
+Calls rotate through members in a fixed order. Each new call goes to the next member in the sequence.
+
+**Best for**: Balancing workload across a team, ensuring equal distribution.
+
+### Sequential
+
+Calls ring the first member. If they do not answer, the call moves to the next member, and so on.
+
+**Best for**: Priority-based routing (manager first, then team), escalations.
+
+## Creating a Ring Group
+
+To create a new ring group:
+
+1. Navigate to **Ring Groups** in the sidebar
+2. Click **Create Ring Group**
+3. Enter a descriptive name
+4. Select the ring strategy
+5. Add member extensions
+6. Configure timeout settings
+7. Set fallback actions
+8. Save the ring group
+
+### Timeout Configuration
+
+| Setting | Description |
+|---------|-------------|
+| Timeout | Seconds to ring before considering unanswered (1-300) |
+| Ring Turns | For sequential strategy, how many times to cycle through members |
+
+## Fallback Actions
+
+When nobody in the ring group answers, the call can route to a fallback destination:
+
+| Fallback | Description |
+|----------|------------|
+| Extension | Route to specific extension |
+| Ring Group | Route to another ring group |
+| IVR Menu | Route to IVR |
+| AI Assistant | Route to AI agent |
+| AI Load Balancer | Route to AI balancer |
+| Hangup | End the call |
+
+:::tip
+Always configure a fallback to prevent callers from hanging up in voicemail limbo. A common pattern is to route to an IVR with a "leave a message" option.
+:::
+
+## Managing Members
+
+### Adding Members
+
+1. Open the ring group details
+2. Click **Add Member**
+3. Select an extension
+4. Set priority (for sequential strategy)
+5. Save
+
+### Member Priority
+
+Priority determines the order for sequential ringing. Lower numbers ring first.
+
+| Priority | Order |
+|----------|-------|
+| 1 | Rings first |
+| 2 | Rings second |
+| 3 | Rings third |
+
+### Removing Members
+
+Click the delete icon next to a member to remove them from the group. This does not delete the extension, only its membership in this group.
+
+## Ring Group Status
+
+| Status | Behavior |
+|--------|----------|
+| Active | Accepts and routes calls |
+| Inactive | Calls skip this group and go to fallback |
+
+Set a ring group to Inactive during:
+- Department meetings
+- After-hours when no one is available
+- System maintenance
+
+## Ring Group Examples
+
+### Sales Department
+
+- **Name**: Sales Team
+- **Strategy**: Simultaneous
+- **Members**: Extensions 1001, 1002, 1003
+- **Timeout**: 20 seconds
+- **Fallback**: Sales IVR
+
+Result: All three sales agents' phones ring. If no one answers, the caller hears the sales menu.
+
+### Support Escalation
+
+- **Name**: Support L1
+- **Strategy**: Sequential
+- **Members**: Extension 2001 (Priority 1), 2002 (Priority 2), 2003 (Priority 3)
+- **Timeout**: 15 seconds per member
+- **Fallback**: Support L2 Ring Group
+
+Result: Calls try the senior agent first, then junior agents, then escalate to Level 2.
+
+## Best Practices
+
+### Member Selection
+
+- Include only active extensions
+- Avoid adding the same extension to multiple overlapping groups
+- Consider skill levels when setting sequential priorities
+
+### Timeout Settings
+
+- Simultaneous: 20-30 seconds is typical
+- Sequential: 10-15 seconds per member
+- Total timeout should not exceed caller patience (usually 60-90 seconds)
+
+### Fallback Design
+
+- Always have a fallback
+- Use IVR for voicemail options
+- Consider routing to a manager for urgent queues
+- Never leave callers with no destination

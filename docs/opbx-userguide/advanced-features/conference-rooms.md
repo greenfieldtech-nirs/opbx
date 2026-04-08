@@ -1,0 +1,134 @@
+---
+sidebar_position: 3
+title: Conference Rooms
+description: Setting up multi-party conference bridges
+---
+
+# Conference Rooms
+
+Conference Rooms create audio bridges where multiple callers can join a shared conversation. Use them for team meetings, webinars, training sessions, or collaborative discussions.
+
+## Conference Settings
+
+Configure your conference room with these options:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Max Participants | Maximum number of concurrent participants (2-1000) | 25 |
+| PIN Required | Require a numeric PIN to join the conference | No |
+| PIN | Numeric access code (max 20 digits) | - |
+| Host PIN | Separate PIN for the host to join | - |
+| Wait for Host | Hold participants until the host joins | No |
+| Mute on Entry | Automatically mute participants when they join | No |
+| Announce Join/Leave | Play a tone when participants join or leave | No |
+| Recording Enabled | Allow call recording for this conference | No |
+| Auto-start Recording | Start recording automatically when the conference begins | No |
+| Music on Hold | Play music while participants wait | No |
+
+:::tip
+Use a Host PIN with "Wait for Host" enabled for secure meetings where you control when the conference begins.
+:::
+
+## Creating a Conference Room
+
+1. Navigate to **Conference Rooms** in the sidebar
+2. Click **Create**
+3. Enter a descriptive name
+4. Set the maximum number of participants
+5. Configure PIN settings if needed
+6. Enable recording options if required
+7. Click **Save**
+
+## Accessing Conference Rooms
+
+You can make conference rooms accessible to callers in two ways:
+
+### Via Extension
+
+Create a Conference-type extension that points to the room:
+
+1. Go to **Extensions** and click **Create**
+2. Select **Conference** as the extension type
+3. Choose the conference room from the dropdown
+4. Assign an extension number
+5. Click **Save**
+
+Callers dial the extension number to join the conference.
+
+### Via DID
+
+Route incoming calls directly to a conference room:
+
+1. Go to **DIDs** and select a phone number
+2. Set the destination type to **Conference Room**
+3. Select the conference room
+4. Click **Save**
+
+Callers dial the DID number to join directly.
+
+## Use Cases
+
+### Scheduled Meetings
+
+Create a conference room with a PIN for recurring team meetings:
+
+- Set a memorable PIN
+- Share the extension number or DID with participants
+- Enable "Announce Join/Leave" for awareness
+
+### Webinar Dial-In Lines
+
+Set up a large-capacity conference for webinars:
+
+- Increase Max Participants to accommodate your audience
+- Enable "Wait for Host" to control start time
+- Enable recording for post-event distribution
+
+### Training Sessions
+
+Configure a conference for training purposes:
+
+- Enable "Mute on Entry" to reduce background noise
+- Use Host PIN for instructor access
+- Enable recording for later review
+
+## Security Considerations
+
+:::warning
+Conference rooms without PINs are accessible to anyone who knows the extension or DID number. Always enable PIN protection for sensitive meetings.
+:::
+
+### Recommended Security Settings
+
+| Scenario | PIN Required | Host PIN | Wait for Host |
+|----------|--------------|----------|---------------|
+| Public webinar | Yes | Yes | Yes |
+| Internal meeting | Yes | No | No |
+| Confidential discussion | Yes | Yes | Yes |
+| Open line | No | No | No |
+
+## Managing Active Conferences
+
+During an active conference:
+
+- Participants can join until the maximum is reached
+- The host can join with the Host PIN (if configured)
+- Recording starts automatically if "Auto-start Recording" is enabled
+- Participants hear music on hold if configured and waiting
+
+:::note
+Conference rooms do not have a moderator interface. For advanced moderation features, consider using external conference solutions integrated via SIP.
+:::
+
+## Recording
+
+When recording is enabled:
+
+- Recordings are stored securely and accessible from the Recordings section
+- Auto-start recording begins when the first participant joins
+- Manual recording requires host intervention (if supported by the provider)
+- Recording stops when the last participant leaves
+
+:::info
+Ensure you comply with local laws regarding call recording. Inform participants that the call is being recorded.
+:::

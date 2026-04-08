@@ -1,0 +1,135 @@
+---
+sidebar_position: 4
+title: Extensions
+description: Creating and managing PBX extensions
+---
+
+# Extensions
+
+Extensions are the foundation of your PBX system. They represent numbered endpoints that callers can reach directly or through routing configurations.
+
+## What Is an Extension
+
+An extension is a numbered endpoint (typically 3-5 digits) that represents a phone destination within your organization. Extensions can be assigned to users, forwarded to external numbers, or connected to automated services.
+
+## Extension Types
+
+OPBX supports multiple extension types for different use cases:
+
+| Type | Description | Configuration |
+|------|------------|--------------|
+| User | SIP phone extension for a person | Assigned to a user, auto-generated SIP password |
+| Conference | Routes to a conference room | Select conference room |
+| Ring Group | Routes to a ring group | Select ring group |
+| IVR | Routes to an IVR menu | Select IVR menu |
+| AI Assistant | Routes to an AI provider | Select AI assistant |
+| Forward | Forwards to external number | Enter phone number |
+| AI Load Balancer | Routes to AI load balancer | Select load balancer |
+| Custom Logic | Custom application routing | Container app/block name |
+
+## Creating an Extension
+
+To create a new extension:
+
+1. Navigate to the Extensions page
+2. Click **Create Extension**
+3. Enter an extension number (3-5 digits, unique within your organization)
+4. Select the extension type
+5. Configure type-specific settings
+6. Save the extension
+
+:::warning
+Extension numbers cannot be changed after creation. If you need a different number, delete the extension and create a new one.
+:::
+
+## User Extensions
+
+User extensions are the most common type. They connect to SIP phones or softphones.
+
+### SIP Credentials
+
+When you create a User extension, OPBX auto-generates a SIP password. View the credentials on the extension detail page:
+
+- SIP Username: The extension number
+- SIP Password: Auto-generated secure password
+- SIP Server: Provided by your administrator
+
+### Resetting SIP Password
+
+If a user loses their SIP password or suspects compromise:
+
+1. Open the extension details
+2. Click **Reset Password**
+3. The new password displays immediately
+4. Update the SIP phone configuration
+
+:::note
+Resetting the SIP password disconnects any active registrations. The SIP phone must re-register with the new credentials.
+:::
+
+### Voicemail
+
+Enable voicemail on User extensions to capture messages when the user is unavailable:
+
+- Toggle voicemail on/off in extension settings
+- Voicemail notifications sent to the assigned user's email
+- Access voicemail through the SIP phone or web portal
+
+## Cloudonix Synchronization
+
+User extensions sync to Cloudonix as SIP subscribers. This enables the Cloudonix platform to route calls to your SIP phones.
+
+### Manual Sync
+
+Click the **Sync** button on the Extensions page to trigger synchronization. This is useful when:
+
+- A new extension is not registering
+- Credentials were reset
+- Changes appear not to be taking effect
+
+### Bidirectional Sync
+
+Synchronization works in both directions:
+
+- **Local to Cloudonix**: New extensions and credential changes push to Cloudonix
+- **Cloudonix to Local**: Existing subscribers import as extensions
+
+:::tip
+Run a sync after bulk imports or when migrating from another system.
+:::
+
+## Extension Status
+
+Extensions have one of two statuses:
+
+| Status | Behavior |
+|--------|----------|
+| Active | Receives calls normally |
+| Inactive | Calls rejected or routed to voicemail |
+
+Set an extension to Inactive when:
+- The user is on extended leave
+- The extension is being repurposed
+- You want to block calls without deleting the extension
+
+## Extension Best Practices
+
+### Numbering Plan
+
+Develop a consistent numbering plan for your organization:
+
+- Reserve 3-digit extensions for departments (100-199 for sales, 200-299 for support)
+- Use 4-digit extensions for individual users
+- Avoid numbers that conflict with feature codes
+
+### Assignment
+
+- Assign extensions to specific users when possible
+- Use descriptive labels for non-user extensions (conference rooms, ring groups)
+- Document forwarding rules for Forward-type extensions
+
+### Security
+
+- Reset SIP passwords periodically
+- Disable extensions instead of leaving them active but unused
+- Monitor registration logs for unauthorized devices

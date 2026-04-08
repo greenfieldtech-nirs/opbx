@@ -1,0 +1,133 @@
+---
+sidebar_position: 1
+title: AI Assistants
+description: Integrating AI voice agents with your PBX
+---
+
+# AI Assistants
+
+AI Assistants let you connect answered calls to AI-powered voice agents that can handle conversations, gather information, and route calls intelligently. OPBX supports two connection protocols: SIP and WebSocket.
+
+## Supported Providers
+
+OPBX integrates with multiple AI voice providers across two protocols.
+
+### SIP Providers (16)
+
+SIP providers connect using a phone number configuration field.
+
+| Provider | Protocol | Configuration |
+|----------|----------|---------------|
+| synthflow | SIP | phone_number |
+| dasha | SIP | phone_number |
+| superdash.ai | SIP | phone_number |
+| ultravox | SIP | phone_number |
+| elevenlabs | SIP | phone_number |
+| deepvox | SIP | phone_number |
+| relayhawk | SIP | phone_number |
+| voicehub | SIP | phone_number |
+| retell | SIP | phone_number |
+| vapi | SIP | phone_number |
+| fonio | SIP | phone_number |
+| sigmamind | SIP | phone_number |
+| modon | SIP | phone_number |
+| puretalk | SIP | phone_number |
+| millis-us | SIP | phone_number |
+| millis-eu | SIP | phone_number |
+
+### WebSocket Provider (1)
+
+WebSocket providers use a real-time streaming connection.
+
+| Provider | Protocol | Configuration |
+|----------|----------|---------------|
+| deepdub | WebSocket | bot_id, auth_token |
+
+:::tip
+Providers are automatically grouped by protocol in the selection dropdown, making it easy to choose the right integration type.
+:::
+
+## How Routing Works
+
+### SIP Routing
+
+When a call routes to a SIP-based AI Assistant, OPBX generates CXML that dials the provider's service number:
+
+```xml
+<Dial>
+  <Service provider="retell">+14155551234</Service>
+</Dial>
+```
+
+The `provider` attribute identifies which AI service handles the call.
+
+### WebSocket Routing
+
+When a call routes to a WebSocket-based AI Assistant, OPBX generates CXML that opens a streaming connection:
+
+```xml
+<Connect>
+  <Stream url="wss://bot.deepdub.dev/ws/{bot_id}/{auth_token}?session={session}&from={from}&to={to}"/>
+</Connect>
+```
+
+The URL template includes:
+
+| Parameter | Description |
+|-----------|-------------|
+| bot_id | Your DeepDub bot identifier |
+| auth_token | Authentication token for the connection |
+| session | Unique session ID for this call |
+| from | Caller ID of the incoming call |
+| to | Destination number being called |
+
+## Creating an AI Assistant
+
+1. Navigate to **AI Assistants** in the sidebar
+2. Click **Create**
+3. Enter a descriptive name
+4. Select a provider from the dropdown
+5. Fill in the provider-specific configuration fields
+6. Set the status to **Active**
+7. Click **Save**
+
+:::note
+The configuration fields change based on your selected provider. SIP providers require a phone number, while WebSocket providers require bot credentials.
+:::
+
+## Using AI Assistants
+
+Once created, you can route calls to AI Assistants from multiple locations:
+
+| Feature | How to Use |
+|---------|------------|
+| DID Routing | Set the AI Assistant as the destination for incoming calls |
+| Ring Group Fallback | Use as a fallback when no agents answer |
+| IVR Options | Route menu selections to an AI Assistant |
+| Business Hours | Route after-hours calls to an AI Assistant |
+| Auto Dialer | Connect campaign calls to an AI Assistant |
+
+## Status Management
+
+AI Assistants have two status states:
+
+| Status | Behavior |
+|--------|----------|
+| Active | Available for call routing |
+| Inactive | Ignored by the routing system |
+
+:::warning
+Changing an AI Assistant to Inactive does not disconnect ongoing calls. It only prevents new calls from routing to it.
+:::
+
+## Delete Protection
+
+You cannot delete an AI Assistant if it is referenced by any extensions. Before deleting, you must:
+
+1. Remove the AI Assistant from all DIDs
+2. Remove it from Ring Group fallbacks
+3. Remove it from IVR menu options
+4. Remove it from Business Hours actions
+5. Remove it from Auto Dialer campaigns
+
+The system displays a list of references when you attempt to delete a connected AI Assistant.

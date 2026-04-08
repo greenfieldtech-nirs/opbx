@@ -1,0 +1,197 @@
+---
+sidebar_position: 2
+title: Managing Campaigns
+description: Creating, configuring, and controlling auto-dialer campaigns
+---
+
+# Managing Campaigns
+
+Campaigns are the core of the Auto Dialer system. Each campaign represents an outbound dialing job with specific configuration for routing, scheduling, rate limiting, and retry behavior.
+
+## Campaign Manager Page
+
+Access the Campaign Manager via the sidebar: **Auto Dialer > Campaign Manager**.
+
+The Campaign Manager provides:
+
+- **Search**: Find campaigns by name
+- **Status Filter**: Filter by Draft, Active, Paused, Completed, or Archived
+- **Create Campaign**: Launch the campaign creation wizard
+- **Campaign List**: View all campaigns with key metrics
+
+### Status Badge Actions
+
+Each campaign displays a status badge that is clickable:
+
+- **Draft badge**: Click to start the campaign (requires assigned distribution list)
+- **Active badge**: Click to pause the campaign
+- **Paused badge**: Click to resume the campaign
+
+### Edit Restrictions
+
+The Edit button is disabled when a campaign is **Active**. You must pause the campaign before making changes.
+
+## Creating a Campaign
+
+Click **Create Campaign** to open the three-tab campaign creation form.
+
+### Basic Tab
+
+Configure fundamental campaign settings:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| **Name** | Yes | Descriptive name for the campaign |
+| **Description** | No | Optional details about the campaign purpose |
+| **Routing Destination Type** | Yes | AI Assistant (WebSocket), AI Assistant (SIP), AI Load Balancer, or Hangup |
+| **Select Destination** | Yes | Specific AI assistant or load balancer to route calls to |
+| **Caller ID** | Yes | Outbound phone number displayed to callees (E.164 format) |
+| **Dial Timeout** | Yes | Seconds to ring before giving up (default: 60) |
+
+:::note
+The Caller ID must be a valid phone number in E.164 format (e.g., +14155551234). This number is displayed on the callee's phone.
+:::
+
+### Schedule Tab
+
+Configure when the campaign is allowed to dial:
+
+| Field | Description |
+|-------|-------------|
+| **Timezone** | Select from 65+ timezones grouped by region (Americas, Europe, Asia, etc.) |
+| **Start Date** | First day the campaign can dial |
+| **End Date** | Last day the campaign can dial |
+| **Weekly Active Hours** | Visual calendar with 24 hourly slots per day. Click to toggle. Green = active, empty = inactive. |
+
+The weekly calendar provides per-day granular control. For example, you can configure:
+
+- Monday-Friday: 9:00 AM to 5:00 PM
+- Saturday: 10:00 AM to 2:00 PM
+- Sunday: No dialing
+
+:::tip
+All scheduling is evaluated in the selected timezone. Make sure to choose the timezone that matches your target audience's location.
+:::
+
+### Advanced Tab
+
+Configure rate limiting, retries, and optional features:
+
+| Field | Range | Default | Description |
+|-------|-------|---------|-------------|
+| **CAC** | 1-50 | 1 | Maximum concurrent active calls |
+| **CPS** | 1-5 | 1 | Calls initiated per second (1=1/sec, 5=200ms interval) |
+| **Max Dial Attempts** | 1-5 | 1 | Retry count per destination |
+| **Record Calls** | Toggle | Off | Enable call recording |
+| **AMD** | Toggle | Off | Enable Answering Machine Detection |
+
+**AMD Configuration (when enabled):**
+
+| Parameter | Description |
+|-----------|-------------|
+| **Mode** | Enable (detect human vs machine) or DetectMessageEnd (wait for greeting to end) |
+| **Detection Timeout** | Maximum seconds to wait for AMD result |
+| **Speech Threshold** | Milliseconds of speech to classify as human |
+| **Speech End Threshold** | Milliseconds of silence after speech to determine end |
+| **Silence Timeout** | Milliseconds of initial silence before any speech |
+
+See [Answering Machine Detection](/opbx-userguide/auto-dialer/answering-machine-detection) for detailed AMD configuration.
+
+## Campaign Statuses
+
+Campaigns exist in one of five statuses:
+
+| Status | Description | Can Edit | Can Start/Pause |
+|--------|-------------|----------|-----------------|
+| **Draft** | Initial configuration state | Yes | Can start |
+| **Active** | Currently dialing | No | Can pause |
+| **Paused** | Temporarily stopped | Yes | Can resume |
+| **Completed** | All destinations processed | No | No |
+| **Archived** | Soft-deleted | No | No |
+
+## Controlling Campaigns
+
+### Starting a Campaign
+
+Before starting, ensure:
+
+1. At least one distribution list is assigned
+2. Schedule is configured correctly
+3. Rate limits are appropriate for your needs
+
+Click the **Start** button or click the Draft status badge. The campaign transitions to Active and the Go worker begins polling.
+
+:::warning
+You cannot start a campaign without an assigned distribution list. The system will display an error message if you attempt to start without one.
+:::
+
+### Pausing a Campaign
+
+Click the **Pause** button or the Active status badge. The campaign transitions to Paused:
+
+- No new calls are initiated
+- Active calls continue until they complete naturally
+- Stale sessions are automatically cleaned up
+- You can now edit campaign settings
+
+### Resuming a Campaign
+
+Click the **Resume** button or the Paused status badge. The campaign transitions back to Active and the Go worker resumes polling on its next cycle (within 10 seconds).
+
+### Archiving a Campaign
+
+Archiving is a permanent soft-delete action. Archived campaigns are hidden from default views but retained in the database for record-keeping.
+
+- Archiving an Active campaign first pauses it
+- Completed and Paused campaigns can be archived directly
+- Archived campaigns cannot be unarchived through the UI
+
+## Campaign Settings Page
+
+Click any campaign in the Campaign Manager to view its detailed settings page.
+
+### Statistics Cards
+
+The top of the page displays five summary cards:
+
+| Card | Description |
+|------|-------------|
+| **Total Destinations** | Total phone numbers in assigned distribution lists |
+| **Completed** | Successfully completed calls (green) |
+| **Failed** | Calls that failed after all retry attempts (red) |
+| **Pending** | Destinations not yet dialed or awaiting retry (yellow) |
+| **Progress** | Percentage complete (Completed / Total Destinations) |
+
+### Settings Display
+
+All campaign settings are displayed in read-only format when the campaign is Active. The settings become editable after pausing.
+
+### Action Buttons
+
+- **Edit**: Opens the campaign edit form (disabled when Active)
+- **Pause/Resume**: Controls campaign state
+- **Refresh**: Manually refresh the statistics
+
+### Distribution Lists Section
+
+View and manage distribution lists assigned to this campaign:
+
+- See list names, versions, and record counts
+- Assign additional lists
+- Unassign lists (only when campaign is not Active)
+
+:::tip
+The Campaign Settings page auto-refreshes every 10 seconds when the campaign is Active, keeping the statistics current.
+:::
+
+## Best Practices
+
+1. **Start Conservative**: Begin with CAC=1 and CPS=1 to test your routing destination and campaign configuration
+
+2. **Test Before Scaling**: Make a few test calls before increasing rate limits
+
+3. **Monitor Early**: Watch the Real-Time Monitor during the first minutes of a campaign
+
+4. **Schedule Appropriately**: Respect local calling hours and regulations in your target timezone
+
+5. **Use Meaningful Names**: Include date, purpose, or target audience in campaign names for easy identification

@@ -1,0 +1,153 @@
+---
+sidebar_position: 5
+title: Inbound Blacklist
+description: Blocking unwanted inbound calls
+---
+
+# Inbound Blacklist
+
+The Inbound Blacklist blocks unwanted callers using pattern matching rules. Reduce spam, prevent harassment, and control who can reach your organization.
+
+## Match Types
+
+Create rules using three pattern matching approaches:
+
+| Type | Pattern Example | Matches |
+|------|-----------------|---------|
+| Exact | +14155551234 | Only that specific number |
+| Prefix | +1415 | Any number starting with +1415 |
+| Wildcard | +1415555* | Numbers matching the wildcard pattern |
+
+### Exact Match
+
+Use for blocking specific known numbers:
+
+- Example: `+14155551234`
+- Use case: Blocking a persistent spam caller
+
+### Prefix Match
+
+Use for blocking number ranges:
+
+- Example: `+1415`
+- Use case: Blocking all calls from a specific area code
+
+### Wildcard Match
+
+Use for flexible pattern matching:
+
+- Example: `+1415555*`
+- Use case: Blocking all numbers in a specific exchange
+
+:::tip
+Prefix matching is more efficient than wildcards for simple range blocks. Use wildcards when you need pattern matching in the middle or end of numbers.
+:::
+
+## Rejection Strategies
+
+Choose how blocked calls are handled:
+
+| Strategy | Behavior |
+|----------|----------|
+| Drop | Silently hang up; caller hears nothing |
+| Reject | Play "Your call has been rejected" then hang up |
+| Torment | Place caller in a conference room with hold music |
+
+### Drop
+
+The call disconnects immediately without any notification. The caller may hear ringing followed by silence or a fast busy signal depending on their carrier.
+
+### Reject
+
+The caller hears a brief message stating their call has been rejected before the call ends.
+
+### Torment
+
+:::warning
+Use torment mode responsibly. This strategy places the caller in a conference room playing hold music indefinitely, consuming their time and resources.
+:::
+
+The caller is connected to a conference room with continuous hold music. They remain connected until they hang up.
+
+## Scope
+
+Rules can apply globally or to specific DIDs:
+
+| Scope | Description |
+|-------|-------------|
+| Global | Applies to all incoming calls on all DIDs |
+| Per-DID | Applies only to calls on selected phone numbers |
+
+:::note
+Per-DID rules are evaluated after global rules. A number blocked globally cannot be unblocked by a Per-DID rule.
+:::
+
+## Creating a Blacklist Rule
+
+1. Navigate to **Inbound Blacklist** in the sidebar
+2. Click **Add Rule**
+3. Enter the pattern to match
+4. Select the match type (Exact, Prefix, or Wildcard)
+5. Choose the rejection strategy
+6. Select the scope (Global or specific DIDs)
+7. Click **Save**
+
+## Blocked Call Logs
+
+View the history of blocked calls to monitor effectiveness:
+
+| Field | Description |
+|-------|-------------|
+| Caller ID | The number that was blocked |
+| Time | When the call occurred |
+| Rule Matched | Which blacklist rule triggered the block |
+| Strategy Used | How the call was handled |
+| DID Called | Which of your numbers was dialed |
+
+Access logs from the **Blocked Calls** tab in the Inbound Blacklist section.
+
+## Statistics
+
+Aggregate statistics show:
+
+- Total blocked calls per rule
+- Most frequently blocked numbers
+- Blocked calls over time
+- Strategy distribution
+
+Use these insights to refine your blocking rules and identify new spam patterns.
+
+## Best Practices
+
+### Start Conservative
+
+Begin with exact matches for known spam numbers before using broader patterns.
+
+### Monitor Logs
+
+Regularly review blocked call logs to ensure legitimate calls are not being blocked.
+
+### Use Prefix Matching
+
+For area code or country blocks, use prefix matching rather than wildcards for better performance.
+
+### Document Rules
+
+Add descriptive names or comments explaining why each rule exists:
+
+| Pattern | Type | Strategy | Purpose |
+|---------|------|----------|---------|
+| +14155551234 | Exact | Drop | Known spammer |
+| +1800 | Prefix | Reject | Toll-free spam |
+
+### Test Before Global Application
+
+Apply new rules to a single DID first to verify they work as expected before making them global.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Legitimate calls blocked | Review the pattern; use Exact match instead of Prefix |
+| Rule not working | Check the pattern format; ensure it includes the country code |
+| Too many false positives | Narrow your patterns or switch to Exact matches |

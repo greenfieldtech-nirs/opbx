@@ -1,0 +1,134 @@
+---
+sidebar_position: 1
+title: Phone Numbers (DIDs)
+description: Managing inbound phone numbers and routing
+---
+
+# Phone Numbers (DIDs)
+
+Direct Inward Dialing (DID) numbers are the phone numbers that external callers dial to reach your organization. This page explains how to manage phone numbers and configure their routing.
+
+## What Is a DID
+
+A DID (Direct Inward Dialing) number is a phone number assigned to your organization. When someone calls this number, the call enters your PBX system and routes according to your configuration.
+
+## Phone Number Format
+
+OPBX stores phone numbers in E.164 international format:
+
+- Starts with a plus sign (+)
+- Followed by country code
+- Followed by national number
+
+Example: `+14155551234` (US number, 415 area code)
+
+:::warning
+Phone numbers are immutable after creation. If you need to change a number, delete the old entry and add a new one.
+:::
+
+## Routing Types
+
+When a call arrives at a DID, OPBX routes it to a destination. The following routing types are available:
+
+| Routing Type | Routes To | Best For |
+|-------------|-----------|----------|
+| Extension | A specific extension | Direct lines |
+| Ring Group | A group of extensions | Department coverage |
+| IVR Menu | Interactive voice menu | Main company number |
+| Business Hours | Time-based routing | Open/closed handling |
+| Conference Room | Conference bridge | Dedicated conference lines |
+| AI Assistant | AI voice agent | Automated support |
+| AI Load Balancer | Distributed AI agents | High-volume AI routing |
+
+## Adding a Phone Number
+
+To add a new phone number to your organization:
+
+1. Navigate to **Phone Numbers** in the sidebar
+2. Click **Add Phone Number**
+3. Enter the number in E.164 format (e.g., +14155551234)
+4. Select the routing type
+5. Choose the destination (the specific extension, ring group, etc.)
+6. Save the configuration
+
+:::tip
+Use a consistent format for all numbers. Include the plus sign and country code to ensure proper routing.
+:::
+
+## Changing Routing
+
+To change where a phone number routes:
+
+1. Find the number in the Phone Numbers list
+2. Click to edit
+3. Select a new routing type
+4. Choose the new destination
+5. Save changes
+
+Routing changes take effect immediately. Active calls are not affected, but new calls follow the new routing.
+
+## Phone Number Status
+
+Each phone number has a status that controls whether it accepts calls:
+
+| Status | Behavior |
+|--------|----------|
+| Active | Routes calls to the configured destination |
+| Inactive | Calls are rejected with an error message |
+
+Set a number to Inactive when:
+- The number is being ported
+- You want to temporarily block calls
+- The number is reserved for future use
+
+## Routing Examples
+
+### Direct Line
+
+Route a DID directly to a user's extension:
+
+- **Number**: +14155551001
+- **Routing Type**: Extension
+- **Destination**: Extension 1001 (John Smith)
+
+Result: When someone calls +14155551001, John Smith's phone rings.
+
+### Main Company Number
+
+Route a DID to an IVR menu:
+
+- **Number**: +14155551000
+- **Routing Type**: IVR Menu
+- **Destination**: Main Menu
+
+Result: Callers hear the main menu and press digits to reach departments.
+
+### After-Hours Support
+
+Route a DID through business hours:
+
+- **Number**: +14155551002
+- **Routing Type**: Business Hours
+- **Destination**: Open hours route to Support Ring Group, closed hours route to Emergency IVR
+
+Result: Calls reach the support team during business hours, and an emergency menu after hours.
+
+## Best Practices
+
+### Number Organization
+
+- Label numbers with their purpose (Sales, Support, Main)
+- Use consistent routing patterns for similar numbers
+- Document which numbers are published externally
+
+### Routing Strategy
+
+- Use IVR menus for main numbers to reduce misdirected calls
+- Route department numbers to ring groups for coverage
+- Consider business hours routing for time-sensitive departments
+
+### Testing
+
+- Test each number after configuration
+- Verify routing changes with test calls
+- Check that inactive numbers properly reject calls
