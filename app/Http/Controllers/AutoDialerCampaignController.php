@@ -616,16 +616,33 @@ class AutoDialerCampaignController extends Controller
                 $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
                     $campaign->pause_reason === 'cloudonix_rate_limit';
 
-                // Get actual destination count from distribution lists
-                $actualDestinations = OrganizationScope::bypass(function () use ($campaign): int {
+                // Compute ALL statistics from actual destination data (model counters drift)
+                $destStats = OrganizationScope::bypass(function () use ($campaign): array {
                     $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
+                    if ($listIds->isEmpty()) {
+                        return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0, 'dialing' => 0];
+                    }
 
-                    return $listIds->isEmpty() ? 0 : AutoDialerDestination::whereIn('list_id', $listIds)->count();
+                    $counts = AutoDialerDestination::whereIn('list_id', $listIds)
+                        ->selectRaw("COUNT(*) as total,
+                            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                            SUM(CASE WHEN status = 'dialing' THEN 1 ELSE 0 END) as dialing")
+                        ->first();
+
+                    return [
+                        'total' => (int) $counts->total,
+                        'completed' => (int) $counts->completed,
+                        'failed' => (int) $counts->failed,
+                        'pending' => (int) $counts->pending,
+                        'dialing' => (int) $counts->dialing,
+                    ];
                 });
 
-                $processed = $campaign->completed_calls + $campaign->failed_calls;
-                $progressPercentage = $actualDestinations > 0
-                    ? (int) round(($processed / $actualDestinations) * 100)
+                $processed = $destStats['completed'] + $destStats['failed'];
+                $progressPercentage = $destStats['total'] > 0
+                    ? (int) round(($processed / $destStats['total']) * 100)
                     : 0;
 
                 $campaignData[] = [
@@ -633,10 +650,10 @@ class AutoDialerCampaignController extends Controller
                     'name' => $campaign->name,
                     'status' => $campaign->status->value,
                     'progress_percentage' => $progressPercentage,
-                    'total_destinations' => $actualDestinations,
-                    'completed_calls' => $campaign->completed_calls,
-                    'failed_calls' => $campaign->failed_calls,
-                    'pending_calls' => $campaign->pending_calls,
+                    'total_destinations' => $destStats['total'],
+                    'completed_calls' => $destStats['completed'],
+                    'failed_calls' => $destStats['failed'],
+                    'pending_calls' => $destStats['pending'],
                     'concurrent_active_calls' => $cac,
                     'active_calls' => $activeCalls,
                     'cac_utilization' => $cacUtilization,
@@ -781,16 +798,31 @@ class AutoDialerCampaignController extends Controller
                     'cac_utilization' => $cacUtilization,
                 ],
                 'statistics' => [
-                    'total_destinations' => ($detailTotalDests = OrganizationScope::bypass(function () use ($campaign): int {
+                    'total_destinations' => ($detailStats = OrganizationScope::bypass(function () use ($campaign): array {
                         $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
+                        if ($listIds->isEmpty()) {
+                            return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0];
+                        }
 
-                        return $listIds->isEmpty() ? 0 : AutoDialerDestination::whereIn('list_id', $listIds)->count();
-                    })),
-                    'completed_calls' => $campaign->completed_calls,
-                    'failed_calls' => $campaign->failed_calls,
-                    'pending_calls' => $campaign->pending_calls,
-                    'progress_percentage' => $detailTotalDests > 0
-                        ? (int) round((($campaign->completed_calls + $campaign->failed_calls) / $detailTotalDests) * 100)
+                        $counts = AutoDialerDestination::whereIn('list_id', $listIds)
+                            ->selectRaw("COUNT(*) as total,
+                                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending")
+                            ->first();
+
+                        return [
+                            'total' => (int) $counts->total,
+                            'completed' => (int) $counts->completed,
+                            'failed' => (int) $counts->failed,
+                            'pending' => (int) $counts->pending,
+                        ];
+                    }))['total'],
+                    'completed_calls' => $detailStats['completed'],
+                    'failed_calls' => $detailStats['failed'],
+                    'pending_calls' => $detailStats['pending'],
+                    'progress_percentage' => $detailStats['total'] > 0
+                        ? (int) round((($detailStats['completed'] + $detailStats['failed']) / $detailStats['total']) * 100)
                         : 0,
                     'avg_duration_seconds' => $statistics['avg_duration_seconds'],
                     'avg_billsec_seconds' => $statistics['avg_billsec_seconds'],
