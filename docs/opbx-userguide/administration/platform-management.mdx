@@ -8,16 +8,20 @@ description: Managing multiple organizations as a platform manager
 
 # Platform Management
 
-Platform Management provides a cross-tenant administrative interface for service providers managing multiple organizations.
+:::danger Platform Owners/Operators Only
+This section applies exclusively to **platform owners and operators** who manage the OPBX deployment itself. Regular organization users (Owner, PBX Admin, PBX User, Reporter) do not have access to Platform Management features. If you are an organization administrator, refer to [Organization Settings](/administration) instead.
+:::
+
+Platform Management provides a cross-tenant administrative interface for service providers who host and operate OPBX for multiple customer organizations.
 
 ## Access Requirements
 
-Platform Management requires the `platform_manager` flag on your user account. This flag can only be set by:
+Platform Management requires the `platform_manager` flag on your user account. This is a system-level privilege that is separate from the organization role hierarchy. The flag can only be set by:
 
-- Direct database modification
+- Direct database modification by a system administrator
 - Another existing platform manager
 
-Contact your system administrator if you need platform manager access.
+This privilege is intended for the team that operates the OPBX platform, not for end-user organizations.
 
 ## Platform Dashboard
 
