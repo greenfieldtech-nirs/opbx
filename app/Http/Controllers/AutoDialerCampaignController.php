@@ -617,18 +617,20 @@ class AutoDialerCampaignController extends Controller
                 $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
                     $campaign->pause_reason === 'cloudonix_rate_limit';
 
-                // Clean up stale dialing destinations (stuck > 5 min) before computing stats.
-                // These are calls that were initiated but never received a CDR callback.
-                // Reset them to pending so the worker can retry them.
+                // Clean up stale dialing destinations before computing stats.
+                // Paused campaigns: ALL dialing records are stale (no calls in flight).
+                // Active campaigns: only those stuck > 5 min (CDR never arrived).
                 OrganizationScope::bypass(function () use ($campaign): void {
                     $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
                     if ($listIds->isEmpty()) {
                         return;
                     }
-                    AutoDialerDestination::whereIn('list_id', $listIds)
-                        ->where('status', DestinationStatus::DIALING)
-                        ->where('last_dialed_at', '<', now()->subMinutes(5))
-                        ->update(['status' => DestinationStatus::PENDING]);
+                    $query = AutoDialerDestination::whereIn('list_id', $listIds)
+                        ->where('status', DestinationStatus::DIALING);
+                    if ($campaign->status !== CampaignStatus::PAUSED) {
+                        $query->where('last_dialed_at', '<', now()->subMinutes(5));
+                    }
+                    $query->update(['status' => DestinationStatus::PENDING]);
                 });
 
                 // Compute ALL statistics from actual destination data (model counters drift)
@@ -820,11 +822,13 @@ class AutoDialerCampaignController extends Controller
                             return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0, 'dialing' => 0];
                         }
 
-                        // Clean up stale dialing destinations (stuck > 5 min)
-                        AutoDialerDestination::whereIn('list_id', $listIds)
-                            ->where('status', DestinationStatus::DIALING)
-                            ->where('last_dialed_at', '<', now()->subMinutes(5))
-                            ->update(['status' => DestinationStatus::PENDING]);
+                        // Clean up stale dialing: all for paused, > 5 min for active
+                        $dialingQuery = AutoDialerDestination::whereIn('list_id', $listIds)
+                            ->where('status', DestinationStatus::DIALING);
+                        if ($campaign->status !== CampaignStatus::PAUSED) {
+                            $dialingQuery->where('last_dialed_at', '<', now()->subMinutes(5));
+                        }
+                        $dialingQuery->update(['status' => DestinationStatus::PENDING]);
 
                         $counts = AutoDialerDestination::whereIn('list_id', $listIds)
                             ->selectRaw("COUNT(*) as total,
