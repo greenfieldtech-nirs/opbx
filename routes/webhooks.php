@@ -26,7 +26,7 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
         ->name('webhooks.cloudonix.call-status');
 
     Route::post('/cdr', [CloudonixWebhookController::class, 'cdr'])
-        ->middleware(['webhook.signature', 'webhook.idempotency', 'rate_limit_org:webhook'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.cdr');
 
     Route::post('/session-update', [CloudonixWebhookController::class, 'sessionUpdate'])
