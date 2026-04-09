@@ -17,6 +17,7 @@ export interface MonitorCampaign {
   completed_calls: number;
   failed_calls: number;
   pending_calls: number;
+  dialing_calls: number;
   concurrent_active_calls: number;
   active_calls: number;
   cac_utilization: number;

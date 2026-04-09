@@ -18,15 +18,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('webhooks/cloudonix')->group(function (): void {
     Route::post('/call-initiated', [CloudonixWebhookController::class, 'callInitiated'])
-        ->middleware(['webhook.signature', 'webhook.idempotency', 'rate_limit_org:webhook'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.call-initiated');
 
     Route::post('/call-status', [CloudonixWebhookController::class, 'callStatus'])
-        ->middleware(['webhook.signature', 'webhook.idempotency', 'rate_limit_org:webhook'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.call-status');
 
     Route::post('/cdr', [CloudonixWebhookController::class, 'cdr'])
-        ->middleware(['webhook.signature', 'webhook.idempotency', 'rate_limit_org:webhook'])
+        ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.cdr');
 
     Route::post('/session-update', [CloudonixWebhookController::class, 'sessionUpdate'])
@@ -50,12 +50,12 @@ use App\Http\Controllers\Voice\VoiceRoutingController;
 Route::prefix('voice')->group(function (): void {
     // Main inbound call routing endpoint
     Route::post('/route', [VoiceRoutingController::class, 'handleInbound'])
-        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
+        ->middleware(['voice.webhook.auth'])
         ->name('voice.route');
 
     // IVR digit input callback
     Route::post('/ivr-input', [VoiceRoutingController::class, 'handleIvrInput'])
-        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
+        ->middleware(['voice.webhook.auth'])
         ->name('voice.ivr-input');
 
     // Voice routing health check
@@ -67,12 +67,12 @@ Route::prefix('voice')->group(function (): void {
 Route::prefix('callbacks')->group(function (): void {
     // Ring group callback for sequential routing (round robin, priority, etc.)
     Route::post('/voice/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
-        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
+        ->middleware(['voice.webhook.auth'])
         ->name('voice.ring-group-callback');
 
     // ALB follow-through callback for failover routing
     Route::post('/voice/albs-follow-through', [\App\Http\Controllers\Voice\AlbsFollowThroughController::class, 'handle'])
-        ->middleware(['voice.webhook.auth', 'rate_limit_org:voice_routing'])
+        ->middleware(['voice.webhook.auth'])
         ->name('voice.albs-follow-through');
 });
 
@@ -100,7 +100,7 @@ Route::prefix('webhooks/auto-dialer')->group(function (): void {
 // Dialer Webhook Proxy Endpoint
 // Receives Cloudonix webhooks and processes them for the auto-dialer
 Route::post('/webhooks/cloudonix/dialer', [DialerWebhookProxyController::class, 'handleCloudonixWebhook'])
-    ->middleware(['webhook.signature', 'webhook.idempotency', 'rate_limit_org:webhook'])
+    ->middleware(['webhook.signature', 'webhook.idempotency'])
     ->name('webhooks.cloudonix.dialer');
 
 // Health check endpoint

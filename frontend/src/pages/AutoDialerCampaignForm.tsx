@@ -231,10 +231,9 @@ export default function AutoDialerCampaignForm() {
   const startTime = watch('start_time');
   const endTime = watch('end_time');
 
-  // Clear routing_destination_id when routing type changes
-  useEffect(() => {
-    setValue('routing_destination_id', null);
-  }, [routingType, setValue]);
+  // NOTE: routing_destination_id is cleared inside the DestinationTypeAndSelector
+  // onChange handler when the user changes the type — NOT via useEffect, which
+  // would race with form initialization and wipe the loaded value on edit.
 
   // Load existing data when editing
   useEffect(() => {
