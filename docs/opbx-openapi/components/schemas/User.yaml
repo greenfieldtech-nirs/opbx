@@ -1,0 +1,60 @@
+type: object
+description: User model representing a person in the organization
+properties:
+  id:
+    type: integer
+    description: Unique user identifier
+    readOnly: true
+    example: 123
+  organization_id:
+    type: integer
+    description: ID of the organization this user belongs to
+    example: 1
+  name:
+    type: string
+    description: Full name of the user
+    example: John Doe
+  email:
+    type: string
+    format: email
+    description: Email address (unique across system)
+    example: john.doe@example.com
+  role:
+    type: string
+    enum:
+      - owner
+      - pbx_admin
+      - pbx_user
+      - reporter
+    description: User's role within the organization
+    example: pbx_admin
+  status:
+    type: string
+    enum:
+      - active
+      - inactive
+    description: Account status
+    example: active
+  is_platform_manager:
+    type: boolean
+    description: Whether user has platform manager privileges
+    example: false
+  created_at:
+    type: string
+    format: date-time
+    description: Timestamp when user was created
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: Timestamp when user was last updated
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+required:
+  - id
+  - organization_id
+  - name
+  - email
+  - role
+  - status

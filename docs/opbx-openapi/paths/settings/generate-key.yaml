@@ -1,0 +1,13 @@
+paths:
+  /v1/settings/cloudonix/generate-requests-key:
+    post:
+      tags:
+        - Settings
+      summary: Generate API requests key
+      operationId: generateRequestsKey
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Key generated

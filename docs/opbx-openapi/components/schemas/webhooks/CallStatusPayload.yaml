@@ -1,0 +1,28 @@
+type: object
+description: Cloudonix call-status webhook payload
+properties:
+  CallSid:
+    type: string
+    description: Call SID
+    example: CA550e8400e29b41d4a716446655440000
+  call_id:
+    type: string
+    description: Alternative call ID field
+  CallStatus:
+    type: string
+    description: Current call status
+    example: completed
+  status:
+    type: string
+    description: Alternative status field
+  Duration:
+    type: integer
+    description: Call duration
+  duration:
+    type: integer
+  From:
+    type: string
+    description: Caller number
+  To:
+    type: string
+    description: Called number

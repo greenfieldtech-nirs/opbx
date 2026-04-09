@@ -1,0 +1,31 @@
+type: object
+description: Business Hours Schedule
+properties:
+  id:
+    type: integer
+  organization_id:
+    type: integer
+  name:
+    type: string
+    example: Business Hours
+  timezone:
+    type: string
+    example: America/New_York
+  status:
+    type: string
+    enum: [active, inactive]
+  configuration:
+    type: object
+    description: Schedule configuration
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+required:
+  - id
+  - organization_id
+  - name
+  - timezone
+  - status

@@ -1,0 +1,14 @@
+paths:
+  /v1/platform/audit-logs:
+    get:
+      tags:
+        - Platform
+      summary: View audit logs
+      description: Platform-wide audit trail
+      operationId: getAuditLogs
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Audit logs

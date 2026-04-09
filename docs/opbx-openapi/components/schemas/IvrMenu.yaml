@@ -1,0 +1,33 @@
+type: object
+description: IVR Menu
+properties:
+  id:
+    type: integer
+  organization_id:
+    type: integer
+  name:
+    type: string
+    example: Main Menu
+  greeting_message:
+    type: string
+    example: Thank you for calling
+  voice:
+    type: string
+    example: en-US-Standard-A
+  status:
+    type: string
+    enum: [active, inactive]
+  options:
+    type: array
+    description: IVR menu options
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+required:
+  - id
+  - organization_id
+  - name
+  - status

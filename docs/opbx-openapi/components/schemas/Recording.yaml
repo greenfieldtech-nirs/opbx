@@ -1,0 +1,26 @@
+type: object
+description: Recording
+properties:
+  id:
+    type: integer
+  organization_id:
+    type: integer
+  call_log_id:
+    type: integer
+  filename:
+    type: string
+  duration:
+    type: integer
+    description: Duration in seconds
+  file_size:
+    type: integer
+    description: Size in bytes
+  storage_path:
+    type: string
+  created_at:
+    type: string
+    format: date-time
+required:
+  - id
+  - organization_id
+  - filename

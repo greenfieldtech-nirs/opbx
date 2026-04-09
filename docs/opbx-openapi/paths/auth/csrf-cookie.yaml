@@ -1,0 +1,30 @@
+paths:
+  /sanctum/csrf-cookie:
+    get:
+      tags:
+        - Authentication
+      summary: Get CSRF cookie
+      description: |
+        Returns a CSRF cookie for SPA authentication.
+        Must be called before login when using cookie-based auth.
+        Uses web middleware to enable sessions and set CSRF cookie.
+      operationId: getCsrfCookie
+      security: []
+      responses:
+        '200':
+          description: CSRF cookie set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: CSRF cookie set
+              example:
+                message: CSRF cookie set
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: XSRF-TOKEN cookie for CSRF protection

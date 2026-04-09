@@ -1,0 +1,19 @@
+paths:
+  /v1/session-updates/{sessionId}/disconnect:
+    delete:
+      tags:
+        - Session Updates
+      summary: Disconnect session
+      operationId: disconnectSession
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session disconnected

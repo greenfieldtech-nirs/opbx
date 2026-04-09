@@ -1,0 +1,18 @@
+paths:
+  /v1/platform/dashboard:
+    get:
+      tags:
+        - Platform
+      summary: Platform dashboard
+      description: Get cross-tenant statistics and dashboard data
+      operationId: getPlatformDashboard
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

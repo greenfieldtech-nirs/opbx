@@ -1,0 +1,55 @@
+paths:
+  /voice/route:
+    post:
+      tags:
+        - Voice Routing
+      summary: Inbound call routing
+      description: |
+        Main inbound call routing endpoint.
+        
+        Returns CXML (Cloudonix XML) document instructing the platform
+        how to route the call based on organizational configuration.
+        
+        Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+        
+        Authentication: Bearer token (per-organization domain_requests_api_key)
+      operationId: voiceRoute
+      security:
+        - voiceWebhookAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                To:
+                  type: string
+                  description: Called number
+                  example: '+1987654321'
+                From:
+                  type: string
+                  description: Caller number
+                  example: '+1234567890'
+                Domain:
+                  type: string
+                  description: Cloudonix domain
+                  example: example.cloudonix.io
+                CallSid:
+                  type: string
+                  description: Call SID
+                  example: CA550e8400e29b41d4a716446655440000
+      responses:
+        '200':
+          description: CXML routing response
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+            text/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '401':
+          description: Unauthorized - Invalid Bearer token
+        '429':
+          description: Rate limit exceeded

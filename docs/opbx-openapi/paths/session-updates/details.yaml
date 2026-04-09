@@ -1,0 +1,19 @@
+paths:
+  /v1/session-updates/{sessionId}:
+    get:
+      tags:
+        - Session Updates
+      summary: Get session details
+      operationId: getSessionDetails
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session details retrieved

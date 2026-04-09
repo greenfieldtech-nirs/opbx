@@ -1,0 +1,34 @@
+paths:
+  /webhooks/cloudonix/call-status:
+    post:
+      tags:
+        - Webhooks
+      summary: Call status webhook
+      description: |
+        Webhook from Cloudonix when call status changes.
+        
+        Updates call log with current status, duration, etc.
+        
+        Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+      operationId: callStatusWebhook
+      security:
+        - webhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/webhooks/CallStatusPayload.yaml'
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: processed
+        '400':
+          $ref: '../../components/responses/BadRequest.yaml'

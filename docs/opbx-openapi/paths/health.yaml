@@ -1,0 +1,126 @@
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Public health check
+      description: |
+        Returns minimal health status. This endpoint is public and returns
+        only basic status information without internal details.
+      operationId: publicHealthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2024-01-15T10:30:00Z'
+              example:
+                status: ok
+                timestamp: '2024-01-15T10:30:00Z'
+
+  /storage/health:
+    get:
+      tags:
+        - Health
+      summary: Storage health check
+      description: |
+        Detailed health check for the storage subsystem (MinIO/S3).
+        Tests connectivity, read/write operations.
+        Requires authentication to prevent internal info leakage.
+      operationId: storageHealthCheck
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Storage is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                  writable:
+                    type: boolean
+                  readable:
+                    type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                status: ok
+                writable: true
+                readable: true
+                timestamp: '2024-01-15T10:30:00Z'
+        '503':
+          description: Storage is unavailable or degraded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '../components/responses/Unauthorized.yaml'
+
+  /websocket/health:
+    get:
+      tags:
+        - Health
+      summary: WebSocket health check
+      description: |
+        Tests Pusher/Soketi WebSocket connection by triggering a test event.
+        Requires authentication to prevent internal info leakage.
+      operationId: websocketHealthCheck
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: WebSocket is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                status: ok
+                timestamp: '2024-01-15T10:30:00Z'
+        '500':
+          description: WebSocket connection failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '../components/responses/Unauthorized.yaml'

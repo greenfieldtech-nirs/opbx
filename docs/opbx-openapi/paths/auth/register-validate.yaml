@@ -1,0 +1,69 @@
+paths:
+  /v1/auth/register/validate:
+    get:
+      tags:
+        - Authentication
+      summary: Validate registration fields
+      description: |
+        Check availability of organization name, slug, and admin email
+        before submitting registration form.
+      operationId: validateRegistration
+      security: []
+      parameters:
+        - name: organization_name
+          in: query
+          required: false
+          description: Organization name to check
+          schema:
+            type: string
+          example: Acme Corporation
+        - name: slug
+          in: query
+          required: false
+          description: Organization slug to check
+          schema:
+            type: string
+          example: acme-corporation
+        - name: admin_email
+          in: query
+          required: false
+          description: Admin email to check
+          schema:
+            type: string
+            format: email
+          example: admin@example.com
+      responses:
+        '200':
+          description: Validation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      organization_name_available:
+                        type: boolean
+                        description: Whether organization name is available
+                      slug_available:
+                        type: boolean
+                        description: Whether organization slug is available
+                      admin_email_available:
+                        type: boolean
+                        description: Whether admin email is available
+              examples:
+                allAvailable:
+                  summary: All fields available
+                  value:
+                    data:
+                      organization_name_available: true
+                      slug_available: true
+                      admin_email_available: true
+                someTaken:
+                  summary: Some fields taken
+                  value:
+                    data:
+                      organization_name_available: false
+                      slug_available: true
+                      admin_email_available: false

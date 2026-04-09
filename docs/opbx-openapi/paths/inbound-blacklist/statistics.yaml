@@ -1,0 +1,13 @@
+paths:
+  /v1/inbound-blacklist/statistics:
+    get:
+      tags:
+        - Inbound Blacklist
+      summary: Get blacklist statistics
+      operationId: getBlacklistStatistics
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Statistics retrieved

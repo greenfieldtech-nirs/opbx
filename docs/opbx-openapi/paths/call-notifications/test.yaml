@@ -1,0 +1,13 @@
+paths:
+  /v1/call-notifications/settings/test:
+    post:
+      tags:
+        - Call Notifications
+      summary: Test notification settings
+      operationId: testNotificationSettings
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Test completed

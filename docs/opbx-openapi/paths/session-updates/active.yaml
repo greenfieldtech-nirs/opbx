@@ -1,0 +1,13 @@
+paths:
+  /v1/session-updates/active:
+    get:
+      tags:
+        - Session Updates
+      summary: Get active calls
+      operationId: getActiveSessions
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Active calls retrieved
