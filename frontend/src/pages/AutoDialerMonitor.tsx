@@ -623,7 +623,7 @@ export default function AutoDialerMonitor() {
 
                   <CardContent className="pt-0 space-y-4">
                     {/* Metric Cards Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Destinations</p>
                         <p className="text-xl font-bold">{campaign.total_destinations.toLocaleString()}</p>
@@ -641,6 +641,10 @@ export default function AutoDialerMonitor() {
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Failed</p>
                         <p className="text-xl font-bold text-red-600">{campaign.failed_calls.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Dialing</p>
+                        <p className="text-xl font-bold text-orange-600">{(campaign.dialing_calls || 0).toLocaleString()}</p>
                       </div>
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Pending</p>
