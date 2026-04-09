@@ -669,8 +669,8 @@ class CloudonixWebhookController extends Controller
                     'last_cdr_id' => $cdr->id,
                 ]);
 
-                // Increment dial attempts
-                $destination->incrementDialAttempts();
+                // Note: dial_attempts is already incremented in DialerWorkerController::initiateCall()
+                // Do NOT increment again here — double-counting causes destinations to exceed max_dial_attempts.
 
                 // Update CDR to mark as auto-dialer call
                 $cdr->update([

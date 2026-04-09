@@ -200,6 +200,9 @@ class AutoDialerCampaignController extends Controller
             ]);
         }
 
+        // Bust monitor cache so the UI reflects the change immediately
+        $this->bustMonitorCache($campaign->organization_id, $campaign->id);
+
         return response()->json([
             'message' => 'Campaign paused successfully',
             'data' => new AutoDialerCampaignResource($campaign),
@@ -216,6 +219,9 @@ class AutoDialerCampaignController extends Controller
         $campaign->update([
             'status' => CampaignStatus::ACTIVE,
         ]);
+
+        // Bust monitor cache so the UI reflects the change immediately
+        $this->bustMonitorCache($campaign->organization_id, $campaign->id);
 
         return response()->json([
             'message' => 'Campaign resumed successfully',
@@ -617,11 +623,16 @@ class AutoDialerCampaignController extends Controller
                     return $listIds->isEmpty() ? 0 : AutoDialerDestination::whereIn('list_id', $listIds)->count();
                 });
 
+                $processed = $campaign->completed_calls + $campaign->failed_calls;
+                $progressPercentage = $actualDestinations > 0
+                    ? (int) round(($processed / $actualDestinations) * 100)
+                    : 0;
+
                 $campaignData[] = [
                     'id' => $campaign->id,
                     'name' => $campaign->name,
                     'status' => $campaign->status->value,
-                    'progress_percentage' => $campaign->getProgressPercentage(),
+                    'progress_percentage' => $progressPercentage,
                     'total_destinations' => $actualDestinations,
                     'completed_calls' => $campaign->completed_calls,
                     'failed_calls' => $campaign->failed_calls,
@@ -770,15 +781,17 @@ class AutoDialerCampaignController extends Controller
                     'cac_utilization' => $cacUtilization,
                 ],
                 'statistics' => [
-                    'total_destinations' => OrganizationScope::bypass(function () use ($campaign): int {
+                    'total_destinations' => ($detailTotalDests = OrganizationScope::bypass(function () use ($campaign): int {
                         $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
 
                         return $listIds->isEmpty() ? 0 : AutoDialerDestination::whereIn('list_id', $listIds)->count();
-                    }),
+                    })),
                     'completed_calls' => $campaign->completed_calls,
                     'failed_calls' => $campaign->failed_calls,
                     'pending_calls' => $campaign->pending_calls,
-                    'progress_percentage' => $campaign->getProgressPercentage(),
+                    'progress_percentage' => $detailTotalDests > 0
+                        ? (int) round((($campaign->completed_calls + $campaign->failed_calls) / $detailTotalDests) * 100)
+                        : 0,
                     'avg_duration_seconds' => $statistics['avg_duration_seconds'],
                     'avg_billsec_seconds' => $statistics['avg_billsec_seconds'],
                 ],
@@ -871,5 +884,14 @@ class AutoDialerCampaignController extends Controller
             'active_calls' => 0,
             'queue_depth' => 0,
         ];
+    }
+
+    /**
+     * Bust the monitor summary and detail cache so the UI reflects changes immediately.
+     */
+    private function bustMonitorCache(int $organizationId, int $campaignId): void
+    {
+        Cache::forget("monitor:summary:{$organizationId}");
+        Cache::forget("monitor:detail:{$campaignId}");
     }
 }
