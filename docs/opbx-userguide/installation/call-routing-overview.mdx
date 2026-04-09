@@ -62,8 +62,11 @@ Destinations can cascade, creating complex routing chains:
 
 ### Example: IVR to Ring Group to Fallback
 
-```
-Phone Number -> IVR Menu -> Ring Group -> Fallback Extension
+```mermaid
+graph LR
+    A[Phone Number] --> B[IVR Menu]
+    B --> C[Ring Group]
+    C --> D[Fallback Extension]
 ```
 
 1. Caller dials main number
@@ -74,8 +77,11 @@ Phone Number -> IVR Menu -> Ring Group -> Fallback Extension
 
 ### Example: Business Hours Branching
 
-```
-Phone Number -> Business Hours -> Open: Ring Group / Closed: IVR
+```mermaid
+graph LR
+    A[Phone Number] --> B{Business Hours}
+    B -->|Open| C[Ring Group]
+    B -->|Closed| D[IVR]
 ```
 
 1. Caller dials support number
@@ -115,17 +121,11 @@ CXML (Cloudonix XML) is the language OPBX uses to instruct Cloudonix how to hand
 
 ### Example CXML Flow
 
-```
-Incoming Call
-    |
-    v
-<Gather> - Play IVR menu, wait for digits
-    |
-    v
-<Dial> - Route to extension based on input
-    |
-    v
-<Hangup> - End when call completes
+```mermaid
+graph TD
+    A[Incoming Call] --> B["&lt;Gather&gt; - Play IVR menu, wait for digits"]
+    B --> C["&lt;Dial&gt; - Route to extension based on input"]
+    C --> D["&lt;Hangup&gt; - End when call completes"]
 ```
 
 ## Routing Configuration

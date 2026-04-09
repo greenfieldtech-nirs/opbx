@@ -150,20 +150,15 @@ When a call arrives, Business Hours evaluates in this order:
 3. **Check time ranges**: Is the current time within open hours?
 4. **Route**: Send to open hours or closed hours destination
 
-```
-Call Arrives
-    |
-    v
-Exception Date? ----Yes----> Use exception rules
-    | No
-    v
-Weekly Schedule? ---No----> Closed Hours
-    | Yes
-    v
-Time in Range? -----No----> Closed Hours
-    | Yes
-    v
-Open Hours
+```mermaid
+graph TD
+    A[Call Arrives] --> B{Exception Date?}
+    B -->|Yes| C[Use exception rules]
+    B -->|No| D{Weekly Schedule?}
+    D -->|No| E[Closed Hours]
+    D -->|Yes| F{Time in Range?}
+    F -->|No| G[Closed Hours]
+    F -->|Yes| H[Open Hours]
 ```
 
 ## Business Hours Examples
