@@ -1,0 +1,655 @@
+openapi: 3.1.0
+info:
+  title: OPBX REST API
+  description: |
+    This API provides complete control plane access for managing a multi-tenant business PBX system.
+    The API is built on Laravel 12 with Sanctum authentication.
+    
+    ## Authentication
+    
+    The API supports two authentication modes:
+    
+    - **Bearer Token** (API clients): Include `Authorization: Bearer <token>` header
+    - **Cookie-based** (SPA): Uses httpOnly session cookies + CSRF protection
+    
+    ## Architecture
+    
+    - **Control Plane**: REST API for configuration and management
+    - **Execution Plane**: Webhooks for real-time call routing (returns CXML)
+    
+    ## API Overview
+    
+    ### Control Plane (Authenticated)
+                 
+      | Resource | Endpoints |
+      |----------|-----------|
+      | **Health** | `GET /health`, `GET /storage/health`, `GET /websocket/health` |
+      | **Auth** | Login, logout, refresh, register, me |
+      | **Profile** | Get/update profile, password, organization |
+      | **Users** | CRUD operations for organization users |
+      | **Extensions** | CRUD + sync + password management |
+      | **Conference Rooms** | CRUD for conference rooms |
+      | **Ring Groups** | CRUD for ring groups |
+      | **Business Hours** | CRUD + duplicate + toggle status |
+      | **IVR Menus** | CRUD + voices + toggle status |
+      | **Phone Numbers** | DID management |
+      | **AI Assistants** | AI assistant configuration |
+      | **AI Load Balancers** | Load balancer configuration |
+      | **Call Logs** | Read-only call history |
+      | **Call Detail Records** | CDR records and export |
+      | **Recordings** | Recording management and download |
+      | **Inbound Blacklist** | Blocked caller management |
+      | **Outbound Whitelist** | Outbound dialing restrictions |
+      | **Settings** | Organization and Cloudonix settings |
+      | **Session Updates** | Real-time call session management |
+      | **Call Notifications** | Webhook notification settings |
+      | **Auto Dialer** | Campaign management, monitoring, lifecycle |
+      | **Distribution Lists** | List upload, assignment, management |
+    
+    ### Execution Plane (Webhooks)
+      
+      | Endpoint | Purpose |
+      |----------|---------|
+      | `POST /webhooks/cloudonix/call-initiated` | Async call notification |
+      | `POST /webhooks/cloudonix/call-status` | Call status updates |
+      | `POST /webhooks/cloudonix/cdr` | Call detail records |
+      | `POST /webhooks/cloudonix/session-update` | Session updates (high velocity) |
+    
+    ### Voice Routing (CXML)
+      
+      | Endpoint | Purpose |
+      |----------|---------|
+      | `POST /voice/route` | Main inbound call routing (returns CXML) |
+      | `POST /voice/ivr-input` | IVR digit input handling |
+      | `POST /callbacks/voice/ring-group-callback` | Ring group routing |
+      | `POST /callbacks/voice/albs-follow-through` | ALB failover routing |
+    
+    ### Platform Manager
+      
+      | Resource | Endpoints |
+      |----------|-----------|
+      | **Dashboard** | Cross-tenant statistics |
+      | **Organizations** | Organization management |
+      | **Users** | Cross-tenant user management |
+      | **Audit Logs** | Platform-wide audit trail |
+    
+    ## Rate Limiting
+    
+    Rate limits are applied per organization:
+      
+      | Endpoint Type | Limit |
+      |---------------|-------|
+      | API endpoints | 60 requests/minute |
+      | Webhooks | 100 requests/minute |
+      | Voice routing | 1000 requests/minute |
+      | Sensitive operations | 10 requests/minute |
+      | Authentication | 5 attempts/minute |
+    
+    ## Response Format
+    
+    ### Success Response
+      ```json
+      {
+        "message": "Operation completed successfully",
+        "data": { ... }
+      }
+      ```
+      
+      ### Error Response
+      ```json
+      {
+        "error": "ERROR_CODE",
+        "message": "Human-readable error message",
+        "code": "MACHINE_CODE"
+      }
+      ```
+      
+      ### Validation Error
+      ```json
+      {
+        "message": "The given data was invalid.",
+        "errors": {
+          "field": ["Error message 1", "Error message 2"]
+        }
+      }
+      ```
+    
+    ## Pagination
+    
+    List endpoints return paginated responses:
+      
+      ```json
+      {
+        "data": [...],
+        "meta": {
+          "current_page": 1,
+          "per_page": 20,
+          "total": 150,
+          "last_page": 8,
+          "from": 1,
+          "to": 20
+        }
+      }
+      ```
+    
+    Query parameters:
+      - `page` - Page number (default: 1)
+      - `per_page` - Items per page (1-100, default: 20)
+      - `sort_by` - Sort field
+      - `sort_order` - asc or desc (default: asc) 
+    
+    ## Rate Limiting
+    
+    Rate limits are applied per organization:
+    - API endpoints: 60 requests/minute
+    - Webhooks: 100 requests/minute
+    - Voice routing: 1000 requests/minute
+    - Sensitive operations: 10 requests/minute
+
+  version: 1.0.0
+  contact:
+    name: OPBX Support
+    url: https://github.com/greenfieldtech-nirs/opbx
+  license:
+    name: MIT Licensed
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://opbx.cloudonix.cloud/api
+    description: Production server
+  - url: http://localhost/api
+    description: Local development server
+
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+
+paths:
+  # Public / Health endpoints
+  /health:
+    $ref: './paths/health.yaml#/paths/~1health'
+  
+  # Auth endpoints
+  /sanctum/csrf-cookie:
+    $ref: './paths/auth/csrf-cookie.yaml#/paths/~1sanctum~1csrf-cookie'
+  /v1/validate-email:
+    $ref: './paths/auth/validate-email.yaml#/paths/~1v1~1validate-email'
+  /v1/auth/login:
+    $ref: './paths/auth/login.yaml#/paths/~1v1~1auth~1login'
+  /v1/auth/logout:
+    $ref: './paths/auth/logout.yaml#/paths/~1v1~1auth~1logout'
+  /v1/auth/refresh:
+    $ref: './paths/auth/refresh.yaml#/paths/~1v1~1auth~1refresh'
+  /v1/auth/me:
+    $ref: './paths/auth/me.yaml#/paths/~1v1~1auth~1me'
+  /v1/auth/register:
+    $ref: './paths/auth/register.yaml#/paths/~1v1~1auth~1register'
+  /v1/auth/register/validate:
+    $ref: './paths/auth/register-validate.yaml#/paths/~1v1~1auth~1register~1validate'
+  
+  # Health checks (authenticated)
+  /storage/health:
+    $ref: './paths/health.yaml#/paths/~1storage~1health'
+  /websocket/health:
+    $ref: './paths/health.yaml#/paths/~1websocket~1health'
+  
+  # Profile endpoints
+  /v1/profile:
+    $ref: './paths/profile/index.yaml#/paths/~1v1~1profile'
+  /v1/profile/password:
+    $ref: './paths/profile/password.yaml#/paths/~1v1~1profile~1password'
+  /v1/profile/organization:
+    $ref: './paths/profile/organization.yaml#/paths/~1v1~1profile~1organization'
+  
+  # Users endpoints
+  /v1/users:
+    $ref: './paths/users/index.yaml#/paths/~1v1~1users'
+  /v1/users/{user}:
+    $ref: './paths/users/index.yaml#/paths/~1v1~1users~1{user}'
+  /v1/users/{user}/password:
+    $ref: './paths/users/password.yaml#/paths/~1v1~1users~1{user}~1password'
+  
+  # Extensions endpoints
+  /v1/extensions:
+    $ref: './paths/extensions/index.yaml#/paths/~1v1~1extensions'
+  /v1/extensions/{extension}:
+    $ref: './paths/extensions/index.yaml#/paths/~1v1~1extensions~1{extension}'
+  /v1/extensions/sync/compare:
+    $ref: './paths/extensions/sync.yaml#/paths/~1v1~1extensions~1sync~1compare'
+  /v1/extensions/sync:
+    $ref: './paths/extensions/sync.yaml#/paths/~1v1~1extensions~1sync'
+  /v1/extensions/{extension}/password:
+    $ref: './paths/extensions/password.yaml#/paths/~1v1~1extensions~1{extension}~1password'
+  /v1/extensions/{extension}/reset-password:
+    $ref: './paths/extensions/password.yaml#/paths/~1v1~1extensions~1{extension}~1reset-password'
+  
+  # Conference Rooms endpoints
+  /v1/conference-rooms:
+    $ref: './paths/conference-rooms/index.yaml#/paths/~1v1~1conference-rooms'
+  /v1/conference-rooms/{conference_room}:
+    $ref: './paths/conference-rooms/index.yaml#/paths/~1v1~1conference-rooms~1{conference_room}'
+  
+  # Ring Groups endpoints
+  /v1/ring-groups:
+    $ref: './paths/ring-groups/index.yaml#/paths/~1v1~1ring-groups'
+  /v1/ring-groups/{ring_group}:
+    $ref: './paths/ring-groups/index.yaml#/paths/~1v1~1ring-groups~1{ring_group}'
+  
+  # AI Assistants endpoints
+  /v1/ai-assistants:
+    $ref: './paths/ai-assistants/index.yaml#/paths/~1v1~1ai-assistants'
+  /v1/ai-assistants/{ai_assistant}:
+    $ref: './paths/ai-assistants/index.yaml#/paths/~1v1~1ai-assistants~1{ai_assistant}'
+  /v1/ai-assistant/providers:
+    $ref: './paths/ai-assistants/providers.yaml#/paths/~1v1~1ai-assistant~1providers'
+  /v1/ai-assistant/providers/{provider}:
+    $ref: './paths/ai-assistants/providers.yaml#/paths/~1v1~1ai-assistant~1providers~1{provider}'
+  /v1/ai-assistant/providers/protocol/{protocol}:
+    $ref: './paths/ai-assistants/providers.yaml#/paths/~1v1~1ai-assistant~1providers~1protocol~1{protocol}'
+  
+  # AI Assistant Load Balancers endpoints
+  /v1/ai-assistant-load-balancers:
+    $ref: './paths/ai-assistant-load-balancers/index.yaml#/paths/~1v1~1ai-assistant-load-balancers'
+  /v1/ai-assistant-load-balancers/{ai_assistant_load_balancer}:
+    $ref: './paths/ai-assistant-load-balancers/index.yaml#/paths/~1v1~1ai-assistant-load-balancers~1{ai_assistant_load_balancer}'
+  
+  # IVR Menus endpoints
+  /v1/ivr-menus:
+    $ref: './paths/ivr-menus/index.yaml#/paths/~1v1~1ivr-menus'
+  /v1/ivr-menus/{ivr_menu}:
+    $ref: './paths/ivr-menus/index.yaml#/paths/~1v1~1ivr-menus~1{ivr_menu}'
+  /v1/ivr-menus/voices:
+    $ref: './paths/ivr-menus/voices.yaml#/paths/~1v1~1ivr-menus~1voices'
+  /v1/ivr-menus/{ivr_menu}/toggle-status:
+    $ref: './paths/ivr-menus/toggle-status.yaml#/paths/~1v1~1ivr-menus~1{ivr_menu}~1toggle-status'
+  
+  # Business Hours endpoints
+  /v1/business-hours:
+    $ref: './paths/business-hours/index.yaml#/paths/~1v1~1business-hours'
+  /v1/business-hours/{business_hour}:
+    $ref: './paths/business-hours/index.yaml#/paths/~1v1~1business-hours~1{business_hour}'
+  /v1/business-hours/{business_hour}/duplicate:
+    $ref: './paths/business-hours/duplicate.yaml#/paths/~1v1~1business-hours~1{business_hour}~1duplicate'
+  /v1/business-hours/{business_hour}/toggle-status:
+    $ref: './paths/business-hours/toggle-status.yaml#/paths/~1v1~1business-hours~1{business_hour}~1toggle-status'
+  
+  # Phone Numbers (DIDs) endpoints
+  /v1/phone-numbers:
+    $ref: './paths/phone-numbers/index.yaml#/paths/~1v1~1phone-numbers'
+  /v1/phone-numbers/{phone_number}:
+    $ref: './paths/phone-numbers/index.yaml#/paths/~1v1~1phone-numbers~1{phone_number}'
+  
+  # Call Logs endpoints
+  /v1/call-logs:
+    $ref: './paths/call-logs/index.yaml#/paths/~1v1~1call-logs'
+  /v1/call-logs/active:
+    $ref: './paths/call-logs/active.yaml#/paths/~1v1~1call-logs~1active'
+  /v1/call-logs/statistics:
+    $ref: './paths/call-logs/statistics.yaml#/paths/~1v1~1call-logs~1statistics'
+  /v1/call-logs/{callLog}:
+    $ref: './paths/call-logs/index.yaml#/paths/~1v1~1call-logs~1{callLog}'
+  
+  # Call Detail Records endpoints
+  /v1/call-detail-records:
+    $ref: './paths/call-detail-records/index.yaml#/paths/~1v1~1call-detail-records'
+  /v1/call-detail-records/export:
+    $ref: './paths/call-detail-records/export.yaml#/paths/~1v1~1call-detail-records~1export'
+  /v1/call-detail-records/statistics:
+    $ref: './paths/call-detail-records/statistics.yaml#/paths/~1v1~1call-detail-records~1statistics'
+  /v1/call-detail-records/{call_detail_record}:
+    $ref: './paths/call-detail-records/index.yaml#/paths/~1v1~1call-detail-records~1{call_detail_record}'
+  
+  # Recordings endpoints
+  /v1/recordings:
+    $ref: './paths/recordings/index.yaml#/paths/~1v1~1recordings'
+  /v1/recordings/{recording}:
+    $ref: './paths/recordings/index.yaml#/paths/~1v1~1recordings~1{recording}'
+  /v1/recordings/{recording}/download:
+    $ref: './paths/recordings/download.yaml#/paths/~1v1~1recordings~1{recording}~1download'
+  /v1/recordings/download:
+    $ref: './paths/recordings/download.yaml#/paths/~1v1~1recordings~1download'
+  /storage/recordings/{path}:
+    $ref: './paths/recordings/public-download.yaml#/paths/~1storage~1recordings~1{path}'
+  
+  # Inbound Blacklist endpoints
+  /v1/inbound-blacklist:
+    $ref: './paths/inbound-blacklist/index.yaml#/paths/~1v1~1inbound-blacklist'
+  /v1/inbound-blacklist/{inboundBlacklist}:
+    $ref: './paths/inbound-blacklist/index.yaml#/paths/~1v1~1inbound-blacklist~1{inboundBlacklist}'
+  /v1/inbound-blacklist/statistics:
+    $ref: './paths/inbound-blacklist/statistics.yaml#/paths/~1v1~1inbound-blacklist~1statistics'
+  /v1/inbound-blacklist/blocked-logs:
+    $ref: './paths/inbound-blacklist/blocked-logs.yaml#/paths/~1v1~1inbound-blacklist~1blocked-logs'
+  /v1/inbound-blacklist/{inboundBlacklist}/toggle-status:
+    $ref: './paths/inbound-blacklist/toggle-status.yaml#/paths/~1v1~1inbound-blacklist~1{inboundBlacklist}~1toggle-status'
+  
+  # Outbound Whitelist endpoints
+  /v1/outbound-whitelist:
+    $ref: './paths/outbound-whitelist/index.yaml#/paths/~1v1~1outbound-whitelist'
+  /v1/outbound-whitelist/{outboundWhitelist}:
+    $ref: './paths/outbound-whitelist/index.yaml#/paths/~1v1~1outbound-whitelist~1{outboundWhitelist}'
+  /v1/outbound-whitelist/{outboundWhitelist}/toggle-status:
+    $ref: './paths/outbound-whitelist/toggle-status.yaml#/paths/~1v1~1outbound-whitelist~1{outboundWhitelist}~1toggle-status'
+  
+  # Settings endpoints
+  /v1/settings/cloudonix:
+    $ref: './paths/settings/cloudonix.yaml#/paths/~1v1~1settings~1cloudonix'
+  /v1/settings/cloudonix/validate:
+    $ref: './paths/settings/validate.yaml#/paths/~1v1~1settings~1cloudonix~1validate'
+  /v1/settings/cloudonix/generate-requests-key:
+    $ref: './paths/settings/generate-key.yaml#/paths/~1v1~1settings~1cloudonix~1generate-requests-key'
+  /v1/settings/cloudonix/outbound-trunks:
+    $ref: './paths/settings/outbound-trunks.yaml#/paths/~1v1~1settings~1cloudonix~1outbound-trunks'
+  
+  # Session Updates endpoints
+  /v1/session-updates/active:
+    $ref: './paths/session-updates/active.yaml#/paths/~1v1~1session-updates~1active'
+  /v1/session-updates/active/stats:
+    $ref: './paths/session-updates/stats.yaml#/paths/~1v1~1session-updates~1active~1stats'
+  /v1/session-updates/{sessionId}:
+    $ref: './paths/session-updates/details.yaml#/paths/~1v1~1session-updates~1{sessionId}'
+  /v1/session-updates/{sessionId}/disconnect:
+    $ref: './paths/session-updates/disconnect.yaml#/paths/~1v1~1session-updates~1{sessionId}~1disconnect'
+  
+  # Call Notifications endpoints
+  /v1/call-notifications/settings:
+    $ref: './paths/call-notifications/settings.yaml#/paths/~1v1~1call-notifications~1settings'
+  /v1/call-notifications/settings/test:
+    $ref: './paths/call-notifications/test.yaml#/paths/~1v1~1call-notifications~1settings~1test'
+  /v1/call-notifications/logs:
+    $ref: './paths/call-notifications/logs.yaml#/paths/~1v1~1call-notifications~1logs'
+  /v1/call-notifications/logs/{sessionToken}:
+    $ref: './paths/call-notifications/session-logs.yaml#/paths/~1v1~1call-notifications~1logs~1{sessionToken}'
+  /v1/call-notifications/rate-limit:
+    $ref: './paths/call-notifications/rate-limit.yaml#/paths/~1v1~1call-notifications~1rate-limit'
+  
+  # Auto Dialer Campaigns endpoints
+  /v1/auto-dialer-campaigns:
+    $ref: './paths/auto-dialer-campaigns/index.yaml#/paths/~1v1~1auto-dialer-campaigns'
+  /v1/auto-dialer-campaigns/{campaign}:
+    $ref: './paths/auto-dialer-campaigns/index.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}'
+  /v1/auto-dialer-campaigns/{campaign}/start:
+    $ref: './paths/auto-dialer-campaigns/lifecycle.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1start'
+  /v1/auto-dialer-campaigns/{campaign}/pause:
+    $ref: './paths/auto-dialer-campaigns/lifecycle.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1pause'
+  /v1/auto-dialer-campaigns/{campaign}/resume:
+    $ref: './paths/auto-dialer-campaigns/lifecycle.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1resume'
+  /v1/auto-dialer-campaigns/{campaign}/archive:
+    $ref: './paths/auto-dialer-campaigns/lifecycle.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1archive'
+  /v1/auto-dialer-campaigns/{campaign}/destinations:
+    $ref: './paths/auto-dialer-campaigns/destinations.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1destinations'
+  /v1/auto-dialer-campaigns/{campaign}/concurrency:
+    $ref: './paths/auto-dialer-campaigns/destinations.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1concurrency'
+  /v1/auto-dialer-campaigns/monitor/summary:
+    $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1monitor~1summary'
+  /v1/auto-dialer-campaigns/{campaign}/monitor/detail:
+    $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1monitor~1detail'
+  
+  # Distribution Lists endpoints
+  /v1/auto-dialer-campaigns/lists:
+    $ref: './paths/distribution-lists/index.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists'
+  /v1/auto-dialer-campaigns/lists/example-csv:
+    $ref: './paths/distribution-lists/index.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1example-csv'
+  /v1/auto-dialer-campaigns/lists/{list}:
+    $ref: './paths/distribution-lists/index.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}'
+  /v1/auto-dialer-campaigns/lists/{list}/upload:
+    $ref: './paths/distribution-lists/upload.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1upload'
+  /v1/auto-dialer-campaigns/lists/upload-progress/{jobId}:
+    $ref: './paths/distribution-lists/upload.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1upload-progress~1{jobId}'
+  /v1/auto-dialer-campaigns/lists/{list}/destinations:
+    $ref: './paths/distribution-lists/destinations.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1destinations'
+  /v1/auto-dialer-campaigns/lists/{list}/destinations/batch:
+    $ref: './paths/distribution-lists/destinations.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1destinations~1batch'
+  /v1/auto-dialer-campaigns/lists/{list}/versions:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions'
+  /v1/auto-dialer-campaigns/lists/{list}/copy:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1copy'
+  /v1/auto-dialer-campaigns/lists/{list}/archive:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1archive'
+  /v1/auto-dialer-campaigns/lists/{list}/download:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1download'
+  /v1/auto-dialer-campaigns/lists/{list}/validation-errors:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1validation-errors'
+  /v1/auto-dialer-campaigns/lists/{list}/assign:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1assign'
+  /v1/auto-dialer-campaigns/lists/{list}/unassign:
+    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1unassign'
+  
+  # Application Config
+  /v1/config/application:
+    $ref: './paths/config/application.yaml#/paths/~1v1~1config~1application'
+  
+  # Webhooks endpoints (Cloudonix)
+  /webhooks/cloudonix/call-initiated:
+    $ref: './paths/webhooks/call-initiated.yaml#/paths/~1webhooks~1cloudonix~1call-initiated'
+  /webhooks/cloudonix/call-status:
+    $ref: './paths/webhooks/call-status.yaml#/paths/~1webhooks~1cloudonix~1call-status'
+  /webhooks/cloudonix/cdr:
+    $ref: './paths/webhooks/cdr.yaml#/paths/~1webhooks~1cloudonix~1cdr'
+  /webhooks/cloudonix/session-update:
+    $ref: './paths/webhooks/session-update.yaml#/paths/~1webhooks~1cloudonix~1session-update'
+  
+  # Voice Routing endpoints
+  /voice/route:
+    $ref: './paths/voice/route.yaml#/paths/~1voice~1route'
+  /voice/ivr-input:
+    $ref: './paths/voice/ivr-input.yaml#/paths/~1voice~1ivr-input'
+  /voice/health:
+    $ref: './paths/voice/health.yaml#/paths/~1voice~1health'
+  /callbacks/voice/ring-group-callback:
+    $ref: './paths/voice/ring-group-callback.yaml#/paths/~1callbacks~1voice~1ring-group-callback'
+  /callbacks/voice/albs-follow-through:
+    $ref: './paths/voice/albs-follow-through.yaml#/paths/~1callbacks~1voice~1albs-follow-through'
+  
+  # Platform Manager endpoints
+  /v1/platform/dashboard:
+    $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
+  /v1/platform/organizations:
+    $ref: './paths/platform/organizations.yaml#/paths/~1v1~1platform~1organizations'
+  /v1/platform/organizations/{organization}:
+    $ref: './paths/platform/organizations.yaml#/paths/~1v1~1platform~1organizations~1{organization}'
+  /v1/platform/organizations/{organization}/status:
+    $ref: './paths/platform/organization-status.yaml#/paths/~1v1~1platform~1organizations~1{organization}~1status'
+  /v1/platform/users:
+    $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users'
+  /v1/platform/organizations/{organization}/users:
+    $ref: './paths/platform/organization-users.yaml#/paths/~1v1~1platform~1organizations~1{organization}~1users'
+  /v1/platform/users/{user}:
+    $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users~1{user}'
+  /v1/platform/users/{user}/platform-manager:
+    $ref: './paths/platform/platform-manager.yaml#/paths/~1v1~1platform~1users~1{user}~1platform-manager'
+  /v1/platform/users/{user}/password:
+    $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users~1{user}~1password'
+  /v1/platform/audit-logs:
+    $ref: './paths/platform/audit-logs.yaml#/paths/~1v1~1platform~1audit-logs'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token authentication via Laravel Sanctum
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: XSRF-TOKEN
+      description: Cookie-based session authentication for SPAs
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: X-Cloudonix-Signature
+      description: HMAC signature for Cloudonix webhooks
+    voiceWebhookAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Bearer token for voice routing webhooks (per-organization)
+  
+  schemas:
+    # Common response schemas
+    Error:
+      $ref: './components/schemas/Error.yaml'
+    ValidationError:
+      $ref: './components/schemas/ValidationError.yaml'
+    PaginationMeta:
+      $ref: './components/schemas/PaginationMeta.yaml'
+    
+    # Entity schemas
+    User:
+      $ref: './components/schemas/User.yaml'
+    Extension:
+      $ref: './components/schemas/Extension.yaml'
+    Organization:
+      $ref: './components/schemas/Organization.yaml'
+    RingGroup:
+      $ref: './components/schemas/RingGroup.yaml'
+    ConferenceRoom:
+      $ref: './components/schemas/ConferenceRoom.yaml'
+    BusinessHoursSchedule:
+      $ref: './components/schemas/BusinessHoursSchedule.yaml'
+    IvrMenu:
+      $ref: './components/schemas/IvrMenu.yaml'
+    PhoneNumber:
+      $ref: './components/schemas/PhoneNumber.yaml'
+    AiAssistant:
+      $ref: './components/schemas/AiAssistant.yaml'
+    AiAssistantLoadBalancer:
+      $ref: './components/schemas/AiAssistantLoadBalancer.yaml'
+    CallLog:
+      $ref: './components/schemas/CallLog.yaml'
+    CallDetailRecord:
+      $ref: './components/schemas/CallDetailRecord.yaml'
+    Recording:
+      $ref: './components/schemas/Recording.yaml'
+    InboundBlacklist:
+      $ref: './components/schemas/InboundBlacklist.yaml'
+    OutboundWhitelist:
+      $ref: './components/schemas/OutboundWhitelist.yaml'
+    CloudonixSettings:
+      $ref: './components/schemas/CloudonixSettings.yaml'
+    CallNotificationsSettings:
+      $ref: './components/schemas/CallNotificationsSettings.yaml'
+    SessionUpdate:
+      $ref: './components/schemas/SessionUpdate.yaml'
+    AutoDialerCampaign:
+      $ref: './components/schemas/AutoDialerCampaign.yaml'
+    DistributionList:
+      $ref: './components/schemas/DistributionList.yaml'
+    MonitorSummary:
+      $ref: './components/schemas/MonitorSummary.yaml'
+    MonitorDetail:
+      $ref: './components/schemas/MonitorDetail.yaml'
+    
+    # Webhook payload schemas
+    CallInitiatedPayload:
+      $ref: './components/schemas/webhooks/CallInitiatedPayload.yaml'
+    CallStatusPayload:
+      $ref: './components/schemas/webhooks/CallStatusPayload.yaml'
+    CdrPayload:
+      $ref: './components/schemas/webhooks/CdrPayload.yaml'
+    SessionUpdatePayload:
+      $ref: './components/schemas/webhooks/SessionUpdatePayload.yaml'
+    
+    # CXML schemas
+    CxmlResponse:
+      $ref: './components/schemas/cxml/CxmlResponse.yaml'
+
+  parameters:
+    # Path parameters
+    Id:
+      $ref: './components/parameters/path/Id.yaml'
+    UserId:
+      $ref: './components/parameters/path/UserId.yaml'
+    ExtensionId:
+      $ref: './components/parameters/path/ExtensionId.yaml'
+    OrganizationId:
+      $ref: './components/parameters/path/OrganizationId.yaml'
+    
+    # Query parameters
+    Page:
+      $ref: './components/parameters/query/Page.yaml'
+    PerPage:
+      $ref: './components/parameters/query/PerPage.yaml'
+    SortBy:
+      $ref: './components/parameters/query/SortBy.yaml'
+    SortOrder:
+      $ref: './components/parameters/query/SortOrder.yaml'
+
+  responses:
+    BadRequest:
+      $ref: './components/responses/BadRequest.yaml'
+    Unauthorized:
+      $ref: './components/responses/Unauthorized.yaml'
+    Forbidden:
+      $ref: './components/responses/Forbidden.yaml'
+    NotFound:
+      $ref: './components/responses/NotFound.yaml'
+    ValidationError:
+      $ref: './components/responses/ValidationError.yaml'
+    ServerError:
+      $ref: './components/responses/ServerError.yaml'
+    TooManyRequests:
+      $ref: './components/responses/TooManyRequests.yaml'
+
+  headers:
+    X-Request-Id:
+      $ref: './components/headers/X-Request-Id.yaml'
+    X-RateLimit-Limit:
+      $ref: './components/headers/X-RateLimit-Limit.yaml'
+    X-RateLimit-Remaining:
+      $ref: './components/headers/X-RateLimit-Remaining.yaml'
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Authentication
+    description: User authentication and session management
+  - name: Profile
+    description: User profile management
+  - name: Users
+    description: User management within organization
+  - name: Extensions
+    description: Extension (SIP endpoint) management
+  - name: Conference Rooms
+    description: Conference room management
+  - name: Ring Groups
+    description: Ring group management for call distribution
+  - name: Business Hours
+    description: Business hours schedule management
+  - name: IVR Menus
+    description: Interactive Voice Response menu management
+  - name: Phone Numbers
+    description: DID (Direct Inward Dialing) number management
+  - name: AI Assistants
+    description: AI assistant and voice agent configuration
+  - name: AI Load Balancers
+    description: AI assistant load balancing configuration
+  - name: Call Logs
+    description: Call history and activity logs
+  - name: Call Detail Records
+    description: Detailed call records (CDR) for billing/analysis
+  - name: Recordings
+    description: Call recording management
+  - name: Inbound Blacklist
+    description: Blocked caller management
+  - name: Outbound Whitelist
+    description: Outbound dialing restrictions
+  - name: Settings
+    description: Organization and integration settings
+  - name: Session Updates
+    description: Real-time call session management
+  - name: Call Notifications
+    description: Call notification configuration
+  - name: Auto Dialer Campaigns
+    description: Outbound campaign management with rate limiting and scheduling
+  - name: Distribution Lists
+    description: Phone number list management for auto-dialer campaigns
+  - name: Configuration
+    description: Application configuration
+  - name: Webhooks
+    description: Incoming webhooks from Cloudonix
+  - name: Voice Routing
+    description: Real-time call routing (CXML responses)
+  - name: Platform
+    description: Platform manager administrative endpoints

@@ -1,0 +1,132 @@
+paths:
+  /v1/platform/users:
+    get:
+      tags:
+        - Platform
+      summary: List all users (cross-tenant)
+      operationId: listAllUsers
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Users list
+  
+  /v1/platform/users/{user}:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+    
+    get:
+      tags:
+        - Platform
+      summary: Get user details
+      operationId: getUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User details
+    
+    put:
+      tags:
+        - Platform
+      summary: Update user
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User updated
+    
+    delete:
+      tags:
+        - Platform
+      summary: Delete user
+      operationId: deleteUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: User deleted
+
+  /v1/platform/users/{user}/password:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        description: User ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    patch:
+      tags:
+        - Platform
+      summary: Update user password
+      description: |
+        Update a user's password (platform manager only).
+        
+        Allows platform managers to reset passwords for any user
+        across all organizations.
+      operationId: updatePlatformUserPassword
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  description: |
+                    New password requirements:
+                    - At least 8 characters
+                    - Upper and lowercase letters
+                    - At least one number
+                  example: "NewSecurePass123"
+                password_confirmation:
+                  type: string
+                  format: password
+                  description: Password confirmation (must match password)
+                  example: "NewSecurePass123"
+              required:
+                - password
+                - password_confirmation
+      responses:
+        '200':
+          description: Password updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password updated successfully."
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

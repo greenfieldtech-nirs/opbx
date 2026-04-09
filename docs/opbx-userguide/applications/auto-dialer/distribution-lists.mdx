@@ -1,0 +1,171 @@
+---
+sidebar_position: 3
+slug: /applications/auto-dialer/distribution-lists
+sidebar_class_name: cxGuidesSidebar
+title: Distribution Lists
+description: Uploading and managing phone number lists
+---
+
+# Distribution Lists
+
+Distribution lists contain the phone numbers that the Auto Dialer calls during a campaign. You upload these as CSV files and assign them to campaigns.
+
+## What Is a Distribution List
+
+A distribution list is a CSV file containing phone numbers and optional contact information. The Auto Dialer processes each row sequentially, dialing the phone number and routing answered calls to the campaign's configured destination.
+
+## Accessing Distribution Lists
+
+Navigate via the sidebar: **Auto Dialer > Distribution Lists**.
+
+The page layout matches the Campaign Manager:
+
+- **Search**: Find lists by name
+- **Status Filter**: Filter by Draft, Processing, Ready, In Use, Used, Failed, or Archived
+- **Refresh Button**: Update the list view
+- **Create Button**: Upload a new distribution list
+
+## CSV Format
+
+Your CSV file must follow this format:
+
+```csv
+phone_number,first_name,last_name
++14155551234,John,Doe
++14155555678,Jane,Smith
++14155559001,Robert,Johnson
+```
+
+### Required Column
+
+| Column | Format | Description |
+|--------|--------|-------------|
+| **phone_number** | E.164 | Phone number with country code (e.g., +14155551234) |
+
+### Optional Columns
+
+| Column | Description |
+|--------|-------------|
+| **first_name** | Contact's first name |
+| **last_name** | Contact's last name |
+
+:::warning
+The `phone_number` column is required. Rows without a valid phone number are rejected during import.
+:::
+
+### Phone Number Format
+
+Phone numbers must be in E.164 format:
+
+- Start with a plus sign (+)
+- Include country code
+- No spaces, dashes, or parentheses
+- Example: +14155551234 (US), +442071838750 (UK)
+
+## Creating a List
+
+1. Click **Create List**
+2. Enter a descriptive name for the list
+3. Upload your CSV file
+4. Click Create
+
+The system validates and imports the CSV. Large files may take a moment to process.
+
+## List Statuses
+
+Distribution lists progress through several statuses:
+
+| Status | Description |
+|--------|-------------|
+| **Draft** | List created but no data uploaded yet |
+| **Processing** | CSV is being validated and imported |
+| **Ready** | Successfully validated and ready to assign to campaigns |
+| **In Use** | Currently assigned to an active campaign |
+| **Used** | Previously assigned to a campaign that has completed |
+| **Failed** | CSV validation failed (check file format) |
+| **Archived** | Soft-deleted and hidden from default views |
+
+:::note
+A list must be in Ready status before it can be assigned to a campaign. Processing typically completes within seconds for files under 10,000 rows.
+:::
+
+## Assigning to a Campaign
+
+A campaign must have at least one distribution list assigned before it can start.
+
+1. Find the list in the Distribution Lists page
+2. Click the **Assign** button
+3. Select the campaign from the dropdown
+4. Confirm the assignment
+
+The list status changes to **In Use** when the campaign is Active.
+
+:::warning
+A campaign requires at least one distribution list to be assigned before it can be started. You will get an error if you try to start a campaign without a list.
+:::
+
+## Unassigning from a Campaign
+
+To remove a list from a campaign:
+
+1. Click the **Unassign** button on the list
+2. Confirm the action
+
+You cannot unassign a list from an Active campaign. Pause the campaign first.
+
+## List Versioning
+
+Distribution lists support multiple versions. When you upload a new CSV to an existing list, it creates a new version while preserving the history.
+
+This is useful when:
+
+- You need to add more contacts to an existing campaign
+- You want to correct errors in the original upload
+- You are running recurring campaigns with updated lists
+
+## Downloading Example CSV
+
+Click the **Example CSV** button in the page header to download a template file. The example includes:
+
+- Proper column headers
+- Sample data rows
+- Correct E.164 formatting
+
+Use this template as a starting point for your own lists.
+
+## Managing List Lifecycle
+
+### Archiving
+
+Archive lists that are no longer needed:
+
+- Archived lists are hidden from default views
+- Archived lists cannot be assigned to new campaigns
+- Existing campaign assignments are preserved
+
+### Deleting
+
+Some implementations support hard deletion of lists. Check your organization's data retention policies before deleting.
+
+## Best Practices
+
+1. **Validate Phone Numbers**: Ensure all numbers are in E.164 format before uploading
+
+2. **Use Descriptive Names**: Include date ranges or campaign purposes in list names
+
+3. **Test Small First**: Upload a small test list (5-10 numbers) to verify your campaign configuration
+
+4. **Remove Duplicates**: Clean your CSV to remove duplicate phone numbers before upload
+
+5. **Respect Do-Not-Call**: Filter out numbers on do-not-call lists before creating distribution lists
+
+6. **Version Control**: Use versioning to track changes to your contact lists over time
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| **Upload fails** | Check CSV format. Ensure phone_number column exists and uses E.164 format. |
+| **Status stuck on Processing** | Large files may take time. Wait 2-3 minutes. If still processing, contact support. |
+| **Failed status** | Review the CSV for invalid characters, missing headers, or malformed phone numbers. |
+| **Cannot assign list** | List must be in Ready status. Wait for processing to complete. |

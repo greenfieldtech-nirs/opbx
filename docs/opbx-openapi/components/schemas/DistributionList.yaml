@@ -1,0 +1,147 @@
+type: object
+description: Distribution List for auto-dialer campaigns
+properties:
+  id:
+    type: integer
+    description: Unique list identifier
+    readOnly: true
+    example: 1
+  name:
+    type: string
+    description: List name
+    example: "Sales Leads Q1"
+  description:
+    type: string
+    nullable: true
+    description: List description
+    example: "Qualified sales leads for Q1 2024"
+  version_number:
+    type: integer
+    description: Version number of this list
+    example: 1
+  is_latest_version:
+    type: boolean
+    description: Whether this is the latest version
+    example: true
+  status:
+    type: string
+    enum:
+      - draft
+      - processing
+      - ready
+      - in_use
+      - used
+      - failed
+      - archived
+    description: Current list status
+    example: "ready"
+  status_label:
+    type: string
+    description: Human-readable status label
+    example: "Ready"
+  status_color:
+    type: string
+    description: Status color for UI display
+    example: "green"
+  campaign_id:
+    type: integer
+    nullable: true
+    description: ID of the campaign this list is assigned to
+    example: 5
+  used_by_campaign_id:
+    type: integer
+    nullable: true
+    description: ID of the campaign that used this list
+    example: 3
+  used_at:
+    type: string
+    format: date-time
+    nullable: true
+    description: When the list was last used
+    example: "2024-01-15 14:30:00"
+  statistics:
+    type: object
+    description: List statistics
+    properties:
+      total_rows:
+        type: integer
+        description: Total number of rows in the list
+        example: 1000
+      valid_rows:
+        type: integer
+        description: Number of valid rows
+        example: 950
+      invalid_rows:
+        type: integer
+        description: Number of invalid rows
+        example: 50
+  parent_list_id:
+    type: integer
+    nullable: true
+    description: ID of the parent list (for versioned lists)
+    example: null
+  has_versions:
+    type: boolean
+    description: Whether this list has version history
+    example: false
+  can_archive:
+    type: boolean
+    description: Whether the list can be archived
+    example: true
+  can_assign:
+    type: boolean
+    description: Whether the list can be assigned to a campaign
+    example: true
+  can_upload:
+    type: boolean
+    description: Whether the list can accept uploads
+    example: true
+  can_copy:
+    type: boolean
+    description: Whether the list can be copied
+    example: true
+  created_at:
+    type: string
+    format: date-time
+    description: Creation timestamp
+    example: "2024-01-10 08:00:00"
+  processed_at:
+    type: string
+    format: date-time
+    nullable: true
+    description: When the list was last processed
+    example: "2024-01-10 08:05:00"
+  archived_at:
+    type: string
+    format: date-time
+    nullable: true
+    description: When the list was archived
+    example: null
+  campaign:
+    type: object
+    nullable: true
+    description: Associated campaign (when loaded)
+    properties:
+      id:
+        type: integer
+        example: 5
+      name:
+        type: string
+        example: "Q1 Sales Campaign"
+  used_by_campaign:
+    type: object
+    nullable: true
+    description: Campaign that used this list (when loaded)
+    properties:
+      id:
+        type: integer
+        example: 3
+      name:
+        type: string
+        example: "Previous Campaign"
+required:
+  - id
+  - name
+  - version_number
+  - is_latest_version
+  - status

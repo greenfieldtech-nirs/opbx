@@ -1,0 +1,71 @@
+paths:
+  /v1/auto-dialer-campaigns/monitor/summary:
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Get monitor summary
+      description: |
+        Get a bird's-eye view of all active and paused campaigns.
+        
+        Returns real-time concurrency data, progress statistics,
+        and dialer worker health status. Data is cached for 5 seconds.
+      operationId: getMonitorSummary
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Monitor summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/MonitorSummary.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+
+  /v1/auto-dialer-campaigns/{campaign}/monitor/detail:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Get campaign monitor detail
+      description: |
+        Get detailed monitoring view for a single campaign.
+        
+        Returns campaign statistics, disposition breakdown,
+        rate limit status, and active call sessions. Statistics
+        are cached for 10 seconds; active sessions are always fresh.
+      operationId: getMonitorDetail
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign monitor detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/MonitorDetail.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

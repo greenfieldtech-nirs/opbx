@@ -1,0 +1,32 @@
+type: object
+description: AI Assistant Load Balancer
+properties:
+  id:
+    type: integer
+  organization_id:
+    type: integer
+  name:
+    type: string
+    example: Support Load Balancer
+  strategy:
+    type: string
+    enum: [round_robin, priority, weighted, least_connections]
+    example: round_robin
+  members:
+    type: array
+    description: Load balancer members
+  status:
+    type: string
+    enum: [active, inactive]
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+required:
+  - id
+  - organization_id
+  - name
+  - strategy
+  - status

@@ -1,0 +1,184 @@
+---
+sidebar_position: 2
+slug: /installation
+sidebar_class_name: cxGuidesSidebar
+title: "Installation"
+description: "Install OPBX using Docker Compose"
+---
+
+# Installation
+
+This guide walks you through installing OPBX using Docker Compose. This is the recommended method for production deployments and local development.
+
+## Prerequisites
+
+Before you begin, ensure your system meets these requirements:
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| RAM | 4 GB | 8 GB |
+| Disk Space | 20 GB | 50 GB |
+| Docker | 20.10+ | Latest |
+| Docker Compose | 2.0+ | Latest |
+| Git | 2.30+ | Latest |
+
+You also need ports 80, 3306, 6379, 9000, and 6001 available on your host machine.
+
+## Installation Steps
+
+### 1. Clone the Repository
+
+Download the OPBX source code from GitHub:
+
+```bash
+git clone https://github.com/greenfieldtech-nirs/opbx.git
+cd opbx
+```
+
+### 2. Configure Environment Variables
+
+Copy the example environment file and customize it for your deployment:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file and set these required variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `APP_URL` | Your domain or IP address | `http://localhost` |
+| `DB_PASSWORD` | MySQL root password | `changeme` |
+| `APP_PORT` | HTTP port for the application | `80` |
+| `REDIS_PASSWORD` | Redis authentication password | `null` |
+
+:::note Cloudonix Configuration
+Cloudonix integration is configured through the web UI after your first login. Do not add Cloudonix credentials to the `.env` file.
+:::
+
+### 3. Start the Services
+
+Launch all OPBX services with Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+This command downloads images and starts the following services:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| nginx | 80 | Reverse proxy and static file server |
+| app | 9000 | Laravel PHP-FPM backend |
+| frontend | 3000 | Vite development server (dev mode) |
+| mysql | 3306 | MySQL 8 database |
+| redis | 6379 | Redis cache and queue |
+| minio | 9000 | S3-compatible object storage |
+| soketi | 6001 | WebSocket server for real-time updates |
+
+:::tip First Boot
+The database automatically migrates on first startup. This process takes 30-60 seconds depending on your hardware.
+:::
+
+### 4. Verify Installation
+
+Check that all services are running:
+
+```bash
+docker compose ps
+```
+
+Test the API health endpoint:
+
+```bash
+curl http://localhost/api/health
+```
+
+You should receive a JSON response indicating the system is healthy.
+
+### 5. Access the Application
+
+Open your browser and navigate to:
+
+| URL | Purpose |
+|-----|---------|
+| `http://localhost/ui` | OPBX web application |
+| `http://localhost/api` | API base URL |
+
+:::tip Next Steps
+Proceed to [First Login](./first-login) to create your organization and admin account.
+:::
+
+## Troubleshooting
+
+### Port Conflicts
+
+If you see errors about ports already in use, change the `APP_PORT` in your `.env` file:
+
+```bash
+APP_PORT=8080  # Use port 8080 instead of 80
+```
+
+### MySQL Slow Start
+
+MySQL may take longer to initialize on first boot. Wait 60 seconds after starting containers before testing:
+
+```bash
+docker compose logs -f mysql
+```
+
+### Permission Denied
+
+If you encounter permission errors, ensure your user is in the `docker` group:
+
+```bash
+sudo usermod -aG docker $USER
+# Log out and back in for changes to take effect
+```
+
+### Container Failures
+
+Check individual service logs for errors:
+
+```bash
+docker compose logs -f [service-name]
+```
+
+Common service names: `app`, `nginx`, `mysql`, `redis`.
+
+## Updating OPBX
+
+To update to the latest version:
+
+```bash
+# Pull latest code
+git pull
+
+# Stop running containers
+docker compose down
+
+# Rebuild images without cache
+docker compose build --no-cache
+
+# Start updated services
+docker compose up -d
+```
+
+:::warning Data Preservation
+The `docker compose down` command preserves database volumes by default. Your data remains intact across updates.
+:::
+
+## Production Deployment
+
+For production environments, consider these additional steps:
+
+1. Use a reverse proxy (nginx, traefik) with SSL termination
+2. Configure automated backups for MySQL and MinIO data
+3. Set strong passwords for all services
+4. Enable Redis persistence
+5. Configure log aggregation
+6. Set up monitoring and alerting
+
+:::danger Security Notice
+Never expose the MySQL or Redis ports to the public internet. Use Docker networks or private IPs for inter-service communication.
+:::

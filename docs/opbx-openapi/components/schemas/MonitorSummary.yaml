@@ -1,0 +1,152 @@
+type: object
+description: Real-time monitor summary for all active campaigns
+properties:
+  campaigns:
+    type: array
+    description: List of active and paused campaigns with monitoring data
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Campaign ID
+          example: 1
+        name:
+          type: string
+          description: Campaign name
+          example: "Q1 Sales Campaign"
+        status:
+          type: string
+          enum:
+            - active
+            - paused
+          description: Campaign status
+          example: "active"
+        progress_percentage:
+          type: number
+          format: float
+          description: Campaign completion percentage
+          example: 75.5
+        total_destinations:
+          type: integer
+          description: Total number of destinations
+          example: 1000
+        completed_calls:
+          type: integer
+          description: Number of completed calls
+          example: 755
+        failed_calls:
+          type: integer
+          description: Number of failed calls
+          example: 45
+        pending_calls:
+          type: integer
+          description: Number of pending calls
+          example: 200
+        concurrent_active_calls:
+          type: integer
+          description: Maximum allowed concurrent calls
+          example: 10
+        active_calls:
+          type: integer
+          description: Currently active calls
+          example: 5
+        cac_utilization:
+          type: number
+          format: float
+          description: CAC utilization percentage
+          example: 50.0
+        rate_limit_status:
+          type: object
+          properties:
+            is_rate_limited:
+              type: boolean
+              description: Whether campaign is rate limited
+              example: false
+            pause_reason:
+              type: string
+              nullable: true
+              description: Reason for pause
+              example: null
+            resumes_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: When the campaign can resume
+              example: null
+        caller_id:
+          type: string
+          description: Campaign caller ID
+          example: "+14155551212"
+        routing_destination_type:
+          type: string
+          description: Routing destination type
+          example: "ai_assistant"
+        routing_destination_label:
+          type: string
+          description: Routing destination label
+          example: "Sales AI Assistant"
+        start_date:
+          type: string
+          format: date
+          description: Campaign start date
+          example: "2024-01-01"
+        end_date:
+          type: string
+          format: date
+          description: Campaign end date
+          example: "2024-12-31"
+  totals:
+    type: object
+    description: Aggregated totals across all campaigns
+    properties:
+      active_campaigns:
+        type: integer
+        description: Number of active campaigns
+        example: 3
+      paused_campaigns:
+        type: integer
+        description: Number of paused campaigns
+        example: 1
+      total_active_calls:
+        type: integer
+        description: Total active calls across all campaigns
+        example: 15
+      total_cac_capacity:
+        type: integer
+        description: Total CAC capacity across all campaigns
+        example: 50
+      overall_utilization:
+        type: number
+        format: float
+        description: Overall CAC utilization percentage
+        example: 30.0
+  worker_health:
+    type: object
+    description: Dialer worker health status
+    properties:
+      status:
+        type: string
+        enum:
+          - healthy
+          - degraded
+          - offline
+          - unknown
+        description: Worker health status
+        example: "healthy"
+      active_campaigns:
+        type: integer
+        description: Number of campaigns being processed
+        example: 4
+      active_calls:
+        type: integer
+        description: Number of active calls
+        example: 15
+      queue_depth:
+        type: integer
+        description: Current queue depth
+        example: 0
+required:
+  - campaigns
+  - totals
+  - worker_health

@@ -1,0 +1,184 @@
+---
+sidebar_position: 7
+slug: /applications/auto-dialer/real-time-monitor
+sidebar_class_name: cxGuidesSidebar
+title: Real-Time Monitor
+description: Monitoring active campaigns in real time
+---
+
+# Real-Time Monitor
+
+The Real-Time Monitor provides live visibility into your Auto Dialer campaigns. It displays active calls, campaign progress, and performance metrics with configurable refresh intervals.
+
+## Accessing the Monitor
+
+Navigate via the sidebar: **Auto Dialer > Real-Time Monitor**.
+
+## Refresh Control
+
+Control how often the monitor updates:
+
+| Interval | Description |
+|----------|-------------|
+| **Manual** | Only updates when you click Refresh Now |
+| **1s** | Updates every second (high resource usage) |
+| **5s** | Updates every 5 seconds |
+| **10s** | Default interval. Good balance of freshness and efficiency |
+| **20s-60s** | Slower intervals for long-running campaigns |
+
+The **Refresh Now** button is always available for manual updates. Your selected interval is saved in browser localStorage and persists across sessions.
+
+:::tip
+Use shorter intervals (1-5s) when starting a campaign to closely monitor the first calls. Switch to longer intervals (20-30s) for stable, long-running campaigns.
+:::
+
+## Bird's-Eye View
+
+The default view shows all active and paused campaigns as card rows. This provides an overview of your entire dialing operation.
+
+### Global Summary Cards
+
+At the top of the page, four cards summarize the overall system state:
+
+| Card | Description |
+|------|-------------|
+| **Active Campaigns** | Number of campaigns currently in Active status |
+| **Total Active Calls** | Sum of active calls across all campaigns |
+| **CAC Utilization** | Percentage of total CAC capacity in use across all campaigns |
+| **Worker Health** | Status of the Go Dialer Worker (healthy, degraded, or offline) |
+
+### Campaign Cards
+
+Each active or paused campaign displays as a full-width card containing:
+
+**Header:**
+- Campaign name
+- Status badge (Active or Paused)
+- Routing destination label
+- Pause/Resume button
+
+**Metric Cards (5 cards in a row):**
+
+| Metric | Description |
+|--------|-------------|
+| **Destinations** | Total phone numbers in assigned distribution lists |
+| **Active Calls** | Current active calls / CAC limit (e.g., "3/10") |
+| **Completed** | Successfully completed calls (green accent) |
+| **Failed** | Calls that failed after all retries (red accent) |
+| **Pending** | Destinations not yet dialed or awaiting retry (muted) |
+
+**Footer:**
+- Progress bar showing percentage complete
+- Rate limit indicator (OK or Limited)
+
+### Card Actions
+
+- **Click the card**: Drill down to detailed campaign view
+- **Pause/Resume button**: Direct action without confirmation
+  - Red button = Pause (when Active)
+  - Green button = Resume (when Paused)
+
+## Campaign Drill-Down
+
+Click any campaign card to view detailed metrics and active call information.
+
+### Navigation
+
+- **Back button**: Returns to bird's-eye view
+- **Campaign header**: Shows name, status badge, Pause/Resume button, Refresh button
+
+### Campaign Progress Card
+
+At the top of the drill-down view:
+
+- Progress bar with percentage complete
+- Completed count (green)
+- Failed count (red)
+- Pending count (muted)
+- Estimated Time of Arrival (ETA) for completion
+
+### KPI Cards (6 cards)
+
+| KPI | Description |
+|-----|-------------|
+| **Active Calls** | Current number of active calls |
+| **CAC Utilization** | Percentage of CAC limit currently in use (color-coded: green under 50%, yellow 50-80%, red over 80%) |
+| **Calls per Minute** | Average call initiation rate over the last 5 minutes |
+| **Answer Rate** | Percentage of calls that were answered |
+| **Avg Call Duration** | Average duration of completed calls |
+| **Rate Limit Status** | OK (within limits) or Limited (throttled) |
+
+### Side-by-Side Layout
+
+The drill-down view displays two sections side by side:
+
+**Left: Active Calls Table**
+
+Displays calls from the last 5 minutes:
+
+| Column | Description |
+|--------|-------------|
+| **Phone Number** | Destination phone number |
+| **Status** | Current call status (ringing, answered, completed, etc.) |
+| **Duration** | How long the call has been active |
+
+:::note
+Paused campaigns show an empty Active Calls table because no calls are in progress.
+:::
+
+**Right: Disposition Breakdown**
+
+A pie chart showing call outcomes:
+
+| Disposition | Color | Description |
+|-------------|-------|-------------|
+| **Answered** | Green | Call was answered by human or machine |
+| **Completed** | Blue | Call completed successfully |
+| **Busy** | Yellow | Destination was busy |
+| **No Answer** | Orange | Call rang but was not answered |
+| **Failed** | Red | Call failed after all retry attempts |
+| **Cancelled** | Gray | Call was cancelled before completion |
+| **Congestion** | Purple | Network congestion prevented call completion |
+
+## Worker Health
+
+The Worker Health indicator shows the status of the Go Dialer Worker:
+
+| Status | Color | Meaning |
+|--------|-------|---------|
+| **Healthy** | Green | Worker is running and polling normally |
+| **Degraded** | Yellow | Worker is running but experiencing issues (high latency, errors) |
+| **Offline** | Red | Worker is not responding or not running |
+
+The health status is proxied from the Go worker's health endpoint. If the worker is offline, campaigns will not progress even if they are in Active status.
+
+:::warning
+If the Worker Health shows Offline, contact your system administrator. Campaigns cannot dial without the worker running.
+:::
+
+## Monitoring Best Practices
+
+1. **Start Small**: Begin with a low CAC (1-2) and watch the first few calls complete before scaling up
+
+2. **Watch CAC Utilization**: If consistently at 100%, consider increasing CAC or reducing CPS
+
+3. **Monitor Answer Rate**: Low answer rates may indicate issues with your distribution list or calling times
+
+4. **Check Worker Health**: Ensure the worker is healthy before starting large campaigns
+
+5. **Review Dispositions**: The pie chart helps identify patterns (e.g., many "No Answer" results may mean your dial timeout is too short)
+
+## Troubleshooting with the Monitor
+
+| Symptom | What to Check | Action |
+|---------|---------------|--------|
+| No calls initiating | Worker Health | Verify worker is running |
+| CAC at 100% constantly | Avg Call Duration | Calls may be taking too long; increase CAC or reduce dial timeout |
+| High Failed count | Disposition Breakdown | Check if specific error pattern exists |
+| Low Answer Rate | Time of Day | Verify you're calling during appropriate hours |
+| Progress not updating | Refresh Interval | Try manual refresh or shorter interval |
+| Campaign shows Paused but should be Active | Campaign Settings | Check if schedule is blocking dialing |
+
+:::tip
+The Real-Time Monitor is the best way to verify your campaign is running correctly. Keep it open during the initial phase of any new campaign.
+:::

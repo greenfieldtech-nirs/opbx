@@ -1,0 +1,259 @@
+paths:
+  /v1/auto-dialer-campaigns/lists/{list}/destinations:
+    parameters:
+      - name: list
+        in: path
+        required: true
+        description: Distribution List ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    get:
+      tags:
+        - Distribution Lists
+      summary: List destinations
+      description: |
+        Get a paginated list of destinations in a distribution list.
+        
+        Supports filtering by status and searching by phone number.
+      operationId: listListDestinations
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, dialing, completed, failed]
+          description: Filter by destination status
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search by phone number
+      responses:
+        '200':
+          description: List of destinations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        phone_number:
+                          type: string
+                          example: "+14155551212"
+                        description:
+                          type: string
+                          nullable: true
+                          example: "John Doe - Sales Lead"
+                        status:
+                          type: string
+                          enum: [pending, dialing, completed, failed]
+                          example: "pending"
+                        dial_attempts:
+                          type: integer
+                          example: 0
+                        last_dialed_at:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          example: null
+                        created_at:
+                          type: string
+                          format: date-time
+                          example: "2024-01-10 08:00:00"
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    post:
+      tags:
+        - Distribution Lists
+      summary: Add single destination
+      description: |
+        Add a single destination to a distribution list.
+        
+        The list must be in a status that allows uploads.
+      operationId: addListDestination
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone_number:
+                  type: string
+                  description: Phone number in E.164 format
+                  example: "+14155551212"
+                description:
+                  type: string
+                  nullable: true
+                  maxLength: 255
+                  description: Optional description
+                  example: "John Doe - Sales Lead"
+              required:
+                - phone_number
+      responses:
+        '201':
+          description: Destination added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Destination added successfully"
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      phone_number:
+                        type: string
+                        example: "+14155551212"
+                      description:
+                        type: string
+                        nullable: true
+                        example: "John Doe - Sales Lead"
+                      status:
+                        type: string
+                        example: "pending"
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: "2024-01-10 08:00:00"
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/auto-dialer-campaigns/lists/{list}/destinations/batch:
+    parameters:
+      - name: list
+        in: path
+        required: true
+        description: Distribution List ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    post:
+      tags:
+        - Distribution Lists
+      summary: Add destinations batch
+      description: |
+        Add multiple destinations to a distribution list in batch.
+        
+        Maximum 1000 destinations per request. The list must be
+        in a status that allows uploads.
+      operationId: addListDestinationsBatch
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destinations:
+                  type: array
+                  maxItems: 1000
+                  description: Array of destinations to add
+                  items:
+                    type: object
+                    properties:
+                      phone_number:
+                        type: string
+                        description: Phone number in E.164 format
+                        example: "+14155551212"
+                      description:
+                        type: string
+                        nullable: true
+                        maxLength: 255
+                        description: Optional description
+                        example: "John Doe - Sales Lead"
+                    required:
+                      - phone_number
+              required:
+                - destinations
+      responses:
+        '200':
+          description: Batch processing completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Batch processing completed"
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: Total destinations in batch
+                        example: 100
+                      added:
+                        type: integer
+                        description: Number of destinations added
+                        example: 98
+                      failed:
+                        type: integer
+                        description: Number of destinations that failed
+                        example: 2
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            index:
+                              type: integer
+                              example: 5
+                            phone_number:
+                              type: string
+                              example: "invalid-number"
+                            message:
+                              type: string
+                              example: "Invalid phone number format"
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

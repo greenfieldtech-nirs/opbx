@@ -1,0 +1,172 @@
+---
+sidebar_position: 5
+slug: /applications/auto-dialer/scheduling
+sidebar_class_name: cxGuidesSidebar
+title: Campaign Scheduling
+description: Configuring when campaigns run
+---
+
+# Campaign Scheduling
+
+Campaign scheduling controls when the Auto Dialer is allowed to initiate calls. You can configure timezones, date ranges, and weekly active hours to ensure campaigns run only during appropriate times.
+
+## Timezone Selection
+
+All scheduling is evaluated in the selected timezone. Choose the timezone that matches your target audience's location.
+
+### Available Timezones
+
+The system provides 65+ timezones organized by region:
+
+| Region | Example Timezones |
+|--------|-------------------|
+| **Americas** | America/New_York, America/Chicago, America/Denver, America/Los_Angeles, America/Toronto, America/Sao_Paulo |
+| **Europe** | Europe/London, Europe/Paris, Europe/Berlin, Europe/Madrid, Europe/Rome, Europe/Amsterdam |
+| **Asia** | Asia/Tokyo, Asia/Shanghai, Asia/Singapore, Asia/Dubai, Asia/Mumbai, Asia/Seoul |
+| **Africa** | Africa/Johannesburg, Africa/Lagos, Africa/Cairo, Africa/Nairobi |
+| **Australia** | Australia/Sydney, Australia/Melbourne, Australia/Perth, Australia/Brisbane |
+| **Pacific** | Pacific/Auckland, Pacific/Fiji, Pacific/Honolulu |
+| **UTC** | UTC, GMT |
+
+:::tip
+Select the timezone where the majority of your contacts are located. This ensures your calls respect local business hours and calling regulations.
+:::
+
+## Date Range
+
+Define the overall window during which the campaign can run:
+
+| Field | Description |
+|-------|-------------|
+| **Start Date** | The first day the campaign is allowed to dial |
+| **End Date** | The last day the campaign is allowed to dial |
+
+The campaign will not initiate calls outside this date range, even if it is Active and within the weekly schedule.
+
+:::note
+The date range is inclusive. If Start Date is January 1 and End Date is January 7, the campaign can dial on all seven days.
+:::
+
+## Weekly Active Hours
+
+The weekly calendar provides granular control over which hours of which days the campaign can dial.
+
+### Calendar Interface
+
+- **24 hourly slots** per day (00:00 to 23:00)
+- **7 days** per week (Monday through Sunday)
+- **Click to toggle**: Green = active (dialing allowed), Empty = inactive (dialing paused)
+
+### Configuration Examples
+
+**Standard Business Hours:**
+
+| Day | Active Hours |
+|-----|-------------|
+| Monday | 09:00 - 17:00 |
+| Tuesday | 09:00 - 17:00 |
+| Wednesday | 09:00 - 17:00 |
+| Thursday | 09:00 - 17:00 |
+| Friday | 09:00 - 17:00 |
+| Saturday | Inactive |
+| Sunday | Inactive |
+
+**Extended Hours with Weekend Support:**
+
+| Day | Active Hours |
+|-----|-------------|
+| Monday | 08:00 - 20:00 |
+| Tuesday | 08:00 - 20:00 |
+| Wednesday | 08:00 - 20:00 |
+| Thursday | 08:00 - 20:00 |
+| Friday | 08:00 - 20:00 |
+| Saturday | 10:00 - 16:00 |
+| Sunday | Inactive |
+
+**Multi-Shift Operation:**
+
+| Day | Active Hours |
+|-----|-------------|
+| Monday | 06:00 - 09:00, 12:00 - 14:00, 17:00 - 21:00 |
+| Tuesday | 06:00 - 09:00, 12:00 - 14:00, 17:00 - 21:00 |
+| (etc.) | ... |
+
+:::note
+You can select non-contiguous time slots. Click individual hours to create complex schedules with breaks.
+:::
+
+## How Scheduling Works
+
+The Go Dialer Worker evaluates the schedule before initiating calls:
+
+1. **Check Campaign Status**: Must be Active
+2. **Check Date Range**: Current date must be between Start Date and End Date (inclusive)
+3. **Check Weekly Schedule**: Current day and hour must be within an active time slot
+4. **Check Timezone**: All evaluations use the campaign's selected timezone
+
+If any check fails, the worker skips the polling cycle and tries again in 10 seconds.
+
+### Schedule Evaluation Example
+
+**Campaign Configuration:**
+- Timezone: America/New_York
+- Start Date: January 1, 2024
+- End Date: January 31, 2024
+- Weekly Schedule: Monday-Friday, 09:00-17:00
+
+**Evaluation at different times:**
+
+| Current Time (UTC) | Current Time (ET) | Result | Reason |
+|-------------------|-------------------|--------|--------|
+| 2024-01-15 14:00 | 09:00 | Dialing | Within date range, weekday, business hours |
+| 2024-01-15 22:00 | 17:00 | Dialing | Within date range, weekday, business hours |
+| 2024-01-15 23:00 | 18:00 | Paused | Outside active hours |
+| 2024-01-13 14:00 | 09:00 | Paused | Saturday (outside weekly schedule) |
+| 2024-02-01 14:00 | 09:00 | Paused | Outside date range |
+
+## Auto-Start Option
+
+Some implementations support an auto-start feature:
+
+- When enabled, the campaign automatically starts when schedule conditions are met
+- When disabled, you must manually start the campaign
+- The campaign still respects the date range and weekly schedule even when auto-started
+
+:::tip
+Use auto-start for recurring campaigns that should begin automatically at the start of a date range. For one-time campaigns, manual start gives you more control.
+:::
+
+## Dial Timeout
+
+The dial timeout setting works alongside scheduling:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **Dial Timeout** | 60 seconds | How long to ring before giving up |
+
+A call initiated near the end of an active time slot will continue ringing even if the schedule transitions to inactive. The timeout ensures calls do not ring indefinitely.
+
+:::warning
+Set the dial timeout appropriately for your use case. Too short may result in missed answers. Too long wastes resources on unanswered calls.
+:::
+
+## Best Practices
+
+1. **Respect Local Laws**: Research and comply with calling time restrictions in your target regions
+
+2. **Consider Timezones**: If calling across multiple timezones, create separate campaigns for each timezone
+
+3. **Business Hours**: Align active hours with your AI assistant or support team availability
+
+4. **Avoid Holidays**: Set date ranges to exclude known holidays when appropriate
+
+5. **Test Schedules**: Verify your schedule works as expected by monitoring the first few cycles
+
+## Troubleshooting
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Campaign not dialing | Outside date range | Check Start Date and End Date |
+| Campaign not dialing | Outside active hours | Verify weekly schedule and timezone |
+| Campaign dialing at wrong times | Wrong timezone selected | Update timezone to match target audience |
+| Calls start then stop | Schedule boundary crossed | This is expected behavior |

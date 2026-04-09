@@ -1,0 +1,167 @@
+type: object
+description: Detailed monitor view for a single campaign
+properties:
+  campaign:
+    type: object
+    description: Campaign overview
+    properties:
+      id:
+        type: integer
+        description: Campaign ID
+        example: 1
+      name:
+        type: string
+        description: Campaign name
+        example: "Q1 Sales Campaign"
+      status:
+        type: string
+        enum:
+          - active
+          - paused
+          - draft
+          - completed
+          - archived
+        description: Campaign status
+        example: "active"
+      concurrent_active_calls:
+        type: integer
+        description: Maximum allowed concurrent calls
+        example: 10
+      active_calls:
+        type: integer
+        description: Currently active calls
+        example: 5
+      cac_utilization:
+        type: number
+        format: float
+        description: CAC utilization percentage
+        example: 50.0
+  statistics:
+    type: object
+    description: Campaign statistics
+    properties:
+      total_destinations:
+        type: integer
+        description: Total number of destinations
+        example: 1000
+      completed_calls:
+        type: integer
+        description: Number of completed calls
+        example: 755
+      failed_calls:
+        type: integer
+        description: Number of failed calls
+        example: 45
+      pending_calls:
+        type: integer
+        description: Number of pending calls
+        example: 200
+      progress_percentage:
+        type: number
+        format: float
+        description: Campaign completion percentage
+        example: 75.5
+      avg_duration_seconds:
+        type: integer
+        description: Average call duration in seconds
+        example: 120
+      avg_billsec_seconds:
+        type: integer
+        description: Average billable seconds
+        example: 95
+  dispositions:
+    type: object
+    description: Call disposition breakdown
+    properties:
+      answered:
+        type: integer
+        description: Number of answered calls
+        example: 700
+      completed:
+        type: integer
+        description: Number of completed calls
+        example: 650
+      busy:
+        type: integer
+        description: Number of busy signals
+        example: 25
+      no_answer:
+        type: integer
+        description: Number of no-answer calls
+        example: 50
+      failed:
+        type: integer
+        description: Number of failed calls
+        example: 30
+      cancelled:
+        type: integer
+        description: Number of cancelled calls
+        example: 10
+      congestion:
+        type: integer
+        description: Number of congestion errors
+        example: 5
+  rate_limit_status:
+    type: object
+    description: Rate limiting status
+    properties:
+      is_rate_limited:
+        type: boolean
+        description: Whether campaign is rate limited
+        example: false
+      pause_reason:
+        type: string
+        nullable: true
+        description: Reason for pause
+        example: null
+      resumes_at:
+        type: string
+        format: date-time
+        nullable: true
+        description: When the campaign can resume
+        example: null
+      can_resume_now:
+        type: boolean
+        description: Whether campaign can be resumed now
+        example: true
+  active_sessions:
+    type: array
+    description: Currently active call sessions
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Session ID
+          example: 123
+        phone_number:
+          type: string
+          description: Destination phone number
+          example: "+14155551212"
+        status:
+          type: string
+          enum:
+            - initiated
+            - ringing
+            - answered
+          description: Current call status
+          example: "answered"
+        call_id:
+          type: string
+          description: Cloudonix call ID
+          example: "call-abc123"
+        initiated_at:
+          type: string
+          format: date-time
+          description: When the call was initiated
+          example: "2024-01-15T14:30:00Z"
+        duration_seconds:
+          type: integer
+          description: Call duration in seconds
+          example: 45
+required:
+  - campaign
+  - statistics
+  - dispositions
+  - rate_limit_status
+  - active_sessions

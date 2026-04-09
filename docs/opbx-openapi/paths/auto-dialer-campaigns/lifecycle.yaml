@@ -1,0 +1,217 @@
+paths:
+  /v1/auto-dialer-campaigns/{campaign}/start:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    patch:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Start campaign
+      description: |
+        Start an auto-dialer campaign.
+        
+        The campaign must be in 'draft' status and have a valid
+        distribution list assigned before it can be started.
+      operationId: startAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Campaign started successfully"
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Cannot start campaign
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "START_FAILED"
+                message: "Campaign cannot be started. Ensure it has a valid list assigned."
+                code: "NO_LIST_ASSIGNED"
+
+  /v1/auto-dialer-campaigns/{campaign}/pause:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    patch:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Pause campaign
+      description: |
+        Pause an active auto-dialer campaign.
+        
+        Paused campaigns stop initiating new calls but active
+        calls continue until completion.
+      operationId: pauseAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign paused successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Campaign paused successfully"
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Cannot pause campaign
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "PAUSE_FAILED"
+                message: "Only active campaigns can be paused"
+                code: "CAMPAIGN_NOT_ACTIVE"
+
+  /v1/auto-dialer-campaigns/{campaign}/resume:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    patch:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Resume campaign
+      description: |
+        Resume a paused auto-dialer campaign.
+        
+        Resumes campaign operations. If the campaign was paused
+        due to rate limiting, it will check if the resume time
+        has been reached before resuming.
+      operationId: resumeAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign resumed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Campaign resumed successfully"
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Cannot resume campaign
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "RESUME_FAILED"
+                message: "Campaign is rate limited and cannot resume yet"
+                code: "RATE_LIMITED"
+
+  /v1/auto-dialer-campaigns/{campaign}/archive:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    patch:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Archive campaign
+      description: |
+        Archive a completed or paused auto-dialer campaign.
+        
+        Archived campaigns are kept for record-keeping but cannot
+        be modified or restarted. Use this for finished campaigns.
+      operationId: archiveAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign archived successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Campaign archived successfully"
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Cannot archive campaign
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "ARCHIVE_FAILED"
+                message: "Only completed or paused campaigns can be archived"
+                code: "CAMPAIGN_CANNOT_ARCHIVE"

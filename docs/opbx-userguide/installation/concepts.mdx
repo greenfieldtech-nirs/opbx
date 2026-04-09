@@ -1,0 +1,208 @@
+---
+sidebar_position: 4
+slug: /installation/concepts
+sidebar_class_name: cxGuidesSidebar
+title: "Core Concepts"
+description: "Understanding OPBX terminology and architecture"
+---
+
+# Core Concepts
+
+This guide explains the fundamental concepts you need to understand before configuring your OPBX phone system.
+
+## Organizations
+
+An organization represents a tenant in the multi-tenant OPBX system. All data belongs to exactly one organization, and users cannot access data from other organizations.
+
+Key characteristics:
+
+- Complete data isolation between organizations
+- Each organization has its own extensions, DIDs, and configuration
+- Users belong to exactly one organization
+- Service providers can host multiple organizations on a single OPBX instance
+
+:::tip Multi-Tenancy
+If you are a service provider, you can create separate organizations for each of your customers. This keeps their data and configurations completely isolated.
+:::
+
+## Extensions
+
+Extensions are numbered endpoints in your phone system. They are typically 3-5 digits long and serve as internal phone numbers.
+
+### Extension Types
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| User | SIP phone assigned to a person | Extension 100 for John Doe |
+| Conference | Multi-party audio bridge | Extension 800 for team meetings |
+| Ring Group | Group of extensions that ring together | Extension 600 for Sales team |
+| IVR | Automated phone menu | Extension 700 for main menu |
+| AI Assistant | Routes calls to AI providers | Extension 900 for AI receptionist |
+| AI Load Balancer | Distributes calls across AI providers | Extension 901 for AI failover |
+| Forward | Forwards calls to external numbers | Extension 101 forwarding to mobile |
+| Custom Logic | Advanced routing via webhooks | Extension for custom integrations |
+
+:::warning Immutable Numbers
+Extension numbers cannot be changed after creation. If you need a different number, delete the extension and create a new one.
+:::
+
+## DIDs (Phone Numbers)
+
+DIDs (Direct Inward Dialing) are external phone numbers that callers dial to reach your organization. OPBX supports E.164 format (e.g., +1-555-123-4567).
+
+Each DID has a destination that determines where incoming calls route:
+
+- Extension
+- Ring group
+- IVR menu
+- Business hours routing
+- Conference room
+- AI assistant
+- AI load balancer
+
+:::note DID Management
+DIDs are configured in OPBX but must be purchased and assigned through your Cloudonix account or telecom provider.
+:::
+
+## Ring Groups
+
+Ring groups distribute incoming calls among multiple extensions using different strategies.
+
+### Distribution Strategies
+
+| Strategy | Behavior | Best For |
+|----------|----------|----------|
+| Simultaneous | All extensions ring at once | Small teams where anyone can answer |
+| Round Robin | Rotates through extensions evenly | Balancing workload across agents |
+| Sequential | Rings extensions in order | Escalation chains or priority routing |
+
+Each ring group has:
+
+- Member extensions
+- Ring timeout (how long to wait before giving up)
+- Fallback action (voicemail, another destination, or hang up)
+
+## IVR Menus
+
+IVR (Interactive Voice Response) menus provide automated phone navigation. Callers press digits on their keypad to route their call.
+
+### IVR Components
+
+- **Greeting**: Audio played when the menu starts (audio file, URL, or text-to-speech)
+- **Options**: Digit presses (0-9, *, #) mapped to destinations
+- **Timeout**: Action taken if no input received
+- **Invalid**: Action taken if invalid digit pressed
+
+:::tip TTS Support
+IVR menus support text-to-speech for dynamic content. Enter plain text and OPBX converts it to spoken audio using Cloudonix TTS services.
+:::
+
+## Business Hours
+
+Business hours enable time-based call routing. Calls route to different destinations depending on whether your business is open or closed.
+
+### Configuration Elements
+
+- **Weekly Schedule**: Define open hours for each day of the week
+- **Time Zones**: Set your local time zone for accurate routing
+- **Exception Dates**: Specify holidays or special closures
+- **Open Destination**: Where calls go during business hours
+- **Closed Destination**: Where calls go after hours (voicemail, emergency line, etc.)
+
+:::note Precision
+Business hours use the organization's configured time zone. Ensure this is set correctly in Settings before configuring business hours.
+:::
+
+## Conference Rooms
+
+Conference rooms provide multi-party audio bridges for meetings.
+
+### Features
+
+- **PIN Protection**: Optional numeric PIN to join
+- **Host PIN**: Special PIN for host controls
+- **Recording**: Option to record conference sessions
+- **Host Waiting**: Wait for host to join before starting
+
+Conference rooms have their own extension numbers and can be destinations for DIDs or IVR options.
+
+## AI Assistants
+
+AI assistants connect calls to AI providers via SIP or WebSocket protocols.
+
+### Supported Providers
+
+OPBX supports 17 AI providers including:
+
+- Bland AI
+- Retell AI
+- Vapi
+- Ultravox
+- And others
+
+Each AI assistant configuration includes:
+
+- Provider selection
+- SIP or WebSocket connection details
+- API credentials
+- Custom parameters for the AI service
+
+## AI Load Balancers
+
+AI load balancers distribute calls across multiple AI providers for redundancy and capacity management.
+
+### Distribution Methods
+
+| Method | Description |
+|--------|-------------|
+| Round Robin | Cycles through providers in order |
+| Random | Selects a random provider for each call |
+| Priority | Uses primary provider, falls back on failure |
+
+Load balancers help ensure high availability for AI-powered call handling.
+
+## Auto Dialer
+
+The Auto Dialer manages outbound campaigns for sales, surveys, or notifications.
+
+### Key Concepts
+
+- **Campaigns**: Define call lists, schedules, and retry logic
+- **Distribution Lists**: Phone numbers to call
+- **Rate Limiting**: Control calls per minute to manage capacity
+- **Scheduling**: Set active calling hours
+- **Retry Logic**: Automatic redial on busy or no-answer
+
+The Go-based dialer worker processes campaigns and initiates calls through Cloudonix.
+
+## Call Routing Flow
+
+This diagram shows how an inbound call flows through the OPBX system:
+
+```mermaid
+flowchart TD
+    A[Inbound Call] --> B{DID Lookup}
+    B --> C[Extension]
+    B --> D[Ring Group]
+    B --> E[IVR Menu]
+    B --> F[Business Hours]
+    B --> G[Conference Room]
+    B --> H[AI Assistant]
+    B --> I[AI Load Balancer]
+    F --> |Open| J[Open Hours Destination]
+    F --> |Closed| K[Closed Hours Destination]
+    E --> |Digit Input| L[Option Destination]
+    D --> |No Answer| M[Fallback Action]
+```
+
+The call enters through a DID, which determines the initial destination. From there, the call may traverse multiple routing rules before reaching its final destination.
+
+## Next Steps
+
+Now that you understand these core concepts, you are ready to:
+
+1. [Create extensions](../extensions/management) for your users
+2. [Configure DIDs](../did-numbers/routing) for inbound calls
+3. [Set up ring groups](../call-routing/ring-groups) for departments
+4. [Build IVR menus](../call-routing/ivr-menus) for self-service
+5. [Define business hours](../call-routing/business-hours) for time-based routing

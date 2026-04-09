@@ -1,0 +1,13 @@
+paths:
+  /v1/call-detail-records/export:
+    get:
+      tags:
+        - Call Detail Records
+      summary: Export CDR records
+      operationId: exportCdr
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CDR export

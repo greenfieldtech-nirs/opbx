@@ -1,0 +1,38 @@
+---
+sidebar_position: 5
+slug: /applications
+sidebar_class_name: cxGuidesSidebar
+title: "PBX Applications"
+description: "Advanced applications built on top of OPBX"
+---
+
+# PBX Applications
+
+OPBX includes advanced applications that extend the core PBX functionality with AI-powered voice agents and automated outbound dialing.
+
+## Available Applications
+
+| Application | Description |
+|-------------|-------------|
+| [AI Assistants](/applications/ai-assistants) | Integrate AI-powered voice agents from 17 providers via SIP or WebSocket |
+| [AI Load Balancers](/applications/ai-load-balancers) | Distribute calls across multiple AI assistants with failover |
+| [Auto Dialer](/applications/auto-dialer) | Run outbound calling campaigns with rate limiting, scheduling, and real-time monitoring |
+
+## AI Voice Integration
+
+OPBX supports connecting answered calls to AI-powered voice agents through two protocols:
+
+- **SIP** -- 16 providers including Retell, Vapi, ElevenLabs, and more
+- **WebSocket** -- Real-time audio streaming for providers like Deepdub
+
+AI Load Balancers allow you to distribute calls across multiple AI assistants using round-robin, priority, or percentage-based strategies with automatic failover.
+
+## Auto Dialer
+
+The Auto Dialer is a complete outbound campaign management system that includes:
+
+- Campaign creation with scheduling and rate limiting
+- Distribution list management with CSV upload
+- Concurrent call control (CAC) and calls-per-second (CPS) pacing
+- Answering machine detection
+- Real-time campaign monitoring with live statistics

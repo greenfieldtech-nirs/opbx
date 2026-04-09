@@ -1,0 +1,9 @@
+description: Unauthorized - Authentication required
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      error: UNAUTHORIZED
+      message: Authentication required
+      code: AUTH_REQUIRED

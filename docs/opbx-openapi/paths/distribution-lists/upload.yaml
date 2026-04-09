@@ -1,0 +1,174 @@
+paths:
+  /v1/auto-dialer-campaigns/lists/{list}/upload:
+    parameters:
+      - name: list
+        in: path
+        required: true
+        description: Distribution List ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    post:
+      tags:
+        - Distribution Lists
+      summary: Upload CSV to list
+      description: |
+        Upload a CSV file to populate a distribution list.
+        
+        If the list is in DRAFT/PROCESSING/FAILED status, the file
+        is uploaded to the current list. If the list is in READY/USED
+        status, old destinations are backed up and the list is updated.
+        
+        CSV format: phone_number,description (first row is header)
+      operationId: uploadDistributionListCsv
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file to upload (max 50MB)
+              required:
+                - file
+      responses:
+        '200':
+          description: File uploaded and processing started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "File uploaded successfully. Processing started."
+                  data:
+                    type: object
+                    properties:
+                      job_id:
+                        type: string
+                        description: Job ID for tracking progress
+                        example: "upload-abc123"
+                      total_rows:
+                        type: integer
+                        description: Total rows in file
+                        example: 1000
+                      action:
+                        type: string
+                        enum: [upload, update]
+                        description: Action performed
+                        example: "upload"
+                      list_id:
+                        type: integer
+                        description: List ID
+                        example: 1
+                      new_version_number:
+                        type: integer
+                        description: New version number (for updates)
+                        example: 2
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Cannot upload to list
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "UPLOAD_FAILED"
+                message: "Cannot upload to list in status: In Use"
+                code: "INVALID_STATUS"
+
+  /v1/auto-dialer-campaigns/lists/upload-progress/{jobId}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        description: Upload job ID
+        schema:
+          type: string
+        example: "upload-abc123"
+
+    get:
+      tags:
+        - Distribution Lists
+      summary: Get upload progress
+      description: |
+        Get the progress of a CSV upload job.
+        
+        Returns processing status, row counts, and any errors.
+      operationId: getUploadProgress
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Upload progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      job_id:
+                        type: string
+                        example: "upload-abc123"
+                      status:
+                        type: string
+                        enum: [pending, processing, completed, failed]
+                        example: "processing"
+                      total_rows:
+                        type: integer
+                        example: 1000
+                      processed_rows:
+                        type: integer
+                        example: 500
+                      valid_rows:
+                        type: integer
+                        example: 480
+                      invalid_rows:
+                        type: integer
+                        example: 20
+                      progress_percentage:
+                        type: number
+                        format: float
+                        example: 50.0
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            row:
+                              type: integer
+                              example: 15
+                            message:
+                              type: string
+                              example: "Invalid phone number format"
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          description: Job not found or expired
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "NOT_FOUND"
+                message: "Job not found or expired"
+                code: "JOB_NOT_FOUND"

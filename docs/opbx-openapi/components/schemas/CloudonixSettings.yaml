@@ -1,0 +1,35 @@
+type: object
+description: Cloudonix Settings
+properties:
+  id:
+    type: integer
+  organization_id:
+    type: integer
+  api_key:
+    type: string
+    description: Cloudonix API key (masked in responses)
+  domain:
+    type: string
+    example: example.cloudonix.io
+  domain_uuid:
+    type: string
+    format: uuid
+  domain_requests_api_key:
+    type: string
+    description: API key for voice routing webhooks
+  outbound_trunk_id:
+    type: integer
+    nullable: true
+  webhook_base_url:
+    type: string
+    format: uri
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+required:
+  - id
+  - organization_id
+  - domain

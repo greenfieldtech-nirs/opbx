@@ -1,0 +1,17 @@
+type: object
+description: Standard error response
+properties:
+  error:
+    type: string
+    description: Error type/code
+    example: UNAUTHORIZED
+  message:
+    type: string
+    description: Human-readable error message
+    example: Authentication required
+  code:
+    type: string
+    description: Machine-readable error code
+    example: AUTH_REQUIRED
+required:
+  - message

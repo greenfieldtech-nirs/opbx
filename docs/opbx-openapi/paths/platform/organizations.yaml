@@ -1,0 +1,45 @@
+paths:
+  /v1/platform/organizations:
+    get:
+      tags:
+        - Platform
+      summary: List all organizations
+      operationId: listOrganizations
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Organizations list
+    
+  /v1/platform/organizations/{organization}:
+    parameters:
+      - name: organization
+        in: path
+        required: true
+        schema:
+          type: integer
+    
+    get:
+      tags:
+        - Platform
+      summary: Get organization details
+      operationId: getOrganization
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Organization details
+    
+    put:
+      tags:
+        - Platform
+      summary: Update organization
+      operationId: updateOrganization
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Organization updated

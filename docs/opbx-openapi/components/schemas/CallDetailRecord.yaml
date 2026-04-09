@@ -1,0 +1,38 @@
+type: object
+description: Call Detail Record
+properties:
+  id:
+    type: integer
+  organization_id:
+    type: integer
+  call_id:
+    type: string
+  from_number:
+    type: string
+  to_number:
+    type: string
+  disposition:
+    type: string
+    example: ANSWERED
+  duration:
+    type: integer
+    description: Duration in seconds
+  billsec:
+    type: integer
+    description: Billable seconds
+  rated_cost:
+    type: number
+    nullable: true
+  recording_url:
+    type: string
+    format: uri
+    nullable: true
+  created_at:
+    type: string
+    format: date-time
+required:
+  - id
+  - organization_id
+  - call_id
+  - disposition
+  - duration

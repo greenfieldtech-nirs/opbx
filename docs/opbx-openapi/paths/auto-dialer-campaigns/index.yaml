@@ -1,0 +1,510 @@
+paths:
+  /v1/auto-dialer-campaigns:
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: List campaigns
+      description: |
+        Get a paginated list of auto-dialer campaigns.
+        Supports filtering by status and search by name.
+      operationId: listAutoDialerCampaigns
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [draft, active, paused, completed, archived]
+          description: Filter by campaign status
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search in campaign name
+      responses:
+        '200':
+          description: List of campaigns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+
+    post:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Create campaign
+      description: |
+        Create a new auto-dialer campaign.
+        
+        The campaign is created in 'draft' status and must be started manually
+        or via auto_start when ready.
+      operationId: createAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: Campaign name
+                  example: "Q1 Sales Campaign"
+                description:
+                  type: string
+                  nullable: true
+                  maxLength: 1000
+                  description: Campaign description
+                  example: "Outbound campaign for Q1 sales leads"
+                routing_destination_type:
+                  type: string
+                  enum: [ai_assistant, ai_load_balancer, hangup]
+                  description: Type of destination for connected calls
+                  example: "ai_assistant"
+                routing_destination_id:
+                  type: integer
+                  nullable: true
+                  description: ID of the routing destination (required unless type is 'hangup')
+                  example: 5
+                dial_timeout:
+                  type: integer
+                  minimum: 1
+                  maximum: 300
+                  description: Timeout in seconds for dial attempts
+                  example: 30
+                destination_connect:
+                  type: string
+                  enum: [connected, immediately]
+                  description: When to connect the destination
+                  example: "connected"
+                caller_id:
+                  type: string
+                  pattern: "^\\+[1-9]\\d{1,14}$"
+                  description: Caller ID in E.164 format
+                  example: "+14155551212"
+                max_dial_attempts:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 1
+                  description: Maximum number of dial attempts per destination
+                  example: 3
+                concurrent_active_calls:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  description: Maximum concurrent active calls (CAC)
+                  example: 10
+                calls_per_second:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Calls per second rate (CPS)
+                  example: 1
+                schedule:
+                  type: object
+                  description: Weekly schedule configuration
+                  properties:
+                    monday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              start_time:
+                                type: string
+                                pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                              end_time:
+                                type: string
+                                pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$"
+                    tuesday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                    wednesday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                    thursday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                    friday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                    saturday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                    sunday:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        time_ranges:
+                          type: array
+                          items:
+                            type: object
+                start_date:
+                  type: string
+                  format: date
+                  description: Campaign start date
+                  example: "2024-01-01"
+                end_date:
+                  type: string
+                  format: date
+                  description: Campaign end date
+                  example: "2024-12-31"
+                timezone:
+                  type: string
+                  description: Timezone for scheduling
+                  example: "America/New_York"
+                time_limit:
+                  type: integer
+                  minimum: 30
+                  maximum: 14400
+                  nullable: true
+                  description: Maximum call duration in seconds
+                  example: 300
+                auto_start:
+                  type: boolean
+                  description: Whether to auto-start when ready
+                  example: false
+                record_calls:
+                  type: boolean
+                  description: Whether to record calls
+                  example: true
+                amd_enabled:
+                  type: boolean
+                  description: Whether answering machine detection is enabled
+                  example: true
+                amd_mode:
+                  type: string
+                  enum: [Enabled, DetectMessageEnd]
+                  description: AMD detection mode (required if amd_enabled is true)
+                  example: "DetectMessageEnd"
+                amd_timeout:
+                  type: integer
+                  minimum: 5
+                  maximum: 120
+                  nullable: true
+                  description: AMD timeout in seconds
+                  example: 30
+                amd_speech_threshold:
+                  type: integer
+                  minimum: 500
+                  maximum: 5000
+                  nullable: true
+                  description: AMD speech threshold in milliseconds
+                  example: 2500
+                amd_speech_end_threshold:
+                  type: integer
+                  minimum: 500
+                  maximum: 5000
+                  nullable: true
+                  description: AMD speech end threshold in milliseconds
+                  example: 2500
+                amd_silence_timeout:
+                  type: integer
+                  minimum: 500
+                  maximum: 10000
+                  nullable: true
+                  description: AMD silence timeout in milliseconds
+                  example: 2500
+              required:
+                - name
+                - routing_destination_type
+                - dial_timeout
+                - destination_connect
+                - caller_id
+                - concurrent_active_calls
+                - schedule
+                - start_date
+                - end_date
+                - timezone
+      responses:
+        '201':
+          description: Campaign created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Campaign created successfully"
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/auto-dialer-campaigns/{campaign}:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Get campaign
+      description: Get a specific campaign by ID
+      operationId: getAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    put:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Update campaign
+      description: |
+        Update an existing campaign.
+        
+        Only campaigns in 'draft' status can be fully updated.
+        Some fields may be restricted for active campaigns.
+      operationId: updateAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  example: "Updated Campaign Name"
+                description:
+                  type: string
+                  nullable: true
+                  maxLength: 1000
+                  example: "Updated description"
+                routing_destination_type:
+                  type: string
+                  enum: [ai_assistant, ai_load_balancer, hangup]
+                  example: "ai_assistant"
+                routing_destination_id:
+                  type: integer
+                  nullable: true
+                  example: 5
+                dial_timeout:
+                  type: integer
+                  minimum: 1
+                  maximum: 300
+                  example: 30
+                destination_connect:
+                  type: string
+                  enum: [connected, immediately]
+                  example: "connected"
+                caller_id:
+                  type: string
+                  pattern: "^\\+[1-9]\\d{1,14}$"
+                  example: "+14155551212"
+                max_dial_attempts:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 3
+                concurrent_active_calls:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  example: 10
+                calls_per_second:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 1
+                schedule:
+                  type: object
+                  description: Weekly schedule configuration
+                start_date:
+                  type: string
+                  format: date
+                  example: "2024-01-01"
+                end_date:
+                  type: string
+                  format: date
+                  example: "2024-12-31"
+                timezone:
+                  type: string
+                  example: "America/New_York"
+                time_limit:
+                  type: integer
+                  minimum: 30
+                  maximum: 14400
+                  nullable: true
+                  example: 300
+                auto_start:
+                  type: boolean
+                  example: false
+                record_calls:
+                  type: boolean
+                  example: true
+                amd_enabled:
+                  type: boolean
+                  example: true
+                amd_mode:
+                  type: string
+                  enum: [Enabled, DetectMessageEnd]
+                  example: "DetectMessageEnd"
+                amd_timeout:
+                  type: integer
+                  minimum: 5
+                  maximum: 120
+                  nullable: true
+                  example: 30
+                amd_speech_threshold:
+                  type: integer
+                  minimum: 500
+                  maximum: 5000
+                  nullable: true
+                  example: 2500
+                amd_speech_end_threshold:
+                  type: integer
+                  minimum: 500
+                  maximum: 5000
+                  nullable: true
+                  example: 2500
+                amd_silence_timeout:
+                  type: integer
+                  minimum: 500
+                  maximum: 10000
+                  nullable: true
+                  example: 2500
+      responses:
+        '200':
+          description: Campaign updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Campaign updated successfully"
+                  data:
+                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+    delete:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Delete campaign
+      description: |
+        Delete a campaign from the organization.
+        
+        Only campaigns in 'draft' or 'archived' status can be deleted.
+        Active campaigns must be paused and archived first.
+      operationId: deleteAutoDialerCampaign
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Campaign deleted successfully
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          description: Cannot delete campaign in current status
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "DELETE_BLOCKED"
+                message: "Cannot delete active campaign. Pause and archive first."
+                code: "CAMPAIGN_ACTIVE"

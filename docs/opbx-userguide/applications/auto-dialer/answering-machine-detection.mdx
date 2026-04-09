@@ -1,0 +1,161 @@
+---
+sidebar_position: 6
+slug: /applications/auto-dialer/answering-machine-detection
+sidebar_class_name: cxGuidesSidebar
+title: Answering Machine Detection
+description: Detecting answering machines and voicemail
+---
+
+# Answering Machine Detection
+
+Answering Machine Detection (AMD) analyzes the audio at the start of a call to determine whether a human or a machine answered. This allows you to handle voicemail systems differently from live answers.
+
+## What Is AMD
+
+When AMD is enabled, the Cloudonix platform analyzes the audio stream at the beginning of each call. It looks for patterns that indicate:
+
+- **Human Answer**: A live person answered the phone
+- **Machine Answer**: An answering machine or voicemail system answered
+
+Based on the detection result, you can configure different call handling behaviors.
+
+## Enabling AMD
+
+Enable AMD on the **Advanced** tab of the campaign creation or edit form:
+
+1. Toggle **AMD** to the ON position
+2. Select the **Mode** (Enable or DetectMessageEnd)
+3. Configure the detection parameters
+4. Save the campaign
+
+:::note
+AMD adds a small delay before the call is connected to the routing destination. The detection timeout determines the maximum delay.
+:::
+
+## AMD Modes
+
+The system supports two AMD modes:
+
+| Mode | Cloudonix Value | Behavior |
+|------|----------------|----------|
+| **Enable** | Enable | Detects human vs machine. Proceeds with routing for humans. Can hang up on machines or route them differently. |
+| **Detect Message End** | DetectMessageEnd | Waits for the end of the answering machine greeting before connecting the call. Useful when you want to leave a message. |
+
+### Enable Mode
+
+Use **Enable** mode when you want to:
+
+- Connect live answers to your AI assistant immediately
+- Hang up on machines without leaving a message
+- Track answer types in your campaign statistics
+
+### DetectMessageEnd Mode
+
+Use **DetectMessageEnd** mode when you want to:
+
+- Leave a message on answering machines
+- Ensure your AI assistant starts speaking after the beep
+- Maximize message delivery rates
+
+## AMD Configuration Parameters
+
+Fine-tune AMD behavior with these parameters:
+
+| Parameter | Default | Unit | Description |
+|-----------|---------|------|-------------|
+| **Detection Timeout** | 30 | seconds | Maximum time to wait for AMD result before proceeding |
+| **Speech Threshold** | 1500 | milliseconds | Minimum duration of speech to classify as human voice |
+| **Speech End Threshold** | 2500 | milliseconds | Duration of silence after speech to determine the end of a greeting |
+| **Silence Timeout** | 3500 | milliseconds | Initial silence period before any speech is detected |
+
+### Parameter Details
+
+**Detection Timeout**
+
+- The maximum time AMD will analyze the call before making a decision
+- If timeout is reached without a clear determination, the call proceeds as if human answered
+- Longer timeouts increase accuracy but add delay
+
+**Speech Threshold**
+
+- Minimum amount of continuous speech required to trigger human detection
+- Shorter thresholds may misclassify short machine greetings as human
+- Longer thresholds may miss brief human greetings
+
+**Speech End Threshold**
+
+- Amount of silence after speech that indicates the end of a greeting
+- Critical for DetectMessageEnd mode to know when the beep occurs
+- Shorter thresholds may trigger too early; longer thresholds add delay
+
+**Silence Timeout**
+
+- Initial silence period that must pass before speech analysis begins
+- Helps filter out connection delays and initial line noise
+- Should be shorter than typical human greeting response time
+
+## How AMD Affects Call Flow
+
+When AMD is enabled, the call flow changes:
+
+```
+1. Call initiated by Go Worker
+2. Cloudonix dials the destination
+3. Callee answers
+4. AMD analysis begins (Detection Timeout window starts)
+5. Audio patterns analyzed:
+   - Live human: Short greeting, immediate response
+   - Machine: Longer greeting, pause, beep
+6. Result determined:
+   - Human: Connect to routing destination immediately
+   - Machine (Enable mode): Hang up or route differently
+   - Machine (DetectMessageEnd mode): Wait for beep, then connect
+7. Call proceeds based on result
+```
+
+## AMD in Campaign Statistics
+
+AMD results are tracked in your campaign data:
+
+- **Human Answers**: Counted as successful connections
+- **Machine Answers**: Counted separately for analysis
+- **Unknown/Timeout**: Calls where AMD could not determine the answer type
+
+Use these statistics to optimize your AMD parameters over time.
+
+## Best Practices
+
+1. **Test Different Parameters**: AMD accuracy varies by region and phone system. Test with your target audience.
+
+2. **Consider Your Use Case**:
+   - **Sales campaigns**: Use Enable mode to focus on live answers
+   - **Notification campaigns**: Use DetectMessageEnd mode to leave messages
+
+3. **Monitor Accuracy**: Track human vs machine detection rates and adjust parameters if needed
+
+4. **Respect Voicemail**: If using DetectMessageEnd mode, ensure your message is concise and starts immediately after connection
+
+5. **Balance Delay vs Accuracy**: Longer detection timeouts improve accuracy but add delay to live answers
+
+## Troubleshooting
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Many false human detections | Speech threshold too low | Increase speech threshold |
+| Many false machine detections | Speech threshold too high | Decrease speech threshold |
+| Messages cut off | Speech end threshold too short | Increase speech end threshold |
+| Long delays before connection | Detection timeout too long | Reduce detection timeout |
+| AMD not triggering | AMD disabled or misconfigured | Verify AMD is enabled and parameters are set |
+| Inconsistent results | Regional variations | Test with local phone systems and adjust parameters |
+
+## AMD and Call Recording
+
+When both AMD and call recording are enabled:
+
+- Recording starts when the call is answered
+- AMD analysis occurs during the initial part of the recording
+- The recording captures the full call including any AMD-related delays
+
+:::tip
+Review recorded calls to evaluate AMD accuracy. Listen to how the system classified different answer types and adjust parameters accordingly.
+:::

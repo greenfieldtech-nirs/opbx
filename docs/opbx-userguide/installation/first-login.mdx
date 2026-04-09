@@ -1,0 +1,117 @@
+---
+sidebar_position: 2
+slug: /installation/first-login
+sidebar_class_name: cxGuidesSidebar
+title: "First Login"
+description: "Create your first organization and admin account"
+---
+
+# First Login
+
+After installing OPBX, you need to create your first organization and administrator account. This guide walks you through the initial setup process.
+
+## Registration Process
+
+### 1. Navigate to the Registration Page
+
+Open your browser and go to:
+
+```
+http://localhost/ui/register
+```
+
+:::note Replace localhost
+If you configured a different `APP_PORT` or domain during installation, adjust the URL accordingly. For example: `http://your-server:8080/ui/register`
+:::
+
+### 2. Complete the Registration Form
+
+Fill in the required fields:
+
+| Field | Requirements |
+|-------|--------------|
+| Organization Name | 2-100 characters, unique across the system |
+| Admin Email | Valid email address, will be used for login |
+| Password | Minimum 8 characters, must include uppercase, lowercase, number, and special character |
+
+:::tip Password Security
+Use a strong, unique password for the admin account. This account has full access to your organization.
+:::
+
+### 3. Submit the Form
+
+Click the **Create Organization** button. The system performs these actions:
+
+1. Creates your organization with the specified name
+2. Creates an Owner user account with your email and password
+3. Generates an API token for system integrations
+4. Redirects you to the Dashboard
+
+:::note First Organization
+The first organization created on a fresh OPBX installation becomes the primary tenant. Additional organizations can be created later by platform administrators.
+:::
+
+## Dashboard Overview
+
+After registration, you land on the Dashboard. This page provides:
+
+- **Quick Setup Checklist**: Guided steps to configure your PBX
+- **Call Statistics**: Summary of calls made and received
+- **Active Calls Count**: Real-time count of ongoing calls
+- **System Status**: Health indicators for connected services
+
+## First Steps After Login
+
+Complete these tasks in order to get your PBX operational:
+
+### 1. Configure Cloudonix Integration
+
+Navigate to **Settings** in the sidebar (Owner-only access). Enter your Cloudonix credentials to enable telephony features.
+
+See the [Cloudonix Integration](./cloudonix-setup) guide for detailed instructions.
+
+### 2. Create Extensions
+
+Go to **Extensions** in the sidebar and create extensions for your team members. Each extension represents a phone endpoint in your system.
+
+Extensions can be:
+- **User extensions**: Assigned to people with SIP phones
+- **Conference rooms**: Multi-party audio bridges
+- **Ring groups**: Groups that ring together
+- **IVR menus**: Automated phone menus
+
+### 3. Set Up Phone Numbers (DIDs)
+
+Navigate to **DID Numbers** to add your phone numbers. DIDs (Direct Inward Dialing numbers) are the phone numbers callers dial to reach your organization.
+
+Each DID routes to a destination such as:
+- A specific extension
+- A ring group
+- An IVR menu
+- Business hours routing
+
+### 4. Configure Call Routing
+
+Set up how incoming calls flow through your system:
+
+1. Define business hours if you want time-based routing
+2. Create ring groups for departments (Sales, Support, etc.)
+3. Build IVR menus for self-service options
+4. Assign DIDs to their destinations
+
+:::tip Testing
+Make test calls to verify your configuration works as expected before announcing new numbers to customers.
+:::
+
+## Next Steps
+
+With your initial setup complete, explore these guides:
+
+- [Core Concepts](./concepts): Understand OPBX terminology and architecture
+- Cloudonix Integration: Connect to the telephony platform
+- Extension Management: Configure user endpoints
+- DID Routing: Set up inbound call handling
+
+:::info Need Help?
+If you encounter issues during setup, check the logs with `docker compose logs -f app` and verify all services are running with `docker compose ps`.
+:::
