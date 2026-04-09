@@ -124,8 +124,11 @@ class AlbsFollowThroughController extends Controller
                 'status' => $status,
             ]);
 
-            // Return empty response to let call continue normally
-            return response('', 204);
+            // Return Hangup CXML to properly terminate the call
+            $builder = new CxmlBuilder;
+            $cxml = $builder->hangup()->build();
+
+            return response($cxml, 200, ['Content-Type' => 'application/xml']);
         }
 
         // Load the AI Load Balancer
