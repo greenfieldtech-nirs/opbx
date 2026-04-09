@@ -445,6 +445,16 @@ class AutoDialerCloudonixService
     private function generateAiLoadBalancerCxml(AutoDialerCampaign $campaign, array $cloudonixParams): string
     {
         $loadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+            ->with(['members' => function ($query) {
+                $query->where('status', 'active')
+                    ->whereHas('aiAssistant', function ($q) {
+                        $q->withoutGlobalScope(OrganizationScope::class)
+                            ->where('status', 'active');
+                    })
+                    ->with(['aiAssistant' => function ($q) {
+                        $q->withoutGlobalScope(OrganizationScope::class);
+                    }]);
+            }])
             ->where('id', $campaign->routing_destination_id)
             ->where('organization_id', $campaign->organization_id)
             ->first();
@@ -458,9 +468,9 @@ class AutoDialerCloudonixService
             return $this->buildHangupCxml();
         }
 
-        // Get the active AI assistant from the load balancer
-        // Note: This uses round-robin strategy by default
-        $aiAssistant = $this->getActiveAssistantFromLoadBalancer($loadBalancer);
+        // Select AI assistant using the distribution service (respects strategy)
+        $distributionService = app(\App\Services\VoiceRouting\AlbsDistributionService::class);
+        $aiAssistant = $distributionService->selectAssistant($loadBalancer);
 
         if (! $aiAssistant) {
             Log::error('AutoDialer: No active AI Assistant found in load balancer', [
@@ -471,15 +481,95 @@ class AutoDialerCloudonixService
             return $this->buildHangupCxml();
         }
 
+        // Build the follow-through callback URL so Cloudonix can try the next
+        // assistant if this one fails (busy, no-answer, etc.)
+        $callbackUrl = $this->buildAlbFollowThroughUrl($loadBalancer, $aiAssistant, $campaign);
+
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;
         $provider = $aiAssistant->provider;
 
+        Log::info('AutoDialer: Routing to AI Load Balancer assistant', [
+            'campaign_id' => $campaign->id,
+            'load_balancer_id' => $loadBalancer->id,
+            'assistant_id' => $aiAssistant->id,
+            'assistant_name' => $aiAssistant->name,
+            'protocol' => $protocol,
+            'callback_url' => $callbackUrl,
+        ]);
+
         if ($protocol === 'websocket') {
-            return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $cloudonixParams);
+            return $this->generateWebSocketCxmlWithAction($aiAssistant, $config, $provider, $cloudonixParams, $callbackUrl);
         }
 
-        return $this->generateSipCxml($aiAssistant, $config, $provider);
+        return $this->generateSipCxmlWithAction($aiAssistant, $config, $provider, $callbackUrl);
+    }
+
+    /**
+     * Build the ALB follow-through callback URL.
+     */
+    private function buildAlbFollowThroughUrl(
+        AiAssistantLoadBalancer $loadBalancer,
+        AiAssistant $currentAssistant,
+        AutoDialerCampaign $campaign
+    ): string {
+        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+
+        $baseUrl = $cloudonixSettings
+            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
+            : rtrim(config('app.url'), '/');
+
+        $relativeUrl = route('voice.albs-follow-through', [
+            'albs_id' => $loadBalancer->id,
+            'current_assistant_id' => $currentAssistant->id,
+        ], false);
+
+        return $baseUrl.$relativeUrl;
+    }
+
+    /**
+     * Generate WebSocket CXML with follow-through action callback.
+     */
+    private function generateWebSocketCxmlWithAction(AiAssistant $aiAssistant, array $config, ?string $provider, array $cloudonixParams, string $callbackUrl): string
+    {
+        if (! $provider) {
+            return $this->buildHangupCxml();
+        }
+
+        $providerRegistry = app(ProviderRegistry::class);
+        $providerDef = $providerRegistry->getProvider($provider);
+
+        if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
+            return $this->buildHangupCxml();
+        }
+
+        try {
+            $urlBuilder = app(WebSocketUrlBuilder::class);
+            $websocketUrl = $urlBuilder->buildUrl($providerDef->urlTemplate, $config, $cloudonixParams);
+
+            return CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl);
+        } catch (\InvalidArgumentException $e) {
+            Log::error('AutoDialer: Failed to build WebSocket URL for ALB', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->buildHangupCxml();
+        }
+    }
+
+    /**
+     * Generate SIP CXML with follow-through action callback.
+     */
+    private function generateSipCxmlWithAction(AiAssistant $aiAssistant, array $config, ?string $provider, string $callbackUrl): string
+    {
+        $phoneNumber = $config['phone_number'] ?? null;
+
+        if (! $provider || ! $phoneNumber) {
+            return $this->buildHangupCxml();
+        }
+
+        return CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl);
     }
 
     /**
