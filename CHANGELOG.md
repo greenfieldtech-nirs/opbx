@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-04-09
+
+#### Auto Dialer Real-Time Monitor
+- Command-center page for monitoring all active/paused campaigns in real time
+- Bird's-eye view with card-row layout showing per-campaign metrics (Destinations, Active Calls, Completed, Failed, Pending, Progress, Rate Limit)
+- Campaign drill-down with 6 KPI cards, active calls table, disposition pie chart (SVG), and campaign progress with ETA
+- Pause/Resume actions directly from monitor (no confirmation dialog, colored buttons)
+- User-selectable refresh interval (Manual, 1s, 5s, 10s default, 20s-60s) persisted in localStorage
+- "Refresh Now" button always visible in both views
+- Worker health status proxied from Go worker (healthy/degraded/offline)
+- Paused campaigns auto-cleanup: stale sessions marked failed/cancelled, CAC counter reset to 0
+- Active sessions computed from distribution lists (not stale model column)
+
+#### CPS (Calls Per Second) Parameter
+- New campaign parameter `calls_per_second` (1-5, default 1) controlling call initiation rate
+- CAC validation changed from fixed values [2,3,4,6,10,15,20] to free range 1-50
+- Go worker rate limiter: MinInterval = 1000/CPS milliseconds between calls
+- Batch size per poll cycle = min(CPS x poll_interval_seconds, CAC)
+- Frontend: CAC is text input (1-50), CPS is select box (1-5), 3-column layout on Advanced tab
+
+#### Comprehensive Documentation
+- OPBX User Guide: 30 Docusaurus-compatible MDX files covering all features
+  - Installation, Getting Started, Cloudonix Integration, Core Concepts
+  - OPBX Modules: Users, Extensions, Ring Groups, IVR, Business Hours, Phone Numbers, Recordings, Conference Rooms, Reporting, Inbound Blacklist, Outbound Whitelist
+  - PBX Applications: AI Assistants, AI Load Balancers, Auto Dialer (8 sub-pages)
+  - Administration: Organization Settings, Platform Management, Profile
+- OpenAPI 3.1.0 specification updated with 30 new Auto Dialer and Distribution List endpoints
+- CPS parameter specification document
+- Real-Time Monitor specification document
+
+### Fixed - 2026-04-09
+
+#### Auto Dialer CAC Counter Management
+- CAC counter now properly decremented when calls complete (was never decremented due to missing Redis Pub/Sub subscriber in Go worker)
+- Laravel webhook controllers decrement `dialer:cac:{id}:active` directly using prefix-free `dialer` Redis connection
+- Fixed Redis key prefix mismatch: Laravel's default connection adds `opbx-...-database-` prefix, Go worker uses raw keys
+- Added `dialer` Redis connection in `config/database.php` with no prefix for shared keys
+
+#### Auto Dialer CDR Processing
+- Fixed session token read path: Cloudonix CDR nests token at `session.token`, not `session_token`
+- Fixed OrganizationScope: `processAutoDialerCDR` now wrapped in `OrganizationScope::bypass()` (webhooks have no authenticated user)
+- Session row now updated on CDR (status, disposition, duration, billsec, completed_at) - was previously only updating the destination
+- Call status webhook (`callStatus`) now updates AutoDialerCallSession status (initiated→ringing→answered)
+
+#### Auto Dialer CXML Generation
+- Fixed WebSocket URL placeholder substitution: {session}, {from}, {to} are now resolved by OPBX (not Cloudonix runtime placeholders)
+- Fixed double XML encoding in `CxmlBuilder::connectStream` (removed redundant `htmlspecialchars`)
+- Fixed AMD mode mapping: `AmdMode::ENABLED` now correctly maps to Cloudonix API value `Enable` (was sending `Enabled`)
+
+#### Auto Dialer Worker
+- Fixed duplicate calls: added `sync.Map` concurrency guard preventing parallel goroutines for the same campaign
+- Added `ReconcileActiveCalls` to Redis client for self-healing stale CAC counters
+- Pausing a campaign now marks all in-flight sessions as failed/cancelled and resets CAC counter
+
+#### Campaign Manager UI
+- Status toggle now uses `resume()` for paused→active (was incorrectly calling `start()` which requires a distribution list)
+- Edit button disabled when campaign is active (must pause first to edit)
+- Campaign Detail: Edit button added to header, 5 stat cards (was 4 + large progress bar), 10s auto-refresh
+- Distribution Lists page layout aligned with Campaign Manager style
+- "Back to Campaigns" invalidates query cache for fresh data on return
+- Timezone selector uses full 65+ timezone list grouped by region
+- Weekly calendar `expandHeight` prop for fully visible schedule without scrolling
+
+### Changed - 2026-04-09
+- `AutoDialerCampaign::VALID_CAC_VALUES` constant replaced with `MIN_CAC`, `MAX_CAC`, `MIN_CPS`, `MAX_CPS`
+- `getApiIntervalSeconds()` renamed to `getApiIntervalMilliseconds()` (CPS-based, not CAC-based)
+- Monitor summary and detail endpoints compute `total_destinations` from distribution lists (not model column)
+- Active sessions query moved outside 10-second cache block for real-time freshness
+
 ### Added - 2026-01-13
 
 #### AI Assistant Fallback & UI Enhancements
