@@ -5,7 +5,9 @@
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
 
-A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, IVR menus, business hours management, AI assistant integration, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
+A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, IVR menus, business hours management, AI assistant integration, automated outbound dialing, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
+
+> **Documentation**: [User Guide](https://developers.cloudonix.com/opbx) | [REST API Reference](https://developers.cloudonix.com/opbxRestOpenAPI)
 
 ---
 
@@ -31,20 +33,31 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Direct Extension Calling**: Extension-to-extension dialing with SIP URI generation
 - **Outbound Calling**: E.164 international dialing with whitelist-based trunk routing
 - **Ring Groups**: Distribute calls with simultaneous, round-robin, or sequential strategies
-- **IVR Menus**: Interactive voice menus with DTMF input and configurable destinations
-- **Business Hours**: Time-based routing with weekly schedules and holiday exceptions
-- **AI Assistant Integration**: Route calls to AI-powered voice assistants
-- **AI Assistant Load Balancers**: Distribute calls across multiple AI assistants with fallback handling
-- **Conference Rooms**: Multi-party conference calls with PIN protection
+- **IVR Menus**: Interactive voice menus with DTMF input, TTS, and configurable destinations
+- **Business Hours**: Time-based routing with weekly schedules, holiday exceptions, and public holiday import
+- **AI Assistant Integration**: Route calls to 17 AI-powered voice providers via SIP or WebSocket
+- **AI Load Balancers**: Distribute calls across multiple AI assistants with round-robin, priority, or percentage strategies and automatic failover
+- **Conference Rooms**: Multi-party conference calls with PIN protection, recording, and host waiting
+
+### Auto Dialer (Outbound Campaigns)
+- **Campaign Management**: Create, schedule, and monitor outbound calling campaigns
+- **Distribution Lists**: CSV-based phone number lists with validation and versioning
+- **Rate Limiting**: Concurrent Active Calls (CAC, 1-50) + Calls Per Second (CPS, 1-5) for precise call pacing
+- **Answering Machine Detection**: AMD with configurable speech/silence thresholds
+- **Real-Time Monitor**: Command-center dashboard with bird's-eye campaign cards and drill-down views
+- **Go Dialer Worker**: Dedicated microservice for rate-limited call execution with Redis-based CAC counters
+- **Campaign Scheduling**: Weekly calendar with per-day time ranges, timezone support, and date ranges
 
 ### Phone Number Management
-- **DID Management**: Full support for Direct Inward Dialing numbers
-- **Flexible Routing**: Route DIDs to extensions, ring groups, IVR menus, AI assistants, conference rooms, or business hours schedules
+- **DID Management**: Full support for Direct Inward Dialing numbers in E.164 format
+- **Flexible Routing**: Route DIDs to extensions, ring groups, IVR menus, AI assistants, conference rooms, AI load balancers, or business hours schedules
 - **Outbound Whitelist**: Control outbound calling with country/prefix-based rules and trunk selection
+- **Inbound Blacklist**: Block unwanted callers with exact, prefix, or wildcard matching and configurable rejection strategies
 
 ### Real-Time Monitoring
 - **Live Call Dashboard**: Real-time call presence via WebSockets with automatic stale record cleanup
-- **Call Detail Records (CDR)**: Complete call history with search, filtering, and CSV export
+- **Auto Dialer Monitor**: Real-time campaign monitoring with active calls, disposition pie charts, and KPI cards
+- **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export
 - **Call Statistics**: Volume, duration, and disposition metrics
 - **Call Notifications**: Webhook-based notifications for call events
 
@@ -54,14 +67,16 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Distributed Locking**: Prevents race conditions on concurrent calls
 - **Queue Workers**: Async job processing for non-blocking operations
 - **Service Architecture**: Modular voice routing with dedicated services for outbound, business hours, and IVR handling
+- **CAC Counter Reconciliation**: Self-healing Redis counters for the auto dialer worker
 
 ### Multi-Tenant Architecture
-- **Organization Isolation**: Complete data separation between tenants
+- **Organization Isolation**: Complete data separation between tenants via global query scopes
 - **Role-Based Access Control (RBAC)**:
   - **Owner**: Full organization control
-  - **PBX Admin**: Manage users, extensions, ring groups, business hours
+  - **PBX Admin**: Manage users, extensions, ring groups, business hours, campaigns
   - **PBX User**: Access own extension and basic features
   - **Reporter**: Read-only access to reports and call logs
+- **Platform Management**: Cross-tenant administration for service providers hosting multiple organizations
 
 ---
 
@@ -90,6 +105,10 @@ graph TB
         APP[Laravel App<br/>PHP-FPM]
         QUEUE[Queue Worker]
         SCHEDULER[Task Scheduler]
+    end
+
+    subgraph "Dialer Service"
+        GOWORKER[Go Dialer Worker<br/>10s Poll Cycle]
     end
 
     subgraph "Voice Routing Services"
@@ -122,6 +141,8 @@ graph TB
     APP --> MINIO
     APP --> SOKETI
     APP --> CX
+    GOWORKER -->|Poll API| APP
+    GOWORKER --> REDIS
     QUEUE --> REDIS
     QUEUE --> MYSQL
     SCHEDULER --> APP
@@ -193,8 +214,9 @@ sequenceDiagram
 |------------|---------|---------|
 | [Laravel](https://laravel.com) | 12 | PHP application framework |
 | [PHP](https://php.net) | 8.4+ | Server-side language |
+| [Go](https://go.dev) | 1.21+ | Dialer worker microservice |
 | [MySQL](https://mysql.com) | 8.0 | Relational database |
-| [Redis](https://redis.io) | 7 | Cache, queues, sessions |
+| [Redis](https://redis.io) | 7 | Cache, queues, CAC counters |
 | [Laravel Sanctum](https://laravel.com/docs/sanctum) | - | API authentication |
 
 ### Frontend
@@ -280,8 +302,9 @@ sequenceDiagram
 | `app` | Laravel PHP-FPM application | - |
 | `queue-worker` | Laravel queue processor | - |
 | `scheduler` | Laravel cron scheduler | - |
+| `dialer-worker` | Go auto-dialer worker | - |
 | `mysql` | MySQL 8.0 database | 3306 |
-| `redis` | Redis 7 cache/queue | 6379 |
+| `redis` | Redis 7 cache/queue/CAC | 6379 |
 | `minio` | S3-compatible storage | 9000, 9001 |
 | `soketi` | WebSocket server | 6001 |
 | `ngrok` | Webhook tunnel | 4040 |
@@ -523,10 +546,18 @@ curl -X DELETE http://localhost/api/v1/session-updates/12345/disconnect \
 | `GET` | `/api/v1/phone-numbers` | List DIDs |
 | `POST` | `/api/v1/phone-numbers` | Create DID |
 | `GET` | `/api/v1/ai-assistants` | List AI assistants |
-| `GET` | `/api/v1/call-logs` | List call records |
+| `GET` | `/api/v1/ai-assistant-load-balancers` | List AI load balancers |
+| `GET` | `/api/v1/auto-dialer-campaigns` | List auto-dialer campaigns |
+| `POST` | `/api/v1/auto-dialer-campaigns` | Create campaign |
+| `PATCH` | `/api/v1/auto-dialer-campaigns/{id}/start` | Start campaign |
+| `PATCH` | `/api/v1/auto-dialer-campaigns/{id}/pause` | Pause campaign |
+| `GET` | `/api/v1/auto-dialer-campaigns/monitor/summary` | Real-time monitor |
+| `GET` | `/api/v1/auto-dialer-campaigns/lists` | List distribution lists |
+| `GET` | `/api/v1/call-detail-records` | List CDR records |
+| `GET` | `/api/v1/session-updates/active` | Active calls |
 | `GET` | `/api/v1/settings/cloudonix` | Get Cloudonix settings |
 
-For complete API documentation, see [`docs/architecture/api-webhooks.md`](docs/architecture/api-webhooks.md).
+For the complete REST API reference (162 endpoints), see the [OpenAPI specification](docs/opbx-openapi/openapi.yaml).
 
 ---
 
@@ -535,41 +566,30 @@ For complete API documentation, see [`docs/architecture/api-webhooks.md`](docs/a
 ### Run All Tests
 
 ```bash
-docker compose exec app php artisan test
+./run-tests.sh                             # All tests (runs inside Docker)
+./run-tests.sh --filter=TestClassName      # Single test class
 ```
 
-### Test Suites
+### Frontend
 
 ```bash
-# Unit tests
-docker compose exec app php artisan test --testsuite=Unit
-
-# Feature tests
-docker compose exec app php artisan test --testsuite=Feature
-
-# Specific test file
-docker compose exec app php artisan test tests/Feature/RingGroupControllerTest.php
+cd frontend && npm run build               # Production build
+cd frontend && npm run lint                # ESLint
+cd frontend && npm run type-check          # TypeScript check
 ```
 
 ### Code Quality
 
 ```bash
-# Run PHP linting
-docker compose exec app vendor/bin/pint
-
-# Frontend linting
-cd frontend && npm run lint
-
-# TypeScript type checking
-cd frontend && npm run type-check
+vendor/bin/pint                            # PHP lint (PSR-12)
+vendor/bin/pint --dirty                    # Lint changed files only
 ```
 
-### Test Coverage
+### Go Worker
 
-- **100+ tests** covering all major features
-- Cache system, voice routing, security, webhook processing
-- Multi-tenancy and RBAC verification
-- Service extraction and routing strategies
+```bash
+cd dialer-worker && docker compose build dialer-worker   # Build
+```
 
 ---
 
@@ -666,48 +686,51 @@ SOFTWARE.
 
 ## Documentation
 
-Additional documentation is available in the `docs/` directory:
+### User & Admin Guides
+Comprehensive Docusaurus-compatible documentation (30 pages):
+- [User Guide](docs/opbx-userguide/) — Installation, modules, call routing, AI assistants, auto dialer, administration
 
+### API Reference
+- [OpenAPI 3.1.0 Specification](docs/opbx-openapi/openapi.yaml) — 162 endpoints, multi-file spec
+- [REST API (online)](https://developers.cloudonix.com/opbxRestOpenAPI) — Interactive API explorer
+
+### Architecture
 - [Architecture Overview](docs/architecture/architecture-overview.md)
 - [Security Implementation](docs/architecture/security-implementation.md)
 - [Database Schema](docs/architecture/database-schema.md)
-- [API & Webhooks](docs/architecture/api-webhooks.md)
 - [Docker Setup](docs/architecture/docker-setup.md)
-- [WebSocket Integration](docs/architecture/realtime-websockets.md)
+
+### Feature Specifications
+- [Auto Dialer Worker v2.0](docs/specifications/auto-dialer-worker-v2.md)
+- [CPS Parameter](docs/specifications/auto-dialer-cps-parameter.md)
+- [Real-Time Monitor](docs/specifications/auto-dialer-realtime-monitor.md)
 
 ---
 
 ## Recent Updates
 
-### Phase 4 - Infrastructure & Code Quality (Latest)
-- Docker health checks improved with actual endpoint monitoring
-- Docker Compose version warning resolved
-- MySQL volume changed from bind mount to named volume
-- CXML Content-Type standardized to `application/xml`
-- Excessive logging cleaned up in voice routing
-- Frontend error handling enhanced with ErrorBoundaries
+### Auto Dialer & Real-Time Monitor (Latest)
+- Auto Dialer campaign management with scheduling, AMD, and retry logic
+- Go-based dialer worker with 10-second poll cycle and Redis CAC counters
+- CPS (Calls Per Second) parameter for independent rate control (1-5 calls/sec)
+- Real-time monitor with card-row campaign view, drill-down KPIs, and disposition pie charts
+- Distribution list management with CSV upload, validation, and versioning
+- Comprehensive documentation: 30-page user guide + OpenAPI spec (162 endpoints)
 
-### Phase 3 - Code Quality
-- 60+ TypeScript `any` types replaced with proper types
-- React Query retry logic improved (no retry on 401/403)
-- VoiceRoutingManager logging reduced (debug vs info)
+### UI/UX Improvements
+- Campaign Manager with status toggle, archive workflow, and edit gating
+- Distribution Lists page aligned with Campaign Manager layout
+- Full timezone selector (65+ timezones grouped by region)
+- Weekly calendar schedule with `expandHeight` for full visibility
 
-### Phase 2 - Architecture Improvements
-- VoiceRoutingManager refactored into dedicated services
-- OutboundRoutingService for whitelist-based trunk routing
-- BusinessHoursRoutingService for time-based routing
-- PhoneNumberService with E.164 normalization
-- CloudonixClient DI issue fixed
-- Session update transaction safety added
-- Authorization policies added to controllers
-
-### Phase 1 - Security & Critical Fixes
-- Dual routing architecture fixed (webhook vs voice route)
-- API key masking in settings endpoints
-- ALB fallback actions implemented
-- Test route removed from production
-- Health endpoints hardened
-- Extension org scope bypass fixed
+### Bug Fixes & Reliability
+- Redis key prefix mismatch resolved (prefix-free `dialer` connection)
+- CDR session token path fixed (`session.token` not `session_token`)
+- OrganizationScope bypass for webhook handlers
+- Duplicate call prevention via `sync.Map` concurrency guard
+- Stale session cleanup on campaign pause
+- AMD mode mapping corrected (`Enabled` to `Enable`)
+- WebSocket URL placeholder substitution fixed
 
 <p align="center">
   Made with ❤️ by <a href="https://github.com/greenfieldtech-nirs">Greenfield Technologies</a>&nbsp;&nbsp;Empowered by <a href="https://developers.cloudonix.com">Cloudonix</a>
