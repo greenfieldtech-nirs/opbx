@@ -126,6 +126,21 @@ export default function AutoDialerCampaignDetail() {
   const callerIdPool = (campaign as any)?.caller_id_pool || [];
   const callerIdStrategy = (campaign as any)?.caller_id_strategy || 'round_robin';
 
+  const getActionIcon = () => {
+    switch (actionType) {
+      case 'start':
+        return <Play className="h-5 w-5" />;
+      case 'pause':
+        return <Pause className="h-5 w-5" />;
+      case 'resume':
+        return <RotateCcw className="h-5 w-5" />;
+      case 'archive':
+        return <Archive className="h-5 w-5" />;
+      default:
+        return null;
+    }
+  };
+
   if (isCampaignLoading) {
     return (
       <div className="container mx-auto p-6">
