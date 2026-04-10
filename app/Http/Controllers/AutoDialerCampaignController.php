@@ -37,6 +37,7 @@ class AutoDialerCampaignController extends Controller
         $this->authorize('viewAny', AutoDialerCampaign::class);
 
         $campaigns = AutoDialerCampaign::forOrganization(Auth::user()->organization_id)
+            ->with('callerIds') // Eager load Caller ID pool
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%"))
             ->orderBy('created_at', 'desc')
