@@ -12,50 +12,58 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. Create pivot table for Caller ID pool
-        Schema::create('auto_dialer_campaign_caller_ids', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('campaign_id')
-                ->constrained('auto_dialer_campaigns')
-                ->onDelete('cascade');
-            $table->foreignId('did_number_id')
-                ->constrained('did_numbers')
-                ->onDelete('cascade');
-            $table->unsignedInteger('weight')->default(1);
-            $table->timestamps();
+        // 1. Create pivot table for Caller ID pool (if not exists)
+        if (! Schema::hasTable('auto_dialer_campaign_caller_ids')) {
+            Schema::create('auto_dialer_campaign_caller_ids', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('campaign_id')
+                    ->constrained('auto_dialer_campaigns')
+                    ->onDelete('cascade');
+                $table->foreignId('did_number_id')
+                    ->constrained('did_numbers')
+                    ->onDelete('cascade');
+                $table->unsignedInteger('weight')->default(1);
+                $table->timestamps();
 
-            // Prevent duplicate assignments
-            $table->unique(['campaign_id', 'did_number_id']);
-        });
+                // Prevent duplicate assignments
+                $table->unique(['campaign_id', 'did_number_id']);
+            });
+        }
 
-        // 2. Create statistics table
-        Schema::create('auto_dialer_caller_id_stats', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('campaign_id')
-                ->constrained('auto_dialer_campaigns')
-                ->onDelete('cascade');
-            $table->foreignId('did_number_id')
-                ->constrained('did_numbers')
-                ->onDelete('cascade');
-            $table->unsignedInteger('total_calls')->default(0);
-            $table->unsignedInteger('completed_calls')->default(0);
-            $table->unsignedInteger('failed_calls')->default(0);
-            $table->timestamp('last_used_at')->nullable();
-            $table->timestamps();
+        // 2. Create statistics table (if not exists)
+        if (! Schema::hasTable('auto_dialer_caller_id_stats')) {
+            Schema::create('auto_dialer_caller_id_stats', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('campaign_id')
+                    ->constrained('auto_dialer_campaigns')
+                    ->onDelete('cascade');
+                $table->foreignId('did_number_id')
+                    ->constrained('did_numbers')
+                    ->onDelete('cascade');
+                $table->unsignedInteger('total_calls')->default(0);
+                $table->unsignedInteger('completed_calls')->default(0);
+                $table->unsignedInteger('failed_calls')->default(0);
+                $table->timestamp('last_used_at')->nullable();
+                $table->timestamps();
 
-            // One stats record per campaign-DID pair
-            $table->unique(['campaign_id', 'did_number_id']);
-        });
+                // One stats record per campaign-DID pair
+                $table->unique(['campaign_id', 'did_number_id']);
+            });
+        }
 
-        // 3. Add columns to auto_dialer_campaigns
+        // 3. Add columns to auto_dialer_campaigns (if not exists)
         Schema::table('auto_dialer_campaigns', function (Blueprint $table) {
-            $table->string('caller_id_strategy', 20)
-                ->default('round_robin')
-                ->after('caller_id')
-                ->comment('round_robin, random, least_recently_used');
-            $table->boolean('caller_id_pool_enabled')
-                ->default(false)
-                ->after('caller_id_strategy');
+            if (! Schema::hasColumn('auto_dialer_campaigns', 'caller_id_strategy')) {
+                $table->string('caller_id_strategy', 20)
+                    ->default('round_robin')
+                    ->after('caller_id')
+                    ->comment('round_robin, random, least_recently_used');
+            }
+            if (! Schema::hasColumn('auto_dialer_campaigns', 'caller_id_pool_enabled')) {
+                $table->boolean('caller_id_pool_enabled')
+                    ->default(false)
+                    ->after('caller_id_strategy');
+            }
         });
 
         // 4. Add columns to auto_dialer_call_sessions
@@ -66,11 +74,13 @@ return new class extends Migration
             }
 
             // Add caller_did_id for tracking which DID was used
-            $table->foreignId('caller_did_id')
-                ->nullable()
-                ->after('caller_id')
-                ->constrained('did_numbers')
-                ->onDelete('set null');
+            if (! Schema::hasColumn('auto_dialer_call_sessions', 'caller_did_id')) {
+                $table->foreignId('caller_did_id')
+                    ->nullable()
+                    ->after('caller_id')
+                    ->constrained('did_numbers')
+                    ->onDelete('set null');
+            }
         });
 
         // 5. Data migration: Migrate existing campaigns with caller_id
