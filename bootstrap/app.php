@@ -119,4 +119,31 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 403);
             }
         });
+
+        // Handle HTTP exceptions with custom error page
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, $request) {
+            $statusCode = $e->getStatusCode();
+
+            // Only handle specific error codes with the custom view
+            if (! in_array($statusCode, [403, 404, 405, 500], true)) {
+                return null; // Let Laravel handle other codes
+            }
+
+            // Skip API routes - return JSON instead
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'error' => class_basename(get_class($e)),
+                    'message' => $e->getMessage() ?: 'An error occurred.',
+                    'status' => $statusCode,
+                ], $statusCode);
+            }
+
+            // Check for query parameter override (for testing)
+            $queryCode = $request->query('code');
+            if ($queryCode && in_array((int) $queryCode, [403, 404, 405, 500], true)) {
+                $statusCode = (int) $queryCode;
+            }
+
+            return response()->view('errors.custom', ['code' => $statusCode], $statusCode);
+        });
     })->create();
