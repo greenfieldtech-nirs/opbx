@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"opbx/dialer-worker/internal/api"
+	"opbx/dialer-worker/internal/callerid"
 	"opbx/dialer-worker/internal/limiter"
 	"opbx/dialer-worker/internal/models"
 	"opbx/dialer-worker/internal/redis"
@@ -16,12 +17,14 @@ import (
 
 // Executor handles the execution of dialer calls
 type Executor struct {
-	apiClient   *api.Client
-	redisClient *redis.Client
-	limiter     *limiter.CACRateLimiter
-	retryMgr    *retry.Manager
-	workerID    string
-	logger      *slog.Logger
+	apiClient       *api.Client
+	redisClient     *redis.Client
+	limiter         *limiter.CACRateLimiter
+	retryMgr        *retry.Manager
+	strategyFactory *callerid.StrategyFactory
+	retryTracker    *callerid.RetryTracker
+	workerID        string
+	logger          *slog.Logger
 }
 
 // NewExecutor creates a new call executor
@@ -34,12 +37,14 @@ func NewExecutor(
 	logger *slog.Logger,
 ) *Executor {
 	return &Executor{
-		apiClient:   apiClient,
-		redisClient: redisClient,
-		limiter:     limiter,
-		retryMgr:    retryMgr,
-		workerID:    workerID,
-		logger:      logger,
+		apiClient:       apiClient,
+		redisClient:     redisClient,
+		limiter:         limiter,
+		retryMgr:        retryMgr,
+		strategyFactory: callerid.NewStrategyFactory(redisClient),
+		retryTracker:    callerid.NewRetryTracker(redisClient),
+		workerID:        workerID,
+		logger:          logger,
 	}
 }
 
@@ -75,11 +80,41 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 		return nil
 	}
 
+	// Check if this is a retry (dial_attempts > 0 means previous attempts failed)
+	isRetry := destination.DialAttempts > 0
+
+	// Select Caller ID (use different one on retry)
+	selectedCallerID, err := e.selectCallerID(ctx, campaign, destination, isRetry)
+	if err != nil {
+		logger.Error("failed to select caller ID", "error", err)
+		return fmt.Errorf("failed to select caller ID: %w", err)
+	}
+
+	logger = logger.With(
+		"caller_id", selectedCallerID.PhoneNumber,
+		"caller_did_id", selectedCallerID.DIDID,
+		"is_retry", isRetry,
+	)
+
 	// Initiate call via Laravel API
 	logger.Info("initiating call")
-	resp, err := e.apiClient.InitiateCall(ctx, campaign.ID, destination.ID, destination.PhoneNumber, e.workerID)
+	resp, err := e.apiClient.InitiateCallWithCallerID(
+		ctx,
+		campaign.ID,
+		destination.ID,
+		destination.PhoneNumber,
+		e.workerID,
+		selectedCallerID.PhoneNumber,
+		selectedCallerID.DIDID,
+	)
 	if err != nil {
 		logger.Error("failed to initiate call", "error", err)
+		// Mark this DID as tried for retry tracking
+		if campaign.CallerIDPoolEnabled {
+			if markErr := e.retryTracker.MarkDIDAsTried(ctx, campaign.ID, destination.ID, selectedCallerID.DIDID); markErr != nil {
+				logger.Error("failed to mark DID as tried", "error", markErr)
+			}
+		}
 		return e.handleInitiationFailure(ctx, campaign, destination, err)
 	}
 
@@ -110,7 +145,55 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 	// Record call timing in rate limiter
 	e.limiter.RecordCall(campaign.ID)
 
+	// Update LRU timestamp if using LRU strategy
+	if campaign.CallerIDPoolEnabled && campaign.CallerIDStrategy == models.StrategyLeastRecentlyUsed {
+		if lruStrategy, ok := e.strategyFactory.Create(campaign.CallerIDStrategy).(*callerid.LRUStrategy); ok {
+			if markErr := lruStrategy.MarkAsUsed(ctx, campaign.ID, selectedCallerID.DIDID); markErr != nil {
+				logger.Error("failed to update LRU timestamp", "error", markErr)
+			}
+		}
+	}
+
+	// Mark DID as tried for potential retries
+	if campaign.CallerIDPoolEnabled {
+		if markErr := e.retryTracker.MarkDIDAsTried(ctx, campaign.ID, destination.ID, selectedCallerID.DIDID); markErr != nil {
+			logger.Error("failed to mark DID as tried", "error", markErr)
+		}
+	}
+
 	return nil
+}
+
+// selectCallerID selects the appropriate Caller ID for the call
+func (e *Executor) selectCallerID(
+	ctx context.Context,
+	campaign *models.Campaign,
+	destination *models.Destination,
+	isRetry bool,
+) (*models.CallerIDPoolItem, error) {
+	// If pool not enabled, use legacy Caller ID
+	if !campaign.CallerIDPoolEnabled {
+		return &models.CallerIDPoolItem{
+			DIDID:       0, // Unknown for legacy
+			PhoneNumber: campaign.CallerID,
+			Weight:      1,
+		}, nil
+	}
+
+	// Create strategy
+	strategy := e.strategyFactory.Create(campaign.CallerIDStrategy)
+
+	// If retrying, get tried DIDs and select a different one
+	if isRetry {
+		triedDIDs, err := e.retryTracker.GetTriedDIDs(ctx, campaign.ID, destination.ID)
+		if err == nil && len(triedDIDs) > 0 {
+			// Use SelectWithRetry to exclude tried DIDs
+			return strategy.SelectWithRetry(ctx, campaign.ID, campaign.CallerIDPool, triedDIDs)
+		}
+	}
+
+	// First attempt or no retry tracking available
+	return strategy.Select(ctx, campaign.ID, campaign.CallerIDPool)
 }
 
 // HandleCDR processes a CDR event from Cloudonix (via Laravel webhook)
@@ -195,6 +278,13 @@ func (e *Executor) handleDisposition(ctx context.Context, callState *redis.CallS
 	resp, err := e.apiClient.SetCallDisposition(ctx, callState.SessionID, dispositionReq)
 	if err != nil {
 		return fmt.Errorf("failed to set disposition: %w", err)
+	}
+
+	// Clear retry tracking on success (call completed, no retry needed)
+	if !resp.WillRetry {
+		if clearErr := e.retryTracker.ClearTriedDIDs(ctx, callState.CampaignID, callState.DestinationID); clearErr != nil {
+			logger.Error("failed to clear retry tracking", "error", clearErr)
+		}
 	}
 
 	logger.Info("disposition set", "will_retry", resp.WillRetry, "destination_status", resp.DestinationStatus)

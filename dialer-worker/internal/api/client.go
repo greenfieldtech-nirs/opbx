@@ -93,11 +93,18 @@ func (c *Client) GetPendingDestinations(ctx context.Context, campaignID int64, l
 
 // InitiateCall creates a new call session via Laravel
 func (c *Client) InitiateCall(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string) (*models.InitiateCallResponse, error) {
+	return c.InitiateCallWithCallerID(ctx, campaignID, destinationID, phoneNumber, workerID, "", 0)
+}
+
+// InitiateCallWithCallerID creates a new call session via Laravel with a specific Caller ID
+func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string, callerID string, callerDIDID int64) (*models.InitiateCallResponse, error) {
 	req := models.InitiateCallRequest{
 		CampaignID:    campaignID,
 		DestinationID: destinationID,
 		PhoneNumber:   phoneNumber,
 		WorkerID:      workerID,
+		CallerID:      callerID,
+		CallerDIDID:   callerDIDID,
 		InitiatedAt:   models.FlexTime(time.Now()),
 	}
 
