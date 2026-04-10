@@ -336,7 +336,23 @@
 
             <div class="msg-row">
                 <div class="avatar bot">🤖</div>
-                <div class="bubble bot typing" id="typedMessage">{{ $message ?? 'Something went wrong.' }}</div>
+                <div class="bubble bot typing" id="typedMessage">
+                    <noscript>
+                        @switch($code ?? 404)
+                            @case(403)
+                                Um... hi. I hate to say this, but I am not allowed to let you in here. This is a 403 Forbidden error.
+                                @break
+                            @case(405)
+                                Ah. Right. About that. This is a 405 Method Not Allowed error. The page exists, but it did not appreciate the way it was approached.
+                                @break
+                            @case(500)
+                                I need to be honest with you. This is a 500 Internal Server Error. Something broke on the inside.
+                                @break
+                            @default
+                                Oh no. I appear to have misplaced the page you were looking for. This is a 404 Not Found error.
+                        @endswitch
+                    </noscript>
+                </div>
             </div>
         </section>
 
