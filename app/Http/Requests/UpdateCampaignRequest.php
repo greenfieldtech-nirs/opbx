@@ -146,7 +146,7 @@ class UpdateCampaignRequest extends FormRequest
             // Caller ID Pooling - can only be modified when campaign is draft or paused
             'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
             'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
-            'caller_id_pool.*.weight' => ['required', 'integer', 'min:1', 'max:100'],
+            'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'caller_id_strategy' => ['sometimes', Rule::enum(\App\Enums\CallerIdStrategy::class)],
         ];
     }

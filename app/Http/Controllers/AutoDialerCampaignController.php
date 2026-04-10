@@ -149,7 +149,7 @@ class AutoDialerCampaignController extends Controller
             // Sync caller ID pool entries
             $syncData = [];
             foreach ($callerIdPool as $entry) {
-                $syncData[$entry['did_id']] = ['weight' => $entry['weight']];
+                $syncData[$entry['did_id']] = ['weight' => $entry['weight'] ?? 1];
             }
             $campaign->callerIds()->sync($syncData);
 
@@ -234,7 +234,7 @@ class AutoDialerCampaignController extends Controller
                 // Sync pool: delete old entries, create new ones
                 $syncData = [];
                 foreach ($callerIdPool as $entry) {
-                    $syncData[$entry['did_id']] = ['weight' => $entry['weight']];
+                    $syncData[$entry['did_id']] = ['weight' => $entry['weight'] ?? 1];
                 }
                 $campaign->callerIds()->sync($syncData);
 
