@@ -9,14 +9,14 @@ import {
   Loader2,
   Phone,
   Bot,
-  Scale,
   Clock,
   Calendar,
   Globe,
   Mic,
   Settings,
-  Check,
-  X,
+  AlertCircle,
+  Users,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import {
   useAutoDialerCampaign,
@@ -49,7 +49,6 @@ import {
 import type { CreateCampaignRequest, UpdateCampaignRequest } from '@/services/autoDialerCampaignsApi';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
-import { phoneNumbersService } from '@/services/createResourceService';
 import { useQuery } from '@tanstack/react-query';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
@@ -58,15 +57,35 @@ import type { WeeklySchedule, DayOfWeek } from '@/types';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
 import { cn } from '@/lib/utils';
+import {
+  StrategySelector,
+  type CallerIdStrategy,
+} from '@/components/AutoDialer/StrategySelector';
+import {
+  CallerIdPoolSelector,
+  type CallerIdPoolItem,
+} from '@/components/AutoDialer/CallerIdPoolSelector';
+import { CallerIdPoolSummary } from '@/components/AutoDialer/CallerIdPoolSummary';
 
-// Validation schema
+// Validation schema with Caller ID Pooling support
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'hangup']),
   routing_destination_id: z.string().optional().nullable(),
   dial_timeout: z.number().min(1).max(300).default(60),
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
-  caller_id: z.string().min(1, 'Caller ID is required'),
+  // Legacy single caller ID (for backward compatibility)
+  caller_id: z.string().optional(),
+  // New Caller ID Pool fields
+  caller_id_strategy: z.enum(['round_robin', 'random', 'least_recently_used']).default('round_robin'),
+  caller_id_pool: z.array(
+    z.object({
+      did_id: z.number().int().positive(),
+      phone_number: z.string().min(1),
+      friendly_name: z.string().optional(),
+      weight: z.number().int().min(1).max(100),
+    })
+  ).max(100, 'Maximum 100 Caller IDs allowed'),
   max_dial_attempts: z.number().min(1).max(5).default(1),
   concurrent_active_calls: z.number().min(1).max(50).default(1),
   calls_per_second: z.number().min(1).max(5).default(1),
@@ -155,6 +174,16 @@ function convertWeeklyScheduleToCampaign(schedule: WeeklySchedule): { daysActive
   return { daysActive, startTime, endTime };
 }
 
+// Helper to convert legacy caller_id to pool format
+function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPoolItem[] {
+  if (!callerId) return [];
+  return [{
+    did_id: 0, // Will be resolved by backend
+    phone_number: callerId,
+    weight: 1,
+  }];
+}
+
 export default function AutoDialerCampaignForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -180,15 +209,8 @@ export default function AutoDialerCampaignForm() {
     queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
   });
 
-  // Fetch Phone Numbers for Caller ID
-  const { data: phoneNumbersData } = useQuery({
-    queryKey: ['phone-numbers', { status: 'active' }],
-    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
-  });
-
   const aiAssistants = aiAssistantsData?.data || [];
   const aiLoadBalancers = aiLoadBalancersData?.data || [];
-  const phoneNumbers = phoneNumbersData?.data || [];
 
   const {
     register,
@@ -205,6 +227,8 @@ export default function AutoDialerCampaignForm() {
       dial_timeout: 60,
       destination_connect: 'connected',
       caller_id: '',
+      caller_id_strategy: 'round_robin',
+      caller_id_pool: [],
       max_dial_attempts: 1,
       concurrent_active_calls: 1,
       calls_per_second: 1,
@@ -230,6 +254,13 @@ export default function AutoDialerCampaignForm() {
   const amdEnabled = watch('amd_enabled');
   const startTime = watch('start_time');
   const endTime = watch('end_time');
+  const callerIdPool = watch('caller_id_pool');
+  const callerIdStrategy = watch('caller_id_strategy');
+
+  // Determine if pool can be modified (only in DRAFT or PAUSED status)
+  const canModifyPool = !isEditing || 
+    existingCampaign?.status === 'draft' || 
+    existingCampaign?.status === 'paused';
 
   // NOTE: routing_destination_id is cleared inside the DestinationTypeAndSelector
   // onChange handler when the user changes the type — NOT via useEffect, which
@@ -238,6 +269,14 @@ export default function AutoDialerCampaignForm() {
   // Load existing data when editing
   useEffect(() => {
     if (existingCampaign && isEditing) {
+      // Convert caller_id_pool if present, otherwise convert legacy caller_id
+      let pool: CallerIdPoolItem[] = [];
+      if ((existingCampaign as any).caller_id_pool && Array.isArray((existingCampaign as any).caller_id_pool)) {
+        pool = (existingCampaign as any).caller_id_pool;
+      } else if (existingCampaign.caller_id) {
+        pool = convertLegacyCallerIdToPool(existingCampaign.caller_id);
+      }
+
       reset({
         name: existingCampaign.name,
         routing_destination_type: existingCampaign.routing_destination_type,
@@ -245,6 +284,8 @@ export default function AutoDialerCampaignForm() {
         dial_timeout: existingCampaign.dial_timeout,
         destination_connect: existingCampaign.destination_connect,
         caller_id: existingCampaign.caller_id,
+        caller_id_strategy: ((existingCampaign as any).caller_id_strategy as CallerIdStrategy) || 'round_robin',
+        caller_id_pool: pool,
         max_dial_attempts: existingCampaign.max_dial_attempts,
         concurrent_active_calls: existingCampaign.concurrent_active_calls,
         calls_per_second: existingCampaign.calls_per_second ?? 1,
@@ -296,13 +337,18 @@ export default function AutoDialerCampaignForm() {
         ? undefined
         : data.routing_destination_id;
       
+      // Use first caller ID from pool for legacy API compatibility
+      const primaryCallerId = data.caller_id_pool.length > 0 
+        ? data.caller_id_pool[0].phone_number 
+        : data.caller_id || '';
+      
       if (isEditing && id) {
         // Build update data with schedule
         const updateData: UpdateCampaignRequest = {
           name: data.name,
           dial_timeout: data.dial_timeout,
           destination_connect: data.destination_connect,
-          caller_id: data.caller_id,
+          caller_id: primaryCallerId,
           max_dial_attempts: data.max_dial_attempts,
           concurrent_active_calls: data.concurrent_active_calls,
           calls_per_second: data.calls_per_second,
@@ -326,6 +372,12 @@ export default function AutoDialerCampaignForm() {
           updateData.routing_destination_type = data.routing_destination_type;
           updateData.routing_destination_id = routingDestinationId;
         }
+
+        // Add Caller ID Pool fields if pool can be modified
+        if (canModifyPool) {
+          (updateData as any).caller_id_strategy = data.caller_id_strategy;
+          (updateData as any).caller_id_pool = data.caller_id_pool;
+        }
         
         await updateMutation.mutateAsync({ id, data: updateData });
         toast.success('Campaign updated successfully');
@@ -336,7 +388,7 @@ export default function AutoDialerCampaignForm() {
           ...(routingDestinationId ? { routing_destination_id: routingDestinationId } : {}),
           dial_timeout: data.dial_timeout,
           destination_connect: data.destination_connect,
-          caller_id: data.caller_id,
+          caller_id: primaryCallerId,
           max_dial_attempts: data.max_dial_attempts,
           concurrent_active_calls: data.concurrent_active_calls,
           calls_per_second: data.calls_per_second,
@@ -353,6 +405,9 @@ export default function AutoDialerCampaignForm() {
           amd_speech_end_threshold: data.amd_speech_end_threshold,
           amd_silence_timeout: data.amd_silence_timeout,
           auto_start: data.auto_start,
+          // Include Caller ID Pool fields
+          caller_id_strategy: data.caller_id_strategy,
+          caller_id_pool: data.caller_id_pool,
         };
         const result = await createMutation.mutateAsync(createData);
         toast.success('Campaign created successfully');
@@ -456,57 +511,59 @@ export default function AutoDialerCampaignForm() {
                   />
                 </div>
 
-                {/* Caller ID, Dial Timeout, and Connect When - side by side */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label htmlFor="caller_id">
-                      Caller ID <span className="text-red-500">*</span>
-                    </Label>
-                    {isEditing && existingCampaign?.caller_id ? (
-                      // Editing: Show current value with option to change
-                      <Select
-                        defaultValue={existingCampaign.caller_id}
-                        onValueChange={(value) => setValue('caller_id', value)}
-                      >
-                        <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
-                          <SelectValue placeholder="Select a phone number" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={existingCampaign.caller_id}>
-                            {existingCampaign.caller_id} (current)
-                          </SelectItem>
-                          {phoneNumbers
-                            .filter(n => n.phone_number !== existingCampaign.caller_id)
-                            .map((number) => (
-                              <SelectItem key={number.id} value={number.phone_number}>
-                                {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      // Creating new: Simple select from available numbers
-                      <Select
-                        value={watch('caller_id') || ''}
-                        onValueChange={(value) => setValue('caller_id', value)}
-                      >
-                        <SelectTrigger className={errors.caller_id ? 'border-red-500' : ''}>
-                          <SelectValue placeholder="Select a phone number" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {phoneNumbers.map((number) => (
-                            <SelectItem key={number.id} value={number.phone_number}>
-                              {number.phone_number} {number.friendly_name && `- ${number.friendly_name}`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {errors.caller_id && (
-                      <p className="text-sm text-red-500">{errors.caller_id.message}</p>
-                    )}
-                  </div>
+                {/* Caller ID Pool Configuration */}
+                <div className="pt-4 border-t">
+                  <CardHeader className="px-0 pt-0">
+                    <CardTitle className="flex items-center gap-2">
+                      <Phone className="h-5 w-5" />
+                      Caller ID Configuration
+                    </CardTitle>
+                    <CardDescription>
+                      Select one or more phone numbers for outbound calls
+                    </CardDescription>
+                  </CardHeader>
 
+                  {/* Pool modification warning */}
+                  {!canModifyPool && (
+                    <Alert className="mb-4 bg-yellow-50 border-yellow-200">
+                      <Info className="h-4 w-4 text-yellow-600" />
+                      <AlertTitle className="text-yellow-800">Pool Locked</AlertTitle>
+                      <AlertDescription className="text-yellow-700">
+                        Caller ID pool can only be modified when campaign is in Draft or Paused status.
+                        Pause the campaign to make changes.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-6">
+                    {/* Strategy Selector */}
+                    <StrategySelector
+                      value={callerIdStrategy}
+                      onChange={(value) => setValue('caller_id_strategy', value)}
+                      disabled={!canModifyPool}
+                    />
+
+                    {/* Pool Selector */}
+                    <div className="space-y-2">
+                      <Label>Caller ID Pool</Label>
+                      <CallerIdPoolSelector
+                        selected={callerIdPool}
+                        onChange={(pool) => setValue('caller_id_pool', pool)}
+                        maxSelection={100}
+                        disabled={!canModifyPool}
+                      />
+                      {errors.caller_id_pool && (
+                        <p className="text-sm text-red-500">{errors.caller_id_pool.message}</p>
+                      )}
+                    </div>
+
+                    {/* Pool Summary */}
+                    <CallerIdPoolSummary pool={callerIdPool} />
+                  </div>
+                </div>
+
+                {/* Dial Timeout and Connect When - side by side */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div className="space-y-2">
                     <Label htmlFor="dial_timeout">Dial Timeout (seconds)</Label>
                     <Input

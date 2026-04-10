@@ -22,6 +22,9 @@ export interface AutoDialerCampaign {
   dial_timeout: number;
   destination_connect: 'connected' | 'immediately';
   caller_id: string;
+  // Caller ID Pool fields
+  caller_id_strategy?: 'round_robin' | 'random' | 'least_recently_used';
+  caller_id_pool?: CallerIdPoolItem[];
   max_dial_attempts: number;
   concurrent_active_calls: number;
   calls_per_second: number;
@@ -62,6 +65,9 @@ export interface CreateCampaignRequest {
   dial_timeout: number;
   destination_connect: 'connected' | 'immediately';
   caller_id: string;
+  // Caller ID Pool fields
+  caller_id_strategy?: 'round_robin' | 'random' | 'least_recently_used';
+  caller_id_pool?: CallerIdPoolItem[];
   max_dial_attempts: number;
   concurrent_active_calls: number;
   calls_per_second: number;
@@ -93,6 +99,9 @@ export interface UpdateCampaignRequest {
   dial_timeout?: number;
   destination_connect?: 'connected' | 'immediately';
   caller_id?: string;
+  // Caller ID Pool fields
+  caller_id_strategy?: 'round_robin' | 'random' | 'least_recently_used';
+  caller_id_pool?: CallerIdPoolItem[];
   max_dial_attempts?: number;
   concurrent_active_calls?: number;
   calls_per_second?: number;
@@ -147,6 +156,13 @@ export interface CampaignParams {
 }
 
 // Caller ID Pool Types
+export interface CallerIdPoolItem {
+  did_id: number;
+  phone_number: string;
+  friendly_name?: string;
+  weight: number;
+}
+
 export interface AvailableCallerId {
   id: number;
   phone_number: string;

@@ -19,6 +19,11 @@ import {
   X,
   Target,
   List,
+  Users,
+  Phone,
+  Shuffle,
+  ListOrdered,
+  Timer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,6 +47,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   StandardDataTable,
   EmptyState,
@@ -82,6 +93,28 @@ const statusConfigs: Record<string, { color: string; label: string; nextStatus: 
     nextLabel: ''
   },
 };
+
+function getStrategyIcon(strategy: string) {
+  switch (strategy) {
+    case 'round_robin':
+      return <ListOrdered className="h-3 w-3" />;
+    case 'random':
+      return <Shuffle className="h-3 w-3" />;
+    case 'least_recently_used':
+      return <Timer className="h-3 w-3" />;
+    default:
+      return <Phone className="h-3 w-3" />;
+  }
+}
+
+function getStrategyLabel(strategy: string): string {
+  const labels: Record<string, string> = {
+    round_robin: 'Round Robin',
+    random: 'Random',
+    least_recently_used: 'Least Recently Used',
+  };
+  return labels[strategy] || strategy;
+}
 
 export default function AutoDialerCampaigns() {
   const navigate = useNavigate();
@@ -233,6 +266,24 @@ export default function AutoDialerCampaigns() {
     setCurrentPage(1);
   };
 
+  // Helper to check if campaign has Caller ID pool
+  const hasCallerIdPool = (campaign: AutoDialerCampaign): boolean => {
+    return !!(
+      (campaign as any).caller_id_pool?.length > 0 ||
+      (campaign as any).caller_id_strategy
+    );
+  };
+
+  // Get Caller ID pool count
+  const getCallerIdPoolCount = (campaign: AutoDialerCampaign): number => {
+    return (campaign as any).caller_id_pool?.length || 0;
+  };
+
+  // Get Caller ID strategy
+  const getCallerIdStrategy = (campaign: AutoDialerCampaign): string => {
+    return (campaign as any).caller_id_strategy || 'round_robin';
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -289,354 +340,394 @@ export default function AutoDialerCampaigns() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Target className="h-8 w-8" />
-              Campaign Manager
-            </h1>
-            {isReadOnly && (
-              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                Read-Only
-              </Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground mt-1">
-            Manage and monitor your outbound calling campaigns
-          </p>
-          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-            <span>Dashboard</span>
-            <span>/</span>
-            <span className="text-foreground">Campaign Manager</span>
-          </div>
-        </div>
-        {canManage && (
-          <Button onClick={() => navigate('/ui/auto-dialer/campaigns/new')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Campaign
-          </Button>
-        )}
-      </div>
-
-      {/* Filters Section */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[250px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search campaigns..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                autoComplete="off"
-              />
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Target className="h-8 w-8" />
+                Campaign Manager
+              </h1>
+              {isReadOnly && (
+                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                  Read-Only
+                </Badge>
+              )}
             </div>
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isRefetching}
-              title="Refresh"
-            >
-              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
-            </Button>
-
-            {/* Status Filter */}
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value as typeof statusFilter);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="not-archived">All (except Archived)</SelectItem>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Running</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Clear Filters */}
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="h-4 w-4 mr-2" />
-                Clear Filters
-              </Button>
-            )}
+            <p className="text-muted-foreground mt-1">
+              Manage and monitor your outbound calling campaigns
+            </p>
+            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+              <span>Dashboard</span>
+              <span>/</span>
+              <span className="text-foreground">Campaign Manager</span>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          {canManage && (
+            <Button onClick={() => navigate('/ui/auto-dialer/campaigns/new')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Campaign
+            </Button>
+          )}
+        </div>
 
-      {/* Campaigns Table */}
-      <Card>
-        <CardContent className="pt-6">
-          <StandardDataTable<AutoDialerCampaign>
-            data={campaigns}
-            isLoading={isLoading}
-            onRowClick={canManage ? ((campaign) => navigate(`/ui/auto-dialer/campaigns/${campaign.id}`)) : undefined}
-            identityIcon={PhoneCall}
-            identityIconBg="bg-purple-100"
-            identityIconColor="text-purple-600"
-            getIdentityPrimary={(campaign) => campaign.name}
-            getIdentitySecondary={() => ''}
-            onIdentityClick={canManage ? ((campaign) => navigate(`/ui/auto-dialer/campaigns/${campaign.id}`)) : undefined}
-            canView={false}
-            canEdit={false}
-            canDelete={false}
-            columns={[
-              {
-                header: 'Status',
-                cell: (campaign) => {
-                  const config = statusConfigs[campaign.status];
-                  const canToggle = canManage && config.nextStatus !== null && campaign.status !== 'archived';
-                  
-                  return (
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        'text-xs cursor-default',
-                        config.color,
-                        canToggle && 'cursor-pointer'
-                      )}
-                      onClick={(e) => {
-                        if (canToggle) {
-                          e.stopPropagation();
-                          handleStatusToggle(campaign);
-                        }
-                      }}
-                      title={canToggle ? `Click to ${config.nextLabel.toLowerCase()}` : undefined}
-                    >
-                      {config.label}
-                      {canToggle && (
-                        <span className="ml-1 opacity-70">({config.nextLabel})</span>
-                      )}
-                    </Badge>
-                  );
+        {/* Filters Section */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[250px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search campaigns..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  autoComplete="off"
+                />
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+                title="Refresh"
+              >
+                <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+              </Button>
+
+              {/* Status Filter */}
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value as typeof statusFilter);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="not-archived">All (except Archived)</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="active">Running</SelectItem>
+                  <SelectItem value="paused">Paused</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Campaigns Table */}
+        <Card>
+          <CardContent className="pt-6">
+            <StandardDataTable<AutoDialerCampaign>
+              data={campaigns}
+              isLoading={isLoading}
+              onRowClick={canManage ? ((campaign) => navigate(`/ui/auto-dialer/campaigns/${campaign.id}`)) : undefined}
+              identityIcon={PhoneCall}
+              identityIconBg="bg-purple-100"
+              identityIconColor="text-purple-600"
+              getIdentityPrimary={(campaign) => campaign.name}
+              getIdentitySecondary={(campaign) => {
+                // Show Caller ID pool info if available
+                if (hasCallerIdPool(campaign)) {
+                  const poolCount = getCallerIdPoolCount(campaign);
+                  const strategy = getCallerIdStrategy(campaign);
+                  return `${poolCount} Caller ID${poolCount !== 1 ? 's' : ''} • ${getStrategyLabel(strategy)}`;
                 }
-              },
-              {
-                header: 'Lists',
-                cell: (campaign) => (
-                  <span className="text-sm">{campaign.has_list ? '1 list' : 'No lists'}</span>
-                )
-              },
-              {
-                header: 'CAC',
-                cell: (campaign) => (
-                  <span className="text-sm">{campaign.concurrent_active_calls} concurrent</span>
-                )
-              },
-              {
-                header: 'Routing',
-                cell: (campaign) => (
-                  <span className="text-sm text-muted-foreground">{campaign.routing_destination_label}</span>
-                )
-              },
-              {
-                header: 'Created',
-                cell: (campaign) => (
-                  <span className="text-sm text-muted-foreground">{formatDateTime(campaign.created_at)}</span>
-                )
-              },
-              {
-                header: 'Actions',
-                className: 'w-[120px]',
-                cell: (campaign) => {
-                  if (!canManage) return null;
-                  
-                  // Archived campaigns cannot be edited or archived again
-                  if (campaign.status === 'archived') {
-                    return <span className="text-xs text-muted-foreground">-</span>;
-                  }
-                  
-                  // Draft campaigns can be deleted or edited
-                  if (campaign.status === 'draft') {
+                return campaign.caller_id || 'No Caller ID';
+              }}
+              onIdentityClick={canManage ? ((campaign) => navigate(`/ui/auto-dialer/campaigns/${campaign.id}`)) : undefined}
+              canView={false}
+              canEdit={false}
+              canDelete={false}
+              columns={[
+                {
+                  header: 'Status',
+                  cell: (campaign) => {
+                    const config = statusConfigs[campaign.status];
+                    const canToggle = canManage && config.nextStatus !== null && campaign.status !== 'archived';
+                    
                     return (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs px-2"
-                          onClick={(e) => {
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          'text-xs cursor-default',
+                          config.color,
+                          canToggle && 'cursor-pointer'
+                        )}
+                        onClick={(e) => {
+                          if (canToggle) {
                             e.stopPropagation();
-                            navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
-                          }}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(campaign);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                            handleStatusToggle(campaign);
+                          }
+                        }}
+                        title={canToggle ? `Click to ${config.nextLabel.toLowerCase()}` : undefined}
+                      >
+                        {config.label}
+                        {canToggle && (
+                          <span className="ml-1 opacity-70">({config.nextLabel})</span>
+                        )}
+                      </Badge>
                     );
                   }
-                  
-                  // Completed campaigns can only be archived
-                  if (campaign.status === 'completed') {
+                },
+                {
+                  header: 'Caller ID',
+                  cell: (campaign) => {
+                    if (hasCallerIdPool(campaign)) {
+                      const poolCount = getCallerIdPoolCount(campaign);
+                      const strategy = getCallerIdStrategy(campaign);
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="gap-1 cursor-help">
+                              <Users className="h-3 w-3" />
+                              {poolCount} Caller ID{poolCount !== 1 ? 's' : ''}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="flex items-center gap-2">
+                              {getStrategyIcon(strategy)}
+                              <span>Using {getStrategyLabel(strategy)} strategy</span>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                    return (
+                      <span className="text-sm text-muted-foreground">
+                        {campaign.caller_id || '-'}
+                      </span>
+                    );
+                  }
+                },
+                {
+                  header: 'Lists',
+                  cell: (campaign) => (
+                    <span className="text-sm">{campaign.has_list ? '1 list' : 'No lists'}</span>
+                  )
+                },
+                {
+                  header: 'CAC',
+                  cell: (campaign) => (
+                    <span className="text-sm">{campaign.concurrent_active_calls} concurrent</span>
+                  )
+                },
+                {
+                  header: 'Routing',
+                  cell: (campaign) => (
+                    <span className="text-sm text-muted-foreground">{campaign.routing_destination_label}</span>
+                  )
+                },
+                {
+                  header: 'Created',
+                  cell: (campaign) => (
+                    <span className="text-sm text-muted-foreground">{formatDateTime(campaign.created_at)}</span>
+                  )
+                },
+                {
+                  header: 'Actions',
+                  className: 'w-[120px]',
+                  cell: (campaign) => {
+                    if (!canManage) return null;
+                    
+                    // Archived campaigns cannot be edited or archived again
+                    if (campaign.status === 'archived') {
+                      return <span className="text-xs text-muted-foreground">-</span>;
+                    }
+                    
+                    // Draft campaigns can be deleted or edited
+                    if (campaign.status === 'draft') {
+                      return (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
+                            }}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(campaign);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    }
+                    
+                    // Completed campaigns can only be archived
+                    if (campaign.status === 'completed') {
+                      return (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleArchive(campaign);
+                          }}
+                        >
+                          <Archive className="h-3.5 w-3.5 mr-1" />
+                          Archive
+                        </Button>
+                      );
+                    }
+                    
+                    // Active/paused campaigns: show Edit (disabled when active)
+                    const canEdit = campaign.status !== 'active';
                     return (
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-8 text-xs"
+                        disabled={!canEdit}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleArchive(campaign);
+                          if (canEdit) {
+                            navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
+                          }
                         }}
+                        title={!canEdit ? 'Pause the campaign to edit' : undefined}
                       >
-                        <Archive className="h-3.5 w-3.5 mr-1" />
-                        Archive
+                        <Edit className="h-3.5 w-3.5 mr-1" />
+                        Edit
                       </Button>
                     );
                   }
-                  
-                  // Active/paused campaigns: show Edit (disabled when active)
-                  const canEdit = campaign.status !== 'active';
-                  return (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs"
-                      disabled={!canEdit}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (canEdit) {
-                          navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
-                        }
-                      }}
-                      title={!canEdit ? 'Pause the campaign to edit' : undefined}
-                    >
-                      <Edit className="h-3.5 w-3.5 mr-1" />
-                      Edit
-                    </Button>
-                  );
-                }
-              },
-            ]}
-            emptyState={
-              <EmptyState
-                icon={List}
-                title="No campaigns found"
-                description={hasActiveFilters ? 'Try adjusting your filters' : 'Create your first campaign to get started'}
-                action={canManage && !hasActiveFilters ? {
-                  label: "Create Campaign",
-                  onClick: () => navigate('/ui/auto-dialer/campaigns/new')
-                } : undefined}
-              />
-            }
-          />
+                },
+              ]}
+              emptyState={
+                <EmptyState
+                  icon={List}
+                  title="No campaigns found"
+                  description={hasActiveFilters ? 'Try adjusting your filters' : 'Create your first campaign to get started'}
+                  action={canManage && !hasActiveFilters ? {
+                    label: "Create Campaign",
+                    onClick: () => navigate('/ui/auto-dialer/campaigns/new')
+                  } : undefined}
+                />
+              }
+            />
 
-          {/* Pagination */}
-          {(statusFilter === 'not-archived' ? campaigns.length > perPage : totalPages > 1) && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCampaigns)} of {totalCampaigns} campaigns
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <div className="text-sm">
-                  Page {currentPage} of {totalPages}
+            {/* Pagination */}
+            {(statusFilter === 'not-archived' ? campaigns.length > perPage : totalPages > 1) && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCampaigns)} of {totalCampaigns} campaigns
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-sm">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Archive Confirmation Dialog */}
-      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Archive className="h-5 w-5" />
-              Archive Campaign
-            </DialogTitle>
-            <DialogDescription>
-              {selectedCampaign && (
-                <>Are you sure you want to archive "{selectedCampaign.name}"? This action cannot be undone.</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmArchive}
-              disabled={archiveMutation.isPending}
-            >
-              {archiveMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              Archive
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Archive Confirmation Dialog */}
+        <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Archive className="h-5 w-5" />
+                Archive Campaign
+              </DialogTitle>
+              <DialogDescription>
+                {selectedCampaign && (
+                  <>Are you sure you want to archive "{selectedCampaign.name}"? This action cannot be undone.</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmArchive}
+                disabled={archiveMutation.isPending}
+              >
+                {archiveMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                Archive
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5" />
-              Delete Campaign
-            </DialogTitle>
-            <DialogDescription>
-              {selectedCampaign && (
-                <>Are you sure you want to delete "{selectedCampaign.name}"? This action cannot be undone. Associated lists will remain in the system.</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Delete Campaign
+              </DialogTitle>
+              <DialogDescription>
+                {selectedCampaign && (
+                  <>Are you sure you want to delete "{selectedCampaign.name}"? This action cannot be undone. Associated lists will remain in the system.</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
