@@ -1112,4 +1112,137 @@ class AutoDialerCampaignController extends Controller
         Cache::forget("monitor:summary:{$organizationId}");
         Cache::forget("monitor:detail:{$campaignId}");
     }
+
+    /**
+     * Get available DIDs for Caller ID pool selection.
+     *
+     * Returns active DIDs from the organization that can be added to a campaign's
+     * Caller ID pool. Optionally excludes DIDs already assigned to a specific campaign.
+     *
+     * @param  Request  $request  The HTTP request with optional exclude_campaign_id
+     */
+    public function getAvailableCallerIds(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', AutoDialerCampaign::class);
+
+        $organizationId = Auth::user()->organization_id;
+        $excludeCampaignId = $request->query('exclude_campaign_id');
+
+        // Build query for active DIDs in the organization
+        $query = DidNumber::forOrganization($organizationId)
+            ->where('status', 'active');
+
+        // Exclude DIDs already in the specified campaign's pool
+        if ($excludeCampaignId !== null) {
+            $excludedDidIds = DB::table('auto_dialer_campaign_caller_ids')
+                ->where('campaign_id', $excludeCampaignId)
+                ->pluck('did_number_id')
+                ->toArray();
+
+            if (! empty($excludedDidIds)) {
+                $query->whereNotIn('id', $excludedDidIds);
+            }
+        }
+
+        $dids = $query->get(['id', 'phone_number', 'friendly_name', 'status']);
+
+        return response()->json([
+            'data' => $dids->map(fn (DidNumber $did) => [
+                'id' => $did->id,
+                'phone_number' => $did->phone_number,
+                'friendly_name' => $did->friendly_name,
+                'status' => $did->status,
+            ]),
+        ]);
+    }
+
+    /**
+     * Get Caller ID statistics for a campaign.
+     *
+     * Returns detailed statistics per Caller ID including total calls,
+     * completed calls, failed calls, success rate, and last used timestamp.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign to get stats for
+     */
+    public function getCallerIdStats(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        // Load stats with DID number details
+        $stats = $campaign->callerIdStats()
+            ->with('didNumber:id,phone_number,friendly_name')
+            ->get();
+
+        // Calculate totals
+        $totalCalls = $stats->sum('total_calls');
+
+        // Format response
+        $formattedStats = $stats->map(fn (AutoDialerCallerIdStat $stat) => [
+            'did_id' => $stat->did_number_id,
+            'phone_number' => $stat->didNumber?->phone_number,
+            'friendly_name' => $stat->didNumber?->friendly_name,
+            'total_calls' => $stat->total_calls,
+            'completed_calls' => $stat->completed_calls,
+            'failed_calls' => $stat->failed_calls,
+            'success_rate' => $stat->success_rate,
+            'last_used_at' => $stat->last_used_at?->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'campaign_id' => $campaign->id,
+            'total_calls' => $totalCalls,
+            'strategy' => $campaign->caller_id_strategy?->value,
+            'stats' => $formattedStats,
+        ]);
+    }
+
+    /**
+     * Reset the Caller ID cycle (Round Robin only).
+     *
+     * Resets the Round Robin counter in Redis. Only works when the campaign
+     * is in PAUSED status. Returns 409 Conflict if campaign is not paused.
+     *
+     * @param  AutoDialerCampaign  $campaign  The campaign to reset the cycle for
+     */
+    public function resetCallerIdCycle(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('update', $campaign);
+
+        // Only allow reset when campaign is PAUSED
+        if ($campaign->status !== CampaignStatus::PAUSED) {
+            return response()->json([
+                'message' => 'Caller ID cycle can only be reset when campaign is PAUSED',
+                'errors' => [
+                    'status' => ['Campaign must be in PAUSED status to reset the cycle.'],
+                ],
+            ], 409);
+        }
+
+        // Reset the Round Robin counter in Redis
+        $redisKey = "campaign:{$campaign->id}:caller_id_index";
+
+        try {
+            $dialerRedis = Redis::connection('dialer');
+            $dialerRedis->set($redisKey, 0);
+
+            return response()->json([
+                'message' => 'Caller ID cycle reset successfully',
+                'campaign_id' => $campaign->id,
+                'strategy' => $campaign->caller_id_strategy?->value,
+                'next_index' => 0,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to reset Caller ID cycle', [
+                'campaign_id' => $campaign->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to reset Caller ID cycle',
+                'errors' => [
+                    'redis' => ['Could not reset cycle counter. Please try again.'],
+                ],
+            ], 500);
+        }
+    }
 }

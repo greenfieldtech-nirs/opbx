@@ -401,6 +401,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
     // Campaigns CRUD + lifecycle
     Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)
         ->parameters(['auto-dialer-campaigns' => 'campaign']);
+    Route::get('auto-dialer-campaigns/available-caller-ids', [AutoDialerCampaignController::class, 'getAvailableCallerIds'])
+        ->name('auto-dialer-campaigns.available-caller-ids');
     Route::patch('auto-dialer-campaigns/{campaign}/start', [AutoDialerCampaignController::class, 'start'])
         ->name('auto-dialer-campaigns.start');
     Route::patch('auto-dialer-campaigns/{campaign}/pause', [AutoDialerCampaignController::class, 'pause'])
@@ -419,6 +421,10 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('auto-dialer-campaigns.destinations');
     Route::get('auto-dialer-campaigns/{campaign}/concurrency', [AutoDialerCampaignController::class, 'concurrency'])
         ->name('auto-dialer-campaigns.concurrency');
+    Route::get('auto-dialer-campaigns/{campaign}/caller-id-stats', [AutoDialerCampaignController::class, 'getCallerIdStats'])
+        ->name('auto-dialer-campaigns.caller-id-stats');
+    Route::post('auto-dialer-campaigns/{campaign}/reset-caller-id-cycle', [AutoDialerCampaignController::class, 'resetCallerIdCycle'])
+        ->name('auto-dialer-campaigns.reset-caller-id-cycle');
 });
 
 // Platform Manager Routes (separate file)
