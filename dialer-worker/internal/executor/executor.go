@@ -171,8 +171,17 @@ func (e *Executor) selectCallerID(
 	destination *models.Destination,
 	isRetry bool,
 ) (*models.CallerIDPoolItem, error) {
+	e.logger.Info("selecting caller ID",
+		"campaign_id", campaign.ID,
+		"caller_id_pool_enabled", campaign.CallerIDPoolEnabled,
+		"pool_size", len(campaign.CallerIDPool),
+		"caller_id_strategy", campaign.CallerIDStrategy,
+		"is_retry", isRetry,
+	)
+
 	// If pool not enabled, use legacy Caller ID
 	if !campaign.CallerIDPoolEnabled {
+		e.logger.Info("pool not enabled, using legacy caller ID", "caller_id", campaign.CallerID)
 		return &models.CallerIDPoolItem{
 			DIDID:       0, // Unknown for legacy
 			PhoneNumber: campaign.CallerID,
@@ -180,20 +189,48 @@ func (e *Executor) selectCallerID(
 		}, nil
 	}
 
+	// If pool is empty, fall back to legacy
+	if len(campaign.CallerIDPool) == 0 {
+		e.logger.Warn("pool enabled but empty, using legacy caller ID", "caller_id", campaign.CallerID)
+		return &models.CallerIDPoolItem{
+			DIDID:       0,
+			PhoneNumber: campaign.CallerID,
+			Weight:      1,
+		}, nil
+	}
+
+	// Log pool contents
+	for i, item := range campaign.CallerIDPool {
+		e.logger.Info("pool item",
+			"index", i,
+			"did_id", item.DIDID,
+			"phone_number", item.PhoneNumber,
+			"weight", item.Weight,
+		)
+	}
+
 	// Create strategy
 	strategy := e.strategyFactory.Create(campaign.CallerIDStrategy)
+	e.logger.Info("using strategy", "strategy", strategy.Name())
 
 	// If retrying, get tried DIDs and select a different one
 	if isRetry {
 		triedDIDs, err := e.retryTracker.GetTriedDIDs(ctx, campaign.ID, destination.ID)
 		if err == nil && len(triedDIDs) > 0 {
+			e.logger.Info("retry mode, excluding tried DIDs", "tried_count", len(triedDIDs))
 			// Use SelectWithRetry to exclude tried DIDs
 			return strategy.SelectWithRetry(ctx, campaign.ID, campaign.CallerIDPool, triedDIDs)
 		}
 	}
 
 	// First attempt or no retry tracking available
-	return strategy.Select(ctx, campaign.ID, campaign.CallerIDPool)
+	selected, err := strategy.Select(ctx, campaign.ID, campaign.CallerIDPool)
+	if err != nil {
+		return nil, err
+	}
+
+	e.logger.Info("selected caller ID", "did_id", selected.DIDID, "phone_number", selected.PhoneNumber)
+	return selected, nil
 }
 
 // HandleCDR processes a CDR event from Cloudonix (via Laravel webhook)

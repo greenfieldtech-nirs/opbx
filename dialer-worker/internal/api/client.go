@@ -62,7 +62,25 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 
 	c.logger.Info("GetActiveCampaigns result", "count", len(campaigns))
 	for i, camp := range campaigns {
-		c.logger.Info("Campaign details", "index", i, "id", camp.ID, "name", camp.Name, "status", camp.Status, "cac", camp.CAC)
+		c.logger.Info("Campaign details",
+			"index", i,
+			"id", camp.ID,
+			"name", camp.Name,
+			"status", camp.Status,
+			"cac", camp.CAC,
+			"caller_id_pool_enabled", camp.CallerIDPoolEnabled,
+			"pool_size", len(camp.CallerIDPool),
+			"strategy", camp.CallerIDStrategy,
+		)
+		// Log pool items
+		for j, item := range camp.CallerIDPool {
+			c.logger.Info("Pool item",
+				"campaign_id", camp.ID,
+				"index", j,
+				"did_id", item.DIDID,
+				"phone_number", item.PhoneNumber,
+			)
+		}
 	}
 
 	return campaigns, nil
