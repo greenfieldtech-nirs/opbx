@@ -851,6 +851,12 @@ export default function AutoDialerCampaignForm() {
 
         {/* Actions */}
         <div className="flex justify-end gap-4 pt-6">
+          {/* Debug: Show form errors if any */}
+          {Object.keys(errors).length > 0 && (
+            <div className="mr-auto text-sm text-red-500">
+              Please fix the errors above before submitting.
+            </div>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -864,6 +870,9 @@ export default function AutoDialerCampaignForm() {
               createMutation.isPending ||
               updateMutation.isPending
             }
+            onClick={() => {
+              console.log('Form submit clicked', { isEditing, isDirty, errors });
+            }}
           >
             {(createMutation.isPending || updateMutation.isPending) && (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />

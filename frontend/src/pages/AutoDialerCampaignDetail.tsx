@@ -22,8 +22,6 @@ import {
   Pencil,
   TrendingUp,
   Phone,
-  Percent,
-  Hash,
   Shuffle,
   ListOrdered,
   Timer,
@@ -194,7 +192,6 @@ export default function AutoDialerCampaignDetail() {
   // Get Caller ID pool from campaign data
   const callerIdPool = (campaign as any)?.caller_id_pool || [];
   const callerIdStrategy = (campaign as any)?.caller_id_strategy || 'round_robin';
-  const totalWeight = callerIdPool.reduce((sum: number, item: any) => sum + (item.weight || 1), 0);
 
   if (isCampaignLoading) {
     return (
@@ -361,9 +358,7 @@ export default function AutoDialerCampaignDetail() {
                   Caller ID Pool
                 </h4>
                 <div className="space-y-2">
-                  {callerIdPool.map((item: any) => {
-                    const percentage = totalWeight > 0 ? ((item.weight || 1) / totalWeight) * 100 : 0;
-                    return (
+                    {callerIdPool.map((item: any) => (
                       <div key={item.did_id} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2 min-w-0">
                           <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -376,18 +371,8 @@ export default function AutoDialerCampaignDetail() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Percent className="h-3 w-3" />
-                            <span className="tabular-nums">{percentage.toFixed(1)}%</span>
-                          </div>
-                          <Badge variant="outline" className="text-xs font-normal">
-                            weight: {item.weight || 1}
-                          </Badge>
-                        </div>
                       </div>
-                    );
-                  })}
+                    ))}
                 </div>
               </div>
             )}
