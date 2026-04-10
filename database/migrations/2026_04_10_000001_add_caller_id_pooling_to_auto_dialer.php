@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -58,8 +58,14 @@ return new class extends Migration
                 ->after('caller_id_strategy');
         });
 
-        // 4. Add column to auto_dialer_call_sessions
+        // 4. Add columns to auto_dialer_call_sessions
         Schema::table('auto_dialer_call_sessions', function (Blueprint $table) {
+            // First add caller_id if it doesn't exist (for storing the phone number used)
+            if (! Schema::hasColumn('auto_dialer_call_sessions', 'caller_id')) {
+                $table->string('caller_id', 50)->nullable()->after('destination_id');
+            }
+
+            // Add caller_did_id for tracking which DID was used
             $table->foreignId('caller_did_id')
                 ->nullable()
                 ->after('caller_id')
@@ -125,8 +131,12 @@ return new class extends Migration
     {
         // Drop foreign key and column from auto_dialer_call_sessions
         Schema::table('auto_dialer_call_sessions', function (Blueprint $table) {
-            $table->dropForeign(['caller_did_id']);
-            $table->dropColumn('caller_did_id');
+            if (Schema::hasColumn('auto_dialer_call_sessions', 'caller_did_id')) {
+                $table->dropForeign(['caller_did_id']);
+                $table->dropColumn('caller_did_id');
+            }
+            // Note: We don't drop caller_id here as it might have been added by this migration
+            // or might have existed before. Manual cleanup may be needed on rollback.
         });
 
         // Drop columns from auto_dialer_campaigns
