@@ -81,7 +81,7 @@ const campaignSchema = z.object({
     z.object({
       did_id: z.number().int().positive(),
       phone_number: z.string().min(1),
-      friendly_name: z.string().optional(),
+      friendly_name: z.string().optional().nullable().transform(val => val || undefined),
       weight: z.number().int().min(1).max(100).optional(),
     })
   ).max(100, 'Maximum 100 Caller IDs allowed'),

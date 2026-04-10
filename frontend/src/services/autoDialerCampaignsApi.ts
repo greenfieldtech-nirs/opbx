@@ -273,7 +273,7 @@ export const autoDialerCampaignsApi = {
   getCallerIdStats: (campaignId: number) =>
     api
       .get<{ data: CallerIdStat[] }>(`/auto-dialer-campaigns/${campaignId}/caller-id-stats`)
-      .then((r) => r.data.data),
+      .then((r) => r.data.data || []),
 
   resetCallerIdCycle: (campaignId: number) =>
     api

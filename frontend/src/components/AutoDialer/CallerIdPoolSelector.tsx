@@ -53,8 +53,8 @@ import { useAvailableCallerIds } from '@/hooks/useCallerIdPool';
 export interface CallerIdPoolItem {
   did_id: number;
   phone_number: string;
-  friendly_name?: string;
-  weight?: number; // Optional, kept for API compatibility
+  friendly_name?: string | null;
+  weight?: number;
 }
 
 interface CallerIdPoolSelectorProps {
