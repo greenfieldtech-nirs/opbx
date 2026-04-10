@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AmdMode;
+use App\Enums\CallerIdStrategy;
 use App\Enums\CampaignStatus;
 use App\Enums\RoutingDestinationType;
 use App\Scopes\OrganizationScope;
