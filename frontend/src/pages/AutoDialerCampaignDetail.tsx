@@ -122,68 +122,6 @@ export default function AutoDialerCampaignDetail() {
   );
   const distributionLists = distributionListsData?.data || [];
 
-  // Fetch Caller ID statistics if campaign has a pool
-  const campaignIdNum = id ? parseInt(id, 10) : 0;
-  const hasCallerIdPool = campaign && ((campaign as any).caller_id_pool?.length > 0 || (campaign as any).caller_id_strategy);
-  const { data: callerIdStats, isLoading: isStatsLoading } = useCallerIdStats(campaignIdNum);
-
-  // Mutations
-  const startMutation = useStartCampaign();
-  const pauseMutation = usePauseCampaign();
-  const resumeMutation = useResumeCampaign();
-  const archiveMutation = useArchiveCampaign();
-
-  const handleAction = (action: 'start' | 'pause' | 'resume' | 'archive') => {
-    setActionType(action);
-    setIsActionDialogOpen(true);
-  };
-
-  const confirmAction = async () => {
-    if (!id || !actionType) return;
-
-    try {
-      switch (actionType) {
-        case 'start':
-          await startMutation.mutateAsync(id);
-          toast.success('Campaign started successfully');
-          break;
-        case 'pause':
-          await pauseMutation.mutateAsync(id);
-          toast.success('Campaign paused successfully');
-          break;
-        case 'resume':
-          await resumeMutation.mutateAsync(id);
-          toast.success('Campaign resumed successfully');
-          break;
-        case 'archive':
-          await archiveMutation.mutateAsync(id);
-          toast.success('Campaign archived successfully');
-          handleBackToCampaigns();
-          return;
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || `Failed to ${actionType} campaign`);
-    } finally {
-      setIsActionDialogOpen(false);
-      setActionType(null);
-    }
-  };
-
-  const getActionIcon = () => {
-    switch (actionType) {
-      case 'start':
-        return <Play className="h-5 w-5" />;
-      case 'pause':
-        return <Pause className="h-5 w-5" />;
-      case 'resume':
-        return <RotateCcw className="h-5 w-5" />;
-      case 'archive':
-        return <Archive className="h-5 w-5" />;
-      default:
-        return null;
-    }
-  };
-
   // Get Caller ID pool from campaign data
   const callerIdPool = (campaign as any)?.caller_id_pool || [];
   const callerIdStrategy = (campaign as any)?.caller_id_strategy || 'round_robin';
