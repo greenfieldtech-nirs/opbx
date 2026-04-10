@@ -272,6 +272,43 @@ func (c *Client) GetWorkerCount(ctx context.Context) (int64, error) {
 	return count, iter.Err()
 }
 
+// === Caller ID Pool Strategy Methods ===
+
+// Incr atomically increments a key and returns the new value
+func (c *Client) Incr(ctx context.Context, key string) (int64, error) {
+	return c.client.Incr(ctx, key).Result()
+}
+
+// Expire sets a TTL on a key (in seconds)
+func (c *Client) Expire(ctx context.Context, key string, seconds int) error {
+	return c.client.Expire(ctx, key, time.Duration(seconds)*time.Second).Err()
+}
+
+// HGetAll gets all fields from a hash
+func (c *Client) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	return c.client.HGetAll(ctx, key).Result()
+}
+
+// HSet sets a field in a hash
+func (c *Client) HSet(ctx context.Context, key string, field string, value interface{}) error {
+	return c.client.HSet(ctx, key, field, value).Err()
+}
+
+// SAdd adds members to a set
+func (c *Client) SAdd(ctx context.Context, key string, members ...interface{}) error {
+	return c.client.SAdd(ctx, key, members...).Err()
+}
+
+// SMembers returns all members of a set
+func (c *Client) SMembers(ctx context.Context, key string) ([]string, error) {
+	return c.client.SMembers(ctx, key).Result()
+}
+
+// Del deletes a key
+func (c *Client) Del(ctx context.Context, key string) error {
+	return c.client.Del(ctx, key).Err()
+}
+
 // === CallState struct for Redis storage ===
 
 type CallState struct {
