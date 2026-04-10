@@ -494,10 +494,6 @@ export default function AutoDialerCampaignDetail() {
                     <span className="text-muted-foreground">Destination Type</span>
                     <span className="font-medium">{campaign.routing_destination_label}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Caller ID</span>
-                    <span className="font-medium">{campaign.caller_id}</span>
-                  </div>
                   {/* Show Caller ID Pool info if available */}
                   {(callerIdPool.length > 0 || (campaign as any).caller_id_strategy) && (
                     <>
@@ -508,9 +504,19 @@ export default function AutoDialerCampaignDetail() {
                           <span className="font-medium">{getStrategyLabel(callerIdStrategy)}</span>
                         </div>
                       </div>
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Caller ID Pool</span>
-                        <Badge variant="secondary">{callerIdPool.length} numbers</Badge>
+                      <div className="py-2 border-b">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-muted-foreground">Caller ID Pool</span>
+                          <span className="text-xs text-muted-foreground">{callerIdPool.length} numbers</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {callerIdPool.map((item: any) => (
+                            <Badge key={item.did_id} variant="outline" className="font-mono">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {item.phone_number}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}
