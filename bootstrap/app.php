@@ -129,19 +129,20 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null; // Let Laravel handle other codes
             }
 
-            // Skip API routes - return JSON instead
-            if ($request->is('api/*') || $request->expectsJson()) {
+            // Check for query parameter override (for testing)
+            $queryCode = $request->query('code');
+            if ($queryCode && in_array((int) $queryCode, [403, 404, 405, 500], true)) {
+                $statusCode = (int) $queryCode;
+            }
+
+            // Only return JSON if the request explicitly expects JSON (via Accept header)
+            // Webhook routes and browser requests will get the HTML error page
+            if ($request->expectsJson()) {
                 return response()->json([
                     'error' => class_basename(get_class($e)),
                     'message' => $e->getMessage() ?: 'An error occurred.',
                     'status' => $statusCode,
                 ], $statusCode);
-            }
-
-            // Check for query parameter override (for testing)
-            $queryCode = $request->query('code');
-            if ($queryCode && in_array((int) $queryCode, [403, 404, 405, 500], true)) {
-                $statusCode = (int) $queryCode;
             }
 
             return response()->view('errors.custom', ['code' => $statusCode], $statusCode);
