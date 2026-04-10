@@ -146,6 +146,25 @@ export interface CampaignParams {
   page?: number;
 }
 
+// Caller ID Pool Types
+export interface AvailableCallerId {
+  id: number;
+  phone_number: string;
+  friendly_name?: string;
+  status: 'active' | 'inactive';
+}
+
+export interface CallerIdStat {
+  did_id: number;
+  phone_number: string;
+  friendly_name?: string;
+  total_calls: number;
+  completed_calls: number;
+  failed_calls: number;
+  success_rate: number;
+  last_used_at: string | null;
+}
+
 /**
  * Auto Dialer Campaigns API
  */
@@ -225,6 +244,24 @@ export const autoDialerCampaignsApi = {
   getDestinations: (campaignId: string, params?: { status?: string; per_page?: number; page?: number }) =>
     api
       .get<PaginatedResponse<CampaignDestination>>(`/auto-dialer-campaigns/${campaignId}/destinations`, { params })
+      .then((r) => r.data),
+
+  // Caller ID Pool Management
+  getAvailableCallerIds: (excludeCampaignId?: number) =>
+    api
+      .get<{ data: AvailableCallerId[] }>('/auto-dialer-campaigns/available-caller-ids', {
+        params: excludeCampaignId ? { exclude_campaign_id: excludeCampaignId } : undefined,
+      })
+      .then((r) => r.data.data),
+
+  getCallerIdStats: (campaignId: number) =>
+    api
+      .get<{ data: CallerIdStat[] }>(`/auto-dialer-campaigns/${campaignId}/caller-id-stats`)
+      .then((r) => r.data.data),
+
+  resetCallerIdCycle: (campaignId: number) =>
+    api
+      .post<{ message: string }>(`/auto-dialer-campaigns/${campaignId}/reset-caller-id-cycle`)
       .then((r) => r.data),
 };
 
