@@ -234,8 +234,15 @@ class DialerWorkerController extends Controller
         $webhookBaseUrl = $cloudonixSettings->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
         $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
 
-        // Initiate the call via Cloudonix API
-        $result = $cloudonixService->initiateCall($campaign, $destination, $cloudonixSettings, $callbackUrl);
+        // Initiate the call via Cloudonix API with selected Caller ID
+        $result = $cloudonixService->initiateCall(
+            $campaign,
+            $destination,
+            $cloudonixSettings,
+            $callbackUrl,
+            $validated['caller_id'] ?? null,
+            $validated['caller_did_id'] ?? null
+        );
 
         if (! $result['success']) {
             Log::error('DialerWorker: Failed to initiate call via Cloudonix', [
