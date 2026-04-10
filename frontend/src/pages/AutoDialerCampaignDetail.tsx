@@ -141,6 +141,42 @@ export default function AutoDialerCampaignDetail() {
     }
   };
 
+  const handleAction = (action: 'start' | 'pause' | 'resume' | 'archive') => {
+    setActionType(action);
+    setIsActionDialogOpen(true);
+  };
+
+  const confirmAction = async () => {
+    if (!id || !actionType) return;
+
+    try {
+      switch (actionType) {
+        case 'start':
+          await startMutation.mutateAsync(id);
+          toast.success('Campaign started successfully');
+          break;
+        case 'pause':
+          await pauseMutation.mutateAsync(id);
+          toast.success('Campaign paused successfully');
+          break;
+        case 'resume':
+          await resumeMutation.mutateAsync(id);
+          toast.success('Campaign resumed successfully');
+          break;
+        case 'archive':
+          await archiveMutation.mutateAsync(id);
+          toast.success('Campaign archived successfully');
+          handleBackToCampaigns();
+          return;
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || `Failed to ${actionType} campaign`);
+    } finally {
+      setIsActionDialogOpen(false);
+      setActionType(null);
+    }
+  };
+
   if (isCampaignLoading) {
     return (
       <div className="container mx-auto p-6">
