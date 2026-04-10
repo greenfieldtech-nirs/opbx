@@ -49,7 +49,7 @@ class DialerWorkerController extends Controller
 
         // Bypass organization scope for worker API
         $campaigns = OrganizationScope::bypass(function () {
-            return AutoDialerCampaign::with('organization.cloudonixSettings')
+            return AutoDialerCampaign::with(['organization.cloudonixSettings', 'callerIds'])
                 ->where('status', CampaignStatus::ACTIVE)
                 ->whereDate('start_date', '<=', now())
                 ->whereDate('end_date', '>=', now())
@@ -193,6 +193,8 @@ class DialerWorkerController extends Controller
             'phone_number' => ['required', 'string'],
             'worker_id' => ['required', 'string'],
             'initiated_at' => ['required', 'date'],
+            'caller_id' => ['nullable', 'string'],
+            'caller_did_id' => ['nullable', 'integer'],
         ]);
 
         // Bypass organization scope for worker API
@@ -256,6 +258,8 @@ class DialerWorkerController extends Controller
                 'session_token' => $result['session_token'] ?? 'sess-'.uniqid(),
                 'call_id' => $result['call_id'] ?? null,
                 'phone_number' => $validated['phone_number'],
+                'caller_id' => $validated['caller_id'] ?? $campaign->caller_id,
+                'caller_did_id' => $validated['caller_did_id'] ?? null,
                 'worker_id' => $validated['worker_id'],
                 'status' => 'initiated',
                 'initiated_at' => $validated['initiated_at'],
@@ -287,6 +291,8 @@ class DialerWorkerController extends Controller
             'data' => [
                 'session_id' => $session->id,
                 'call_id' => $result['call_id'],
+                'caller_id' => $validated['caller_id'] ?? $campaign->caller_id,
+                'caller_did_id' => $validated['caller_did_id'] ?? null,
                 'callback_url' => $callbackUrl,
             ],
         ], 201);
