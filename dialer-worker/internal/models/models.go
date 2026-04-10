@@ -135,6 +135,8 @@ type InitiateCallRequest struct {
 	DestinationID int64    `json:"destination_id"`
 	PhoneNumber   string   `json:"phone_number"`
 	WorkerID      string   `json:"worker_id"`
+	CallerID      string   `json:"caller_id,omitempty"`     // Selected Caller ID from pool
+	CallerDIDID   int64    `json:"caller_did_id,omitempty"` // DID ID of selected Caller ID
 	InitiatedAt   FlexTime `json:"initiated_at"`
 }
 
