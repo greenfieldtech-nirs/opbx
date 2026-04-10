@@ -2,18 +2,18 @@
  * CallerIdPoolSelector Component
  *
  * Multi-select DID picker with search functionality for Caller ID pooling.
- * Allows selecting multiple phone numbers with configurable weights.
+ * Allows selecting multiple phone numbers for Caller ID cycling.
  *
  * Features:
  * - Searchable dropdown with checkbox-based selection
- * - Selected items display with weight input (1-100)
+ * - Selected items display with remove functionality
  * - Validation for max 100 items
  * - Empty state with "Add Caller IDs" button
  * - Loading and error states
  *
  * @example
  * <CallerIdPoolSelector
- *   selected={[{ did_id: 1, phone_number: "+1234567890", weight: 1 }]}
+ *   selected={[{ did_id: 1, phone_number: "+1234567890" }]}
  *   onChange={(pool) => setPool(pool)}
  *   maxSelection={100}
  * />
@@ -46,7 +46,6 @@ import {
   AlertCircle,
   Check,
   ChevronDown,
-  GripVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAvailableCallerIds } from '@/hooks/useCallerIdPool';
@@ -55,7 +54,7 @@ export interface CallerIdPoolItem {
   did_id: number;
   phone_number: string;
   friendly_name?: string;
-  weight: number;
+  weight?: number; // Optional, kept for API compatibility
 }
 
 interface CallerIdPoolSelectorProps {
@@ -106,7 +105,6 @@ export function CallerIdPoolSelector({
       did_id: did.id,
       phone_number: did.phone_number,
       friendly_name: did.friendly_name,
-      weight: 1,
     };
 
     onChange([...selected, newItem]);
@@ -115,15 +113,6 @@ export function CallerIdPoolSelector({
 
   const handleRemove = (didId: number) => {
     onChange(selected.filter((item) => item.did_id !== didId));
-  };
-
-  const handleWeightChange = (didId: number, weight: number) => {
-    const clampedWeight = Math.max(1, Math.min(100, weight));
-    onChange(
-      selected.map((item) =>
-        item.did_id === didId ? { ...item, weight: clampedWeight } : item
-      )
-    );
   };
 
   const isMaxReached = selected.length >= maxSelection;
@@ -297,11 +286,6 @@ export function CallerIdPoolSelector({
               disabled && 'opacity-50'
             )}
           >
-            {/* Drag handle (for reordering - visual only for now) */}
-            <div className="text-muted-foreground cursor-grab active:cursor-grabbing">
-              <GripVertical className="h-4 w-4" />
-            </div>
-
             {/* Phone number info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -313,29 +297,6 @@ export function CallerIdPoolSelector({
                   {item.friendly_name}
                 </div>
               )}
-            </div>
-
-            {/* Weight input */}
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor={`weight-${item.did_id}`}
-                className="text-xs text-muted-foreground whitespace-nowrap"
-              >
-                Weight:
-              </label>
-              <Input
-                id={`weight-${item.did_id}`}
-                type="number"
-                min={1}
-                max={100}
-                value={item.weight}
-                onChange={(e) =>
-                  handleWeightChange(item.did_id, parseInt(e.target.value, 10) || 1)
-                }
-                className="w-16 h-8 text-center"
-                disabled={disabled}
-                aria-label={`Weight for ${item.phone_number}`}
-              />
             </div>
 
             {/* Remove button */}
@@ -355,8 +316,7 @@ export function CallerIdPoolSelector({
 
       {/* Helper text */}
       <p className="text-xs text-muted-foreground">
-        Higher weights increase the frequency of selection. Weights are relative to the total
-        weight of all Caller IDs in the pool.
+        Selected Caller IDs will be cycled through based on the chosen strategy.
       </p>
     </div>
   );

@@ -65,7 +65,6 @@ import {
   CallerIdPoolSelector,
   type CallerIdPoolItem,
 } from '@/components/AutoDialer/CallerIdPoolSelector';
-import { CallerIdPoolSummary } from '@/components/AutoDialer/CallerIdPoolSummary';
 
 // Validation schema with Caller ID Pooling support
 const campaignSchema = z.object({
@@ -83,7 +82,7 @@ const campaignSchema = z.object({
       did_id: z.number().int().positive(),
       phone_number: z.string().min(1),
       friendly_name: z.string().optional(),
-      weight: z.number().int().min(1).max(100),
+      weight: z.number().int().min(1).max(100).optional(),
     })
   ).max(100, 'Maximum 100 Caller IDs allowed'),
   max_dial_attempts: z.number().min(1).max(5).default(1),
@@ -180,7 +179,6 @@ function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPool
   return [{
     did_id: 0, // Will be resolved by backend
     phone_number: callerId,
-    weight: 1,
   }];
 }
 
@@ -556,9 +554,6 @@ export default function AutoDialerCampaignForm() {
                         <p className="text-sm text-red-500">{errors.caller_id_pool.message}</p>
                       )}
                     </div>
-
-                    {/* Pool Summary */}
-                    <CallerIdPoolSummary pool={callerIdPool} />
                   </div>
                 </div>
 
