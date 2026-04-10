@@ -113,6 +113,12 @@ export default function AutoDialerCampaignDetail() {
 
   const canManageCampaigns = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
 
+  // Mutations
+  const startMutation = useStartCampaign();
+  const pauseMutation = usePauseCampaign();
+  const resumeMutation = useResumeCampaign();
+  const archiveMutation = useArchiveCampaign();
+
   // Fetch campaign data — poll every 10s when campaign is active
   const { data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
 
