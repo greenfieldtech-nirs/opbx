@@ -25,12 +25,10 @@ import {
   Shuffle,
   ListOrdered,
   Timer,
-  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -47,7 +45,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,9 +57,7 @@ import {
   autoDialerKeys,
 } from '@/hooks/useAutoDialerCampaigns';
 import { useDistributionLists } from '@/hooks/useDistributionLists';
-import { useCallerIdStats } from '@/hooks/useCallerIdPool';
 import type { AutoDialerCampaign } from '@/services/autoDialerCampaignsApi';
-import { formatTimeAgo } from '@/utils/formatters';
 
 function getStatusBadge(status: string) {
   const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -325,126 +320,6 @@ export default function AutoDialerCampaignDetail() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Caller ID Statistics Section */}
-      {(hasCallerIdPool || callerIdPool.length > 0) && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Phone className="h-5 w-5" />
-                  Caller ID Statistics
-                </CardTitle>
-                <CardDescription>
-                  Performance breakdown by phone number
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="gap-1">
-                  {getStrategyIcon(callerIdStrategy)}
-                  {getStrategyLabel(callerIdStrategy)}
-                </Badge>
-                <Badge variant="outline">{callerIdPool.length} numbers</Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Caller ID Pool Summary */}
-            {callerIdPool.length > 0 && (
-              <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  Caller ID Pool
-                </h4>
-                <div className="space-y-2">
-                    {callerIdPool.map((item: any) => (
-                      <div key={item.did_id} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="font-medium truncate">
-                            {item.friendly_name || item.phone_number}
-                          </span>
-                          {item.friendly_name && (
-                            <span className="text-muted-foreground text-xs truncate hidden sm:inline">
-                              ({item.phone_number})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Detailed Statistics Table */}
-            {isStatsLoading ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                <p>Loading Caller ID statistics...</p>
-              </div>
-            ) : callerIdStats && callerIdStats.length > 0 ? (
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Phone Number</TableHead>
-                      <TableHead className="text-right">Total Calls</TableHead>
-                      <TableHead className="text-right">Completed</TableHead>
-                      <TableHead className="text-right">Failed</TableHead>
-                      <TableHead>Success Rate</TableHead>
-                      <TableHead>Last Used</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {callerIdStats.map((stat) => (
-                      <TableRow key={stat.did_id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <div className="font-medium">{stat.phone_number}</div>
-                              {stat.friendly_name && (
-                                <div className="text-sm text-muted-foreground">
-                                  {stat.friendly_name}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">{stat.total_calls}</TableCell>
-                        <TableCell className="text-right text-green-600">{stat.completed_calls}</TableCell>
-                        <TableCell className="text-right text-red-600">{stat.failed_calls}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={stat.success_rate} className="w-20 h-2" />
-                            <span className="text-sm text-muted-foreground">
-                              {stat.success_rate.toFixed(1)}%
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {stat.last_used_at
-                            ? formatTimeAgo(new Date(stat.last_used_at))
-                            : 'Never'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>No statistics available</AlertTitle>
-                <AlertDescription>
-                  Caller ID statistics will appear here once calls have been made using this campaign.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Settings Tab - Full Campaign Details */}
       <Card>
