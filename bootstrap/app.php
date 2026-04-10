@@ -145,6 +145,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], $statusCode);
             }
 
-            return response()->view('errors.custom', ['code' => $statusCode], $statusCode);
+            // Generate CSP nonce for inline scripts
+            $nonce = base64_encode(random_bytes(16));
+
+            return response()->view('errors.custom', [
+                'code' => $statusCode,
+                'csp_nonce' => $nonce,
+            ], $statusCode)->withHeaders([
+                'Content-Security-Policy' => "script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'unsafe-inline'",
+            ]);
         });
     })->create();
