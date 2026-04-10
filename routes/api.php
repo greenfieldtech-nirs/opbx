@@ -398,11 +398,13 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
     Route::post('auto-dialer-campaigns/lists/{list}/unassign', [\App\Http\Controllers\DistributionListController::class, 'unassignFromCampaign'])
         ->name('distribution-lists.unassign');
 
+    // Campaigns - Caller ID Pooling (static routes must come BEFORE apiResource)
+    Route::get('auto-dialer-campaigns/available-caller-ids', [AutoDialerCampaignController::class, 'getAvailableCallerIds'])
+        ->name('auto-dialer-campaigns.available-caller-ids');
+
     // Campaigns CRUD + lifecycle
     Route::apiResource('auto-dialer-campaigns', AutoDialerCampaignController::class)
         ->parameters(['auto-dialer-campaigns' => 'campaign']);
-    Route::get('auto-dialer-campaigns/available-caller-ids', [AutoDialerCampaignController::class, 'getAvailableCallerIds'])
-        ->name('auto-dialer-campaigns.available-caller-ids');
     Route::patch('auto-dialer-campaigns/{campaign}/start', [AutoDialerCampaignController::class, 'start'])
         ->name('auto-dialer-campaigns.start');
     Route::patch('auto-dialer-campaigns/{campaign}/pause', [AutoDialerCampaignController::class, 'pause'])
