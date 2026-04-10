@@ -10,15 +10,18 @@ use App\Http\Requests\CreateCampaignRequest;
 use App\Http\Requests\UpdateCampaignRequest;
 use App\Http\Requests\UploadListRequest;
 use App\Http\Resources\AutoDialerCampaignResource;
+use App\Models\AutoDialerCallerIdStat;
 use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\DidNumber;
 use App\Scopes\OrganizationScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -57,6 +60,9 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('view', $campaign);
 
+        // Load caller ID pool with DID numbers
+        $campaign->load('callerIds');
+
         return response()->json([
             'data' => new AutoDialerCampaignResource($campaign),
         ]);
@@ -70,23 +76,100 @@ class AutoDialerCampaignController extends Controller
         $this->authorize('create', AutoDialerCampaign::class);
 
         $data = $request->validated();
-        $data['organization_id'] = Auth::user()->organization_id;
-        $data['status'] = CampaignStatus::DRAFT;
-        $data['total_destinations'] = 0;
-        $data['completed_calls'] = 0;
-        $data['failed_calls'] = 0;
-        $data['pending_calls'] = 0;
+        $organizationId = Auth::user()->organization_id;
+
+        // Validate Caller ID Pool DIDs belong to organization and are active
+        $callerIdPool = $data['caller_id_pool'] ?? [];
+        $didIds = array_column($callerIdPool, 'did_id');
+
+        $validDids = DidNumber::whereIn('id', $didIds)
+            ->where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->pluck('id')
+            ->toArray();
+
+        $invalidDids = array_diff($didIds, $validDids);
+        if (! empty($invalidDids)) {
+            return response()->json([
+                'message' => 'Invalid Caller ID pool',
+                'errors' => [
+                    'caller_id_pool' => ['Some DIDs do not exist, do not belong to your organization, or are not active.'],
+                ],
+            ], 422);
+        }
+
+        // Prepare campaign data
+        $campaignData = [
+            'organization_id' => $organizationId,
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'status' => CampaignStatus::DRAFT,
+            'auto_start' => $data['auto_start'] ?? false,
+            'routing_destination_type' => $data['routing_destination_type'],
+            'routing_destination_id' => $data['routing_destination_id'] ?? null,
+            'dial_timeout' => $data['dial_timeout'],
+            'destination_connect' => $data['destination_connect'],
+            'caller_id' => $data['caller_id'],
+            'caller_id_strategy' => $data['caller_id_strategy'],
+            'caller_id_pool_enabled' => true,
+            'max_dial_attempts' => $data['max_dial_attempts'],
+            'concurrent_active_calls' => $data['concurrent_active_calls'],
+            'calls_per_second' => $data['calls_per_second'] ?? 1,
+            'total_destinations' => 0,
+            'completed_calls' => 0,
+            'failed_calls' => 0,
+            'pending_calls' => 0,
+            'start_date' => $data['start_date'],
+            'end_date' => $data['end_date'],
+            'timezone' => $data['timezone'],
+            'time_limit' => $data['time_limit'] ?? null,
+            'record_calls' => $data['record_calls'] ?? false,
+            'amd_enabled' => $data['amd_enabled'] ?? false,
+            'amd_mode' => $data['amd_mode'] ?? null,
+            'amd_timeout' => $data['amd_timeout'] ?? null,
+            'amd_speech_threshold' => $data['amd_speech_threshold'] ?? null,
+            'amd_speech_end_threshold' => $data['amd_speech_end_threshold'] ?? null,
+            'amd_silence_timeout' => $data['amd_silence_timeout'] ?? null,
+        ];
 
         // Extract days_active and legacy time fields from schedule
         $schedule = $data['schedule'] ?? [];
-        $data['days_active'] = $this->extractDaysActiveFromSchedule($schedule);
+        $campaignData['days_active'] = $this->extractDaysActiveFromSchedule($schedule);
+        $campaignData['schedule'] = $schedule;
 
         // Extract start_time and end_time from first enabled day's first time range
         $timeRange = $this->extractTimeRangeFromSchedule($schedule);
-        $data['start_time'] = $timeRange['start_time'] ?? 9;
-        $data['end_time'] = $timeRange['end_time'] ?? 17;
+        $campaignData['start_time'] = $timeRange['start_time'] ?? 9;
+        $campaignData['end_time'] = $timeRange['end_time'] ?? 17;
 
-        $campaign = AutoDialerCampaign::create($data);
+        // Create campaign and sync pool in a transaction
+        $campaign = DB::transaction(function () use ($campaignData, $callerIdPool): AutoDialerCampaign {
+            $campaign = AutoDialerCampaign::create($campaignData);
+
+            // Sync caller ID pool entries
+            $syncData = [];
+            foreach ($callerIdPool as $entry) {
+                $syncData[$entry['did_id']] = ['weight' => $entry['weight']];
+            }
+            $campaign->callerIds()->sync($syncData);
+
+            // Create initial stats records for each Caller ID
+            foreach ($callerIdPool as $entry) {
+                AutoDialerCallerIdStat::create([
+                    'campaign_id' => $campaign->id,
+                    'did_number_id' => $entry['did_id'],
+                    'total_calls' => 0,
+                    'completed_calls' => 0,
+                    'failed_calls' => 0,
+                    'last_used_at' => null,
+                ]);
+            }
+
+            return $campaign;
+        });
+
+        // Load relationships for response
+        $campaign->load('callerIds');
 
         return response()->json([
             'message' => 'Campaign created successfully',
@@ -103,6 +186,16 @@ class AutoDialerCampaignController extends Controller
 
         $data = $request->validated();
 
+        // Check if trying to modify caller_id_pool on active campaign
+        if (isset($data['caller_id_pool']) && $campaign->status === CampaignStatus::ACTIVE) {
+            return response()->json([
+                'message' => 'Cannot modify Caller ID pool on an active campaign',
+                'errors' => [
+                    'caller_id_pool' => ['Please pause the campaign before modifying the Caller ID pool.'],
+                ],
+            ], 409);
+        }
+
         // Extract days_active and legacy time fields from schedule if provided
         if (isset($data['schedule'])) {
             $data['days_active'] = $this->extractDaysActiveFromSchedule($data['schedule']);
@@ -113,7 +206,71 @@ class AutoDialerCampaignController extends Controller
             $data['end_time'] = $timeRange['end_time'] ?? 17;
         }
 
-        $campaign->update($data);
+        // Handle Caller ID Pool updates
+        $callerIdPool = $data['caller_id_pool'] ?? null;
+        unset($data['caller_id_pool']); // Remove from data to be updated directly
+
+        DB::transaction(function () use ($campaign, $data, $callerIdPool): void {
+            // Update campaign fields
+            $campaign->update($data);
+
+            // Update Caller ID Pool if provided
+            if ($callerIdPool !== null) {
+                $organizationId = $campaign->organization_id;
+                $didIds = array_column($callerIdPool, 'did_id');
+
+                // Validate all DIDs belong to organization and are active
+                $validDids = DidNumber::whereIn('id', $didIds)
+                    ->where('organization_id', $organizationId)
+                    ->where('status', 'active')
+                    ->pluck('id')
+                    ->toArray();
+
+                $invalidDids = array_diff($didIds, $validDids);
+                if (! empty($invalidDids)) {
+                    throw new \InvalidArgumentException('Some DIDs do not exist, do not belong to your organization, or are not active.');
+                }
+
+                // Sync pool: delete old entries, create new ones
+                $syncData = [];
+                foreach ($callerIdPool as $entry) {
+                    $syncData[$entry['did_id']] = ['weight' => $entry['weight']];
+                }
+                $campaign->callerIds()->sync($syncData);
+
+                // Get existing stats DID IDs
+                $existingStatDidIds = $campaign->callerIdStats()
+                    ->pluck('did_number_id')
+                    ->toArray();
+
+                $newDidIds = array_diff($didIds, $existingStatDidIds);
+                $removedDidIds = array_diff($existingStatDidIds, $didIds);
+
+                // Create stats records for new DIDs
+                foreach ($callerIdPool as $entry) {
+                    if (in_array($entry['did_id'], $newDidIds, true)) {
+                        AutoDialerCallerIdStat::create([
+                            'campaign_id' => $campaign->id,
+                            'did_number_id' => $entry['did_id'],
+                            'total_calls' => 0,
+                            'completed_calls' => 0,
+                            'failed_calls' => 0,
+                            'last_used_at' => null,
+                        ]);
+                    }
+                }
+
+                // Delete stats records for removed DIDs
+                if (! empty($removedDidIds)) {
+                    $campaign->callerIdStats()
+                        ->whereIn('did_number_id', $removedDidIds)
+                        ->delete();
+                }
+            }
+        });
+
+        // Reload relationships
+        $campaign->load('callerIds');
 
         return response()->json([
             'message' => 'Campaign updated successfully',

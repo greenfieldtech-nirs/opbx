@@ -140,6 +140,12 @@ class CreateCampaignRequest extends FormRequest
 
             // Auto-start option
             'auto_start' => ['boolean'],
+
+            // Caller ID Pooling
+            'caller_id_pool' => ['required', 'array', 'min:1', 'max:100'],
+            'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
+            'caller_id_pool.*.weight' => ['required', 'integer', 'min:1', 'max:100'],
+            'caller_id_strategy' => ['required', Rule::enum(\App\Enums\CallerIdStrategy::class)],
         ];
     }
 

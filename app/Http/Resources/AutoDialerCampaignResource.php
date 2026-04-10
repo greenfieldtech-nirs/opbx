@@ -84,6 +84,36 @@ class AutoDialerCampaignResource extends JsonResource
             'cloudonix_domain' => $this->organization->cloudonixSettings?->domain_uuid ?? $this->organization->cloudonixSettings?->domain_name,
             'cloudonix_api_url' => config('services.cloudonix.api_url', 'https://api.cloudonix.io'),
 
+            // Caller ID Pooling
+            'caller_id_pool_enabled' => $this->caller_id_pool_enabled,
+            'caller_id_strategy' => $this->caller_id_strategy?->value,
+            'caller_id_strategy_label' => $this->caller_id_strategy?->label(),
+            'caller_id_pool' => $this->whenLoaded('callerIds', function () {
+                return $this->callerIds->map(fn ($did) => [
+                    'did_id' => $did->id,
+                    'phone_number' => $did->phone_number,
+                    'friendly_name' => $did->friendly_name,
+                    'weight' => $did->pivot->weight ?? 1,
+                ]);
+            }, []),
+            'caller_id_stats' => $this->whenLoaded('callerIdStats', function () {
+                $stats = $this->callerIdStats;
+                $totalCalls = $stats->sum('total_calls');
+
+                return [
+                    'total_calls' => $totalCalls,
+                    'by_did' => $stats->map(fn ($stat) => [
+                        'did_id' => $stat->did_number_id,
+                        'phone_number' => $stat->didNumber?->phone_number,
+                        'friendly_name' => $stat->didNumber?->friendly_name,
+                        'total_calls' => $stat->total_calls,
+                        'completed' => $stat->completed_calls,
+                        'failed' => $stat->failed_calls,
+                        'success_rate' => $stat->success_rate,
+                    ]),
+                ];
+            }),
+
             // Computed
             'is_runnable' => $this->isRunnable(),
             'has_list' => $this->hasList(),
