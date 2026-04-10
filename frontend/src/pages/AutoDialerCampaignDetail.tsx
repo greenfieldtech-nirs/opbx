@@ -354,7 +354,7 @@ export default function AutoDialerCampaignDetail() {
             {callerIdPool.length > 0 && (
               <div className="mb-6 p-4 bg-muted/50 rounded-lg">
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Hash className="h-4 w-4 text-muted-foreground" />
+                  <Phone className="h-4 w-4 text-muted-foreground" />
                   Caller ID Pool
                 </h4>
                 <div className="space-y-2">
