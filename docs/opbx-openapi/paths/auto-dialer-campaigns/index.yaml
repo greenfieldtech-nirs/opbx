@@ -101,8 +101,31 @@ paths:
                 caller_id:
                   type: string
                   pattern: "^\\+[1-9]\\d{1,14}$"
-                  description: Caller ID in E.164 format
+                  description: Default Caller ID in E.164 format (legacy single Caller ID)
                   example: "+14155551212"
+                caller_id_pool:
+                  type: array
+                  description: Array of Caller IDs for the pool (1-100 items)
+                  items:
+                    type: object
+                    properties:
+                      did_id:
+                        type: integer
+                        description: ID of the DID number
+                        example: 1
+                      weight:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                        default: 1
+                        description: Weight for distribution
+                        example: 1
+                caller_id_strategy:
+                  type: string
+                  enum: [round_robin, random, least_recently_used]
+                  default: round_robin
+                  description: Distribution strategy for Caller ID Pool
+                  example: "round_robin"
                 max_dial_attempts:
                   type: integer
                   minimum: 1
@@ -508,3 +531,194 @@ paths:
                 error: "DELETE_BLOCKED"
                 message: "Cannot delete active campaign. Pause and archive first."
                 code: "CAMPAIGN_ACTIVE"
+
+  /v1/auto-dialer-campaigns/available-caller-ids:
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Get available Caller IDs
+      description: |
+        Get a list of active DID numbers that can be used as Caller IDs
+        for auto-dialer campaigns.
+      operationId: getAvailableCallerIds
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: exclude_campaign_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Campaign ID to exclude DIDs already in that campaign's pool
+      responses:
+        '200':
+          description: List of available Caller IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: DID number ID
+                          example: 1
+                        phone_number:
+                          type: string
+                          description: Phone number in E.164 format
+                          example: "+12127773456"
+                        friendly_name:
+                          type: string
+                          nullable: true
+                          description: Friendly name for the number
+                          example: "Sales Line 1"
+                        status:
+                          type: string
+                          enum: [active, inactive]
+                          description: DID status
+                          example: "active"
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+
+  /v1/auto-dialer-campaigns/{campaign}/caller-id-stats:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Get Caller ID statistics
+      description: |
+        Get usage statistics for each Caller ID in the campaign's pool.
+        Includes total calls, completed, failed, and success rates.
+      operationId: getCallerIdStats
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Caller ID statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campaign_id:
+                    type: integer
+                    example: 9
+                  total_calls:
+                    type: integer
+                    example: 150
+                  strategy:
+                    type: string
+                    example: "round_robin"
+                  stats:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        did_id:
+                          type: integer
+                          example: 1
+                        phone_number:
+                          type: string
+                          example: "+12127773456"
+                        friendly_name:
+                          type: string
+                          nullable: true
+                          example: "Sales Line 1"
+                        total_calls:
+                          type: integer
+                          example: 50
+                        completed_calls:
+                          type: integer
+                          example: 45
+                        failed_calls:
+                          type: integer
+                          example: 5
+                        success_rate:
+                          type: number
+                          format: float
+                          example: 90.0
+                        last_used_at:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          example: "2026-04-10T14:35:00Z"
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+    post:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Reset Caller ID cycle
+      description: |
+        Reset the Caller ID cycle position for Round Robin strategy.
+        Only available when campaign is in PAUSED status.
+      operationId: resetCallerIdCycle
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Cycle reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Caller ID cycle reset successfully"
+                  campaign_id:
+                    type: integer
+                    example: 9
+                  strategy:
+                    type: string
+                    example: "round_robin"
+                  next_index:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          description: Campaign not in valid status for reset
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "INVALID_STATUS"
+                message: "Campaign must be PAUSED to reset cycle"
+                code: "CAMPAIGN_NOT_PAUSED"

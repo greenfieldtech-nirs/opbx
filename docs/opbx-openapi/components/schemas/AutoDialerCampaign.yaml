@@ -67,8 +67,84 @@ properties:
     example: "connected"
   caller_id:
     type: string
-    description: Caller ID in E.164 format
+    description: Default Caller ID in E.164 format (legacy single Caller ID)
     example: "+14155551212"
+  caller_id_pool_enabled:
+    type: boolean
+    description: Whether Caller ID Pooling is enabled
+    example: true
+  caller_id_strategy:
+    type: string
+    enum:
+      - round_robin
+      - random
+      - least_recently_used
+    description: Distribution strategy for Caller ID Pool
+    example: "round_robin"
+  caller_id_strategy_label:
+    type: string
+    description: Human-readable label for the strategy
+    example: "Round Robin"
+  caller_id_pool:
+    type: array
+    description: Array of Caller IDs in the pool
+    items:
+      type: object
+      properties:
+        did_id:
+          type: integer
+          description: ID of the DID number
+          example: 1
+        phone_number:
+          type: string
+          description: Phone number in E.164 format
+          example: "+12127773456"
+        friendly_name:
+          type: string
+          nullable: true
+          description: Friendly name for the Caller ID
+          example: "Sales Line 1"
+        weight:
+          type: integer
+          description: Weight for distribution (default 1)
+          example: 1
+  caller_id_stats:
+    type: object
+    description: Statistics for Caller ID usage
+    properties:
+      total_calls:
+        type: integer
+        description: Total calls across all Caller IDs
+        example: 150
+      by_did:
+        type: array
+        description: Breakdown per Caller ID
+        items:
+          type: object
+          properties:
+            did_id:
+              type: integer
+              example: 1
+            phone_number:
+              type: string
+              example: "+12127773456"
+            friendly_name:
+              type: string
+              nullable: true
+              example: "Sales Line 1"
+            total_calls:
+              type: integer
+              example: 50
+            completed:
+              type: integer
+              example: 45
+            failed:
+              type: integer
+              example: 5
+            success_rate:
+              type: number
+              format: float
+              example: 90.0
   max_dial_attempts:
     type: integer
     minimum: 1
@@ -347,4 +423,6 @@ required:
   - status
   - routing_destination_type
   - caller_id
+  - caller_id_pool_enabled
+  - caller_id_strategy
   - concurrent_active_calls
