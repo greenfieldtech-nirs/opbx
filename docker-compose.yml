@@ -282,30 +282,6 @@ services:
       retries: 3
       start_period: 10s
 
-  # Pinggy - SSH-based tunnel for webhook development
-  # Provides a persistent public URL for Cloudonix webhooks
-  pinggy:
-    image: alpine:latest
-    container_name: opbx_pinggy
-    command: >
-      sh -c "apk add --no-cache openssh-client &&
-      ssh -p 443
-      -R0:nginx:80
-      -Llocalhost:4040:localhost:4300
-      -o StrictHostKeyChecking=no
-      -o ServerAliveInterval=30
-      ${PINGGY_TOKEN}@free.pinggy.io"
-    environment:
-      - PINGGY_TOKEN=${PINGGY_TOKEN}
-    depends_on:
-      - nginx
-    networks:
-      - opbx
-    restart: unless-stopped
-    # Note: Pinggy provides a persistent URL like: https://<token>.a.pinggy.link
-    # Access locally at: http://localhost:4040
-    # This URL should be configured in Cloudonix as the webhook base URL
-
 networks:
   opbx:
     driver: bridge
