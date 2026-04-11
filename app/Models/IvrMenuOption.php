@@ -177,7 +177,7 @@ class IvrMenuOption extends Model
             IvrDestinationType::RING_GROUP => $destination->isActive(),
             IvrDestinationType::CONFERENCE_ROOM => true, // Conference rooms don't have status
             IvrDestinationType::IVR_MENU => $destination->isActive(),
-            IvrDestinationType::AI_ASSISTANT => $destination->status === UserStatus::ACTIVE,
+            IvrDestinationType::AI_ASSISTANT => $destination->status->isActive(),
             IvrDestinationType::AI_LOAD_BALANCER => $destination->isActive(), // uses AlbsStatus, isActive() method handles it
             IvrDestinationType::BUSINESS_HOURS => $destination->isActive(),
         };
