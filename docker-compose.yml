@@ -282,6 +282,31 @@ services:
       retries: 3
       start_period: 10s
 
+  # Gost - GO Simple Tunnel for webhook development
+  # Provides secure tunneling for Cloudonix webhooks
+  # Docs: https://latest.gost.run/en/
+  gost:
+    image: ginuerzh/gost:latest
+    container_name: opbx_gost
+    command: >
+      -L "http://:${GOST_HTTP_PORT:-8080}"
+      -F "${GOST_FORWARD_PROTOCOL:-relay}+tls://${GOST_FORWARD_ADDRESS:-free.gost.run:443}?sniff=false"
+    ports:
+      - "${GOST_HTTP_PORT:-8080}:${GOST_HTTP_PORT:-8080}"
+    environment:
+      - GOST_FORWARD_PROTOCOL=${GOST_FORWARD_PROTOCOL:-relay}
+      - GOST_FORWARD_ADDRESS=${GOST_FORWARD_ADDRESS:-free.gost.run:443}
+      - GOST_HTTP_PORT=${GOST_HTTP_PORT:-8080}
+    depends_on:
+      - nginx
+    networks:
+      - opbx
+    restart: unless-stopped
+    # Note: Configure GOST_FORWARD_ADDRESS with your gost server
+    # Example with auth: relay+tls://user:pass@gost.example.com:443
+    # Local access: http://localhost:${GOST_HTTP_PORT}
+    # Configure Cloudonix webhook URL to point to your gost server
+
 networks:
   opbx:
     driver: bridge
