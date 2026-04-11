@@ -100,9 +100,7 @@ func (c *Config) Validate() error {
 	if c.WebhookPort == "" {
 		return fmt.Errorf("WEBHOOK_PORT is required")
 	}
-	if c.WebhookSecret == "" {
-		return fmt.Errorf("WEBHOOK_SECRET is required")
-	}
+	// Note: WEBHOOK_SECRET is optional - only required if webhook signature verification is enabled
 
 	return nil
 }
