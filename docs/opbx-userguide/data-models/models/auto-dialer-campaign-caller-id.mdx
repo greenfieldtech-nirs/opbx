@@ -1,0 +1,131 @@
+---
+sidebar_position: 11
+slug: /data-models/models/auto-dialer-campaign-caller-id
+sidebar_class_name: cxGuidesSidebar
+title: AutoDialerCampaignCallerId Model
+---
+
+# AutoDialerCampaignCallerId Model
+
+## Overview
+
+Pivot model for the many-to-many relationship between campaigns and Caller IDs (DIDs). Stores the Caller ID pool configuration including optional weights.
+
+**Table:** `auto_dialer_campaign_caller_ids`  
+**Model:** `App\Models\AutoDialerCampaignCallerId`  
+**Type:** Eloquent Pivot
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `campaign_id` | bigint unsigned | No | - | FK to auto_dialer_campaigns |
+| `did_number_id` | bigint unsigned | No | - | FK to did_numbers |
+| `weight` | int unsigned | No | 1 | Distribution weight |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Indexes
+
+- **Primary:** `id`
+- **Unique:** `campaign_id` + `did_number_id` (prevents duplicate assignments)
+- **Foreign Keys:** Indexed automatically
+
+## Relationships
+
+### Belongs To
+```php
+$pivot->campaign() → AutoDialerCampaign
+$pivot->didNumber() → DidNumber
+```
+
+## Usage
+
+### Assigning Caller IDs to Campaign
+
+```php
+use App\Models\AutoDialerCampaign;
+
+$campaign = AutoDialerCampaign::find(1);
+
+// Method 1: Using sync (recommended)
+$campaign->callerIds()->sync([
+    1 => ['weight' => 1],  // did_id => [pivot_data]
+    2 => ['weight' => 1],
+    3 => ['weight' => 2],  // Higher weight = more frequent selection
+]);
+
+// Method 2: Using attach
+$campaign->callerIds()->attach($didId, ['weight' => 1]);
+
+// Method 3: Using detach/remove
+$campaign->callerIds()->detach($didId);
+```
+
+### Accessing Pivot Data
+
+```php
+// When iterating caller IDs
+foreach ($campaign->callerIds as $did) {
+    $weight = $did->pivot->weight;
+    echo "{$did->phone_number} has weight {$weight}";
+}
+```
+
+### Updating Weights
+
+```php
+// Update weight for specific DID in campaign
+$campaign->callerIds()->updateExistingPivot($didId, [
+    'weight' => 3
+]);
+```
+
+## Weight System
+
+The `weight` field controls distribution frequency in weighted strategies:
+
+| Weight | Meaning | Example (3 DIDs with weights 1,1,2) |
+|--------|---------|-------------------------------------|
+| 1 | Normal frequency | 25% selection rate |
+| 2 | 2x frequency | 50% selection rate |
+| 3 | 3x frequency | Higher selection rate |
+
+**Note:** While the backend supports weights, the current UI presents a simplified view without weight editing. All Caller IDs are assigned weight=1 by default.
+
+## Constraints
+
+- Maximum 100 Caller IDs per campaign (enforced at application level)
+- Only DIDs with `status = 'active'` can be assigned
+- DIDs must belong to the same organization as the campaign
+
+## Validation
+
+```php
+// In CreateCampaignRequest/UpdateCampaignRequest
+'caller_id_pool' => ['required', 'array', 'min:1', 'max:100'],
+'caller_id_pool.*.did_id' => ['required', 'exists:did_numbers,id'],
+'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
+```
+
+## Example Queries
+
+```php
+// Get all campaigns using a specific DID
+$campaigns = AutoDialerCampaign::whereHas('callerIds', function ($q) use ($didId) {
+    $q->where('did_numbers.id', $didId);
+})->get();
+
+// Get count of Caller IDs per campaign
+$counts = AutoDialerCampaign::withCount('callerIds')->get();
+
+// Check if DID is in campaign pool
+$hasDid = $campaign->callerIds()->where('did_numbers.id', $didId)->exists();
+```
+
+## Related Models
+
+- [AutoDialerCampaign](./auto-dialer-campaign) - Parent campaign
+- [DidNumber](./did-number) - The actual phone number
+- [AutoDialerCallerIdStat](./auto-dialer-caller-id-stat) - Usage statistics

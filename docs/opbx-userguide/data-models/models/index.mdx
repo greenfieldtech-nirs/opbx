@@ -1,0 +1,427 @@
+---
+sidebar_position: 1
+slug: /data-models/models/index
+sidebar_class_name: cxGuidesSidebar
+title: Database Models
+---
+
+# Database Models
+
+## Auto Dialer Models
+
+### [AutoDialerCampaign](./auto-dialer-campaign)
+Core campaign configuration for outbound dialing.
+
+**Key Features:**
+- Caller ID Pooling (up to 100 numbers)
+- Rate limiting (CAC/CPS)
+- Scheduling
+- Retry logic
+
+### [AutoDialerCampaignCallerId](./auto-dialer-campaign-caller-id)
+Pivot table for Caller ID pool assignments.
+
+**Table:** `auto_dialer_campaign_caller_ids`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `campaign_id` | FK | Reference to campaign |
+| `did_number_id` | FK | Reference to DID |
+| `weight` | int | Distribution weight |
+
+### [AutoDialerCallerIdStat](./auto-dialer-caller-id-stat)
+Per-Caller ID usage statistics.
+
+**Table:** `auto_dialer_caller_id_stats`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `campaign_id` | FK | Reference to campaign |
+| `did_number_id` | FK | Reference to DID |
+| `total_calls` | int | Total calls made |
+| `completed_calls` | int | Successful calls |
+| `failed_calls` | int | Failed calls |
+| `last_used_at` | datetime | Last usage timestamp |
+
+### AutoDialerDestination
+Phone numbers to be called.
+
+**Table:** `auto_dialer_destinations`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `campaign_id` | FK | Parent campaign |
+| `phone_number` | string | E.164 format |
+| `status` | enum | pending, dialing, completed, failed |
+| `dial_attempts` | int | Number of attempts |
+| `next_retry_at` | datetime | Scheduled retry time |
+
+### AutoDialerCallSession
+Individual call session tracking.
+
+**Table:** `auto_dialer_call_sessions`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `campaign_id` | FK | Parent campaign |
+| `destination_id` | FK | Called destination |
+| `session_token` | string | Unique session ID |
+| `call_id` | string | Cloudonix call ID |
+| `caller_id` | string | Caller ID used |
+| `caller_did_id` | FK | DID record used |
+| `status` | enum | initiated, ringing, answered, completed |
+| `disposition` | enum | answered, busy, no-answer, failed |
+
+### AutoDialerList
+Distribution lists containing destinations.
+
+**Table:** `auto_dialer_lists`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | List name |
+| `version` | int | Version for tracking changes |
+| `record_count` | int | Number of records |
+
+## Core PBX Models
+
+### Extension
+PBX extensions for users and services.
+
+**Table:** `extensions`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `extension_number` | string | Short code (e.g., 101) |
+| `name` | string | Display name |
+| `type` | enum | user, ai_assistant, ring_group, etc. |
+| `status` | enum | active, inactive |
+| `ai_assistant_id` | FK | Linked AI assistant |
+| `service_url` | string | SIP service URL |
+| `service_token` | string | Authentication token |
+
+### DidNumber
+Phone numbers (DIDs) for inbound/outbound.
+
+**Table:** `did_numbers`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `phone_number` | string | E.164 format |
+| `friendly_name` | string | Display name |
+| `status` | enum | active, inactive |
+| `purpose` | enum | general, ai_assistant, etc. |
+
+### RingGroup
+Call distribution groups.
+
+**Table:** `ring_groups`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Group name |
+| `strategy` | enum | simultaneous, round_robin, sequential |
+| `timeout` | int | Ring timeout in seconds |
+| `max_call_duration` | int | Maximum call duration |
+
+### RingGroupMember
+Extension assignments to ring groups.
+
+**Table:** `ring_group_members`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `ring_group_id` | FK | Parent group |
+| `extension_id` | FK | Member extension |
+| `position` | int | Order for sequential strategy |
+
+### IvrMenu
+Interactive Voice Response menus.
+
+**Table:** `ivr_menus`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Menu name |
+| `audio_file_path` | string | Greeting audio file |
+| `tts_text` | string | Text-to-speech greeting |
+| `inter_digit_timeout` | int | Timeout between digits |
+| `max_timeout` | int | Maximum wait time |
+
+### IvrMenuOption
+DTMF key options for IVR menus.
+
+**Table:** `ivr_menu_options`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `ivr_menu_id` | FK | Parent menu |
+| `key` | string | DTMF key (0-9, *, #) |
+| `destination_type` | enum | routing destination type |
+| `destination_id` | int | Target destination ID |
+
+## AI Integration Models
+
+### AiAssistant
+AI assistant configurations.
+
+**Table:** `ai_assistants`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Assistant name |
+| `protocol` | enum | websocket, sip |
+| `provider` | string | Provider identifier |
+| `configuration` | json | Provider-specific settings |
+| `max_concurrent_calls` | int | Call limit |
+
+### AiAssistantLoadBalancer
+Load balancer for multiple AI assistants.
+
+**Table:** `ai_assistant_load_balancers`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Load balancer name |
+| `strategy` | enum | round_robin, weighted_random, sequential |
+| `follow_through` | boolean | Retry on failure |
+
+### AiAssistantLoadBalancerMember
+Members of an AI load balancer.
+
+**Table:** `ai_assistant_load_balancer_members`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `load_balancer_id` | FK | Parent load balancer |
+| `ai_assistant_id` | FK | Member assistant |
+| `position` | int | Order/weight |
+| `status` | enum | active, inactive |
+
+## User & Organization Models
+
+### User
+System users with RBAC.
+
+**Table:** `users`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Full name |
+| `email` | string | Email address |
+| `role` | enum | owner, pbx_admin, pbx_user, reporter |
+| `organization_id` | FK | Parent organization |
+| `extension_id` | FK | Linked extension |
+| `status` | enum | active, inactive |
+
+### Organization
+Multi-tenant organization container.
+
+**Table:** `organizations`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Organization name |
+| `status` | enum | active, suspended |
+| `settings` | json | Organization-wide settings |
+
+### CloudonixSettings
+Cloudonix CPaaS credentials per organization.
+
+**Table:** `cloudonix_settings`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `organization_id` | FK | Parent organization |
+| `domain_uuid` | string | Cloudonix domain UUID |
+| `domain_api_key` | string | API authentication key |
+| `voice_application_id` | int | Default voice app ID |
+| `webhook_base_url` | string | Base URL for webhooks |
+
+## Call & Logging Models
+
+### CallLog
+Call records for PBX calls.
+
+**Table:** `call_logs`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `call_id` | string | Unique call identifier |
+| `direction` | enum | inbound, outbound |
+| `from_number` | string | Caller number |
+| `to_number` | string | Called number |
+| `status` | enum | initiated, answered, completed, failed |
+| `duration` | int | Call duration in seconds |
+
+### CallDetailRecord
+Detailed call records from Cloudonix.
+
+**Table:** `call_detail_records`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `call_id` | string | Cloudonix call ID |
+| `session_id` | string | Session identifier |
+| `caller_id` | string | Source number |
+| `destination` | string | Target number |
+| `disposition` | enum | final call disposition |
+| `billsec` | int | Billable seconds |
+| `recording_url` | string | Recording path |
+
+### SessionUpdate
+Real-time call session updates.
+
+**Table:** `session_updates`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `call_id` | string | Call identifier |
+| `status` | enum | current status |
+| `timestamp` | datetime | Update time |
+
+## Security Models
+
+### InboundBlacklist
+Blocked caller ID patterns.
+
+**Table:** `inbound_blacklists`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `pattern` | string | Pattern to match |
+| `match_type` | enum | exact, prefix, wildcard |
+| `block_reason` | string | Reason for blocking |
+| `is_active` | boolean | Active status |
+
+### OutboundWhitelist
+Outbound routing rules.
+
+**Table:** `outbound_whitelists`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `country_code` | string | Country ISO code |
+| `country_name` | string | Country name |
+| `prefix` | string | Number prefix |
+| `outbound_trunk_name` | string | Trunk for routing |
+| `is_active` | boolean | Active status |
+
+### BlockedCallLog
+Log of blocked inbound calls.
+
+**Table:** `blocked_call_logs`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `caller_id` | string | Blocked caller |
+| `did_number_id` | FK | Target DID |
+| `blocked_reason` | string | Why blocked |
+| `occurred_at` | datetime | When blocked |
+
+## Business Hours Models
+
+### BusinessHours
+Business hours configuration.
+
+**Table:** `business_hours`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Configuration name |
+| `timezone` | string | Timezone identifier |
+
+### BusinessHoursTimeRange
+Daily time ranges.
+
+**Table:** `business_hours_time_ranges`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `business_hours_id` | FK | Parent configuration |
+| `day_of_week` | enum | monday-sunday |
+| `start_time` | time | Opening time |
+| `end_time` | time | Closing time |
+
+### BusinessHoursException
+Holiday/exception dates.
+
+**Table:** `business_hours_exceptions`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `business_hours_id` | FK | Parent configuration |
+| `date` | date | Exception date |
+| `is_closed` | boolean | Closed all day |
+| `name` | string | Holiday name |
+
+## Conference Models
+
+### ConferenceRoom
+Conference bridge configuration.
+
+**Table:** `conference_rooms`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `name` | string | Room name |
+| `pin` | string | Access PIN |
+| `max_participants` | int | Participant limit |
+| `mute_on_entry` | boolean | Auto-mute new participants |
+| `announce_join_leave` | boolean | Play join/leave sounds |
+
+## Notification Models
+
+### CallNotificationsSettings
+Webhook notification configuration.
+
+**Table:** `call_notifications_settings`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `webhook_url` | string | Target URL |
+| `enabled_events` | json | Event types to send |
+| `retry_attempts` | int | Retry count |
+| `rate_limit` | int | Max requests per minute |
+
+### CallNotificationLog
+Notification delivery log.
+
+**Table:** `call_notification_logs`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `session_id` | string | Related call session |
+| `event_type` | string | Event that triggered notification |
+| `payload` | json | Data sent |
+| `response_status` | int | HTTP response code |
+| `attempts` | int | Delivery attempts |
+
+### EmailLog
+Transactional email log.
+
+**Table:** `email_logs`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `recipient` | string | To address |
+| `subject` | string | Email subject |
+| `template` | string | Template used |
+| `status` | enum | pending, sent, failed |
+
+## Platform Admin Models
+
+### PlatformAuditLog
+Cross-tenant audit trail.
+
+**Table:** `platform_audit_logs`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `organization_id` | FK | Target organization |
+| `user_id` | FK | Acting user |
+| `action` | enum | create, update, delete, view |
+| `entity_type` | string | Model affected |
+| `entity_id` | int | Record ID |
+| `changes` | json | Before/after values |
+| `ip_address` | string | Request IP |
