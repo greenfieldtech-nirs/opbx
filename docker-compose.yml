@@ -282,42 +282,27 @@ services:
       retries: 3
       start_period: 10s
 
-  # Zrok - Open-source, zero-trust network sharing
-  # Provides secure public URLs for webhook development
-  # Docs: https://docs.zrok.io/
-  zrok:
-    image: openziti/zrok:latest
-    container_name: opbx_zrok
-    command: >
-      share public http://nginx:80
-      --headless
-      --insecure
+  # ngrok - Secure tunneling for webhook development
+  # Provides a public URL for Cloudonix webhooks
+  # Docs: https://ngrok.com/docs
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: opbx_ngrok
+    command:
+      - "http"
+      - "nginx:80"
     environment:
-      - ZROK_ENABLE_TOKEN=${ZROK_ENABLE_TOKEN}
-      - ZROK_ENVIRONMENT_NAME=${ZROK_ENVIRONMENT_NAME:-opbx-local}
-      - ZROK_BACKEND_MODE=proxy
-      - ZROK_TARGET=http://nginx:80
-    ports:
-      - "${ZROK_ADMIN_PORT:-8082}:8082"  # Admin/metrics port (optional)
-    volumes:
-      - ./volumes/zrok:/home/ziggy/.zrok
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     depends_on:
       - nginx
     networks:
       - opbx
+    ports:
+      - "4040:4040"  # ngrok web interface
     restart: unless-stopped
-    # Note: Requires a zrok account from https://zrok.io/
-    #
-    # Setup:
-    # 1. Sign up at https://zrok.io/
-    # 2. Get your enable token from the zrok console
-    # 3. Set ZROK_ENABLE_TOKEN in .env
-    # 4. Start: docker compose up -d zrok
-    # 5. Check logs for the public URL: docker compose logs zrok
-    #
-    # Alternative: Use zrok CLI locally:
-    # zrok enable <token>
-    # zrok share public http://localhost:80
+    # Note: Get your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
+    # Set NGROK_AUTHTOKEN in .env
+    # Public URL will be shown in logs: docker compose logs ngrok
 
 networks:
   opbx:
