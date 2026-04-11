@@ -287,23 +287,30 @@ services:
   pinggy:
     image: pinggy/pinggy:latest
     container_name: opbx_pinggy
+    ports:
+      - "${PINGGY_LOCAL_PORT:-4300}:4300"  # Local port for accessing the tunnel
     command:
       - "-p"
       - "443"
       - "-R0:nginx:80"
+      - "-L0.0.0.0:localhost:${PINGGY_LOCAL_PORT:-4300}:localhost:4300"
       - "-o"
       - "StrictHostKeyChecking=no"
       - "-o"
       - "ServerAliveInterval=30"
-      - "${PINGGY_TOKEN}@free.pinggy.io"
+      - "-t"
+      - "${PINGGY_TOKEN}+force@free.pinggy.io"
+      - "x:xff"
     environment:
       - PINGGY_TOKEN=${PINGGY_TOKEN}
+      - PINGGY_LOCAL_PORT=${PINGGY_LOCAL_PORT:-4300}
     depends_on:
       - nginx
     networks:
       - opbx
     restart: unless-stopped
     # Note: Pinggy provides a persistent URL like: https://<token>.a.pinggy.link
+    # Access locally at: http://localhost:4300
     # This URL should be configured in Cloudonix as the webhook base URL
 
 networks:
