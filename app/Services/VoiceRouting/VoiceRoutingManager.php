@@ -1736,6 +1736,16 @@ class VoiceRoutingManager
                 ->where('id', $destinationId)
                 ->where('organization_id', $ivrMenu->organization_id)
                 ->first();
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::AI_ASSISTANT) {
+            $validatedDestination = \App\Models\AiAssistant::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $destinationId)
+                ->where('organization_id', $ivrMenu->organization_id)
+                ->first();
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::AI_LOAD_BALANCER) {
+            $validatedDestination = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $destinationId)
+                ->where('organization_id', $ivrMenu->organization_id)
+                ->first();
         }
 
         if (! $validatedDestination) {
@@ -1769,6 +1779,14 @@ class VoiceRoutingManager
             $destination = ['ivr_menu' => $validatedDestination];
 
             return $this->executeStrategy(\App\Enums\ExtensionType::IVR, $request, new DidNumber, $destination);
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::AI_ASSISTANT) {
+            $destination = ['ai_assistant' => $validatedDestination];
+
+            return $this->executeStrategy(\App\Enums\ExtensionType::AI_ASSISTANT, $request, new DidNumber, $destination);
+        } elseif ($destinationType === \App\Enums\IvrDestinationType::AI_LOAD_BALANCER) {
+            $destination = ['ai_load_balancer' => $validatedDestination];
+
+            return $this->executeStrategy(\App\Enums\ExtensionType::AI_LOAD_BALANCER, $request, new DidNumber, $destination);
         }
 
         return response(
