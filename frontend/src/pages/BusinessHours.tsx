@@ -100,6 +100,11 @@ import {
   getNextTimeRangeId,
 } from '@/utils/businessHours';
 
+// Import extracted components
+import { WeeklyCalendarView } from './BusinessHours/components/WeeklyCalendarView';
+import { ScheduleDetailSheet } from './BusinessHours/components/ScheduleDetailSheet';
+import { getErrorMessage } from '@/types/api';
+
 
 // ============================================================================
 // Helper Functions
@@ -110,9 +115,8 @@ const getActionDisplayName = (action: unknown, extensions: Extension[], ringGrou
   if (!action) return <span className="text-muted-foreground">Not set</span>;
 
   // If it's a structured object (new format)
-  if (typeof action === 'object' && action.type && action.target_id) {
+  if (typeof action === 'object' && action !== null && 'type' in action && 'target_id' in action) {
     const actionObj = action as BusinessHoursAction;
-
 
     // Get type configuration - matching ActionSelector
     const getTypeConfig = (type: string) => {

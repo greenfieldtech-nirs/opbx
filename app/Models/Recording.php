@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[ScopedBy([OrganizationScope::class])]
 class Recording extends Model
 {
     use HasFactory;
@@ -53,14 +55,6 @@ class Recording extends Model
             'status' => 'string',
             'type' => 'string',
         ];
-    }
-
-    /**
-     * The "booted" method of the model.
-     */
-    protected static function booted(): void
-    {
-        static::addGlobalScope(new OrganizationScope);
     }
 
     /**

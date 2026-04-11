@@ -54,6 +54,7 @@ import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 import { WeeklyCalendarView } from '@/pages/BusinessHours/components';
 import type { WeeklySchedule, DayOfWeek } from '@/types';
+import { getErrorMessage } from '@/types/api';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
 import { cn } from '@/lib/utils';
@@ -373,8 +374,8 @@ export default function AutoDialerCampaignForm() {
 
         // Add Caller ID Pool fields if pool can be modified
         if (canModifyPool) {
-          (updateData as any).caller_id_strategy = data.caller_id_strategy;
-          (updateData as any).caller_id_pool = data.caller_id_pool;
+          updateData.caller_id_strategy = data.caller_id_strategy;
+          updateData.caller_id_pool = data.caller_id_pool;
         }
         
         await updateMutation.mutateAsync({ id, data: updateData });
@@ -413,8 +414,8 @@ export default function AutoDialerCampaignForm() {
         return;
       }
       navigate(-1);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
     }
   };
 

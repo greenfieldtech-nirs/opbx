@@ -121,6 +121,31 @@ func (c *Client) GetActiveCalls(ctx context.Context, campaignID int64) (int64, e
 	return result, err
 }
 
+// IncrementIfBelow atomically increments a counter if it's below the max value
+// Returns the new value and true if incremented, or current value and false if at/max
+func (c *Client) IncrementIfBelow(ctx context.Context, key string, max int64) (int64, bool, error) {
+	luaScript := `
+		local current = tonumber(redis.call('GET', KEYS[1]) or 0)
+		if current >= tonumber(ARGV[1]) then
+			return {-1, current}
+		end
+		local new = redis.call('INCR', KEYS[1])
+		return {new, new}
+	`
+	result, err := c.client.Eval(ctx, luaScript, []string{key}, max).Result()
+	if err != nil {
+		return 0, false, err
+	}
+
+	values := result.([]interface{})
+	newVal := values[0].(int64)
+
+	if newVal == -1 {
+		return values[1].(int64), false, nil
+	}
+	return newVal, true, nil
+}
+
 // ResetActiveCalls sets the active call counter to zero for a campaign
 func (c *Client) ResetActiveCalls(ctx context.Context, campaignID int64) error {
 	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)

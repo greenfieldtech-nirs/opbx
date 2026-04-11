@@ -13,16 +13,19 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Verify Cloudonix Webhook Authentication
  *
- * Simplified webhook authentication for Cloudonix status/CDR webhooks.
+ * Unified webhook authentication for Cloudonix status/CDR webhooks.
  *
- * Authentication Flow:
- * 1. CDR Webhooks: Extract Domain UUID from JSON body (owner.domain.uuid)
- *    - Match against CloudonixSettings.domain_uuid
- *    - No Bearer token required for CDR
+ * Security Model:
+ * 1. Domain MUST be present in payload (session-update: 'domain', CDR: 'domain' or 'owner.domain.uuid/name')
+ * 2. Match domain to organization via CloudonixSettings
+ * 3. If organization has domain_requests_api_key configured:
+ *    - Bearer token MUST be present and match
+ *    - If token missing or mismatch → 401 Unauthorized
+ * 4. If organization has NO domain_requests_api_key configured:
+ *    - Request processed without token validation
  *
- * 2. Status Webhooks: Verify Bearer token from Authorization header
- *    - Token verified against CloudonixSettings.domain_requests_api_key
- *    - Domain UUID extracted from payload if present
+ * This ensures backward compatibility while allowing organizations to enable
+ * webhook authentication when needed.
  *
  * Used for: call-initiated, call-status, session-update, and CDR webhooks
  *
@@ -35,196 +38,194 @@ class VerifyCloudonixSignature
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Special handling for CDR webhooks (no Bearer token, uses domain UUID)
-        if ($this->isCdrRequest($request)) {
-            return $this->handleCdrAuthentication($request, $next);
-        }
-
-        // Handle Bearer token authentication for status webhooks
-        return $this->handleBearerTokenAuthentication($request, $next);
-    }
-
-    /**
-     * Check if this is a CDR webhook request
-     */
-    private function isCdrRequest(Request $request): bool
-    {
-        return $request->routeIs('webhooks.cloudonix.cdr') ||
-            $request->path() === 'api/webhooks/cloudonix/cdr';
-    }
-
-    /**
-     * Handle CDR webhook authentication using domain UUID or Name
-     *
-     * CDR webhooks from Cloudonix do not include Authorization headers.
-     * We identify the organization by the domain UUID or Name in the payload.
-     * Additional verification via CDR auth key if configured.
-     */
-    private function handleCdrAuthentication(Request $request, Closure $next): Response
-    {
-        // Verify CDR auth key if configured
-        $expectedKey = config('webhooks.cdr_auth_key');
-        if ($expectedKey) {
-            $authKey = $request->header('X-CDR-Auth-Key') ?? $request->bearerToken();
-            if (! hash_equals($expectedKey, $authKey ?? '')) {
-                Log::warning('CDR webhook auth key mismatch', [
-                    'ip' => $request->ip(),
-                    'path' => $request->path(),
-                ]);
-
-                return response()->json([
-                    'error' => 'Unauthorized - Invalid auth key',
-                ], Response::HTTP_UNAUTHORIZED);
-            }
-        }
-
-        $payload = $request->json()->all();
-        $settings = null;
-
-        // 1. Try owner.domain.uuid -> domain_uuid
-        $domainUuid = $payload['owner']['domain']['uuid'] ?? null;
-        if ($domainUuid) {
-            $settings = CloudonixSettings::where('domain_uuid', $domainUuid)->first();
-        }
-
-        // 2. Try owner.domain.name -> domain_name
-        if (! $settings) {
-            $domainName = $payload['owner']['domain']['name'] ?? null;
-            if ($domainName) {
-                $settings = CloudonixSettings::where('domain_name', $domainName)->first();
-            }
-        }
-
-        // 3. Try top-level domain -> domain_name
-        if (! $settings && isset($payload['domain'])) {
-            $settings = CloudonixSettings::where('domain_name', $payload['domain'])->first();
-        }
-
-        if (! $settings) {
-            Log::warning('CDR webhook for unknown domain', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-                'payload_domain_uuid' => $domainUuid ?? 'N/A',
-                'payload_domain_name' => $payload['owner']['domain']['name'] ?? 'N/A',
-                'payload_domain' => $payload['domain'] ?? 'N/A',
-            ]);
-
-            return response()->json([
-                'error' => 'Not Found - Unknown domain',
-            ], Response::HTTP_NOT_FOUND);
-        }
-
-        $organizationId = $settings->organization_id;
-
-        Log::info('CDR webhook authenticated via owner.domain.uuid', [
-            'ip' => $request->ip(),
-            'path' => $request->path(),
-            'organization_id' => $organizationId,
-            'domain_uuid' => $domainUuid,
-        ]);
-
-        // Attach organization_id to request for controller use
-        $request->merge(['_organization_id' => $organizationId]);
-
-        return $next($request);
-    }
-
-    /**
-     * Handle Bearer token authentication for status webhooks
-     *
-     * Flow:
-     * 1. Extract Bearer token from Authorization header
-     * 2. Extract domain UUID from payload (if present)
-     * 3. Find CloudonixSettings and verify token matches domain_requests_api_key
-     */
-    private function handleBearerTokenAuthentication(Request $request, Closure $next): Response
-    {
-        // Get Authorization header
-        $authHeader = $request->header('Authorization');
-
-        if (empty($authHeader)) {
-            Log::warning('Webhook missing Authorization header', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-            ]);
-
-            return response()->json([
-                'error' => 'Unauthorized - Missing Authorization header',
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Extract Bearer token
-        if (! str_starts_with($authHeader, 'Bearer ')) {
-            Log::warning('Webhook Authorization header not Bearer format', [
-                'ip' => $request->ip(),
-                'path' => $request->path(),
-            ]);
-
-            return response()->json([
-                'error' => 'Unauthorized - Invalid Authorization format',
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $providedToken = substr($authHeader, 7); // Remove "Bearer " prefix
-
-        // Get request payload
         $payload = $request->json()->all();
 
-        // Try to find organization by domain_uuid in payload
-        $settings = null;
-        if (isset($payload['domain_uuid'])) {
-            $settings = CloudonixSettings::where('domain_uuid', $payload['domain_uuid'])->first();
-        }
+        // Step 1: Extract domain from payload
+        $domain = $this->extractDomain($payload);
 
-        // Check for 'domain' in payload (maps to domain_name)
-        // Cloudonix session updates often send 'domain' instead of 'domain_uuid'
-        if (! $settings && isset($payload['domain'])) {
-            $settings = CloudonixSettings::where('domain_name', $payload['domain'])->first();
-        }
-
-        // Note: We cannot search by domain_requests_api_key because it is encrypted
-        // and Laravel's encrypted cast is non-deterministic. We must rely on
-        // domain_uuid or domain_name to identify the organization first.
-
-        if (! $settings) {
-            Log::warning('Webhook: Organization not found for Bearer token', [
+        if (! $domain) {
+            Log::warning('Webhook: Missing domain parameter', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
             ]);
 
             return response()->json([
-                'error' => 'Unauthorized - Invalid token',
+                'error' => 'Bad Request - Missing domain parameter',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Step 2: Find organization by domain
+        $settings = $this->findOrganizationByDomain($domain, $payload);
+
+        if (! $settings) {
+            Log::warning('Webhook: Unknown domain', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+                'domain' => $domain,
+            ]);
+
+            return response()->json([
+                'error' => 'Unauthorized - Unknown domain',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Verify token matches (redundant check since we already searched by token, but safe)
-        if (
-            ! empty($settings->domain_requests_api_key) &&
-            ! hash_equals($settings->domain_requests_api_key, $providedToken)
-        ) {
-            Log::warning('Webhook: Token mismatch', [
+        // Step 3: Authenticate via Bearer token if organization has auth configured
+        $authResult = $this->authenticateRequest($request, $settings);
+
+        if (! $authResult['success']) {
+            Log::warning('Webhook: Authentication failed', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
                 'organization_id' => $settings->organization_id,
+                'reason' => $authResult['reason'],
             ]);
 
             return response()->json([
-                'error' => 'Unauthorized - Invalid token',
+                'error' => 'Unauthorized - '.$authResult['reason'],
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $organizationId = $settings->organization_id;
-
         // Authentication successful
-        Log::info('Webhook authenticated via Bearer token', [
+        Log::info('Webhook authenticated', [
             'ip' => $request->ip(),
             'path' => $request->path(),
-            'organization_id' => $organizationId,
+            'organization_id' => $settings->organization_id,
+            'domain' => $domain,
+            'auth_method' => $authResult['method'],
         ]);
 
         // Attach organization_id to request for controller use
-        $request->merge(['_organization_id' => $organizationId]);
+        $request->merge(['_organization_id' => $settings->organization_id]);
 
         return $next($request);
+    }
+
+    /**
+     * Extract domain from webhook payload.
+     *
+     * Tries multiple locations to support different webhook types.
+     */
+    private function extractDomain(array $payload): ?string
+    {
+        // Priority 1: Top-level 'domain' (session-update, call-status)
+        if (! empty($payload['domain'])) {
+            return $payload['domain'];
+        }
+
+        // Priority 2: CDR owner.domain.name
+        if (! empty($payload['owner']['domain']['name'])) {
+            return $payload['owner']['domain']['name'];
+        }
+
+        // Priority 3: CDR owner.domain.uuid (less common)
+        if (! empty($payload['owner']['domain']['uuid'])) {
+            return $payload['owner']['domain']['uuid'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Find organization settings by domain.
+     *
+     * Tries domain_name first, then domain_uuid.
+     */
+    private function findOrganizationByDomain(string $domain, array $payload): ?CloudonixSettings
+    {
+        // Try domain_name match first
+        $settings = CloudonixSettings::where('domain_name', $domain)->first();
+
+        if ($settings) {
+            return $settings;
+        }
+
+        // Try domain_uuid match (if domain looks like a UUID)
+        if ($this->isUuid($domain)) {
+            $settings = CloudonixSettings::where('domain_uuid', $domain)->first();
+
+            if ($settings) {
+                return $settings;
+            }
+        }
+
+        // Also check owner.domain.uuid if present (for CDR)
+        if (! empty($payload['owner']['domain']['uuid'])) {
+            $settings = CloudonixSettings::where('domain_uuid', $payload['owner']['domain']['uuid'])->first();
+
+            if ($settings) {
+                return $settings;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if string is a valid UUID format.
+     */
+    private function isUuid(string $str): bool
+    {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $str) === 1;
+    }
+
+    /**
+     * Authenticate the request based on organization's auth configuration.
+     *
+     * @return array{success: bool, reason: string|null, method: string|null}
+     */
+    private function authenticateRequest(Request $request, CloudonixSettings $settings): array
+    {
+        $providedToken = $this->extractBearerToken($request);
+
+        // Case 1: Organization has webhook auth configured
+        if (! empty($settings->domain_requests_api_key)) {
+            if (! $providedToken) {
+                return [
+                    'success' => false,
+                    'reason' => 'Bearer token required',
+                    'method' => null,
+                ];
+            }
+
+            if (! hash_equals($settings->domain_requests_api_key, $providedToken)) {
+                return [
+                    'success' => false,
+                    'reason' => 'Invalid Bearer token',
+                    'method' => null,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'reason' => null,
+                'method' => 'bearer_token',
+            ];
+        }
+
+        // Case 2: Organization has NO webhook auth configured
+        // Allow request regardless of token presence
+        return [
+            'success' => true,
+            'reason' => null,
+            'method' => $providedToken ? 'bearer_token_ignored' : 'none',
+        ];
+    }
+
+    /**
+     * Extract Bearer token from Authorization header.
+     */
+    private function extractBearerToken(Request $request): ?string
+    {
+        $authHeader = $request->header('Authorization');
+
+        if (empty($authHeader)) {
+            return null;
+        }
+
+        if (! str_starts_with($authHeader, 'Bearer ')) {
+            return null;
+        }
+
+        return substr($authHeader, 7); // Remove "Bearer " prefix
     }
 }

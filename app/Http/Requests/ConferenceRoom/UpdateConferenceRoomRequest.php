@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\ConferenceRoom;
 
 use App\Enums\UserStatus;
+use App\Rules\ValidWebhookUrl;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -14,8 +15,6 @@ use Illuminate\Validation\Rules\Enum;
  */
 class UpdateConferenceRoomRequest extends FormRequest
 {
-
-
     /**
      * Get the validation rules that apply to the request.
      *
@@ -85,6 +84,7 @@ class UpdateConferenceRoomRequest extends FormRequest
                 'string',
                 'url',
                 'max:500',
+                new ValidWebhookUrl,
             ],
             'wait_for_host' => [
                 'sometimes',
@@ -107,11 +107,12 @@ class UpdateConferenceRoomRequest extends FormRequest
                 'boolean',
             ],
             'talk_detection_webhook_url' => [
-                Rule::requiredIf(fn() => $this->input('talk_detection_enabled') === true),
+                Rule::requiredIf(fn () => $this->input('talk_detection_enabled') === true),
                 'nullable',
                 'string',
                 'url',
                 'max:500',
+                new ValidWebhookUrl,
             ],
         ];
     }
@@ -145,7 +146,7 @@ class UpdateConferenceRoomRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             // If PIN is required, ensure PIN is provided
-            if ($this->input('pin_required') && !$this->filled('pin')) {
+            if ($this->input('pin_required') && ! $this->filled('pin')) {
                 $validator->errors()->add(
                     'pin',
                     'PIN is required when PIN protection is enabled.'
@@ -153,7 +154,7 @@ class UpdateConferenceRoomRequest extends FormRequest
             }
 
             // If talk detection is enabled, ensure webhook URL is provided
-            if ($this->input('talk_detection_enabled') && !$this->filled('talk_detection_webhook_url')) {
+            if ($this->input('talk_detection_enabled') && ! $this->filled('talk_detection_webhook_url')) {
                 $validator->errors()->add(
                     'talk_detection_webhook_url',
                     'Webhook URL is required when talk detection is enabled.'

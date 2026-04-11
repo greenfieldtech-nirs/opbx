@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\CallNotifications;
 
+use App\Rules\ValidWebhookUrl;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -35,12 +36,7 @@ class UpdateSettingsRequest extends FormRequest
                 'required',
                 'url',
                 'max:2048',
-                // Must be HTTP or HTTPS
-                function ($attribute, $value, $fail) {
-                    if (! str_starts_with($value, 'http://') && ! str_starts_with($value, 'https://')) {
-                        $fail('The webhook URL must use HTTP or HTTPS.');
-                    }
-                },
+                new ValidWebhookUrl,
             ],
             'auth_method' => [
                 'sometimes',

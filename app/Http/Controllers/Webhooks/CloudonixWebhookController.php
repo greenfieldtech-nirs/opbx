@@ -213,7 +213,17 @@ class CloudonixWebhookController extends Controller
         try {
 
             // Filter events by status - only process specific statuses
-            $allowedStatuses = ['processing', 'ringing', 'connected', 'answer'];
+            // These statuses map to notification events that users care about
+            $allowedStatuses = [
+                'new', 'initiated', 'created',           // Maps to 'new' event
+                'ringing', 'ring', 'progress',           // Maps to 'ringing' event
+                'connected', 'connect',                  // Maps to 'connected' event
+                'answer', 'answered', 'active',          // Maps to 'answered' event
+                'busy',                                  // Maps to 'busy' event
+                'cancel', 'cancelled', 'canceled',       // Maps to 'cancel' event
+                'failed', 'fail', 'error',               // Maps to 'failed' event
+                'congestion', 'congested',               // Maps to 'congestion' event
+            ];
             if (! in_array($validated['status'], $allowedStatuses)) {
                 Log::info('Session update ignored - status not in allowed list', [
                     'request_id' => $requestId,
@@ -224,7 +234,7 @@ class CloudonixWebhookController extends Controller
                 ]);
 
                 // Return 200 OK to acknowledge receipt but indicate no processing
-                return response()->json(['error' => 'Discarded Content'], 204);
+                return response()->json(['message' => 'Status not processed'], 200);
             }
 
             // Identify organization from Cloudonix domain
@@ -378,8 +388,9 @@ class CloudonixWebhookController extends Controller
             }
 
             // Create session update record for final call status
+            $sessionUpdate = null;
             try {
-                $this->createSessionUpdateFromCDR($request, $organizationId);
+                $sessionUpdate = $this->createSessionUpdateFromCDR($request, $organizationId);
 
                 Log::info('Session update created from CDR', [
                     'call_id' => $callId,
@@ -396,6 +407,11 @@ class CloudonixWebhookController extends Controller
 
                 // Don't fail the entire CDR processing for session update failure
                 // Just log the error and continue
+            }
+
+            // Trigger call notification if session update was created
+            if ($sessionUpdate) {
+                $this->triggerCallNotification($sessionUpdate, $organizationId);
             }
 
             // Check if this is an auto-dialer call and update destination
@@ -439,8 +455,9 @@ class CloudonixWebhookController extends Controller
 
     /**
      * Create a session update record from CDR data to indicate final call status.
+     * Returns the created SessionUpdate model or null if duplicate.
      */
-    private function createSessionUpdateFromCDR(CdrRequest $request, int $organizationId): void
+    private function createSessionUpdateFromCDR(CdrRequest $request, int $organizationId): ?SessionUpdate
     {
         $sessionId = $request->input('session.id') ?? $request->input('call_id');
         $disposition = $request->input('disposition');
@@ -464,7 +481,7 @@ class CloudonixWebhookController extends Controller
                 'existing_id' => $existingFinalUpdate->id,
             ]);
 
-            return;
+            return null;
         }
 
         // Get session data
@@ -520,6 +537,8 @@ class CloudonixWebhookController extends Controller
             'disposition' => $disposition,
             'mapped_status' => $status,
         ]);
+
+        return $sessionUpdate;
     }
 
     /**
@@ -527,21 +546,67 @@ class CloudonixWebhookController extends Controller
      */
     private function triggerCallNotification(SessionUpdate $sessionUpdate, int $organizationId): void
     {
+        Log::info('=== CALL NOTIFICATION START ===', [
+            'organization_id' => $organizationId,
+            'session_id' => $sessionUpdate->session_id,
+            'status' => $sessionUpdate->status,
+            'action' => $sessionUpdate->action,
+        ]);
+
         try {
             // Get notification settings for organization
-            $settings = CallNotificationsSettings::forOrganization($organizationId)
-                ->active()
-                ->first();
+            // Must bypass OrganizationScope since webhooks have no authenticated user
+            Log::info('NOTIFICATION: Looking up settings...', [
+                'organization_id' => $organizationId,
+            ]);
 
-            if (! $settings || ! $settings->isConfigured()) {
-                // No notification settings configured
+            $settings = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId) {
+                return CallNotificationsSettings::forOrganization($organizationId)
+                    ->active()
+                    ->first();
+            });
+
+            if (! $settings) {
+                Log::info('NOTIFICATION: No settings found for organization', [
+                    'organization_id' => $organizationId,
+                ]);
+
                 return;
             }
 
+            Log::info('NOTIFICATION: Settings found', [
+                'organization_id' => $organizationId,
+                'settings_id' => $settings->id,
+                'webhook_url' => $settings->webhook_url,
+                'is_active' => $settings->is_active,
+            ]);
+
+            if (! $settings->isConfigured()) {
+                Log::info('NOTIFICATION: Settings not configured', [
+                    'organization_id' => $organizationId,
+                    'webhook_url' => $settings->webhook_url,
+                    'is_active' => $settings->is_active,
+                ]);
+
+                return;
+            }
+
+            Log::info('NOTIFICATION: Settings are configured', [
+                'organization_id' => $organizationId,
+                'webhook_url' => $settings->webhook_url,
+                'enabled_events' => $settings->enabled_events,
+            ]);
+
             // Check if this status should trigger a notification
             $normalizedStatus = $this->normalizeNotificationStatus($sessionUpdate->status ?? 'unknown');
+
+            Log::info('NOTIFICATION: Status normalized', [
+                'original_status' => $sessionUpdate->status,
+                'normalized_status' => $normalizedStatus,
+            ]);
+
             if (! $settings->isEventEnabled($normalizedStatus)) {
-                Log::debug('Call notification skipped - event not enabled', [
+                Log::info('NOTIFICATION: Event not enabled', [
                     'organization_id' => $organizationId,
                     'session_id' => $sessionUpdate->session_id,
                     'status' => $normalizedStatus,
@@ -551,35 +616,53 @@ class CloudonixWebhookController extends Controller
                 return;
             }
 
+            Log::info('NOTIFICATION: Event is enabled, proceeding...');
+
             // Get previous status from database
-            $previousStatus = SessionUpdate::where('organization_id', $organizationId)
-                ->where('session_id', $sessionUpdate->session_id)
-                ->where('id', '<', $sessionUpdate->id)
-                ->orderBy('id', 'desc')
-                ->value('status') ?? 'unknown';
+            // Must bypass OrganizationScope since webhooks have no authenticated user
+            $previousStatus = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId, $sessionUpdate) {
+                return SessionUpdate::where('organization_id', $organizationId)
+                    ->where('session_id', $sessionUpdate->session_id)
+                    ->where('id', '<', $sessionUpdate->id)
+                    ->orderBy('id', 'desc')
+                    ->value('status') ?? 'unknown';
+            });
+
+            Log::info('NOTIFICATION: Previous status retrieved', [
+                'previous_status' => $previousStatus,
+            ]);
 
             // Build notification payload
+            Log::info('NOTIFICATION: Building payload...');
             $payload = $this->payloadBuilder->build($sessionUpdate, $previousStatus);
+            Log::info('NOTIFICATION: Payload built', [
+                'event_id' => $payload['event_id'] ?? 'missing',
+            ]);
 
             // Dispatch webhook
-            $this->webhookDispatcher->dispatch(
+            Log::info('NOTIFICATION: Dispatching webhook...', [
+                'webhook_url' => $settings->webhook_url,
+            ]);
+
+            $result = $this->webhookDispatcher->dispatch(
                 $settings,
                 $payload,
                 $payload['event_id'],
                 $sessionUpdate->session_token ?? (string) $sessionUpdate->session_id
             );
 
-            Log::info('Call notification triggered', [
+            Log::info('=== CALL NOTIFICATION END ===', [
                 'organization_id' => $organizationId,
                 'session_id' => $sessionUpdate->session_id,
-                'event_id' => $payload['event_id'],
-                'status' => $normalizedStatus,
+                'dispatch_result' => $result ? 'success' : 'failed',
             ]);
+
         } catch (\Exception $e) {
-            Log::error('Failed to trigger call notification', [
+            Log::error('=== CALL NOTIFICATION EXCEPTION ===', [
                 'organization_id' => $organizationId,
                 'session_id' => $sessionUpdate->session_id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }

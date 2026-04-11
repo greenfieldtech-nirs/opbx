@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Stores webhook notification configuration for organizations.
  */
+#[ScopedBy([OrganizationScope::class])]
 class CallNotificationsSettings extends Model
 {
     use HasFactory;
@@ -82,19 +85,20 @@ class CallNotificationsSettings extends Model
     }
 
     /**
+     * Scope a query to only include records for a specific organization.
+     * Note: This is in addition to the global OrganizationScope.
+     */
+    public function scopeForOrganization($query, int $organizationId)
+    {
+        return $query->where('organization_id', $organizationId);
+    }
+
+    /**
      * Scope query to only include active settings.
      */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
-    }
-
-    /**
-     * Scope query to only include settings for a specific organization.
-     */
-    public function scopeForOrganization($query, int $organizationId)
-    {
-        return $query->where('organization_id', $organizationId);
     }
 
     /**
