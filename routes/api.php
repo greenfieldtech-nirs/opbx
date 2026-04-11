@@ -272,7 +272,11 @@ Route::prefix('v1')->group(function (): void {
 
         // IVR Menus
         Route::get('ivr-menus/voices', [IvrMenuController::class, 'getVoices'])->name('ivr-menus.voices');
-        Route::apiResource('ivr-menus', IvrMenuController::class);
+        Route::get('ivr-menus', [IvrMenuController::class, 'index'])->name('ivr-menus.index');
+        Route::post('ivr-menus', [IvrMenuController::class, 'store'])->name('ivr-menus.store');
+        Route::get('ivr-menus/{ivrMenu}', [IvrMenuController::class, 'show'])->name('ivr-menus.show');
+        Route::put('ivr-menus/{ivrMenu}', [IvrMenuController::class, 'update'])->name('ivr-menus.update');
+        Route::delete('ivr-menus/{ivrMenu}', [IvrMenuController::class, 'destroy'])->name('ivr-menus.destroy');
         Route::patch('ivr-menus/{ivrMenu}/toggle-status', [IvrMenuController::class, 'toggleStatus'])
             ->name('ivr-menus.toggle-status');
 

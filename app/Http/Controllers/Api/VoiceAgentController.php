@@ -15,6 +15,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated Since 2026-04-11. Use AiAssistantController instead.
+ *             This controller uses legacy tenant_id field (should be organization_id)
+ *             and references non-existent VoiceAgentProvider enum.
+ *             This controller will be removed in a future version.
+ */
 class VoiceAgentController extends Controller
 {
     /**
@@ -22,6 +28,10 @@ class VoiceAgentController extends Controller
      */
     public function index(Request $request): VoiceAgentCollection
     {
+        Log::warning('VoiceAgentController::index is deprecated. Use AiAssistantController::index instead.', [
+            'user_id' => auth()->id(),
+        ]);
+
         Gate::authorize('viewAny', VoiceAgent::class);
 
         $query = VoiceAgent::where('tenant_id', auth()->user()->tenant_id);
@@ -57,6 +67,10 @@ class VoiceAgentController extends Controller
      */
     public function store(StoreVoiceAgentRequest $request): JsonResponse
     {
+        Log::warning('VoiceAgentController::store is deprecated. Use AiAssistantController::store instead.', [
+            'user_id' => auth()->id(),
+        ]);
+
         Gate::authorize('create', VoiceAgent::class);
 
         try {
@@ -101,6 +115,11 @@ class VoiceAgentController extends Controller
      */
     public function show(VoiceAgent $voiceAgent): VoiceAgentResource
     {
+        Log::warning('VoiceAgentController::show is deprecated. Use AiAssistantController::show instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('view', $voiceAgent);
 
         return new VoiceAgentResource($voiceAgent);
@@ -111,6 +130,11 @@ class VoiceAgentController extends Controller
      */
     public function update(UpdateVoiceAgentRequest $request, VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::update is deprecated. Use AiAssistantController::update instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('update', $voiceAgent);
 
         try {
@@ -148,6 +172,11 @@ class VoiceAgentController extends Controller
      */
     public function toggleStatus(VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::toggleStatus is deprecated. Use AiAssistantController::update instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('toggle', $voiceAgent);
 
         try {
@@ -187,6 +216,11 @@ class VoiceAgentController extends Controller
      */
     public function destroy(VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::destroy is deprecated. Use AiAssistantController::destroy instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('delete', $voiceAgent);
 
         try {
@@ -233,6 +267,11 @@ class VoiceAgentController extends Controller
      */
     public function validateConfig(VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::validateConfig is deprecated. Use AiAssistantController instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('validateConfig', $voiceAgent);
 
         $errors = $voiceAgent->getValidationErrors();
@@ -255,6 +294,10 @@ class VoiceAgentController extends Controller
      */
     public function providers(): JsonResponse
     {
+        Log::warning('VoiceAgentController::providers is deprecated. Use AiAssistantProviderController instead.', [
+            'user_id' => auth()->id(),
+        ]);
+
         Gate::authorize('viewProviders', VoiceAgent::class);
 
         $providers = [];

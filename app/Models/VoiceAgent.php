@@ -1,17 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Enums\VoiceAgentProvider;
+use App\Validators\VoiceAgentProviderValidator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use App\Enums\VoiceAgentProvider;
-use App\Validators\VoiceAgentProviderValidator;
 
+/**
+ * @deprecated Since 2026-04-11. Use AiAssistant model instead.
+ *             This model uses legacy tenant_id field (should be organization_id)
+ *             and references non-existent VoiceAgentProvider enum.
+ *             This model will be removed in a future version.
+ */
 class VoiceAgent extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'tenant_id',
         'name',
@@ -171,6 +180,7 @@ class VoiceAgent extends Model
             ];
 
             $validator->validate($data);
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -192,6 +202,7 @@ class VoiceAgent extends Model
             ];
 
             $validator->validate($data);
+
             return [];
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $e->errors();
@@ -199,6 +210,4 @@ class VoiceAgent extends Model
             return ['general' => [$e->getMessage()]];
         }
     }
-
-
 }

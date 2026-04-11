@@ -15,6 +15,14 @@ import (
 	"opbx/dialer-worker/pkg/retry"
 )
 
+// Timeout and duration constants
+const (
+	// DefaultLockTTL is the default TTL for distributed locks
+	DefaultLockTTL = 30 * time.Second
+	// DefaultCallStateTTL is the default TTL for call state entries in Redis
+	DefaultCallStateTTL = 60 * time.Second
+)
+
 // Executor handles the execution of dialer calls
 type Executor struct {
 	apiClient       *api.Client
@@ -58,7 +66,7 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 
 	// Acquire distributed lock for destination
 	lockKey := fmt.Sprintf("dest:%d", destination.ID)
-	acquired, err := e.redisClient.AcquireLock(ctx, lockKey, 30*time.Second)
+	acquired, err := e.redisClient.AcquireLock(ctx, lockKey, DefaultLockTTL)
 	if err != nil {
 		logger.Error("failed to acquire lock", "error", err)
 		return fmt.Errorf("failed to acquire lock: %w", err)
@@ -138,7 +146,7 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 		Status:        string(models.CallStatusInitiated),
 		StartedAt:     time.Now(),
 	}
-	if err := e.redisClient.SetCallState(ctx, strconv.FormatInt(sessionID, 10), callState, 60*time.Second); err != nil {
+	if err := e.redisClient.SetCallState(ctx, strconv.FormatInt(sessionID, 10), callState, DefaultCallStateTTL); err != nil {
 		logger.Error("failed to store call state", "error", err)
 	}
 
