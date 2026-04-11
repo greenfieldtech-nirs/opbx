@@ -282,21 +282,29 @@ services:
       retries: 3
       start_period: 10s
 
-  ngrok:
-    image: ngrok/ngrok:latest
-    container_name: opbx_ngrok
+  # Pinggy - SSH-based tunnel for webhook development
+  # Provides a persistent public URL for Cloudonix webhooks
+  pinggy:
+    image: pinggy/pinggy:latest
+    container_name: opbx_pinggy
     command:
-      - "http"
-      - "nginx:80"
+      - "-p"
+      - "443"
+      - "-R0:nginx:80"
+      - "-o"
+      - "StrictHostKeyChecking=no"
+      - "-o"
+      - "ServerAliveInterval=30"
+      - "${PINGGY_TOKEN}@free.pinggy.io"
     environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+      - PINGGY_TOKEN=${PINGGY_TOKEN}
     depends_on:
       - nginx
     networks:
       - opbx
-    ports:
-      - "4040:4040"  # ngrok web interface
     restart: unless-stopped
+    # Note: Pinggy provides a persistent URL like: https://<token>.a.pinggy.link
+    # This URL should be configured in Cloudonix as the webhook base URL
 
 networks:
   opbx:
