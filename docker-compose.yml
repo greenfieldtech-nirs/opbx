@@ -283,26 +283,33 @@ services:
       start_period: 10s
 
   # Cloudflare Tunnel - Secure HTTP tunneling for webhook development
-  # Provides a public URL via Cloudflare's network
-  # Docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+  # Web UI for easy tunnel management
+  # Image: https://github.com/WisdomSky/cloudflared-web
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: wisdomsky/cloudflared-web:latest
     container_name: opbx_cloudflared
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    ports:
+      - "${CLOUDFLARE_WEB_UI_PORT:-14333}:14333"  # Web UI
     environment:
-      - CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+      - WEBUI_PORT=${CLOUDFLARE_WEB_UI_PORT:-14333}
+      - EDGE_IP_VERSION=${CLOUDFLARE_EDGE_IP_VERSION:-auto}
+      - PROTOCOL=${CLOUDFLARE_PROTOCOL:-http2}
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    volumes:
+      - ./volumes/cloudflared:/etc/cloudflared
     depends_on:
       - nginx
     networks:
       - opbx
     restart: unless-stopped
-    # Note: Requires a Cloudflare Tunnel token from Zero Trust dashboard
-    # 1. Install cloudflared locally: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
-    # 2. Authenticate: cloudflared tunnel login
-    # 3. Create tunnel: cloudflared tunnel create opbx-local
-    # 4. Get token from: ~/.cloudflared/*.json or Zero Trust dashboard
-    # 5. Set CLOUDFLARE_TUNNEL_TOKEN in .env
-    # 6. Configure public hostname in Cloudflare dashboard to point to nginx:80
+    # Web UI: http://localhost:14333
+    # Docs: https://github.com/WisdomSky/cloudflared-web
+    #
+    # Setup via Web UI:
+    # 1. Open http://localhost:14333
+    # 2. Enter your Cloudflare Tunnel token
+    # 3. Or login with cloudflared credentials
+    # 4. Configure tunnel to point to nginx:80
 
 networks:
   opbx:
