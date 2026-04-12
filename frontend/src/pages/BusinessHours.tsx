@@ -220,13 +220,13 @@ const BusinessHours: React.FC = () => {
           <StandardDataTable<BusinessHoursSchedule>
             data={schedules}
             isLoading={isLoading}
-            onRowClick={handleOpenEdit}
+            onRowClick={handleEdit}
             identityIcon={Clock}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(schedule) => schedule.name}
-            getIdentitySecondary={() => 'Business Hours'}
-            onIdentityClick={handleOpenEdit}
+            getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayName(schedule.open_routing_type)} when open`}
+            onIdentityClick={handleEdit}
             sortField={sortBy}
             sortDirection="asc"
             onSort={(field) => setSortBy(field as any)}
