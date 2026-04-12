@@ -36,6 +36,19 @@ class IvrMenuResource extends JsonResource
             'failover_destination_id' => $this->failover_destination_id,
             'status' => $this->status->value,
             'options_count' => $this->whenCounted('options'),
+            'options' => $this->whenLoaded('options', function () {
+                return $this->options->map(function ($option) {
+                    return [
+                        'id' => $option->id,
+                        'ivr_menu_id' => $option->ivr_menu_id,
+                        'input_digits' => $option->input_digits,
+                        'description' => $option->description,
+                        'destination_type' => $option->destination_type->value,
+                        'destination_id' => $option->destination_id,
+                        'priority' => $option->priority,
+                    ];
+                });
+            }),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
