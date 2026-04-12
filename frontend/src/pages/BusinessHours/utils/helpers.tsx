@@ -8,8 +8,133 @@ import React from 'react';
 import { Phone, Users, Menu, Bot, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { BusinessHoursAction } from '@/types';
+import type { BusinessHoursAction, WeeklySchedule, DaySchedule, DayOfWeek, TimeRange } from '@/types';
 import type { Extension, RingGroup } from '@/types';
+
+let timeRangeIdCounter = 0;
+let exceptionIdCounter = 0;
+
+export function getNextTimeRangeId(): string {
+  return `tr-${Date.now()}-${timeRangeIdCounter++}`;
+}
+
+export function getNextExceptionId(): string {
+  return `exc-${Date.now()}-${exceptionIdCounter++}`;
+}
+
+export function createEmptyWeeklySchedule(): WeeklySchedule {
+  const emptyDaySchedule: DaySchedule = {
+    enabled: false,
+    time_ranges: [],
+  };
+
+  return {
+    monday: { ...emptyDaySchedule },
+    tuesday: { ...emptyDaySchedule },
+    wednesday: { ...emptyDaySchedule },
+    thursday: { ...emptyDaySchedule },
+    friday: { ...emptyDaySchedule },
+    saturday: { ...emptyDaySchedule },
+    sunday: { ...emptyDaySchedule },
+  };
+}
+
+export function applyScheduleTemplate(template: string): WeeklySchedule {
+  const newSchedule = createEmptyWeeklySchedule();
+
+  switch (template) {
+    case 'mon-fri-business':
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: true,
+          time_ranges: [{
+            id: getNextTimeRangeId(),
+            start_time: '09:00',
+            end_time: '17:00'
+          }]
+        };
+      });
+      ['saturday', 'sunday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: false,
+          time_ranges: []
+        };
+      });
+      break;
+
+    case 'mon-fri-all-day':
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: true,
+          time_ranges: [{
+            id: getNextTimeRangeId(),
+            start_time: '00:00',
+            end_time: '23:59'
+          }]
+        };
+      });
+      ['saturday', 'sunday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: false,
+          time_ranges: []
+        };
+      });
+      break;
+
+    case 'sun-thu-business':
+      ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: true,
+          time_ranges: [{
+            id: getNextTimeRangeId(),
+            start_time: '09:00',
+            end_time: '17:00'
+          }]
+        };
+      });
+      ['friday', 'saturday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: false,
+          time_ranges: []
+        };
+      });
+      break;
+
+    case 'sun-thu-all-day':
+      ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: true,
+          time_ranges: [{
+            id: getNextTimeRangeId(),
+            start_time: '00:00',
+            end_time: '23:59'
+          }]
+        };
+      });
+      ['friday', 'saturday'].forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: false,
+          time_ranges: []
+        };
+      });
+      break;
+
+    case '24-7':
+      Object.keys(newSchedule).forEach(day => {
+        newSchedule[day as DayOfWeek] = {
+          enabled: true,
+          time_ranges: [{
+            id: getNextTimeRangeId(),
+            start_time: '00:00',
+            end_time: '23:59'
+          }]
+        };
+      });
+      break;
+  }
+
+  return newSchedule;
+}
 
 const getTypeConfig = (type: string) => {
   const configs = {
