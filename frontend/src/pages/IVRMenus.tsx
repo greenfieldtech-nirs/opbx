@@ -722,8 +722,10 @@ export default function IVRMenus() {
     setSelectedMenu(menu);
     setFormData({
       name: menu.name,
-      audio_file_path: menu.recording_id ? undefined : menu.audio_file_path,
-      recording_id: menu.recording_id,
+      // If it's a recording URL, clear audio_file_path so the recording selector shows
+      // Otherwise keep it for remote URLs
+      audio_file_path: menu.is_recording_url ? undefined : menu.audio_file_path,
+      recording_id: undefined, // We'll detect this from the URL pattern in the UI
       tts_text: menu.tts_text,
       tts_voice: menu.tts_voice,
       useTTS: !!menu.tts_text,
@@ -1021,24 +1023,7 @@ export default function IVRMenus() {
                       </Select>
                     </div>
 
-                    {typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="audio-url">Remote Audio URL</Label>
-                        <Input
-                          id="audio-url"
-                          value={formData.audio_file_path || ''}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, audio_file_path: e.target.value })}
-                          placeholder="https://example.com/audio/welcome.mp3"
-                          maxLength={500}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Enter a full URL to an audio file (MP3, WAV, etc.) - {(formData.audio_file_path || '').length}/500 characters
-                          {(formData.audio_file_path || '').length > 450 && (
-                            <span className="text-amber-600 ml-2">Approaching limit</span>
-                          )}
-                        </p>
-                      </div>
-                    ) : (
+                    {selectedMenu?.is_recording_url || (!formData.audio_file_path?.startsWith('http') && !formData.recording_id) ? (
                       <div className="space-y-2">
                         <Label htmlFor="recording-select">Select Recording</Label>
                         <Select
@@ -1058,6 +1043,23 @@ export default function IVRMenus() {
                         </Select>
                         <p className="text-sm text-muted-foreground">
                           Select from uploaded recordings or upload new ones in the Recordings page
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="audio-url">Remote Audio URL</Label>
+                        <Input
+                          id="audio-url"
+                          value={formData.audio_file_path || ''}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, audio_file_path: e.target.value })}
+                          placeholder="https://example.com/audio/welcome.mp3"
+                          maxLength={500}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Enter a full URL to an audio file (MP3, WAV, etc.) - {(formData.audio_file_path || '').length}/500 characters
+                          {(formData.audio_file_path || '').length > 450 && (
+                            <span className="text-amber-600 ml-2">Approaching limit</span>
+                          )}
                         </p>
                       </div>
                     )}
@@ -1348,7 +1350,7 @@ export default function IVRMenus() {
                     <div className="space-y-2">
                       <Label htmlFor="edit-audio-source">Audio Source</Label>
                       <Select
-                        value={typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? 'remote' : 'recording'}
+                        value={selectedMenu?.is_recording_url ? 'recording' : (typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? 'remote' : 'recording')}
                         onValueChange={(value) => {
                           if (value === 'remote') {
                             setFormData({ ...formData, audio_file_path: 'https://' });
@@ -1367,24 +1369,7 @@ export default function IVRMenus() {
                       </Select>
                     </div>
 
-                    {typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-audio-url">Remote Audio URL</Label>
-                        <Input
-                          id="edit-audio-url"
-                          value={formData.audio_file_path || ''}
-                          onChange={(e) => setFormData({ ...formData, audio_file_path: e.target.value })}
-                          placeholder="https://example.com/audio/welcome.mp3"
-                          maxLength={500}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Enter a full URL to an audio file (MP3, WAV, etc.) - {(formData.audio_file_path || '').length}/500 characters
-                          {(formData.audio_file_path || '').length > 450 && (
-                            <span className="text-amber-600 ml-2">Approaching limit</span>
-                          )}
-                        </p>
-                      </div>
-                    ) : (
+                    {selectedMenu?.is_recording_url || (!formData.audio_file_path?.startsWith('http') && !formData.recording_id) ? (
                       <div className="space-y-2">
                         <Label htmlFor="edit-recording-select">Select Recording</Label>
                         <Select
@@ -1404,6 +1389,23 @@ export default function IVRMenus() {
                         </Select>
                         <p className="text-sm text-muted-foreground">
                           Select from uploaded recordings or upload new ones in the Recordings page
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-audio-url">Remote Audio URL</Label>
+                        <Input
+                          id="edit-audio-url"
+                          value={formData.audio_file_path || ''}
+                          onChange={(e) => setFormData({ ...formData, audio_file_path: e.target.value })}
+                          placeholder="https://example.com/audio/welcome.mp3"
+                          maxLength={500}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Enter a full URL to an audio file (MP3, WAV, etc.) - {(formData.audio_file_path || '').length}/500 characters
+                          {(formData.audio_file_path || '').length > 450 && (
+                            <span className="text-amber-600 ml-2">Approaching limit</span>
+                          )}
                         </p>
                       </div>
                     )}
