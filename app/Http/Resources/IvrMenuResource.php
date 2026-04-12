@@ -51,7 +51,7 @@ class IvrMenuResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'audio_file_path' => $this->audio_file_path,
-            'recording_id' => $recordingId,
+            'recording_id' => $this->recording_id,
             'is_recording_url' => $audioFilePath && str_contains($audioFilePath, '/api/v1/recordings/download'),
             'tts_text' => $this->tts_text,
             'tts_voice' => $this->tts_voice,

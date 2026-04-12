@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\IvrMenuStatus;
 use App\Enums\IvrDestinationType;
+use App\Enums\IvrMenuStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,6 +29,7 @@ class IvrMenu extends Model
         'name',
         'description',
         'audio_file_path',
+        'recording_id',
         'tts_text',
         'tts_voice',
         'max_timeout',
@@ -76,7 +77,7 @@ class IvrMenu extends Model
      */
     public function getFallbackDestination()
     {
-        if (!$this->failover_destination_id) {
+        if (! $this->failover_destination_id) {
             return null;
         }
 

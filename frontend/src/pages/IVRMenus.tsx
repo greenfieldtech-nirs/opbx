@@ -722,10 +722,8 @@ export default function IVRMenus() {
     setSelectedMenu(menu);
     setFormData({
       name: menu.name,
-      // If it's a recording URL, clear audio_file_path so the recording selector shows
-      // Otherwise keep it for remote URLs
-      audio_file_path: menu.is_recording_url ? undefined : menu.audio_file_path,
-      recording_id: undefined, // We'll detect this from the URL pattern in the UI
+      audio_file_path: menu.recording_id ? undefined : menu.audio_file_path,
+      recording_id: menu.recording_id,
       tts_text: menu.tts_text,
       tts_voice: menu.tts_voice,
       useTTS: !!menu.tts_text,
@@ -1350,7 +1348,7 @@ export default function IVRMenus() {
                     <div className="space-y-2">
                       <Label htmlFor="edit-audio-source">Audio Source</Label>
                       <Select
-                        value={selectedMenu?.is_recording_url ? 'recording' : (typeof formData.audio_file_path === 'string' && formData.audio_file_path.startsWith('http') ? 'remote' : 'recording')}
+                        value={formData.recording_id ? 'recording' : (formData.audio_file_path?.startsWith('http') ? 'remote' : 'recording')}
                         onValueChange={(value) => {
                           if (value === 'remote') {
                             setFormData({ ...formData, audio_file_path: 'https://' });
