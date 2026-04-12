@@ -4,27 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
-use App\Enums\RoutingDestinationType;
 use App\Http\Resources\AutoDialerCampaignResource;
 use App\Http\Resources\ListDestinationResource;
-use App\Models\AiAssistant;
-use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
-use App\Models\AutoDialerList;
-use App\Models\Extension;
-use App\Models\IvrMenu;
-use App\Models\RingGroup;
-use App\Scopes\OrganizationScope;
-use App\Services\AiAssistant\ProviderRegistry;
-use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
-use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\AutoDialer\CallSessionService;
+use App\Services\AutoDialer\CampaignQueryService;
+use App\Services\AutoDialer\CxmlGenerationService;
+use App\Services\AutoDialer\DestinationManagementService;
+use App\Services\AutoDialer\DialerWorkerCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -32,9 +24,24 @@ use Illuminate\Support\Facades\Log;
  *
  * Provides API endpoints for the Go dialer worker to consume.
  * All endpoints require worker authentication.
+ *
+ * This controller delegates all business logic to specialized services:
+ * - CampaignQueryService: Campaign queries and filtering
+ * - CallSessionService: Call session management
+ * - CxmlGenerationService: CXML generation for routing
+ * - DialerWorkerCampaignService: Campaign lifecycle operations
+ * - DestinationManagementService: Destination queries and updates
  */
 class DialerWorkerController extends Controller
 {
+    public function __construct(
+        private readonly CampaignQueryService $campaignQueryService,
+        private readonly CallSessionService $callSessionService,
+        private readonly CxmlGenerationService $cxmlGenerationService,
+        private readonly DialerWorkerCampaignService $campaignService,
+        private readonly DestinationManagementService $destinationService,
+    ) {}
+
     /**
      * Get all active campaigns that should be running.
      *
@@ -47,16 +54,7 @@ class DialerWorkerController extends Controller
     {
         $this->authorizeWorker($request);
 
-        // Bypass organization scope for worker API
-        $campaigns = OrganizationScope::bypass(function () {
-            return AutoDialerCampaign::with(['organization.cloudonixSettings', 'callerIds'])
-                ->where('status', CampaignStatus::ACTIVE)
-                ->whereDate('start_date', '<=', now())
-                ->whereDate('end_date', '>=', now())
-                ->get()
-                ->filter(fn ($campaign) => $campaign->isRunnable())
-                ->values();
-        });
+        $campaigns = $this->campaignQueryService->getActiveRunnableCampaigns();
 
         return response()->json([
             'data' => AutoDialerCampaignResource::collection($campaigns),
@@ -75,10 +73,7 @@ class DialerWorkerController extends Controller
 
         $limit = $request->input('limit', 50);
 
-        // Bypass organization scope and find campaign
-        $campaignModel = OrganizationScope::bypass(
-            fn () => AutoDialerCampaign::find($campaign)
-        );
+        $campaignModel = $this->campaignQueryService->findById($campaign);
 
         if (! $campaignModel) {
             return response()->json([
@@ -86,27 +81,7 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        // Get lists assigned to this campaign (bypass scope)
-        $listIds = OrganizationScope::bypass(
-            fn () => AutoDialerList::where('campaign_id', $campaign)->pluck('id')->toArray()
-        );
-
-        if (empty($listIds)) {
-            return response()->json([
-                'data' => [],
-                'meta' => ['total' => 0, 'limit' => $limit, 'offset' => 0],
-            ]);
-        }
-
-        // Get pending destinations (bypass scope)
-        $destinations = OrganizationScope::bypass(function () use ($listIds, $campaignModel, $limit) {
-            return AutoDialerDestination::whereIn('list_id', $listIds)
-                ->where('status', DestinationStatus::PENDING)
-                ->where('dial_attempts', '<', $campaignModel->max_dial_attempts)
-                ->orderBy('created_at', 'asc')
-                ->limit($limit)
-                ->get();
-        });
+        $destinations = $this->destinationService->getPendingDestinations($campaign, $limit);
 
         return response()->json([
             'data' => ListDestinationResource::collection($destinations),
@@ -130,10 +105,7 @@ class DialerWorkerController extends Controller
 
         $limit = $request->input('limit', 50);
 
-        // Bypass organization scope and find campaign
-        $campaignModel = OrganizationScope::bypass(
-            fn () => AutoDialerCampaign::find($campaign)
-        );
+        $campaignModel = $this->campaignQueryService->findById($campaign);
 
         if (! $campaignModel) {
             return response()->json([
@@ -141,34 +113,7 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        // Get lists assigned to this campaign (bypass scope)
-        $listIds = OrganizationScope::bypass(
-            fn () => AutoDialerList::where('campaign_id', $campaign)->pluck('id')->toArray()
-        );
-
-        if (empty($listIds)) {
-            return response()->json([
-                'data' => [],
-                'meta' => ['total' => 0, 'limit' => $limit, 'offset' => 0],
-            ]);
-        }
-
-        // Retryable dispositions
-        $retryableDispositions = ['busy', 'no-answer', 'cancelled'];
-
-        // Get destinations ready for retry (bypass scope)
-        $destinations = OrganizationScope::bypass(function () use ($listIds, $campaignModel, $limit, $retryableDispositions) {
-            return AutoDialerDestination::whereIn('list_id', $listIds)
-                ->whereIn('last_disposition', $retryableDispositions)
-                ->where('dial_attempts', '<', $campaignModel->max_dial_attempts)
-                ->where(function ($query) {
-                    $query->whereNull('next_retry_at')
-                        ->orWhere('next_retry_at', '<=', now());
-                })
-                ->orderBy('next_retry_at', 'asc')
-                ->limit($limit)
-                ->get();
-        });
+        $destinations = $this->destinationService->getRetryDestinations($campaign, $limit);
 
         return response()->json([
             'data' => ListDestinationResource::collection($destinations),
@@ -197,14 +142,8 @@ class DialerWorkerController extends Controller
             'caller_did_id' => ['nullable', 'integer'],
         ]);
 
-        // Bypass organization scope for worker API
-        $campaign = OrganizationScope::bypass(
-            fn () => AutoDialerCampaign::find($validated['campaign_id'])
-        );
-
-        $destination = OrganizationScope::bypass(
-            fn () => AutoDialerDestination::find($validated['destination_id'])
-        );
+        $campaign = $this->campaignQueryService->findById($validated['campaign_id']);
+        $destination = $this->destinationService->findById($validated['destination_id']);
 
         if (! $campaign || ! $destination) {
             return response()->json([
@@ -256,34 +195,22 @@ class DialerWorkerController extends Controller
             ], 500);
         }
 
-        // Create call session within scope bypass
-        $session = OrganizationScope::bypass(function () use ($campaign, $destination, $validated, $result) {
-            return AutoDialerCallSession::create([
-                'organization_id' => $campaign->organization_id,
-                'campaign_id' => $campaign->id,
-                'destination_id' => $destination->id,
-                'session_token' => $result['session_token'] ?? 'sess-'.uniqid(),
-                'call_id' => $result['call_id'] ?? null,
-                'phone_number' => $validated['phone_number'],
-                'caller_id' => $validated['caller_id'] ?? $campaign->caller_id,
-                'caller_did_id' => $validated['caller_did_id'] ?? null,
-                'worker_id' => $validated['worker_id'],
-                'status' => 'initiated',
-                'initiated_at' => $validated['initiated_at'],
-            ]);
-        });
+        // Create call session
+        $session = $this->callSessionService->createSession($campaign, $destination, [
+            'session_token' => $result['session_token'] ?? 'sess-'.uniqid(),
+            'call_id' => $result['call_id'] ?? null,
+            'phone_number' => $validated['phone_number'],
+            'caller_id' => $validated['caller_id'] ?? $campaign->caller_id,
+            'caller_did_id' => $validated['caller_did_id'] ?? null,
+            'worker_id' => $validated['worker_id'],
+            'initiated_at' => $validated['initiated_at'],
+        ]);
 
         // Update destination status
-        OrganizationScope::bypass(function () use ($destination) {
-            $destination->update([
-                'status' => DestinationStatus::DIALING,
-                'dial_attempts' => $destination->dial_attempts + 1,
-                'last_dialed_at' => now(),
-            ]);
-        });
+        $this->destinationService->markAsDialing($destination);
 
         // Increment campaign pending calls counter
-        OrganizationScope::bypass(fn () => $campaign->increment('pending_calls'));
+        $this->campaignService->incrementPendingCalls($campaign);
 
         Log::info('DialerWorker: Call initiated successfully', [
             'session_id' => $session->id,
@@ -321,10 +248,7 @@ class DialerWorkerController extends Controller
             'completed_at' => ['nullable', 'date'],
         ]);
 
-        // Bypass organization scope to find session
-        $sessionModel = OrganizationScope::bypass(
-            fn () => AutoDialerCallSession::find($session)
-        );
+        $sessionModel = $this->callSessionService->findById($session);
 
         if (! $sessionModel) {
             return response()->json([
@@ -332,76 +256,36 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        $campaign = OrganizationScope::bypass(
-            fn () => $sessionModel->campaign
-        );
+        $campaign = $sessionModel->campaign;
+        $destination = $sessionModel->destination;
 
         // Update session
-        OrganizationScope::bypass(function () use ($sessionModel, $validated) {
-            $sessionModel->update([
-                'status' => $validated['status'],
-                'disposition' => $validated['disposition'],
-                'duration' => $validated['duration'] ?? 0,
-                'billsec' => $validated['billsec'] ?? 0,
-                'recording_url' => $validated['recording_url'] ?? null,
-                'completed_at' => $validated['completed_at'] ?? null,
-            ]);
-        });
-
-        // Update destination
-        $destination = OrganizationScope::bypass(
-            fn () => $sessionModel->destination
-        );
-
-        $destinationData = [
-            'last_disposition' => $validated['disposition'],
+        $this->callSessionService->updateSession($sessionModel, [
+            'status' => $validated['status'],
+            'disposition' => $validated['disposition'],
             'duration' => $validated['duration'] ?? 0,
             'billsec' => $validated['billsec'] ?? 0,
-        ];
+            'recording_url' => $validated['recording_url'] ?? null,
+            'completed_at' => $validated['completed_at'] ?? null,
+        ]);
 
-        // Map disposition to status
-        $completedDispositions = ['answered', 'completed'];
-        $failedDispositions = ['busy', 'no-answer', 'failed', 'cancelled', 'congestion'];
-
-        if (in_array($validated['disposition'], $completedDispositions, true)) {
-            $destinationData['status'] = DestinationStatus::COMPLETED;
-            $campaign->increment('completed_calls');
-        } elseif (in_array($validated['disposition'], $failedDispositions, true)) {
-            // Check if should retry
-            $retryableDispositions = ['busy', 'no-answer', 'cancelled'];
-            if (in_array($validated['disposition'], $retryableDispositions, true) &&
-                $destination->dial_attempts < $campaign->max_dial_attempts) {
-                // Calculate next retry time (exponential backoff)
-                $nextRetry = $this->calculateNextRetry($destination->dial_attempts);
-                $destinationData['next_retry_at'] = $nextRetry;
-                $destinationData['status'] = DestinationStatus::PENDING;
-            } else {
-                $destinationData['status'] = DestinationStatus::FAILED;
-                $campaign->increment('failed_calls');
-            }
-        } else {
-            // Default to current status if disposition doesn't match expected values
-            $destinationData['status'] = $destination->status;
-        }
-
-        OrganizationScope::bypass(function () use ($destination, $destinationData) {
-            $destination->update($destinationData);
-        });
+        // Handle destination status based on disposition
+        $this->handleDispositionUpdate($campaign, $destination, $validated);
 
         // Decrement pending calls
-        $campaign->decrement('pending_calls');
+        $this->campaignService->decrementPendingCalls($campaign);
 
         Log::info('DialerWorker: Call status updated', [
             'session_id' => $sessionModel->id,
             'status' => $validated['status'],
-            'disposition' => $validated['disposition'],
+            'disposition' => $validated['disposition'] ?? null,
         ]);
 
         return response()->json([
             'message' => 'Call status updated',
             'data' => [
                 'session_id' => $sessionModel->id,
-                'destination_status' => $destinationData['status']->value,
+                'destination_status' => $this->getDestinationStatusFromDisposition($validated['disposition'] ?? null)->value,
             ],
         ]);
     }
@@ -425,10 +309,7 @@ class DialerWorkerController extends Controller
             'billsec' => ['nullable', 'integer'],
         ]);
 
-        // Bypass organization scope for worker API calls
-        $sessionModel = OrganizationScope::bypass(function () use ($session): ?AutoDialerCallSession {
-            return AutoDialerCallSession::with(['campaign', 'destination'])->find($session);
-        });
+        $sessionModel = $this->callSessionService->findWithRelations($session);
 
         if (! $sessionModel) {
             return response()->json([
@@ -436,9 +317,8 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        $session = $sessionModel;
-        $campaign = $session->campaign;
-        $destination = $session->destination;
+        $campaign = $sessionModel->campaign;
+        $destination = $sessionModel->destination;
 
         if (! $campaign || ! $destination) {
             return response()->json([
@@ -446,62 +326,11 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        // Perform updates within scope bypass and get destination status
-        $destinationStatus = OrganizationScope::bypass(function () use ($session, $campaign, $destination, $validated): DestinationStatus {
-            // Update session
-            $session->update([
-                'disposition' => $validated['disposition'],
-                'duration' => $validated['duration'] ?? 0,
-                'billsec' => $validated['billsec'] ?? 0,
-                'completed_at' => now(),
-            ]);
-
-            // Build destination update data
-            $destinationData = [
-                'last_disposition' => $validated['disposition'],
-                'duration' => $validated['duration'] ?? 0,
-                'billsec' => $validated['billsec'] ?? 0,
-            ];
-
-            // Determine status based on disposition and retry settings
-            $completedDispositions = ['answered', 'completed'];
-
-            if (in_array($validated['disposition'], $completedDispositions, true)) {
-                // Successful call
-                $destinationData['status'] = DestinationStatus::COMPLETED;
-                $session->update(['status' => 'completed']);
-                $campaign->increment('completed_calls');
-            } elseif ($validated['should_retry'] && $validated['next_retry_at']) {
-                // Schedule for retry
-                $destinationData['status'] = DestinationStatus::PENDING;
-                $destinationData['next_retry_at'] = $validated['next_retry_at'];
-                $session->update(['status' => 'failed']);
-
-                Log::info('DialerWorker: Destination scheduled for retry', [
-                    'session_id' => $session->id,
-                    'destination_id' => $destination->id,
-                    'attempt_number' => $validated['attempt_number'],
-                    'next_retry_at' => $validated['next_retry_at'],
-                ]);
-            } else {
-                // Permanent failure
-                $destinationData['status'] = DestinationStatus::FAILED;
-                $session->update(['status' => 'failed']);
-                $campaign->increment('failed_calls');
-            }
-
-            $destination->update($destinationData);
-
-            // Decrement pending calls if not already done
-            if ($campaign->pending_calls > 0) {
-                $campaign->decrement('pending_calls');
-            }
-
-            return $destinationData['status'];
-        });
+        // Handle the disposition
+        $destinationStatus = $this->processDisposition($sessionModel, $campaign, $destination, $validated);
 
         Log::info('DialerWorker: Disposition set', [
-            'session_id' => $session->id,
+            'session_id' => $sessionModel->id,
             'disposition' => $validated['disposition'],
             'should_retry' => $validated['should_retry'],
             'attempt_number' => $validated['attempt_number'],
@@ -510,7 +339,7 @@ class DialerWorkerController extends Controller
         return response()->json([
             'message' => 'Disposition set successfully',
             'data' => [
-                'session_id' => $session->id,
+                'session_id' => $sessionModel->id,
                 'disposition' => $validated['disposition'],
                 'destination_status' => $destinationStatus->value,
                 'will_retry' => $validated['should_retry'] && isset($validated['next_retry_at']),
@@ -531,10 +360,7 @@ class DialerWorkerController extends Controller
             'resume_at' => ['nullable', 'date'],
         ]);
 
-        // Bypass organization scope to find campaign
-        $campaignModel = OrganizationScope::bypass(
-            fn () => AutoDialerCampaign::find($campaign)
-        );
+        $campaignModel = $this->campaignQueryService->findById($campaign);
 
         if (! $campaignModel) {
             return response()->json([
@@ -542,38 +368,11 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        OrganizationScope::bypass(function () use ($campaignModel, $validated) {
-            $campaignModel->update([
-                'status' => CampaignStatus::PAUSED,
-                'pause_reason' => $validated['reason'],
-                'resume_at' => $validated['resume_at'] ?? null,
-            ]);
-        });
-
-        // Store pause info in cache
-        Cache::put(
-            "campaign_pause:{$campaign}",
-            [
-                'reason' => $validated['reason'],
-                'paused_by' => $validated['paused_by'],
-                'resume_at' => $validated['resume_at'] ?? null,
-                'paused_at' => now()->toIso8601String(),
-            ],
-            now()->addHours(24)
-        );
-
-        Log::info('DialerWorker: Campaign paused', [
-            'campaign_id' => $campaign,
-            'reason' => $validated['reason'],
-            'paused_by' => $validated['paused_by'],
-        ]);
+        $result = $this->campaignService->pauseCampaign($campaignModel, $validated);
 
         return response()->json([
             'message' => 'Campaign paused',
-            'data' => [
-                'campaign_id' => $campaign,
-                'status' => 'paused',
-            ],
+            'data' => $result,
         ]);
     }
 
@@ -584,7 +383,6 @@ class DialerWorkerController extends Controller
     {
         $this->authorizeWorker($request);
 
-        // Accept any array structure for flexibility
         $validated = $request->validate([
             'worker_id' => ['required', 'string'],
             'active_calls' => ['present', 'array'],
@@ -593,11 +391,7 @@ class DialerWorkerController extends Controller
             'last_updated' => ['required', 'date'],
         ]);
 
-        Cache::put(
-            "worker_state:{$validated['worker_id']}",
-            $validated,
-            now()->addMinutes(10)
-        );
+        $this->campaignService->persistWorkerState($validated['worker_id'], $validated);
 
         return response()->json([
             'message' => 'State persisted successfully',
@@ -611,7 +405,7 @@ class DialerWorkerController extends Controller
     {
         $this->authorizeWorker($request);
 
-        $state = Cache::get("worker_state:{$workerId}");
+        $state = $this->campaignService->getWorkerState($workerId);
 
         if (! $state) {
             return response()->json([
@@ -631,26 +425,9 @@ class DialerWorkerController extends Controller
     {
         $this->authorizeWorker($request);
 
-        // Count active campaigns (bypass scope)
-        $activeCampaigns = OrganizationScope::bypass(
-            fn () => AutoDialerCampaign::where('status', CampaignStatus::ACTIVE)->count()
-        );
-
-        // Count active call sessions (bypass scope)
-        $activeCalls = OrganizationScope::bypass(
-            fn () => AutoDialerCallSession::whereIn('status', ['initiated', 'ringing', 'answered'])->count()
-        );
-
-        // Count destinations in retry queue (approximate)
-        $retryableDispositions = ['busy', 'no-answer', 'cancelled'];
-        $queueDepth = OrganizationScope::bypass(
-            fn () => AutoDialerDestination::whereIn('last_disposition', $retryableDispositions)
-                ->where(function ($query) {
-                    $query->whereNull('next_retry_at')
-                        ->orWhere('next_retry_at', '<=', now());
-                })
-                ->count()
-        );
+        $activeCampaigns = $this->campaignQueryService->countActive();
+        $activeCalls = $this->callSessionService->countActive();
+        $queueDepth = $this->destinationService->countGlobalRetryQueue();
 
         return response()->json([
             'status' => 'healthy',
@@ -661,52 +438,7 @@ class DialerWorkerController extends Controller
     }
 
     /**
-     * Authorize worker requests.
-     */
-    private function authorizeWorker(Request $request): void
-    {
-        $token = $request->bearerToken();
-        $expectedToken = config('services.dialer_worker.token');
-        $secondaryToken = config('services.dialer_worker.token_secondary');
-
-        // Check primary token
-        $isValid = $token && hash_equals($expectedToken, $token);
-
-        // Check secondary token (for rotation)
-        $isSecondaryValid = $token && ! empty($secondaryToken) && hash_equals($secondaryToken, $token);
-
-        if (! $isValid && ! $isSecondaryValid) {
-            abort(401, 'Unauthorized');
-        }
-    }
-
-    /**
-     * Calculate next retry time using exponential backoff.
-     */
-    private function calculateNextRetry(int $attemptNumber): string
-    {
-        $baseDelay = 5; // 5 minutes
-        $delay = $baseDelay * (2 ** ($attemptNumber - 1));
-
-        // Cap at 60 minutes
-        if ($delay > 60) {
-            $delay = 60;
-        }
-
-        return now()->addMinutes($delay)->toIso8601String();
-    }
-
-    /**
      * Generate CXML for outbound call routing.
-     *
-     * This endpoint generates CXML that tells Cloudonix how to route an outbound call,
-     * similar to how inbound calls are routed via the voice routing endpoint.
-     *
-     * Supported routing types:
-     * - ai_assistant: Routes to AI Assistant (WebSocket or SIP)
-     * - ring_group: Routes to a ring group
-     * - ivr_menu: Routes to an IVR menu
-     * - extension: Routes to a specific extension
      */
     public function generateCxml(Request $request): JsonResponse
     {
@@ -719,9 +451,9 @@ class DialerWorkerController extends Controller
             'call_sid' => ['required', 'string'],
         ]);
 
-        // Bypass organization scope for worker API
-        $campaign = OrganizationScope::bypass(
-            fn () => AutoDialerCampaign::with(['aiAssistant', 'aiLoadBalancer'])->find($validated['campaign_id'])
+        $campaign = $this->campaignQueryService->findWithRelations(
+            $validated['campaign_id'],
+            ['aiAssistant', 'aiLoadBalancer']
         );
 
         if (! $campaign) {
@@ -731,7 +463,7 @@ class DialerWorkerController extends Controller
         }
 
         try {
-            $cxml = $this->generateRoutingCxml($campaign, $validated);
+            $cxml = $this->cxmlGenerationService->generateRoutingCxml($campaign, $validated);
 
             Log::info('DialerWorker: Generated CXML for outbound call', [
                 'campaign_id' => $campaign->id,
@@ -759,262 +491,137 @@ class DialerWorkerController extends Controller
     }
 
     /**
-     * Generate CXML based on campaign routing configuration.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign configuration
-     * @param  array<string, mixed>  $params  Call parameters (session_id, phone_number, call_sid)
-     * @return string The generated CXML
-     *
-     * @throws \InvalidArgumentException If routing configuration is invalid
+     * Authorize worker requests.
      */
-    private function generateRoutingCxml(AutoDialerCampaign $campaign, array $params): string
+    private function authorizeWorker(Request $request): void
     {
-        $routingType = $campaign->routing_destination_type;
+        $token = $request->bearerToken();
+        $expectedToken = config('services.dialer_worker.token');
+        $secondaryToken = config('services.dialer_worker.token_secondary');
 
-        return match ($routingType) {
-            RoutingDestinationType::AI_ASSISTANT => $this->generateAiAssistantCxml($campaign, $params),
-            RoutingDestinationType::AI_LOAD_BALANCER => $this->generateAiLoadBalancerCxml($campaign, $params),
-            RoutingDestinationType::RING_GROUP => $this->generateRingGroupCxml($campaign, $params),
-            RoutingDestinationType::IVR_MENU => $this->generateIvrMenuCxml($campaign, $params),
-            RoutingDestinationType::EXTENSION => $this->generateExtensionCxml($campaign, $params),
-            default => throw new \InvalidArgumentException("Unsupported routing type: {$routingType?->value}"),
-        };
-    }
+        // Check primary token
+        $isValid = $token && hash_equals($expectedToken, $token);
 
-    /**
-     * Generate CXML for AI Assistant routing.
-     *
-     * Supports both WebSocket and SIP protocols.
-     */
-    private function generateAiAssistantCxml(AutoDialerCampaign $campaign, array $params): string
-    {
-        $aiAssistant = $campaign->aiAssistant;
+        // Check secondary token (for rotation)
+        $isSecondaryValid = $token && ! empty($secondaryToken) && hash_equals($secondaryToken, $token);
 
-        if (! $aiAssistant) {
-            throw new \InvalidArgumentException('AI Assistant not found for campaign');
-        }
-
-        $config = $aiAssistant->configuration ?? [];
-        $protocol = $aiAssistant->protocol;
-        $provider = $aiAssistant->provider;
-
-        // Route based on protocol
-        if ($protocol === 'websocket') {
-            return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $params);
-        } else {
-            return $this->generateSipCxml($aiAssistant, $config, $provider, $params);
+        if (! $isValid && ! $isSecondaryValid) {
+            abort(401, 'Unauthorized');
         }
     }
 
     /**
-     * Generate CXML for WebSocket-based AI Assistant.
+     * Handle disposition update for a destination.
+     *
+     * @param  AutoDialerCampaign  $campaign
+     * @param  AutoDialerDestination  $destination
+     * @param  array<string, mixed>  $validated
      */
-    private function generateWebSocketCxml(AiAssistant $aiAssistant, array $config, ?string $provider, array $params): string
+    private function handleDispositionUpdate($campaign, $destination, array $validated): void
     {
-        if (! $provider) {
-            throw new \InvalidArgumentException('AI Assistant provider not configured');
+        $disposition = $validated['disposition'] ?? null;
+        $duration = $validated['duration'] ?? 0;
+        $billsec = $validated['billsec'] ?? 0;
+
+        if ($disposition === null) {
+            // No disposition provided, just update the session status
+            return;
         }
 
-        // Get provider registry to resolve URL template
-        $providerRegistry = app(ProviderRegistry::class);
-        $providerDef = $providerRegistry->getProvider($provider);
-
-        if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
-            throw new \InvalidArgumentException('Invalid WebSocket provider configuration');
-        }
-
-        // Build WebSocket URL using the URL builder
-        $urlBuilder = app(WebSocketUrlBuilder::class);
-        $cloudonixParams = [
-            'session' => $params['call_sid'],
-            'from' => $params['phone_number'], // Outbound: destination is "from" in CXML context
-            'to' => $campaign->caller_id ?? '', // Outbound: caller ID is "to" in CXML context
+        $destinationData = [
+            'disposition' => $disposition,
+            'duration' => $duration,
+            'billsec' => $billsec,
         ];
 
-        $websocketUrl = $urlBuilder->buildUrl(
-            $providerDef->urlTemplate,
-            $config,
-            $cloudonixParams
-        );
-
-        Log::debug('DialerWorker: Generated WebSocket URL for AI Assistant', [
-            'ai_assistant_id' => $aiAssistant->id,
-            'provider' => $provider,
-            'websocket_url' => $websocketUrl,
-        ]);
-
-        // Generate CXML with Connect>Stream verb
-        return CxmlBuilder::streamToWebSocket($websocketUrl);
-    }
-
-    /**
-     * Generate CXML for SIP-based AI Assistant.
-     */
-    private function generateSipCxml(AiAssistant $aiAssistant, array $config, ?string $provider, array $params): string
-    {
-        // Check if AI Assistant has service URL (preferred for generic service URLs)
-        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
-            ->where('ai_assistant_id', $aiAssistant->id)
-            ->where('organization_id', $aiAssistant->organization_id)
-            ->first();
-
-        if ($extension && $extension->service_url) {
-            Log::debug('DialerWorker: Using extension service URL for SIP routing', [
-                'ai_assistant_id' => $aiAssistant->id,
-                'extension_id' => $extension->id,
-                'service_url' => $extension->service_url,
-            ]);
-
-            return CxmlBuilder::dialService(
-                $extension->service_url,
-                $extension->service_token,
-                $extension->service_params ?? []
-            );
-        }
-
-        // Fall back to legacy provider + phone number format
-        $phoneNumber = $config['phone_number'] ?? null;
-
-        if (! $provider || ! $phoneNumber) {
-            throw new \InvalidArgumentException('SIP AI Assistant missing provider or phone number');
-        }
-
-        Log::debug('DialerWorker: Using provider format for SIP routing', [
-            'ai_assistant_id' => $aiAssistant->id,
-            'provider' => $provider,
-            'phone_number' => $phoneNumber,
-        ]);
-
-        return CxmlBuilder::dialServiceProvider($provider, $phoneNumber);
-    }
-
-    /**
-     * Generate CXML for AI Load Balancer routing.
-     */
-    private function generateAiLoadBalancerCxml(AutoDialerCampaign $campaign, array $params): string
-    {
-        $loadBalancer = $campaign->aiLoadBalancer;
-
-        if (! $loadBalancer) {
-            throw new \InvalidArgumentException('AI Load Balancer not found for campaign');
-        }
-
-        // Get the active AI assistant from the load balancer
-        $aiAssistant = $loadBalancer->getActiveAssistant();
-
-        if (! $aiAssistant) {
-            throw new \InvalidArgumentException('No active AI Assistant found in load balancer');
-        }
-
-        $config = $aiAssistant->configuration ?? [];
-        $protocol = $aiAssistant->protocol;
-        $provider = $aiAssistant->provider;
-
-        if ($protocol === 'websocket') {
-            return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $params);
-        } else {
-            return $this->generateSipCxml($aiAssistant, $config, $provider, $params);
-        }
-    }
-
-    /**
-     * Generate CXML for Ring Group routing.
-     */
-    private function generateRingGroupCxml(AutoDialerCampaign $campaign, array $params): string
-    {
-        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
-            ->where('id', $campaign->routing_destination_id)
-            ->where('organization_id', $campaign->organization_id)
-            ->first();
-
-        if (! $ringGroup) {
-            throw new \InvalidArgumentException('Ring group not found');
-        }
-
-        // Get members' SIP URIs
-        $sipUris = [];
-        foreach ($ringGroup->members as $member) {
-            if ($member->extension && $member->extension->isActive()) {
-                $sipUris[] = $member->extension->getSipUri();
+        if ($this->campaignService->isCompletedDisposition($disposition)) {
+            $destinationData['status'] = DestinationStatus::COMPLETED;
+            $this->campaignService->incrementCompletedCalls($campaign);
+        } elseif ($this->campaignService->isFailedDisposition($disposition)) {
+            if ($this->campaignService->isRetryableDisposition($disposition) &&
+                ! $this->destinationService->hasReachedMaxAttempts($destination, $campaign->max_dial_attempts)) {
+                $destinationData['next_retry_at'] = $this->campaignService->calculateNextRetry($destination->dial_attempts);
+                $destinationData['status'] = DestinationStatus::PENDING;
+            } else {
+                $destinationData['status'] = DestinationStatus::FAILED;
+                $this->campaignService->incrementFailedCalls($campaign);
             }
+        } else {
+            $destinationData['status'] = $destination->status;
         }
 
-        if (empty($sipUris)) {
-            throw new \InvalidArgumentException('Ring group has no active members');
-        }
-
-        Log::debug('DialerWorker: Generated ring group CXML', [
-            'ring_group_id' => $ringGroup->id,
-            'member_count' => count($sipUris),
-        ]);
-
-        // Generate webhook callback URL for ring group fallback
-        $webhookBaseUrl = config('app.webhook_base_url') ?? config('app.url');
-        $actionUrl = rtrim($webhookBaseUrl, '/').'/api/voice/ring-group-callback?ring_group_id='.$ringGroup->id;
-
-        return CxmlBuilder::dialRingGroup($sipUris, $campaign->dial_timeout ?? 30, $actionUrl);
+        $this->destinationService->updateDisposition($destination, $destinationData);
     }
 
     /**
-     * Generate CXML for IVR Menu routing.
+     * Process disposition and return the resulting destination status.
+     *
+     * @param  \App\Models\AutoDialerCallSession  $session
+     * @param  AutoDialerCampaign  $campaign
+     * @param  AutoDialerDestination  $destination
+     * @param  array<string, mixed>  $validated
      */
-    private function generateIvrMenuCxml(AutoDialerCampaign $campaign, array $params): string
+    private function processDisposition($session, $campaign, $destination, array $validated): DestinationStatus
     {
-        $ivrMenu = IvrMenu::withoutGlobalScope(OrganizationScope::class)
-            ->where('id', $campaign->routing_destination_id)
-            ->where('organization_id', $campaign->organization_id)
-            ->first();
+        $disposition = $validated['disposition'];
+        $shouldRetry = $validated['should_retry'];
+        $nextRetryAt = $validated['next_retry_at'] ?? null;
 
-        if (! $ivrMenu) {
-            throw new \InvalidArgumentException('IVR menu not found');
+        // Determine destination status first
+        if ($this->campaignService->isCompletedDisposition($disposition)) {
+            $this->destinationService->markAsCompleted($destination, $disposition, $validated['duration'] ?? 0, $validated['billsec'] ?? 0);
+            $this->campaignService->incrementCompletedCalls($campaign);
+            $sessionStatus = 'completed';
+            $destStatus = DestinationStatus::COMPLETED;
+        } elseif ($shouldRetry && $nextRetryAt) {
+            $this->destinationService->scheduleRetry($destination, $nextRetryAt, $disposition);
+            $sessionStatus = 'failed';
+            $destStatus = DestinationStatus::PENDING;
+
+            Log::info('DialerWorker: Destination scheduled for retry', [
+                'session_id' => $session->id,
+                'destination_id' => $destination->id,
+                'attempt_number' => $validated['attempt_number'],
+                'next_retry_at' => $nextRetryAt,
+            ]);
+        } else {
+            $this->destinationService->markAsFailed($destination, $disposition, $validated['duration'] ?? 0, $validated['billsec'] ?? 0);
+            $this->campaignService->incrementFailedCalls($campaign);
+            $sessionStatus = 'failed';
+            $destStatus = DestinationStatus::FAILED;
         }
 
-        // Generate webhook URL for IVR input handling
-        $webhookBaseUrl = config('app.webhook_base_url') ?? config('app.url');
-        $actionUrl = rtrim($webhookBaseUrl, '/').'/api/voice/ivr-input?menu_id='.$ivrMenu->id;
-
-        // Build the IVR prompt
-        $nestedVerbs = '';
-        if ($ivrMenu->greeting_audio_url) {
-            $nestedVerbs .= CxmlBuilder::playXml($ivrMenu->greeting_audio_url);
-        } elseif ($ivrMenu->greeting_text) {
-            $nestedVerbs .= CxmlBuilder::sayXml($ivrMenu->greeting_text);
-        }
-
-        Log::debug('DialerWorker: Generated IVR menu CXML', [
-            'ivr_menu_id' => $ivrMenu->id,
-            'has_audio' => (bool) $ivrMenu->greeting_audio_url,
+        // Update session
+        $this->callSessionService->setDisposition($session, [
+            'disposition' => $disposition,
+            'duration' => $validated['duration'] ?? 0,
+            'billsec' => $validated['billsec'] ?? 0,
+            'status' => $sessionStatus,
         ]);
 
-        return CxmlBuilder::gather(
-            $nestedVerbs,
-            $actionUrl,
-            $ivrMenu->timeout ?? 5,
-            $ivrMenu->finish_on_key ?? '#',
-            $ivrMenu->min_digits ?? 1,
-            $ivrMenu->max_digits ?? 1
-        );
+        // Decrement pending calls
+        $this->campaignService->decrementPendingCalls($campaign);
+
+        return $destStatus;
     }
 
     /**
-     * Generate CXML for Extension routing.
+     * Get destination status from disposition string.
      */
-    private function generateExtensionCxml(AutoDialerCampaign $campaign, array $params): string
+    private function getDestinationStatusFromDisposition(?string $disposition): DestinationStatus
     {
-        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
-            ->where('id', $campaign->routing_destination_id)
-            ->where('organization_id', $campaign->organization_id)
-            ->first();
-
-        if (! $extension) {
-            throw new \InvalidArgumentException('Extension not found');
+        if ($disposition === null) {
+            return DestinationStatus::PENDING;
         }
 
-        Log::debug('DialerWorker: Generated extension CXML', [
-            'extension_id' => $extension->id,
-            'extension_number' => $extension->extension_number,
-        ]);
+        if ($this->campaignService->isCompletedDisposition($disposition)) {
+            return DestinationStatus::COMPLETED;
+        }
 
-        return CxmlBuilder::dialExtension($extension->getSipUri(), $campaign->dial_timeout ?? 30);
+        if (in_array($disposition, ['failed', 'congestion'], true)) {
+            return DestinationStatus::FAILED;
+        }
+
+        return DestinationStatus::PENDING;
     }
 }
