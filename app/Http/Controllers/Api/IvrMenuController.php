@@ -173,7 +173,6 @@ class IvrMenuController extends AbstractApiCrudController
         // Resolve audio configuration using value object
         $audioConfig = IvrAudioConfig::fromRequest($validated, $user);
         $validated = array_merge($validated, $audioConfig->toArray());
-        unset($validated['recording_id']); // Clean up temporary field
 
         return $validated;
     }
@@ -222,7 +221,6 @@ class IvrMenuController extends AbstractApiCrudController
         // Resolve audio configuration using value object
         $audioConfig = IvrAudioConfig::fromRequest($validated, $user);
         $validated = array_merge($validated, $audioConfig->toArray());
-        unset($validated['recording_id']); // Clean up temporary field
 
         return $validated;
     }
