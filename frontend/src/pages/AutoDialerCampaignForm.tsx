@@ -52,7 +52,7 @@ import { aiAssistantLoadBalancersService } from '@/services/createResourceServic
 import { useQuery } from '@tanstack/react-query';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
-import { WeeklyCalendarView } from '@/pages/BusinessHours/components';
+import { WeeklyCalendarView } from '@/pages/business-hours-components/components';
 import type { WeeklySchedule, DayOfWeek } from '@/types';
 import { getErrorMessage } from '@/types/api';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';

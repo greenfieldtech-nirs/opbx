@@ -35,7 +35,7 @@ import {
   ExceptionDialog,
   CopyHoursDialog,
   ScheduleDetailSheet,
-} from './BusinessHours/index';
+} from './business-hours-components';
 
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();
