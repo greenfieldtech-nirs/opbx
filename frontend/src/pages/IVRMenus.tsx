@@ -733,7 +733,7 @@ export default function IVRMenus() {
       failover_destination_type: menu.failover_destination_type,
       failover_destination_id: menu.failover_destination_id ? String(menu.failover_destination_id) : undefined,
       status: menu.status,
-      options: menu.options.map(opt => ({
+      options: (menu.options || []).map(opt => ({
         ...opt,
         destination_id: String(opt.destination_id)
       })),
