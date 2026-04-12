@@ -50,6 +50,16 @@ class IvrMenuController extends AbstractApiCrudController
     }
 
     /**
+     * Get the route parameter name for model binding.
+     *
+     * Override to match route parameter 'ivrMenu' instead of 'ivr_menu'.
+     */
+    protected function getRouteParameterName(): string
+    {
+        return 'ivrMenu';
+    }
+
+    /**
      * Get the resource class name for transforming models.
      */
     protected function getResourceClass(): string
