@@ -36,6 +36,7 @@ import {
   CopyHoursDialog,
   ScheduleDetailSheet,
   getActionDisplayName,
+  getActionDisplayNameSimple,
 } from './business-hours-components';
 
 const BusinessHours: React.FC = () => {
@@ -226,7 +227,7 @@ const BusinessHours: React.FC = () => {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(schedule) => schedule.name}
-            getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayName(schedule.open_routing_type)} when open`}
+            getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayNameSimple(schedule.open_routing_type)} when open`}
             onIdentityClick={handleEdit}
             sortField={sortBy}
             sortDirection="asc"

@@ -11,4 +11,5 @@ export {
   createEmptyWeeklySchedule,
   applyScheduleTemplate,
   getActionDisplayName,
+  getActionDisplayNameSimple,
 } from './utils/helpers';

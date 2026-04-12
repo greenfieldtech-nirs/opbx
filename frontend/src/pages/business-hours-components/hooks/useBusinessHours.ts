@@ -5,6 +5,7 @@ import { businessHoursService } from '@/services/businessHours.service';
 import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService, ivrMenusService, conferenceRoomsService } from '@/services/createResourceService';
 import api from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 import type {
   BusinessHoursSchedule,
   ScheduleStatus,
@@ -16,6 +17,10 @@ import { createEmptyWeeklySchedule, getNextTimeRangeId, getNextExceptionId } fro
 
 export function useBusinessHours() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  // Get organization timezone, fallback to UTC
+  const organizationTimezone = user?.organization?.timezone || 'UTC';
 
   // State for filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,7 +191,7 @@ export function useBusinessHours() {
       exceptions: [],
       open_hours_action: null,
       closed_hours_action: null,
-      timezone: 'America/New_York',
+      timezone: organizationTimezone,
     };
     setFormData(initialSchedule);
     setOpenHoursAction(null);
@@ -408,7 +413,7 @@ export function useBusinessHours() {
       closed_hours_action: closedHoursAction!,
       schedule: formData.schedule!,
       exceptions: formData.exceptions || [],
-      timezone: formData.timezone || 'America/New_York',
+      timezone: formData.timezone || organizationTimezone,
     };
 
     if (editingSchedule) {

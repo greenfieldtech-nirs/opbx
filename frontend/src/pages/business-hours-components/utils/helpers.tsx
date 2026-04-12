@@ -156,6 +156,36 @@ const extractNumericId = (targetId: string): string => {
 };
 
 /**
+ * Get simple action display name as string (for table subtitles)
+ */
+export const getActionDisplayNameSimple = (action: unknown): string => {
+  if (!action) return 'Not set';
+
+  if (typeof action === 'object' && (action as BusinessHoursAction).type && (action as BusinessHoursAction).target_id) {
+    const actionObj = action as BusinessHoursAction;
+    
+    switch (actionObj.type) {
+      case 'extension':
+        return `Extension ${actionObj.target_id}`;
+      case 'ring_group':
+        return `Ring Group ${actionObj.target_id}`;
+      case 'ivr_menu':
+        return `IVR Menu ${actionObj.target_id}`;
+      case 'ai_assistant':
+        return `AI Assistant ${actionObj.target_id}`;
+      default:
+        return `${actionObj.type}: ${actionObj.target_id}`;
+    }
+  }
+
+  if (typeof action === 'string') {
+    return action;
+  }
+
+  return 'Unknown';
+};
+
+/**
  * Get action display name for both structured and legacy formats
  */
 export const getActionDisplayName = (
