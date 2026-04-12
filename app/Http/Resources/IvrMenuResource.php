@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\Recording;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,12 +22,36 @@ class IvrMenuResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // Detect if audio_file_path is a recording URL and extract recording_id
+        $recordingId = null;
+        $audioFilePath = $this->audio_file_path;
+
+        if ($audioFilePath && str_starts_with($audioFilePath, 'http')) {
+            // Try to find a recording with this playback URL
+            $recording = Recording::where('file_path', $audioFilePath)
+                ->orWhere('file_url', $audioFilePath)
+                ->first();
+
+            if (! $recording) {
+                // Try to match by parsing the URL
+                $recording = Recording::all()->first(function ($rec) use ($audioFilePath) {
+                    return str_contains($audioFilePath, $rec->file_name) ||
+                           str_contains($audioFilePath, (string) $rec->id);
+                });
+            }
+
+            if ($recording) {
+                $recordingId = $recording->id;
+            }
+        }
+
         return [
             'id' => $this->id,
             'organization_id' => $this->organization_id,
             'name' => $this->name,
             'description' => $this->description,
             'audio_file_path' => $this->audio_file_path,
+            'recording_id' => $recordingId,
             'tts_text' => $this->tts_text,
             'tts_voice' => $this->tts_voice,
             'max_timeout' => $this->max_timeout,

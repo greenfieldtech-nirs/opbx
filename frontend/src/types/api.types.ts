@@ -359,6 +359,7 @@ export interface IvrMenu {
   name: string;
   description?: string;
   audio_file_path?: string;
+  recording_id?: number;
   tts_text?: string;
   tts_voice?: string;
   max_timeout: number;

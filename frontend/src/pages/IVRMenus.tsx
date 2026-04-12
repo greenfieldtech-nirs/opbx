@@ -722,8 +722,8 @@ export default function IVRMenus() {
     setSelectedMenu(menu);
     setFormData({
       name: menu.name,
-      audio_file_path: menu.audio_file_path,
-      recording_id: undefined,
+      audio_file_path: menu.recording_id ? undefined : menu.audio_file_path,
+      recording_id: menu.recording_id,
       tts_text: menu.tts_text,
       tts_voice: menu.tts_voice,
       useTTS: !!menu.tts_text,
