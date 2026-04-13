@@ -38,7 +38,7 @@ const timeSlots = Array.from({ length: 24 }, (_, i) => {
   const hour = i;
   return {
     hour,
-    label: `${hour.toString().padStart(2, '0')}:00`,
+    label: `${hour}:00`,
     display: hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`,
   };
 });
@@ -171,8 +171,8 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
 
         {timeSlots.map(({ hour }) => (
           <div key={hour} className="grid grid-cols-8 border-b last:border-b-0 hover:bg-muted/20">
-            <div className="p-2 text-xs text-muted-foreground border-r flex items-center">
-              {`${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`}
+            <div className="p-2 text-xs text-muted-foreground border-r flex items-center justify-end pr-3">
+              {`${hour}:00 - ${hour + 1}:00`}
             </div>
             {days.map(({ key: dayKey }) => {
               const status = getTimeSlotStatus(dayKey, hour);
