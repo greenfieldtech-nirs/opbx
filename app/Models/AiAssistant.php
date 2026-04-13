@@ -99,6 +99,14 @@ class AiAssistant extends Model
     }
 
     /**
+     * Check if the AI assistant is active.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === AiAssistantStatus::ACTIVE;
+    }
+
+    /**
      * Get the extensions that use this AI assistant.
      *
      * Note: Extensions are scoped to the same organization via the organization scope.

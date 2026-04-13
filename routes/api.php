@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
-use App\Http\Controllers\Api\CallLogController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
@@ -273,7 +272,11 @@ Route::prefix('v1')->group(function (): void {
 
         // IVR Menus
         Route::get('ivr-menus/voices', [IvrMenuController::class, 'getVoices'])->name('ivr-menus.voices');
-        Route::apiResource('ivr-menus', IvrMenuController::class);
+        Route::get('ivr-menus', [IvrMenuController::class, 'index'])->name('ivr-menus.index');
+        Route::post('ivr-menus', [IvrMenuController::class, 'store'])->name('ivr-menus.store');
+        Route::get('ivr-menus/{ivrMenu}', [IvrMenuController::class, 'show'])->name('ivr-menus.show');
+        Route::put('ivr-menus/{ivrMenu}', [IvrMenuController::class, 'update'])->name('ivr-menus.update');
+        Route::delete('ivr-menus/{ivrMenu}', [IvrMenuController::class, 'destroy'])->name('ivr-menus.destroy');
         Route::patch('ivr-menus/{ivrMenu}/toggle-status', [IvrMenuController::class, 'toggleStatus'])
             ->name('ivr-menus.toggle-status');
 
@@ -300,14 +303,6 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('inbound-blacklist/{inboundBlacklist}/toggle-status', [InboundBlacklistController::class, 'toggleStatus'])
             ->name('inbound-blacklist.toggle-status');
         Route::apiResource('inbound-blacklist', InboundBlacklistController::class);
-
-        // Call Logs (read-only)
-        Route::prefix('call-logs')->group(function (): void {
-            Route::get('/', [CallLogController::class, 'index'])->name('call-logs.index');
-            Route::get('/active', [CallLogController::class, 'active'])->name('call-logs.active');
-            Route::get('/statistics', [CallLogController::class, 'statistics'])->name('call-logs.statistics');
-            Route::get('/{callLog}', [CallLogController::class, 'show'])->name('call-logs.show');
-        });
 
         // Call Detail Records (read-only)
         Route::prefix('call-detail-records')->group(function (): void {

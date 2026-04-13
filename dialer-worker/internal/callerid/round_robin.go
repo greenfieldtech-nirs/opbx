@@ -84,7 +84,10 @@ func (s *RoundRobinStrategy) SelectWithRetry(
 	selected := expandedPool[index]
 
 	// Set TTL on the key (24 hours)
-	s.redisClient.Expire(ctx, key, 24*60*60)
+	if err := s.redisClient.Expire(ctx, key, 24*60*60); err != nil {
+		// Error is intentionally ignored - key will work without TTL
+		_ = err
+	}
 
 	return &selected, nil
 }

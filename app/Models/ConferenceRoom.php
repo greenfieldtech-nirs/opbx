@@ -33,7 +33,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $talk_detection_webhook_url
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
- *
  * @property-read Organization $organization
  */
 #[ScopedBy([OrganizationScope::class])]
@@ -87,6 +86,14 @@ class ConferenceRoom extends Model
     }
 
     /**
+     * Check if the conference room is active.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === UserStatus::ACTIVE;
+    }
+
+    /**
      * Get the organization that owns the conference room.
      */
     public function organization(): BelongsTo
@@ -133,7 +140,7 @@ class ConferenceRoom extends Model
     {
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%");
+                ->orWhere('description', 'like', "%{$search}%");
         });
     }
 }

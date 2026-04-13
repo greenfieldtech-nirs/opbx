@@ -40,6 +40,12 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   useAutoDialerCampaign,
@@ -52,8 +58,9 @@ import { aiAssistantLoadBalancersService } from '@/services/createResourceServic
 import { useQuery } from '@tanstack/react-query';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
-import { WeeklyCalendarView } from '@/pages/BusinessHours/components';
+import { WeeklyCalendarView } from '@/pages/business-hours-components/components';
 import type { WeeklySchedule, DayOfWeek } from '@/types';
+import { getErrorMessage } from '@/types/api';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
 import { cn } from '@/lib/utils';
@@ -373,8 +380,8 @@ export default function AutoDialerCampaignForm() {
 
         // Add Caller ID Pool fields if pool can be modified
         if (canModifyPool) {
-          (updateData as any).caller_id_strategy = data.caller_id_strategy;
-          (updateData as any).caller_id_pool = data.caller_id_pool;
+          updateData.caller_id_strategy = data.caller_id_strategy;
+          updateData.caller_id_pool = data.caller_id_pool;
         }
         
         await updateMutation.mutateAsync({ id, data: updateData });
@@ -413,8 +420,8 @@ export default function AutoDialerCampaignForm() {
         return;
       }
       navigate(-1);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
     }
   };
 
@@ -456,38 +463,27 @@ export default function AutoDialerCampaignForm() {
           </TabsList>
 
           {/* Basic Info Tab - Combined with Routing */}
-          <TabsContent value="basic" className="space-y-6">
+          <TabsContent value="basic" className="space-y-6 max-h-[calc(100vh-360px)] overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Information</CardTitle>
                 <CardDescription>Basic details and routing configuration</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Campaign Name and Auto-Start side by side */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">
-                      Campaign Name <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      {...register('name')}
-                      placeholder="Enter campaign name"
-                      className={errors.name ? 'border-red-500' : ''}
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name.message}</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2 h-full pt-8">
-                    <Switch
-                      id="auto_start"
-                      checked={watch('auto_start')}
-                      onCheckedChange={(checked) => setValue('auto_start', checked)}
-                    />
-                    <Label htmlFor="auto_start">Auto-start campaign when scheduled</Label>
-                  </div>
+                {/* Campaign Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    Campaign Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    {...register('name')}
+                    placeholder="Enter campaign name"
+                    className={errors.name ? 'border-red-500' : ''}
+                  />
+                  {errors.name && (
+                    <p className="text-sm text-red-500">{errors.name.message}</p>
+                  )}
                 </div>
 
                 {/* Routing Destination - side by side layout */}
@@ -533,15 +529,15 @@ export default function AutoDialerCampaignForm() {
                     </Alert>
                   )}
 
-                  <div className="space-y-6">
-                    {/* Strategy Selector */}
+                  <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+                    {/* Strategy Selector - Left Column */}
                     <StrategySelector
                       value={callerIdStrategy}
                       onChange={(value) => setValue('caller_id_strategy', value)}
                       disabled={!canModifyPool}
                     />
 
-                    {/* Pool Selector */}
+                    {/* Pool Selector - Right Column */}
                     <div className="space-y-2">
                       <Label>Caller ID Pool</Label>
                       <CallerIdPoolSelector
@@ -556,11 +552,125 @@ export default function AutoDialerCampaignForm() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                {/* Dial Timeout and Connect When - side by side */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+          {/* Schedule Tab */}
+          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-380px)] overflow-y-auto pr-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign Schedule</CardTitle>
+                <CardDescription>Configure when the campaign should run</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Left Column - Date/Time Settings */}
+                  <div className="lg:w-[20%] space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="timezone">Timezone</Label>
+                      <Select
+                        value={watch('timezone')}
+                        onValueChange={(value) => setValue('timezone', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a timezone" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {regionOrder.map((region) => {
+                            const tzs = timezoneGroups[region];
+                            if (!tzs || tzs.length === 0) return null;
+                            return (
+                              <SelectGroup key={region}>
+                                <SelectLabel>{region}</SelectLabel>
+                                {tzs.map((tz) => (
+                                  <SelectItem key={tz.value} value={tz.value}>
+                                    {formatTimezoneLabel(tz)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="start_date">Start Date</Label>
+                      <Input id="start_date" type="date" {...register('start_date')} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="end_date">End Date</Label>
+                      <Input id="end_date" type="date" {...register('end_date')} />
+                    </div>
+                  </div>
+
+                  {/* Right Column - Active Hours Calendar */}
+                  <div className="lg:w-[80%] space-y-3">
+                    <Label>Active Hours</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Click on time slots to toggle active hours. Green = Active, Empty = Inactive.
+                    </p>
+                    <WeeklyCalendarView
+                      schedule={weeklySchedule}
+                      onScheduleChange={setWeeklySchedule}
+                      onDayScheduleChange={() => {}}
+                      onTimeRangeChange={() => {}}
+                      onAddTimeRange={() => {}}
+                      onRemoveTimeRange={() => {}}
+                      onOpenCopyHours={() => {}}
+                      errors={{}}
+                      expandHeight
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Advanced Tab */}
+          <TabsContent value="advanced" className="space-y-6 max-h-[calc(100vh-360px)] overflow-y-auto pr-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Advanced Settings</CardTitle>
+                <CardDescription>Additional configuration options</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Row 1: Auto Start, Time Limit, Dial Timeout, Connect When */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="dial_timeout">Dial Timeout (seconds)</Label>
+                    <Label htmlFor="auto_start">Auto-start</Label>
+                    <Select
+                      value={watch('auto_start') ? 'true' : 'false'}
+                      onValueChange={(value) => setValue('auto_start', value === 'true')}
+                    >
+                      <SelectTrigger id="auto_start">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Enabled</SelectItem>
+                        <SelectItem value="false">Disabled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">Auto-start on schedule</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="time_limit">Time Limit (sec)</Label>
+                    <Input
+                      id="time_limit"
+                      type="number"
+                      {...register('time_limit', { valueAsNumber: true })}
+                      min={30}
+                      max={14400}
+                      placeholder="3600"
+                    />
+                    <p className="text-sm text-muted-foreground">Max call duration</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dial_timeout">Dial Timeout (sec)</Label>
                     <Input
                       id="dial_timeout"
                       type="number"
@@ -568,6 +678,7 @@ export default function AutoDialerCampaignForm() {
                       min={1}
                       max={300}
                     />
+                    <p className="text-sm text-muted-foreground">Answer timeout</p>
                   </div>
 
                   <div className="space-y-2">
@@ -586,263 +697,215 @@ export default function AutoDialerCampaignForm() {
                         <SelectItem value="immediately">Immediately</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Schedule Tab */}
-          <TabsContent value="schedule" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Campaign Schedule</CardTitle>
-                <CardDescription>Configure when the campaign should run</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Date and Timezone Row */}
-                <div className="flex gap-4">
-                  <div className="space-y-2" style={{ width: '40%' }}>
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Select
-                      value={watch('timezone')}
-                      onValueChange={(value) => setValue('timezone', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a timezone" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
-                        {regionOrder.map((region) => {
-                          const tzs = timezoneGroups[region];
-                          if (!tzs || tzs.length === 0) return null;
-                          return (
-                            <SelectGroup key={region}>
-                              <SelectLabel>{region}</SelectLabel>
-                              {tzs.map((tz) => (
-                                <SelectItem key={tz.value} value={tz.value}>
-                                  {formatTimezoneLabel(tz)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2" style={{ width: '30%' }}>
-                    <Label htmlFor="start_date">Start Date</Label>
-                    <Input id="start_date" type="date" {...register('start_date')} />
-                  </div>
-
-                  <div className="space-y-2" style={{ width: '30%' }}>
-                    <Label htmlFor="end_date">End Date</Label>
-                    <Input id="end_date" type="date" {...register('end_date')} />
+                    <p className="text-sm text-muted-foreground">When to connect destination</p>
                   </div>
                 </div>
 
-                {/* Active Hours Calendar */}
-                <div className="space-y-3 pt-4 border-t">
-                  <Label>Active Hours</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Click on time slots to toggle active hours. Green = Active, Empty = Inactive.
-                  </p>
-                  <WeeklyCalendarView
-                    schedule={weeklySchedule}
-                    onScheduleChange={setWeeklySchedule}
-                    onDayScheduleChange={() => {}}
-                    onTimeRangeChange={() => {}}
-                    onAddTimeRange={() => {}}
-                    onRemoveTimeRange={() => {}}
-                    onOpenCopyHours={() => {}}
-                    errors={{}}
-                    expandHeight
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Advanced Tab */}
-          <TabsContent value="advanced" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Advanced Settings</CardTitle>
-                <CardDescription>Additional configuration options</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* CAC, CPS, and Max Dial Attempts */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="concurrent_active_calls">Concurrent Active Calls (CAC)</Label>
-                    <Input
-                      id="concurrent_active_calls"
-                      type="number"
-                      {...register('concurrent_active_calls', { valueAsNumber: true })}
-                      min={1}
-                      max={50}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Max simultaneous active calls (1–50)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="calls_per_second">Calls Per Second (CPS)</Label>
-                    <Select
-                      value={String(watch('calls_per_second'))}
-                      onValueChange={(value) => setValue('calls_per_second', parseInt(value))}
-                    >
-                      <SelectTrigger id="calls_per_second">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5].map((value) => (
-                          <SelectItem key={value} value={String(value)}>
-                            {value} call{value > 1 ? 's' : ''}/sec
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      Call initiation rate (1–5)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="max_dial_attempts">Max Dial Attempts</Label>
-                    <Input
-                      id="max_dial_attempts"
-                      type="number"
-                      {...register('max_dial_attempts', { valueAsNumber: true })}
-                      min={1}
-                      max={5}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Maximum retry attempts per destination
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="record_calls">Record Calls</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Record all calls for quality assurance
-                    </p>
-                  </div>
-                  <Switch
-                    id="record_calls"
-                    checked={watch('record_calls')}
-                    onCheckedChange={(checked) => setValue('record_calls', checked)}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="amd_enabled">Answering Machine Detection</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Detect if call is answered by human or machine
-                      </p>
+                {/* Row 2: Two Columns (33% / 67%) */}
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6">
+                  {/* Left Column: CAC, CPS, Dial Attempts */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="concurrent_active_calls">Concurrent Active Calls (CAC)</Label>
+                      <Input
+                        id="concurrent_active_calls"
+                        type="number"
+                        {...register('concurrent_active_calls', { valueAsNumber: true })}
+                        min={1}
+                        max={50}
+                      />
+                      <p className="text-sm text-muted-foreground">Max simultaneous active calls (1–50)</p>
                     </div>
-                    <Switch
-                      id="amd_enabled"
-                      checked={amdEnabled}
-                      onCheckedChange={(checked) => setValue('amd_enabled', checked)}
-                    />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="calls_per_second">Calls Per Second (CPS)</Label>
+                      <Select
+                        value={String(watch('calls_per_second'))}
+                        onValueChange={(value) => setValue('calls_per_second', parseInt(value))}
+                      >
+                        <SelectTrigger id="calls_per_second">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5].map((value) => (
+                            <SelectItem key={value} value={String(value)}>
+                              {value} call{value > 1 ? 's' : ''}/sec
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">Call initiation rate (1–5)</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="max_dial_attempts">Max Dial Attempts</Label>
+                      <Input
+                        id="max_dial_attempts"
+                        type="number"
+                        {...register('max_dial_attempts', { valueAsNumber: true })}
+                        min={1}
+                        max={5}
+                      />
+                      <p className="text-sm text-muted-foreground">Maximum retry attempts per destination</p>
+                    </div>
                   </div>
 
-                  {amdEnabled && (
-                    <div className="pl-6 space-y-4 border-l-2 border-muted">
-                      <div className="space-y-2">
-                        <Label htmlFor="amd_mode">AMD Mode</Label>
-                        <Select
-                          value={watch('amd_mode')}
-                          onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
-                            setValue('amd_mode', value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select AMD mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Enabled">Enabled</SelectItem>
-                            <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  {/* Right Column: Record Calls, Answering Machine Detection */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="record_calls">Record Calls</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Record all calls for quality assurance
+                        </p>
                       </div>
+                      <Switch
+                        id="record_calls"
+                        checked={watch('record_calls')}
+                        onCheckedChange={(checked) => setValue('record_calls', checked)}
+                      />
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="amd_timeout">
-                          Detection Timeout (seconds)
-                        </Label>
-                        <Input
-                          id="amd_timeout"
-                          type="number"
-                          {...register('amd_timeout', { valueAsNumber: true })}
-                          min={5}
-                          max={120}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="amd_enabled">Answering Machine Detection</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Detect if call is answered by human or machine
+                          </p>
+                        </div>
+                        <Switch
+                          id="amd_enabled"
+                          checked={amdEnabled}
+                          onCheckedChange={(checked) => setValue('amd_enabled', checked)}
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="amd_speech_threshold">
-                            Speech Threshold (ms)
-                          </Label>
-                          <Input
-                            id="amd_speech_threshold"
-                            type="number"
-                            {...register('amd_speech_threshold', { valueAsNumber: true })}
-                            min={500}
-                            max={5000}
-                          />
-                        </div>
+                      {amdEnabled && (
+                        <TooltipProvider>
+                          <div className="pl-6 space-y-4 border-l-2 border-muted">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor="amd_mode" className="whitespace-nowrap">AMD Mode <span className="text-red-500">*</span></Label>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>Enabled: Basic machine detection.</p>
+                                    <p className="mt-1">Detect Message End: Waits for the beep to finish before connecting.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                              <Select
+                                value={watch('amd_mode')}
+                                onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
+                                  setValue('amd_mode', value)
+                                }
+                              >
+                                <SelectTrigger className={amdEnabled && !watch('amd_mode') ? 'border-red-500' : ''}>
+                                  <SelectValue placeholder="Select AMD mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Enabled">Enabled</SelectItem>
+                                  <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {amdEnabled && !watch('amd_mode') && (
+                                <p className="text-sm text-red-500">AMD Mode is required</p>
+                              )}
+                            </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="amd_speech_end_threshold">
-                            Speech End (ms)
-                          </Label>
-                          <Input
-                            id="amd_speech_end_threshold"
-                            type="number"
-                            {...register('amd_speech_end_threshold', { valueAsNumber: true })}
-                            min={500}
-                            max={5000}
-                          />
-                        </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor="amd_timeout" className="whitespace-nowrap">Detection Timeout (sec)</Label>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    Maximum time to wait for AMD analysis before giving up and treating the call as answered.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                              <Input
+                                id="amd_timeout"
+                                type="number"
+                                {...register('amd_timeout', { valueAsNumber: true })}
+                                min={5}
+                                max={120}
+                              />
+                            </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="amd_silence_timeout">
-                            Silence Timeout (ms)
-                          </Label>
-                          <Input
-                            id="amd_silence_timeout"
-                            type="number"
-                            {...register('amd_silence_timeout', { valueAsNumber: true })}
-                            min={500}
-                            max={10000}
-                          />
-                        </div>
-                      </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1">
+                                  <Label htmlFor="amd_speech_threshold" className="text-xs whitespace-nowrap">Speech Threshold (ms)</Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Minimum volume level that must be detected to qualify as human speech.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Input
+                                  id="amd_speech_threshold"
+                                  type="number"
+                                  {...register('amd_speech_threshold', { valueAsNumber: true })}
+                                  min={500}
+                                  max={5000}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1">
+                                  <Label htmlFor="amd_speech_end_threshold" className="text-xs whitespace-nowrap">Speech End (ms)</Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Amount of silence required after speech to determine the message has ended.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Input
+                                  id="amd_speech_end_threshold"
+                                  type="number"
+                                  {...register('amd_speech_end_threshold', { valueAsNumber: true })}
+                                  min={500}
+                                  max={5000}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1">
+                                  <Label htmlFor="amd_silence_timeout" className="text-xs whitespace-nowrap">Silence Timeout (ms)</Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Maximum silence duration before considering the greeting finished.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Input
+                                  id="amd_silence_timeout"
+                                  type="number"
+                                  {...register('amd_silence_timeout', { valueAsNumber: true })}
+                                  min={500}
+                                  max={10000}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </TooltipProvider>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="time_limit">Time Limit (seconds)</Label>
-                  <Input
-                    id="time_limit"
-                    type="number"
-                    {...register('time_limit', { valueAsNumber: true })}
-                    min={30}
-                    max={14400}
-                    placeholder="3600 (optional)"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Maximum call duration. Leave empty for no limit.
-                  </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -857,6 +920,11 @@ export default function AutoDialerCampaignForm() {
               Please fix the errors above before submitting.
             </div>
           )}
+          {amdEnabled && !watch('amd_mode') && (
+            <div className="mr-auto text-sm text-red-500">
+              Please select an AMD Mode when Answering Machine Detection is enabled.
+            </div>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -868,7 +936,8 @@ export default function AutoDialerCampaignForm() {
             type="submit"
             disabled={
               createMutation.isPending ||
-              updateMutation.isPending
+              updateMutation.isPending ||
+              (amdEnabled && !watch('amd_mode'))
             }
             onClick={() => {
               console.log('Form submit clicked', { isEditing, isDirty, errors });

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -35,11 +36,21 @@ type Worker struct {
 	activeCampaigns     map[int64]*models.Campaign
 	processingCampaigns sync.Map // tracks campaign IDs currently being processed
 	shutdown            chan struct{}
+
+	// Concurrency control
+	campaignSem chan struct{} // semaphore to limit concurrent campaigns
+
+	// Webhook server
+	webhookServer *http.Server
+	wg            sync.WaitGroup
 }
 
 func main() {
 	// Load configuration
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
+	}
 
 	// Setup logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -79,6 +90,7 @@ func main() {
 		logger:          logger,
 		activeCampaigns: make(map[int64]*models.Campaign),
 		shutdown:        make(chan struct{}),
+		campaignSem:     make(chan struct{}, 10), // Max 10 concurrent campaigns
 	}
 
 	// Register worker in Redis
@@ -103,7 +115,7 @@ func main() {
 	close(worker.shutdown)
 
 	// Graceful shutdown
-	time.Sleep(1 * time.Second)
+	worker.shutdownServer()
 	logger.Info("worker stopped")
 }
 
@@ -152,8 +164,10 @@ func (w *Worker) processCampaigns() {
 			continue
 		}
 
-		// Process the campaign in a goroutine, clearing the flag when done
+		// Process the campaign in a goroutine with semaphore, clearing the flag when done
 		go func(c *models.Campaign) {
+			w.campaignSem <- struct{}{}        // Acquire semaphore
+			defer func() { <-w.campaignSem }() // Release semaphore
 			defer w.processingCampaigns.Delete(c.ID)
 			w.processCampaign(ctx, c)
 		}(campaign)
@@ -236,14 +250,31 @@ func (w *Worker) startWebhookServer() {
 	webhookHandler := webhook.NewHandler(w.executor, w.config.WebhookSecret)
 	webhookHandler.RegisterRoutes(router)
 
-	server := &http.Server{
+	w.webhookServer = &http.Server{
 		Addr:    ":" + w.config.WebhookPort,
 		Handler: router,
 	}
 
 	w.logger.Info("starting webhook server", "port", w.config.WebhookPort)
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		w.logger.Error("webhook server error", "error", err)
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		if err := w.webhookServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			w.logger.Error("webhook server error", "error", err)
+		}
+	}()
+}
+
+// shutdownServer gracefully shuts down the webhook server
+func (w *Worker) shutdownServer() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if w.webhookServer != nil {
+		if err := w.webhookServer.Shutdown(ctx); err != nil {
+			w.logger.Error("webhook server shutdown error", "error", err)
+		}
 	}
+	w.wg.Wait()
 }

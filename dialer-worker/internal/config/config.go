@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -31,8 +32,9 @@ type Config struct {
 }
 
 // Load loads configuration from environment variables
-func Load() *Config {
-	return &Config{
+// Returns an error if required configuration values are missing or invalid
+func Load() (*Config, error) {
+	cfg := &Config{
 		LaravelAPIURL:   getEnv("LARAVEL_API_URL", "http://localhost:8000"),
 		LaravelAPIToken: getEnv("LARAVEL_API_TOKEN", ""),
 
@@ -56,6 +58,51 @@ func Load() *Config {
 		},
 		MaxRetries: 4,
 	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+// Validate checks that all required configuration values are present and valid
+func (c *Config) Validate() error {
+	// Validate Laravel API configuration
+	if c.LaravelAPIURL == "" {
+		return fmt.Errorf("LARAVEL_API_URL is required")
+	}
+	if c.LaravelAPIToken == "" {
+		return fmt.Errorf("LARAVEL_API_TOKEN is required")
+	}
+
+	// Validate Redis configuration
+	if c.RedisHost == "" {
+		return fmt.Errorf("REDIS_HOST is required")
+	}
+	if c.RedisPort == "" {
+		return fmt.Errorf("REDIS_PORT is required")
+	}
+	if c.RedisDB < 0 {
+		return fmt.Errorf("REDIS_DB must be non-negative")
+	}
+
+	// Validate Worker configuration
+	if c.WorkerID == "" {
+		return fmt.Errorf("WORKER_ID is required")
+	}
+	if c.PollInterval <= 0 {
+		return fmt.Errorf("POLL_INTERVAL must be positive")
+	}
+	if c.HealthCheckPort == "" {
+		return fmt.Errorf("HEALTH_CHECK_PORT is required")
+	}
+	if c.WebhookPort == "" {
+		return fmt.Errorf("WEBHOOK_PORT is required")
+	}
+	// Note: WEBHOOK_SECRET is optional - only required if webhook signature verification is enabled
+
+	return nil
 }
 
 func getEnv(key, defaultValue string) string {

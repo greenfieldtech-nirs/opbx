@@ -23,6 +23,20 @@ const (
 	PrefixCAC           KeyPrefix = "dialer:cac"
 )
 
+// Timeout and TTL constants
+const (
+	// DefaultConnectTimeout is the timeout for Redis connection attempts
+	DefaultConnectTimeout = 5 * time.Second
+	// DefaultLockTTL is the default TTL for distributed locks
+	DefaultLockTTL = 30 * time.Second
+	// DefaultCallStateTTL is the default TTL for call state entries
+	DefaultCallStateTTL = 60 * time.Second
+	// ConnectedCallPersistTTL is the TTL extension for connected calls
+	ConnectedCallPersistTTL = 60 * time.Second
+	// DefaultIdempotencyTTL is the default TTL for idempotency keys
+	DefaultIdempotencyTTL = 24 * time.Hour
+)
+
 // Client handles Redis operations for the dialer worker
 type Client struct {
 	client *redis.Client
@@ -36,7 +50,7 @@ func NewClient(cfg *config.Config) (*Client, error) {
 		DB:       cfg.RedisDB,
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultConnectTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -74,7 +88,7 @@ func (c *Client) GetCallState(ctx context.Context, callID string) (*CallState, e
 	if len(result) == 0 {
 		return nil, nil
 	}
-	return CallStateFromMap(result), nil
+	return CallStateFromMap(result)
 }
 
 // DeleteCallState removes call state from Redis
@@ -95,7 +109,7 @@ func (c *Client) UpdateCallStateTTL(ctx context.Context, callID string, status s
 	}
 
 	// Extend TTL by 60 seconds for other statuses
-	return c.client.Expire(ctx, key, 60*time.Second).Err()
+	return c.client.Expire(ctx, key, ConnectedCallPersistTTL).Err()
 }
 
 // IncrementActiveCalls increments active call count for a campaign
@@ -119,6 +133,31 @@ func (c *Client) GetActiveCalls(ctx context.Context, campaignID int64) (int64, e
 		return 0, nil
 	}
 	return result, err
+}
+
+// IncrementIfBelow atomically increments a counter if it's below the max value
+// Returns the new value and true if incremented, or current value and false if at/max
+func (c *Client) IncrementIfBelow(ctx context.Context, key string, max int64) (int64, bool, error) {
+	luaScript := `
+		local current = tonumber(redis.call('GET', KEYS[1]) or 0)
+		if current >= tonumber(ARGV[1]) then
+			return {-1, current}
+		end
+		local new = redis.call('INCR', KEYS[1])
+		return {new, new}
+	`
+	result, err := c.client.Eval(ctx, luaScript, []string{key}, max).Result()
+	if err != nil {
+		return 0, false, err
+	}
+
+	values := result.([]interface{})
+	newVal := values[0].(int64)
+
+	if newVal == -1 {
+		return values[1].(int64), false, nil
+	}
+	return newVal, true, nil
 }
 
 // ResetActiveCalls sets the active call counter to zero for a campaign
@@ -311,6 +350,7 @@ func (c *Client) Del(ctx context.Context, key string) error {
 
 // === CallState struct for Redis storage ===
 
+// CallState represents the state of a call stored in Redis
 type CallState struct {
 	SessionID     int64
 	CampaignID    int64
@@ -319,6 +359,7 @@ type CallState struct {
 	StartedAt     time.Time
 }
 
+// ToMap converts CallState to a map for Redis storage
 func (cs *CallState) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"session_id":     strconv.FormatInt(cs.SessionID, 10),
@@ -329,17 +370,45 @@ func (cs *CallState) ToMap() map[string]interface{} {
 	}
 }
 
-func CallStateFromMap(m map[string]string) *CallState {
-	startedAt, _ := time.Parse(time.RFC3339, m["started_at"])
-	sessionID, _ := strconv.ParseInt(m["session_id"], 10, 64)
-	campaignID, _ := strconv.ParseInt(m["campaign_id"], 10, 64)
-	destinationID, _ := strconv.ParseInt(m["destination_id"], 10, 64)
-
-	return &CallState{
-		SessionID:     sessionID,
-		CampaignID:    campaignID,
-		DestinationID: destinationID,
-		Status:        m["status"],
-		StartedAt:     startedAt,
+// CallStateFromMap creates a CallState from a Redis hash map
+// Returns an error if required fields cannot be parsed
+func CallStateFromMap(m map[string]string) (*CallState, error) {
+	if len(m) == 0 {
+		return nil, fmt.Errorf("empty map provided")
 	}
+
+	var cs CallState
+	var parseErrs []error
+
+	if startedAt, err := time.Parse(time.RFC3339, m["started_at"]); err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("failed to parse started_at: %w", err))
+	} else {
+		cs.StartedAt = startedAt
+	}
+
+	if sessionID, err := strconv.ParseInt(m["session_id"], 10, 64); err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("failed to parse session_id: %w", err))
+	} else {
+		cs.SessionID = sessionID
+	}
+
+	if campaignID, err := strconv.ParseInt(m["campaign_id"], 10, 64); err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("failed to parse campaign_id: %w", err))
+	} else {
+		cs.CampaignID = campaignID
+	}
+
+	if destinationID, err := strconv.ParseInt(m["destination_id"], 10, 64); err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("failed to parse destination_id: %w", err))
+	} else {
+		cs.DestinationID = destinationID
+	}
+
+	cs.Status = m["status"]
+
+	if len(parseErrs) > 0 {
+		return &cs, fmt.Errorf("call state parsing errors: %v", parseErrs)
+	}
+
+	return &cs, nil
 }

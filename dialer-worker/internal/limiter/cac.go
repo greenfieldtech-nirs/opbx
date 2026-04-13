@@ -78,21 +78,29 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 		return false, fmt.Errorf("campaign %d not registered", campaignID)
 	}
 
-	// Check CAC limit against Redis
-	activeCalls, err := rl.redis.GetActiveCalls(ctx, campaignID)
-	if err != nil {
-		return false, err
-	}
-
-	if int(activeCalls) >= limiter.CAC {
-		return false, nil // CAC limit reached
-	}
-
-	// Check minimum interval between calls
+	// Check minimum interval between calls first (local check)
 	now := time.Now()
 	if now.Sub(limiter.LastCallTime) < limiter.MinInterval {
 		return false, nil // Rate limited by time
 	}
+
+	// Check CAC limit atomically using Redis Lua script
+	key := fmt.Sprintf("dialer:cac:%d:active", campaignID)
+	newCount, acquired, err := rl.redis.IncrementIfBelow(ctx, key, int64(limiter.CAC))
+	if err != nil {
+		return false, err
+	}
+
+	if !acquired {
+		return false, nil // CAC limit reached
+	}
+
+	// Update local cache of active calls
+	rl.mu.Lock()
+	if l, exists := rl.campaigns[campaignID]; exists {
+		l.ActiveCalls = int(newCount)
+	}
+	rl.mu.Unlock()
 
 	return true, nil
 }

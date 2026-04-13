@@ -90,14 +90,40 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(
             \App\Services\VoiceRouting\VoiceRoutingManager::class,
             function ($app) {
+                $strategyExecutor = new \App\Services\VoiceRouting\VoiceRoutingStrategyExecutor(
+                    $app->tagged('voice_routing.strategies')
+                );
+
+                $inboundRouting = new \App\Services\VoiceRouting\InboundRoutingService(
+                    $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class),
+                    $app->make(\App\Services\VoiceRouting\ExtensionRoutingService::class),
+                    $strategyExecutor
+                );
+
+                $extensionRouting = new \App\Services\VoiceRouting\ExtensionRoutingService(
+                    $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class)
+                );
+
+                $ivrRouting = new \App\Services\VoiceRouting\IvrRoutingService(
+                    $app->make(\App\Services\IvrStateService::class),
+                    $extensionRouting,
+                    $strategyExecutor
+                );
+
+                $ringGroupRouting = new \App\Services\VoiceRouting\RingGroupRoutingService(
+                    $strategyExecutor
+                );
+
                 return new \App\Services\VoiceRouting\VoiceRoutingManager(
                     $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class),
-                    $app->make(\App\Services\IvrStateService::class),
-                    $app->make(\App\Services\PhoneNumberService::class),
+                    $app->make(\App\Services\InboundBlacklist\InboundBlacklistService::class),
                     $app->make(\App\Services\VoiceRouting\OutboundRoutingService::class),
                     $app->make(\App\Services\VoiceRouting\BusinessHoursRoutingService::class),
-                    $app->make(\App\Services\InboundBlacklist\InboundBlacklistService::class),
-                    $app->tagged('voice_routing.strategies')
+                    $inboundRouting,
+                    $extensionRouting,
+                    $ivrRouting,
+                    $ringGroupRouting,
+                    $strategyExecutor
                 );
             }
         );

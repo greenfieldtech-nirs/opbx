@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -42,19 +43,19 @@ func (h *Handler) RegisterRoutes(router *gin.Engine) {
 
 // handleCDR processes CDR webhooks from Laravel
 func (h *Handler) handleCDR(c *gin.Context) {
-	// Verify webhook signature if secret is configured
-	if h.webhookSecret != "" {
-		if !h.verifySignature(c) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-			return
-		}
-	}
-
-	// Read body
+	// Read body first (must be done before signature verification)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
 		return
+	}
+
+	// Verify webhook signature if secret is configured
+	if h.webhookSecret != "" {
+		if !h.verifySignature(c, body) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+			return
+		}
 	}
 
 	// Parse CDR event
@@ -70,9 +71,10 @@ func (h *Handler) handleCDR(c *gin.Context) {
 		return
 	}
 
-	// Process CDR asynchronously
+	// Process CDR asynchronously with a new context (not the HTTP request context)
 	go func() {
-		ctx := c.Request.Context()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		if err := h.executor.HandleCDR(ctx, &event); err != nil {
 			// Log error but still return 200 to acknowledge receipt
 			// Laravel should handle retries if needed
@@ -95,14 +97,9 @@ func (h *Handler) handleHealth(c *gin.Context) {
 }
 
 // verifySignature verifies the webhook signature
-func (h *Handler) verifySignature(c *gin.Context) bool {
+func (h *Handler) verifySignature(c *gin.Context, body []byte) bool {
 	signature := c.GetHeader("X-Webhook-Signature")
 	if signature == "" {
-		return false
-	}
-
-	body, err := io.ReadAll(c.Request.Body)
-	if err != nil {
 		return false
 	}
 

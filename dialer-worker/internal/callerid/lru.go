@@ -120,8 +120,14 @@ func (s *LRUStrategy) SelectWithRetry(
 	}
 
 	// Update the timestamp for the selected DID
-	s.redisClient.HSet(ctx, key, strconv.FormatInt(selected.DIDID, 10), now)
-	s.redisClient.Expire(ctx, key, 24*60*60) // 24 hour TTL
+	if err := s.redisClient.HSet(ctx, key, strconv.FormatInt(selected.DIDID, 10), now); err != nil {
+		// Error is intentionally ignored - call can proceed without LRU tracking
+		_ = err
+	}
+	if err := s.redisClient.Expire(ctx, key, 24*60*60); err != nil { // 24 hour TTL
+		// Error is intentionally ignored - key will work without TTL
+		_ = err
+	}
 
 	return selected, nil
 }

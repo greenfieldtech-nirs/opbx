@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Scopes\OrganizationScope;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -42,9 +44,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array $raw_cdr Complete CDR JSON
  * @property Carbon $created_at
  * @property Carbon $updated_at
- *
  * @property-read Organization $organization
  */
+#[ScopedBy([OrganizationScope::class])]
 class CallDetailRecord extends Model
 {
     use HasFactory;
@@ -119,9 +121,8 @@ class CallDetailRecord extends Model
     /**
      * Create a CDR from Cloudonix webhook payload
      *
-     * @param array $payload Cloudonix CDR webhook payload
-     * @param int $organizationId Organization ID to associate with this CDR
-     * @return self
+     * @param  array  $payload  Cloudonix CDR webhook payload
+     * @param  int  $organizationId  Organization ID to associate with this CDR
      */
     public static function createFromWebhook(array $payload, int $organizationId): self
     {
@@ -186,7 +187,8 @@ class CallDetailRecord extends Model
     }
 
     /**
-     * Scope query to a specific organization
+     * Scope a query to only include records for a specific organization.
+     * Note: This is in addition to the global OrganizationScope.
      */
     public function scopeForOrganization($query, int $organizationId)
     {

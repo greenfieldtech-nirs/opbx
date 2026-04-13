@@ -5,30 +5,33 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\CampaignStatus;
-use App\Enums\DestinationStatus;
 use App\Http\Requests\CreateCampaignRequest;
 use App\Http\Requests\UpdateCampaignRequest;
 use App\Http\Requests\UploadListRequest;
 use App\Http\Resources\AutoDialerCampaignResource;
-use App\Models\AutoDialerCallerIdStat;
-use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
-use App\Models\AutoDialerDestination;
-use App\Models\AutoDialerList;
-use App\Models\DidNumber;
-use App\Scopes\OrganizationScope;
+use App\Services\AutoDialer\CallerIdPoolService;
+use App\Services\AutoDialer\CampaignLifecycleService;
+use App\Services\AutoDialer\CampaignListService;
+use App\Services\AutoDialer\CampaignManagementService;
+use App\Services\AutoDialer\CampaignMonitorService;
+use App\Services\AutoDialer\ScheduleExtractorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Facades\Storage;
 
 class AutoDialerCampaignController extends Controller
 {
+    public function __construct(
+        private readonly CampaignListService $listService,
+        private readonly CampaignMonitorService $monitorService,
+        private readonly CampaignLifecycleService $lifecycleService,
+        private readonly CallerIdPoolService $callerIdService,
+        private readonly CampaignManagementService $managementService,
+        private readonly ScheduleExtractorService $scheduleExtractor,
+    ) {}
+
     /**
      * List all campaigns.
      */
@@ -36,12 +39,16 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('viewAny', AutoDialerCampaign::class);
 
-        $campaigns = AutoDialerCampaign::forOrganization(Auth::user()->organization_id)
-            ->with('callerIds') // Eager load Caller ID pool
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%"))
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 25);
+        $filters = [
+            'status' => $request->status,
+            'search' => $request->search,
+            'per_page' => $request->per_page ?? 25,
+        ];
+
+        $campaigns = $this->managementService->listCampaigns(
+            Auth::user()->organization_id,
+            $filters
+        );
 
         return response()->json([
             'data' => AutoDialerCampaignResource::collection($campaigns),
@@ -61,8 +68,7 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('view', $campaign);
 
-        // Load caller ID pool with DID numbers
-        $campaign->load('callerIds');
+        $campaign = $this->managementService->getCampaign($campaign, ['callerIds']);
 
         return response()->json([
             'data' => new AutoDialerCampaignResource($campaign),
@@ -79,18 +85,11 @@ class AutoDialerCampaignController extends Controller
         $data = $request->validated();
         $organizationId = Auth::user()->organization_id;
 
-        // Validate Caller ID Pool DIDs belong to organization and are active
+        // Validate Caller ID Pool
         $callerIdPool = $data['caller_id_pool'] ?? [];
-        $didIds = array_column($callerIdPool, 'did_id');
+        $validation = $this->callerIdService->validateCallerIdPool($callerIdPool, $organizationId);
 
-        $validDids = DidNumber::whereIn('id', $didIds)
-            ->where('organization_id', $organizationId)
-            ->where('status', 'active')
-            ->pluck('id')
-            ->toArray();
-
-        $invalidDids = array_diff($didIds, $validDids);
-        if (! empty($invalidDids)) {
+        if (! $validation['valid']) {
             return response()->json([
                 'message' => 'Invalid Caller ID pool',
                 'errors' => [
@@ -100,7 +99,346 @@ class AutoDialerCampaignController extends Controller
         }
 
         // Prepare campaign data
-        $campaignData = [
+        $campaignData = $this->buildCampaignData($data, $organizationId);
+
+        // Create campaign with pool in transaction
+        $campaign = DB::transaction(function () use ($campaignData, $callerIdPool): AutoDialerCampaign {
+            $campaign = AutoDialerCampaign::create($campaignData);
+
+            // Sync caller ID pool
+            $syncData = $this->callerIdService->buildSyncData($callerIdPool);
+            $campaign->callerIds()->sync($syncData);
+
+            // Create initial stats records
+            $this->callerIdService->createInitialStats($campaign, $callerIdPool);
+
+            return $campaign;
+        });
+
+        $campaign->load('callerIds');
+
+        return response()->json([
+            'message' => 'Campaign created successfully',
+            'data' => new AutoDialerCampaignResource($campaign),
+        ], 201);
+    }
+
+    /**
+     * Update a campaign.
+     */
+    public function update(UpdateCampaignRequest $request, AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('update', $campaign);
+
+        $data = $request->validated();
+
+        // Check if trying to modify caller_id_pool on active campaign
+        if (isset($data['caller_id_pool']) && $campaign->status === CampaignStatus::ACTIVE) {
+            return response()->json([
+                'message' => 'Cannot modify Caller ID pool on an active campaign',
+                'errors' => [
+                    'caller_id_pool' => ['Please pause the campaign before modifying the Caller ID pool.'],
+                ],
+            ], 409);
+        }
+
+        // Extract schedule data if provided
+        if (isset($data['schedule'])) {
+            $scheduleData = $this->scheduleExtractor->processSchedule($data['schedule']);
+            $data = array_merge($data, $scheduleData);
+        }
+
+        // Handle Caller ID Pool updates
+        $callerIdPool = $data['caller_id_pool'] ?? null;
+        unset($data['caller_id_pool']);
+
+        DB::transaction(function () use ($campaign, $data, $callerIdPool): void {
+            $campaign->update($data);
+
+            if ($callerIdPool !== null) {
+                $result = $this->callerIdService->syncCallerIdPool($campaign, $callerIdPool);
+
+                if (! $result['success']) {
+                    throw new \InvalidArgumentException($result['message']);
+                }
+            }
+        });
+
+        $campaign->load('callerIds');
+
+        return response()->json([
+            'message' => 'Campaign updated successfully',
+            'data' => new AutoDialerCampaignResource($campaign),
+        ]);
+    }
+
+    /**
+     * Delete a campaign.
+     */
+    public function destroy(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('delete', $campaign);
+
+        $campaign->delete();
+
+        return response()->json([
+            'message' => 'Campaign deleted successfully',
+        ]);
+    }
+
+    /**
+     * Start a campaign.
+     */
+    public function start(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('start', $campaign);
+
+        $result = $this->lifecycleService->start($campaign);
+
+        if (! $result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+            ], $result['code'] ?? 422);
+        }
+
+        return response()->json([
+            'message' => $result['message'],
+            'data' => new AutoDialerCampaignResource($result['campaign']),
+        ]);
+    }
+
+    /**
+     * Pause a campaign.
+     */
+    public function pause(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('pause', $campaign);
+
+        $result = $this->lifecycleService->pause($campaign);
+
+        if (! $result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+            ], $result['code'] ?? 409);
+        }
+
+        return response()->json([
+            'message' => $result['message'],
+            'data' => new AutoDialerCampaignResource($result['campaign']),
+        ]);
+    }
+
+    /**
+     * Resume a campaign.
+     */
+    public function resume(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('resume', $campaign);
+
+        $result = $this->lifecycleService->resume($campaign);
+
+        if (! $result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+            ], $result['code'] ?? 409);
+        }
+
+        return response()->json([
+            'message' => $result['message'],
+            'data' => new AutoDialerCampaignResource($result['campaign']),
+        ]);
+    }
+
+    /**
+     * Archive a campaign.
+     */
+    public function archive(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('archive', $campaign);
+
+        $result = $this->lifecycleService->archive($campaign);
+
+        return response()->json([
+            'message' => $result['message'],
+            'data' => new AutoDialerCampaignResource($result['campaign']),
+        ]);
+    }
+
+    /**
+     * Upload a destination list.
+     */
+    public function uploadList(UploadListRequest $request, AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('uploadList', $campaign);
+
+        $file = $request->file('file');
+        $name = $request->input('name');
+
+        $result = $this->listService->uploadList($campaign, $file, $name);
+
+        return response()->json([
+            'message' => 'List uploaded successfully',
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Get list for a campaign.
+     */
+    public function getList(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $listDetails = $this->listService->getListDetails($campaign);
+
+        if ($listDetails === null) {
+            return response()->json([
+                'message' => 'No list uploaded for this campaign',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => $listDetails,
+        ]);
+    }
+
+    /**
+     * Delete list from a campaign.
+     */
+    public function deleteList(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('deleteList', $campaign);
+
+        $this->listService->deleteList($campaign);
+
+        return response()->json([
+            'message' => 'List deleted successfully',
+        ]);
+    }
+
+    /**
+     * Get destinations for a campaign.
+     */
+    public function getDestinations(Request $request, AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $filters = [
+            'status' => $request->status,
+            'per_page' => $request->per_page ?? 50,
+        ];
+
+        $destinations = $this->managementService->getDestinations($campaign, $filters);
+
+        return response()->json([
+            'data' => $destinations,
+        ]);
+    }
+
+    /**
+     * Get real-time concurrency status for a campaign.
+     */
+    public function concurrency(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $data = $this->monitorService->getConcurrencyStatus($campaign);
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get real-time monitor summary for all active/paused campaigns.
+     */
+    public function monitorSummary(): JsonResponse
+    {
+        $this->authorize('viewAny', AutoDialerCampaign::class);
+
+        $organizationId = Auth::user()->organization_id;
+        $data = $this->monitorService->getMonitorSummary($organizationId);
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get detailed monitor view for a single campaign.
+     */
+    public function monitorDetail(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $data = $this->monitorService->getMonitorDetail($campaign);
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Get available DIDs for Caller ID pool selection.
+     */
+    public function getAvailableCallerIds(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', AutoDialerCampaign::class);
+
+        $organizationId = Auth::user()->organization_id;
+        $excludeCampaignId = $request->query('exclude_campaign_id');
+
+        $dids = $this->callerIdService->getAvailableDids($organizationId, $excludeCampaignId);
+        $formattedDids = $this->callerIdService->formatAvailableDids($dids);
+
+        return response()->json(['data' => $formattedDids]);
+    }
+
+    /**
+     * Get Caller ID statistics for a campaign.
+     */
+    public function getCallerIdStats(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('view', $campaign);
+
+        $data = $this->callerIdService->getCallerIdStats($campaign);
+
+        return response()->json($data);
+    }
+
+    /**
+     * Reset the Caller ID cycle (Round Robin only).
+     */
+    public function resetCallerIdCycle(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('update', $campaign);
+
+        $result = $this->callerIdService->resetCallerIdCycle($campaign);
+
+        if (! $result['success']) {
+            return response()->json([
+                'message' => $result['message'],
+                'errors' => [
+                    'status' => [$result['message']],
+                ],
+            ], $result['code'] ?? 409);
+        }
+
+        return response()->json([
+            'message' => $result['message'],
+            'campaign_id' => $campaign->id,
+            'strategy' => $campaign->caller_id_strategy?->value,
+            'next_index' => $result['next_index'],
+        ]);
+    }
+
+    /**
+     * Build campaign data array from validated request data.
+     *
+     * @param  array<string, mixed>  $data  Validated request data
+     * @param  int  $organizationId  Organization ID
+     * @return array<string, mixed>
+     */
+    private function buildCampaignData(array $data, int $organizationId): array
+    {
+        $schedule = $data['schedule'] ?? [];
+        $scheduleData = $this->scheduleExtractor->processSchedule($schedule);
+
+        return [
             'organization_id' => $organizationId,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
@@ -131,1119 +469,10 @@ class AutoDialerCampaignController extends Controller
             'amd_speech_threshold' => $data['amd_speech_threshold'] ?? null,
             'amd_speech_end_threshold' => $data['amd_speech_end_threshold'] ?? null,
             'amd_silence_timeout' => $data['amd_silence_timeout'] ?? null,
+            'days_active' => $scheduleData['days_active'],
+            'schedule' => $schedule,
+            'start_time' => $scheduleData['start_time'],
+            'end_time' => $scheduleData['end_time'],
         ];
-
-        // Extract days_active and legacy time fields from schedule
-        $schedule = $data['schedule'] ?? [];
-        $campaignData['days_active'] = $this->extractDaysActiveFromSchedule($schedule);
-        $campaignData['schedule'] = $schedule;
-
-        // Extract start_time and end_time from first enabled day's first time range
-        $timeRange = $this->extractTimeRangeFromSchedule($schedule);
-        $campaignData['start_time'] = $timeRange['start_time'] ?? 9;
-        $campaignData['end_time'] = $timeRange['end_time'] ?? 17;
-
-        // Create campaign and sync pool in a transaction
-        $campaign = DB::transaction(function () use ($campaignData, $callerIdPool): AutoDialerCampaign {
-            $campaign = AutoDialerCampaign::create($campaignData);
-
-            // Sync caller ID pool entries
-            $syncData = [];
-            foreach ($callerIdPool as $entry) {
-                $syncData[$entry['did_id']] = ['weight' => $entry['weight'] ?? 1];
-            }
-            $campaign->callerIds()->sync($syncData);
-
-            // Create initial stats records for each Caller ID
-            foreach ($callerIdPool as $entry) {
-                AutoDialerCallerIdStat::create([
-                    'campaign_id' => $campaign->id,
-                    'did_number_id' => $entry['did_id'],
-                    'total_calls' => 0,
-                    'completed_calls' => 0,
-                    'failed_calls' => 0,
-                    'last_used_at' => null,
-                ]);
-            }
-
-            return $campaign;
-        });
-
-        // Load relationships for response
-        $campaign->load('callerIds');
-
-        return response()->json([
-            'message' => 'Campaign created successfully',
-            'data' => new AutoDialerCampaignResource($campaign),
-        ], 201);
-    }
-
-    /**
-     * Update a campaign.
-     */
-    public function update(UpdateCampaignRequest $request, AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('update', $campaign);
-
-        $data = $request->validated();
-
-        // Check if trying to modify caller_id_pool on active campaign
-        if (isset($data['caller_id_pool']) && $campaign->status === CampaignStatus::ACTIVE) {
-            return response()->json([
-                'message' => 'Cannot modify Caller ID pool on an active campaign',
-                'errors' => [
-                    'caller_id_pool' => ['Please pause the campaign before modifying the Caller ID pool.'],
-                ],
-            ], 409);
-        }
-
-        // Extract days_active and legacy time fields from schedule if provided
-        if (isset($data['schedule'])) {
-            $data['days_active'] = $this->extractDaysActiveFromSchedule($data['schedule']);
-
-            // Extract start_time and end_time from first enabled day's first time range
-            $timeRange = $this->extractTimeRangeFromSchedule($data['schedule']);
-            $data['start_time'] = $timeRange['start_time'] ?? 9;
-            $data['end_time'] = $timeRange['end_time'] ?? 17;
-        }
-
-        // Handle Caller ID Pool updates
-        $callerIdPool = $data['caller_id_pool'] ?? null;
-        unset($data['caller_id_pool']); // Remove from data to be updated directly
-
-        DB::transaction(function () use ($campaign, $data, $callerIdPool): void {
-            // Update campaign fields
-            $campaign->update($data);
-
-            // Update Caller ID Pool if provided
-            if ($callerIdPool !== null) {
-                $organizationId = $campaign->organization_id;
-                $didIds = array_column($callerIdPool, 'did_id');
-
-                // Validate all DIDs belong to organization and are active
-                $validDids = DidNumber::whereIn('id', $didIds)
-                    ->where('organization_id', $organizationId)
-                    ->where('status', 'active')
-                    ->pluck('id')
-                    ->toArray();
-
-                $invalidDids = array_diff($didIds, $validDids);
-                if (! empty($invalidDids)) {
-                    throw new \InvalidArgumentException('Some DIDs do not exist, do not belong to your organization, or are not active.');
-                }
-
-                // Sync pool: delete old entries, create new ones
-                $syncData = [];
-                foreach ($callerIdPool as $entry) {
-                    $syncData[$entry['did_id']] = ['weight' => $entry['weight'] ?? 1];
-                }
-                $campaign->callerIds()->sync($syncData);
-
-                // Get existing stats DID IDs
-                $existingStatDidIds = $campaign->callerIdStats()
-                    ->pluck('did_number_id')
-                    ->toArray();
-
-                $newDidIds = array_diff($didIds, $existingStatDidIds);
-                $removedDidIds = array_diff($existingStatDidIds, $didIds);
-
-                // Create stats records for new DIDs
-                foreach ($callerIdPool as $entry) {
-                    if (in_array($entry['did_id'], $newDidIds, true)) {
-                        AutoDialerCallerIdStat::create([
-                            'campaign_id' => $campaign->id,
-                            'did_number_id' => $entry['did_id'],
-                            'total_calls' => 0,
-                            'completed_calls' => 0,
-                            'failed_calls' => 0,
-                            'last_used_at' => null,
-                        ]);
-                    }
-                }
-
-                // Delete stats records for removed DIDs
-                if (! empty($removedDidIds)) {
-                    $campaign->callerIdStats()
-                        ->whereIn('did_number_id', $removedDidIds)
-                        ->delete();
-                }
-            }
-        });
-
-        // Reload relationships
-        $campaign->load('callerIds');
-
-        return response()->json([
-            'message' => 'Campaign updated successfully',
-            'data' => new AutoDialerCampaignResource($campaign),
-        ]);
-    }
-
-    /**
-     * Delete a campaign.
-     */
-    public function destroy(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('delete', $campaign);
-
-        $campaign->delete();
-
-        return response()->json([
-            'message' => 'Campaign deleted successfully',
-        ]);
-    }
-
-    /**
-     * Start a campaign.
-     */
-    public function start(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('start', $campaign);
-
-        if (! $campaign->hasList()) {
-            return response()->json([
-                'message' => 'Cannot start campaign without a destination list',
-            ], 422);
-        }
-
-        $campaign->update([
-            'status' => CampaignStatus::ACTIVE,
-            'started_at' => now(),
-        ]);
-
-        return response()->json([
-            'message' => 'Campaign started successfully',
-            'data' => new AutoDialerCampaignResource($campaign),
-        ]);
-    }
-
-    /**
-     * Pause a campaign.
-     */
-    public function pause(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('pause', $campaign);
-
-        $campaign->update([
-            'status' => CampaignStatus::PAUSED,
-        ]);
-
-        // Mark all in-flight sessions as failed/cancelled — once paused,
-        // these are orphans whose CDRs may never arrive.
-        $staleCount = OrganizationScope::bypass(function () use ($campaign): int {
-            return AutoDialerCallSession::where('campaign_id', $campaign->id)
-                ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                ->update([
-                    'status' => 'failed',
-                    'disposition' => 'cancelled',
-                    'completed_at' => now(),
-                ]);
-        });
-
-        if ($staleCount > 0) {
-            Log::info('Cleaned up stale sessions on campaign pause', [
-                'campaign_id' => $campaign->id,
-                'stale_sessions' => $staleCount,
-            ]);
-        }
-
-        // Reset the CAC counter — any in-flight calls are no longer tracked
-        // by the worker once the campaign is paused.
-        try {
-            $dialerRedis = Redis::connection('dialer');
-            $dialerRedis->set("dialer:cac:{$campaign->id}:active", 0);
-        } catch (\Exception $e) {
-            Log::error('Failed to reset CAC counter on pause', [
-                'campaign_id' => $campaign->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        // Bust monitor cache so the UI reflects the change immediately
-        $this->bustMonitorCache($campaign->organization_id, $campaign->id);
-
-        return response()->json([
-            'message' => 'Campaign paused successfully',
-            'data' => new AutoDialerCampaignResource($campaign),
-        ]);
-    }
-
-    /**
-     * Resume a campaign.
-     */
-    public function resume(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('resume', $campaign);
-
-        $campaign->update([
-            'status' => CampaignStatus::ACTIVE,
-        ]);
-
-        // Bust monitor cache so the UI reflects the change immediately
-        $this->bustMonitorCache($campaign->organization_id, $campaign->id);
-
-        return response()->json([
-            'message' => 'Campaign resumed successfully',
-            'data' => new AutoDialerCampaignResource($campaign),
-        ]);
-    }
-
-    /**
-     * Archive a campaign.
-     */
-    public function archive(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('archive', $campaign);
-
-        $campaign->update([
-            'status' => CampaignStatus::ARCHIVED,
-        ]);
-
-        return response()->json([
-            'message' => 'Campaign archived successfully',
-            'data' => new AutoDialerCampaignResource($campaign),
-        ]);
-    }
-
-    /**
-     * Upload a destination list.
-     */
-    public function uploadList(UploadListRequest $request, AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('uploadList', $campaign);
-
-        $file = $request->file('file');
-        $path = $file->store('auto-dialer-lists');
-
-        // Create list record
-        $list = AutoDialerList::create([
-            'organization_id' => $campaign->organization_id,
-            'campaign_id' => $campaign->id,
-            'name' => $request->input('name', $file->getClientOriginalName()),
-            'status' => 'processing',
-            'original_filename' => $file->getClientOriginalName(),
-        ]);
-
-        // Process CSV (basic implementation)
-        $this->processCsvFile($path, $campaign, $list);
-
-        return response()->json([
-            'message' => 'List uploaded successfully',
-            'data' => [
-                'list_id' => $list->id,
-                'total_rows' => $list->total_rows,
-                'valid_rows' => $list->valid_rows,
-                'invalid_rows' => $list->invalid_rows,
-            ],
-        ]);
-    }
-
-    /**
-     * Get list for a campaign.
-     */
-    public function getList(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('view', $campaign);
-
-        if (! $campaign->list) {
-            return response()->json([
-                'message' => 'No list uploaded for this campaign',
-            ], 404);
-        }
-
-        return response()->json([
-            'data' => $campaign->list,
-        ]);
-    }
-
-    /**
-     * Delete list from a campaign.
-     */
-    public function deleteList(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('deleteList', $campaign);
-
-        if ($campaign->list) {
-            $campaign->list->destinations()->delete();
-            $campaign->list->delete();
-        }
-
-        return response()->json([
-            'message' => 'List deleted successfully',
-        ]);
-    }
-
-    /**
-     * Get destinations for a campaign.
-     */
-    public function getDestinations(Request $request, AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('view', $campaign);
-
-        $destinations = $campaign->destinations()
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->paginate($request->per_page ?? 50);
-
-        return response()->json([
-            'data' => $destinations,
-        ]);
-    }
-
-    /**
-     * Process CSV file (basic implementation).
-     */
-    private function processCsvFile(string $path, AutoDialerCampaign $campaign, AutoDialerList $list): void
-    {
-        $fullPath = Storage::path($path);
-        $handle = fopen($fullPath, 'r');
-
-        if (! $handle) {
-            return;
-        }
-
-        // Read header
-        $header = fgetcsv($handle, escape: '\\');
-        if (! $header) {
-            fclose($handle);
-
-            return;
-        }
-
-        $totalRows = 0;
-        $validRows = 0;
-        $invalidRows = 0;
-        $destinations = [];
-
-        while (($row = fgetcsv($handle, escape: '\\')) !== false) {
-            $totalRows++;
-
-            if (count($row) < 1) {
-                $invalidRows++;
-
-                continue;
-            }
-
-            $phoneNumber = trim($row[0]);
-            $description = trim($row[1] ?? '');
-
-            // Basic E.164 validation
-            if (! preg_match('/^\+[1-9]\d{1,14}$/', $phoneNumber)) {
-                $invalidRows++;
-
-                continue;
-            }
-
-            $destinations[] = [
-                'organization_id' => $campaign->organization_id,
-                'list_id' => $list->id,
-                'phone_number' => $phoneNumber,
-                'description' => $description,
-                'status' => 'pending',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-
-            $validRows++;
-
-            // Batch insert every 1000 records
-            if (count($destinations) >= 1000) {
-                AutoDialerDestination::insert($destinations);
-                $destinations = [];
-            }
-        }
-
-        fclose($handle);
-
-        // Insert remaining records
-        if (! empty($destinations)) {
-            AutoDialerDestination::insert($destinations);
-        }
-
-        // Remove duplicates
-        $this->removeDuplicateDestinations($list->id);
-
-        // Update list
-        $uniqueCount = AutoDialerDestination::where('list_id', $list->id)->count();
-        $list->update([
-            'status' => 'ready',
-            'processed_at' => now(),
-            'total_rows' => $totalRows,
-            'valid_rows' => $uniqueCount,
-            'invalid_rows' => $invalidRows + ($validRows - $uniqueCount),
-        ]);
-
-        // Update campaign stats
-        $campaign->update([
-            'total_destinations' => $uniqueCount,
-            'pending_calls' => $uniqueCount,
-        ]);
-
-        // Clean up file
-        Storage::delete($path);
-    }
-
-    /**
-     * Remove duplicate phone numbers from list.
-     */
-    private function removeDuplicateDestinations(int $listId): void
-    {
-        $duplicates = AutoDialerDestination::select('phone_number')
-            ->where('list_id', $listId)
-            ->groupBy('phone_number')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('phone_number');
-
-        foreach ($duplicates as $phoneNumber) {
-            $ids = AutoDialerDestination::where('list_id', $listId)
-                ->where('phone_number', $phoneNumber)
-                ->orderBy('id')
-                ->pluck('id');
-
-            // Keep first, delete rest
-            $ids->shift();
-            AutoDialerDestination::whereIn('id', $ids)->delete();
-        }
-    }
-
-    /**
-     * Extract days_active array from schedule data.
-     *
-     * @param  array<string, mixed>  $schedule
-     * @return array<string>
-     */
-    private function extractDaysActiveFromSchedule(array $schedule): array
-    {
-        $daysActive = [];
-
-        foreach ($schedule as $day => $config) {
-            if (is_array($config) && ($config['enabled'] ?? false)) {
-                $daysActive[] = strtolower($day);
-            }
-        }
-
-        return $daysActive;
-    }
-
-    /**
-     * Extract start_time and end_time from first enabled day's first time range.
-     *
-     * @param  array<string, mixed>  $schedule
-     * @return array<string, int|null>
-     */
-    private function extractTimeRangeFromSchedule(array $schedule): array
-    {
-        foreach ($schedule as $config) {
-            if (is_array($config) && ($config['enabled'] ?? false)) {
-                $timeRanges = $config['time_ranges'] ?? [];
-                if (! empty($timeRanges) && is_array($timeRanges[0])) {
-                    $startTime = $timeRanges[0]['start_time'] ?? '09:00';
-                    $endTime = $timeRanges[0]['end_time'] ?? '17:00';
-
-                    return [
-                        'start_time' => (int) substr($startTime, 0, 2),
-                        'end_time' => (int) substr($endTime, 0, 2),
-                    ];
-                }
-            }
-        }
-
-        return ['start_time' => 9, 'end_time' => 17];
-    }
-
-    /**
-     * Get real-time concurrency status for a campaign.
-     *
-     * Returns the current CAC (Concurrent Active Calls) utilization,
-     * active sessions, and API rate information for real-time monitoring.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign to get status for
-     */
-    public function concurrency(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('view', $campaign);
-
-        $cac = $campaign->concurrent_active_calls;
-
-        // Get current active count from Redis
-        $counterKey = "campaign:{$campaign->id}:concurrency_counter";
-        $activeCount = (int) Redis::get($counterKey) ?? 0;
-
-        // Ensure non-negative
-        if ($activeCount < 0) {
-            $activeCount = 0;
-        }
-
-        // Get active sessions from Redis
-        $sessionsKey = "campaign:{$campaign->id}:active_sessions";
-        $sessionTokens = Redis::smembers($sessionsKey) ?? [];
-
-        // Get active session details from database
-        $activeSessions = [];
-        if (! empty($sessionTokens)) {
-            $sessions = AutoDialerCallSession::whereIn('session_token', $sessionTokens)
-                ->with('destination')
-                ->where('campaign_id', $campaign->id)
-                ->get();
-
-            foreach ($sessions as $session) {
-                $activeSessions[] = [
-                    'session_id' => $session->id,
-                    'session_token' => $session->session_token,
-                    'destination_id' => $session->destination_id,
-                    'phone_number' => $session->destination?->phone_number ?? 'unknown',
-                    'started_at' => $session->started_at?->toIso8601String(),
-                    'duration_seconds' => $session->started_at ? now()->diffInSeconds($session->started_at) : 0,
-                ];
-            }
-        }
-
-        // Calculate utilization percentage
-        $utilizationPercentage = $cac > 0 ? round(($activeCount / $cac) * 100, 1) : 0;
-
-        // Calculate API interval
-        $apiIntervalSeconds = $campaign->getApiIntervalSeconds();
-
-        return response()->json([
-            'data' => [
-                'cac_limit' => $cac,
-                'active_calls' => $activeCount,
-                'available_slots' => max(0, $cac - $activeCount),
-                'utilization_percentage' => $utilizationPercentage,
-                'api_interval_seconds' => $apiIntervalSeconds,
-                'active_sessions' => $activeSessions,
-                'rate_limit_status' => [
-                    'is_rate_limited' => $campaign->status === CampaignStatus::PAUSED &&
-                                         $campaign->pause_reason === 'cloudonix_rate_limit',
-                    'pause_reason' => $campaign->pause_reason,
-                    'resumes_at' => $campaign->resume_at?->toIso8601String(),
-                    'can_resume_now' => $campaign->resume_at ? now()->gte($campaign->resume_at) : true,
-                ],
-            ],
-        ]);
-    }
-
-    /**
-     * Get real-time monitor summary for all active/paused campaigns.
-     *
-     * Returns a bird's-eye view of all campaigns with their concurrency data,
-     * progress statistics, and dialer worker health status.
-     */
-    public function monitorSummary(): JsonResponse
-    {
-        $this->authorize('viewAny', AutoDialerCampaign::class);
-
-        $organizationId = Auth::user()->organization_id;
-        $cacheKey = "monitor:summary:org:{$organizationId}";
-
-        $data = Cache::remember($cacheKey, 5, function () use ($organizationId): array {
-            // Query active and paused campaigns for this organization
-            $campaigns = AutoDialerCampaign::forOrganization($organizationId)
-                ->whereIn('status', [CampaignStatus::ACTIVE, CampaignStatus::PAUSED])
-                ->get();
-
-            $campaignData = [];
-            $totalActiveCalls = 0;
-            $totalCacCapacity = 0;
-            $activeCampaignCount = 0;
-            $pausedCampaignCount = 0;
-
-            foreach ($campaigns as $campaign) {
-                // Read active calls from the Go worker's unprefixed Redis key
-                $dialerRedis = Redis::connection('dialer');
-                $workerKey = "dialer:cac:{$campaign->id}:active";
-                $activeCalls = max(0, (int) $dialerRedis->get($workerKey));
-
-                // Paused campaigns cannot have active calls — force to 0
-                if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
-                    $dialerRedis->set($workerKey, 0);
-                    $activeCalls = 0;
-                }
-
-                $cac = $campaign->concurrent_active_calls;
-                $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
-
-                $totalActiveCalls += $activeCalls;
-                $totalCacCapacity += $cac;
-
-                if ($campaign->status === CampaignStatus::ACTIVE) {
-                    $activeCampaignCount++;
-                } else {
-                    $pausedCampaignCount++;
-                }
-
-                // Check rate limit status
-                $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
-                    $campaign->pause_reason === 'cloudonix_rate_limit';
-
-                // Clean up stale dialing destinations before computing stats.
-                // Paused campaigns: ALL dialing records are stale (no calls in flight).
-                // Active campaigns: only those stuck > 5 min (CDR never arrived).
-                OrganizationScope::bypass(function () use ($campaign): void {
-                    $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
-                    if ($listIds->isEmpty()) {
-                        return;
-                    }
-                    $query = AutoDialerDestination::whereIn('list_id', $listIds)
-                        ->where('status', DestinationStatus::DIALING);
-                    if ($campaign->status !== CampaignStatus::PAUSED) {
-                        $query->where('last_dialed_at', '<', now()->subMinutes(5));
-                    }
-                    $query->update(['status' => DestinationStatus::PENDING]);
-                });
-
-                // Compute ALL statistics from actual destination data (model counters drift)
-                $destStats = OrganizationScope::bypass(function () use ($campaign): array {
-                    $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
-                    if ($listIds->isEmpty()) {
-                        return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0, 'dialing' => 0];
-                    }
-
-                    $counts = AutoDialerDestination::whereIn('list_id', $listIds)
-                        ->selectRaw("COUNT(*) as total,
-                            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-                            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-                            SUM(CASE WHEN status = 'dialing' THEN 1 ELSE 0 END) as dialing")
-                        ->first();
-
-                    return [
-                        'total' => (int) $counts->total,
-                        'completed' => (int) $counts->completed,
-                        'failed' => (int) $counts->failed,
-                        'pending' => (int) $counts->pending,
-                        'dialing' => (int) $counts->dialing,
-                    ];
-                });
-
-                $processed = $destStats['completed'] + $destStats['failed'];
-                $progressPercentage = $destStats['total'] > 0
-                    ? (int) round(($processed / $destStats['total']) * 100)
-                    : 0;
-
-                $campaignData[] = [
-                    'id' => $campaign->id,
-                    'name' => $campaign->name,
-                    'status' => $campaign->status->value,
-                    'progress_percentage' => $progressPercentage,
-                    'total_destinations' => $destStats['total'],
-                    'completed_calls' => $destStats['completed'],
-                    'failed_calls' => $destStats['failed'],
-                    'pending_calls' => $destStats['pending'],
-                    'dialing_calls' => $destStats['dialing'],
-                    'concurrent_active_calls' => $cac,
-                    'active_calls' => $activeCalls,
-                    'cac_utilization' => $cacUtilization,
-                    'rate_limit_status' => [
-                        'is_rate_limited' => $isRateLimited,
-                        'pause_reason' => $campaign->pause_reason,
-                        'resumes_at' => $campaign->resume_at?->toIso8601String(),
-                    ],
-                    'caller_id' => $campaign->caller_id,
-                    'routing_destination_type' => $campaign->routing_destination_type->value,
-                    'routing_destination_label' => $campaign->getRoutingDestinationLabel(),
-                    'start_date' => $campaign->start_date?->toDateString(),
-                    'end_date' => $campaign->end_date?->toDateString(),
-                ];
-            }
-
-            // Calculate overall utilization
-            $overallUtilization = $totalCacCapacity > 0
-                ? round(($totalActiveCalls / $totalCacCapacity) * 100, 1)
-                : 0;
-
-            // Get worker health status
-            $workerHealth = $this->getDialerWorkerHealth();
-
-            return [
-                'campaigns' => $campaignData,
-                'totals' => [
-                    'active_campaigns' => $activeCampaignCount,
-                    'paused_campaigns' => $pausedCampaignCount,
-                    'total_active_calls' => $totalActiveCalls,
-                    'total_cac_capacity' => $totalCacCapacity,
-                    'overall_utilization' => $overallUtilization,
-                ],
-                'worker_health' => $workerHealth,
-            ];
-        });
-
-        return response()->json(['data' => $data]);
-    }
-
-    /**
-     * Get detailed monitor view for a single campaign.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign to get details for
-     */
-    public function monitorDetail(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('view', $campaign);
-
-        $cacheKey = "monitor:detail:campaign:{$campaign->id}";
-
-        $data = Cache::remember($cacheKey, 10, function () use ($campaign): array {
-            // Read active calls from the Go worker's unprefixed Redis key
-            $dialerRedis = Redis::connection('dialer');
-            $workerKey = "dialer:cac:{$campaign->id}:active";
-            $activeCalls = max(0, (int) $dialerRedis->get($workerKey));
-
-            // Paused campaigns cannot have active calls — force to 0 and clean up
-            if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
-                $dialerRedis->set($workerKey, 0);
-                $activeCalls = 0;
-            }
-
-            $cac = $campaign->concurrent_active_calls;
-            $cacUtilization = $cac > 0 ? round(($activeCalls / $cac) * 100, 1) : 0;
-
-            // Get disposition breakdown - bypass scope since campaign is already scoped
-            $dispositions = OrganizationScope::bypass(function () use ($campaign): array {
-                $results = AutoDialerCallSession::where('campaign_id', $campaign->id)
-                    ->whereNotNull('disposition')
-                    ->selectRaw('disposition, COUNT(*) as count')
-                    ->groupBy('disposition')
-                    ->pluck('count', 'disposition')
-                    ->toArray();
-
-                // Ensure all disposition keys exist with 0 if not present
-                $allDispositions = [
-                    'answered' => 0,
-                    'completed' => 0,
-                    'busy' => 0,
-                    'no_answer' => 0,
-                    'failed' => 0,
-                    'cancelled' => 0,
-                    'congestion' => 0,
-                ];
-
-                // Map Cloudonix disposition values (uppercase) to our keys (lowercase)
-                $dispositionMap = [
-                    'answer' => 'answered',
-                    'answered' => 'answered',
-                    'completed' => 'completed',
-                    'busy' => 'busy',
-                    'no-answer' => 'no_answer',
-                    'no_answer' => 'no_answer',
-                    'noanswer' => 'no_answer',
-                    'failed' => 'failed',
-                    'cancelled' => 'cancelled',
-                    'cancel' => 'cancelled',
-                    'congestion' => 'congestion',
-                ];
-
-                foreach ($results as $disposition => $count) {
-                    $normalized = $dispositionMap[strtolower($disposition)] ?? strtolower($disposition);
-                    if (array_key_exists($normalized, $allDispositions)) {
-                        $allDispositions[$normalized] += (int) $count;
-                    }
-                }
-
-                return $allDispositions;
-            });
-
-            // Get average duration and billsec - bypass scope
-            $statistics = OrganizationScope::bypass(function () use ($campaign): array {
-                $avgDuration = AutoDialerCallSession::where('campaign_id', $campaign->id)
-                    ->where('status', 'completed')
-                    ->where('duration', '>', 0)
-                    ->avg('duration');
-
-                $avgBillsec = AutoDialerCallSession::where('campaign_id', $campaign->id)
-                    ->where('status', 'completed')
-                    ->where('billsec', '>', 0)
-                    ->avg('billsec');
-
-                return [
-                    'avg_duration_seconds' => $avgDuration ? (int) round((float) $avgDuration) : 0,
-                    'avg_billsec_seconds' => $avgBillsec ? (int) round((float) $avgBillsec) : 0,
-                ];
-            });
-
-            // Check rate limit status
-            $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
-                $campaign->pause_reason === 'cloudonix_rate_limit';
-            $canResumeNow = $campaign->resume_at ? now()->gte($campaign->resume_at) : true;
-
-            return [
-                'campaign' => [
-                    'id' => $campaign->id,
-                    'name' => $campaign->name,
-                    'status' => $campaign->status->value,
-                    'concurrent_active_calls' => $cac,
-                    'active_calls' => $activeCalls,
-                    'cac_utilization' => $cacUtilization,
-                ],
-                'statistics' => [
-                    'total_destinations' => ($detailStats = OrganizationScope::bypass(function () use ($campaign): array {
-                        $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
-                        if ($listIds->isEmpty()) {
-                            return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0, 'dialing' => 0];
-                        }
-
-                        // Clean up stale dialing: all for paused, > 5 min for active
-                        $dialingQuery = AutoDialerDestination::whereIn('list_id', $listIds)
-                            ->where('status', DestinationStatus::DIALING);
-                        if ($campaign->status !== CampaignStatus::PAUSED) {
-                            $dialingQuery->where('last_dialed_at', '<', now()->subMinutes(5));
-                        }
-                        $dialingQuery->update(['status' => DestinationStatus::PENDING]);
-
-                        $counts = AutoDialerDestination::whereIn('list_id', $listIds)
-                            ->selectRaw("COUNT(*) as total,
-                                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-                                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-                                SUM(CASE WHEN status = 'dialing' THEN 1 ELSE 0 END) as dialing")
-                            ->first();
-
-                        return [
-                            'total' => (int) $counts->total,
-                            'completed' => (int) $counts->completed,
-                            'failed' => (int) $counts->failed,
-                            'pending' => (int) $counts->pending,
-                            'dialing' => (int) $counts->dialing,
-                        ];
-                    }))['total'],
-                    'completed_calls' => $detailStats['completed'],
-                    'failed_calls' => $detailStats['failed'],
-                    'pending_calls' => $detailStats['pending'],
-                    'dialing_calls' => $detailStats['dialing'],
-                    'progress_percentage' => $detailStats['total'] > 0
-                        ? (int) round((($detailStats['completed'] + $detailStats['failed']) / $detailStats['total']) * 100)
-                        : 0,
-                    'avg_duration_seconds' => $statistics['avg_duration_seconds'],
-                    'avg_billsec_seconds' => $statistics['avg_billsec_seconds'],
-                ],
-                'dispositions' => $dispositions,
-                'rate_limit_status' => [
-                    'is_rate_limited' => $isRateLimited,
-                    'pause_reason' => $campaign->pause_reason,
-                    'resumes_at' => $campaign->resume_at?->toIso8601String(),
-                    'can_resume_now' => $canResumeNow,
-                ],
-            ];
-        });
-
-        // Active sessions: queried fresh (never cached).
-        // Paused campaigns have no active calls — clean up any stale sessions.
-        if ($campaign->status === CampaignStatus::PAUSED) {
-            OrganizationScope::bypass(function () use ($campaign): void {
-                AutoDialerCallSession::where('campaign_id', $campaign->id)
-                    ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                    ->update([
-                        'status' => 'failed',
-                        'disposition' => 'cancelled',
-                        'completed_at' => now(),
-                    ]);
-            });
-            $data['active_sessions'] = [];
-        } else {
-            $data['active_sessions'] = OrganizationScope::bypass(function () use ($campaign): array {
-                return AutoDialerCallSession::where('campaign_id', $campaign->id)
-                    ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                    ->where('initiated_at', '>=', now()->subMinutes(5))
-                    ->orderBy('initiated_at', 'desc')
-                    ->get(['id', 'phone_number', 'status', 'call_id', 'initiated_at'])
-                    ->map(fn ($s) => [
-                        'id' => $s->id,
-                        'phone_number' => $s->phone_number,
-                        'status' => $s->status,
-                        'call_id' => $s->call_id,
-                        'initiated_at' => $s->initiated_at?->toIso8601String(),
-                        'duration_seconds' => $s->initiated_at ? (int) now()->diffInSeconds($s->initiated_at) : 0,
-                    ])
-                    ->toArray();
-            });
-        }
-
-        return response()->json(['data' => $data]);
-    }
-
-    /**
-     * Get dialer worker health status.
-     *
-     * @return array<string, mixed>
-     */
-    private function getDialerWorkerHealth(): array
-    {
-        $healthUrl = config('services.dialer_worker.health_url');
-
-        if (empty($healthUrl)) {
-            return [
-                'status' => 'unknown',
-                'active_campaigns' => 0,
-                'active_calls' => 0,
-                'queue_depth' => 0,
-            ];
-        }
-
-        try {
-            $response = Http::timeout(5)->get($healthUrl);
-
-            if ($response->successful()) {
-                $data = $response->json();
-
-                return [
-                    'status' => $data['status'] ?? 'healthy',
-                    'active_campaigns' => $data['active_campaigns'] ?? 0,
-                    'active_calls' => $data['active_calls'] ?? 0,
-                    'queue_depth' => $data['queue_depth'] ?? 0,
-                ];
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to fetch dialer worker health', [
-                'url' => $healthUrl,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return [
-            'status' => 'offline',
-            'active_campaigns' => 0,
-            'active_calls' => 0,
-            'queue_depth' => 0,
-        ];
-    }
-
-    /**
-     * Bust the monitor summary and detail cache so the UI reflects changes immediately.
-     */
-    private function bustMonitorCache(int $organizationId, int $campaignId): void
-    {
-        Cache::forget("monitor:summary:{$organizationId}");
-        Cache::forget("monitor:detail:{$campaignId}");
-    }
-
-    /**
-     * Get available DIDs for Caller ID pool selection.
-     *
-     * Returns active DIDs from the organization that can be added to a campaign's
-     * Caller ID pool. Optionally excludes DIDs already assigned to a specific campaign.
-     *
-     * @param  Request  $request  The HTTP request with optional exclude_campaign_id
-     */
-    public function getAvailableCallerIds(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', AutoDialerCampaign::class);
-
-        $organizationId = Auth::user()->organization_id;
-        $excludeCampaignId = $request->query('exclude_campaign_id');
-
-        // Build query for active DIDs in the organization
-        $query = DidNumber::forOrganization($organizationId)
-            ->where('status', 'active');
-
-        // Exclude DIDs already in the specified campaign's pool
-        if ($excludeCampaignId !== null) {
-            $excludedDidIds = DB::table('auto_dialer_campaign_caller_ids')
-                ->where('campaign_id', $excludeCampaignId)
-                ->pluck('did_number_id')
-                ->toArray();
-
-            if (! empty($excludedDidIds)) {
-                $query->whereNotIn('id', $excludedDidIds);
-            }
-        }
-
-        $dids = $query->get(['id', 'phone_number', 'friendly_name', 'status']);
-
-        return response()->json([
-            'data' => $dids->map(fn (DidNumber $did) => [
-                'id' => $did->id,
-                'phone_number' => $did->phone_number,
-                'friendly_name' => $did->friendly_name,
-                'status' => $did->status,
-            ]),
-        ]);
-    }
-
-    /**
-     * Get Caller ID statistics for a campaign.
-     *
-     * Returns detailed statistics per Caller ID including total calls,
-     * completed calls, failed calls, success rate, and last used timestamp.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign to get stats for
-     */
-    public function getCallerIdStats(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('view', $campaign);
-
-        // Load stats with DID number details
-        $stats = $campaign->callerIdStats()
-            ->with('didNumber:id,phone_number,friendly_name')
-            ->get();
-
-        // Calculate totals
-        $totalCalls = $stats->sum('total_calls');
-
-        // Format response
-        $formattedStats = $stats->map(fn (AutoDialerCallerIdStat $stat) => [
-            'did_id' => $stat->did_number_id,
-            'phone_number' => $stat->didNumber?->phone_number,
-            'friendly_name' => $stat->didNumber?->friendly_name,
-            'total_calls' => $stat->total_calls,
-            'completed_calls' => $stat->completed_calls,
-            'failed_calls' => $stat->failed_calls,
-            'success_rate' => $stat->success_rate,
-            'last_used_at' => $stat->last_used_at?->toIso8601String(),
-        ]);
-
-        return response()->json([
-            'campaign_id' => $campaign->id,
-            'total_calls' => $totalCalls,
-            'strategy' => $campaign->caller_id_strategy?->value,
-            'stats' => $formattedStats,
-        ]);
-    }
-
-    /**
-     * Reset the Caller ID cycle (Round Robin only).
-     *
-     * Resets the Round Robin counter in Redis. Only works when the campaign
-     * is in PAUSED status. Returns 409 Conflict if campaign is not paused.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign to reset the cycle for
-     */
-    public function resetCallerIdCycle(AutoDialerCampaign $campaign): JsonResponse
-    {
-        $this->authorize('update', $campaign);
-
-        // Only allow reset when campaign is PAUSED
-        if ($campaign->status !== CampaignStatus::PAUSED) {
-            return response()->json([
-                'message' => 'Caller ID cycle can only be reset when campaign is PAUSED',
-                'errors' => [
-                    'status' => ['Campaign must be in PAUSED status to reset the cycle.'],
-                ],
-            ], 409);
-        }
-
-        // Reset the Round Robin counter in Redis
-        $redisKey = "campaign:{$campaign->id}:caller_id_index";
-
-        try {
-            $dialerRedis = Redis::connection('dialer');
-            $dialerRedis->set($redisKey, 0);
-
-            return response()->json([
-                'message' => 'Caller ID cycle reset successfully',
-                'campaign_id' => $campaign->id,
-                'strategy' => $campaign->caller_id_strategy?->value,
-                'next_index' => 0,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to reset Caller ID cycle', [
-                'campaign_id' => $campaign->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to reset Caller ID cycle',
-                'errors' => [
-                    'redis' => ['Could not reset cycle counter. Please try again.'],
-                ],
-            ], 500);
-        }
     }
 }

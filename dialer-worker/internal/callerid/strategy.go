@@ -3,15 +3,10 @@ package callerid
 import (
 	"context"
 	"math/rand"
-	"time"
 
 	"opbx/dialer-worker/internal/models"
 	"opbx/dialer-worker/internal/redis"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // Strategy defines the interface for Caller ID selection strategies
 type Strategy interface {
