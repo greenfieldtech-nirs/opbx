@@ -160,7 +160,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
   return (
     <div className="border rounded-lg overflow-hidden">
       <div className={expandHeight ? 'overflow-y-auto' : 'max-h-96 overflow-y-auto'}>
-        <div className="grid grid-cols-8 bg-muted/50 border-b">
+        <div className="grid grid-cols-[5fr_3fr_3fr_3fr_3fr_3fr_3fr_3fr] bg-muted/50 border-b">
           <div className="p-3 font-medium text-sm border-r">Time</div>
           {days.map(({ key, shortLabel }) => (
             <div key={key} className="p-3 font-medium text-sm text-center border-r last:border-r-0">
@@ -170,7 +170,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
         </div>
 
         {timeSlots.map(({ hour }) => (
-          <div key={hour} className="grid grid-cols-8 border-b last:border-b-0 hover:bg-muted/20">
+          <div key={hour} className="grid grid-cols-[5fr_3fr_3fr_3fr_3fr_3fr_3fr_3fr] border-b last:border-b-0 hover:bg-muted/20">
             <div className="p-2 text-xs text-muted-foreground border-r flex items-center justify-end pr-3">
               {`${hour}:00 - ${hour + 1}:00`}
             </div>
