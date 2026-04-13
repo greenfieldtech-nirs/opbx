@@ -560,7 +560,7 @@ export default function AutoDialerCampaignForm() {
               <CardContent className="space-y-6">
                 <div className="flex flex-col lg:flex-row gap-6">
                   {/* Left Column - Date/Time Settings */}
-                  <div className="lg:w-[30%] space-y-4">
+                  <div className="lg:w-[20%] space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="timezone">Timezone</Label>
                       <Select
@@ -601,7 +601,7 @@ export default function AutoDialerCampaignForm() {
                   </div>
 
                   {/* Right Column - Active Hours Calendar */}
-                  <div className="lg:w-[70%] space-y-3">
+                  <div className="lg:w-[80%] space-y-3">
                     <Label>Active Hours</Label>
                     <p className="text-sm text-muted-foreground">
                       Click on time slots to toggle active hours. Green = Active, Empty = Inactive.
