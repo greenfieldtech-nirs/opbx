@@ -457,7 +457,7 @@ export default function AutoDialerCampaignForm() {
           </TabsList>
 
           {/* Basic Info Tab - Combined with Routing */}
-          <TabsContent value="basic" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+          <TabsContent value="basic" className="space-y-6 max-h-[calc(100vh-340px)] overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Information</CardTitle>
@@ -551,7 +551,7 @@ export default function AutoDialerCampaignForm() {
           </TabsContent>
 
           {/* Schedule Tab */}
-          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-340px)] overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Schedule</CardTitle>
@@ -624,7 +624,7 @@ export default function AutoDialerCampaignForm() {
           </TabsContent>
 
           {/* Advanced Tab */}
-          <TabsContent value="advanced" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+          <TabsContent value="advanced" className="space-y-6 max-h-[calc(100vh-340px)] overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle>Advanced Settings</CardTitle>
