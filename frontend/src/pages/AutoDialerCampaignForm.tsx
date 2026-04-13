@@ -786,7 +786,7 @@ export default function AutoDialerCampaignForm() {
                           <div className="pl-6 space-y-4 border-l-2 border-muted">
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <Label htmlFor="amd_mode" className="whitespace-nowrap">AMD Mode</Label>
+                                <Label htmlFor="amd_mode" className="whitespace-nowrap">AMD Mode <span className="text-red-500">*</span></Label>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Info className="h-4 w-4 text-muted-foreground cursor-help" />
@@ -803,7 +803,7 @@ export default function AutoDialerCampaignForm() {
                                   setValue('amd_mode', value)
                                 }
                               >
-                                <SelectTrigger>
+                                <SelectTrigger className={amdEnabled && !watch('amd_mode') ? 'border-red-500' : ''}>
                                   <SelectValue placeholder="Select AMD mode" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -811,6 +811,9 @@ export default function AutoDialerCampaignForm() {
                                   <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
                                 </SelectContent>
                               </Select>
+                              {amdEnabled && !watch('amd_mode') && (
+                                <p className="text-sm text-red-500">AMD Mode is required</p>
+                              )}
                             </div>
 
                             <div className="space-y-2">
@@ -917,6 +920,11 @@ export default function AutoDialerCampaignForm() {
               Please fix the errors above before submitting.
             </div>
           )}
+          {amdEnabled && !watch('amd_mode') && (
+            <div className="mr-auto text-sm text-red-500">
+              Please select an AMD Mode when Answering Machine Detection is enabled.
+            </div>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -928,7 +936,8 @@ export default function AutoDialerCampaignForm() {
             type="submit"
             disabled={
               createMutation.isPending ||
-              updateMutation.isPending
+              updateMutation.isPending ||
+              (amdEnabled && !watch('amd_mode'))
             }
             onClick={() => {
               console.log('Form submit clicked', { isEditing, isDirty, errors });
