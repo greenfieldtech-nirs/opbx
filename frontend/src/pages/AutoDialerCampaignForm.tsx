@@ -551,7 +551,7 @@ export default function AutoDialerCampaignForm() {
           </TabsContent>
 
           {/* Schedule Tab */}
-          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-360px)] overflow-y-auto pr-2">
+          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-380px)] overflow-y-auto pr-2">
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Schedule</CardTitle>
