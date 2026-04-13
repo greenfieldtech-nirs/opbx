@@ -71,7 +71,7 @@ class DialerWorkerController extends Controller
     {
         $this->authorizeWorker($request);
 
-        $limit = $request->input('limit', 50);
+        $limit = (int) $request->input('limit', 50);
 
         $campaignModel = $this->campaignQueryService->findById($campaign);
 
@@ -103,7 +103,7 @@ class DialerWorkerController extends Controller
     {
         $this->authorizeWorker($request);
 
-        $limit = $request->input('limit', 50);
+        $limit = (int) $request->input('limit', 50);
 
         $campaignModel = $this->campaignQueryService->findById($campaign);
 
