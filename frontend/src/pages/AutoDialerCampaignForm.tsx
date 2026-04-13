@@ -40,6 +40,12 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   useAutoDialerCampaign,
@@ -695,8 +701,8 @@ export default function AutoDialerCampaignForm() {
                   </div>
                 </div>
 
-                {/* Row 2: Two Columns (50% / 50%) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
+                {/* Row 2: Two Columns (33% / 67%) */}
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6">
                   {/* Left Column: CAC, CPS, Dial Attempts */}
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -776,79 +782,124 @@ export default function AutoDialerCampaignForm() {
                       </div>
 
                       {amdEnabled && (
-                        <div className="pl-6 space-y-4 border-l-2 border-muted">
-                          <div className="space-y-2">
-                            <Label htmlFor="amd_mode">AMD Mode</Label>
-                            <Select
-                              value={watch('amd_mode')}
-                              onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
-                                setValue('amd_mode', value)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select AMD mode" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Enabled">Enabled</SelectItem>
-                                <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="amd_timeout">
-                              Detection Timeout (seconds)
-                            </Label>
-                            <Input
-                              id="amd_timeout"
-                              type="number"
-                              {...register('amd_timeout', { valueAsNumber: true })}
-                              min={5}
-                              max={120}
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-4">
+                        <TooltipProvider>
+                          <div className="pl-6 space-y-4 border-l-2 border-muted">
                             <div className="space-y-2">
-                              <Label htmlFor="amd_speech_threshold">
-                                Speech Threshold (ms)
-                              </Label>
-                              <Input
-                                id="amd_speech_threshold"
-                                type="number"
-                                {...register('amd_speech_threshold', { valueAsNumber: true })}
-                                min={500}
-                                max={5000}
-                              />
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor="amd_mode" className="whitespace-nowrap">AMD Mode</Label>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p>Enabled: Basic machine detection.</p>
+                                    <p className="mt-1">Detect Message End: Waits for the beep to finish before connecting.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                              <Select
+                                value={watch('amd_mode')}
+                                onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
+                                  setValue('amd_mode', value)
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select AMD mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Enabled">Enabled</SelectItem>
+                                  <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="amd_speech_end_threshold">
-                                Speech End (ms)
-                              </Label>
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor="amd_timeout" className="whitespace-nowrap">Detection Timeout (sec)</Label>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    Maximum time to wait for AMD analysis before giving up and treating the call as answered.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
                               <Input
-                                id="amd_speech_end_threshold"
+                                id="amd_timeout"
                                 type="number"
-                                {...register('amd_speech_end_threshold', { valueAsNumber: true })}
-                                min={500}
-                                max={5000}
+                                {...register('amd_timeout', { valueAsNumber: true })}
+                                min={5}
+                                max={120}
                               />
                             </div>
 
-                            <div className="space-y-2">
-                              <Label htmlFor="amd_silence_timeout">
-                                Silence Timeout (ms)
-                              </Label>
-                              <Input
-                                id="amd_silence_timeout"
-                                type="number"
-                                {...register('amd_silence_timeout', { valueAsNumber: true })}
-                                min={500}
-                                max={10000}
-                              />
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1">
+                                  <Label htmlFor="amd_speech_threshold" className="text-xs whitespace-nowrap">Speech Threshold (ms)</Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Minimum volume level that must be detected to qualify as human speech.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Input
+                                  id="amd_speech_threshold"
+                                  type="number"
+                                  {...register('amd_speech_threshold', { valueAsNumber: true })}
+                                  min={500}
+                                  max={5000}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1">
+                                  <Label htmlFor="amd_speech_end_threshold" className="text-xs whitespace-nowrap">Speech End (ms)</Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Amount of silence required after speech to determine the message has ended.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Input
+                                  id="amd_speech_end_threshold"
+                                  type="number"
+                                  {...register('amd_speech_end_threshold', { valueAsNumber: true })}
+                                  min={500}
+                                  max={5000}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1">
+                                  <Label htmlFor="amd_silence_timeout" className="text-xs whitespace-nowrap">Silence Timeout (ms)</Label>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Maximum silence duration before considering the greeting finished.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                <Input
+                                  id="amd_silence_timeout"
+                                  type="number"
+                                  {...register('amd_silence_timeout', { valueAsNumber: true })}
+                                  min={500}
+                                  max={10000}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </TooltipProvider>
                       )}
                     </div>
                   </div>
