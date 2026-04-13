@@ -119,4 +119,40 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 403);
             }
         });
+
+        // Handle HTTP exceptions with custom error page
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, $request) {
+            $statusCode = $e->getStatusCode();
+
+            // Only handle specific error codes with the custom view
+            if (! in_array($statusCode, [403, 404, 405, 500], true)) {
+                return null; // Let Laravel handle other codes
+            }
+
+            // Check for query parameter override (for testing)
+            $queryCode = $request->query('code');
+            if ($queryCode && in_array((int) $queryCode, [403, 404, 405, 500], true)) {
+                $statusCode = (int) $queryCode;
+            }
+
+            // Only return JSON if the request explicitly expects JSON (via Accept header)
+            // Webhook routes and browser requests will get the HTML error page
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => class_basename(get_class($e)),
+                    'message' => $e->getMessage() ?: 'An error occurred.',
+                    'status' => $statusCode,
+                ], $statusCode);
+            }
+
+            // Generate CSP nonce for inline scripts
+            $nonce = base64_encode(random_bytes(16));
+
+            return response()->view('errors.custom', [
+                'code' => $statusCode,
+                'csp_nonce' => $nonce,
+            ], $statusCode)->withHeaders([
+                'Content-Security-Policy' => "script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'unsafe-inline'",
+            ]);
+        });
     })->create();

@@ -6,6 +6,7 @@ namespace App\Services\CallNotifications;
 
 use App\Models\CallNotificationLog;
 use App\Models\CallNotificationsSettings;
+use App\Services\Security\SsrfUrlValidator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -38,6 +39,26 @@ class WebhookDispatcher
         string $eventId,
         string $sessionToken
     ): bool {
+        // Defense in depth: Validate URL against SSRF attacks before dispatching
+        $ssrfValidator = new SsrfUrlValidator;
+        $isValidUrl = $ssrfValidator->isValid($settings->webhook_url);
+
+        Log::debug('SSRF validation check', [
+            'organization_id' => $settings->organization_id,
+            'webhook_url' => $settings->webhook_url,
+            'is_valid' => $isValidUrl,
+        ]);
+
+        if (! $isValidUrl) {
+            Log::warning('Blocked webhook dispatch to internal URL', [
+                'organization_id' => $settings->organization_id,
+                'event_id' => $eventId,
+                'webhook_url' => $settings->webhook_url,
+            ]);
+
+            return false;
+        }
+
         // Check rate limiting
         if (! $this->checkRateLimit($settings)) {
             Log::warning('Call notification rate limit exceeded', [
@@ -49,18 +70,21 @@ class WebhookDispatcher
         }
 
         // Create log entry
-        $log = CallNotificationLog::create([
-            'organization_id' => $settings->organization_id,
-            'call_session_token' => $sessionToken,
-            'event_id' => $eventId,
-            'event_type' => $payload['event_type'] ?? 'call.status_update',
-            'status' => $payload['session']['status'] ?? 'unknown',
-            'webhook_url' => $settings->webhook_url,
-            'request_payload' => $payload,
-            'attempt_number' => 1,
-            'is_success' => false,
-            'created_at' => now(),
-        ]);
+        // Must bypass OrganizationScope since webhooks have no authenticated user context
+        $log = \App\Scopes\OrganizationScope::bypass(function () use ($settings, $payload, $eventId, $sessionToken) {
+            return CallNotificationLog::create([
+                'organization_id' => $settings->organization_id,
+                'call_session_token' => $sessionToken,
+                'event_id' => $eventId,
+                'event_type' => $payload['event_type'] ?? 'call.status_update',
+                'status' => $payload['session']['status'] ?? 'unknown',
+                'webhook_url' => $settings->webhook_url,
+                'request_payload' => $payload,
+                'attempt_number' => 1,
+                'is_success' => false,
+                'created_at' => now(),
+            ]);
+        });
 
         // Attempt delivery with retries
         $maxAttempts = $settings->retry_attempts ?? 3;
@@ -274,7 +298,9 @@ class WebhookDispatcher
         $current = (int) (Redis::get($key) ?? 0);
         $ttl = Redis::ttl($key);
 
-        $settings = CallNotificationsSettings::forOrganization($organizationId)->first();
+        $settings = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId) {
+            return CallNotificationsSettings::forOrganization($organizationId)->first();
+        });
         $limit = $settings?->rate_limit_per_minute ?? 500;
 
         return [

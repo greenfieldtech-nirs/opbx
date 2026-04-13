@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AmdMode;
+use App\Enums\CallerIdStrategy;
 use App\Enums\CampaignStatus;
 use App\Enums\RoutingDestinationType;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -78,8 +80,10 @@ class AutoDialerCampaign extends Model
         'completed_calls',
         'failed_calls',
         'pending_calls',
-        'pause_reason',      // Reason for pause: cloudonix_rate_limit, manual, etc.
-        'resume_at',         // When rate-limited campaign can resume
+        'pause_reason',
+        'resume_at',
+        'caller_id_strategy',
+        'caller_id_pool_enabled',
     ];
 
     /**
@@ -104,6 +108,8 @@ class AutoDialerCampaign extends Model
         'concurrent_active_calls' => 'integer',
         'calls_per_second' => 'integer',
         'resume_at' => 'datetime',
+        'caller_id_strategy' => CallerIdStrategy::class,
+        'caller_id_pool_enabled' => 'boolean',
     ];
 
     /**
@@ -365,5 +371,28 @@ class AutoDialerCampaign extends Model
         $cps = $this->calls_per_second ?? 1;
 
         return $cps >= self::MIN_CPS && $cps <= self::MAX_CPS;
+    }
+
+    /**
+     * Get the Caller IDs (DIDs) assigned to this campaign.
+     */
+    public function callerIds(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            DidNumber::class,
+            'auto_dialer_campaign_caller_ids',
+            'campaign_id',
+            'did_number_id'
+        )
+            ->withPivot('weight')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the Caller ID statistics for this campaign.
+     */
+    public function callerIdStats(): HasMany
+    {
+        return $this->hasMany(AutoDialerCallerIdStat::class, 'campaign_id');
     }
 }

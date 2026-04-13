@@ -1,8 +1,0 @@
-name: extension
-in: path
-required: true
-description: Extension ID
-schema:
-  type: integer
-  minimum: 1
-example: 789

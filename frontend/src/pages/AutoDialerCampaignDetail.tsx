@@ -21,6 +21,10 @@ import {
   FileSpreadsheet,
   Pencil,
   TrendingUp,
+  Phone,
+  Shuffle,
+  ListOrdered,
+  Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,6 +72,28 @@ function getStatusBadge(status: string) {
   return <Badge variant={config.variant}>{config.label}</Badge>;
 }
 
+function getStrategyIcon(strategy: string) {
+  switch (strategy) {
+    case 'round_robin':
+      return <ListOrdered className="h-4 w-4" />;
+    case 'random':
+      return <Shuffle className="h-4 w-4" />;
+    case 'least_recently_used':
+      return <Timer className="h-4 w-4" />;
+    default:
+      return <Phone className="h-4 w-4" />;
+  }
+}
+
+function getStrategyLabel(strategy: string): string {
+  const labels: Record<string, string> = {
+    round_robin: 'Round Robin',
+    random: 'Random',
+    least_recently_used: 'Least Recently Used',
+  };
+  return labels[strategy] || strategy;
+}
+
 export default function AutoDialerCampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -87,6 +113,12 @@ export default function AutoDialerCampaignDetail() {
 
   const canManageCampaigns = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
 
+  // Mutations
+  const startMutation = useStartCampaign();
+  const pauseMutation = usePauseCampaign();
+  const resumeMutation = useResumeCampaign();
+  const archiveMutation = useArchiveCampaign();
+
   // Fetch campaign data — poll every 10s when campaign is active
   const { data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
 
@@ -96,11 +128,24 @@ export default function AutoDialerCampaignDetail() {
   );
   const distributionLists = distributionListsData?.data || [];
 
-  // Mutations
-  const startMutation = useStartCampaign();
-  const pauseMutation = usePauseCampaign();
-  const resumeMutation = useResumeCampaign();
-  const archiveMutation = useArchiveCampaign();
+  // Get Caller ID pool from campaign data
+  const callerIdPool = (campaign as any)?.caller_id_pool || [];
+  const callerIdStrategy = (campaign as any)?.caller_id_strategy || 'round_robin';
+
+  const getActionIcon = () => {
+    switch (actionType) {
+      case 'start':
+        return <Play className="h-5 w-5" />;
+      case 'pause':
+        return <Pause className="h-5 w-5" />;
+      case 'resume':
+        return <RotateCcw className="h-5 w-5" />;
+      case 'archive':
+        return <Archive className="h-5 w-5" />;
+      default:
+        return null;
+    }
+  };
 
   const handleAction = (action: 'start' | 'pause' | 'resume' | 'archive') => {
     setActionType(action);
@@ -135,21 +180,6 @@ export default function AutoDialerCampaignDetail() {
     } finally {
       setIsActionDialogOpen(false);
       setActionType(null);
-    }
-  };
-
-  const getActionIcon = () => {
-    switch (actionType) {
-      case 'start':
-        return <Play className="h-5 w-5" />;
-      case 'pause':
-        return <Pause className="h-5 w-5" />;
-      case 'resume':
-        return <RotateCcw className="h-5 w-5" />;
-      case 'archive':
-        return <Archive className="h-5 w-5" />;
-      default:
-        return null;
     }
   };
 
@@ -334,10 +364,32 @@ export default function AutoDialerCampaignDetail() {
                     <span className="text-muted-foreground">Destination Type</span>
                     <span className="font-medium">{campaign.routing_destination_label}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Caller ID</span>
-                    <span className="font-medium">{campaign.caller_id}</span>
-                  </div>
+                  {/* Show Caller ID Pool info if available */}
+                  {(callerIdPool.length > 0 || (campaign as any).caller_id_strategy) && (
+                    <>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Caller ID Strategy</span>
+                        <div className="flex items-center gap-2">
+                          {getStrategyIcon(callerIdStrategy)}
+                          <span className="font-medium">{getStrategyLabel(callerIdStrategy)}</span>
+                        </div>
+                      </div>
+                      <div className="py-2 border-b">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-muted-foreground">Caller ID Pool</span>
+                          <span className="text-xs text-muted-foreground">{callerIdPool.length} numbers</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {callerIdPool.map((item: any) => (
+                            <Badge key={item.did_id} variant="outline" className="font-mono">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {item.phone_number}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Dial Timeout</span>
                     <span className="font-medium">{campaign.dial_timeout} seconds</span>

@@ -1,0 +1,164 @@
+---
+sidebar_position: 12
+slug: /data-models/models/auto-dialer-caller-id-stat
+sidebar_class_name: cxGuidesSidebar
+title: AutoDialerCallerIdStat Model
+---
+
+# AutoDialerCallerIdStat Model
+
+## Overview
+
+Tracks usage statistics for each Caller ID (DID) within a campaign's pool. Provides insights into call distribution and success rates per number.
+
+**Table:** `auto_dialer_caller_id_stats`  
+**Model:** `App\Models\AutoDialerCallerIdStat`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `campaign_id` | bigint unsigned | No | - | FK to auto_dialer_campaigns |
+| `did_number_id` | bigint unsigned | No | - | FK to did_numbers |
+| `total_calls` | int unsigned | No | 0 | Total calls attempted |
+| `completed_calls` | int unsigned | No | 0 | Successfully completed calls |
+| `failed_calls` | int unsigned | No | 0 | Failed calls |
+| `last_used_at` | timestamp | Yes | null | When this DID was last used |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Indexes
+
+- **Primary:** `id`
+- **Unique:** `campaign_id` + `did_number_id` (one stats record per DID per campaign)
+- **Foreign Keys:** Indexed automatically
+
+## Relationships
+
+### Belongs To
+```php
+$stat->campaign() → AutoDialerCampaign
+$stat->didNumber() → DidNumber
+```
+
+## Methods
+
+### Attribute Accessors
+
+```php
+// Calculate success rate percentage
+$stat->success_rate → float (e.g., 90.0)
+```
+
+### Business Logic Methods
+
+```php
+// Record a completed call
+$stat->recordCompleted(): void
+// Increments total_calls and completed_calls
+// Updates last_used_at
+
+// Record a failed call
+$stat->recordFailed(): void
+// Increments total_calls and failed_calls
+// Updates last_used_at
+```
+
+## Usage Examples
+
+### Getting Statistics
+
+```php
+use App\Models\AutoDialerCampaign;
+
+$campaign = AutoDialerCampaign::with('callerIdStats.didNumber')->find(1);
+
+foreach ($campaign->callerIdStats as $stat) {
+    echo "Number: {$stat->didNumber->phone_number}\n";
+    echo "Total Calls: {$stat->total_calls}\n";
+    echo "Success Rate: {$stat->success_rate}%\n";
+    echo "Last Used: {$stat->last_used_at}\n";
+}
+```
+
+### Aggregate Statistics
+
+```php
+// Total calls across all Caller IDs
+$totalCalls = $campaign->callerIdStats->sum('total_calls');
+
+// Average success rate
+$avgSuccessRate = $campaign->callerIdStats->avg('success_rate');
+
+// Most used Caller ID
+$mostUsed = $campaign->callerIdStats->sortByDesc('total_calls')->first();
+```
+
+### API Response Format
+
+```json
+{
+  "campaign_id": 9,
+  "total_calls": 150,
+  "strategy": "round_robin",
+  "stats": [
+    {
+      "did_id": 1,
+      "phone_number": "+12127773456",
+      "friendly_name": "Sales Line 1",
+      "total_calls": 50,
+      "completed_calls": 45,
+      "failed_calls": 5,
+      "success_rate": 90.0,
+      "last_used_at": "2026-04-10T14:30:00Z"
+    }
+  ]
+}
+```
+
+## Recording Statistics
+
+Statistics are recorded automatically when call sessions are updated via webhooks:
+
+```php
+// In CDR webhook handler
+$stat = AutoDialerCallerIdStat::firstOrCreate([
+    'campaign_id' => $session->campaign_id,
+    'did_number_id' => $session->caller_did_id,
+]);
+
+if ($disposition === 'completed') {
+    $stat->recordCompleted();
+} else {
+    $stat->recordFailed();
+}
+```
+
+## Analytics Queries
+
+```php
+// Top performing Caller IDs
+$topPerformers = AutoDialerCallerIdStat::with('didNumber')
+    ->where('campaign_id', $campaignId)
+    ->orderByDesc('success_rate')
+    ->limit(5)
+    ->get();
+
+// Caller IDs needing attention (high failure rate)
+$problematic = AutoDialerCallerIdStat::with('didNumber')
+    ->where('campaign_id', $campaignId)
+    ->whereColumn('failed_calls', '>', 'completed_calls')
+    ->get();
+
+// Usage distribution
+$distribution = AutoDialerCallerIdStat::where('campaign_id', $campaignId)
+    ->select('did_number_id', 'total_calls')
+    ->get();
+```
+
+## Related Models
+
+- [AutoDialerCampaign](./auto-dialer-campaign) - Parent campaign
+- [AutoDialerCampaignCallerId](./auto-dialer-campaign-caller-id) - Pool assignment
+- [DidNumber](./did-number) - The phone number details

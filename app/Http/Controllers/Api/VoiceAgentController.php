@@ -1,18 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\VoiceAgent;
-use App\Http\Resources\VoiceAgentResource;
-use App\Http\Resources\VoiceAgentCollection;
 use App\Http\Requests\StoreVoiceAgentRequest;
 use App\Http\Requests\UpdateVoiceAgentRequest;
-use Illuminate\Http\Request;
+use App\Http\Resources\VoiceAgentCollection;
+use App\Http\Resources\VoiceAgentResource;
+use App\Models\VoiceAgent;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated Since 2026-04-11. Use AiAssistantController instead.
+ *             This controller uses legacy tenant_id field (should be organization_id)
+ *             and references non-existent VoiceAgentProvider enum.
+ *             This controller will be removed in a future version.
+ */
 class VoiceAgentController extends Controller
 {
     /**
@@ -20,13 +28,17 @@ class VoiceAgentController extends Controller
      */
     public function index(Request $request): VoiceAgentCollection
     {
+        Log::warning('VoiceAgentController::index is deprecated. Use AiAssistantController::index instead.', [
+            'user_id' => auth()->id(),
+        ]);
+
         Gate::authorize('viewAny', VoiceAgent::class);
 
         $query = VoiceAgent::where('tenant_id', auth()->user()->tenant_id);
 
         // Apply filters
-        if ($request->has('search') && !empty($request->search)) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+        if ($request->has('search') && ! empty($request->search)) {
+            $query->where('name', 'like', '%'.$request->search.'%');
         }
 
         if ($request->has('enabled')) {
@@ -55,6 +67,10 @@ class VoiceAgentController extends Controller
      */
     public function store(StoreVoiceAgentRequest $request): JsonResponse
     {
+        Log::warning('VoiceAgentController::store is deprecated. Use AiAssistantController::store instead.', [
+            'user_id' => auth()->id(),
+        ]);
+
         Gate::authorize('create', VoiceAgent::class);
 
         try {
@@ -65,7 +81,7 @@ class VoiceAgentController extends Controller
 
             $agent = VoiceAgent::create([
                 'tenant_id' => $tenantId,
-                ...$validated
+                ...$validated,
             ]);
 
             Log::info('Voice agent created', [
@@ -73,23 +89,23 @@ class VoiceAgentController extends Controller
                 'name' => $agent->name,
                 'provider' => $agent->provider->value,
                 'tenant_id' => $tenantId,
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => 'Voice agent created successfully',
-                'data' => new VoiceAgentResource($agent)
+                'data' => new VoiceAgentResource($agent),
             ], 201);
 
         } catch (\Exception $e) {
             Log::error('Failed to create voice agent', [
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => 'Failed to create voice agent',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -99,6 +115,11 @@ class VoiceAgentController extends Controller
      */
     public function show(VoiceAgent $voiceAgent): VoiceAgentResource
     {
+        Log::warning('VoiceAgentController::show is deprecated. Use AiAssistantController::show instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('view', $voiceAgent);
 
         return new VoiceAgentResource($voiceAgent);
@@ -109,6 +130,11 @@ class VoiceAgentController extends Controller
      */
     public function update(UpdateVoiceAgentRequest $request, VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::update is deprecated. Use AiAssistantController::update instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('update', $voiceAgent);
 
         try {
@@ -119,24 +145,24 @@ class VoiceAgentController extends Controller
             Log::info('Voice agent updated', [
                 'agent_id' => $voiceAgent->id,
                 'changes' => array_keys($validated),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => 'Voice agent updated successfully',
-                'data' => new VoiceAgentResource($voiceAgent)
+                'data' => new VoiceAgentResource($voiceAgent),
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to update voice agent', [
                 'agent_id' => $voiceAgent->id,
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => 'Failed to update voice agent',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -146,11 +172,16 @@ class VoiceAgentController extends Controller
      */
     public function toggleStatus(VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::toggleStatus is deprecated. Use AiAssistantController::update instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('toggle', $voiceAgent);
 
         try {
             $voiceAgent->update([
-                'enabled' => !$voiceAgent->enabled
+                'enabled' => ! $voiceAgent->enabled,
             ]);
 
             $status = $voiceAgent->enabled ? 'enabled' : 'disabled';
@@ -158,24 +189,24 @@ class VoiceAgentController extends Controller
             Log::info('Voice agent status toggled', [
                 'agent_id' => $voiceAgent->id,
                 'status' => $status,
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => "Voice agent {$status} successfully",
-                'data' => new VoiceAgentResource($voiceAgent)
+                'data' => new VoiceAgentResource($voiceAgent),
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to toggle voice agent status', [
                 'agent_id' => $voiceAgent->id,
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => 'Failed to toggle voice agent status',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -185,6 +216,11 @@ class VoiceAgentController extends Controller
      */
     public function destroy(VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::destroy is deprecated. Use AiAssistantController::destroy instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('delete', $voiceAgent);
 
         try {
@@ -205,23 +241,23 @@ class VoiceAgentController extends Controller
             Log::info('Voice agent deleted', [
                 'agent_id' => $agentId,
                 'name' => $agentName,
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
-                'message' => 'Voice agent deleted successfully'
+                'message' => 'Voice agent deleted successfully',
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to delete voice agent', [
                 'agent_id' => $voiceAgent->id,
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => auth()->id(),
             ]);
 
             return response()->json([
                 'message' => 'Failed to delete voice agent',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -231,6 +267,11 @@ class VoiceAgentController extends Controller
      */
     public function validateConfig(VoiceAgent $voiceAgent): JsonResponse
     {
+        Log::warning('VoiceAgentController::validateConfig is deprecated. Use AiAssistantController instead.', [
+            'user_id' => auth()->id(),
+            'voice_agent_id' => $voiceAgent->id,
+        ]);
+
         Gate::authorize('validateConfig', $voiceAgent);
 
         $errors = $voiceAgent->getValidationErrors();
@@ -238,13 +279,13 @@ class VoiceAgentController extends Controller
         if (empty($errors)) {
             return response()->json([
                 'valid' => true,
-                'message' => 'Voice agent configuration is valid'
+                'message' => 'Voice agent configuration is valid',
             ]);
         }
 
         return response()->json([
             'valid' => false,
-            'errors' => $errors
+            'errors' => $errors,
         ], 422);
     }
 
@@ -253,6 +294,10 @@ class VoiceAgentController extends Controller
      */
     public function providers(): JsonResponse
     {
+        Log::warning('VoiceAgentController::providers is deprecated. Use AiAssistantProviderController instead.', [
+            'user_id' => auth()->id(),
+        ]);
+
         Gate::authorize('viewProviders', VoiceAgent::class);
 
         $providers = [];
@@ -269,7 +314,7 @@ class VoiceAgentController extends Controller
         }
 
         return response()->json([
-            'providers' => $providers
+            'providers' => $providers,
         ]);
     }
 }

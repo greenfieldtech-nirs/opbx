@@ -1,4 +1,0 @@
-description: Rate limit maximum requests per window
-schema:
-  type: integer
-example: 60

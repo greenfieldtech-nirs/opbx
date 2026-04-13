@@ -142,6 +142,12 @@ class UpdateCampaignRequest extends FormRequest
             'amd_silence_timeout' => ['sometimes', 'nullable', 'integer', 'min:500', 'max:10000'],
 
             'auto_start' => ['sometimes', 'boolean'],
+
+            // Caller ID Pooling - can only be modified when campaign is draft or paused
+            'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
+            'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
+            'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'caller_id_strategy' => ['sometimes', Rule::enum(\App\Enums\CallerIdStrategy::class)],
         ];
     }
 

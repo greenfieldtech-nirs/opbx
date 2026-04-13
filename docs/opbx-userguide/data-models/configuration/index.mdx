@@ -1,0 +1,331 @@
+---
+sidebar_position: 1
+slug: /data-models/configuration/index
+sidebar_class_name: cxGuidesSidebar
+title: Configuration Reference
+---
+
+# Configuration Reference
+
+## Environment Variables
+
+### Core Application
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_NAME` | OpBX | Application name |
+| `APP_ENV` | production | Environment: local, production |
+| `APP_KEY` | - | Encryption key (generate with artisan) |
+| `APP_DEBUG` | false | Enable debug mode |
+| `APP_URL` | http://localhost | Base URL |
+
+### Database
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_CONNECTION` | mysql | Database driver |
+| `DB_HOST` | mysql | Database host |
+| `DB_PORT` | 3306 | Database port |
+| `DB_DATABASE` | opbx | Database name |
+| `DB_USERNAME` | opbx | Database user |
+| `DB_PASSWORD` | - | Database password |
+
+### Redis
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REDIS_HOST` | redis | Redis host |
+| `REDIS_PORT` | 6379 | Redis port |
+| `REDIS_PASSWORD` | null | Redis password |
+| `REDIS_DB` | 0 | Default database |
+| `REDIS_CACHE_DB` | 1 | Cache database |
+| `REDIS_QUEUE_DB` | 2 | Queue database |
+
+### Cloudonix Integration
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CLOUDONIX_API_TOKEN` | Yes | Bearer token for API |
+| `CLOUDONIX_API_BASE_URL` | https://api.cloudonix.io | API base URL |
+| `CLOUDONIX_WEBHOOK_SECRET` | Yes | Webhook signature secret |
+| `CLOUDONIX_DEFAULT_TRUNK` | - | Default outbound trunk |
+
+### Authentication
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SANCTUM_STATEFUL_DOMAINS` | localhost | Cookie auth domains |
+| `SESSION_DRIVER` | redis | Session storage |
+| `SESSION_LIFETIME` | 120 | Session lifetime (minutes) |
+
+### Queue & Broadcasting
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `QUEUE_CONNECTION` | redis | Queue driver |
+| `BROADCAST_DRIVER` | pusher | Broadcasting driver |
+| `PUSHER_APP_ID` | - | Soketi app ID |
+| `PUSHER_APP_KEY` | - | Soketi app key |
+| `PUSHER_APP_SECRET` | - | Soketi app secret |
+| `PUSHER_HOST` | soketi | Soketi host |
+| `PUSHER_PORT` | 6001 | Soketi port |
+
+### Storage
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FILESYSTEM_DISK` | s3 | Default storage disk |
+| `AWS_ACCESS_KEY_ID` | - | MinIO access key |
+| `AWS_SECRET_ACCESS_KEY` | - | MinIO secret key |
+| `AWS_DEFAULT_REGION` | us-east-1 | Region |
+| `AWS_BUCKET` | opbx | Bucket name |
+| `AWS_ENDPOINT` | http://minio:9000 | MinIO endpoint |
+| `AWS_USE_PATH_STYLE_ENDPOINT` | true | Use path-style URLs |
+
+### Mail
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAIL_MAILER` | smtp | Mail driver |
+| `MAIL_HOST` | mailpit | SMTP host |
+| `MAIL_PORT` | 1025 | SMTP port |
+| `MAIL_FROM_ADDRESS` | noreply@opbx.local | From address |
+| `MAIL_FROM_NAME` | OpBX | From name |
+
+### Dialer Worker
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DIALER_WORKER_API_TOKEN` | Yes | Worker auth token |
+| `DIALER_WORKER_URL` | http://dialer-worker:8080 | Worker base URL |
+
+### Rate Limiting
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RATE_LIMIT_API_PER_MINUTE` | 60 | API rate limit |
+| `RATE_LIMIT_LOGIN_PER_MINUTE` | 5 | Login attempts limit |
+| `RATE_LIMIT_SENSITIVE_PER_MINUTE` | 3 | Sensitive operations limit |
+
+### Security
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HSTS_MAX_AGE` | 31536000 | HSTS header max age |
+| `HSTS_INCLUDE_SUBDOMAINS` | true | Include subdomains in HSTS |
+| `CSP_REPORT_URI` | - | CSP violation report URL |
+
+## Config Files
+
+### config/app.php
+
+```php
+'name' => env('APP_NAME', 'OpBX'),
+'env' => env('APP_ENV', 'production'),
+'debug' => (bool) env('APP_DEBUG', false),
+'url' => env('APP_URL', 'http://localhost'),
+'timezone' => 'UTC',
+'locale' => 'en',
+'cipher' => 'AES-256-CBC',
+```
+
+### config/services.php
+
+```php
+'cloudonix' => [
+    'api_base_url' => env('CLOUDONIX_API_BASE_URL', 'https://api.cloudonix.io'),
+    'webhook_secret' => env('CLOUDONIX_WEBHOOK_SECRET'),
+],
+
+'dialer_worker' => [
+    'token' => env('DIALER_WORKER_API_TOKEN'),
+    'token_secondary' => env('DIALER_WORKER_API_TOKEN_SECONDARY'),
+],
+```
+
+### config/security.php
+
+```php
+'hsts_max_age' => env('HSTS_MAX_AGE', 31536000),
+'hsts_include_subdomains' => env('HSTS_INCLUDE_SUBDOMAINS', true),
+'hsts_preload' => env('HSTS_PRELOAD', false),
+'csp_report_uri' => env('CSP_REPORT_URI'),
+'csp_connect_domains' => [],
+```
+
+### config/auto-dialer.php
+
+```php
+'max_cac' => 50,           // Maximum concurrent active calls
+'max_cps' => 5,            // Maximum calls per second
+'max_caller_ids' => 100,   // Maximum Caller IDs per pool
+'max_destinations' => 100000, // Max destinations per campaign
+'default_dial_timeout' => 60,
+'default_max_attempts' => 3,
+```
+
+## Feature Flags
+
+Configuration values that enable/disable features:
+
+| Config Path | Environment | Description |
+|-------------|-------------|-------------|
+| `features.auto_dialer.enabled` | `FEATURE_AUTO_DIALER` | Enable Auto Dialer |
+| `features.ai_assistants.enabled` | `FEATURE_AI_ASSISTANTS` | Enable AI integration |
+| `features.call_recording.enabled` | `FEATURE_CALL_RECORDING` | Enable recording |
+| `features.amd.enabled` | `FEATURE_AMD` | Enable AMD detection |
+
+## Database Configuration
+
+### Connection Pool
+
+```php
+// config/database.php
+'mysql' => [
+    'driver' => 'mysql',
+    'host' => env('DB_HOST', '127.0.0.1'),
+    'port' => env('DB_PORT', '3306'),
+    'database' => env('DB_DATABASE', 'forge'),
+    'username' => env('DB_USERNAME', 'forge'),
+    'password' => env('DB_PASSWORD', ''),
+    'charset' => 'utf8mb4',
+    'collation' => 'utf8mb4_unicode_ci',
+    'prefix' => '',
+    'prefix_indexes' => true,
+    'strict' => true,
+    'engine' => null,
+    'options' => extension_loaded('pdo_mysql') ? array_filter([
+        PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+    ]) : [],
+],
+```
+
+### Redis Databases
+
+| DB | Purpose |
+|----|---------|
+| 0 | Default/Cache |
+| 1 | Session |
+| 2 | Queue |
+| 3 | Broadcasting |
+| 4 | Call State |
+| 5 | Rate Limiting |
+
+## Cache Configuration
+
+### Stores
+
+```php
+// config/cache.php
+'stores' => [
+    'redis' => [
+        'driver' => 'redis',
+        'connection' => 'cache',
+        'lock_connection' => 'default',
+    ],
+],
+```
+
+### TTLs
+
+| Cache Key | TTL | Description |
+|-----------|-----|-------------|
+| `voice_routing:{did}` | 5 min | Voice routing decisions |
+| `campaign:{id}:state` | 1 hour | Campaign transient state |
+| `rate_limit:{org}` | 1 min | Rate limit counters |
+| `session:{token}` | 24 hours | Call sessions |
+
+## Queue Configuration
+
+### Connections
+
+```php
+// config/queue.php
+'connections' => [
+    'redis' => [
+        'driver' => 'redis',
+        'connection' => 'default',
+        'queue' => 'default',
+        'retry_after' => 90,
+        'block_for' => null,
+        'after_commit' => false,
+    ],
+],
+```
+
+### Queues
+
+| Queue | Purpose |
+|-------|---------|
+| `default` | General jobs |
+| `webhooks` | Webhook dispatch |
+| `notifications` | Email/SMS notifications |
+| `cdr` | Call detail record processing |
+
+## Logging Configuration
+
+### Channels
+
+```php
+// config/logging.php
+'channels' => [
+    'stack' => [
+        'driver' => 'stack',
+        'channels' => ['single', 'stderr'],
+    ],
+    'daily' => [
+        'driver' => 'daily',
+        'path' => storage_path('logs/laravel.log'),
+        'level' => env('LOG_LEVEL', 'debug'),
+        'days' => 14,
+    ],
+    'audit' => [
+        'driver' => 'daily',
+        'path' => storage_path('logs/audit.log'),
+        'level' => 'info',
+    ],
+],
+```
+
+### Log Levels
+
+| Level | Used For |
+|-------|----------|
+| `emergency` | System down |
+| `alert` | Immediate action required |
+| `critical` | Critical conditions |
+| `error` | Runtime errors |
+| `warning` | Warnings |
+| `notice` | Normal but significant |
+| `info` | Informational |
+| `debug` | Debug-level messages |
+
+## Health Check Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/up` | Laravel health check |
+| `/health` | Full system health |
+| `/api/health` | API health (with auth) |
+
+## Docker Environment
+
+### Services
+
+| Service | Container | Port |
+|---------|-----------|------|
+| Nginx | nginx | 80, 443 |
+| PHP-FPM | app | 9000 |
+| MySQL | mysql | 3306 |
+| Redis | redis | 6379 |
+| MinIO | minio | 9000, 9001 |
+| Soketi | soketi | 6001 |
+| Go Worker | dialer-worker | 8080 |
+| ngrok | ngrok | 4040 |
+
+### Networks
+
+| Network | Purpose |
+|---------|---------|
+| `opbx` | Main application network |
+| `opbx-bridge` | External connectivity |

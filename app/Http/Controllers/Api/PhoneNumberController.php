@@ -55,6 +55,8 @@ class PhoneNumberController extends Controller
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
+        $this->authorize('viewAny', DidNumber::class);
+
         Log::info('Retrieving phone numbers list', [
             'request_id' => $requestId,
             'user_id' => $user->id,

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\IvrDestinationType;
-use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -172,15 +171,8 @@ class IvrMenuOption extends Model
         ]);
 
         // Additional validation based on destination type
-        $isValid = match ($this->destination_type) {
-            IvrDestinationType::EXTENSION => $destination->status === UserStatus::ACTIVE,
-            IvrDestinationType::RING_GROUP => $destination->isActive(),
-            IvrDestinationType::CONFERENCE_ROOM => true, // Conference rooms don't have status
-            IvrDestinationType::IVR_MENU => $destination->isActive(),
-            IvrDestinationType::AI_ASSISTANT => $destination->status === UserStatus::ACTIVE,
-            IvrDestinationType::AI_LOAD_BALANCER => $destination->isActive(), // uses AlbsStatus, isActive() method handles it
-            IvrDestinationType::BUSINESS_HOURS => $destination->isActive(),
-        };
+        // All destination models implement isActive() method for consistency
+        $isValid = $destination->isActive();
 
         Log::debug('IVR Option: Destination validation result', [
             'option_id' => $this->id,

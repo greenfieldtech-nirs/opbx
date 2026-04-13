@@ -62,7 +62,25 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 
 	c.logger.Info("GetActiveCampaigns result", "count", len(campaigns))
 	for i, camp := range campaigns {
-		c.logger.Info("Campaign details", "index", i, "id", camp.ID, "name", camp.Name, "status", camp.Status, "cac", camp.CAC)
+		c.logger.Info("Campaign details",
+			"index", i,
+			"id", camp.ID,
+			"name", camp.Name,
+			"status", camp.Status,
+			"cac", camp.CAC,
+			"caller_id_pool_enabled", camp.CallerIDPoolEnabled,
+			"pool_size", len(camp.CallerIDPool),
+			"strategy", camp.CallerIDStrategy,
+		)
+		// Log pool items
+		for j, item := range camp.CallerIDPool {
+			c.logger.Info("Pool item",
+				"campaign_id", camp.ID,
+				"index", j,
+				"did_id", item.DIDID,
+				"phone_number", item.PhoneNumber,
+			)
+		}
 	}
 
 	return campaigns, nil
@@ -93,11 +111,18 @@ func (c *Client) GetPendingDestinations(ctx context.Context, campaignID int64, l
 
 // InitiateCall creates a new call session via Laravel
 func (c *Client) InitiateCall(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string) (*models.InitiateCallResponse, error) {
+	return c.InitiateCallWithCallerID(ctx, campaignID, destinationID, phoneNumber, workerID, "", 0)
+}
+
+// InitiateCallWithCallerID creates a new call session via Laravel with a specific Caller ID
+func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string, callerID string, callerDIDID int64) (*models.InitiateCallResponse, error) {
 	req := models.InitiateCallRequest{
 		CampaignID:    campaignID,
 		DestinationID: destinationID,
 		PhoneNumber:   phoneNumber,
 		WorkerID:      workerID,
+		CallerID:      callerID,
+		CallerDIDID:   callerDIDID,
 		InitiatedAt:   models.FlexTime(time.Now()),
 	}
 

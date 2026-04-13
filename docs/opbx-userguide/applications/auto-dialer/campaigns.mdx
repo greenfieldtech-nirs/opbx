@@ -47,11 +47,18 @@ Configure fundamental campaign settings:
 | **Description** | No | Optional details about the campaign purpose |
 | **Routing Destination Type** | Yes | AI Assistant (WebSocket), AI Assistant (SIP), AI Load Balancer, or Hangup |
 | **Select Destination** | Yes | Specific AI assistant or load balancer to route calls to |
-| **Caller ID** | Yes | Outbound phone number displayed to callees (E.164 format) |
+| **Caller ID Pool** | Yes | One or more phone numbers for outbound calls (up to 100) |
+| **Caller ID Strategy** | Yes | How to cycle through Caller IDs: Round Robin, Random, or Least Recently Used |
 | **Dial Timeout** | Yes | Seconds to ring before giving up (default: 60) |
 
-:::note
-The Caller ID must be a valid phone number in E.164 format (e.g., +14155551234). This number is displayed on the callee's phone.
+:::note Caller ID Pooling
+Instead of a single Caller ID, you can now assign up to 100 phone numbers to a campaign. The system automatically cycles through these numbers based on your selected strategy:
+
+- **Round Robin**: Sequential cycling (1, 2, 3, 1, 2, 3...)
+- **Random**: Random selection for each call
+- **Least Recently Used**: Selects the number used longest ago
+
+This helps with carrier load distribution and compliance in certain jurisdictions.
 :::
 
 ### Schedule Tab
@@ -184,6 +191,27 @@ View and manage distribution lists assigned to this campaign:
 
 :::tip
 The Campaign Settings page auto-refreshes every 10 seconds when the campaign is Active, keeping the statistics current.
+:::
+
+### Caller ID Pool Section
+
+View the Caller IDs assigned to this campaign and their usage statistics:
+
+| Display | Description |
+|---------|-------------|
+| **Phone Numbers** | Badges showing each Caller ID in the pool |
+| **Strategy** | The distribution strategy (Round Robin, Random, LRU) |
+| **Total Calls** | Combined calls across all Caller IDs |
+| **Per-Number Stats** | Total, completed, failed, and success rate per Caller ID |
+
+The Caller ID Pool section helps you monitor:
+
+- Which numbers are being used most frequently
+- Success rates per Caller ID
+- Whether the distribution is balanced
+
+:::tip
+On retry attempts, the system automatically selects a different Caller ID from the pool to improve connection rates.
 :::
 
 ## Best Practices

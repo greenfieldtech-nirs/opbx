@@ -52,6 +52,14 @@ class DidNumber extends Model
     }
 
     /**
+     * Scope query to filter by organization.
+     */
+    public function scopeForOrganization($query, int $organizationId)
+    {
+        return $query->where('organization_id', $organizationId);
+    }
+
+    /**
      * Check if the DID is active.
      */
     public function isActive(): bool

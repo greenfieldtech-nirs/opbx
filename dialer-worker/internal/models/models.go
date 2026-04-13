@@ -29,7 +29,28 @@ type Campaign struct {
 	FailedCalls            int      `json:"failed_calls"`
 	CreatedAt              FlexTime `json:"created_at"`
 	UpdatedAt              FlexTime `json:"updated_at"`
+
+	// Caller ID Pool fields (new)
+	CallerIDPoolEnabled bool               `json:"caller_id_pool_enabled"`
+	CallerIDPool        []CallerIDPoolItem `json:"caller_id_pool"`
+	CallerIDStrategy    CallerIDStrategy   `json:"caller_id_strategy"`
 }
+
+// CallerIDPoolItem represents a single Caller ID in the pool
+type CallerIDPoolItem struct {
+	DIDID       int64  `json:"did_id"`
+	PhoneNumber string `json:"phone_number"`
+	Weight      int    `json:"weight"`
+}
+
+// CallerIDStrategy represents the strategy for selecting Caller IDs
+type CallerIDStrategy string
+
+const (
+	StrategyRoundRobin        CallerIDStrategy = "round_robin"
+	StrategyRandom            CallerIDStrategy = "random"
+	StrategyLeastRecentlyUsed CallerIDStrategy = "least_recently_used"
+)
 
 // Destination represents a phone number to dial
 type Destination struct {
@@ -114,6 +135,8 @@ type InitiateCallRequest struct {
 	DestinationID int64    `json:"destination_id"`
 	PhoneNumber   string   `json:"phone_number"`
 	WorkerID      string   `json:"worker_id"`
+	CallerID      string   `json:"caller_id,omitempty"`     // Selected Caller ID from pool
+	CallerDIDID   int64    `json:"caller_did_id,omitempty"` // DID ID of selected Caller ID
 	InitiatedAt   FlexTime `json:"initiated_at"`
 }
 

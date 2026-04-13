@@ -22,6 +22,9 @@ export interface AutoDialerCampaign {
   dial_timeout: number;
   destination_connect: 'connected' | 'immediately';
   caller_id: string;
+  // Caller ID Pool fields
+  caller_id_strategy?: 'round_robin' | 'random' | 'least_recently_used';
+  caller_id_pool?: CallerIdPoolItem[];
   max_dial_attempts: number;
   concurrent_active_calls: number;
   calls_per_second: number;
@@ -62,6 +65,9 @@ export interface CreateCampaignRequest {
   dial_timeout: number;
   destination_connect: 'connected' | 'immediately';
   caller_id: string;
+  // Caller ID Pool fields
+  caller_id_strategy?: 'round_robin' | 'random' | 'least_recently_used';
+  caller_id_pool?: CallerIdPoolItem[];
   max_dial_attempts: number;
   concurrent_active_calls: number;
   calls_per_second: number;
@@ -93,6 +99,9 @@ export interface UpdateCampaignRequest {
   dial_timeout?: number;
   destination_connect?: 'connected' | 'immediately';
   caller_id?: string;
+  // Caller ID Pool fields
+  caller_id_strategy?: 'round_robin' | 'random' | 'least_recently_used';
+  caller_id_pool?: CallerIdPoolItem[];
   max_dial_attempts?: number;
   concurrent_active_calls?: number;
   calls_per_second?: number;
@@ -144,6 +153,32 @@ export interface CampaignParams {
   search?: string;
   per_page?: number;
   page?: number;
+}
+
+// Caller ID Pool Types
+export interface CallerIdPoolItem {
+  did_id: number;
+  phone_number: string;
+  friendly_name?: string;
+  weight: number;
+}
+
+export interface AvailableCallerId {
+  id: number;
+  phone_number: string;
+  friendly_name?: string;
+  status: 'active' | 'inactive';
+}
+
+export interface CallerIdStat {
+  did_id: number;
+  phone_number: string;
+  friendly_name?: string;
+  total_calls: number;
+  completed_calls: number;
+  failed_calls: number;
+  success_rate: number;
+  last_used_at: string | null;
 }
 
 /**
@@ -225,6 +260,24 @@ export const autoDialerCampaignsApi = {
   getDestinations: (campaignId: string, params?: { status?: string; per_page?: number; page?: number }) =>
     api
       .get<PaginatedResponse<CampaignDestination>>(`/auto-dialer-campaigns/${campaignId}/destinations`, { params })
+      .then((r) => r.data),
+
+  // Caller ID Pool Management
+  getAvailableCallerIds: (excludeCampaignId?: number) =>
+    api
+      .get<{ data: AvailableCallerId[] }>('/auto-dialer-campaigns/available-caller-ids', {
+        params: excludeCampaignId ? { exclude_campaign_id: excludeCampaignId } : undefined,
+      })
+      .then((r) => r.data.data),
+
+  getCallerIdStats: (campaignId: number) =>
+    api
+      .get<{ data: CallerIdStat[] }>(`/auto-dialer-campaigns/${campaignId}/caller-id-stats`)
+      .then((r) => r.data.data || []),
+
+  resetCallerIdCycle: (campaignId: number) =>
+    api
+      .post<{ message: string }>(`/auto-dialer-campaigns/${campaignId}/reset-caller-id-cycle`)
       .then((r) => r.data),
 };
 

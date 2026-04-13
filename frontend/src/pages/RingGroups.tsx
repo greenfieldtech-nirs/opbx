@@ -28,6 +28,7 @@ import type {
   UpdateRingGroupRequest,
 } from '@/types/api.types';
 import type { Extension, RingGroupMember } from '@/types';
+import { getErrorMessage } from '@/types/api';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -340,15 +341,15 @@ export default function RingGroups() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data as any),
+    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
       setIsCreateDialogOpen(false);
       resetForm();
       toast.success('Ring group created successfully');
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to create ring group';
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error) || 'Failed to create ring group';
       toast.error(message);
     },
   });
@@ -356,7 +357,7 @@ export default function RingGroups() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateRingGroupRequest }) =>
-      ringGroupsService.update(id, data as any),
+      ringGroupsService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
       setIsEditDialogOpen(false);
@@ -364,8 +365,8 @@ export default function RingGroups() {
       resetForm();
       toast.success('Ring group updated successfully');
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to update ring group';
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error) || 'Failed to update ring group';
       toast.error(message);
     },
   });
@@ -378,8 +379,8 @@ export default function RingGroups() {
       setSelectedGroup(null);
       toast.success('Ring group deleted successfully');
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to delete ring group';
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error) || 'Failed to delete ring group';
       toast.error(message);
     },
   });
@@ -392,7 +393,7 @@ export default function RingGroups() {
     // We only need to send the status for a toggle
     updateMutation.mutate({
       id: group.id,
-      data: { status: newStatus } as any
+      data: { status: newStatus }
     });
   };
 
@@ -639,7 +640,7 @@ export default function RingGroups() {
         break;
     }
 
-    createMutation.mutate(requestData as any);
+    createMutation.mutate(requestData);
   };
 
   // Handle edit
@@ -712,7 +713,7 @@ export default function RingGroups() {
         break;
     }
 
-    updateMutation.mutate({ id: selectedGroup.id, data: requestData as any });
+    updateMutation.mutate({ id: selectedGroup.id, data: requestData });
   };
 
   // Handle delete

@@ -64,7 +64,9 @@ class AutoDialerCloudonixService
         AutoDialerCampaign $campaign,
         AutoDialerDestination $destination,
         CloudonixSettings $settings,
-        string $webhookUrl
+        string $webhookUrl,
+        ?string $selectedCallerId = null,
+        ?int $selectedCallerDidId = null
     ): array {
         try {
             // Validate that Cloudonix is configured for this organization
@@ -83,7 +85,7 @@ class AutoDialerCloudonixService
             }
 
             // Build the payload according to Cloudonix API specification
-            $payload = $this->buildPayload($campaign, $destination, $webhookUrl);
+            $payload = $this->buildPayload($campaign, $destination, $webhookUrl, $selectedCallerId);
 
             Log::info('AutoDialer: Initiating call via Cloudonix', [
                 'campaign_id' => $campaign->id,
@@ -151,12 +153,16 @@ class AutoDialerCloudonixService
     private function buildPayload(
         AutoDialerCampaign $campaign,
         AutoDialerDestination $destination,
-        string $webhookUrl
+        string $webhookUrl,
+        ?string $selectedCallerId = null
     ): array {
+        // Use selected Caller ID from pool if provided, otherwise fall back to campaign default
+        $callerId = $selectedCallerId ?? $campaign->caller_id;
+
         // Mandatory fields
         $payload = [
             'destination' => $destination->phone_number,
-            'caller-id' => $campaign->caller_id,
+            'caller-id' => $callerId,
         ];
 
         // Add routing destination (application, url, or cxml)

@@ -1,0 +1,252 @@
+---
+sidebar_position: 10
+slug: /data-models/models/auto-dialer-campaign
+sidebar_class_name: cxGuidesSidebar
+title: AutoDialerCampaign Model
+---
+
+# AutoDialerCampaign Model
+
+## Overview
+
+The `AutoDialerCampaign` model represents an outbound dialing campaign with configuration for routing, scheduling, rate limiting, and Caller ID Pooling.
+
+**Table:** `auto_dialer_campaigns`  
+**Model:** `App\Models\AutoDialerCampaign`  
+**Resource:** `App\Http\Resources\AutoDialerCampaignResource`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
+| `name` | varchar(255) | No | - | Campaign name |
+| `description` | text | Yes | null | Campaign description |
+| `status` | varchar(20) | No | draft | Campaign status enum |
+| `auto_start` | boolean | No | false | Auto-start when ready |
+| `routing_destination_type` | varchar(50) | No | - | ai_assistant, ai_load_balancer, hangup |
+| `routing_destination_id` | bigint unsigned | Yes | null | Target destination ID |
+| `dial_timeout` | int | No | 60 | Seconds to ring before timeout |
+| `destination_connect` | varchar(20) | No | connected | connected or immediately |
+| `caller_id` | varchar(50) | Yes | null | Default Caller ID (legacy) |
+| `caller_id_strategy` | varchar(20) | No | round_robin | Distribution strategy |
+| `caller_id_pool_enabled` | boolean | No | false | Whether pool mode is enabled |
+| `max_dial_attempts` | int | No | 1 | Max retries per destination |
+| `concurrent_active_calls` | int | No | 1 | Max concurrent calls (CAC) |
+| `calls_per_second` | int | No | 1 | Call initiation rate (CPS) |
+| `days_active` | json | Yes | null | Legacy schedule days |
+| `start_time` | int | Yes | null | Legacy start hour |
+| `end_time` | int | Yes | null | Legacy end hour |
+| `start_date` | date | Yes | null | Campaign start date |
+| `end_date` | date | Yes | null | Campaign end date |
+| `timezone` | varchar(50) | Yes | UTC | Schedule timezone |
+| `schedule` | json | Yes | null | Full weekly schedule |
+| `time_limit` | int | Yes | null | Max call duration (seconds) |
+| `record_calls` | boolean | No | false | Enable recording |
+| `amd_enabled` | boolean | No | false | Enable AMD |
+| `amd_mode` | varchar(20) | Yes | null | Enabled or DetectMessageEnd |
+| `amd_timeout` | int | Yes | null | AMD detection timeout |
+| `amd_speech_threshold` | int | Yes | null | Speech threshold (ms) |
+| `amd_speech_end_threshold` | int | Yes | null | Speech end threshold (ms) |
+| `amd_silence_timeout` | int | Yes | null | Silence timeout (ms) |
+| `total_destinations` | int | No | 0 | Total destinations count |
+| `completed_calls` | int | No | 0 | Completed calls count |
+| `failed_calls` | int | No | 0 | Failed calls count |
+| `pending_calls` | int | No | 0 | Pending calls count |
+| `pause_reason` | varchar(50) | Yes | null | Reason for pause |
+| `resume_at` | timestamp | Yes | null | Scheduled resume time |
+| `started_at` | timestamp | Yes | null | When campaign started |
+| `completed_at` | timestamp | Yes | null | When campaign completed |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Relationships
+
+### Belongs To
+```php
+campaign.organization() → Organization
+```
+
+### Has Many
+```php
+campaign.destinations() → AutoDialerDestination[]
+campaign.callSessions() → AutoDialerCallSession[]
+campaign.lists() → AutoDialerList[] (via pivot)
+campaign.callerIdStats() → AutoDialerCallerIdStat[]
+```
+
+### Belongs To Many
+```php
+campaign.callerIds() → DidNumber[]
+  - Pivot: auto_dialer_campaign_caller_ids
+  - With pivot: weight
+```
+
+## Enums
+
+### CampaignStatus
+- `draft` - Initial configuration
+- `active` - Currently dialing
+- `paused` - Temporarily stopped
+- `completed` - All destinations processed
+- `archived` - Soft-deleted
+
+### RoutingDestinationType
+- `ai_assistant` - Route to AI Assistant
+- `ai_load_balancer` - Route via ALBS
+- `hangup` - Hang up immediately
+
+### DestinationConnect
+- `connected` - Connect when call answered
+- `immediately` - Connect immediately
+
+### AmdMode
+- `Enabled` - Basic AMD detection
+- `DetectMessageEnd` - Wait for greeting end
+
+## Caller ID Pooling
+
+### Configuration
+
+**Enable Pool Mode:**
+```php
+$campaign->update([
+    'caller_id_pool_enabled' => true,
+    'caller_id_strategy' => 'round_robin', // or 'random', 'least_recently_used'
+]);
+```
+
+**Assign Caller IDs:**
+```php
+$syncData = [
+    $didId1 => ['weight' => 1],
+    $didId2 => ['weight' => 1],
+    $didId3 => ['weight' => 1],
+];
+$campaign->callerIds()->sync($syncData);
+```
+
+### Strategies
+
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| `round_robin` | Sequential cycling | Fair distribution |
+| `random` | Random selection | Load balancing |
+| `least_recently_used` | Pick least used | Even wear |
+
+## Methods
+
+### Scopes
+
+```php
+// Organization-scoped (automatic via OrganizationScope)
+AutoDialerCampaign::forOrganization($orgId)
+
+// Status filters
+AutoDialerCampaign::active()
+AutoDialerCampaign::paused()
+AutoDialerCampaign::draft()
+AutoDialerCampaign::runnable() // Can be started
+```
+
+### Business Logic
+
+```php
+// Check if campaign can run
+$campaign->isRunnable(): bool
+
+// Get progress percentage
+$campaign->getProgressPercentage(): float
+
+// Calculate API interval from CPS
+$campaign->getApiIntervalMilliseconds(): int
+
+// Check valid CPS
+$campaign->hasValidCps(): bool
+
+// Check if has list assigned
+$campaign->hasList(): bool
+```
+
+### Lifecycle Methods
+
+```php
+// Start campaign
+$campaign->start(): void
+
+// Pause campaign
+$campaign->pause(string $reason, ?DateTime $resumeAt = null): void
+
+// Resume campaign
+$campaign->resume(): void
+
+// Archive campaign
+$campaign->archive(): void
+
+// Mark as completed
+$campaign->complete(): void
+```
+
+## Validation Rules
+
+### Create/Update
+
+| Field | Rules |
+|-------|-------|
+| `name` | required, string, max:255 |
+| `caller_id_pool` | array, min:1, max:100 (when pool enabled) |
+| `caller_id_pool.*.did_id` | required, exists:did_numbers,id |
+| `caller_id_strategy` | required, in:round_robin,random,least_recently_used |
+| `concurrent_active_calls` | required, integer, min:1, max:50 |
+| `calls_per_second` | required, integer, min:1, max:5 |
+
+## Events
+
+The model dispatches events for state changes:
+- `CampaignStarted`
+- `CampaignPaused`
+- `CampaignResumed`
+- `CampaignCompleted`
+- `CampaignArchived`
+
+## Example Usage
+
+```php
+use App\Models\AutoDialerCampaign;
+use App\Enums\CampaignStatus;
+use App\Enums\RoutingDestinationType;
+
+// Create with Caller ID Pool
+$campaign = AutoDialerCampaign::create([
+    'organization_id' => $orgId,
+    'name' => 'Sales Campaign Q2',
+    'status' => CampaignStatus::DRAFT,
+    'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT,
+    'routing_destination_id' => $assistantId,
+    'caller_id_pool_enabled' => true,
+    'caller_id_strategy' => 'round_robin',
+    'concurrent_active_calls' => 10,
+    'calls_per_second' => 2,
+    'schedule' => [...],
+    'start_date' => '2026-04-01',
+    'end_date' => '2026-04-30',
+    'timezone' => 'America/New_York',
+]);
+
+// Assign Caller IDs
+$campaign->callerIds()->sync([
+    $did1->id => ['weight' => 1],
+    $did2->id => ['weight' => 1],
+    $did3->id => ['weight' => 1],
+]);
+
+// Start campaign
+$campaign->start();
+```
+
+## Related Documentation
+
+- [Managing Campaigns](../../applications/auto-dialer/campaigns)
+- [AutoDialerCampaignCallerId](./auto-dialer-campaign-caller-id)
+- [AutoDialerCallerIdStat](./auto-dialer-caller-id-stat)
