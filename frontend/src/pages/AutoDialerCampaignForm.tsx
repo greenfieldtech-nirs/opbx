@@ -464,31 +464,20 @@ export default function AutoDialerCampaignForm() {
                 <CardDescription>Basic details and routing configuration</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Campaign Name and Auto-Start side by side */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">
-                      Campaign Name <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      {...register('name')}
-                      placeholder="Enter campaign name"
-                      className={errors.name ? 'border-red-500' : ''}
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name.message}</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2 h-full pt-8">
-                    <Switch
-                      id="auto_start"
-                      checked={watch('auto_start')}
-                      onCheckedChange={(checked) => setValue('auto_start', checked)}
-                    />
-                    <Label htmlFor="auto_start">Auto-start campaign when scheduled</Label>
-                  </div>
+                {/* Campaign Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    Campaign Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    {...register('name')}
+                    placeholder="Enter campaign name"
+                    className={errors.name ? 'border-red-500' : ''}
+                  />
+                  {errors.name && (
+                    <p className="text-sm text-red-500">{errors.name.message}</p>
+                  )}
                 </div>
 
                 {/* Routing Destination - side by side layout */}
@@ -534,15 +523,15 @@ export default function AutoDialerCampaignForm() {
                     </Alert>
                   )}
 
-                  <div className="space-y-6">
-                    {/* Strategy Selector */}
+                  <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+                    {/* Strategy Selector - Left Column */}
                     <StrategySelector
                       value={callerIdStrategy}
                       onChange={(value) => setValue('caller_id_strategy', value)}
                       disabled={!canModifyPool}
                     />
 
-                    {/* Pool Selector */}
+                    {/* Pool Selector - Right Column */}
                     <div className="space-y-2">
                       <Label>Caller ID Pool</Label>
                       <CallerIdPoolSelector
@@ -557,9 +546,93 @@ export default function AutoDialerCampaignForm() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                {/* Dial Timeout and Connect When - side by side */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+          {/* Schedule Tab */}
+          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign Schedule</CardTitle>
+                <CardDescription>Configure when the campaign should run</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Left Column - Date/Time Settings */}
+                  <div className="lg:w-[30%] space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="timezone">Timezone</Label>
+                      <Select
+                        value={watch('timezone')}
+                        onValueChange={(value) => setValue('timezone', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a timezone" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {regionOrder.map((region) => {
+                            const tzs = timezoneGroups[region];
+                            if (!tzs || tzs.length === 0) return null;
+                            return (
+                              <SelectGroup key={region}>
+                                <SelectLabel>{region}</SelectLabel>
+                                {tzs.map((tz) => (
+                                  <SelectItem key={tz.value} value={tz.value}>
+                                    {formatTimezoneLabel(tz)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="start_date">Start Date</Label>
+                      <Input id="start_date" type="date" {...register('start_date')} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="end_date">End Date</Label>
+                      <Input id="end_date" type="date" {...register('end_date')} />
+                    </div>
+                  </div>
+
+                  {/* Right Column - Active Hours Calendar */}
+                  <div className="lg:w-[70%] space-y-3">
+                    <Label>Active Hours</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Click on time slots to toggle active hours. Green = Active, Empty = Inactive.
+                    </p>
+                    <WeeklyCalendarView
+                      schedule={weeklySchedule}
+                      onScheduleChange={setWeeklySchedule}
+                      onDayScheduleChange={() => {}}
+                      onTimeRangeChange={() => {}}
+                      onAddTimeRange={() => {}}
+                      onRemoveTimeRange={() => {}}
+                      onOpenCopyHours={() => {}}
+                      errors={{}}
+                      expandHeight
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Advanced Tab */}
+          <TabsContent value="advanced" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Advanced Settings</CardTitle>
+                <CardDescription>Additional configuration options</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Dial Timeout and Connect When */}
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dial_timeout">Dial Timeout (seconds)</Label>
                     <Input
@@ -569,6 +642,9 @@ export default function AutoDialerCampaignForm() {
                       min={1}
                       max={300}
                     />
+                    <p className="text-sm text-muted-foreground">
+                      Time to wait for call answer before timing out
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -587,93 +663,30 @@ export default function AutoDialerCampaignForm() {
                         <SelectItem value="immediately">Immediately</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Schedule Tab */}
-          <TabsContent value="schedule" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Campaign Schedule</CardTitle>
-                <CardDescription>Configure when the campaign should run</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Date and Timezone Row */}
-                <div className="flex gap-4">
-                  <div className="space-y-2" style={{ width: '40%' }}>
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Select
-                      value={watch('timezone')}
-                      onValueChange={(value) => setValue('timezone', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a timezone" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
-                        {regionOrder.map((region) => {
-                          const tzs = timezoneGroups[region];
-                          if (!tzs || tzs.length === 0) return null;
-                          return (
-                            <SelectGroup key={region}>
-                              <SelectLabel>{region}</SelectLabel>
-                              {tzs.map((tz) => (
-                                <SelectItem key={tz.value} value={tz.value}>
-                                  {formatTimezoneLabel(tz)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2" style={{ width: '30%' }}>
-                    <Label htmlFor="start_date">Start Date</Label>
-                    <Input id="start_date" type="date" {...register('start_date')} />
-                  </div>
-
-                  <div className="space-y-2" style={{ width: '30%' }}>
-                    <Label htmlFor="end_date">End Date</Label>
-                    <Input id="end_date" type="date" {...register('end_date')} />
+                    <p className="text-sm text-muted-foreground">
+                      When to connect the destination to the call
+                    </p>
                   </div>
                 </div>
 
-                {/* Active Hours Calendar */}
-                <div className="space-y-3 pt-4 border-t">
-                  <Label>Active Hours</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Click on time slots to toggle active hours. Green = Active, Empty = Inactive.
-                  </p>
-                  <WeeklyCalendarView
-                    schedule={weeklySchedule}
-                    onScheduleChange={setWeeklySchedule}
-                    onDayScheduleChange={() => {}}
-                    onTimeRangeChange={() => {}}
-                    onAddTimeRange={() => {}}
-                    onRemoveTimeRange={() => {}}
-                    onOpenCopyHours={() => {}}
-                    errors={{}}
-                    expandHeight
-                  />
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="auto_start">Auto-start Campaign</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically start the campaign when the scheduled time arrives
+                      </p>
+                    </div>
+                    <Switch
+                      id="auto_start"
+                      checked={watch('auto_start')}
+                      onCheckedChange={(checked) => setValue('auto_start', checked)}
+                    />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          {/* Advanced Tab */}
-          <TabsContent value="advanced" className="space-y-6 max-h-[calc(100vh-280px)] overflow-y-auto pr-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Advanced Settings</CardTitle>
-                <CardDescription>Additional configuration options</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
                 {/* CAC, CPS, and Max Dial Attempts */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4 border-t pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="concurrent_active_calls">Concurrent Active Calls (CAC)</Label>
                     <Input
