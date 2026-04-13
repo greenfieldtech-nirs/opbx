@@ -631,10 +631,40 @@ export default function AutoDialerCampaignForm() {
                 <CardDescription>Additional configuration options</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Dial Timeout and Connect When */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Row 1: Auto Start, Time Limit, Dial Timeout, Connect When */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="dial_timeout">Dial Timeout (seconds)</Label>
+                    <Label htmlFor="auto_start">Auto-start</Label>
+                    <Select
+                      value={watch('auto_start') ? 'true' : 'false'}
+                      onValueChange={(value) => setValue('auto_start', value === 'true')}
+                    >
+                      <SelectTrigger id="auto_start">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Enabled</SelectItem>
+                        <SelectItem value="false">Disabled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">Auto-start on schedule</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="time_limit">Time Limit (sec)</Label>
+                    <Input
+                      id="time_limit"
+                      type="number"
+                      {...register('time_limit', { valueAsNumber: true })}
+                      min={30}
+                      max={14400}
+                      placeholder="3600"
+                    />
+                    <p className="text-sm text-muted-foreground">Max call duration</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dial_timeout">Dial Timeout (sec)</Label>
                     <Input
                       id="dial_timeout"
                       type="number"
@@ -642,9 +672,7 @@ export default function AutoDialerCampaignForm() {
                       min={1}
                       max={300}
                     />
-                    <p className="text-sm text-muted-foreground">
-                      Time to wait for call answer before timing out
-                    </p>
+                    <p className="text-sm text-muted-foreground">Answer timeout</p>
                   </div>
 
                   <div className="space-y-2">
@@ -663,200 +691,167 @@ export default function AutoDialerCampaignForm() {
                         <SelectItem value="immediately">Immediately</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-sm text-muted-foreground">
-                      When to connect the destination to the call
-                    </p>
+                    <p className="text-sm text-muted-foreground">When to connect destination</p>
                   </div>
                 </div>
 
-                <div className="border-t pt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="auto_start">Auto-start Campaign</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically start the campaign when the scheduled time arrives
-                      </p>
+                {/* Row 2: Two Columns (50% / 50%) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
+                  {/* Left Column: CAC, CPS, Dial Attempts */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="concurrent_active_calls">Concurrent Active Calls (CAC)</Label>
+                      <Input
+                        id="concurrent_active_calls"
+                        type="number"
+                        {...register('concurrent_active_calls', { valueAsNumber: true })}
+                        min={1}
+                        max={50}
+                      />
+                      <p className="text-sm text-muted-foreground">Max simultaneous active calls (1–50)</p>
                     </div>
-                    <Switch
-                      id="auto_start"
-                      checked={watch('auto_start')}
-                      onCheckedChange={(checked) => setValue('auto_start', checked)}
-                    />
-                  </div>
-                </div>
 
-                {/* CAC, CPS, and Max Dial Attempts */}
-                <div className="grid grid-cols-3 gap-4 border-t pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="concurrent_active_calls">Concurrent Active Calls (CAC)</Label>
-                    <Input
-                      id="concurrent_active_calls"
-                      type="number"
-                      {...register('concurrent_active_calls', { valueAsNumber: true })}
-                      min={1}
-                      max={50}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Max simultaneous active calls (1–50)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="calls_per_second">Calls Per Second (CPS)</Label>
-                    <Select
-                      value={String(watch('calls_per_second'))}
-                      onValueChange={(value) => setValue('calls_per_second', parseInt(value))}
-                    >
-                      <SelectTrigger id="calls_per_second">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5].map((value) => (
-                          <SelectItem key={value} value={String(value)}>
-                            {value} call{value > 1 ? 's' : ''}/sec
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      Call initiation rate (1–5)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="max_dial_attempts">Max Dial Attempts</Label>
-                    <Input
-                      id="max_dial_attempts"
-                      type="number"
-                      {...register('max_dial_attempts', { valueAsNumber: true })}
-                      min={1}
-                      max={5}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Maximum retry attempts per destination
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="record_calls">Record Calls</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Record all calls for quality assurance
-                    </p>
-                  </div>
-                  <Switch
-                    id="record_calls"
-                    checked={watch('record_calls')}
-                    onCheckedChange={(checked) => setValue('record_calls', checked)}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="amd_enabled">Answering Machine Detection</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Detect if call is answered by human or machine
-                      </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="calls_per_second">Calls Per Second (CPS)</Label>
+                      <Select
+                        value={String(watch('calls_per_second'))}
+                        onValueChange={(value) => setValue('calls_per_second', parseInt(value))}
+                      >
+                        <SelectTrigger id="calls_per_second">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5].map((value) => (
+                            <SelectItem key={value} value={String(value)}>
+                              {value} call{value > 1 ? 's' : ''}/sec
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">Call initiation rate (1–5)</p>
                     </div>
-                    <Switch
-                      id="amd_enabled"
-                      checked={amdEnabled}
-                      onCheckedChange={(checked) => setValue('amd_enabled', checked)}
-                    />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="max_dial_attempts">Max Dial Attempts</Label>
+                      <Input
+                        id="max_dial_attempts"
+                        type="number"
+                        {...register('max_dial_attempts', { valueAsNumber: true })}
+                        min={1}
+                        max={5}
+                      />
+                      <p className="text-sm text-muted-foreground">Maximum retry attempts per destination</p>
+                    </div>
                   </div>
 
-                  {amdEnabled && (
-                    <div className="pl-6 space-y-4 border-l-2 border-muted">
-                      <div className="space-y-2">
-                        <Label htmlFor="amd_mode">AMD Mode</Label>
-                        <Select
-                          value={watch('amd_mode')}
-                          onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
-                            setValue('amd_mode', value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select AMD mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Enabled">Enabled</SelectItem>
-                            <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  {/* Right Column: Record Calls, Answering Machine Detection */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="record_calls">Record Calls</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Record all calls for quality assurance
+                        </p>
                       </div>
+                      <Switch
+                        id="record_calls"
+                        checked={watch('record_calls')}
+                        onCheckedChange={(checked) => setValue('record_calls', checked)}
+                      />
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="amd_timeout">
-                          Detection Timeout (seconds)
-                        </Label>
-                        <Input
-                          id="amd_timeout"
-                          type="number"
-                          {...register('amd_timeout', { valueAsNumber: true })}
-                          min={5}
-                          max={120}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="amd_enabled">Answering Machine Detection</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Detect if call is answered by human or machine
+                          </p>
+                        </div>
+                        <Switch
+                          id="amd_enabled"
+                          checked={amdEnabled}
+                          onCheckedChange={(checked) => setValue('amd_enabled', checked)}
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="amd_speech_threshold">
-                            Speech Threshold (ms)
-                          </Label>
-                          <Input
-                            id="amd_speech_threshold"
-                            type="number"
-                            {...register('amd_speech_threshold', { valueAsNumber: true })}
-                            min={500}
-                            max={5000}
-                          />
-                        </div>
+                      {amdEnabled && (
+                        <div className="pl-6 space-y-4 border-l-2 border-muted">
+                          <div className="space-y-2">
+                            <Label htmlFor="amd_mode">AMD Mode</Label>
+                            <Select
+                              value={watch('amd_mode')}
+                              onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
+                                setValue('amd_mode', value)
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select AMD mode" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Enabled">Enabled</SelectItem>
+                                <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="amd_speech_end_threshold">
-                            Speech End (ms)
-                          </Label>
-                          <Input
-                            id="amd_speech_end_threshold"
-                            type="number"
-                            {...register('amd_speech_end_threshold', { valueAsNumber: true })}
-                            min={500}
-                            max={5000}
-                          />
-                        </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="amd_timeout">
+                              Detection Timeout (seconds)
+                            </Label>
+                            <Input
+                              id="amd_timeout"
+                              type="number"
+                              {...register('amd_timeout', { valueAsNumber: true })}
+                              min={5}
+                              max={120}
+                            />
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="amd_silence_timeout">
-                            Silence Timeout (ms)
-                          </Label>
-                          <Input
-                            id="amd_silence_timeout"
-                            type="number"
-                            {...register('amd_silence_timeout', { valueAsNumber: true })}
-                            min={500}
-                            max={10000}
-                          />
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="amd_speech_threshold">
+                                Speech Threshold (ms)
+                              </Label>
+                              <Input
+                                id="amd_speech_threshold"
+                                type="number"
+                                {...register('amd_speech_threshold', { valueAsNumber: true })}
+                                min={500}
+                                max={5000}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="amd_speech_end_threshold">
+                                Speech End (ms)
+                              </Label>
+                              <Input
+                                id="amd_speech_end_threshold"
+                                type="number"
+                                {...register('amd_speech_end_threshold', { valueAsNumber: true })}
+                                min={500}
+                                max={5000}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="amd_silence_timeout">
+                                Silence Timeout (ms)
+                              </Label>
+                              <Input
+                                id="amd_silence_timeout"
+                                type="number"
+                                {...register('amd_silence_timeout', { valueAsNumber: true })}
+                                min={500}
+                                max={10000}
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="time_limit">Time Limit (seconds)</Label>
-                  <Input
-                    id="time_limit"
-                    type="number"
-                    {...register('time_limit', { valueAsNumber: true })}
-                    min={30}
-                    max={14400}
-                    placeholder="3600 (optional)"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Maximum call duration. Leave empty for no limit.
-                  </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
