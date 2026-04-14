@@ -350,6 +350,10 @@ class AlbsFollowThroughController extends Controller
             return $this->routeWebSocket($aiAssistant, $config, $provider, $callbackUrl, $request);
         }
 
+        if ($protocol === 'dummy') {
+            return $this->routeDummy($aiAssistant);
+        }
+
         return $this->routeSip($aiAssistant, $config, $provider, $callbackUrl, $request);
     }
 
@@ -658,6 +662,23 @@ class AlbsFollowThroughController extends Controller
     }
 
     /**
+     * Route to dummy AI Assistant.
+     */
+    private function routeDummy(AiAssistant $aiAssistant): Response
+    {
+        Log::info('ALBS Follow Through: Routing to Dummy AI provider', [
+            'ai_assistant_id' => $aiAssistant->id,
+            'ai_assistant_name' => $aiAssistant->name,
+        ]);
+
+        return response(
+            CxmlBuilder::dummyAiMessage(),
+            200,
+            ['Content-Type' => 'application/xml']
+        );
+    }
+
+    /**
      * Route to fallback AI Assistant.
      *
      * Reuses the existing routeToAssistant() method which handles
@@ -747,6 +768,10 @@ class AlbsFollowThroughController extends Controller
 
                 return $this->errorResponse('Fallback AI Assistant configuration error');
             }
+        }
+
+        if ($protocol === 'dummy') {
+            return $this->routeDummy($aiAssistant);
         }
 
         // SIP-based routing

@@ -89,7 +89,7 @@ export default function AiAssistants() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [protocolFilter, setProtocolFilter] = useState<'all' | 'sip' | 'websocket'>('all');
+  const [protocolFilter, setProtocolFilter] = useState<'all' | 'sip' | 'websocket' | 'dummy'>('all');
   const [providerFilter, setProviderFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<'name' | 'provider' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -303,16 +303,22 @@ export default function AiAssistants() {
         const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
         const protocol = assistant.protocol || provider?.protocol || 'sip';
         const isWebSocket = protocol === 'websocket';
+        const isDummy = protocol === 'dummy';
         
         return (
           <Badge
-            variant={isWebSocket ? 'default' : 'secondary'}
+            variant={isWebSocket ? 'default' : isDummy ? 'outline' : 'secondary'}
             className="text-xs"
           >
             {isWebSocket ? (
               <>
                 <Wifi className="h-3 w-3 mr-1" />
                 WebSocket
+              </>
+            ) : isDummy ? (
+              <>
+                <Bot className="h-3 w-3 mr-1" />
+                Dummy
               </>
             ) : (
               <>
@@ -449,6 +455,7 @@ export default function AiAssistants() {
                 <SelectItem value="all">All Protocols</SelectItem>
                 <SelectItem value="sip">SIP</SelectItem>
                 <SelectItem value="websocket">WebSocket</SelectItem>
+                <SelectItem value="dummy">Dummy</SelectItem>
               </SelectContent>
             </Select>
 
@@ -683,11 +690,16 @@ export default function AiAssistants() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Protocol:</span>
-                      <Badge variant={selectedAssistant.protocol === 'websocket' ? 'default' : 'secondary'}>
+                      <Badge variant={selectedAssistant.protocol === 'websocket' ? 'default' : selectedAssistant.protocol === 'dummy' ? 'outline' : 'secondary'}>
                         {selectedAssistant.protocol === 'websocket' ? (
                           <>
                             <Wifi className="h-3 w-3 mr-1" />
                             WebSocket
+                          </>
+                        ) : selectedAssistant.protocol === 'dummy' ? (
+                          <>
+                            <Bot className="h-3 w-3 mr-1" />
+                            Dummy
                           </>
                         ) : (
                           <>

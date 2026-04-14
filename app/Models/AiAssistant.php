@@ -209,6 +209,14 @@ class AiAssistant extends Model
     }
 
     /**
+     * Check if this AI assistant uses the dummy protocol.
+     */
+    public function isDummy(): bool
+    {
+        return $this->protocol === 'dummy';
+    }
+
+    /**
      * Get usage count for this AI assistant.
      */
     public function getUsageCountAttribute(): int

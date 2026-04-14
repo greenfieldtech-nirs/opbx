@@ -34,6 +34,7 @@ class AiAssistantProviderController extends Controller
         $grouped = [
             'sip' => [],
             'websocket' => [],
+            'dummy' => [],
         ];
 
         $providersArray = [];
@@ -47,7 +48,7 @@ class AiAssistantProviderController extends Controller
             'data' => [
                 'providers' => $providersArray,
                 'grouped' => $grouped,
-                'protocols' => ['sip', 'websocket'],
+                'protocols' => ['sip', 'websocket', 'dummy'],
             ],
         ]);
     }
@@ -75,9 +76,9 @@ class AiAssistantProviderController extends Controller
      */
     public function byProtocol(string $protocol): JsonResponse
     {
-        if (! in_array($protocol, ['sip', 'websocket'])) {
+        if (! in_array($protocol, ['sip', 'websocket', 'dummy'])) {
             return response()->json([
-                'message' => 'Invalid protocol. Must be "sip" or "websocket".',
+                'message' => 'Invalid protocol. Must be "sip", "websocket", or "dummy".',
             ], 400);
         }
 

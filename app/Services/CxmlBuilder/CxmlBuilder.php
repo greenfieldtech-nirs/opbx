@@ -387,6 +387,18 @@ class CxmlBuilder
     }
 
     /**
+     * Build a dummy AI assistant response with a fixed message and hangup.
+     */
+    public static function dummyAiMessage(): string
+    {
+        $builder = new self;
+        $builder->say('Hi There, this is not an AI assistant, this is just a small dummy audio message, that will ensure that your routing setup is functional and working. Thank you for using Cloudonix and O.P.B.X')
+            ->hangup();
+
+        return $builder->build();
+    }
+
+    /**
      * Build service provider dialing response.
      *
      * @param  string  $serviceUrl  The service provider URL

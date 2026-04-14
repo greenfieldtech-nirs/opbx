@@ -53,7 +53,7 @@ class UpdateCampaignRequest extends FormRequest
             'caller_id' => ['sometimes', 'string', 'regex:/^\+[1-9]\d{1,14}$/'],
             'max_dial_attempts' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'concurrent_active_calls' => ['sometimes', 'integer', 'min:1', 'max:50'],
-            'calls_per_second' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'calls_per_second' => ['sometimes', 'integer', 'min:1', 'max:30'],
 
             // Scheduling - new format with full schedule object
             'schedule' => ['sometimes', 'array'],

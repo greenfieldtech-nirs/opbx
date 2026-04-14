@@ -412,5 +412,15 @@ class ProviderRegistry
             ],
             description: 'DeepDub WebSocket-based AI assistant',
         ));
+
+        // Dummy test provider (no external connection)
+        $this->register(new ProviderDefinition(
+            key: 'dummy_ai',
+            name: 'Dummy Test',
+            protocol: 'dummy',
+            urlTemplate: null,
+            configFields: [],
+            description: 'Local dummy provider that plays a test message and hangs up. Useful for verifying routing configuration without connecting to a real AI service.',
+        ));
     }
 }

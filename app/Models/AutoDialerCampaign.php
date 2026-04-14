@@ -32,7 +32,7 @@ class AutoDialerCampaign extends Model
      *
      * CAC determines the maximum number of calls that can be active
      * (ringing or connected) at the same time. Valid range: 1–50.
-     * CPS (Calls Per Second) controls initiation rate. Valid range: 1–5.
+     * CPS (Calls Per Second) controls initiation rate. Valid range: 1–30.
      */
     public const MIN_CAC = 1;
 
@@ -40,7 +40,7 @@ class AutoDialerCampaign extends Model
 
     public const MIN_CPS = 1;
 
-    public const MAX_CPS = 5;
+    public const MAX_CPS = 30;
 
     /**
      * The attributes that are mass assignable.
@@ -60,7 +60,7 @@ class AutoDialerCampaign extends Model
         'caller_id',
         'max_dial_attempts',
         'concurrent_active_calls', // Max concurrent active calls (CAC, 1-50)
-        'calls_per_second',        // Call initiation rate (CPS, 1-5)
+        'calls_per_second',        // Call initiation rate (CPS, 1-30)
         'days_active',
         'start_time',
         'end_time',
@@ -339,6 +339,8 @@ class AutoDialerCampaign extends Model
      *   CPS = 1 → 1000ms between calls
      *   CPS = 2 → 500ms between calls
      *   CPS = 5 → 200ms between calls
+     *   CPS = 10 → 100ms between calls
+     *   CPS = 30 → ~33ms between calls
      *
      * @return float The interval in milliseconds between call initiations
      */
@@ -364,7 +366,7 @@ class AutoDialerCampaign extends Model
     }
 
     /**
-     * Check if the current CPS value is valid (1–5).
+     * Check if the current CPS value is valid (1–30).
      */
     public function hasValidCps(): bool
     {

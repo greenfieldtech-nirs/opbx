@@ -779,7 +779,7 @@ class CloudonixWebhookController extends Controller
             // Decrement the CAC counter directly in Redis.
             // The Go worker increments this when initiating calls but has no
             // Pub/Sub subscriber to decrement it — Laravel handles this directly.
-            $this->decrementCacCounter($session->campaign_id);
+            $this->decrementCacCounter($session->campaign_id, $session->session_token);
 
             // Also publish CDR event to Redis channel for any future subscribers
             $this->cdrPublisher->publish(
@@ -818,19 +818,28 @@ class CloudonixWebhookController extends Controller
      * The Go dialer worker increments this counter when initiating a call.
      * Laravel decrements it directly when processing CDR webhooks, since the
      * worker has no Pub/Sub subscriber for the cdr:completed channel.
-     */
-    /**
-     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
+     * Idempotency is enforced per session token so a completed call only
+     * decrements the counter once, even if multiple webhooks arrive.
      *
      * Uses the 'dialer' connection (no key prefix) because the Go worker
      * writes raw keys like dialer:cac:{id}:active without any prefix.
      * The default Laravel Redis connection adds a prefix, which would
      * cause Laravel and the Go worker to read/write different keys.
      */
-    private function decrementCacCounter(int $campaignId): void
+    private function decrementCacCounter(int $campaignId, string $sessionToken): void
     {
         try {
             $redis = Redis::connection('dialer');
+
+            $idempotencyKey = "dialer:cac:decremented:{$sessionToken}";
+            if ($redis->get($idempotencyKey)) {
+                Log::info('CAC decrement already processed for session', [
+                    'campaign_id' => $campaignId,
+                    'session_token' => $sessionToken,
+                ]);
+
+                return;
+            }
 
             $workerKey = "dialer:cac:{$campaignId}:active";
             $newCount = $redis->decr($workerKey);
@@ -841,13 +850,17 @@ class CloudonixWebhookController extends Controller
                 $newCount = 0;
             }
 
+            $redis->setex($idempotencyKey, 86400, '1');
+
             Log::info('CAC counter decremented', [
                 'campaign_id' => $campaignId,
                 'active_calls' => $newCount,
+                'session_token' => $sessionToken,
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to decrement CAC counter', [
                 'campaign_id' => $campaignId,
+                'session_token' => $sessionToken,
                 'error' => $e->getMessage(),
             ]);
         }
