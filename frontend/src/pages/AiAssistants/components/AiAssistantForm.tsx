@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Wifi, Phone } from 'lucide-react';
+import { Wifi, Phone, Bot } from 'lucide-react';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 
 interface FormData {
@@ -66,6 +66,7 @@ export function AiAssistantForm({
   // Group providers by protocol
   const sipProviders = providers.filter((p) => p.protocol === 'sip');
   const websocketProviders = providers.filter((p) => p.protocol === 'websocket');
+  const dummyProviders = providers.filter((p) => p.protocol === 'dummy');
 
   return (
     <div className="space-y-4">
@@ -113,6 +114,19 @@ export function AiAssistantForm({
                   WebSocket Providers
                 </div>
                 {websocketProviders.map((provider) => (
+                  <SelectItem key={provider.key} value={provider.key}>
+                    {provider.name}
+                  </SelectItem>
+                ))}
+              </>
+            )}
+            {dummyProviders.length > 0 && (
+              <>
+                <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2 mt-2">
+                  <Bot className="h-3 w-3" />
+                  Test Providers
+                </div>
+                {dummyProviders.map((provider) => (
                   <SelectItem key={provider.key} value={provider.key}>
                     {provider.name}
                   </SelectItem>

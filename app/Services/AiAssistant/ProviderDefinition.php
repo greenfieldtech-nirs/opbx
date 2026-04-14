@@ -43,6 +43,14 @@ class ProviderDefinition
     }
 
     /**
+     * Check if this is a dummy/test provider.
+     */
+    public function isDummyProvider(): bool
+    {
+        return $this->protocol === 'dummy';
+    }
+
+    /**
      * Convert to array representation.
      *
      * @return array<string, mixed>

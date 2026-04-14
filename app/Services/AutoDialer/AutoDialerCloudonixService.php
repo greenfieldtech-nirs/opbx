@@ -331,6 +331,10 @@ class AutoDialerCloudonixService
             return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $cloudonixParams);
         }
 
+        if ($protocol === 'dummy') {
+            return $this->generateDummyCxml($aiAssistant);
+        }
+
         return $this->generateSipCxml($aiAssistant, $config, $provider);
     }
 
@@ -385,6 +389,21 @@ class AutoDialerCloudonixService
 
         // Generate CXML with Connect>Stream verb
         return CxmlBuilder::streamToWebSocket($websocketUrl);
+    }
+
+    /**
+     * Generate CXML for dummy AI Assistant.
+     *
+     * @param  AiAssistant  $aiAssistant  The AI assistant
+     * @return string The generated CXML
+     */
+    private function generateDummyCxml(AiAssistant $aiAssistant): string
+    {
+        Log::debug('AutoDialer: Using dummy AI provider', [
+            'ai_assistant_id' => $aiAssistant->id,
+        ]);
+
+        return CxmlBuilder::dummyAiMessage();
     }
 
     /**
@@ -506,6 +525,10 @@ class AutoDialerCloudonixService
 
         if ($protocol === 'websocket') {
             return $this->generateWebSocketCxmlWithAction($aiAssistant, $config, $provider, $cloudonixParams, $callbackUrl);
+        }
+
+        if ($protocol === 'dummy') {
+            return $this->generateDummyCxml($aiAssistant);
         }
 
         return $this->generateSipCxmlWithAction($aiAssistant, $config, $provider, $callbackUrl);

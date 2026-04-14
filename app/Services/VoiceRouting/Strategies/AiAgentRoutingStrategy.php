@@ -67,6 +67,8 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         // Route based on protocol
         if ($protocol === 'websocket') {
             return $this->routeWebSocket($request, $aiAssistant, $config, $provider, $extension);
+        } elseif ($protocol === 'dummy') {
+            return $this->routeDummy($aiAssistant, $extension);
         } else {
             return $this->routeSip($aiAssistant, $config, $provider, $extension);
         }
@@ -152,6 +154,29 @@ class AiAgentRoutingStrategy implements RoutingStrategy
                 ['Content-Type' => 'application/xml']
             );
         }
+    }
+
+    /**
+     * Route call to dummy AI provider.
+     *
+     * Returns a simple CXML response with a test message and hangup.
+     */
+    private function routeDummy(
+        \App\Models\AiAssistant $aiAssistant,
+        ?Extension $extension = null
+    ): Response {
+        Log::info('Routing to Dummy AI provider', [
+            'ai_assistant_id' => $aiAssistant->id,
+            'ai_assistant_name' => $aiAssistant->name,
+            'extension_id' => $extension?->id,
+            'extension_number' => $extension?->extension_number,
+        ]);
+
+        return response(
+            CxmlBuilder::dummyAiMessage(),
+            200,
+            ['Content-Type' => 'application/xml']
+        );
     }
 
     /**

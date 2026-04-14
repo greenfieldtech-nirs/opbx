@@ -2,7 +2,7 @@
  * AI Assistant Provider Types
  */
 
-export type ProviderProtocol = 'sip' | 'websocket';
+export type ProviderProtocol = 'sip' | 'websocket' | 'dummy';
 
 export interface ProviderConfigField {
   name: string;
@@ -29,6 +29,7 @@ export interface ProvidersResponse {
     grouped: {
       sip: ProviderDefinition[];
       websocket: ProviderDefinition[];
+      dummy: ProviderDefinition[];
     };
     protocols: ProviderProtocol[];
   };

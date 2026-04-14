@@ -24,7 +24,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_can_get_all_providers(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers');
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -33,6 +33,7 @@ class AiAssistantProviderTest extends TestCase
                 'grouped' => [
                     'sip',
                     'websocket',
+                    'dummy',
                 ],
                 'protocols',
             ],
@@ -43,17 +44,18 @@ class AiAssistantProviderTest extends TestCase
         // Should have providers
         $this->assertNotEmpty($data['providers']);
 
-        // Should have both SIP and WebSocket providers
+        // Should have SIP, WebSocket, and Dummy providers
         $this->assertNotEmpty($data['grouped']['sip']);
         $this->assertNotEmpty($data['grouped']['websocket']);
+        $this->assertNotEmpty($data['grouped']['dummy']);
 
         // Should have protocol list
-        $this->assertEquals(['sip', 'websocket'], $data['protocols']);
+        $this->assertEquals(['sip', 'websocket', 'dummy'], $data['protocols']);
     }
 
     public function test_provider_has_required_fields(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers');
 
         $response->assertStatus(200);
 
@@ -70,7 +72,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_can_get_specific_provider(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/vapi');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/vapi');
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -92,7 +94,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_returns_404_for_unknown_provider(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/unknown');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/unknown');
 
         $response->assertStatus(404);
         $response->assertJson([
@@ -102,7 +104,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_can_get_providers_by_protocol(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/protocol/sip');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/protocol/sip');
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -126,7 +128,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_can_get_websocket_providers(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/protocol/websocket');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/protocol/websocket');
 
         $response->assertStatus(200);
 
@@ -141,24 +143,39 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_returns_400_for_invalid_protocol(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/protocol/invalid');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/protocol/invalid');
 
         $response->assertStatus(400);
         $response->assertJson([
-            'message' => 'Invalid protocol. Must be "sip" or "websocket".',
+            'message' => 'Invalid protocol. Must be "sip", "websocket", or "dummy".',
         ]);
+    }
+
+    public function test_can_get_dummy_providers(): void
+    {
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/protocol/dummy');
+
+        $response->assertStatus(200);
+
+        $providers = $response->json('data');
+
+        // All providers should have dummy protocol
+        foreach ($providers as $provider) {
+            $this->assertEquals('dummy', $provider['protocol']);
+            $this->assertEmpty($provider['config_fields']);
+        }
     }
 
     public function test_requires_authentication(): void
     {
-        $response = $this->getJson('/api/ai-assistant/providers');
+        $response = $this->getJson('/api/v1/ai-assistant/providers');
 
         $response->assertStatus(401);
     }
 
     public function test_sip_providers_have_phone_number_field(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/protocol/sip');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/protocol/sip');
 
         $providers = $response->json('data');
 
@@ -175,7 +192,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_websocket_providers_have_required_config_fields(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/protocol/websocket');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/protocol/websocket');
 
         $providers = $response->json('data');
 
@@ -196,7 +213,7 @@ class AiAssistantProviderTest extends TestCase
 
     public function test_deepdub_provider_configuration(): void
     {
-        $response = $this->actingAs($this->user)->getJson('/api/ai-assistant/providers/deepdub');
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/deepdub');
 
         $response->assertStatus(200);
 

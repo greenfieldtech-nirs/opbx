@@ -54,6 +54,7 @@ class ProviderRegistryTest extends TestCase
             $this->assertEquals('sip', $provider->protocol);
             $this->assertTrue($provider->isSipProvider());
             $this->assertFalse($provider->isWebSocketProvider());
+            $this->assertFalse($provider->isDummyProvider());
         }
     }
 
@@ -68,7 +69,23 @@ class ProviderRegistryTest extends TestCase
             $this->assertEquals('websocket', $provider->protocol);
             $this->assertTrue($provider->isWebSocketProvider());
             $this->assertFalse($provider->isSipProvider());
+            $this->assertFalse($provider->isDummyProvider());
             $this->assertNotNull($provider->urlTemplate);
+        }
+    }
+
+    public function test_can_filter_dummy_providers(): void
+    {
+        $dummyProviders = $this->registry->getProvidersByProtocol('dummy');
+
+        $this->assertIsArray($dummyProviders);
+        $this->assertNotEmpty($dummyProviders);
+
+        foreach ($dummyProviders as $provider) {
+            $this->assertEquals('dummy', $provider->protocol);
+            $this->assertTrue($provider->isDummyProvider());
+            $this->assertFalse($provider->isSipProvider());
+            $this->assertFalse($provider->isWebSocketProvider());
         }
     }
 
@@ -110,6 +127,19 @@ class ProviderRegistryTest extends TestCase
         $this->assertEquals('websocket', $provider->protocol);
         $this->assertStringStartsWith('wss://', $provider->urlTemplate);
         $this->assertNotEmpty($provider->configFields);
+    }
+
+    public function test_dummy_provider_is_registered(): void
+    {
+        $provider = $this->registry->getProvider('dummy_ai');
+
+        $this->assertNotNull($provider);
+        $this->assertEquals('dummy_ai', $provider->key);
+        $this->assertEquals('Dummy Test', $provider->name);
+        $this->assertEquals('dummy', $provider->protocol);
+        $this->assertTrue($provider->isDummyProvider());
+        $this->assertEmpty($provider->configFields);
+        $this->assertNull($provider->urlTemplate);
     }
 
     public function test_sip_providers_have_phone_number_field(): void

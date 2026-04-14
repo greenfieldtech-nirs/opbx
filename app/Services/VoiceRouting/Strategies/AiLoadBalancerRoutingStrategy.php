@@ -194,6 +194,10 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->routeWebSocket($aiAssistant, $aiLoadBalancer, $config, $provider, $request);
         }
 
+        if ($protocol === 'dummy') {
+            return $this->routeDummy($aiAssistant, $aiLoadBalancer);
+        }
+
         return $this->routeSip($aiAssistant, $aiLoadBalancer, $config, $provider, $request);
     }
 
@@ -271,6 +275,21 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
                 ['Content-Type' => 'application/xml']
             );
         }
+    }
+
+    private function routeDummy(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer): Response
+    {
+        Log::info('AiLoadBalancerRoutingStrategy: Routing to Dummy AI provider', [
+            'ai_assistant_id' => $aiAssistant->id,
+            'ai_assistant_name' => $aiAssistant->name,
+            'ai_load_balancer_id' => $aiLoadBalancer->id,
+        ]);
+
+        return response(
+            CxmlBuilder::dummyAiMessage(),
+            200,
+            ['Content-Type' => 'application/xml']
+        );
     }
 
     private function routeSip(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, array $config, ?string $provider, Request $request): Response
