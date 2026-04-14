@@ -103,7 +103,7 @@ export const campaignSchema = z.object({
     .number()
     .int()
     .min(1, 'Must be at least 1 call per second')
-    .max(10, 'Cannot exceed 10 calls per second'),
+    .max(30, 'Cannot exceed 30 calls per second'),
 
   // Schedule configuration
   schedule: weeklyScheduleSchema,

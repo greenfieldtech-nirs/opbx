@@ -8,7 +8,7 @@ export interface AiAssistant {
   description: string | null;
   status: 'active' | 'inactive';
   provider: string;
-  protocol: 'sip' | 'websocket';
+  protocol: 'sip' | 'websocket' | 'dummy';
   configuration: Record<string, any>;
   usage_count?: number;
   used_by_extensions?: Array<{
@@ -35,7 +35,7 @@ export interface AiAssistantFilters {
   per_page?: number;
   search?: string;
   status?: 'active' | 'inactive';
-  protocol?: 'sip' | 'websocket';
+  protocol?: 'sip' | 'websocket' | 'dummy';
   provider?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';

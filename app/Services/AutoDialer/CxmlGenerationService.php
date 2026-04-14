@@ -91,6 +91,10 @@ class CxmlGenerationService
             return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $params);
         }
 
+        if ($protocol === 'dummy') {
+            return $this->generateDummyCxml($aiAssistant);
+        }
+
         return $this->generateSipCxml($aiAssistant, $config, $provider, $params);
     }
 
@@ -136,6 +140,21 @@ class CxmlGenerationService
 
         // Generate CXML with Connect>Stream verb
         return CxmlBuilder::streamToWebSocket($websocketUrl);
+    }
+
+    /**
+     * Generate CXML for dummy AI Assistant.
+     *
+     * @param  AiAssistant  $aiAssistant  The AI assistant
+     * @return string The generated CXML
+     */
+    public function generateDummyCxml(AiAssistant $aiAssistant): string
+    {
+        Log::debug('DialerWorker: Using dummy AI provider', [
+            'ai_assistant_id' => $aiAssistant->id,
+        ]);
+
+        return CxmlBuilder::dummyAiMessage();
     }
 
     /**
@@ -208,6 +227,10 @@ class CxmlGenerationService
 
         if ($protocol === 'websocket') {
             return $this->generateWebSocketCxml($aiAssistant, $config, $provider, $params);
+        }
+
+        if ($protocol === 'dummy') {
+            return $this->generateDummyCxml($aiAssistant);
         }
 
         return $this->generateSipCxml($aiAssistant, $config, $provider, $params);
