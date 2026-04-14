@@ -37,7 +37,7 @@ func NewCACRateLimiter(redisClient *redis.Client) *CACRateLimiter {
 }
 
 // RegisterCampaign registers a campaign for rate limiting.
-// CAC = max concurrent active calls (1-50), CPS = calls per second (1-5).
+// CAC = max concurrent active calls (1-50), CPS = calls per second (1-30).
 func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -46,8 +46,8 @@ func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	if cps < 1 {
 		cps = 1
 	}
-	if cps > 5 {
-		cps = 5
+	if cps > 30 {
+		cps = 30
 	}
 
 	// Calculate minimum interval between calls from CPS: 1000/CPS milliseconds

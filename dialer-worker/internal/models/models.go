@@ -16,7 +16,7 @@ type Campaign struct {
 	Name                   string   `json:"name"`
 	Status                 string   `json:"status"`
 	CAC                    int      `json:"concurrent_active_calls"`  // Concurrent Active Calls (1-50)
-	CPS                    int      `json:"calls_per_second"`         // Calls Per Second (1-5)
+	CPS                    int      `json:"calls_per_second"`         // Calls Per Second (1-30)
 	MaxDialAttempts        int      `json:"max_dial_attempts"`        // Maximum retry attempts
 	CallerID               string   `json:"caller_id"`                // Outbound caller ID
 	DialTimeout            int      `json:"dial_timeout"`             // Ring timeout in seconds

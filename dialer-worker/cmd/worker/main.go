@@ -197,6 +197,9 @@ func (w *Worker) processCampaign(ctx context.Context, campaign *models.Campaign)
 	if cps < 1 {
 		cps = 1
 	}
+	if cps > 30 {
+		cps = 30
+	}
 	pollIntervalSec := int(w.config.PollInterval.Seconds())
 	if pollIntervalSec < 1 {
 		pollIntervalSec = 10
