@@ -113,10 +113,9 @@ class SimulateOutboundCall extends Command
         if (empty($webhookBase) || str_contains($webhookBase, 'localhost')) {
             $this->error("❌ Invalid webhook base URL: {$webhookBase}");
             $this->error("   Please configure webhook_base_url in CloudonixSettings for organization {$campaign->organization_id}");
-            $this->error('   Or set a proper WEBHOOK_BASE_URL in your .env file');
             $this->error('   For local testing with ngrok:');
             $this->error('   1. Run: ngrok http 80');
-            $this->error('   2. Update CloudonixSettings.webhook_base_url to your ngrok URL');
+            $this->error('   2. Update Settings → Cloudonix in the OPBX admin UI');
 
             return self::FAILURE;
         }
