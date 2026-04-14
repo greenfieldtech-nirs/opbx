@@ -94,7 +94,7 @@ const campaignSchema = z.object({
   ).max(100, 'Maximum 100 Caller IDs allowed'),
   max_dial_attempts: z.number().min(1).max(5).default(1),
   concurrent_active_calls: z.number().min(1).max(50).default(1),
-  calls_per_second: z.number().min(1).max(5).default(1),
+  calls_per_second: z.number().min(1).max(30).default(1),
   days_active: z.array(z.string()).min(1, 'Select at least one day'),
   start_time: z.number().min(0).max(23).default(9),
   end_time: z.number().min(0).max(23).default(17),
@@ -727,14 +727,14 @@ export default function AutoDialerCampaignForm() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {[1, 2, 3, 4, 5].map((value) => (
+                          {[1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 25, 30].map((value) => (
                             <SelectItem key={value} value={String(value)}>
                               {value} call{value > 1 ? 's' : ''}/sec
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-sm text-muted-foreground">Call initiation rate (1–5)</p>
+                      <p className="text-sm text-muted-foreground">Call initiation rate (1–30)</p>
                     </div>
 
                     <div className="space-y-2">
