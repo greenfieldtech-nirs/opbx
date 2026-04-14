@@ -267,6 +267,42 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # AMD Worker - Node.js voicemail detection service
+  # Receives audio streams from Cloudonix via nginx WebSocket proxy at /ws/amd/
+  # Reports detection results to Laravel via internal HTTP
+  amd-worker:
+    build:
+      context: ./amd-worker
+      dockerfile: Dockerfile
+    container_name: opbx_amd_worker
+    restart: unless-stopped
+    # No external ports - all traffic proxied through nginx
+    environment:
+      - AMD_WEBSOCKET_PORT=8082
+      - AMD_HTTP_PORT=8083
+      - OPBX_API_URL=http://nginx
+      - AMD_WORKER_API_TOKEN=${AMD_WORKER_API_TOKEN:-dev-amd-token-change-in-production}
+      - AMD_MODEL_PATH=/app/models/beep_detector.onnx
+      - AMD_MAX_CONCURRENT_STREAMS=${AMD_MAX_CONCURRENT_STREAMS:-100}
+      - AMD_DEFAULT_TIMEOUT_SECONDS=30
+      - AMD_LOG_LEVEL=info
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - ./amd-worker/models:/app/models:ro
+    depends_on:
+      - nginx
+      - redis
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8083/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - opbx
+
   # Auto Dialer Worker - Go-based service for outbound campaigns
   # Receives CDR events from Laravel via webhook at /webhooks/cdr
   dialer-worker:
