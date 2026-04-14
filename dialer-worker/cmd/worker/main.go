@@ -158,6 +158,13 @@ func (w *Worker) processCampaigns() {
 		// Register with rate limiter
 		w.limiter.RegisterCampaign(campaign.ID, campaign.CAC, campaign.CPS)
 
+		// Reconcile active calls counter to self-heal any drift
+		if reconciledCount, didReconcile, err := w.redisClient.ReconcileActiveCalls(ctx, campaign.ID); err != nil {
+			w.logger.Error("failed to reconcile active calls", "campaign_id", campaign.ID, "error", err)
+		} else if didReconcile {
+			w.logger.Info("reconciled active calls counter", "campaign_id", campaign.ID, "new_count", reconciledCount)
+		}
+
 		// Skip if this campaign is already being processed by a previous cycle's goroutine
 		if _, alreadyProcessing := w.processingCampaigns.LoadOrStore(campaign.ID, true); alreadyProcessing {
 			w.logger.Info("campaign already being processed, skipping", "id", campaign.ID)
