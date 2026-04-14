@@ -68,31 +68,32 @@ func (rl *CACRateLimiter) UnregisterCampaign(campaignID int64) {
 	delete(rl.campaigns, campaignID)
 }
 
-// CanDial checks if a call can be dialed for the given campaign
-func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, error) {
+// CanDial checks if a call can be dialed for the given campaign.
+// Returns true, the new active call count, and nil error if a slot was reserved.
+func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, int64, error) {
 	rl.mu.RLock()
 	limiter, exists := rl.campaigns[campaignID]
 	rl.mu.RUnlock()
 
 	if !exists {
-		return false, fmt.Errorf("campaign %d not registered", campaignID)
+		return false, 0, fmt.Errorf("campaign %d not registered", campaignID)
 	}
 
 	// Check minimum interval between calls first (local check)
 	now := time.Now()
 	if now.Sub(limiter.LastCallTime) < limiter.MinInterval {
-		return false, nil // Rate limited by time
+		return false, 0, nil // Rate limited by time
 	}
 
 	// Check CAC limit atomically using Redis Lua script
 	key := fmt.Sprintf("dialer:cac:%d:active", campaignID)
 	newCount, acquired, err := rl.redis.IncrementIfBelow(ctx, key, int64(limiter.CAC))
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	if !acquired {
-		return false, nil // CAC limit reached
+		return false, newCount, nil // CAC limit reached
 	}
 
 	// Update local cache of active calls
@@ -102,7 +103,7 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 	}
 	rl.mu.Unlock()
 
-	return true, nil
+	return true, newCount, nil
 }
 
 // WaitTime returns how long to wait before next call can be made

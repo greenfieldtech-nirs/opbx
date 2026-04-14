@@ -77,8 +77,8 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 	}
 	defer e.redisClient.ReleaseLock(ctx, lockKey)
 
-	// Check CAC availability
-	canDial, err := e.limiter.CanDial(ctx, campaign.ID)
+	// Check CAC availability (reserves a slot if available)
+	canDial, activeCount, err := e.limiter.CanDial(ctx, campaign.ID)
 	if err != nil {
 		logger.Error("failed to check CAC", "error", err)
 		return err
@@ -117,6 +117,10 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 	)
 	if err != nil {
 		logger.Error("failed to initiate call", "error", err)
+		// Roll back the CAC slot reserved by CanDial
+		if _, decErr := e.limiter.DecrementActive(ctx, campaign.ID); decErr != nil {
+			logger.Error("failed to decrement active count after initiation failure", "error", decErr)
+		}
 		// Mark this DID as tried for retry tracking
 		if campaign.CallerIDPoolEnabled {
 			if markErr := e.retryTracker.MarkDIDAsTried(ctx, campaign.ID, destination.ID, selectedCallerID.DIDID); markErr != nil {
@@ -124,12 +128,6 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 			}
 		}
 		return e.handleInitiationFailure(ctx, campaign, destination, err)
-	}
-
-	// Increment active call count
-	activeCount, err := e.limiter.IncrementActive(ctx, campaign.ID)
-	if err != nil {
-		logger.Error("failed to increment active count", "error", err)
 	}
 
 	// Parse session ID from response
