@@ -328,22 +328,21 @@ See `.env.example` for all available configuration options. Key variables:
 
 | Variable | Description |
 |----------|-------------|
-| `WEBHOOK_BASE_URL` | Public URL for webhooks (ngrok URL for local dev) |
 | `REDIS_PASSWORD` | Redis authentication password |
 | `DB_PASSWORD` | MySQL database password |
 | `NGROK_AUTHTOKEN` | ngrok authentication token |
 
 ### Cloudonix Webhook Configuration
 
-Configure these webhook URLs in your Cloudonix portal:
+Webhooks are configured per-organization in **Settings → Cloudonix** in the admin UI. Configure these webhook URLs in your Cloudonix portal (replace `{YOUR_WEBHOOK_URL}` with your organization's webhook base URL):
 
 | Event | URL |
 |-------|-----|
-| Voice Application | `{WEBHOOK_BASE_URL}/api/voice/route` |
-| IVR Input | `{WEBHOOK_BASE_URL}/api/voice/ivr-input` |
-| CDR | `{WEBHOOK_BASE_URL}/api/webhooks/cloudonix/cdr` |
-| Session Update | `{WEBHOOK_BASE_URL}/api/webhooks/cloudonix/session-update` |
-| Call Status | `{WEBHOOK_BASE_URL}/api/webhooks/cloudonix/call-status` |
+| Voice Application | `{YOUR_WEBHOOK_URL}/api/voice/route` |
+| IVR Input | `{YOUR_WEBHOOK_URL}/api/voice/ivr-input` |
+| CDR | `{YOUR_WEBHOOK_URL}/api/webhooks/cloudonix/cdr` |
+| Session Update | `{YOUR_WEBHOOK_URL}/api/webhooks/cloudonix/session-update` |
+| Call Status | `{YOUR_WEBHOOK_URL}/api/webhooks/cloudonix/call-status` |
 
 ---
 

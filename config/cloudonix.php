@@ -28,4 +28,17 @@ return [
     */
 
     'sip_server' => env('CLOUDONIX_SIP_SERVER', 'sip.cloudonix.io'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | CXML Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Default timeout for CXML verb responses.
+    |
+    */
+
+    'cxml' => [
+        'default_timeout' => env('CXML_DEFAULT_TIMEOUT', 30),
+    ],
 ];

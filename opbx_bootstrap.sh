@@ -318,12 +318,6 @@ if [ -z "$CLOUDONIX_TOKEN" ]; then
     echo "    Get your token from https://developers.cloudonix.com"
 fi
 
-WEBHOOK_URL=$(grep "^WEBHOOK_BASE_URL=" .env | cut -d '=' -f2-)
-if [ "$WEBHOOK_URL" = "https://your-domain.com" ] || [ -z "$WEBHOOK_URL" ]; then
-    print_warning "WEBHOOK_BASE_URL is not configured (required for production)"
-    echo "    For local development, ngrok runs in Docker - see instructions below"
-fi
-
 print_header "Step 6: Pre-flight Summary"
 
 print_success "All pre-flight checks passed!"
@@ -373,10 +367,10 @@ echo "  3. Get your ngrok public URL:"
 echo "     - Web UI: http://localhost:4040"
 echo "     - API: curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'"
 echo ""
-echo "  4. Update WEBHOOK_BASE_URL in .env with the ngrok HTTPS URL"
+echo "  4. Go to Settings → Cloudonix in the OPBX admin UI"
+echo "     and set the webhook base URL to your ngrok HTTPS URL"
 echo ""
-echo "  5. Restart Laravel app to pick up the new URL:"
-echo "     docker compose restart app"
+echo "  5. Save the settings - the change is effective immediately"
 echo ""
 
 print_success "Bootstrap script completed successfully!"
