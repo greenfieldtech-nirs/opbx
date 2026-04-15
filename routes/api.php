@@ -374,7 +374,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('distribution-lists.destinations.add');
     Route::post('auto-dialer-campaigns/lists/{list}/destinations/batch', [\App\Http\Controllers\DistributionListController::class, 'addDestinationsBatch'])
         ->name('distribution-lists.destinations.batch');
-    Route::post('auto-dialer-campaigns/lists/{list}/destinations/{destination}/reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'resetDialAttempts'])
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'resetDialAttempts'])
         ->name('distribution-lists.destinations.reset-dial-attempts');
     Route::post('auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'bulkResetDialAttempts'])
         ->name('distribution-lists.destinations.bulk-reset-dial-attempts');
