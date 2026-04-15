@@ -510,6 +510,23 @@ class DistributionListController extends Controller
     }
 
     /**
+     * Reset all pending destinations in a list.
+     */
+    public function resetPendingDestinations(AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('update', $list);
+
+        $updatedCount = $this->destinationService->resetPendingDestinations($list->id);
+
+        return response()->json([
+            'message' => "Reset {$updatedCount} pending destinations",
+            'data' => [
+                'updated_count' => $updatedCount,
+            ],
+        ]);
+    }
+
+    /**
      * Unassign a list from its campaign.
      */
     public function unassignFromCampaign(AutoDialerList $list): JsonResponse

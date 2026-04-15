@@ -311,6 +311,24 @@ class DestinationManagementService
     }
 
     /**
+     * Reset all pending destinations in a list.
+     */
+    public function resetPendingDestinations(int $listId): int
+    {
+        return OrganizationScope::bypass(function () use ($listId) {
+            return AutoDialerDestination::where('list_id', $listId)
+                ->where('status', DestinationStatus::PENDING)
+                ->update([
+                    'dial_attempts' => 0,
+                    'status' => DestinationStatus::PENDING,
+                    'last_disposition' => null,
+                    'next_retry_at' => null,
+                    'last_dialed_at' => null,
+                ]);
+        });
+    }
+
+    /**
      * Check if destination is ready for retry.
      */
     public function isReadyForRetry(AutoDialerDestination $destination): bool

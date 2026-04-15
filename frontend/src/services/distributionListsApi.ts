@@ -174,6 +174,18 @@ export const distributionListsApi = {
   },
 
   /**
+   * Reset all pending destinations in a list
+   */
+  resetPendingDestinations: async (
+    listId: string | number,
+  ): Promise<{ message: string; data: { updated_count: number } }> => {
+    const response = await api.post(
+      `/auto-dialer-campaigns/lists/${listId}/reset-pending-destinations`,
+    );
+    return response.data;
+  },
+
+  /**
    * Get version history
    */
   getVersions: async (listId: string | number): Promise<{ data: AutoDialerList[] }> => {

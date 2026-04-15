@@ -276,6 +276,26 @@ export function useBulkResetDialAttempts() {
 }
 
 /**
+ * Hook to reset all pending destinations in a list
+ */
+export function useResetPendingDestinations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ listId }: { listId: string | number }) =>
+      distributionListsApi.resetPendingDestinations(listId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.destinations(variables.listId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.detail(variables.listId),
+      });
+    },
+  });
+}
+
+/**
  * Hook to delete a list
  */
 export function useDeleteList() {

@@ -56,7 +56,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
-import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
@@ -139,6 +139,7 @@ export default function DistributionListDetail() {
   const downloadMutation = useDownloadList();
   const resetDialAttemptsMutation = useResetDialAttempts();
   const bulkResetDialAttemptsMutation = useBulkResetDialAttempts();
+  const resetPendingDestinationsMutation = useResetPendingDestinations();
   const queryClient = useQueryClient();
 
   const list = listData?.data;
@@ -222,6 +223,20 @@ export default function DistributionListDetail() {
         },
         onError: () => {
           toast.error('Failed to reset dial attempts for selected destinations');
+        },
+      }
+    );
+  };
+
+  const handleResetPendingDestinations = () => {
+    resetPendingDestinationsMutation.mutate(
+      { listId: id! },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message);
+        },
+        onError: () => {
+          toast.error('Failed to reset pending destinations');
         },
       }
     );
@@ -412,6 +427,15 @@ export default function DistributionListDetail() {
                     <SelectItem value="invalid">Invalid</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  onClick={handleResetPendingDestinations}
+                  disabled={resetPendingDestinationsMutation.isPending}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset Pending Entries
+                </Button>
                 {selectedDestinations.length > 0 && (
                   <div className="flex gap-2">
                     <Button variant="outline" className="h-10" onClick={handleRetryFailed}>
