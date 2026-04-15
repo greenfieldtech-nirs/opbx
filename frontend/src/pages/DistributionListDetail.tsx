@@ -56,7 +56,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
-import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
@@ -137,6 +137,8 @@ export default function DistributionListDetail() {
     { page, per_page: 25, status: statusFilter !== 'all' ? statusFilter : undefined, search: search || undefined }
   );
   const downloadMutation = useDownloadList();
+  const resetDialAttemptsMutation = useResetDialAttempts();
+  const bulkResetDialAttemptsMutation = useBulkResetDialAttempts();
   const queryClient = useQueryClient();
 
   const list = listData?.data;
@@ -196,8 +198,33 @@ export default function DistributionListDetail() {
   };
 
   const handleResetDialAttempts = (destinationId: number) => {
-    // TODO: Implement reset dial attempts
-    toast.info('Reset dial attempts functionality coming soon');
+    resetDialAttemptsMutation.mutate(
+      { listId: id!, destinationId },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message);
+        },
+        onError: () => {
+          toast.error('Failed to reset dial attempts');
+        },
+      }
+    );
+  };
+
+  const handleBulkResetDialAttempts = () => {
+    if (selectedDestinations.length === 0) return;
+    bulkResetDialAttemptsMutation.mutate(
+      { listId: id!, destinationIds: selectedDestinations },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message);
+          setSelectedDestinations([]);
+        },
+        onError: () => {
+          toast.error('Failed to reset dial attempts for selected destinations');
+        },
+      }
+    );
   };
 
   const handleDeleteDestination = (destinationId: number) => {
@@ -390,6 +417,10 @@ export default function DistributionListDetail() {
                     <Button variant="outline" className="h-10" onClick={handleRetryFailed}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Retry ({selectedDestinations.length})
+                    </Button>
+                    <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset Dial Attempts ({selectedDestinations.length})
                     </Button>
                     <Button variant="destructive" className="h-10" onClick={handleBulkDelete}>
                       <Trash2 className="h-4 w-4 mr-2" />
