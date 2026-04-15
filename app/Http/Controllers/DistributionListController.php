@@ -451,7 +451,7 @@ class DistributionListController extends Controller
      */
     public function resetDialAttempts(AutoDialerList $list, int $destinationId): JsonResponse
     {
-        $this->authorize('update', $list);
+        $this->authorize('resetDialAttempts', $list);
 
         $destination = AutoDialerDestination::where('list_id', $list->id)
             ->where('id', $destinationId)
@@ -479,7 +479,7 @@ class DistributionListController extends Controller
      */
     public function bulkResetDialAttempts(Request $request, AutoDialerList $list): JsonResponse
     {
-        $this->authorize('update', $list);
+        $this->authorize('resetDialAttempts', $list);
 
         $validated = $request->validate([
             'destination_ids' => ['required', 'array'],
@@ -514,7 +514,7 @@ class DistributionListController extends Controller
      */
     public function resetPendingDestinations(AutoDialerList $list): JsonResponse
     {
-        $this->authorize('update', $list);
+        $this->authorize('resetDialAttempts', $list);
 
         $updatedCount = $this->destinationService->resetPendingDestinations($list->id);
 
