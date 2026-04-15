@@ -371,15 +371,27 @@ class CampaignMonitorService
      */
     private function cleanupStaleDialing(AutoDialerCampaign $campaign, $listIds): void
     {
-        $query = AutoDialerDestination::whereIn('list_id', $listIds)
-            ->where('status', DestinationStatus::DIALING);
+        $buildQuery = function () use ($campaign, $listIds) {
+            $query = AutoDialerDestination::whereIn('list_id', $listIds)
+                ->where('status', DestinationStatus::DIALING);
 
-        // For active campaigns, only clean up records stuck for > 5 minutes
-        if ($campaign->status !== CampaignStatus::PAUSED) {
-            $query->where('last_dialed_at', '<', now()->subMinutes(5));
-        }
+            // For active campaigns, only clean up records stuck for > 5 minutes
+            if ($campaign->status !== CampaignStatus::PAUSED) {
+                $query->where('last_dialed_at', '<', now()->subMinutes(5));
+            }
 
-        $query->update(['status' => DestinationStatus::PENDING]);
+            return $query;
+        };
+
+        // Mark as failed if max dial attempts have been reached
+        $buildQuery()
+            ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
+            ->update(['status' => DestinationStatus::FAILED]);
+
+        // Reset remaining stale destinations to pending for retry
+        $buildQuery()
+            ->where('dial_attempts', '<', $campaign->max_dial_attempts)
+            ->update(['status' => DestinationStatus::PENDING]);
     }
 
     /**
