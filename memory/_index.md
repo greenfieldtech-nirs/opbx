@@ -1,7 +1,7 @@
 # OpBX Project Memory Index
 
 ## Architecture
-- Laravel 12 (PHP 8.4) backend + React 18 (TypeScript) SPA + Go dialer worker
+- Laravel 12 (PHP 8.4) backend + React 18 (TypeScript) SPA + Go dialer worker + Java (Vert.x 5) AMD worker
 - Multi-tenant: all data scoped by organization_id
 - Cloudonix CPaaS for VoIP (CXML-based call routing)
 - MySQL + Redis + MinIO + Soketi (WebSocket)
@@ -10,6 +10,7 @@
 - Backend: Laravel 12, Sanctum auth, Redis caching, MySQL 8
 - Frontend: React 18, Vite, TanStack Query, shadcn/ui, Zod, react-hook-form
 - Dialer: Go 1.21+, Gin HTTP framework, go-redis
+- AMD Worker: Java 21, Vert.x 5, ONNX Runtime, JTransforms
 - Infra: Docker Compose, Nginx reverse proxy, MinIO S3, Soketi WebSocket
 
 ## Module Index
@@ -38,7 +39,7 @@
 | Auto Dialer Campaigns | [auto-dialer-campaigns.md](auto-dialer-campaigns.md) | AutoDialerCampaignController, DialerWorkerController | AutoDialerCampaigns |
 | Distribution Lists | [distribution-lists.md](distribution-lists.md) | DistributionListController, ListManagementService | DistributionLists |
 | Dialer Worker (Go) | [dialer-worker.md](dialer-worker.md) | dialer-worker/cmd/worker/main.go | N/A |
-| AMD Worker (Node.js) | [amd-worker.md](amd-worker.md) | amd-worker/src/index.ts | N/A |
+| AMD Worker (Java/Vert.x) | [amd-worker.md](amd-worker.md) | amd-worker/src/main/java/... | N/A |
 | Auto Dialer Caller ID Pooling | [auto-dialer-caller-id-pooling.md](auto-dialer-caller-id-pooling.md) | See feature specification | See feature specification |
 | Platform Management | [platform-management.md](platform-management.md) | Platform controllers, PlatformAuditService | PlatformDashboard, PlatformOrganizations |
 | Settings & Cloudonix | [settings-cloudonix.md](settings-cloudonix.md) | SettingsController, CloudonixClient | Settings |
@@ -97,7 +98,7 @@ frontend/src/services/             # API service layer
 frontend/src/hooks/                # Custom React hooks
 frontend/src/context/              # AuthContext, ConfigContext
 dialer-worker/                     # Go dialer service
-amd-worker/                        # Node.js AMD (voicemail detection) service (planned)
+amd-worker/                        # Java/Vert.x AMD (voicemail detection) service
 docs/opbx-userguide/               # Docusaurus user guide
 docs/opbx-openapi/                 # OpenAPI 3.1.0 spec
 docs/feature-specification/        # Feature specifications & workplans

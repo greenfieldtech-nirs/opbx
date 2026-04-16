@@ -1,4 +1,10 @@
-node_modules/
-dist/
-*.log
+target/
+*.class
+*.jar
+*.war
+*.ear
+.idea/
+*.iml
 .DS_Store
+*.log
+node_modules/
