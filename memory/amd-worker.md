@@ -50,8 +50,13 @@ Standalone Java/Vert.x 5 microservice that receives real-time audio streams from
 | `AMD_MAX_CONCURRENT_STREAMS` | `100` | Max simultaneous streams |
 | `AMD_LOG_LEVEL` | `info` | Logging level (slf4j-simple) |
 | `AMD_DETECTORS` | `beep_ml,tone_energy` | Enabled detectors |
+| `AMD_DUMP_AUDIO` | `false` | Debug: dump each stream to a WAV file |
+| `AMD_DUMP_AUDIO_PATH` | `/tmp/amd-dumps` | Directory for debug WAV files |
 
 **Note:** `AMD_DEFAULT_TIMEOUT_SECONDS` is hardcoded to `45` in `Config.java`.
+
+## Audio Debug Dumps
+When `AMD_DUMP_AUDIO=true`, every received stream is written to a 16kHz mono PCM16 WAV file at `AMD_DUMP_AUDIO_PATH`. The filename includes `callSid` and `streamSid` for easy correlation with logs. This is useful for offline analysis of detection accuracy.
 
 ## Call Flow (Simplified)
 1. Cloudonix connects WebSocket to public URL `/ws/amd/detect` (via nginx)

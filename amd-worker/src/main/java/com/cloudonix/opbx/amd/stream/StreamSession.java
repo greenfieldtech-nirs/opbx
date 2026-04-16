@@ -1,5 +1,6 @@
 package com.cloudonix.opbx.amd.stream;
 
+import com.cloudonix.opbx.amd.audio.AudioDumper;
 import com.cloudonix.opbx.amd.audio.EnergyVad;
 import com.cloudonix.opbx.amd.detector.DetectionResult;
 import com.cloudonix.opbx.amd.detector.DetectionPipeline;
@@ -14,6 +15,7 @@ public class StreamSession {
     public final long startTimeMs;
     public final DetectionPipeline pipeline;
     public final EnergyVad vad;
+    public final AudioDumper dumper;
     public final AtomicBoolean resolved = new AtomicBoolean(false);
     public volatile long timeoutTimerId = -1;
     public Consumer<Void> onTimeout;
@@ -23,7 +25,8 @@ public class StreamSession {
     public volatile long lastMediaLogMs = 0;
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
-                          java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl) {
+                          java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
+                          boolean dumpAudio, String dumpAudioPath) {
         this.callSid = callSid;
         this.streamSid = streamSid;
         this.startTimeMs = System.currentTimeMillis();
@@ -33,6 +36,7 @@ public class StreamSession {
                 onResultLogged.accept(result);
             }
         });
+        this.dumper = new AudioDumper(dumpAudio, dumpAudioPath, callSid, streamSid);
     }
 
     public void startTimeoutTimer(Vertx vertx) {
@@ -54,5 +58,8 @@ public class StreamSession {
     public void dispose(Vertx vertx) {
         clearTimeout(vertx);
         resolved.set(true);
+        if (dumper != null && dumper.isEnabled()) {
+            dumper.finalizeDump();
+        }
     }
 }

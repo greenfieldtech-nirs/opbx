@@ -284,6 +284,8 @@ services:
       - AMD_MODEL_PATH=/app/models/beep_detector.onnx
       - AMD_MAX_CONCURRENT_STREAMS=${AMD_MAX_CONCURRENT_STREAMS:-100}
       - AMD_LOG_LEVEL=info
+      - AMD_DUMP_AUDIO=${AMD_DUMP_AUDIO:-false}
+      - AMD_DUMP_AUDIO_PATH=${AMD_DUMP_AUDIO_PATH:-/tmp/amd-dumps}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}

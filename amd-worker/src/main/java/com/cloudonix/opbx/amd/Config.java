@@ -11,6 +11,8 @@ public class Config {
     public final int defaultTimeoutSeconds;
     public final String logLevel;
     public final List<String> detectors;
+    public final boolean dumpAudio;
+    public final String dumpAudioPath;
     public final String redisHost;
     public final int redisPort;
     public final String redisPassword;
@@ -24,6 +26,8 @@ public class Config {
         this.logLevel = getEnv("AMD_LOG_LEVEL", "info");
         String detectorsEnv = getEnv("AMD_DETECTORS", "beep_ml,tone_energy");
         this.detectors = Arrays.asList(detectorsEnv.split(","));
+        this.dumpAudio = Boolean.parseBoolean(getEnv("AMD_DUMP_AUDIO", "false"));
+        this.dumpAudioPath = getEnv("AMD_DUMP_AUDIO_PATH", "/tmp/amd-dumps");
         this.redisHost = getEnv("REDIS_HOST", "redis");
         this.redisPort = Integer.parseInt(getEnv("REDIS_PORT", "6379"));
         this.redisPassword = System.getenv("REDIS_PASSWORD");

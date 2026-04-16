@@ -26,12 +26,15 @@ public class StreamHandler {
     private final BeepMlDetector beepMlDetector;
     private final MetricsService metrics;
     private final ObjectMapper mapper;
+    private final boolean dumpAudio;
+    private final String dumpAudioPath;
     private final Map<String, StreamSession> activeStreams = new ConcurrentHashMap<>();
     private final Map<ServerWebSocket, String> wsToStreamSid = new ConcurrentHashMap<>();
 
     public StreamHandler(Vertx vertx, int maxConcurrentStreams, int defaultTimeoutMs,
                          List<String> detectors, BeepMlDetector beepMlDetector,
-                         MetricsService metrics, ObjectMapper mapper) {
+                         MetricsService metrics, ObjectMapper mapper,
+                         boolean dumpAudio, String dumpAudioPath) {
         this.vertx = vertx;
         this.maxConcurrentStreams = maxConcurrentStreams;
         this.defaultTimeoutMs = defaultTimeoutMs;
@@ -39,6 +42,8 @@ public class StreamHandler {
         this.beepMlDetector = beepMlDetector;
         this.metrics = metrics;
         this.mapper = mapper;
+        this.dumpAudio = dumpAudio;
+        this.dumpAudioPath = dumpAudioPath;
     }
 
     public void handleConnection(ServerWebSocket ws) {
@@ -87,7 +92,8 @@ public class StreamHandler {
         String callSid = msg.start.callSid;
 
         StreamSession session = new StreamSession(
-            vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector
+            vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector,
+            dumpAudio, dumpAudioPath
         );
 
         session.onResultLogged = result -> {
@@ -103,8 +109,8 @@ public class StreamHandler {
         wsToStreamSid.put(ws, streamSid);
         metrics.incrementActiveStreams();
 
-        logger.info("Stream started call_sid={} stream_sid={} timeout_ms={} detectors={}",
-            callSid, streamSid, defaultTimeoutMs, detectors);
+        logger.info("Stream started call_sid={} stream_sid={} timeout_ms={} detectors={} dump_audio={}",
+            callSid, streamSid, defaultTimeoutMs, detectors, dumpAudio);
     }
 
     private void handleMedia(ServerWebSocket ws, StreamMessage msg) {
@@ -124,6 +130,10 @@ public class StreamHandler {
 
         session.mediaChunkCounter++;
         session.totalAudioMs += chunkDurationMs;
+
+        if (session.dumper.isEnabled()) {
+            session.dumper.append(float32_16k);
+        }
 
         boolean shouldLog = session.mediaChunkCounter == 1
             || (System.currentTimeMillis() - session.lastMediaLogMs) >= 5000;
