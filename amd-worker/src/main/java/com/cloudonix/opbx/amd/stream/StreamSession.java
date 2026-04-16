@@ -18,9 +18,12 @@ public class StreamSession {
     public volatile long timeoutTimerId = -1;
     public Consumer<Void> onTimeout;
     public Consumer<DetectionResult> onResultLogged;
+    public volatile int mediaChunkCounter = 0;
+    public volatile double totalAudioMs = 0;
+    public volatile long lastMediaLogMs = 0;
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
-                         java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl) {
+                          java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl) {
         this.callSid = callSid;
         this.streamSid = streamSid;
         this.startTimeMs = System.currentTimeMillis();

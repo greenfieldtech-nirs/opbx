@@ -122,7 +122,22 @@ public class StreamHandler {
         double streamElapsedMs = System.currentTimeMillis() - session.startTimeMs;
         double chunkStartMs = Math.max(0, streamElapsedMs - chunkDurationMs);
 
+        session.mediaChunkCounter++;
+        session.totalAudioMs += chunkDurationMs;
+
+        boolean shouldLog = session.mediaChunkCounter == 1
+            || (System.currentTimeMillis() - session.lastMediaLogMs) >= 5000;
+        if (shouldLog) {
+            session.lastMediaLogMs = System.currentTimeMillis();
+            logger.info("Receiving audio call_sid={} stream_sid={} chunks={} total_audio_ms={} elapsed_ms={}",
+                session.callSid, session.streamSid, session.mediaChunkCounter, (int) session.totalAudioMs, (int) streamElapsedMs);
+        }
+
         List<EnergyVad.VadSegment> segments = session.vad.process(float32_16k, chunkStartMs);
+        if (!segments.isEmpty()) {
+            logger.info("VAD produced {} segment(s) call_sid={} stream_sid={}",
+                segments.size(), session.callSid, session.streamSid);
+        }
         processVadSegments(session, segments);
     }
 
@@ -132,13 +147,19 @@ public class StreamHandler {
                 break;
             }
             double durationMs = segment.endMs() - segment.startMs();
-            logger.info("VAD segment call_sid={} stream_sid={} duration_ms={}", session.callSid, session.streamSid, durationMs);
+            logger.info("Processing VAD segment call_sid={} stream_sid={} duration_ms={} start_ms={}",
+                session.callSid, session.streamSid, (int) durationMs, (int) segment.startMs());
             Detector.AudioSegment audioSeg = new Detector.AudioSegment(
                 segment.pcmData(), 16000, durationMs, segment.startMs()
             );
             session.pipeline.processSegment(vertx, audioSeg).onComplete(ar -> {
                 if (ar.succeeded() && session.pipeline.isResolved()) {
                     logger.info("Pipeline resolved for call_sid={} stream_sid={}", session.callSid, session.streamSid);
+                } else if (ar.succeeded()) {
+                    logger.info("Pipeline completed segment with no detection call_sid={} stream_sid={}", session.callSid, session.streamSid);
+                } else {
+                    logger.warn("Pipeline failed for segment call_sid={} stream_sid={} error={}",
+                        session.callSid, session.streamSid, ar.cause().getMessage());
                 }
             });
         }
@@ -170,8 +191,10 @@ public class StreamHandler {
             return;
         }
         session.resolved.set(true);
-        logger.info("WebSocket closed - no voicemail detected call_sid={} stream_sid={} elapsed_ms={}",
-            session.callSid, session.streamSid, System.currentTimeMillis() - session.startTimeMs);
+        long elapsedMs = System.currentTimeMillis() - session.startTimeMs;
+        metrics.recordDetection("unknown", elapsedMs);
+        logger.info("DECISION: UNKNOWN (timeout) call_sid={} stream_sid={} elapsed_ms={} reason=\"No voicemail detected within timeout\"",
+            session.callSid, session.streamSid, elapsedMs);
         cleanupSession(session.streamSid);
         wsToStreamSid.remove(ws);
         if (!ws.isClosed()) {
@@ -184,11 +207,14 @@ public class StreamHandler {
         metrics.recordDetection(result.result.value, elapsedMs);
 
         if (result.result == ResultType.VOICEMAIL) {
-            logger.info("Voicemail detected call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
+            logger.info("DECISION: VOICEMAIL call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
                 session.callSid, session.streamSid, result.detector, result.confidence, result.reason, elapsedMs);
         } else if (result.result == ResultType.HUMAN) {
-            logger.info("Human detected call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
+            logger.info("DECISION: HUMAN call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
                 session.callSid, session.streamSid, result.detector, result.confidence, result.reason, elapsedMs);
+        } else {
+            logger.info("DECISION: {} call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
+                result.result, session.callSid, session.streamSid, result.detector, result.confidence, result.reason, elapsedMs);
         }
 
         cleanupSession(session.streamSid);

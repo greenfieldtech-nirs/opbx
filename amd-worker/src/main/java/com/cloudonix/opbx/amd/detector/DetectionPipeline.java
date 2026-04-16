@@ -56,6 +56,8 @@ public class DetectionPipeline {
             return;
         }
         Detector detector = detectors.get(index);
+        logger.info("Running detector detector={} segment_duration_ms={} start_ms={}",
+            detector.name(), (int) segment.durationMs, (int) segment.startTimestampMs);
         if (detector instanceof BeepMlDetector beepMl) {
             vertx.executeBlocking(() -> {
                 try {
@@ -66,16 +68,23 @@ public class DetectionPipeline {
                 }
             }).onComplete(ar -> {
                 if (ar.succeeded() && ar.result() != null) {
+                    logger.info("Detector positive detector={} result={} reason=\"{}\"",
+                        detector.name(), ar.result().result, ar.result().reason);
                     handleResult(ar.result(), promise);
                     return;
+                } else if (ar.succeeded()) {
+                    logger.info("Detector negative detector={}", detector.name());
                 }
                 processNextDetector(vertx, segment, index + 1, promise);
             });
         } else {
             DetectionResult result = detector.process(segment);
             if (result != null && result.result != ResultType.UNKNOWN) {
+                logger.info("Detector positive detector={} result={} reason=\"{}\"",
+                    detector.name(), result.result, result.reason);
                 handleResult(result, promise);
             } else {
+                logger.info("Detector negative detector={}", detector.name());
                 processNextDetector(vertx, segment, index + 1, promise);
             }
         }

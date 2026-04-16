@@ -79,6 +79,25 @@ Standalone Java/Vert.x 5 microservice that receives real-time audio streams from
 - JTransforms 3.1 (FFT for MFCC + energy analysis)
 - slf4j-simple 2.0.16 (logging)
 
+## Console Logging
+The worker logs key events at `INFO` level so you can follow the decision process in real time:
+
+| Log line | What it means |
+|----------|---------------|
+| `Stream started call_sid=...` | New Cloudonix stream opened |
+| `Receiving audio call_sid=... chunks=N total_audio_ms=X elapsed_ms=Y` | Audio is flowing (throttled to once per ~5s) |
+| `VAD speech start at_ms=...` | Energy VAD detected the start of speech |
+| `VAD speech end duration_ms=...` | Energy VAD detected end of speech and emitted a segment |
+| `VAD segment clipped ...` | Ongoing speech hit the 3000ms max and was split |
+| `Processing VAD segment call_sid=... duration_ms=...` | A completed segment is being sent to detectors |
+| `Running detector detector=... segment_duration_ms=...` | A specific detector is analyzing the segment |
+| `Detector positive detector=... result=VOICEMAIL reason="..."` | A detector found a beep/tone |
+| `Detector negative detector=...` | A detector found nothing in this segment |
+| `DECISION: VOICEMAIL call_sid=... detector=...` | Final result — voicemail beep detected |
+| `DECISION: HUMAN call_sid=... detector=...` | Final result — human speech detected |
+| `DECISION: UNKNOWN (timeout) call_sid=...` | 45s elapsed with no detection |
+| `Stream stopped by Cloudonix call_sid=...` | Cloudonix sent a `stop` event |
+
 ## Build & Run
 ```bash
 cd amd-worker

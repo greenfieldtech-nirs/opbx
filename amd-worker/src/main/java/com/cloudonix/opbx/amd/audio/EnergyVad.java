@@ -1,9 +1,13 @@
 package com.cloudonix.opbx.amd.audio;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class EnergyVad {
+    private static final Logger logger = LoggerFactory.getLogger(EnergyVad.class);
     public record VadSegment(double[] pcmData, double startMs, double endMs) {}
 
     private final int sampleRate;
@@ -71,6 +75,7 @@ public class EnergyVad {
                     inSpeech = true;
                     currentSpeechStartMs = bufferStartMs;
                     currentSpeechBuffer = new double[0];
+                    logger.info("VAD speech start at_ms={}", (int) currentSpeechStartMs);
                 }
                 if (inSpeech) {
                     // Append frame to current speech buffer
@@ -82,6 +87,7 @@ public class EnergyVad {
                     // Emit segment if it exceeds clipMaxMs, then start a new one
                     double segmentDurationMs = currentStreamMs - currentSpeechStartMs;
                     if (segmentDurationMs >= clipMaxMs) {
+                        logger.info("VAD segment clipped at max_duration_ms={} start_ms={}", clipMaxMs, (int) currentSpeechStartMs);
                         newSegments.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, currentStreamMs));
                         currentSpeechBuffer = new double[0];
                         currentSpeechStartMs = currentStreamMs;
@@ -93,7 +99,10 @@ public class EnergyVad {
                     double segmentEndMs = currentStreamMs;
                     double durationMs = segmentEndMs - currentSpeechStartMs;
                     if (durationMs >= clipMinMs && durationMs <= clipMaxMs) {
+                        logger.info("VAD speech end duration_ms={} start_ms={} end_ms={}", (int) durationMs, (int) currentSpeechStartMs, (int) segmentEndMs);
                         newSegments.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, segmentEndMs));
+                    } else {
+                        logger.info("VAD speech discarded duration_ms={} (outside min/max)", (int) durationMs);
                     }
 
                     inSpeech = false;
@@ -117,10 +126,18 @@ public class EnergyVad {
             double segmentEndMs = currentStreamMs;
             double durationMs = segmentEndMs - currentSpeechStartMs;
             if (durationMs >= clipMinMs && durationMs <= clipMaxMs) {
+                logger.info("VAD flush emitted trailing segment duration_ms={} start_ms={} end_ms={}", (int) durationMs, (int) currentSpeechStartMs, (int) segmentEndMs);
                 segments.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, segmentEndMs));
+            } else {
+                logger.info("VAD flush discarded trailing segment duration_ms={} (outside min/max)", (int) durationMs);
             }
         }
         List<VadSegment> result = new ArrayList<>(segments);
+        if (result.isEmpty()) {
+            logger.info("VAD flush produced no segments");
+        } else {
+            logger.info("VAD flush produced {} segment(s)", result.size());
+        }
         reset();
         return result;
     }
