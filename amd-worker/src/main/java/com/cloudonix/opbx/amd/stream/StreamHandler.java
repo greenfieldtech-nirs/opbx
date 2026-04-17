@@ -81,6 +81,19 @@ public class StreamHandler {
         });
 
         ws.textMessageHandler(text -> {
+            // Log raw JSON for debugging. Media payloads are huge (Base64 audio), so truncate them.
+            if (text.contains("\"event\":\"media\"")) {
+                int payloadStart = text.indexOf("\"payload\":\"");
+                if (payloadStart > 0) {
+                    int payloadEnd = text.indexOf("\"", payloadStart + 12);
+                    String truncated = text.substring(0, payloadStart + 12) + "[truncated]" + text.substring(payloadEnd);
+                    logger.debug("RAW: {}", truncated);
+                } else {
+                    logger.debug("RAW: {}", text);
+                }
+            } else {
+                logger.debug("RAW: {}", text);
+            }
             StreamMessage msg = StreamMessage.parse(text, mapper);
             if (msg == null || msg.event == null) {
                 logger.error("Failed to parse message: {}", text.substring(0, Math.min(text.length(), 200)));
