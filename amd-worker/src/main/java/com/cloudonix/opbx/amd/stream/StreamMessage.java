@@ -4,9 +4,23 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.List;
+import java.util.Map;
+
+/**
+ * DTO for Cloudonix WebSocket Stream protocol messages.
+ *
+ * Protocol reference:
+ * https://developers.cloudonix.com/Documentation/voiceApplication/Verb/start/stream
+ *
+ * Events: connected, start, media, dtmf, stop
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StreamMessage {
     public String event;
+
+    @JsonProperty("sequenceNumber")
+    public String sequenceNumber;
 
     @JsonProperty("streamSid")
     public String streamSid;
@@ -33,10 +47,14 @@ public class StreamMessage {
     public static class Start {
         @JsonProperty("streamSid")
         public String streamSid;
-        @JsonProperty("accountSid")
-        public String accountSid;
+        @JsonProperty("session")
+        public String session;
         @JsonProperty("callSid")
         public String callSid;
+        @JsonProperty("tracks")
+        public List<String> tracks;
+        @JsonProperty("customParameters")
+        public Map<String, Object> customParameters;
         @JsonProperty("mediaFormat")
         public MediaFormat mediaFormat;
     }
@@ -64,8 +82,8 @@ public class StreamMessage {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Stop {
-        @JsonProperty("accountSid")
-        public String accountSid;
+        @JsonProperty("session")
+        public String session;
         @JsonProperty("callSid")
         public String callSid;
     }

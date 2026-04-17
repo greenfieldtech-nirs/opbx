@@ -87,19 +87,26 @@ public class StreamHandler {
                 return;
             }
             switch (msg.event) {
-                case "connected" -> logger.info("Stream connected protocol={} version={}", msg.protocol, msg.version);
+                case "connected" -> handleConnected(msg);
                 case "start" -> handleStart(ws, msg);
                 case "media" -> handleMedia(ws, msg);
                 case "stop" -> handleStop(ws, msg);
-                case "dtmf" -> { /* ignored */ }
-                default -> logger.warn("Unknown event: {}", msg.event);
+                case "dtmf" -> handleDtmf(msg);
+                default -> logger.warn("Unknown event type={} seq={}", msg.event, msg.sequenceNumber);
             }
         });
+    }
+
+    private void handleConnected(StreamMessage msg) {
+        logger.info("EVENT: connected protocol={} version={}", msg.protocol, msg.version);
     }
 
     private void handleStart(ServerWebSocket ws, StreamMessage msg) {
         String streamSid = msg.streamSid;
         String callSid = msg.start.callSid;
+        logger.info("EVENT: start seq={} stream_sid={} call_sid={} session={} tracks={} custom_params={}",
+            msg.sequenceNumber, streamSid, callSid, msg.start.session,
+            msg.start.tracks, msg.start.customParameters);
 
         // Close any existing WebSocket for this streamSid to prevent duplicate streams corrupting VAD state
         ServerWebSocket oldWs = null;
@@ -156,6 +163,10 @@ public class StreamHandler {
         if (session == null || session.resolved.get()) {
             return;
         }
+
+        logger.debug("EVENT: media seq={} stream_sid={} track={} chunk={} timestamp={} payload_bytes={}",
+            msg.sequenceNumber, msg.streamSid, msg.media.track, msg.media.chunk,
+            msg.media.timestamp, msg.media.payload != null ? msg.media.payload.length() : 0);
 
         byte[] payload = AudioDecoder.decodeBase64(msg.media.payload);
         short[] pcm16 = AudioDecoder.decodeMulawToPcm16(payload);
@@ -238,8 +249,8 @@ public class StreamHandler {
     }
 
     private void handleStop(ServerWebSocket ws, StreamMessage msg) {
-        logger.info("Stream stopped by Cloudonix call_sid={} stream_sid={}",
-            msg.stop.callSid, msg.streamSid);
+        logger.info("EVENT: stop seq={} stream_sid={} call_sid={} session={}",
+            msg.sequenceNumber, msg.streamSid, msg.stop.callSid, msg.stop.session);
         StreamSession session = activeStreams.get(msg.streamSid);
         if (session != null && !session.resolved.get()) {
             List<EnergyVad.VadSegment> flushed = session.vad.flush();
@@ -256,6 +267,11 @@ public class StreamHandler {
                 ws.close((short) 1000, "Stopped");
             }
         });
+    }
+
+    private void handleDtmf(StreamMessage msg) {
+        logger.info("EVENT: dtmf seq={} stream_sid={} track={} digit={}",
+            msg.sequenceNumber, msg.streamSid, msg.dtmf.track, msg.dtmf.digit);
     }
 
     private void handleTimeout(ServerWebSocket ws, StreamSession session) {
