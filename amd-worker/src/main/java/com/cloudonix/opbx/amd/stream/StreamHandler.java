@@ -108,29 +108,22 @@ public class StreamHandler {
             msg.sequenceNumber, streamSid, callSid, msg.start.session,
             msg.start.tracks, msg.start.customParameters);
 
-        // Close any existing WebSocket for this streamSid to prevent duplicate streams corrupting VAD state
-        ServerWebSocket oldWs = null;
-        for (java.util.Map.Entry<ServerWebSocket, String> entry : wsToStreamSid.entrySet()) {
-            if (streamSid.equals(entry.getValue())) {
-                oldWs = entry.getKey();
-                break;
-            }
-        }
-        if (oldWs != null) {
-            logger.warn("Closing duplicate stream call_sid={} stream_sid={}", callSid, streamSid);
-            wsToStreamSid.remove(oldWs);
-            activeStreams.remove(streamSid);
-            try {
-                oldWs.close();
-            } catch (Exception e) {
-                logger.debug("Error closing old websocket: {}", e.getMessage());
-            }
-        }
-
         StreamSession session = new StreamSession(
             vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector,
             dumpAudio, dumpAudioPath
         );
+
+        // Atomically register this stream. If another connection already registered
+        // the same streamSid, reject this new connection to prevent duplicate streams
+        // from corrupting VAD state and producing duplicate log output.
+        StreamSession existing = activeStreams.putIfAbsent(streamSid, session);
+        if (existing != null) {
+            logger.warn("Duplicate stream rejected call_sid={} stream_sid={} — already has active session",
+                callSid, streamSid);
+            ws.close((short) 1008, "Duplicate stream");
+            return;
+        }
+        wsToStreamSid.put(ws, streamSid);
 
         if (msg.start.mediaFormat != null) {
             session.sampleRate = msg.start.mediaFormat.sampleRate;
@@ -150,8 +143,6 @@ public class StreamHandler {
         };
 
         session.startTimeoutTimer(vertx);
-        activeStreams.put(streamSid, session);
-        wsToStreamSid.put(ws, streamSid);
         metrics.incrementActiveStreams();
 
         logger.info("Stream started call_sid={} stream_sid={} timeout_ms={} detectors={} dump_audio={}",
