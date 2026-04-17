@@ -139,18 +139,10 @@ public class EnergyVad {
     }
 
     private boolean isSpeechFrame(double[] frame) {
-        double energy = computeEnergy(frame);
+        double energy = AudioMath.energy(frame);
         double baseThreshold = 0.001;
         double threshold = baseThreshold / vadSensitivity;
         return energy > threshold;
-    }
-
-    private double computeEnergy(double[] frame) {
-        double sum = 0;
-        for (double v : frame) {
-            sum += v * v;
-        }
-        return sum / frame.length;
     }
 
     private double[] trimArray(double[] arr, int offset) {

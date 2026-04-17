@@ -4,7 +4,7 @@ import java.util.Base64;
 
 public class AudioDecoder {
     private static final short[] MULAW_TO_PCM = new short[256];
-    private static final byte[] PCM_TO_MULAW = new byte[65536];
+    private static final int MAX_BASE64_PAYLOAD_BYTES = 1024 * 1024; // 1 MiB
 
     static {
         for (int i = 0; i < 256; i++) {
@@ -18,20 +18,6 @@ public class AudioDecoder {
                 value = -value;
             }
             MULAW_TO_PCM[i] = (short) value;
-        }
-
-        for (int pcm = -32768; pcm <= 32767; pcm++) {
-            int idx = pcm + 32768;
-            int bestU = 0;
-            int bestDist = Integer.MAX_VALUE;
-            for (int u = 0; u < 256; u++) {
-                int dist = Math.abs(pcm - MULAW_TO_PCM[u]);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestU = u;
-                }
-            }
-            PCM_TO_MULAW[idx] = (byte) bestU;
         }
     }
 
@@ -51,15 +37,17 @@ public class AudioDecoder {
         return out;
     }
 
-    public static byte[] pcm16ToMulaw(short[] pcm16) {
-        byte[] ulaw = new byte[pcm16.length];
-        for (int i = 0; i < pcm16.length; i++) {
-            ulaw[i] = PCM_TO_MULAW[pcm16[i] + 32768];
-        }
-        return ulaw;
-    }
-
     public static byte[] decodeBase64(String base64) {
+        if (base64 == null) {
+            return new byte[0];
+        }
+        // Reject payloads that would decode to more than MAX_BASE64_PAYLOAD_BYTES
+        int estimatedDecodedLen = (base64.length() * 3) / 4;
+        if (estimatedDecodedLen > MAX_BASE64_PAYLOAD_BYTES) {
+            throw new IllegalArgumentException(
+                "Base64 payload too large: estimated " + estimatedDecodedLen + " bytes (max " + MAX_BASE64_PAYLOAD_BYTES + ")"
+            );
+        }
         return Base64.getDecoder().decode(base64);
     }
 }

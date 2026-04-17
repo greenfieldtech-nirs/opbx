@@ -30,13 +30,6 @@ public class DetectionPipeline {
         }
     }
 
-    public void reset() {
-        resolved.set(false);
-        for (Detector d : detectors) {
-            d.reset();
-        }
-    }
-
     public int getTimeoutMs() {
         return timeoutMs;
     }

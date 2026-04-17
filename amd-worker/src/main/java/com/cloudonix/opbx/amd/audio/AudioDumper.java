@@ -57,9 +57,17 @@ public class AudioDumper {
                 }
             }
 
-            Files.createDirectories(Paths.get(dumpDir));
-            String filename = dumpDir + "/" + callSid + "_" + streamSid + ".wav";
-            try (FileOutputStream fos = new FileOutputStream(filename)) {
+            String safeCallSid = sanitizeFilename(callSid);
+            String safeStreamSid = sanitizeFilename(streamSid);
+            String filename = dumpDir + "/" + safeCallSid + "_" + safeStreamSid + ".wav";
+            java.nio.file.Path filePath = Paths.get(filename).toAbsolutePath().normalize();
+            java.nio.file.Path dirPath = Paths.get(dumpDir).toAbsolutePath().normalize();
+            if (!filePath.startsWith(dirPath)) {
+                logger.warn("Blocked path traversal attempt call_sid={} stream_sid={}", callSid, streamSid);
+                return;
+            }
+            Files.createDirectories(dirPath);
+            try (FileOutputStream fos = new FileOutputStream(filePath.toString())) {
                 writeWavHeader(fos, data.length, 16000, (short) 1, (short) 16);
                 fos.write(data);
             }
@@ -105,5 +113,16 @@ public class AudioDumper {
             (byte) (value & 0xFF),
             (byte) ((value >> 8) & 0xFF)
         };
+    }
+
+    /**
+     * Sanitizes a filename by removing path traversal characters and
+     * replacing filesystem-special characters with underscores.
+     */
+    private static String sanitizeFilename(String input) {
+        if (input == null || input.isEmpty()) {
+            return "unknown";
+        }
+        return input.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 }

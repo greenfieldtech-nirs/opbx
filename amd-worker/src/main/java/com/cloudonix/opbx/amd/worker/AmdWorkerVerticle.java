@@ -55,7 +55,8 @@ public class AmdWorkerVerticle extends AbstractVerticle {
             metrics,
             mapper,
             config.dumpAudio,
-            config.dumpAudioPath
+            config.dumpAudioPath,
+            config.apiToken
         );
 
         wsServer = vertx.createHttpServer(new HttpServerOptions().setPort(config.websocketPort));
@@ -76,6 +77,7 @@ public class AmdWorkerVerticle extends AbstractVerticle {
                         .put("human", m.humanDetections())
                         .put("unknown", m.unknownDetections()))
                     .put("avg_detection_time_ms", m.avgDetectionTimeMs())
+                    .put("errors_total", m.errorsTotal())
                     .put("uptime_seconds", m.uptimeSeconds());
                 req.response().putHeader("Content-Type", "application/json").end(json.encode());
             } else {

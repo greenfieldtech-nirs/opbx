@@ -1,9 +1,28 @@
 package com.cloudonix.opbx.amd.detector;
 
+import com.cloudonix.opbx.amd.audio.AudioMath;
 import com.cloudonix.opbx.amd.feature.EnergyAnalyzer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Energy-based tone detector for voicemail beep detection.
+ *
+ * Detection strategy:
+ * 1. Divide audio into 20ms windows
+ * 2. Compute FFT energy in the 300-1000 Hz band for each window
+ * 3. Look for a contiguous 400ms run (20 windows) where:
+ *    - All windows have band energy above the silence threshold
+ *    - The RMS amplitude has low coefficient-of-variation (CV ≤ 0.22),
+ *      indicating a stable-amplitude tone (not speech)
+ *    - The spectral purity ratio is high (≥ 10.0), meaning most energy
+ *      is concentrated in the target band
+ * 4. Only accept detections starting at ≥ 10.5 seconds, since the real
+ *    voicemail beep in this system consistently appears around 12-13s
+ *
+ * This detector is stateless and thread-safe — a single instance can be
+ * reused across all streams.
+ */
 public class ToneEnergyDetector implements Detector {
     private static final Logger logger = LoggerFactory.getLogger(ToneEnergyDetector.class);
 
@@ -39,7 +58,7 @@ public class ToneEnergyDetector implements Detector {
             System.arraycopy(segment.pcmData, startSample, window, 0, windowSamples);
             EnergyAnalyzer.EnergyBands bands = EnergyAnalyzer.computeEnergyBands(window, sampleRate, LOW_FREQ, HIGH_FREQ);
             targetEnergies[i] = bands.targetBandEnergy();
-            rmsVals[i] = computeRms(window);
+            rmsVals[i] = AudioMath.rms(window);
             ratios[i] = bands.ratio();
         }
 
@@ -90,16 +109,8 @@ public class ToneEnergyDetector implements Detector {
         return null;
     }
 
-    private static double computeRms(double[] samples) {
-        double sum = 0;
-        for (double v : samples) {
-            sum += v * v;
-        }
-        return Math.sqrt(sum / samples.length);
-    }
-
     @Override
     public void reset() {
-        // stateless
+        // stateless — no per-segment state to reset
     }
 }

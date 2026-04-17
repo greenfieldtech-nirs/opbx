@@ -28,13 +28,15 @@ public class StreamHandler {
     private final ObjectMapper mapper;
     private final boolean dumpAudio;
     private final String dumpAudioPath;
+    private final String apiToken;
     private final Map<String, StreamSession> activeStreams = new ConcurrentHashMap<>();
     private final Map<ServerWebSocket, String> wsToStreamSid = new ConcurrentHashMap<>();
+    private final ToneEnergyDetector toneEnergyDetector = new ToneEnergyDetector();
 
     public StreamHandler(Vertx vertx, int maxConcurrentStreams, int defaultTimeoutMs,
                          List<String> detectors, BeepMlDetector beepMlDetector,
                          MetricsService metrics, ObjectMapper mapper,
-                         boolean dumpAudio, String dumpAudioPath) {
+                         boolean dumpAudio, String dumpAudioPath, String apiToken) {
         this.vertx = vertx;
         this.maxConcurrentStreams = maxConcurrentStreams;
         this.defaultTimeoutMs = defaultTimeoutMs;
@@ -44,11 +46,18 @@ public class StreamHandler {
         this.mapper = mapper;
         this.dumpAudio = dumpAudio;
         this.dumpAudioPath = dumpAudioPath;
+        this.apiToken = apiToken;
     }
 
     public void handleConnection(ServerWebSocket ws) {
         if (!"/ws/detect".equals(ws.path())) {
             ws.close((short) 1000, "Not Found");
+            return;
+        }
+        if (!apiToken.isEmpty() && !isAuthorized(ws)) {
+            logger.warn("Unauthorized WebSocket connection from {} path={}", ws.remoteAddress(), ws.path());
+            ws.close((short) 1008, "Unauthorized");
+            metrics.incrementErrors();
             return;
         }
         if (activeStreams.size() >= maxConcurrentStreams) {
@@ -176,8 +185,7 @@ public class StreamHandler {
                 Detector.AudioSegment toneSeg = new Detector.AudioSegment(
                     recentAudio, 16000, (recentAudio.length / 16000.0) * 1000.0, checkStartMs
                 );
-                ToneEnergyDetector toneDetector = new ToneEnergyDetector();
-                DetectionResult toneResult = toneDetector.process(toneSeg);
+                DetectionResult toneResult = toneEnergyDetector.process(toneSeg);
                 if (toneResult != null) {
                     logger.info("Tone detected in rolling buffer call_sid={} stream_sid={} start_ms={} reason=\"{}\"",
                         session.callSid, session.streamSid, (int) checkStartMs, toneResult.reason);
@@ -294,5 +302,29 @@ public class StreamHandler {
             session.dispose(vertx);
             metrics.decrementActiveStreams();
         }
+    }
+
+    private boolean isAuthorized(ServerWebSocket ws) {
+        String authHeader = ws.headers().get("Authorization");
+        if (authHeader == null || authHeader.isEmpty()) {
+            return false;
+        }
+        String expected = "Bearer " + apiToken;
+        // Use constant-time comparison to prevent timing attacks
+        return constantTimeEquals(authHeader, expected);
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        byte[] aBytes = a.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bBytes = b.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int diff = aBytes.length ^ bBytes.length;
+        int len = Math.min(aBytes.length, bBytes.length);
+        for (int i = 0; i < len; i++) {
+            diff |= aBytes[i] ^ bBytes[i];
+        }
+        return diff == 0;
     }
 }

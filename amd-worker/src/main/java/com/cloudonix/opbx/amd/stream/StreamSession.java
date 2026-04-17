@@ -9,6 +9,20 @@ import io.vertx.core.Vertx;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/**
+ * Per-stream session state. Created when a Cloudonix stream starts and
+ * destroyed when the stream ends or a detection decision is reached.
+ *
+ * Holds:
+ * - VAD instance for speech segmentation
+ * - Detection pipeline (ML + energy-based detectors)
+ * - Timeout timer for the overall detection window
+ * - Rolling audio buffer for tone detection fallback
+ * - Audio dumper for optional debugging
+ *
+ * Memory safety: the rolling audio buffer is capped at 5 seconds
+ * (~80 KB at 16 kHz) to prevent unbounded growth.
+ */
 public class StreamSession {
     public final String callSid;
     public final String streamSid;
@@ -27,11 +41,28 @@ public class StreamSession {
     public volatile double lastToneCheckMs = 0;
 
     private final java.util.List<double[]> rawAudioChunks = new java.util.ArrayList<>();
+    private static final int MAX_RETAINED_AUDIO_MS = 5000; // Keep last 5 seconds for rolling buffer checks
+    private static final int MAX_RETAINED_SAMPLES = (int) ((MAX_RETAINED_AUDIO_MS / 1000.0) * 16000);
+    private int totalRetainedSamples = 0;
 
+    /**
+     * Appends an audio chunk to the rolling buffer.
+     * Oldest chunks are evicted if the total retained audio exceeds 5 seconds.
+     */
     public void appendRawAudio(double[] chunk) {
         rawAudioChunks.add(chunk.clone());
+        totalRetainedSamples += chunk.length;
+        // Evict oldest chunks to stay within memory bounds
+        while (totalRetainedSamples > MAX_RETAINED_SAMPLES && !rawAudioChunks.isEmpty()) {
+            double[] removed = rawAudioChunks.remove(0);
+            totalRetainedSamples -= removed.length;
+        }
     }
 
+    /**
+     * Returns the most recent audio up to the requested duration.
+     * Chunks are concatenated in reverse order (newest first).
+     */
     public double[] getRecentAudio(double durationMs) {
         int samplesNeeded = (int) Math.ceil((durationMs / 1000.0) * 16000);
         double[] result = new double[samplesNeeded];

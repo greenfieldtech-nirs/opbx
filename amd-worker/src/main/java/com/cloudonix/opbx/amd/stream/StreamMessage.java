@@ -74,6 +74,9 @@ public class StreamMessage {
         try {
             return mapper.readValue(json, StreamMessage.class);
         } catch (Exception e) {
+            // Log truncated payload to avoid flooding logs with huge Base64 strings
+            String preview = json.length() > 200 ? json.substring(0, 200) + "..." : json;
+            System.err.println("Failed to parse stream message: " + e.getMessage() + " | payload=" + preview);
             return null;
         }
     }

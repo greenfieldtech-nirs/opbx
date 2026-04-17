@@ -16,6 +16,7 @@ public class EnergyAnalyzer {
         double binSize = (double) sampleRate / n;
         double totalEnergy = 0;
         double targetBandEnergy = 0;
+        double peakEnergy = 0;
 
         int numBins = n / 2 + 1;
         for (int i = 0; i < numBins; i++) {
@@ -27,25 +28,14 @@ public class EnergyAnalyzer {
             double freq = i * binSize;
             if (freq >= lowFreq && freq <= highFreq) {
                 targetBandEnergy += energy;
-            }
-        }
-
-        double otherEnergy = totalEnergy - targetBandEnergy;
-        double ratio = otherEnergy > 0 ? targetBandEnergy / otherEnergy : targetBandEnergy;
-
-        double peakEnergy = 0;
-        for (int i = 0; i < numBins; i++) {
-            double freq = i * binSize;
-            if (freq >= lowFreq && freq <= highFreq) {
-                double real = (i == 0 || i == n / 2) ? padded[i] : padded[2 * i];
-                double imag = (i == 0 || i == n / 2) ? 0 : padded[2 * i + 1];
-                double magnitude = Math.sqrt(real * real + imag * imag);
-                double energy = magnitude * magnitude;
                 if (energy > peakEnergy) {
                     peakEnergy = energy;
                 }
             }
         }
+
+        double otherEnergy = totalEnergy - targetBandEnergy;
+        double ratio = otherEnergy > 0 ? targetBandEnergy / otherEnergy : targetBandEnergy;
         double peakConcentration = targetBandEnergy > 0 ? peakEnergy / targetBandEnergy : 0;
         return new EnergyBands(totalEnergy, targetBandEnergy, otherEnergy, ratio, peakConcentration);
     }
