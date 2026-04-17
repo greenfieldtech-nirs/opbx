@@ -23,7 +23,6 @@ public class EnergyVad {
     private int speechCounter = 0;
     private boolean inSpeech = false;
     private double currentStreamMs = 0;
-    private final List<VadSegment> segments = new ArrayList<>();
 
     // Track audio for the current ongoing speech segment
     private double[] currentSpeechBuffer = new double[0];
@@ -45,7 +44,6 @@ public class EnergyVad {
         speechCounter = 0;
         inSpeech = false;
         currentStreamMs = 0;
-        segments.clear();
         currentSpeechBuffer = new double[0];
         currentSpeechStartMs = 0;
     }
@@ -75,7 +73,7 @@ public class EnergyVad {
                     inSpeech = true;
                     currentSpeechStartMs = bufferStartMs;
                     currentSpeechBuffer = new double[0];
-                    logger.info("VAD speech start at_ms={}", (int) currentSpeechStartMs);
+                    logger.debug("VAD speech start at_ms={}", (int) currentSpeechStartMs);
                 }
                 if (inSpeech) {
                     // Append frame to current speech buffer
@@ -87,7 +85,7 @@ public class EnergyVad {
                     // Emit segment if it exceeds clipMaxMs, then start a new one
                     double segmentDurationMs = currentStreamMs - currentSpeechStartMs;
                     if (segmentDurationMs >= clipMaxMs) {
-                        logger.info("VAD segment clipped at max_duration_ms={} start_ms={}", clipMaxMs, (int) currentSpeechStartMs);
+                        logger.debug("VAD segment clipped at max_duration_ms={} start_ms={}", clipMaxMs, (int) currentSpeechStartMs);
                         newSegments.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, currentStreamMs));
                         currentSpeechBuffer = new double[0];
                         currentSpeechStartMs = currentStreamMs;
@@ -99,10 +97,9 @@ public class EnergyVad {
                     double segmentEndMs = currentStreamMs;
                     double durationMs = segmentEndMs - currentSpeechStartMs;
                     if (durationMs >= clipMinMs && durationMs <= clipMaxMs) {
-                        logger.info("VAD speech end duration_ms={} start_ms={} end_ms={}", (int) durationMs, (int) currentSpeechStartMs, (int) segmentEndMs);
-                        newSegments.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, segmentEndMs));
+                        logger.debug("VAD speech end duration_ms={} start_ms={} end_ms={}", (int) durationMs, (int) currentSpeechStartMs, (int) segmentEndMs);
                     } else {
-                        logger.info("VAD speech discarded duration_ms={} (outside min/max)", (int) durationMs);
+                        logger.debug("VAD speech discarded duration_ms={} (outside min/max)", (int) durationMs);
                     }
 
                     inSpeech = false;
@@ -117,22 +114,21 @@ public class EnergyVad {
             bufferStartMs += (shiftSamples / (double) sampleRate) * 1000.0;
         }
 
-        segments.addAll(newSegments);
         return newSegments;
     }
 
     public List<VadSegment> flush() {
+        List<VadSegment> result = new ArrayList<>();
         if (inSpeech && currentSpeechBuffer.length > 0) {
             double segmentEndMs = currentStreamMs;
             double durationMs = segmentEndMs - currentSpeechStartMs;
             if (durationMs >= clipMinMs && durationMs <= clipMaxMs) {
                 logger.info("VAD flush emitted trailing segment duration_ms={} start_ms={} end_ms={}", (int) durationMs, (int) currentSpeechStartMs, (int) segmentEndMs);
-                segments.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, segmentEndMs));
+                result.add(new VadSegment(currentSpeechBuffer.clone(), currentSpeechStartMs, segmentEndMs));
             } else {
                 logger.info("VAD flush discarded trailing segment duration_ms={} (outside min/max)", (int) durationMs);
             }
         }
-        List<VadSegment> result = new ArrayList<>(segments);
         if (result.isEmpty()) {
             logger.info("VAD flush produced no segments");
         } else {

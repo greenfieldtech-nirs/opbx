@@ -7,17 +7,15 @@ public class AudioDecoder {
     private static final byte[] PCM_TO_MULAW = new byte[65536];
 
     static {
-        final int BIAS = 33;
         for (int i = 0; i < 256; i++) {
-            int sign = (i & 0x80) != 0 ? -1 : 1;
-            int exponent = (i & 0x70) >> 4;
-            int mantissa = i & 0x0f;
-            int value = mantissa << (exponent + 3);
-            value += BIAS << exponent;
-            if (sign < 0) {
-                value = BIAS - value;
-            } else {
-                value = value - BIAS;
+            int u = ~i & 0xFF;
+            int sign = (u & 0x80) >> 7;
+            int exponent = (u & 0x70) >> 4;
+            int mantissa = u & 0x0F;
+            int value = ((mantissa << 1) + 33) << exponent;
+            value -= 33;
+            if (sign == 1) {
+                value = -value;
             }
             MULAW_TO_PCM[i] = (short) value;
         }

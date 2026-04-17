@@ -291,6 +291,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./amd-worker/models:/app/models:ro
+      - ./volumes/amd-dumps:/tmp/amd-dumps
     depends_on:
       - nginx
       - redis

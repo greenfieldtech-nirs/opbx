@@ -3,7 +3,7 @@ package com.cloudonix.opbx.amd.feature;
 import org.jtransforms.fft.DoubleFFT_1D;
 
 public class EnergyAnalyzer {
-    public record EnergyBands(double totalEnergy, double targetBandEnergy, double otherEnergy, double ratio) {}
+    public record EnergyBands(double totalEnergy, double targetBandEnergy, double otherEnergy, double ratio, double peakConcentration) {}
 
     public static EnergyBands computeEnergyBands(double[] pcmData, int sampleRate, int lowFreq, int highFreq) {
         int n = (int) Math.pow(2, Math.ceil(Math.log(pcmData.length) / Math.log(2)));
@@ -32,6 +32,21 @@ public class EnergyAnalyzer {
 
         double otherEnergy = totalEnergy - targetBandEnergy;
         double ratio = otherEnergy > 0 ? targetBandEnergy / otherEnergy : targetBandEnergy;
-        return new EnergyBands(totalEnergy, targetBandEnergy, otherEnergy, ratio);
+
+        double peakEnergy = 0;
+        for (int i = 0; i < numBins; i++) {
+            double freq = i * binSize;
+            if (freq >= lowFreq && freq <= highFreq) {
+                double real = (i == 0 || i == n / 2) ? padded[i] : padded[2 * i];
+                double imag = (i == 0 || i == n / 2) ? 0 : padded[2 * i + 1];
+                double magnitude = Math.sqrt(real * real + imag * imag);
+                double energy = magnitude * magnitude;
+                if (energy > peakEnergy) {
+                    peakEnergy = energy;
+                }
+            }
+        }
+        double peakConcentration = targetBandEnergy > 0 ? peakEnergy / targetBandEnergy : 0;
+        return new EnergyBands(totalEnergy, targetBandEnergy, otherEnergy, ratio, peakConcentration);
     }
 }

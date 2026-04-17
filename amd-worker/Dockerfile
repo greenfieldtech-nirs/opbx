@@ -13,4 +13,4 @@ WORKDIR /app
 COPY --from=builder /build/target/amd-worker-1.0.0.jar ./app.jar
 COPY models ./models
 EXPOSE 8082 8083
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Dorg.slf4j.simpleLogger.showDateTime=true", "-Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS", "-jar", "app.jar"]

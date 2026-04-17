@@ -91,10 +91,38 @@ public class StreamHandler {
         String streamSid = msg.streamSid;
         String callSid = msg.start.callSid;
 
+        // Close any existing WebSocket for this streamSid to prevent duplicate streams corrupting VAD state
+        ServerWebSocket oldWs = null;
+        for (java.util.Map.Entry<ServerWebSocket, String> entry : wsToStreamSid.entrySet()) {
+            if (streamSid.equals(entry.getValue())) {
+                oldWs = entry.getKey();
+                break;
+            }
+        }
+        if (oldWs != null) {
+            logger.warn("Closing duplicate stream call_sid={} stream_sid={}", callSid, streamSid);
+            wsToStreamSid.remove(oldWs);
+            activeStreams.remove(streamSid);
+            try {
+                oldWs.close();
+            } catch (Exception e) {
+                logger.debug("Error closing old websocket: {}", e.getMessage());
+            }
+        }
+
         StreamSession session = new StreamSession(
             vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector,
             dumpAudio, dumpAudioPath
         );
+
+        if (msg.start.mediaFormat != null) {
+            session.sampleRate = msg.start.mediaFormat.sampleRate;
+            logger.info("Stream media format call_sid={} stream_sid={} encoding={} sample_rate={} channels={}",
+                callSid, streamSid,
+                msg.start.mediaFormat.encoding,
+                msg.start.mediaFormat.sampleRate,
+                msg.start.mediaFormat.channels);
+        }
 
         session.onResultLogged = result -> {
             logResultAndClose(ws, session, result);
@@ -121,8 +149,8 @@ public class StreamHandler {
 
         byte[] payload = AudioDecoder.decodeBase64(msg.media.payload);
         short[] pcm16 = AudioDecoder.decodeMulawToPcm16(payload);
-        double[] float32_8k = AudioDecoder.pcm16ToDouble(pcm16);
-        double[] float32_16k = AudioResampler.resampleLinear(float32_8k, 8000, 16000);
+        double[] float32_input = AudioDecoder.pcm16ToDouble(pcm16);
+        double[] float32_16k = AudioResampler.resampleLinear(float32_input, session.sampleRate, 16000);
 
         double chunkDurationMs = (float32_16k.length / 16000.0) * 1000.0;
         double streamElapsedMs = System.currentTimeMillis() - session.startTimeMs;
@@ -130,9 +158,34 @@ public class StreamHandler {
 
         session.mediaChunkCounter++;
         session.totalAudioMs += chunkDurationMs;
+        session.appendRawAudio(float32_16k);
 
         if (session.dumper.isEnabled()) {
             session.dumper.append(float32_16k);
+        }
+
+        // Run tone detector on rolling buffer to catch beeps that VAD may classify as silence.
+        // Only enable after ~11.5s since the real voicemail beep is always around 12-13s.
+        if (!session.resolved.get()
+            && session.totalAudioMs >= 11500
+            && session.totalAudioMs - session.lastToneCheckMs >= 500) {
+            session.lastToneCheckMs = session.totalAudioMs;
+            double[] recentAudio = session.getRecentAudio(1500);
+            if (recentAudio.length >= 640) { // at least 40ms
+                double checkStartMs = Math.max(0, session.totalAudioMs - 1500);
+                Detector.AudioSegment toneSeg = new Detector.AudioSegment(
+                    recentAudio, 16000, (recentAudio.length / 16000.0) * 1000.0, checkStartMs
+                );
+                ToneEnergyDetector toneDetector = new ToneEnergyDetector();
+                DetectionResult toneResult = toneDetector.process(toneSeg);
+                if (toneResult != null) {
+                    logger.info("Tone detected in rolling buffer call_sid={} stream_sid={} start_ms={} reason=\"{}\"",
+                        session.callSid, session.streamSid, (int) checkStartMs, toneResult.reason);
+                    if (session.pipeline.resolveWithResult(toneResult)) {
+                        logResultAndClose(ws, session, toneResult);
+                    }
+                }
+            }
         }
 
         boolean shouldLog = session.mediaChunkCounter == 1
@@ -145,7 +198,7 @@ public class StreamHandler {
 
         List<EnergyVad.VadSegment> segments = session.vad.process(float32_16k, chunkStartMs);
         if (!segments.isEmpty()) {
-            logger.info("VAD produced {} segment(s) call_sid={} stream_sid={}",
+            logger.debug("VAD produced {} segment(s) call_sid={} stream_sid={}",
                 segments.size(), session.callSid, session.streamSid);
         }
         processVadSegments(session, segments);
@@ -157,7 +210,7 @@ public class StreamHandler {
                 break;
             }
             double durationMs = segment.endMs() - segment.startMs();
-            logger.info("Processing VAD segment call_sid={} stream_sid={} duration_ms={} start_ms={}",
+            logger.debug("Processing VAD segment call_sid={} stream_sid={} duration_ms={} start_ms={}",
                 session.callSid, session.streamSid, (int) durationMs, (int) segment.startMs());
             Detector.AudioSegment audioSeg = new Detector.AudioSegment(
                 segment.pcmData(), 16000, durationMs, segment.startMs()
@@ -166,7 +219,7 @@ public class StreamHandler {
                 if (ar.succeeded() && session.pipeline.isResolved()) {
                     logger.info("Pipeline resolved for call_sid={} stream_sid={}", session.callSid, session.streamSid);
                 } else if (ar.succeeded()) {
-                    logger.info("Pipeline completed segment with no detection call_sid={} stream_sid={}", session.callSid, session.streamSid);
+                    logger.debug("Pipeline completed segment with no detection call_sid={} stream_sid={}", session.callSid, session.streamSid);
                 } else {
                     logger.warn("Pipeline failed for segment call_sid={} stream_sid={} error={}",
                         session.callSid, session.streamSid, ar.cause().getMessage());

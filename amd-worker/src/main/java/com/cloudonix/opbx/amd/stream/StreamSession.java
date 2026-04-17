@@ -23,10 +23,36 @@ public class StreamSession {
     public volatile int mediaChunkCounter = 0;
     public volatile double totalAudioMs = 0;
     public volatile long lastMediaLogMs = 0;
+    public volatile int sampleRate = 8000;
+    public volatile double lastToneCheckMs = 0;
+
+    private final java.util.List<double[]> rawAudioChunks = new java.util.ArrayList<>();
+
+    public void appendRawAudio(double[] chunk) {
+        rawAudioChunks.add(chunk.clone());
+    }
+
+    public double[] getRecentAudio(double durationMs) {
+        int samplesNeeded = (int) Math.ceil((durationMs / 1000.0) * 16000);
+        double[] result = new double[samplesNeeded];
+        int pos = samplesNeeded;
+        for (int i = rawAudioChunks.size() - 1; i >= 0 && pos > 0; i--) {
+            double[] chunk = rawAudioChunks.get(i);
+            int toCopy = Math.min(chunk.length, pos);
+            System.arraycopy(chunk, chunk.length - toCopy, result, pos - toCopy, toCopy);
+            pos -= toCopy;
+        }
+        if (pos > 0) {
+            double[] trimmed = new double[samplesNeeded - pos];
+            System.arraycopy(result, pos, trimmed, 0, trimmed.length);
+            return trimmed;
+        }
+        return result;
+    }
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
-                          java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
-                          boolean dumpAudio, String dumpAudioPath) {
+                           java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
+                           boolean dumpAudio, String dumpAudioPath) {
         this.callSid = callSid;
         this.streamSid = streamSid;
         this.startTimeMs = System.currentTimeMillis();
