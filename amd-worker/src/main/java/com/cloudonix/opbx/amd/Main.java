@@ -6,9 +6,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Main {
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
+        // Configure slf4j-simple log level from env var BEFORE creating any logger.
+        // slf4j-simple reads org.slf4j.simpleLogger.defaultLogLevel system property.
+        String logLevel = System.getenv("AMD_LOG_LEVEL");
+        if (logLevel != null && !logLevel.isEmpty()) {
+            System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", logLevel);
+        }
+
+        Logger logger = LoggerFactory.getLogger(Main.class);
         logger.info("AMD Worker starting version=1.0.0");
         Config config = new Config();
         Vertx vertx = Vertx.vertx();
