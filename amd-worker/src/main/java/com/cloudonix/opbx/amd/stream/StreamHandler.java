@@ -81,17 +81,8 @@ public class StreamHandler {
         });
 
         ws.textMessageHandler(text -> {
-            // Log raw JSON for debugging. Media payloads are huge (Base64 audio), so truncate them.
-            if (text.contains("\"event\":\"media\"")) {
-                int payloadStart = text.indexOf("\"payload\":\"");
-                if (payloadStart > 0) {
-                    int payloadEnd = text.indexOf("\"", payloadStart + 12);
-                    String truncated = text.substring(0, payloadStart + 12) + "[truncated]" + text.substring(payloadEnd);
-                    logger.info("RAW: {}", truncated);
-                } else {
-                    logger.info("RAW: {}", text);
-                }
-            } else {
+            // Log raw JSON for debugging, but skip media events (arrive every 20ms and are huge).
+            if (!text.contains("\"event\":\"media\"")) {
                 logger.info("RAW: {}", text);
             }
             StreamMessage msg = StreamMessage.parse(text, mapper);
@@ -167,10 +158,6 @@ public class StreamHandler {
         if (session == null || session.resolved.get()) {
             return;
         }
-
-        logger.info("EVENT: media seq={} stream_sid={} track={} chunk={} timestamp={} payload_bytes={}",
-            msg.sequenceNumber, msg.streamSid, msg.media.track, msg.media.chunk,
-            msg.media.timestamp, msg.media.payload != null ? msg.media.payload.length() : 0);
 
         byte[] payload = AudioDecoder.decodeBase64(msg.media.payload);
         short[] pcm16 = AudioDecoder.decodeMulawToPcm16(payload);
