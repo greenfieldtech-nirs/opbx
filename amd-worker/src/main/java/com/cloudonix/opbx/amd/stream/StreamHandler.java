@@ -87,12 +87,12 @@ public class StreamHandler {
                 if (payloadStart > 0) {
                     int payloadEnd = text.indexOf("\"", payloadStart + 12);
                     String truncated = text.substring(0, payloadStart + 12) + "[truncated]" + text.substring(payloadEnd);
-                    logger.debug("RAW: {}", truncated);
+                    logger.info("RAW: {}", truncated);
                 } else {
-                    logger.debug("RAW: {}", text);
+                    logger.info("RAW: {}", text);
                 }
             } else {
-                logger.debug("RAW: {}", text);
+                logger.info("RAW: {}", text);
             }
             StreamMessage msg = StreamMessage.parse(text, mapper);
             if (msg == null || msg.event == null) {
@@ -168,7 +168,7 @@ public class StreamHandler {
             return;
         }
 
-        logger.debug("EVENT: media seq={} stream_sid={} track={} chunk={} timestamp={} payload_bytes={}",
+        logger.info("EVENT: media seq={} stream_sid={} track={} chunk={} timestamp={} payload_bytes={}",
             msg.sequenceNumber, msg.streamSid, msg.media.track, msg.media.chunk,
             msg.media.timestamp, msg.media.payload != null ? msg.media.payload.length() : 0);
 
