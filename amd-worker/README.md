@@ -4,24 +4,34 @@ The **AMD (Answering Machine Detection) Worker** is a Java/Vert.x service that a
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Cloudonix Platform                            │
-│  ┌──────────────┐   WebSocket   ┌─────────────────────────────────┐ │
-│  │  Voice Call  │──────────────▶│  AMD Worker  (/ws/detect)       │ │
-│  │  (mu-law)    │  audio/x-mulaw│  - StreamHandler                │ │
-│  └──────────────┘               │  - EnergyVad                    │ │
-│                                 │  - DetectionPipeline            │ │
-│                                 │    ├─ BeepMlDetector (ONNX)     │ │
-│                                 │    └─ ToneEnergyDetector        │ │
-│                                 └─────────────────────────────────┘ │
-│                                                    │                 │
-│                                                    ▼                 │
-│                                 ┌─────────────────────────────────┐ │
-│                                 │  Decision: HUMAN / VOICEMAIL    │ │
-│                                 │  (returned via callback/close)  │ │
-│                                 └─────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Cloudonix["Cloudonix Platform"]
+        VC["Voice Call<br/>audio/x-mulaw"]
+    end
+
+    subgraph AMD["AMD Worker"]
+        WS["WebSocket Handler<br/>/ws/detect"]
+        SH["StreamHandler"]
+        VAD["EnergyVad"]
+        DP["DetectionPipeline"]
+        BMLD["BeepMlDetector<br/>(ONNX)"]
+        TED["ToneEnergyDetector"]
+        AD["AudioDumper<br/>(optional)"]
+    end
+
+    Decision["Decision:<br/>HUMAN / VOICEMAIL / UNKNOWN"]
+
+    VC -->|"WebSocket audio stream"| WS
+    WS --> SH
+    SH --> VAD
+    SH -->|"rolling buffer<br/>> 11.5s"| TED
+    SH -->|"debugging"| AD
+    VAD -->|"speech segments"| DP
+    DP -->|"async worker thread"| BMLD
+    DP -->|"sync fallback"| TED
+    BMLD --> Decision
+    TED --> Decision
 ```
 
 ## Components
@@ -84,23 +94,59 @@ The **AMD (Answering Machine Detection) Worker** is a Java/Vert.x service that a
 
 ## Data Flow
 
-1. **Connection**: Cloudonix opens a WebSocket to `/ws/detect` with audio stream.
-2. **Auth**: `StreamHandler` validates `Authorization: Bearer <token>` header (if `AMD_WORKER_API_TOKEN` is configured).
-3. **Start**: `StreamMessage` with `event: "start"` creates a `StreamSession` with VAD + detection pipeline + timeout timer.
-4. **Media**: Each 20ms mu-law chunk is:
-   - Base64 decoded (with 1 MiB size limit)
-   - Mu-law → PCM16 → float64
-   - Resampled from stream rate to 16 kHz
-   - Appended to rolling audio buffer (max 5 seconds retained)
-   - Optionally dumped to WAV file
-   - Fed to VAD for speech segmentation
-   - After ~11.5 seconds, rolling buffer is scanned by `ToneEnergyDetector` every 500ms
-5. **VAD Segments**: When VAD emits a speech segment, it's passed through the `DetectionPipeline`:
-   - `BeepMlDetector` runs asynchronously (if enabled and model loaded)
-   - `ToneEnergyDetector` runs synchronously as fallback
-6. **Decision**: First positive detection resolves the pipeline. Result is logged and WebSocket is closed.
-7. **Timeout**: If no detection within 45 seconds, session times out with `UNKNOWN` result.
-8. **Stop**: Cloudonix sends `event: "stop"`. VAD flushes remaining audio, pipeline processes final segments, session cleans up.
+```mermaid
+sequenceDiagram
+    participant C as Cloudonix
+    participant WS as WebSocket<br/>/ws/detect
+    participant SH as StreamHandler
+    participant SS as StreamSession
+    participant VAD as EnergyVad
+    participant DP as DetectionPipeline
+    participant TED as ToneEnergyDetector
+    participant BML as BeepMlDetector
+
+    C->>WS: WebSocket upgrade
+    WS->>WS: Validate Bearer token<br/>(if AMD_WORKER_API_TOKEN set)
+    C->>SH: event: "start"
+    SH->>SS: Create session + timeout timer
+    loop Every 20ms audio chunk
+        C->>SH: event: "media" (mu-law)
+        SH->>SH: Base64 decode → PCM16 → float64
+        SH->>SH: Resample to 16kHz
+        SH->>SS: Append to rolling buffer
+        SH->>VAD: Process audio chunk
+        opt After ~11.5s elapsed
+            SH->>TED: Scan rolling buffer<br/>(every 500ms)
+            alt Beep detected (CV ≤ 0.22, ratio ≥ 10)
+                TED->>DP: Result: VOICEMAIL
+                DP-->>SH: Resolve pipeline
+                SH-->>C: Close WebSocket
+            end
+        end
+    end
+    VAD->>DP: Speech segment
+    DP->>BML: processAsync (Vert.x worker)
+    alt ML detection positive
+        BML->>DP: Result: VOICEMAIL
+        DP-->>SH: Resolve pipeline
+        SH-->>C: Close WebSocket
+    else No ML detection
+        DP->>TED: process (sync)
+        alt Tone detected
+            TED->>DP: Result: VOICEMAIL
+            DP-->>SH: Resolve pipeline
+            SH-->>C: Close WebSocket
+        end
+    end
+    alt Timeout (45s)
+        SS->>SH: onTimeout
+        SH-->>C: Close WebSocket<br/>Result: UNKNOWN
+    end
+    C->>SH: event: "stop"
+    SH->>VAD: flush()
+    VAD->>DP: Final segments
+    SH->>SS: Cleanup + dispose
+```
 
 ## Security Model
 
@@ -108,7 +154,7 @@ The **AMD (Answering Machine Detection) Worker** is a Java/Vert.x service that a
 
 The WebSocket endpoint supports optional Bearer token authentication via the `Authorization` header:
 
-```
+```bash
 AMD_WORKER_API_TOKEN=your-secret-token
 ```
 
@@ -233,6 +279,7 @@ DECISION: HUMAN ... detector=beep_ml ...
 amd-worker/
 ├── Dockerfile
 ├── pom.xml
+├── README.md
 ├── models/
 │   └── beep_detector.onnx
 └── src/
