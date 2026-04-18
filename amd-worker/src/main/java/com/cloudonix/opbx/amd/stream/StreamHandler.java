@@ -336,24 +336,39 @@ public class StreamHandler {
 
         String json = buildCallbackPayload(session, result, action, reason, confidence, detectionTimeMs);
 
-        vertx.createHttpClient()
-            .request(io.vertx.core.http.HttpMethod.POST, actionCallbackUrl)
-            .compose(req -> {
-                req.putHeader("Content-Type", "application/json");
-                req.putHeader("Authorization", "Bearer " + apiToken);
-                return req.send(json);
-            })
-            .onComplete(ar -> {
-                if (ar.succeeded()) {
-                    var response = ar.result();
-                    logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
-                        session.callSid, result, action, response.statusCode());
-                    response.body(); // consume body to avoid resource leak
-                } else {
-                    logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
-                        session.callSid, result, action, ar.cause().getMessage());
-                }
-            });
+        try {
+            java.net.URI uri = new java.net.URI(actionCallbackUrl);
+            String host = uri.getHost();
+            int port = uri.getPort() != -1 ? uri.getPort() : ("https".equals(uri.getScheme()) ? 443 : 80);
+            String path = uri.getRawPath();
+            if (uri.getRawQuery() != null) {
+                path += "?" + uri.getRawQuery();
+            }
+
+            logger.info("Sending AMD action callback to {}:{}{} call_sid={} result={} action={}",
+                host, port, path, session.callSid, result, action);
+
+            vertx.createHttpClient()
+                .request(io.vertx.core.http.HttpMethod.POST, port, host, path)
+                .compose(req -> {
+                    req.putHeader("Content-Type", "application/json");
+                    req.putHeader("Authorization", "Bearer " + apiToken);
+                    return req.send(json);
+                })
+                .onComplete(ar -> {
+                    if (ar.succeeded()) {
+                        var response = ar.result();
+                        logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
+                            session.callSid, result, action, response.statusCode());
+                        response.body(); // consume body to avoid resource leak
+                    } else {
+                        logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
+                            session.callSid, result, action, ar.cause().getMessage());
+                    }
+                });
+        } catch (java.net.URISyntaxException e) {
+            logger.error("Invalid action callback URL: {} error={}", actionCallbackUrl, e.getMessage());
+        }
     }
 
     private String resolveAction(StreamSession session, String result) {
