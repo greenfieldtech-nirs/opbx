@@ -120,6 +120,18 @@ class CloudonixClient
     }
 
     /**
+     * Switch an active session to a new voice application.
+     *
+     * @param  string  $sessionToken  The Cloudonix session token
+     * @param  string  $url  The URL of the new voice application CXML endpoint
+     * @return bool True on success, false on failure
+     */
+    public function switchVoiceApplication(string $sessionToken, string $url): bool
+    {
+        return $this->callsClient->switchVoiceApplication($sessionToken, $url);
+    }
+
+    /**
      * Get list of calls with optional filters.
      *
      * @param  array<string, mixed>  $filters

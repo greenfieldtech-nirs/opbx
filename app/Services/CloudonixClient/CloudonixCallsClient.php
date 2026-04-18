@@ -329,4 +329,67 @@ class CloudonixCallsClient extends CloudonixBaseClient
             fallbackValue: null
         );
     }
+
+    /**
+     * Switch an active session to a new voice application.
+     *
+     * Makes a POST request to /calls/{domain-id}/sessions/{token}/application
+     * to redirect the session to a new CXML endpoint.
+     *
+     * @see https://developers.cloudonix.com/cloudonixRestOpenAPI#/operations/switchVoiceApplication
+     *
+     * @param  string  $sessionToken  The Cloudonix session token
+     * @param  string  $url  The URL of the new voice application CXML endpoint
+     * @return bool True on success, false on failure
+     */
+    public function switchVoiceApplication(string $sessionToken, string $url): bool
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($sessionToken, $url) {
+                try {
+                    $apiUrl = "/calls/{$this->getDomainUuid()}/sessions/{$sessionToken}/application";
+                    $fullUrl = $this->getBaseUrl().$apiUrl;
+
+                    Log::info('CloudonixClient: Switching voice application', [
+                        'session_token' => $sessionToken,
+                        'url' => $url,
+                        'api_url' => $fullUrl,
+                    ]);
+
+                    $response = $this->client()
+                        ->post($apiUrl, ['url' => $url]);
+
+                    if ($response->successful()) {
+                        Log::info('CloudonixClient: Voice application switched successfully', [
+                            'session_token' => $sessionToken,
+                            'url' => $url,
+                        ]);
+
+                        return true;
+                    }
+
+                    Log::warning('CloudonixClient: Failed to switch voice application', [
+                        'session_token' => $sessionToken,
+                        'url' => $url,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return false;
+                } catch (\Exception $e) {
+                    Log::error('CloudonixClient: Exception while switching voice application', [
+                        'session_token' => $sessionToken,
+                        'url' => $url,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null, // No caching for write operations
+            fallbackValue: false
+        );
+    }
 }

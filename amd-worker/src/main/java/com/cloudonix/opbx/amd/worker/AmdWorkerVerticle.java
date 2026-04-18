@@ -56,7 +56,8 @@ public class AmdWorkerVerticle extends AbstractVerticle {
             mapper,
             config.dumpAudio,
             config.dumpAudioPath,
-            config.apiToken
+            config.apiToken,
+            config.actionCallbackUrl
         );
 
         wsServer = vertx.createHttpServer(new HttpServerOptions().setPort(config.websocketPort));

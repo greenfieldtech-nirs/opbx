@@ -29,6 +29,7 @@ public class StreamHandler {
     private final boolean dumpAudio;
     private final String dumpAudioPath;
     private final String apiToken;
+    private final String actionCallbackUrl;
     private final Map<String, StreamSession> activeStreams = new ConcurrentHashMap<>();
     private final Map<ServerWebSocket, String> wsToStreamSid = new ConcurrentHashMap<>();
     private final ToneEnergyDetector toneEnergyDetector = new ToneEnergyDetector();
@@ -36,7 +37,8 @@ public class StreamHandler {
     public StreamHandler(Vertx vertx, int maxConcurrentStreams, int defaultTimeoutMs,
                          List<String> detectors, BeepMlDetector beepMlDetector,
                          MetricsService metrics, ObjectMapper mapper,
-                         boolean dumpAudio, String dumpAudioPath, String apiToken) {
+                         boolean dumpAudio, String dumpAudioPath, String apiToken,
+                         String actionCallbackUrl) {
         this.vertx = vertx;
         this.maxConcurrentStreams = maxConcurrentStreams;
         this.defaultTimeoutMs = defaultTimeoutMs;
@@ -47,6 +49,7 @@ public class StreamHandler {
         this.dumpAudio = dumpAudio;
         this.dumpAudioPath = dumpAudioPath;
         this.apiToken = apiToken;
+        this.actionCallbackUrl = actionCallbackUrl;
     }
 
     public void handleConnection(ServerWebSocket ws) {
@@ -112,9 +115,20 @@ public class StreamHandler {
             msg.sequenceNumber, streamSid, callSid, msg.start.session,
             msg.start.tracks, msg.start.customParameters);
 
+        // Extract action options from customParameters
+        String sessionToken = msg.start.session;
+        String actionHuman = null;
+        String actionVoicemail = null;
+        String actionUnknown = null;
+        if (msg.start.customParameters != null) {
+            actionHuman = (String) msg.start.customParameters.get("action_human");
+            actionVoicemail = (String) msg.start.customParameters.get("action_voicemail");
+            actionUnknown = (String) msg.start.customParameters.get("action_unknown");
+        }
+
         StreamSession session = new StreamSession(
             vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector,
-            dumpAudio, dumpAudioPath
+            dumpAudio, dumpAudioPath, sessionToken, actionHuman, actionVoicemail, actionUnknown
         );
 
         // Atomically register this stream. If another connection already registered
@@ -274,6 +288,7 @@ public class StreamHandler {
         metrics.recordDetection("unknown", elapsedMs);
         logger.info("DECISION: UNKNOWN (timeout) call_sid={} stream_sid={} elapsed_ms={} reason=\"No voicemail detected within timeout\"",
             session.callSid, session.streamSid, elapsedMs);
+        sendActionCallback(session, "unknown", "No voicemail detected within timeout", 0.0, elapsedMs);
         cleanupSession(session.streamSid);
         wsToStreamSid.remove(ws);
         if (!ws.isClosed()) {
@@ -296,11 +311,92 @@ public class StreamHandler {
                 result.result, session.callSid, session.streamSid, result.detector, result.confidence, result.reason, elapsedMs);
         }
 
+        sendActionCallback(session, result.result.value, result.reason, result.confidence, elapsedMs);
+
         cleanupSession(session.streamSid);
         wsToStreamSid.remove(ws);
         if (!ws.isClosed()) {
             ws.close((short) 1000, "Detection complete");
         }
+    }
+
+    /**
+     * Send the AMD result to the Laravel callback endpoint.
+     * The callback is fire-and-forget: we close the WebSocket regardless of success.
+     */
+    private void sendActionCallback(StreamSession session, String result, String reason,
+                                     double confidence, long detectionTimeMs) {
+        if (actionCallbackUrl == null || actionCallbackUrl.isEmpty()) {
+            logger.debug("No action callback URL configured, skipping callback");
+            return;
+        }
+
+        // Resolve action based on result type and configured options
+        String action = resolveAction(session, result);
+
+        String json = buildCallbackPayload(session, result, action, reason, confidence, detectionTimeMs);
+
+        vertx.createHttpClient()
+            .request(io.vertx.core.http.HttpMethod.POST, actionCallbackUrl)
+            .compose(req -> {
+                req.putHeader("Content-Type", "application/json");
+                req.putHeader("Authorization", "Bearer " + apiToken);
+                return req.send(json);
+            })
+            .onComplete(ar -> {
+                if (ar.succeeded()) {
+                    var response = ar.result();
+                    logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
+                        session.callSid, result, action, response.statusCode());
+                    response.body(); // consume body to avoid resource leak
+                } else {
+                    logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
+                        session.callSid, result, action, ar.cause().getMessage());
+                }
+            });
+    }
+
+    private String resolveAction(StreamSession session, String result) {
+        String configuredAction = switch (result) {
+            case "voicemail" -> session.actionVoicemail;
+            case "human" -> session.actionHuman;
+            case "unknown" -> session.actionUnknown;
+            default -> null;
+        };
+
+        if (configuredAction != null && !configuredAction.isEmpty()) {
+            return configuredAction;
+        }
+
+        // Default behavior when no options are provided
+        if ("voicemail".equals(result)) {
+            return "HANGUP";
+        }
+        return "CONTINUE";
+    }
+
+    private String buildCallbackPayload(StreamSession session, String result, String action,
+                                         String reason, double confidence, long detectionTimeMs) {
+        return String.format(
+            "{\"callSid\":\"%s\",\"streamSid\":\"%s\",\"session\":\"%s\",\"result\":\"%s\",\"action\":\"%s\",\"confidence\":%.2f,\"detectionTimeMs\":%d,\"reason\":\"%s\"}",
+            escapeJson(session.callSid),
+            escapeJson(session.streamSid),
+            escapeJson(session.sessionToken != null ? session.sessionToken : ""),
+            escapeJson(result),
+            escapeJson(action),
+            confidence,
+            detectionTimeMs,
+            escapeJson(reason != null ? reason : "")
+        );
+    }
+
+    private static String escapeJson(String input) {
+        if (input == null) return "";
+        return input.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
     }
 
     private void cleanupSession(String streamSid) {

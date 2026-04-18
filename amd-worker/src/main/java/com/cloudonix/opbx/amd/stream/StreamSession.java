@@ -39,6 +39,10 @@ public class StreamSession {
     public volatile long lastMediaLogMs = 0;
     public volatile int sampleRate = 8000;
     public volatile double lastToneCheckMs = 0;
+    public volatile String actionHuman = null;
+    public volatile String actionVoicemail = null;
+    public volatile String actionUnknown = null;
+    public volatile String sessionToken = null;
 
     private final java.util.List<double[]> rawAudioChunks = new java.util.ArrayList<>();
     private static final int MAX_RETAINED_AUDIO_MS = 5000; // Keep last 5 seconds for rolling buffer checks
@@ -84,9 +88,20 @@ public class StreamSession {
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
                            java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
                            boolean dumpAudio, String dumpAudioPath) {
+        this(vertx, callSid, streamSid, timeoutMs, detectors, beepMl, dumpAudio, dumpAudioPath, null, null, null, null);
+    }
+
+    public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
+                           java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
+                           boolean dumpAudio, String dumpAudioPath,
+                           String sessionToken, String actionHuman, String actionVoicemail, String actionUnknown) {
         this.callSid = callSid;
         this.streamSid = streamSid;
         this.startTimeMs = System.currentTimeMillis();
+        this.sessionToken = sessionToken;
+        this.actionHuman = actionHuman;
+        this.actionVoicemail = actionVoicemail;
+        this.actionUnknown = actionUnknown;
         this.vad = new EnergyVad(16000, 10, 200, 3000, 3, 20);
         this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, result -> {
             if (onResultLogged != null) {
