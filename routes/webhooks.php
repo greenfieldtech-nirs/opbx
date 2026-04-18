@@ -45,6 +45,7 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
 |
 */
 
+use App\Http\Controllers\Voice\AmdActionController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
 Route::prefix('voice')->group(function (): void {
