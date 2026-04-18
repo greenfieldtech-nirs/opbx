@@ -307,6 +307,26 @@ export default function CallLogs() {
                 )
               },
               {
+                header: 'AMD Status',
+                accessorKey: 'amd_status' as any,
+                cell: (cdr) => {
+                  const isEnabled = cdr.amd_status?.startsWith('Enabled');
+                  const result = isEnabled ? cdr.amd_status.split('::')[1] : null;
+                  return (
+                    <span
+                      className={cn(
+                        'px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap',
+                        isEnabled
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                      )}
+                    >
+                      {isEnabled ? `Enabled::${result}` : 'Disabled'}
+                    </span>
+                  );
+                }
+              },
+              {
                 header: 'Duration',
                 accessorKey: 'duration_formatted' as any,
               },
@@ -415,6 +435,53 @@ export default function CallLogs() {
                   </div>
                 )}
               </div>
+
+              {/* AMD Result Section */}
+              {selectedCdr.amd_status?.startsWith('Enabled') && (
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-sm font-semibold text-green-800 mb-2">AMD Result</div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-green-700">Result</div>
+                      <div className="text-sm text-green-900 font-medium">
+                        {selectedCdr.amd_status.split('::')[1] || 'Unknown'}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-green-700">Confidence</div>
+                      <div className="text-sm text-green-900">
+                        {(selectedCdr.raw_cdr?.profile as any)?.amd?.confidence !== undefined
+                          ? `${((selectedCdr.raw_cdr?.profile as any)?.amd?.confidence * 100).toFixed(0)}%`
+                          : 'N/A'}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-green-700">Detection Time</div>
+                      <div className="text-sm text-green-900">
+                        {(selectedCdr.raw_cdr?.profile as any)?.amd?.detectionTimeMs !== undefined
+                          ? `${(selectedCdr.raw_cdr?.profile as any)?.amd?.detectionTimeMs}ms`
+                          : 'N/A'}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-green-700">Timestamp</div>
+                      <div className="text-sm text-green-900">
+                        {(selectedCdr.raw_cdr?.profile as any)?.amd?.timestamp
+                          ? formatDateTime((selectedCdr.raw_cdr?.profile as any)?.amd?.timestamp)
+                          : 'N/A'}
+                      </div>
+                    </div>
+                    {(selectedCdr.raw_cdr?.profile as any)?.amd?.reason && (
+                      <div className="min-w-0 col-span-2">
+                        <div className="text-xs font-medium text-green-700">Reason</div>
+                        <div className="text-sm text-green-900 break-words">
+                          {(selectedCdr.raw_cdr?.profile as any)?.amd?.reason}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <Tabs defaultValue="executions" className="w-full min-w-0">
                 <TabsList className="grid w-full grid-cols-2">

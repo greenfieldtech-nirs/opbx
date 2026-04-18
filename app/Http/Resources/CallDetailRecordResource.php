@@ -17,7 +17,6 @@ class CallDetailRecordResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -61,6 +60,9 @@ class CallDetailRecordResource extends JsonResource
             'rated_cost' => $this->rated_cost ? (float) $this->rated_cost : null,
             'approx_cost' => $this->approx_cost ? (float) $this->approx_cost : null,
             'sell_cost' => $this->sell_cost ? (float) $this->sell_cost : null,
+
+            // AMD status indicator
+            'amd_status' => $this->amd_status,
 
             // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
             'raw_cdr' => $this->when(

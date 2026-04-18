@@ -348,6 +348,18 @@ class CloudonixClient
         return $this->sessionsClient->disconnectSession($sessionId);
     }
 
+    /**
+     * Update a session's profile data.
+     *
+     * @param  int|string  $sessionId  The Cloudonix session token
+     * @param  array<string, mixed>  $profile  Profile data to update
+     * @return bool True on success, false on failure
+     */
+    public function updateSessionProfile(int|string $sessionId, array $profile): bool
+    {
+        return $this->sessionsClient->updateSessionProfile($sessionId, $profile);
+    }
+
     // =========================================================================
     // Recording Management Methods (Delegated to CloudonixRecordingsClient)
     // =========================================================================

@@ -204,6 +204,25 @@ class CallDetailRecord extends Model
     }
 
     /**
+     * Get AMD status from the raw CDR profile.
+     *
+     * Returns "Enabled::{result}" if AMD result exists in profile,
+     * or "Disabled" if no AMD data is present.
+     */
+    public function getAmdStatusAttribute(): string
+    {
+        $rawCdr = $this->raw_cdr ?? [];
+        $profile = $rawCdr['profile'] ?? [];
+        $amd = $profile['amd'] ?? null;
+
+        if ($amd && isset($amd['result'])) {
+            return 'Enabled::'.$amd['result'];
+        }
+
+        return 'Disabled';
+    }
+
+    /**
      * Scope query to connected calls only
      */
     public function scopeConnected($query)

@@ -658,6 +658,9 @@ export interface CallDetailRecord {
   approx_cost?: number;
   sell_cost?: number;
 
+  // AMD status (Enabled::{result} or Disabled)
+  amd_status: string;
+
   // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
   raw_cdr?: Record<string, unknown>;
 

@@ -86,6 +86,26 @@ class AmdActionController extends Controller
         try {
             $client = new CloudonixClient($settings);
 
+            // Step 1: Update session profile with AMD result BEFORE executing action
+            $profile = [
+                'amd' => [
+                    'result' => $result,
+                    'confidence' => $confidence,
+                    'detectionTimeMs' => $detectionTimeMs,
+                    'reason' => $reason,
+                    'timestamp' => now()->toIso8601String(),
+                ],
+            ];
+
+            $profileUpdated = $client->updateSessionProfile($sessionToken, $profile);
+            Log::info('AMD action: Session profile updated', [
+                'call_sid' => $callSid,
+                'session_token' => $sessionToken,
+                'profile' => $profile,
+                'success' => $profileUpdated,
+            ]);
+
+            // Step 2: Execute the configured action
             if ($action === 'HANGUP') {
                 $success = $client->disconnectSession($sessionToken);
                 Log::info('AMD action: HANGUP executed', [
@@ -97,6 +117,7 @@ class AmdActionController extends Controller
                 return response()->json([
                     'status' => $success ? 'ok' : 'error',
                     'action' => 'hangup',
+                    'profile_updated' => $profileUpdated,
                 ]);
             }
 
@@ -113,6 +134,7 @@ class AmdActionController extends Controller
                     'status' => $success ? 'ok' : 'error',
                     'action' => 'transfer',
                     'url' => $action,
+                    'profile_updated' => $profileUpdated,
                 ]);
             }
 
@@ -125,6 +147,7 @@ class AmdActionController extends Controller
                 return response()->json([
                     'status' => 'ok',
                     'action' => 'continue',
+                    'profile_updated' => $profileUpdated,
                 ]);
             }
 
