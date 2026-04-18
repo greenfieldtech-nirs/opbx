@@ -35,7 +35,7 @@ public class Config {
         this.dumpAudio = Boolean.parseBoolean(getEnv("AMD_DUMP_AUDIO", "false"));
         this.dumpAudioPath = getEnv("AMD_DUMP_AUDIO_PATH", "/tmp/amd-dumps");
         this.apiToken = getEnv("AMD_WORKER_API_TOKEN", "");
-        this.actionCallbackUrl = getEnv("AMD_ACTION_CALLBACK_URL", "http://app/api/voice/amd-action");
+        this.actionCallbackUrl = getEnv("AMD_ACTION_CALLBACK_URL", "http://nginx/api/voice/amd-action");
     }
 
     private static String getEnv(String key, String defaultValue) {
