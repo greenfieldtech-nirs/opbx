@@ -39,9 +39,9 @@ export interface AutoDialerCampaign {
   time_limit?: number;
   record_calls?: boolean;
   // WebSocket-based AMD action fields
-  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
-  action_human?: 'HANGUP' | 'CONTINUE' | string;
-  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  action_voicemail?: 'HANGUP' | 'CONTINUE';
+  action_human?: 'HANGUP' | 'CONTINUE';
+  action_unknown?: 'HANGUP' | 'CONTINUE';
   retry_on_voicemail?: boolean;
   statistics: {
     total_destinations: number;
@@ -83,9 +83,9 @@ export interface CreateCampaignRequest {
   time_limit?: number;
   record_calls?: boolean;
   // WebSocket-based AMD action fields
-  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
-  action_human?: 'HANGUP' | 'CONTINUE' | string;
-  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  action_voicemail?: 'HANGUP' | 'CONTINUE';
+  action_human?: 'HANGUP' | 'CONTINUE';
+  action_unknown?: 'HANGUP' | 'CONTINUE';
   retry_on_voicemail?: boolean;
   auto_start?: boolean;
 }
@@ -116,9 +116,9 @@ export interface UpdateCampaignRequest {
   time_limit?: number;
   record_calls?: boolean;
   // WebSocket-based AMD action fields
-  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
-  action_human?: 'HANGUP' | 'CONTINUE' | string;
-  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  action_voicemail?: 'HANGUP' | 'CONTINUE';
+  action_human?: 'HANGUP' | 'CONTINUE';
+  action_unknown?: 'HANGUP' | 'CONTINUE';
   retry_on_voicemail?: boolean;
   auto_start?: boolean;
 }

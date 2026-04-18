@@ -103,6 +103,7 @@ const campaignSchema = z.object({
   timezone: z.string().default('UTC'),
   time_limit: z.number().min(30).max(14400).default(3600),
   record_calls: z.boolean().default(false),
+  amd_enabled: z.boolean().default(false),
   action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
   action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
   action_unknown: z.enum(['HANGUP', 'CONTINUE']).optional(),
@@ -243,6 +244,7 @@ export default function AutoDialerCampaignForm() {
       timezone: 'UTC',
       time_limit: 3600,
       record_calls: false,
+      amd_enabled: false,
       action_voicemail: undefined,
       action_human: undefined,
       action_unknown: undefined,
@@ -298,6 +300,7 @@ export default function AutoDialerCampaignForm() {
         timezone: existingCampaign.timezone,
         time_limit: existingCampaign.time_limit,
         record_calls: existingCampaign.record_calls,
+        amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
         action_voicemail: (existingCampaign as any).action_voicemail || undefined,
         action_human: (existingCampaign as any).action_human || undefined,
         action_unknown: (existingCampaign as any).action_unknown || undefined,
@@ -358,10 +361,13 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
-          action_voicemail: data.action_voicemail,
-          action_human: data.action_human,
-          action_unknown: data.action_unknown,
-          retry_on_voicemail: data.retry_on_voicemail,
+          // Only include AMD actions if AMD is enabled
+          ...(data.amd_enabled ? {
+            action_voicemail: data.action_voicemail,
+            action_human: data.action_human,
+            action_unknown: data.action_unknown,
+            retry_on_voicemail: data.retry_on_voicemail,
+          } : {}),
         };
         
         // Add routing fields only if provided
@@ -395,10 +401,13 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
-          action_voicemail: data.action_voicemail,
-          action_human: data.action_human,
-          action_unknown: data.action_unknown,
-          retry_on_voicemail: data.retry_on_voicemail,
+          // Only include AMD actions if AMD is enabled
+          ...(data.amd_enabled ? {
+            action_voicemail: data.action_voicemail,
+            action_human: data.action_human,
+            action_unknown: data.action_unknown,
+            retry_on_voicemail: data.retry_on_voicemail,
+          } : {}),
           auto_start: data.auto_start,
           // Include Caller ID Pool fields
           caller_id_strategy: data.caller_id_strategy,
@@ -757,86 +766,109 @@ export default function AutoDialerCampaignForm() {
                     </div>
 
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-base font-medium">Answering Machine Detection</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Configure how the system handles calls based on who or what answers.
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="amd_enabled" className="text-base font-medium">Answering Machine Detection</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Detect voicemail and handle calls accordingly
+                          </p>
+                        </div>
+                        <Switch
+                          id="amd_enabled"
+                          checked={watch('amd_enabled')}
+                          onCheckedChange={(checked) => {
+                            setValue('amd_enabled', checked);
+                            if (checked) {
+                              // Set defaults when enabling
+                              setValue('action_voicemail', 'HANGUP');
+                              setValue('action_human', 'CONTINUE');
+                              setValue('action_unknown', 'HANGUP');
+                            } else {
+                              // Clear values when disabling
+                              setValue('action_voicemail', undefined);
+                              setValue('action_human', undefined);
+                              setValue('action_unknown', undefined);
+                              setValue('retry_on_voicemail', false);
+                            }
+                          }}
+                        />
                       </div>
 
-                      <div className="space-y-4 pl-4 border-l-2 border-muted">
-                        {/* Action: Voicemail */}
-                        <div className="space-y-2">
-                          <Label htmlFor="action_voicemail">If Voicemail Detected</Label>
-                          <Select
-                            value={watch('action_voicemail') || ''}
-                            onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
-                              setValue('action_voicemail', value)
-                            }
-                          >
-                            <SelectTrigger id="action_voicemail">
-                              <SelectValue placeholder="Select action" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-                              <SelectItem value="HANGUP">Hang up</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Action: Human */}
-                        <div className="space-y-2">
-                          <Label htmlFor="action_human">If Human Detected</Label>
-                          <Select
-                            value={watch('action_human') || ''}
-                            onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
-                              setValue('action_human', value)
-                            }
-                          >
-                            <SelectTrigger id="action_human">
-                              <SelectValue placeholder="Select action" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-                              <SelectItem value="HANGUP">Hang up</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Action: Unknown */}
-                        <div className="space-y-2">
-                          <Label htmlFor="action_unknown">If Detection Unclear</Label>
-                          <Select
-                            value={watch('action_unknown') || ''}
-                            onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
-                              setValue('action_unknown', value)
-                            }
-                          >
-                            <SelectTrigger id="action_unknown">
-                              <SelectValue placeholder="Select action" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-                              <SelectItem value="HANGUP">Hang up</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Retry on Voicemail */}
-                        <div className="flex items-center justify-between pt-2">
-                          <div className="space-y-0.5">
-                            <Label htmlFor="retry_on_voicemail">Retry on Voicemail</Label>
-                            <p className="text-sm text-muted-foreground">
-                              Automatically retry the call if voicemail is detected
-                            </p>
+                      {watch('amd_enabled') && (
+                        <div className="space-y-4 pl-4 border-l-2 border-muted">
+                          {/* Action: Voicemail */}
+                          <div className="space-y-2">
+                            <Label htmlFor="action_voicemail">If Voicemail Detected</Label>
+                            <Select
+                              value={watch('action_voicemail') || ''}
+                              onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
+                                setValue('action_voicemail', value)
+                              }
+                            >
+                              <SelectTrigger id="action_voicemail">
+                                <SelectValue placeholder="Select action" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CONTINUE">Continue to destination</SelectItem>
+                                <SelectItem value="HANGUP">Hang up</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <Switch
-                            id="retry_on_voicemail"
-                            checked={watch('retry_on_voicemail')}
-                            onCheckedChange={(checked) => setValue('retry_on_voicemail', checked)}
-                          />
+
+                          {/* Action: Human */}
+                          <div className="space-y-2">
+                            <Label htmlFor="action_human">If Human Detected</Label>
+                            <Select
+                              value={watch('action_human') || ''}
+                              onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
+                                setValue('action_human', value)
+                              }
+                            >
+                              <SelectTrigger id="action_human">
+                                <SelectValue placeholder="Select action" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CONTINUE">Continue to destination</SelectItem>
+                                <SelectItem value="HANGUP">Hang up</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Action: Unknown */}
+                          <div className="space-y-2">
+                            <Label htmlFor="action_unknown">If Detection Unclear</Label>
+                            <Select
+                              value={watch('action_unknown') || ''}
+                              onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
+                                setValue('action_unknown', value)
+                              }
+                            >
+                              <SelectTrigger id="action_unknown">
+                                <SelectValue placeholder="Select action" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CONTINUE">Continue to destination</SelectItem>
+                                <SelectItem value="HANGUP">Hang up</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Retry on Voicemail */}
+                          <div className="flex items-center justify-between pt-2">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="retry_on_voicemail">Retry on Voicemail</Label>
+                              <p className="text-sm text-muted-foreground">
+                                Automatically retry the call if voicemail is detected
+                              </p>
+                            </div>
+                            <Switch
+                              id="retry_on_voicemail"
+                              checked={watch('retry_on_voicemail')}
+                              onCheckedChange={(checked) => setValue('retry_on_voicemail', checked)}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

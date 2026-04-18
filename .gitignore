@@ -155,10 +155,12 @@ temp/
 reports/
 
 # ============================================================================
-# Local Storage Volumes
+# Local Storage Volumes & Backups
 # ============================================================================
+/backups/
 /volumes/minio/
 /volumes/mysql/
+/volumes/amd-dumps/
 
 # ============================================================================
 # Agent Memory (AI coding agent context files)
