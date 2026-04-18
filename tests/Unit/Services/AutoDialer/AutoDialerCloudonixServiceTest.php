@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\AutoDialer;
 
-use App\Enums\AmdMode;
 use App\Enums\RoutingDestinationType;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
@@ -77,12 +76,11 @@ class AutoDialerCloudonixServiceTest extends TestCase
             'dial_timeout' => 30,
             'time_limit' => 3600,
             'record_calls' => true,
-            'amd_enabled' => false,
-            'amd_mode' => null,
-            'amd_timeout' => 30,
-            'amd_speech_threshold' => 1500,
-            'amd_speech_end_threshold' => 2500,
-            'amd_silence_timeout' => 3500,
+            'action_voicemail' => null,
+            'action_human' => null,
+            'action_unknown' => null,
+            'retry_on_voicemail' => false,
+            'voicemail_calls' => 0,
         ];
 
         $campaign = new AutoDialerCampaign(array_merge($defaults, $overrides));
@@ -209,12 +207,13 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $campaign = $this->createCampaign([
             'routing_destination_type' => RoutingDestinationType::HANGUP,
         ]);
+        $destination = $this->createDestination();
 
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('buildRoutingPayload');
         $method->setAccessible(true);
 
-        $options = $method->invoke($this->service, $campaign);
+        $options = $method->invoke($this->service, $campaign, $destination);
 
         // Should return cxml key with hangup CXML
         $this->assertArrayHasKey('cxml', $options);
@@ -226,37 +225,15 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $campaign = $this->createCampaign([
             'routing_destination_type' => RoutingDestinationType::HANGUP,
         ]);
+        $destination = $this->createDestination();
 
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('generateCxmlForCampaign');
         $method->setAccessible(true);
 
-        $cxml = $method->invoke($this->service, $campaign);
+        $cxml = $method->invoke($this->service, $campaign, $destination);
 
         $this->assertStringContainsString('<Hangup/>', $cxml);
-    }
-
-    public function test_amd_mode_mapping_with_enum(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('mapAmdMode');
-        $method->setAccessible(true);
-
-        // Test with enum - returns the enum value directly
-        $this->assertEquals('Enabled', $method->invoke($this->service, AmdMode::ENABLED));
-        $this->assertEquals('DetectMessageEnd', $method->invoke($this->service, AmdMode::DETECT_MESSAGE_END));
-    }
-
-    public function test_amd_mode_mapping_with_string(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('mapAmdMode');
-        $method->setAccessible(true);
-
-        // Test with string values - maps to Cloudonix format
-        $this->assertEquals('Enable', $method->invoke($this->service, 'detect_wait'));
-        $this->assertEquals('DetectMessageEnd', $method->invoke($this->service, 'detect_beep'));
-        $this->assertEquals('Enable', $method->invoke($this->service, null));
     }
 
     public function test_validate_credentials_delegates_to_client(): void

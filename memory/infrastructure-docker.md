@@ -66,9 +66,36 @@
 ## Persistent Volumes
 | Volume | Mount Point | Purpose |
 |--------|------------|---------|
-| `mysql_data` | `/var/lib/mysql` | Database persistence |
+| `mysql_data` | `/var/lib/mysql` | Database persistence (survives container restarts) |
 | `redis_data` | `/data` | Redis AOF persistence |
 | `volumes/minio/` | `/data` | MinIO object storage |
+
+### ⚠️ Data Persistence Warnings
+
+**MySQL data is stored in a Docker named volume (`mysql_data`) which survives:**
+- Container restarts (`docker compose restart`)
+- Container recreation (`docker compose up -d --force-recreate`)
+- Host reboots (volume auto-reattaches)
+
+**MySQL data WILL BE LOST if you run:**
+- `docker compose down -v` (the `-v` flag removes volumes!)
+- `docker volume rm opbxcloudonixcom_mysql_data`
+- `docker volume prune` (if container is stopped)
+- Docker Desktop "Clean / Purge data" or "Reset to factory defaults"
+
+**Always backup before major changes:**
+```bash
+# Create timestamped backup
+./scripts/backup-database.sh
+
+# Create daily backup (overwrites previous daily)
+./scripts/backup-database.sh daily
+
+# Restore from backup
+./scripts/restore-database.sh backups/opbx-daily.sql.gz
+```
+
+**Backups are stored in `./backups/` on the host filesystem** (not in Docker volumes).
 
 ## Network
 Single `opbx` bridge network. All services communicate internally.

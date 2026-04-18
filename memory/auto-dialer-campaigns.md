@@ -16,7 +16,7 @@ Outbound calling campaigns that automatically dial phone numbers from distributi
 | `app/Models/AutoDialerCallerIdStat.php` | Per-DID usage statistics |
 | `app/Enums/CampaignStatus.php` | DRAFT, ACTIVE, PAUSED, COMPLETED, ARCHIVED |
 | `app/Enums/DestinationStatus.php` | PENDING, DIALING, CONNECTED, FAILED, COMPLETED, INVALID |
-| `app/Enums/AmdMode.php` | ENABLED, DETECT_MESSAGE_END |
+| `app/Services/AutoDialer/AutoDialerCloudonixService.php` | Cloudonix API calls + CXML generation with AMD stream wrapper (937 lines) |
 | `app/Services/AutoDialer/CampaignLifecycleManager.php` | State transitions (197 lines) |
 | `app/Services/AutoDialer/CampaignProcessor.php` | Batch processing (156 lines) |
 | `app/Services/AutoDialer/CampaignStatistics.php` | Stats with caching |
@@ -48,7 +48,7 @@ ANY --[archive]--> ARCHIVED  (pauses first if ACTIVE)
 
 ## Database Tables
 ### `auto_dialer_campaigns`
-Key columns: organization_id, name, status, routing_destination_type, routing_destination_id, dial_timeout, caller_id, max_dial_attempts, concurrent_active_calls (CAC, 1-50), calls_per_second (CPS, 1-5), days_active (JSON), start_time, end_time, start_date, end_date, timezone, schedule (JSON weekly), amd_enabled, amd_mode, total_destinations, completed_calls, failed_calls, pending_calls
+Key columns: organization_id, name, status, routing_destination_type, routing_destination_id, dial_timeout, caller_id, max_dial_attempts, concurrent_active_calls (CAC, 1-50), calls_per_second (CPS, 1-5), days_active (JSON), start_time, end_time, start_date, end_date, timezone, schedule (JSON weekly), action_voicemail, action_human, action_unknown, retry_on_voicemail, total_destinations, completed_calls, failed_calls, voicemail_calls, pending_calls
 
 ### `auto_dialer_call_sessions`
 organization_id, campaign_id, destination_id, phone_number, worker_id, session_token, call_id, status, disposition, duration, billsec, recording_url, amd_result, amd_confidence, initiated_at, answered_at, completed_at
@@ -109,6 +109,12 @@ Prefix: `/v1/dialer/worker`, middleware: `dialer.worker.auth`
 ## Retry Strategy
 Exponential backoff: `5 * 2^(attempt-1)` minutes, capped at 60 minutes. Retryable dispositions: busy, no-answer, cancelled.
 
+### Voicemail Retry
+- If `retry_on_voicemail` is true and AMD detects voicemail, destination is rescheduled as PENDING with exponential backoff
+- Voicemail retry counts against `max_dial_attempts`
+- Voicemail calls increment `voicemail_calls` counter on campaign
+- If max attempts reached, voicemail counts as completed (not failed)
+
 ### Tests
 | File | Purpose |
 |------|---------|
@@ -130,7 +136,9 @@ Exponential backoff: `5 * 2^(attempt-1)` minutes, capped at 60 minutes. Retryabl
 ## CXML Generation
 - WebSocket URLs: all placeholders ({session}, {from}, {to}, {bot_id}, {auth_token}) resolved before sending to Cloudonix
 - CXML Provider: AutoDialerCloudonixService simulates a POST request to the `endpoint_url` as if Cloudonix issued a Voice Application Request, with `From` and `To` swapped because the dialer flow is reversed (`From` = destination phone number, `To` = campaign caller_id). The returned CXML is then passed inline to Cloudonix as `cxml` (not as a `url` parameter)
-- AMD mode mapping: `AmdMode::ENABLED` → `Enable` (not `Enabled`), `AmdMode::DETECT_MESSAGE_END` → `DetectMessageEnd`
+- AMD Stream Wrapper: `wrapCxmlWithAmdStream()` wraps existing CXML with `<Start><Stream url="wss://.../ws/amd/detect"><Parameter name="action_voicemail" value="..."/>...</Stream></Start>` based on campaign action fields
+- AMD actions: `action_voicemail`, `action_human`, `action_unknown` — each can be `HANGUP`, `CONTINUE`, or a remote `http/https` CXML URL
+- Stream URL derived from `CloudonixSettings.webhook_base_url` (https→wss, http→ws)
 - CxmlBuilder: `connectStream` does NOT use htmlspecialchars (DOMDocument handles escaping)
 - Uses `dialer` Redis connection (prefix-free) for all Go worker shared keys
 

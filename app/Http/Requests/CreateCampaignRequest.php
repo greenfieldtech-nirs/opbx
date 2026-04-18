@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
-use App\Enums\AmdMode;
 use App\Enums\RoutingDestinationType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -126,17 +125,11 @@ class CreateCampaignRequest extends FormRequest
             'time_limit' => ['nullable', 'integer', 'min:30', 'max:14400'],
             'record_calls' => ['boolean'],
 
-            // Answering Machine Detection
-            'amd_enabled' => ['boolean'],
-            'amd_mode' => [
-                'nullable',
-                Rule::enum(AmdMode::class),
-                Rule::requiredIf(fn () => $this->boolean('amd_enabled')),
-            ],
-            'amd_timeout' => ['nullable', 'integer', 'min:5', 'max:120'],
-            'amd_speech_threshold' => ['nullable', 'integer', 'min:500', 'max:5000'],
-            'amd_speech_end_threshold' => ['nullable', 'integer', 'min:500', 'max:5000'],
-            'amd_silence_timeout' => ['nullable', 'integer', 'min:500', 'max:10000'],
+            // Answering Machine Detection (WebSocket-based)
+            'action_voicemail' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
+            'action_human' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
+            'action_unknown' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
+            'retry_on_voicemail' => ['boolean'],
 
             // Auto-start option
             'auto_start' => ['boolean'],
@@ -185,12 +178,10 @@ class CreateCampaignRequest extends FormRequest
             'end_date' => 'end date',
             'time_limit' => 'time limit',
             'record_calls' => 'record calls',
-            'amd_enabled' => 'answering machine detection',
-            'amd_mode' => 'AMD mode',
-            'amd_timeout' => 'AMD timeout',
-            'amd_speech_threshold' => 'speech threshold',
-            'amd_speech_end_threshold' => 'speech end threshold',
-            'amd_silence_timeout' => 'silence timeout',
+            'action_voicemail' => 'voicemail action',
+            'action_human' => 'human action',
+            'action_unknown' => 'unknown action',
+            'retry_on_voicemail' => 'retry on voicemail',
         ];
     }
 }

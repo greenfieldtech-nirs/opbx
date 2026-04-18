@@ -97,7 +97,6 @@ class DialerWebhookProxyController extends Controller
                 'call.answered', 'call.connected' => $this->handleCallAnswered($request, $session),
                 'call.completed' => $this->handleCallCompleted($request, $session),
                 'call.failed', 'call.busy', 'call.no-answer' => $this->handleCallFailed($request, $session),
-                'amd.completed' => $this->handleAmdCompleted($request, $session),
                 default => $this->handleUnknownEvent($request),
             };
         });
@@ -233,29 +232,6 @@ class DialerWebhookProxyController extends Controller
     }
 
     /**
-     * Handle AMD (Answering Machine Detection) completed event.
-     */
-    private function handleAmdCompleted(Request $request, ?AutoDialerCallSession $session): JsonResponse
-    {
-        if (! $session) {
-            return response()->json(['status' => 'error', 'message' => 'Session not found'], 404);
-        }
-
-        $result = $request->input('result'); // 'human', 'machine', 'unknown'
-        $confidence = $request->input('confidence');
-
-        $session->setAmdResult($result, $confidence);
-
-        Log::info('Dialer AMD result', [
-            'session_id' => $session->id,
-            'result' => $result,
-            'confidence' => $confidence,
-        ]);
-
-        return response()->json(['status' => 'ok']);
-    }
-
-    /**
      * Handle unknown event types.
      */
     private function handleUnknownEvent(Request $request): JsonResponse
@@ -310,7 +286,6 @@ class DialerWebhookProxyController extends Controller
             'call.failed',
             'call.busy',
             'call.no-answer',
-            'amd.completed',
         ], true);
     }
 

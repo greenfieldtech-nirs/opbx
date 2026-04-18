@@ -23,6 +23,7 @@ import {
   Clock,
   BarChart3,
   Loader2,
+  Voicemail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -643,6 +644,10 @@ export default function AutoDialerMonitor() {
                         <p className="text-xl font-bold text-red-600">{campaign.failed_calls.toLocaleString()}</p>
                       </div>
                       <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Voicemail</p>
+                        <p className="text-xl font-bold text-purple-600">{(campaign.voicemail_calls || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Dialing</p>
                         <p className="text-xl font-bold text-orange-600">{(campaign.dialing_calls || 0).toLocaleString()}</p>
                       </div>
@@ -765,6 +770,10 @@ export default function AutoDialerMonitor() {
                       <span>
                         <span className="text-muted-foreground">Failed:</span>{' '}
                         <span className="font-medium text-red-600">{detail.statistics.failed_calls}</span>
+                      </span>
+                      <span>
+                        <span className="text-muted-foreground">Voicemail:</span>{' '}
+                        <span className="font-medium text-purple-600">{detail.statistics.voicemail_calls || 0}</span>
                       </span>
                       <span>
                         <span className="text-muted-foreground">Pending:</span>{' '}
@@ -891,6 +900,24 @@ export default function AutoDialerMonitor() {
                     </div>
                     <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
                       <Activity className="h-6 w-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Voicemail Detected</p>
+                      <p className="text-2xl font-bold mt-1 text-purple-600">
+                        {detail.statistics.voicemail_calls || 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total voicemail hits
+                      </p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Voicemail className="h-6 w-6 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>

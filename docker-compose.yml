@@ -175,9 +175,15 @@ services:
       - MYSQL_USER=${DB_USERNAME:-opbx}
       - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
+      # PERSISTENCE: This named volume stores MySQL data on the host filesystem.
+      # Data survives container restarts and even container removal.
+      # WARNING: 'docker compose down -v' or 'docker volume rm' WILL DELETE this data!
+      # Always backup before major changes: ./scripts/backup-database.sh
       - mysql_data:/var/lib/mysql
     networks:
       - opbx
+    # Restart policy ensures MySQL comes back up after host reboots
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s

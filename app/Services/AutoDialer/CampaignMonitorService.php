@@ -166,6 +166,7 @@ class CampaignMonitorService
                     'total_destinations' => $stats['total'],
                     'completed_calls' => $stats['completed'],
                     'failed_calls' => $stats['failed'],
+                    'voicemail_calls' => $campaign->voicemail_calls ?? 0,
                     'pending_calls' => $stats['pending'],
                     'dialing_calls' => $stats['dialing'],
                     'progress_percentage' => $stats['total'] > 0
@@ -308,6 +309,7 @@ class CampaignMonitorService
             'total_destinations' => $stats['total'],
             'completed_calls' => $stats['completed'],
             'failed_calls' => $stats['failed'],
+            'voicemail_calls' => $campaign->voicemail_calls ?? 0,
             'pending_calls' => $stats['pending'],
             'dialing_calls' => $stats['dialing'],
             'concurrent_active_calls' => $cac,

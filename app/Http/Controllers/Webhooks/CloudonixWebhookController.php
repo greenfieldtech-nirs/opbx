@@ -729,6 +729,13 @@ class CloudonixWebhookController extends Controller
                 return;
             }
 
+            // Check for AMD result in session profile
+            $sessionProfile = $request->input('session.profile', []);
+            $amdResult = $sessionProfile['amd']['result'] ?? null;
+
+            // Load campaign for retry logic
+            $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+
             // Update the session itself with CDR data
             $disposition = $request->input('disposition', 'unknown');
             $isCompleted = in_array(strtoupper($disposition), ['ANSWER', 'ANSWERED', 'COMPLETED'], true);
@@ -740,20 +747,54 @@ class CloudonixWebhookController extends Controller
                 'completed_at' => now(),
             ]);
 
+            // Store AMD result on session if present
+            if ($amdResult) {
+                $session->update([
+                    'amd_result' => $amdResult,
+                    'amd_confidence' => $sessionProfile['amd']['confidence'] ?? null,
+                ]);
+            }
+
             // Update destination record
             $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
 
             if ($destination) {
-                $destination->update([
-                    'status' => $this->mapDispositionToStatus($request->input('disposition')),
-                    'last_disposition' => $request->input('disposition'),
-                    'duration' => $request->input('duration', 0),
-                    'billsec' => $request->input('billsec', 0),
-                    'last_cdr_id' => $cdr->id,
-                ]);
+                // Check for voicemail retry
+                $shouldRetryVoicemail = ($amdResult === 'voicemail')
+                    && $campaign
+                    && $campaign->retry_on_voicemail
+                    && ($destination->dial_attempts < $campaign->max_dial_attempts);
 
-                // Note: dial_attempts is already incremented in DialerWorkerController::initiateCall()
-                // Do NOT increment again here — double-counting causes destinations to exceed max_dial_attempts.
+                if ($shouldRetryVoicemail) {
+                    // Schedule retry for voicemail
+                    $nextRetry = now()->addMinutes(5 * (2 ** ($destination->dial_attempts - 1)));
+                    if ($nextRetry->diffInMinutes(now()) > 60) {
+                        $nextRetry = now()->addMinutes(60);
+                    }
+
+                    $destination->update([
+                        'status' => \App\Enums\DestinationStatus::PENDING,
+                        'next_retry_at' => $nextRetry,
+                        'last_disposition' => 'voicemail',
+                        'duration' => $request->input('duration', 0),
+                        'billsec' => $request->input('billsec', 0),
+                        'last_cdr_id' => $cdr->id,
+                    ]);
+
+                    Log::info('Auto-dialer destination scheduled for voicemail retry', [
+                        'destination_id' => $destination->id,
+                        'attempts' => $destination->dial_attempts,
+                        'next_retry_at' => $nextRetry,
+                    ]);
+                } else {
+                    $destination->update([
+                        'status' => $this->mapDispositionToStatus($request->input('disposition')),
+                        'last_disposition' => $request->input('disposition'),
+                        'duration' => $request->input('duration', 0),
+                        'billsec' => $request->input('billsec', 0),
+                        'last_cdr_id' => $cdr->id,
+                    ]);
+                }
 
                 // Update CDR to mark as auto-dialer call
                 $cdr->update([
@@ -766,14 +807,25 @@ class CloudonixWebhookController extends Controller
                     'session_token' => $sessionToken,
                     'destination_id' => $destination->id,
                     'campaign_id' => $session->campaign_id,
+                    'amd_result' => $amdResult,
                 ]);
             }
 
             // Update campaign statistics
             $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
             if ($campaign) {
-                $campaign->increment('completed_calls');
-                $campaign->decrement('pending_calls');
+                if ($amdResult === 'voicemail' && $shouldRetryVoicemail) {
+                    // Voicemail with retry: don't count as completed, just decrement pending
+                    $campaign->decrement('pending_calls');
+                } else {
+                    $campaign->increment('completed_calls');
+                    $campaign->decrement('pending_calls');
+                }
+
+                // Increment voicemail counter if AMD detected voicemail
+                if ($amdResult === 'voicemail') {
+                    $campaign->increment('voicemail_calls');
+                }
             }
 
             // Decrement the CAC counter directly in Redis.
