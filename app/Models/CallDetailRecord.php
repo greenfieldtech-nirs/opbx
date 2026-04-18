@@ -206,13 +206,14 @@ class CallDetailRecord extends Model
     /**
      * Get AMD status from the raw CDR profile.
      *
-     * Returns "Enabled::{result}" if AMD result exists in profile,
+     * Returns "Enabled::{result}" if AMD result exists in session profile,
      * or "Disabled" if no AMD data is present.
      */
     public function getAmdStatusAttribute(): string
     {
         $rawCdr = $this->raw_cdr ?? [];
-        $profile = $rawCdr['profile'] ?? [];
+        $session = $rawCdr['session'] ?? [];
+        $profile = $session['profile'] ?? [];
         $amd = $profile['amd'] ?? null;
 
         if ($amd && isset($amd['result'])) {

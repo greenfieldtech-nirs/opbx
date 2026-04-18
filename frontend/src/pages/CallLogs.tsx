@@ -450,32 +450,32 @@ export default function CallLogs() {
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-green-700">Confidence</div>
                       <div className="text-sm text-green-900">
-                        {(selectedCdr.raw_cdr?.profile as any)?.amd?.confidence !== undefined
-                          ? `${((selectedCdr.raw_cdr?.profile as any)?.amd?.confidence * 100).toFixed(0)}%`
+                        {((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.confidence !== undefined)
+                          ? `${((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.confidence * 100).toFixed(0)}%`
                           : 'N/A'}
                       </div>
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-green-700">Detection Time</div>
                       <div className="text-sm text-green-900">
-                        {(selectedCdr.raw_cdr?.profile as any)?.amd?.detectionTimeMs !== undefined
-                          ? `${(selectedCdr.raw_cdr?.profile as any)?.amd?.detectionTimeMs}ms`
+                        {((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.detectionTimeMs !== undefined)
+                          ? `${(selectedCdr.raw_cdr?.session as any)?.profile?.amd?.detectionTimeMs}ms`
                           : 'N/A'}
                       </div>
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-green-700">Timestamp</div>
                       <div className="text-sm text-green-900">
-                        {(selectedCdr.raw_cdr?.profile as any)?.amd?.timestamp
-                          ? formatDateTime((selectedCdr.raw_cdr?.profile as any)?.amd?.timestamp)
+                        {(selectedCdr.raw_cdr?.session as any)?.profile?.amd?.timestamp
+                          ? formatDateTime((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.timestamp)
                           : 'N/A'}
                       </div>
                     </div>
-                    {(selectedCdr.raw_cdr?.profile as any)?.amd?.reason && (
+                    {((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.reason) && (
                       <div className="min-w-0 col-span-2">
                         <div className="text-xs font-medium text-green-700">Reason</div>
                         <div className="text-sm text-green-900 break-words">
-                          {(selectedCdr.raw_cdr?.profile as any)?.amd?.reason}
+                          {(selectedCdr.raw_cdr?.session as any)?.profile?.amd?.reason}
                         </div>
                       </div>
                     )}
