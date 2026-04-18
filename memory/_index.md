@@ -29,20 +29,20 @@
 | AI Assistants | [ai-assistants.md](ai-assistants.md) | AiAssistantController, ProviderRegistry | AiAssistants |
 | AI Load Balancers | [ai-load-balancers.md](ai-load-balancers.md) | AiAssistantLoadBalancerController, AlbsDistributionService | AiAssistantLoadBalancers |
 | Recordings | [recordings-announcements.md](recordings-announcements.md) | RecordingsController, Recording model | Announcements |
-| Call Logs | [call-logs.md](call-logs.md) | CallLogController, CallLog model | CallLogs |
-| Call Detail Records | [call-detail-records.md](call-detail-records.md) | CallDetailRecordController, CDR model | (via CallLogs) |
+| Call Logs | [call-logs.md](call-logs.md) | CallDetailRecordController, CDR model | CallLogs (with AMD Status column) |
+| Call Detail Records | [call-detail-records.md](call-detail-records.md) | CallDetailRecordController, CDR model (amd_status accessor), CallDetailRecordResource | (via CallLogs) |
 | Live Calls | [live-calls.md](live-calls.md) | SessionUpdateController, SessionUpdate model | LiveCalls |
-| Voice Routing Engine | [voice-routing-engine.md](voice-routing-engine.md) | VoiceRoutingController, VoiceRoutingManager, CxmlBuilder | N/A (server-side) |
+| Voice Routing Engine | [voice-routing-engine.md](voice-routing-engine.md) | VoiceRoutingController, VoiceRoutingManager, CxmlBuilder, **AmdActionController** | N/A (server-side) |
 | Outbound Whitelist | [outbound-whitelist.md](outbound-whitelist.md) | OutboundWhitelistController | OutboundWhitelist |
 | Inbound Blacklist | [inbound-blacklist.md](inbound-blacklist.md) | InboundBlacklistController, InboundBlacklistService | InboundBlacklist |
 | Call Notifications | [call-notifications.md](call-notifications.md) | CallNotificationsSettingsController, WebhookDispatcher | CallNotificationsSettings |
 | Auto Dialer Campaigns | [auto-dialer-campaigns.md](auto-dialer-campaigns.md) | AutoDialerCampaignController, DialerWorkerController | AutoDialerCampaigns |
 | Distribution Lists | [distribution-lists.md](distribution-lists.md) | DistributionListController, ListManagementService | DistributionLists |
 | Dialer Worker (Go) | [dialer-worker.md](dialer-worker.md) | dialer-worker/cmd/worker/main.go | N/A |
-| AMD Worker (Java/Vert.x) | [amd-worker.md](amd-worker.md) | amd-worker/src/main/java/... | N/A |
+| AMD Worker (Java/Vert.x) | [amd-worker.md](amd-worker.md) | amd-worker/src/main/java/... (action callback, session profile, 300-1000Hz detector) | N/A |
 | Auto Dialer Caller ID Pooling | [auto-dialer-caller-id-pooling.md](auto-dialer-caller-id-pooling.md) | See feature specification | See feature specification |
 | Platform Management | [platform-management.md](platform-management.md) | Platform controllers, PlatformAuditService | PlatformDashboard, PlatformOrganizations |
-| Settings & Cloudonix | [settings-cloudonix.md](settings-cloudonix.md) | SettingsController, CloudonixClient | Settings |
+| Settings & Cloudonix | [settings-cloudonix.md](settings-cloudonix.md) | SettingsController, CloudonixClient (with **switchVoiceApplication**, **updateSessionProfile**) | Settings |
 | Transactional Email | [transactional-email.md](transactional-email.md) | TransactionalEmailService, email drivers | N/A |
 | WebSocket / Real-Time | [websocket-realtime.md](websocket-realtime.md) | channels.php, Soketi | echo.service, useCallPresence |
 | Webhook Processing | [webhook-processing.md](webhook-processing.md) | CloudonixWebhookController, signature middleware | N/A |

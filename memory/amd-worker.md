@@ -1,35 +1,78 @@
 # AMD Worker (Stream-Based Voicemail Detection)
 
 ## Overview
-Standalone Java/Vert.x 5 microservice that receives real-time audio streams from Cloudonix via `<Start><Stream>` WebSocket, analyzes audio for voicemail beep tones using ML + energy-based detectors, and logs detection results locally. No OPBX HTTP callbacks in current implementation (planned for Phase 4).
+Standalone Java/Vert.x 5 microservice that receives real-time audio streams from Cloudonix via `<Start><Stream>` WebSocket, analyzes audio for voicemail beep tones using ML + energy-based detectors, and **posts detection results to Laravel for action execution**. AMD result is stored in the Cloudonix session profile and visible in CDR / Call Logs UI.
+
+```mermaid
+sequenceDiagram
+    participant C as Cloudonix
+    participant W as AMD Worker
+    participant L as Laravel
+    participant CX as Cloudonix API
+    participant UI as Call Logs UI
+
+    C->>W: WebSocket /ws/detect
+    C->>W: start (customParameters: action_human, action_voicemail, action_unknown)
+    loop Every 20ms
+        C->>W: media (mu-law audio)
+    end
+    W->>W: Detect voicemail beep
+    W->>L: POST /voice/amd-action (Bearer token)
+    L->>CX: PUT /sessions/{token} {profile: {amd: {...}}}
+    L->>CX: Execute action (URL transfer / HANGUP / CONTINUE)
+    C->>L: CDR webhook (includes profile.amd)
+    L->>UI: Display AMD status in Call Logs
+```
 
 ## Source Files
 
+### Core
 | File | Purpose |
 |------|---------|
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/Main.java` | Entry point: creates Vert.x instance, deploys `AmdWorkerVerticle` |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/Main.java` | Entry point: configures slf4j log level from env, creates Vert.x, deploys verticle |
 | `amd-worker/src/main/java/com/cloudonix/opbx/amd/Config.java` | Environment variable configuration loader |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/stream/StreamMessage.java` | Cloudonix Stream WebSocket message parser/types |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/stream/StreamSession.java` | Per-stream session state + 45s timeout management |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/stream/StreamHandler.java` | WebSocket connection lifecycle, audio routing to VAD/pipeline |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/AudioDecoder.java` | µ-law to PCM 16-bit + float32 conversion |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/AudioResampler.java` | 8kHz to 16kHz linear interpolation resampling |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/EnergyVad.java` | Energy-based Voice Activity Detection |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/feature/MfccExtractor.java` | MFCC feature extraction (40 coeffs, librosa-like params) |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/feature/EnergyAnalyzer.java` | Spectral energy band analysis for tone detection |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/Detector.java` | Detector interface |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/DetectionResult.java` | Detection result payload |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/ResultType.java` | Result type enum (`VOICEMAIL`, `HUMAN`, `UNKNOWN`) |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/BeepMlDetector.java` | ONNX-based ML beep detector |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/ToneEnergyDetector.java` | Energy-based pure-tone detector (800-2500Hz) |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/DetectionPipeline.java` | Pluggable detector pipeline (first positive wins) |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/model/OnnxModel.java` | ONNX Runtime model loader + inference wrapper |
-| `amd-worker/src/main/java/com/cloudonix/opbx/amd/metrics/MetricsService.java` | In-memory health/metrics tracking |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/stream/StreamMessage.java` | Cloudonix Stream WebSocket message parser/types with full Javadoc per Cloudonix docs |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/stream/StreamSession.java` | Per-stream session state: VAD, pipeline, timeout timer, rolling buffer (capped at 5s), action options |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/stream/StreamHandler.java` | WebSocket lifecycle, audio routing, tone detection fallback, action callback POST |
 | `amd-worker/src/main/java/com/cloudonix/opbx/amd/worker/AmdWorkerVerticle.java` | Verticle: starts WS + HTTP servers, wires detectors |
-| `amd-worker/pom.xml` | Maven build with Shade plugin for uber-JAR |
-| `amd-worker/Dockerfile` | Multi-stage Maven build + `eclipse-temurin:21-jre` runtime |
-| `amd-worker/scripts/generate_model.py` | Python script to generate `beep_detector.onnx` |
-| `amd-worker/models/beep_detector.onnx` | Pre-trained GaussianNB ONNX model |
+
+### Audio Processing
+| File | Purpose |
+|------|---------|
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/AudioDecoder.java` | µ-law to PCM 16-bit + float64; Base64 size limit (1 MiB) |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/AudioResampler.java` | Linear resampler (8kHz→16kHz) |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/EnergyVad.java` | Energy-based VAD with configurable clip durations |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/AudioMath.java` | Shared audio math utilities (RMS, energy) |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/audio/AudioDumper.java` | Optional WAV dump with path traversal protection |
+
+### Detection
+| File | Purpose |
+|------|---------|
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/BeepMlDetector.java` | ONNX-based ML beep detector |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/ToneEnergyDetector.java` | Energy-based tone detector (300-1000Hz, 400ms window, CV≤0.22, ratio≥10.0) |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/DetectionPipeline.java` | Pluggable pipeline: async ML + sync fallback |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/DetectionResult.java` | Immutable result record |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/detector/ResultType.java` | VOICEMAIL, HUMAN, UNKNOWN |
+
+### Feature Extraction
+| File | Purpose |
+|------|---------|
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/feature/MfccExtractor.java` | MFCC extraction (40 coeffs) |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/feature/EnergyAnalyzer.java` | FFT energy band analysis |
+
+### Supporting
+| File | Purpose |
+|------|---------|
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/model/OnnxModel.java` | ONNX Runtime loader + inference |
+| `amd-worker/src/main/java/com/cloudonix/opbx/amd/metrics/MetricsService.java` | In-memory metrics tracking |
+
+### Offline Test Tools
+| File | Purpose |
+|------|---------|
+| `amd-worker/src/test/java/com/cloudonix/opbx/amd/detector/OfflineToneTest.java` | Validate detector params against saved WAV dumps |
+| `amd-worker/src/test/java/com/cloudonix/opbx/amd/detector/AnalyzeAllBeeps.java` | Analyze beep characteristics across all dumps |
+| `amd-worker/src/test/java/com/cloudonix/opbx/amd/detector/CompareBeepCharacteristics.java` | Compare real beep vs false positive |
+| `amd-worker/src/test/java/com/cloudonix/opbx/amd/detector/AnalyzeFalsePositive.java` | Deep-dive false positive analysis |
 
 ## Infrastructure
 
@@ -39,6 +82,7 @@ Standalone Java/Vert.x 5 microservice that receives real-time audio streams from
 | Docker service | `amd-worker` in `docker-compose.yml`, no external ports |
 | Health endpoint | `GET :8083/health` |
 | WebSocket endpoint | `ws://amd-worker:8082/ws/detect` (internal), exposed via `wss://{public}/ws/amd/detect` |
+| Callback endpoint | `http://nginx/api/voice/amd-action` (internal Docker network) |
 
 ## Environment Variables
 
@@ -48,60 +92,102 @@ Standalone Java/Vert.x 5 microservice that receives real-time audio streams from
 | `AMD_HTTP_PORT` | `8083` | Health/metrics HTTP port |
 | `AMD_MODEL_PATH` | `./models/beep_detector.onnx` | ONNX model file path |
 | `AMD_MAX_CONCURRENT_STREAMS` | `100` | Max simultaneous streams |
+| `AMD_DEFAULT_TIMEOUT_SECONDS` | `30` | Detection timeout (was 45s) |
 | `AMD_LOG_LEVEL` | `info` | Logging level (slf4j-simple) |
 | `AMD_DETECTORS` | `beep_ml,tone_energy` | Enabled detectors |
 | `AMD_DUMP_AUDIO` | `false` | Debug: dump each stream to a WAV file |
 | `AMD_DUMP_AUDIO_PATH` | `/tmp/amd-dumps` | Directory for debug WAV files |
+| `AMD_ACTION_CALLBACK_URL` | `http://nginx/api/voice/amd-action` | Laravel callback URL |
+| `AMD_WORKER_API_TOKEN` | *(empty)* | Bearer token for callback auth |
 
-**Note:** `AMD_DEFAULT_TIMEOUT_SECONDS` is hardcoded to `45` in `Config.java`.
+## Action Options (from `start.customParameters`)
 
-## Audio Debug Dumps
-When `AMD_DUMP_AUDIO=true`, every received stream is written to a 16kHz mono PCM16 WAV file at `AMD_DUMP_AUDIO_PATH`. The filename includes `callSid` and `streamSid` for easy correlation with logs. This is useful for offline analysis of detection accuracy.
+Cloudonix passes action configuration via `<Parameter>` elements in the CXML `<Stream>` verb:
 
-## Call Flow (Simplified)
-1. Cloudonix connects WebSocket to public URL `/ws/amd/detect` (via nginx)
-2. `StreamHandler` parses `connected` → `start` → `media` → `stop` messages
-3. Audio decoded (µ-law → PCM → 16kHz resample)
-4. VAD segments audio into speech/silence regions
-5. Pipeline runs detectors on completed speech segments
-6. **First positive result wins**: logs `Voicemail detected` or `Human detected`
-7. If no result after **45 seconds**: logs timeout and closes connection
-8. No OPBX HTTP callbacks in current implementation
+```xml
+<Stream url="wss://.../ws/amd/detect" track="outbound">
+    <Parameter name="action_voicemail" value="HANGUP" />
+    <Parameter name="action_human" value="https://example.com/human-handler" />
+    <Parameter name="action_unknown" value="CONTINUE" />
+</Stream>
+```
+
+Available values per action:
+- **URL** (`https://...`) — Switch voice application via Cloudonix API
+- **`HANGUP`** — Disconnect session via Cloudonix API
+- **`CONTINUE`** — Close WebSocket, take no further action
+
+Default behavior (when no options provided):
+- Voicemail detected → `HANGUP`
+- Human or Unknown → `CONTINUE`
+
+## Call Flow (Detailed)
+
+```mermaid
+sequenceDiagram
+    participant C as Cloudonix
+    participant W as AMD Worker
+    participant L as Laravel
+    participant CX as Cloudonix API
+
+    C->>W: connected
+    C->>W: start (customParameters with actions)
+    Note over W: Store action_human, action_voicemail, action_unknown
+    loop Every 20ms
+        C->>W: media (mu-law Base64)
+        W->>W: Decode → PCM16 → 16kHz resample
+        W->>W: VAD segmentation
+        opt After ~11.5s elapsed
+            W->>W: Rolling buffer tone scan (300-1000Hz, CV≤0.22)
+        end
+    end
+    W->>W: Pipeline resolved (VOICEMAIL / HUMAN)
+    W->>L: POST /voice/amd-action
+    Note right of W: Body: {callSid, streamSid, session, result, action, confidence, detectionTimeMs, reason}
+    L->>L: Validate Bearer token
+    L->>CX: PUT /sessions/{token} {profile: {amd: {result, confidence, detectionTimeMs, reason, timestamp}}}
+    alt Action = URL
+        L->>CX: POST /calls/{domain}/sessions/{token}/application {url}
+    else Action = HANGUP
+        L->>CX: DELETE /customers/self/domains/{domain}/sessions/{token}
+    else Action = CONTINUE
+        Note over L: Log only, no Cloudonix call
+    end
+    W->>C: Close WebSocket
+    C->>L: CDR webhook (includes profile.amd)
+```
+
+## Security
+
+| Layer | Protection |
+|-------|------------|
+| **WAV dump filenames** | Path traversal blocked via `Path.startsWith()` check |
+| **Base64 payload size** | Rejected if decoded size > 1 MiB |
+| **Duplicate streams** | `putIfAbsent` atomic check — first connection wins |
+| **Callback auth** | `Authorization: Bearer {AMD_WORKER_API_TOKEN}` (constant-time comparison in Laravel) |
+| **Rolling buffer** | Capped at 5 seconds (~80 KB per stream) |
 
 ## Key Fixes & Safety Measures
 - **`AtomicBoolean` `resolved` flag** prevents race conditions on concurrent detector results
 - **`OnnxTensor` try-with-resources** ensures tensor memory is released after inference
-- **`OnnxModel.close()`** properly closes ONNX session and environment on shutdown
 - **`ws.closeHandler`** triggers cleanup to remove stale session mappings
-- **`EnergyVad` buffer fix** tracks `currentSpeechBuffer` so `flush()` can emit trailing speech segments up to `clipMaxMs` (3000ms)
-
-## Dependencies
-- Cloudonix `<Start><Stream>` CXML verb for stream initiation
-- Nginx WebSocket proxy (`/ws/amd/`)
-- Vert.x 5.0.10 (WebSocket + HTTP server)
-- Jackson 2.19.0 (JSON parsing)
-- ONNX Runtime 1.22.0 (ML inference)
-- JTransforms 3.1 (FFT for MFCC + energy analysis)
-- slf4j-simple 2.0.16 (logging)
+- **Duplicate stream rejection** via `ConcurrentHashMap.putIfAbsent()`
+- **Dynamic sample rate** read from `start.mediaFormat.sampleRate`
 
 ## Console Logging
-The worker logs key events at `INFO` level so you can follow the decision process in real time:
+
+The worker logs key events at `INFO` level:
 
 | Log line | What it means |
 |----------|---------------|
-| `Stream started call_sid=...` | New Cloudonix stream opened |
-| `Receiving audio call_sid=... chunks=N total_audio_ms=X elapsed_ms=Y` | Audio is flowing (throttled to once per ~5s) |
-| `VAD speech start at_ms=...` | Energy VAD detected the start of speech |
-| `VAD speech end duration_ms=...` | Energy VAD detected end of speech and emitted a segment |
-| `VAD segment clipped ...` | Ongoing speech hit the 3000ms max and was split |
-| `Processing VAD segment call_sid=... duration_ms=...` | A completed segment is being sent to detectors |
-| `Running detector detector=... segment_duration_ms=...` | A specific detector is analyzing the segment |
-| `Detector positive detector=... result=VOICEMAIL reason="..."` | A detector found a beep/tone |
-| `Detector negative detector=...` | A detector found nothing in this segment |
-| `DECISION: VOICEMAIL call_sid=... detector=...` | Final result — voicemail beep detected |
-| `DECISION: HUMAN call_sid=... detector=...` | Final result — human speech detected |
-| `DECISION: UNKNOWN (timeout) call_sid=...` | 45s elapsed with no detection |
-| `Stream stopped by Cloudonix call_sid=...` | Cloudonix sent a `stop` event |
+| `RAW: {"event":"start",...}` | Raw JSON of non-media events |
+| `Stream started call_sid=...` | New stream opened with action options |
+| `Receiving audio call_sid=...` | Audio flowing (throttled to once per ~5s) |
+| `Tone detected in rolling buffer...` | ToneEnergyDetector found a match |
+| `DECISION: VOICEMAIL call_sid=...` | Final detection result |
+| `Sending AMD action callback to...` | About to POST result to Laravel |
+| `AMD action callback sent status=...` | Callback succeeded |
+| `AMD action callback failed error=...` | Callback failed (logged, not fatal) |
 
 ## Build & Run
 ```bash
@@ -110,4 +196,33 @@ mvn package -DskipTests -B          # Build shaded JAR
 docker compose up -d amd-worker      # Run via Docker Compose
 ```
 
-(End of file)
+## Testing
+
+### Offline Validation
+```bash
+cd amd-worker
+mvn test-compile
+mvn -Dexec.mainClass="com.cloudonix.opbx.amd.detector.OfflineToneTest" -Dexec.classpathScope=test exec:java
+```
+
+### Live Test
+Watch logs during a call:
+```bash
+docker compose logs -f amd-worker
+```
+
+Look for:
+```
+DECISION: VOICEMAIL ... detector=tone_energy ...
+Sending AMD action callback to nginx:80/api/voice/amd-action ...
+AMD action callback sent status=200
+```
+
+## Dependencies
+- Cloudonix `<Start><Stream>` CXML verb for stream initiation
+- Nginx WebSocket proxy (`/ws/amd/`)
+- Vert.x 5.0.10 (WebSocket + HTTP client/server)
+- Jackson 2.19.0 (JSON parsing)
+- ONNX Runtime 1.22.0 (ML inference)
+- JTransforms 3.1 (FFT for MFCC + energy analysis)
+- slf4j-simple 2.0.16 (logging)

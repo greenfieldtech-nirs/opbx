@@ -1,6 +1,6 @@
 # AMD Worker
 
-The **AMD (Answering Machine Detection) Worker** is a Java/Vert.x service that analyzes real-time audio streams from Cloudonix to detect whether a call reached a human or a voicemail system.
+The **AMD (Answering Machine Detection) Worker** is a Java/Vert.x service that analyzes real-time audio streams from Cloudonix to detect whether a call reached a human or a voicemail system, then posts the result to Laravel for action execution.
 
 ## Architecture Overview
 
@@ -17,10 +17,14 @@ graph TB
         DP["DetectionPipeline"]
         BMLD["BeepMlDetector<br/>(ONNX)"]
         TED["ToneEnergyDetector"]
+        CB["Action Callback<br/>POST to Laravel"]
         AD["AudioDumper<br/>(optional)"]
     end
 
-    Decision["Decision:<br/>HUMAN / VOICEMAIL / UNKNOWN"]
+    subgraph Laravel["Laravel Backend"]
+        AA["AmdActionController<br/>/voice/amd-action"]
+        CX["Cloudonix API Calls"]
+    end
 
     VC -->|"WebSocket audio stream"| WS
     WS --> SH
@@ -30,8 +34,11 @@ graph TB
     VAD -->|"speech segments"| DP
     DP -->|"async worker thread"| BMLD
     DP -->|"sync fallback"| TED
-    BMLD --> Decision
-    TED --> Decision
+    BMLD -->|"result"| SH
+    TED -->|"result"| SH
+    SH -->|"POST JSON"| CB
+    CB -->|"Bearer auth"| AA
+    AA -->|"update profile + execute"| CX
 ```
 
 ## Components
@@ -40,7 +47,7 @@ graph TB
 
 | Class | Purpose |
 |-------|---------|
-| `Main` | Application bootstrap. Creates Vert.x instance and deploys `AmdWorkerVerticle`. |
+| `Main` | Application bootstrap. Sets slf4j log level from `AMD_LOG_LEVEL` env var before creating any logger. |
 | `Config` | Reads all configuration from environment variables. No hardcoded secrets. |
 
 ### WebSocket Streaming
@@ -48,18 +55,18 @@ graph TB
 | Class | Purpose |
 |-------|---------|
 | `AmdWorkerVerticle` | Vert.x verticle. Sets up WebSocket server, HTTP health endpoint, loads ONNX model, wires `StreamHandler`. |
-| `StreamHandler` | Handles WebSocket lifecycle: connection auth, `start`/`media`/`stop` events, routes audio to VAD + detectors. |
-| `StreamSession` | Per-stream state machine. Holds VAD, detection pipeline, timeout timer, rolling audio buffer. |
-| `StreamMessage` | Jackson DTO for Cloudonix WebSocket events (`connected`, `start`, `media`, `stop`, `dtmf`). |
+| `StreamHandler` | Handles WebSocket lifecycle: connection auth, `start`/`media`/`stop` events, routes audio to VAD + detectors, posts results to Laravel callback. |
+| `StreamSession` | Per-stream state machine. Holds VAD, detection pipeline, timeout timer, rolling audio buffer (capped at 5s), action options from customParameters. |
+| `StreamMessage` | Jackson DTO for Cloudonix WebSocket events. Full Javadoc per Cloudonix docs. |
 
 ### Audio Processing
 
 | Class | Purpose |
 |-------|---------|
-| `AudioDecoder` | Decodes Base64 mu-law payloads from Cloudonix into PCM16 and then double-precision float arrays (-1..1). |
+| `AudioDecoder` | Decodes Base64 mu-law payloads into PCM16 and then double-precision float arrays (-1..1). Base64 size limit: 1 MiB. |
 | `AudioResampler` | Linear resampler. Converts audio from stream sample rate (usually 8000 Hz) to 16000 Hz for detectors. |
 | `EnergyVad` | Energy-based Voice Activity Detector. Chunks continuous audio into speech/silence segments with configurable min/max clip durations. |
-| `AudioDumper` | Optional WAV file dump for debugging. Writes per-call audio to disk. |
+| `AudioDumper` | Optional WAV file dump for debugging. Writes per-call audio to disk with path traversal protection. |
 | `AudioMath` | Shared audio math utilities (RMS, energy calculations). |
 
 ### Feature Extraction
@@ -75,7 +82,7 @@ graph TB
 |-------|---------|
 | `DetectionPipeline` | Chains detectors sequentially. Runs ML detector asynchronously on Vert.x worker threads, then falls back to energy-based detection. |
 | `BeepMlDetector` | ONNX-based ML detector. Extracts MFCC features and runs inference via ONNX Runtime. |
-| `ToneEnergyDetector` | Energy-based tone detector. Looks for sustained 400ms+ tones in the 300-1000 Hz band with stable amplitude (low coefficient of variation) and high spectral purity. |
+| `ToneEnergyDetector` | Energy-based tone detector. Looks for sustained 400ms+ tones in the 300-1000 Hz band with stable amplitude (CV ≤ 0.22) and high spectral purity (ratio ≥ 10.0). |
 | `Detector` | Interface for all detection algorithms. |
 | `DetectionResult` | Immutable result record: detector name, result type, confidence, reason, timestamp. |
 | `ResultType` | Enum: `VOICEMAIL`, `HUMAN`, `UNKNOWN`. |
@@ -104,10 +111,12 @@ sequenceDiagram
     participant DP as DetectionPipeline
     participant TED as ToneEnergyDetector
     participant BML as BeepMlDetector
+    participant CB as Action Callback
+    participant L as Laravel
 
     C->>WS: WebSocket upgrade
-    WS->>WS: Validate Bearer token<br/>(if AMD_WORKER_API_TOKEN set)
     C->>SH: event: "start"
+    Note over SH: Parse customParameters:<br/>action_human, action_voicemail, action_unknown
     SH->>SS: Create session + timeout timer
     loop Every 20ms audio chunk
         C->>SH: event: "media" (mu-law)
@@ -120,6 +129,8 @@ sequenceDiagram
             alt Beep detected (CV ≤ 0.22, ratio ≥ 10)
                 TED->>DP: Result: VOICEMAIL
                 DP-->>SH: Resolve pipeline
+                SH-->>CB: POST result to Laravel
+                CB-->>L: {callSid, result, action, ...}
                 SH-->>C: Close WebSocket
             end
         end
@@ -129,24 +140,74 @@ sequenceDiagram
     alt ML detection positive
         BML->>DP: Result: VOICEMAIL
         DP-->>SH: Resolve pipeline
+        SH-->>CB: POST result to Laravel
+        CB-->>L: {callSid, result, action, ...}
         SH-->>C: Close WebSocket
     else No ML detection
         DP->>TED: process (sync)
         alt Tone detected
             TED->>DP: Result: VOICEMAIL
             DP-->>SH: Resolve pipeline
+            SH-->>CB: POST result to Laravel
+            CB-->>L: {callSid, result, action, ...}
             SH-->>C: Close WebSocket
         end
     end
-    alt Timeout (45s)
+    alt Timeout (30s)
         SS->>SH: onTimeout
-        SH-->>C: Close WebSocket<br/>Result: UNKNOWN
+        SH-->>CB: POST result=unknown
+        CB-->>L: {callSid, result: unknown, ...}
+        SH-->>C: Close WebSocket
     end
     C->>SH: event: "stop"
     SH->>VAD: flush()
     VAD->>DP: Final segments
     SH->>SS: Cleanup + dispose
 ```
+
+## Action Callback
+
+When a detection decision is reached, the worker POSTs the result to Laravel:
+
+```
+POST http://nginx/api/voice/amd-action
+Authorization: Bearer {AMD_WORKER_API_TOKEN}
+Content-Type: application/json
+
+{
+  "callSid": "...",
+  "streamSid": "...",
+  "session": "...",
+  "result": "voicemail|human|unknown",
+  "action": "https://...|HANGUP|CONTINUE",
+  "confidence": 0.9,
+  "detectionTimeMs": 13487,
+  "reason": "Tone detected in 300-1000Hz for 400ms (cv=0.214 ratio=81.4)"
+}
+```
+
+The callback is **fire-and-forget**: the WebSocket is closed immediately after the POST is initiated, regardless of success or failure.
+
+## Action Options
+
+Cloudonix passes action configuration via `<Parameter>` elements in the CXML `<Stream>` verb:
+
+```xml
+<Stream url="wss://.../ws/amd/detect" track="outbound">
+    <Parameter name="action_voicemail" value="HANGUP" />
+    <Parameter name="action_human" value="https://example.com/human-handler" />
+    <Parameter name="action_unknown" value="CONTINUE" />
+</Stream>
+```
+
+Available values:
+- **URL** (`https://...`) — Switch voice application via Cloudonix API
+- **`HANGUP`** — Disconnect session via Cloudonix API
+- **`CONTINUE`** — Close WebSocket, take no further action
+
+Default behavior (when no options provided):
+- Voicemail detected → `HANGUP`
+- Human or Unknown → `CONTINUE`
 
 ## Security Model
 
@@ -165,6 +226,8 @@ Authorization: Bearer <your-secret-token>
 
 Token comparison uses constant-time equality to prevent timing attacks.
 
+**Note:** Auth check is currently commented out for development. Re-enable before production.
+
 ### Input Validation
 
 | Layer | Protection |
@@ -173,6 +236,7 @@ Token comparison uses constant-time equality to prevent timing attacks.
 | **WAV dump filename** | `callSid` and `streamSid` sanitized; path traversal blocked via `Path.startsWith()` check (`AudioDumper`) |
 | **JSON parsing** | Parse errors logged with truncated preview; null messages rejected (`StreamMessage`) |
 | **Max concurrent streams** | Hard limit enforced; excess connections rejected with 1013 (`StreamHandler`) |
+| **Duplicate streams** | `ConcurrentHashMap.putIfAbsent()` — first connection wins (`StreamHandler`) |
 
 ### Memory Safety
 
@@ -190,10 +254,12 @@ All configuration is via environment variables:
 | `AMD_HTTP_PORT` | `8083` | HTTP health/metrics port |
 | `AMD_MODEL_PATH` | `./models/beep_detector.onnx` | Path to ONNX model file |
 | `AMD_MAX_CONCURRENT_STREAMS` | `100` | Maximum simultaneous audio streams |
+| `AMD_DEFAULT_TIMEOUT_SECONDS` | `30` | Detection timeout (was 45s) |
 | `AMD_DETECTORS` | `beep_ml,tone_energy` | Comma-separated detector list |
 | `AMD_DUMP_AUDIO` | `false` | Enable WAV file dumping for debugging |
 | `AMD_DUMP_AUDIO_PATH` | `/tmp/amd-dumps` | Directory for audio dumps |
-| `AMD_WORKER_API_TOKEN` | *(empty)* | Bearer token for WebSocket auth (optional but recommended) |
+| `AMD_ACTION_CALLBACK_URL` | `http://nginx/api/voice/amd-action` | Laravel callback URL |
+| `AMD_WORKER_API_TOKEN` | *(empty)* | Bearer token for callback auth |
 | `AMD_LOG_LEVEL` | `info` | SLF4J log level |
 
 ## Health Endpoint
@@ -267,10 +333,8 @@ docker compose logs -f amd-worker
 Look for:
 ```
 DECISION: VOICEMAIL ... detector=tone_energy ...
-```
-or
-```
-DECISION: HUMAN ... detector=beep_ml ...
+Sending AMD action callback to nginx:80/api/voice/amd-action ...
+AMD action callback sent status=200
 ```
 
 ## File Structure
@@ -325,3 +389,4 @@ amd-worker/
 - The `ToneEnergyDetector` is **stateless**; a single instance is reused across all streams.
 - The `BeepMlDetector` requires the ONNX model to be loaded; if loading fails, the pipeline gracefully falls back to tone detection only.
 - Audio dumps are **disabled by default** and should only be enabled for debugging.
+- The action callback is **fire-and-forget**: the WebSocket closes immediately after initiating the POST. Laravel handles the Cloudonix API calls asynchronously.
