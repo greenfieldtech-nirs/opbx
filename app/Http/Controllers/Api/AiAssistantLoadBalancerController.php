@@ -200,6 +200,10 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
             ]);
         }
 
+        // Clear cache for this load balancer
+        Cache::forget("albs:{$model->id}");
+        Cache::forget("albs:rr:{$model->id}");
+
         // Load relationships
         $model->loadMissing(AiAssistantLoadBalancer::DEFAULT_RELATIONSHIP_FIELDS);
     }
@@ -314,5 +318,14 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
             $model->id,
             $model->organization_id
         );
+    }
+
+    /**
+     * Clear cache after deleting a load balancer.
+     */
+    protected function afterDestroy(Model $model, Request $request): void
+    {
+        Cache::forget("albs:{$model->id}");
+        Cache::forget("albs:rr:{$model->id}");
     }
 }
