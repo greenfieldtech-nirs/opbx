@@ -189,82 +189,98 @@ function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPool
 }
 
 /**
- * AMD Action Field Component
- * Supports HANGUP, CONTINUE, or a custom CXML URL
+ * AMD Action Selector Component (Left Column)
+ * Dropdown to select HANGUP, CONTINUE, or Remote CXML URL
  */
-interface AmdActionFieldProps {
+interface AmdActionSelectorProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
 }
 
-function AmdActionField({ label, value, onChange }: AmdActionFieldProps) {
+function AmdActionSelector({ label, value, onChange }: AmdActionSelectorProps) {
   const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-  const [mode, setMode] = useState<'preset' | 'url'>(isCustomUrl ? 'url' : 'preset');
-  const [urlValue, setUrlValue] = useState(isCustomUrl ? value : '');
-
-  // Sync internal state when external value changes
-  useEffect(() => {
-    const externalIsUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-    setMode(externalIsUrl ? 'url' : 'preset');
-    if (externalIsUrl) {
-      setUrlValue(value);
-    }
-  }, [value]);
-
-  const handleModeChange = (newMode: 'preset' | 'url') => {
-    setMode(newMode);
-    if (newMode === 'preset') {
-      onChange('HANGUP');
-    } else {
-      onChange(urlValue || '');
-    }
-  };
-
-  const handlePresetChange = (preset: string) => {
-    onChange(preset);
-  };
-
-  const handleUrlChange = (newUrl: string) => {
-    setUrlValue(newUrl);
-    onChange(newUrl);
-  };
+  const selectValue = isCustomUrl ? 'CUSTOM_URL' : (value || 'HANGUP');
 
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="space-y-2">
-        <Select
-          value={mode === 'preset' ? (value || 'HANGUP') : 'CUSTOM_URL'}
-          onValueChange={(selected) => {
-            if (selected === 'CUSTOM_URL') {
-              handleModeChange('url');
-            } else {
-              handleModeChange('preset');
-              handlePresetChange(selected);
-            }
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select action" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-            <SelectItem value="HANGUP">Hang up</SelectItem>
-            <SelectItem value="CUSTOM_URL">Remote CXML URL</SelectItem>
-          </SelectContent>
-        </Select>
+      <Label className="text-sm">{label}</Label>
+      <Select
+        value={selectValue}
+        onValueChange={(selected) => {
+          if (selected === 'CUSTOM_URL') {
+            onChange(''); // Will trigger URL input in right column
+          } else {
+            onChange(selected);
+          }
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select action" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="CONTINUE">Continue to destination</SelectItem>
+          <SelectItem value="HANGUP">Hang up</SelectItem>
+          <SelectItem value="CUSTOM_URL">Remote CXML URL</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
-        {mode === 'url' && (
-          <Input
-            type="url"
-            placeholder="https://example.com/voicemail-cxml"
-            value={urlValue}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            className="mt-2"
-          />
-        )}
+/**
+ * AMD URL Input Component (Right Column)
+ * Shown only when the corresponding action is set to Remote CXML URL
+ */
+interface AmdUrlInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function AmdUrlInput({ label, value, onChange }: AmdUrlInputProps) {
+  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+  const [urlValue, setUrlValue] = useState(isCustomUrl ? value : '');
+
+  // Sync when external value changes
+  useEffect(() => {
+    const externalIsUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+    if (externalIsUrl) {
+      setUrlValue(value);
+    } else {
+      setUrlValue('');
+    }
+  }, [value]);
+
+  if (!isCustomUrl) {
+    return (
+      <div className="space-y-2 opacity-50">
+        <Label className="text-sm">{label}</Label>
+        <Input
+          type="url"
+          placeholder="Select 'Remote CXML URL' on the left..."
+          disabled
+          value=""
+        />
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm">{label}</Label>
+      <Input
+        type="url"
+        placeholder="https://example.com/cxml-handler"
+        value={urlValue}
+        onChange={(e) => {
+          setUrlValue(e.target.value);
+          onChange(e.target.value);
+        }}
+      />
+      <p className="text-xs text-muted-foreground">
+        Enter a valid HTTP/HTTPS URL that returns CXML
+      </p>
     </div>
   );
 }
@@ -744,40 +760,69 @@ export default function AutoDialerCampaignForm() {
 
                 {watch('amd_enabled') && (
                   <div className="space-y-4 pl-4 border-l-2 border-muted">
-                    {/* Action: Voicemail */}
-                    <AmdActionField
-                      label="If Voicemail Detected"
-                      value={watch('action_voicemail') || ''}
-                      onChange={(value) => setValue('action_voicemail', value)}
-                    />
+                    {/* Two-column layout: 25% actions / 75% URL inputs */}
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      {/* Left Column - Action Selectors (25%) */}
+                      <div className="lg:w-[25%] space-y-4">
+                        <AmdActionSelector
+                          label="If Voicemail Detected"
+                          value={watch('action_voicemail') || ''}
+                          onChange={(value) => setValue('action_voicemail', value)}
+                        />
 
-                    {/* Action: Human */}
-                    <AmdActionField
-                      label="If Human Detected"
-                      value={watch('action_human') || ''}
-                      onChange={(value) => setValue('action_human', value)}
-                    />
+                        <AmdActionSelector
+                          label="If Human Detected"
+                          value={watch('action_human') || ''}
+                          onChange={(value) => setValue('action_human', value)}
+                        />
 
-                    {/* Action: Unknown */}
-                    <AmdActionField
-                      label="If Detection Unclear"
-                      value={watch('action_unknown') || ''}
-                      onChange={(value) => setValue('action_unknown', value)}
-                    />
+                        <AmdActionSelector
+                          label="If Detection Unclear"
+                          value={watch('action_unknown') || ''}
+                          onChange={(value) => setValue('action_unknown', value)}
+                        />
 
-                    {/* Retry on Voicemail */}
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="retry_on_voicemail">Retry on Voicemail</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Automatically retry the call if voicemail is detected
-                        </p>
+                        {/* Retry on Voicemail */}
+                        <div className="flex items-center justify-between pt-4 border-t">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="retry_on_voicemail">Retry on Voicemail</Label>
+                            <p className="text-sm text-muted-foreground">
+                              Auto-retry if voicemail detected
+                            </p>
+                          </div>
+                          <Switch
+                            id="retry_on_voicemail"
+                            checked={watch('retry_on_voicemail')}
+                            onCheckedChange={(checked) => setValue('retry_on_voicemail', checked)}
+                          />
+                        </div>
                       </div>
-                      <Switch
-                        id="retry_on_voicemail"
-                        checked={watch('retry_on_voicemail')}
-                        onCheckedChange={(checked) => setValue('retry_on_voicemail', checked)}
-                      />
+
+                      {/* Right Column - CXML URL Inputs (75%) */}
+                      <div className="lg:w-[75%] space-y-4">
+                        <Label className="text-sm font-medium text-muted-foreground">Remote CXML Endpoints</Label>
+                        <p className="text-xs text-muted-foreground">
+                          When an action is set to "Remote CXML URL", enter the endpoint URL below.
+                        </p>
+
+                        <AmdUrlInput
+                          label="Voicemail CXML URL"
+                          value={watch('action_voicemail') || ''}
+                          onChange={(value) => setValue('action_voicemail', value)}
+                        />
+
+                        <AmdUrlInput
+                          label="Human CXML URL"
+                          value={watch('action_human') || ''}
+                          onChange={(value) => setValue('action_human', value)}
+                        />
+
+                        <AmdUrlInput
+                          label="Unknown CXML URL"
+                          value={watch('action_unknown') || ''}
+                          onChange={(value) => setValue('action_unknown', value)}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
