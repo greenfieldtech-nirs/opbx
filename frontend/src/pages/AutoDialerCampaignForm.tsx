@@ -209,7 +209,7 @@ function AmdActionSelector({ label, value, onChange }: AmdActionSelectorProps) {
         value={selectValue}
         onValueChange={(selected) => {
           if (selected === 'CUSTOM_URL') {
-            onChange(''); // Will trigger URL input in right column
+            onChange('https://example.com'); // Trigger URL input in right column
           } else {
             onChange(selected);
           }
@@ -271,16 +271,13 @@ function AmdUrlInput({ label, value, onChange }: AmdUrlInputProps) {
       <Label className="text-sm">{label}</Label>
       <Input
         type="url"
-        placeholder="https://example.com/cxml-handler"
+        placeholder="https://your-domain.com/voicemail-cxml"
         value={urlValue}
         onChange={(e) => {
           setUrlValue(e.target.value);
           onChange(e.target.value);
         }}
       />
-      <p className="text-xs text-muted-foreground">
-        Enter a valid HTTP/HTTPS URL that returns CXML
-      </p>
     </div>
   );
 }
@@ -800,11 +797,6 @@ export default function AutoDialerCampaignForm() {
 
                       {/* Right Column - CXML URL Inputs (75%) */}
                       <div className="lg:w-[75%] space-y-4">
-                        <Label className="text-sm font-medium text-muted-foreground">Remote CXML Endpoints</Label>
-                        <p className="text-xs text-muted-foreground">
-                          When an action is set to "Remote CXML URL", enter the endpoint URL below.
-                        </p>
-
                         <AmdUrlInput
                           label="Voicemail CXML URL"
                           value={watch('action_voicemail') || ''}
