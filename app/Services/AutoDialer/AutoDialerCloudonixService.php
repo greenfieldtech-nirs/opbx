@@ -91,7 +91,11 @@ class AutoDialerCloudonixService
                 'destination_id' => $destination->id,
                 'phone_number' => substr($destination->phone_number, 0, 8).'...',
                 'routing_type' => $campaign->routing_destination_type,
-                'amd_enabled' => $campaign->amd_enabled,
+                'amd_actions' => [
+                    'voicemail' => $campaign->action_voicemail,
+                    'human' => $campaign->action_human,
+                    'unknown' => $campaign->action_unknown,
+                ],
             ]);
 
             // Make the API call
@@ -237,25 +241,32 @@ class AutoDialerCloudonixService
 
             switch ($routingType) {
                 case 'ai_assistant':
-                    return $this->generateAiAssistantCxml($campaign, $cloudonixParams);
+                    $innerCxml = $this->generateAiAssistantCxml($campaign, $cloudonixParams);
+                    break;
 
                 case 'ai_load_balancer':
-                    return $this->generateAiLoadBalancerCxml($campaign, $cloudonixParams);
+                    $innerCxml = $this->generateAiLoadBalancerCxml($campaign, $cloudonixParams);
+                    break;
 
                 case 'extension':
-                    return $this->generateExtensionCxml($campaign);
+                    $innerCxml = $this->generateExtensionCxml($campaign);
+                    break;
 
                 case 'ring_group':
-                    return $this->generateRingGroupCxml($campaign);
+                    $innerCxml = $this->generateRingGroupCxml($campaign);
+                    break;
 
                 case 'conference_room':
-                    return $this->generateConferenceRoomCxml($campaign);
+                    $innerCxml = $this->generateConferenceRoomCxml($campaign);
+                    break;
 
                 case 'ivr_menu':
-                    return $this->generateIvrMenuCxml($campaign);
+                    $innerCxml = $this->generateIvrMenuCxml($campaign);
+                    break;
 
                 case 'hangup':
-                    return $this->buildHangupCxml();
+                    $innerCxml = $this->buildHangupCxml();
+                    break;
 
                 default:
                     Log::warning('AutoDialer: Unknown routing destination type', [
