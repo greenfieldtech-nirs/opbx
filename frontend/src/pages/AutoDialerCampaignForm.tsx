@@ -104,9 +104,9 @@ const campaignSchema = z.object({
   time_limit: z.number().min(30).max(14400).default(3600),
   record_calls: z.boolean().default(false),
   amd_enabled: z.boolean().default(false),
-  action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
-  action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
-  action_unknown: z.enum(['HANGUP', 'CONTINUE']).optional(),
+  action_voicemail: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  action_human: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  action_unknown: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
   retry_on_voicemail: z.boolean().default(false),
   auto_start: z.boolean().default(false),
 });
@@ -186,6 +186,87 @@ function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPool
     did_id: 0, // Will be resolved by backend
     phone_number: callerId,
   }];
+}
+
+/**
+ * AMD Action Field Component
+ * Supports HANGUP, CONTINUE, or a custom CXML URL
+ */
+interface AmdActionFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function AmdActionField({ label, value, onChange }: AmdActionFieldProps) {
+  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+  const [mode, setMode] = useState<'preset' | 'url'>(isCustomUrl ? 'url' : 'preset');
+  const [urlValue, setUrlValue] = useState(isCustomUrl ? value : '');
+
+  // Sync internal state when external value changes
+  useEffect(() => {
+    const externalIsUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+    setMode(externalIsUrl ? 'url' : 'preset');
+    if (externalIsUrl) {
+      setUrlValue(value);
+    }
+  }, [value]);
+
+  const handleModeChange = (newMode: 'preset' | 'url') => {
+    setMode(newMode);
+    if (newMode === 'preset') {
+      onChange('HANGUP');
+    } else {
+      onChange(urlValue || '');
+    }
+  };
+
+  const handlePresetChange = (preset: string) => {
+    onChange(preset);
+  };
+
+  const handleUrlChange = (newUrl: string) => {
+    setUrlValue(newUrl);
+    onChange(newUrl);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="space-y-2">
+        <Select
+          value={mode === 'preset' ? (value || 'HANGUP') : 'CUSTOM_URL'}
+          onValueChange={(selected) => {
+            if (selected === 'CUSTOM_URL') {
+              handleModeChange('url');
+            } else {
+              handleModeChange('preset');
+              handlePresetChange(selected);
+            }
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select action" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="CONTINUE">Continue to destination</SelectItem>
+            <SelectItem value="HANGUP">Hang up</SelectItem>
+            <SelectItem value="CUSTOM_URL">Remote CXML URL</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {mode === 'url' && (
+          <Input
+            type="url"
+            placeholder="https://example.com/voicemail-cxml"
+            value={urlValue}
+            onChange={(e) => handleUrlChange(e.target.value)}
+            className="mt-2"
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AutoDialerCampaignForm() {
@@ -632,11 +713,7 @@ export default function AutoDialerCampaignForm() {
           {/* Answering Machine Detection Tab */}
           <TabsContent value="amd" className="space-y-6 max-h-[calc(100vh-360px)] overflow-y-auto pr-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Answering Machine Detection</CardTitle>
-                <CardDescription>Configure how the system handles calls based on who or what answers</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-6 pt-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="amd_enabled" className="text-base font-medium">Enable Detection</Label>
@@ -668,61 +745,25 @@ export default function AutoDialerCampaignForm() {
                 {watch('amd_enabled') && (
                   <div className="space-y-4 pl-4 border-l-2 border-muted">
                     {/* Action: Voicemail */}
-                    <div className="space-y-2">
-                      <Label htmlFor="action_voicemail">If Voicemail Detected</Label>
-                      <Select
-                        value={watch('action_voicemail') || ''}
-                        onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
-                          setValue('action_voicemail', value)
-                        }
-                      >
-                        <SelectTrigger id="action_voicemail">
-                          <SelectValue placeholder="Select action" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-                          <SelectItem value="HANGUP">Hang up</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <AmdActionField
+                      label="If Voicemail Detected"
+                      value={watch('action_voicemail') || ''}
+                      onChange={(value) => setValue('action_voicemail', value)}
+                    />
 
                     {/* Action: Human */}
-                    <div className="space-y-2">
-                      <Label htmlFor="action_human">If Human Detected</Label>
-                      <Select
-                        value={watch('action_human') || ''}
-                        onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
-                          setValue('action_human', value)
-                        }
-                      >
-                        <SelectTrigger id="action_human">
-                          <SelectValue placeholder="Select action" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-                          <SelectItem value="HANGUP">Hang up</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <AmdActionField
+                      label="If Human Detected"
+                      value={watch('action_human') || ''}
+                      onChange={(value) => setValue('action_human', value)}
+                    />
 
                     {/* Action: Unknown */}
-                    <div className="space-y-2">
-                      <Label htmlFor="action_unknown">If Detection Unclear</Label>
-                      <Select
-                        value={watch('action_unknown') || ''}
-                        onValueChange={(value: 'HANGUP' | 'CONTINUE') =>
-                          setValue('action_unknown', value)
-                        }
-                      >
-                        <SelectTrigger id="action_unknown">
-                          <SelectValue placeholder="Select action" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="CONTINUE">Continue to destination</SelectItem>
-                          <SelectItem value="HANGUP">Hang up</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <AmdActionField
+                      label="If Detection Unclear"
+                      value={watch('action_unknown') || ''}
+                      onChange={(value) => setValue('action_unknown', value)}
+                    />
 
                     {/* Retry on Voicemail */}
                     <div className="flex items-center justify-between pt-2">
