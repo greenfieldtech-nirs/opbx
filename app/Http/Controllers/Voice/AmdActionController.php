@@ -179,14 +179,55 @@ class AmdActionController extends Controller
     /**
      * Resolve Cloudonix settings from session token or call SID.
      *
-     * This is a best-effort lookup. In production, you may want to store
-     * a mapping of session tokens to organization IDs in Redis.
+     * Looks up the auto-dialer session by token, finds the campaign's
+     * organization, and returns that organization's Cloudonix settings.
+     * This ensures the correct domain credentials are used for the
+     * session profile update.
      */
     private function resolveSettings(string $sessionToken, string $callSid): ?CloudonixSettings
     {
-        // Try to find settings that have been recently used for this domain
-        // For now, we just return the first available settings.
-        // In a multi-tenant system, you'd store session->organization mapping.
-        return CloudonixSettings::first();
+        // Look up the auto-dialer session by token
+        $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+
+        if (! $session) {
+            Log::warning('AMD action: No auto-dialer session found for token', [
+                'session_token' => $sessionToken,
+                'call_sid' => $callSid,
+            ]);
+
+            return null;
+        }
+
+        // Load the campaign with its organization
+        $campaign = \App\Models\AutoDialerCampaign::with('organization.cloudonixSettings')
+            ->find($session->campaign_id);
+
+        if (! $campaign || ! $campaign->organization) {
+            Log::warning('AMD action: Campaign or organization not found', [
+                'session_token' => $sessionToken,
+                'campaign_id' => $session->campaign_id,
+            ]);
+
+            return null;
+        }
+
+        $settings = $campaign->organization->cloudonixSettings;
+
+        if (! $settings) {
+            Log::warning('AMD action: No Cloudonix settings for organization', [
+                'session_token' => $sessionToken,
+                'organization_id' => $campaign->organization_id,
+            ]);
+
+            return null;
+        }
+
+        Log::info('AMD action: Resolved Cloudonix settings', [
+            'session_token' => $sessionToken,
+            'organization_id' => $campaign->organization_id,
+            'domain_uuid' => $settings->domain_uuid,
+        ]);
+
+        return $settings;
     }
 }
