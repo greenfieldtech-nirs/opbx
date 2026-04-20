@@ -216,6 +216,9 @@ export default function LiveCalls() {
   const [totalToDisconnect, setTotalToDisconnect] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
+  // Check for stale calls (WebSocket-only calls without session_id)
+  const staleCallsCount = liveCalls.filter((call) => !call.session_id).length;
+
   const handleDisconnect = (sessionId: number) => {
     if (confirm('Are you sure you want to disconnect this call?')) {
       disconnectMutation.mutate(sessionId);
@@ -224,7 +227,9 @@ export default function LiveCalls() {
 
   const handleDisconnectAll = async () => {
     const callsWithSessionId = liveCalls.filter((call) => call.session_id);
-    if (callsWithSessionId.length === 0) {
+    const totalCalls = liveCalls.length;
+
+    if (totalCalls === 0) {
       toast.info('No active calls to disconnect');
       setShowConfirmDialog(false);
       return;
@@ -248,19 +253,28 @@ export default function LiveCalls() {
         failed++;
         console.error(`Failed to disconnect session ${sessionId}:`, error);
       }
-      completed++;
       setDisconnectProgress(completed);
       // Small delay between requests
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
-    // Refresh the calls list
+    // IMPORTANT: Clear local state for ALL calls, not just those with session_id.
+    // WebSocket calls may not have session_id and cannot be disconnected via API.
+    // Stale records persist when WebSocket 'call_ended' events are missed.
+    setLiveCalls([]);
+
+    // Refresh the calls list from server
     await queryClient.invalidateQueries({ queryKey: ['active-calls'] });
 
     setIsDisconnectingAll(false);
 
+    const disconnectedCount = sessionIds.length;
+    const skippedCount = totalCalls - disconnectedCount;
+
     if (failed > 0) {
       toast.warning(`Disconnected ${completed} calls, ${failed} failed`);
+    } else if (skippedCount > 0) {
+      toast.success(`Disconnected ${completed} calls. ${skippedCount} stale records cleared.`);
     } else {
       toast.success(`All ${completed} calls disconnected successfully`);
     }
@@ -324,6 +338,11 @@ export default function LiveCalls() {
                     <p>
                       Are you sure you want to disconnect all <strong>{liveCalls.length}</strong> active calls?
                     </p>
+                    {staleCallsCount > 0 && (
+                      <p className="text-yellow-600 text-sm">
+                        Note: {staleCallsCount} call{staleCallsCount > 1 ? 's' : ''} without session ID will be cleared from display only.
+                      </p>
+                    )}
                     <p className="text-red-600 font-medium">
                       This action cannot be undone. All ongoing calls will be forcibly terminated.
                     </p>
@@ -340,6 +359,24 @@ export default function LiveCalls() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          )}
+
+          {/* Clear Stale Records Button */}
+          {!isReadOnly && staleCallsCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+              onClick={() => {
+                if (confirm(`Clear ${staleCallsCount} stale record(s) without session ID from display?`)) {
+                  setLiveCalls((prev) => prev.filter((call) => call.session_id));
+                  toast.info(`Cleared ${staleCallsCount} stale record(s)`);
+                }
+              }}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Clear Stale ({staleCallsCount})
+            </Button>
           )}
 
           {/* Refresh Rate Selector */}
