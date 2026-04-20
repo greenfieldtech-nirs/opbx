@@ -351,11 +351,18 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: opbx_ngrok
+    # Use a shell command to conditionally add --url when NGROK_DOMAIN is set
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "http"
-      - "nginx:80"
+      - |
+        if [ -n "${NGROK_DOMAIN}" ]; then
+          exec ngrok http nginx:80 --url=${NGROK_DOMAIN}
+        else
+          exec ngrok http nginx:80
+        fi
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+      NGROK_DOMAIN: ${NGROK_DOMAIN:-}
     depends_on:
       - nginx
     networks:
@@ -365,6 +372,7 @@ services:
     restart: unless-stopped
     # Note: Get your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
     # Set NGROK_AUTHTOKEN in .env
+    # Optional: Set NGROK_DOMAIN to use a custom domain (e.g., opbx.ngrok.io)
     # Public URL will be shown in logs: docker compose logs ngrok
 
 networks:

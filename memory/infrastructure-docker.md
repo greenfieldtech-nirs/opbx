@@ -114,6 +114,22 @@ php artisan queue:work redis --queue=auto-dialer,default --sleep=3 --tries=3 --t
 - Processes `auto-dialer` queue first (higher priority), then `default`
 - 3 retry attempts, 90s timeout per job
 
+## ngrok Configuration
+
+The ngrok service supports optional custom domains (requires ngrok paid plan):
+
+| Environment Variable | Required | Description |
+|----------------------|----------|-------------|
+| `NGROK_AUTHTOKEN` | Yes | Your ngrok authtoken |
+| `NGROK_DOMAIN` | No | Custom domain (e.g., `opbx.ngrok.io`) |
+
+When `NGROK_DOMAIN` is set, the container passes `--url=${NGROK_DOMAIN}` to ngrok:
+```bash
+ngrok http nginx:80 --url=opbx.ngrok.io
+```
+
+When `NGROK_DOMAIN` is empty, ngrok uses a random subdomain.
+
 ## Startup Order
 1. `mysql` + `redis` (health checks)
 2. `app` (depends on mysql healthy + redis)
