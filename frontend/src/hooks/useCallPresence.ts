@@ -28,6 +28,7 @@ export interface CallPresenceState {
   totalActiveCalls: number;
   isConnected: boolean;
   connectionState: 'disconnected' | 'connecting' | 'connected';
+  clearActiveCalls: () => void;
 }
 
 /**
@@ -106,6 +107,15 @@ export function useCallPresence(): CallPresenceState {
     setOnlineMembers(prev => prev.filter(m => m.id !== member.id));
   }, []);
 
+  /**
+   * Clear all active calls from WebSocket state.
+   * Used when manually disconnecting all calls or clearing stale records.
+   */
+  const clearActiveCalls = useCallback(() => {
+    logger.info('[useCallPresence] Clearing all active calls');
+    setActiveCalls([]);
+  }, []);
+
   // Connect to Echo and subscribe to organization channel
   useEffect(() => {
     if (!isAuthenticated || !user || !token) {
@@ -179,6 +189,7 @@ export function useCallPresence(): CallPresenceState {
     totalActiveCalls: activeCalls.length,
     isConnected: connectionState === 'connected',
     connectionState,
+    clearActiveCalls,
   };
 }
 

@@ -112,7 +112,7 @@ export default function LiveCalls() {
   const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(5000);
 
   // WebSocket real-time call presence
-  const { activeCalls: wsActiveCalls, isConnected: isWsConnected, connectionState } = useCallPresence();
+  const { activeCalls: wsActiveCalls, isConnected: isWsConnected, connectionState, clearActiveCalls } = useCallPresence();
 
   // State for merged calls (initial HTTP + WebSocket updates)
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
@@ -262,6 +262,7 @@ export default function LiveCalls() {
     // WebSocket calls may not have session_id and cannot be disconnected via API.
     // Stale records persist when WebSocket 'call_ended' events are missed.
     setLiveCalls([]);
+    clearActiveCalls();
 
     // Refresh the calls list from server
     await queryClient.invalidateQueries({ queryKey: ['active-calls'] });
@@ -370,6 +371,7 @@ export default function LiveCalls() {
               onClick={() => {
                 if (confirm(`Clear ${staleCallsCount} stale record(s) without session ID from display?`)) {
                   setLiveCalls((prev) => prev.filter((call) => call.session_id));
+                  clearActiveCalls();
                   toast.info(`Cleared ${staleCallsCount} stale record(s)`);
                 }
               }}
