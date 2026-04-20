@@ -425,12 +425,20 @@ class CloudonixWebhookController extends Controller
             }
 
             // Check if this is an auto-dialer call and update destination
+            Log::info('CDR: Checking auto-dialer processing', [
+                'call_id' => $callId,
+                'session_token' => $request->input('session.token') ?? $request->input('session_token'),
+            ]);
             try {
                 $this->processAutoDialerCDR($request, $cdr);
+                Log::info('CDR: Auto-dialer processing completed', [
+                    'call_id' => $callId,
+                ]);
             } catch (\Exception $e) {
                 Log::error('Failed to process auto-dialer CDR', [
                     'call_id' => $callId,
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
                 // Don't fail the entire CDR processing
             }
@@ -749,9 +757,22 @@ class CloudonixWebhookController extends Controller
                 return;
             }
 
-            // Check for AMD result in session profile
+            // Check for AMD result in session profile from CDR payload
+            // NOTE: Due to race conditions, the CDR may not include the updated
+            // profile if the call ended immediately after AMD detection. Fall back
+            // to the locally stored AMD result from the AmdActionController.
             $sessionProfile = $request->input('session.profile', []);
-            $amdResult = $sessionProfile['amd']['result'] ?? null;
+            $cdrAmdResult = $sessionProfile['amd']['result'] ?? null;
+
+            // Use locally stored AMD result if CDR doesn't have it
+            $amdResult = $cdrAmdResult ?? $session->amd_result;
+
+            Log::info('Auto-dialer: AMD result resolution', [
+                'session_token' => $sessionToken,
+                'cdr_amd_result' => $cdrAmdResult,
+                'local_amd_result' => $session->amd_result,
+                'resolved_amd_result' => $amdResult,
+            ]);
 
             // Load campaign for retry logic
             $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
@@ -767,11 +788,15 @@ class CloudonixWebhookController extends Controller
                 'completed_at' => now(),
             ]);
 
-            // Store AMD result on session if present
+            // Store AMD result on session if present (from CDR or already stored locally)
             if ($amdResult) {
                 $session->update([
                     'amd_result' => $amdResult,
-                    'amd_confidence' => $sessionProfile['amd']['confidence'] ?? null,
+                    'amd_confidence' => $sessionProfile['amd']['confidence'] ?? $session->amd_confidence,
+                ]);
+                Log::info('Auto-dialer: AMD result stored on session', [
+                    'session_id' => $session->id,
+                    'amd_result' => $amdResult,
                 ]);
             }
 

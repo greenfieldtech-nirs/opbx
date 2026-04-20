@@ -84,9 +84,30 @@ class AmdActionController extends Controller
         }
 
         try {
+            // Update LOCAL session record first (source of truth for CDR processing)
+            // This is critical because Cloudonix CDR may not include the profile
+            // update due to race conditions when the call ends immediately.
+            $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+            if ($session) {
+                $session->update([
+                    'amd_result' => $result,
+                    'amd_confidence' => $confidence,
+                ]);
+                Log::info('AMD action: Local session updated with AMD result', [
+                    'session_id' => $session->id,
+                    'session_token' => $sessionToken,
+                    'amd_result' => $result,
+                    'amd_confidence' => $confidence,
+                ]);
+            } else {
+                Log::warning('AMD action: No local session found for token', [
+                    'session_token' => $sessionToken,
+                ]);
+            }
+
             $client = new CloudonixClient($settings);
 
-            // Step 1: Update session profile with AMD result BEFORE executing action
+            // Step 2: Update Cloudonix session profile (best effort - may race with CDR)
             $profile = [
                 'amd' => [
                     'result' => $result,
