@@ -264,8 +264,15 @@ export default function LiveCalls() {
     setLiveCalls([]);
     clearActiveCalls();
 
-    // Refresh the calls list from server
-    await queryClient.invalidateQueries({ queryKey: ['active-calls'] });
+    // DO NOT call invalidateQueries here. It triggers an immediate background
+    // refetch that brings back any calls the backend still considers active
+    // (either disconnection failed, or they are stale WebSocket records).
+    // Let the automatic polling (every 5s) refresh the list instead.
+    // This gives the user immediate visual feedback (calls disappear)
+    // while the backend catches up.
+
+    // Small delay so the user sees the progress bar hit 100%
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     setIsDisconnectingAll(false);
 
