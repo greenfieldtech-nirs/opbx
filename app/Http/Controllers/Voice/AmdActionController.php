@@ -177,17 +177,20 @@ class AmdActionController extends Controller
     }
 
     /**
-     * Resolve Cloudonix settings from session token or call SID.
+     * Resolve Cloudonix settings from session token.
      *
-     * Looks up the auto-dialer session by token, finds the campaign's
-     * organization, and returns that organization's Cloudonix settings.
-     * This ensures the correct domain credentials are used for the
-     * session profile update.
+     * Looks up the auto-dialer session by Cloudonix session token,
+     * finds the campaign's organization, and returns that organization's
+     * Cloudonix settings. The session token is the authoritative identifier
+     * from Cloudonix — never use call_id.
      */
     private function resolveSettings(string $sessionToken, string $callSid): ?CloudonixSettings
     {
-        // Look up the auto-dialer session by token
-        $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+        // Look up the auto-dialer session by Cloudonix session token
+        // Must bypass OrganizationScope since this is an unauthenticated worker callback
+        $session = \App\Scopes\OrganizationScope::bypass(
+            fn () => \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first()
+        );
 
         if (! $session) {
             Log::warning('AMD action: No auto-dialer session found for token', [
@@ -199,8 +202,11 @@ class AmdActionController extends Controller
         }
 
         // Load the campaign with its organization
-        $campaign = \App\Models\AutoDialerCampaign::with('organization.cloudonixSettings')
-            ->find($session->campaign_id);
+        // Must bypass OrganizationScope since this is an unauthenticated worker callback
+        $campaign = \App\Scopes\OrganizationScope::bypass(
+            fn () => \App\Models\AutoDialerCampaign::with('organization.cloudonixSettings')
+                ->find($session->campaign_id)
+        );
 
         if (! $campaign || ! $campaign->organization) {
             Log::warning('AMD action: Campaign or organization not found', [
