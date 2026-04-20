@@ -757,6 +757,7 @@ class CloudonixWebhookController extends Controller
 
             // Update destination record
             $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
+            $shouldRetryVoicemail = false;
 
             if ($destination) {
                 // Check for voicemail retry
@@ -796,13 +797,7 @@ class CloudonixWebhookController extends Controller
                     ]);
                 }
 
-                // Update CDR to mark as auto-dialer call
-                $cdr->update([
-                    'is_auto_dialer' => true,
-                    'auto_dialer_campaign_id' => $session->campaign_id,
-                ]);
-
-                Log::info('Auto-dialer CDR processed', [
+                Log::info('Auto-dialer destination updated', [
                     'call_id' => $callId,
                     'session_token' => $sessionToken,
                     'destination_id' => $destination->id,
@@ -811,21 +806,54 @@ class CloudonixWebhookController extends Controller
                 ]);
             }
 
+            // Update CDR to mark as auto-dialer call (always do this when session is found)
+            $cdr->update([
+                'is_auto_dialer' => true,
+                'auto_dialer_campaign_id' => $session->campaign_id,
+            ]);
+
+            Log::info('Auto-dialer CDR processed', [
+                'call_id' => $callId,
+                'session_token' => $sessionToken,
+                'campaign_id' => $session->campaign_id,
+                'destination_id' => $destination ? $destination->id : null,
+                'amd_result' => $amdResult,
+                'should_retry_voicemail' => $shouldRetryVoicemail,
+            ]);
+
             // Update campaign statistics
             $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
             if ($campaign) {
                 if ($amdResult === 'voicemail' && $shouldRetryVoicemail) {
                     // Voicemail with retry: don't count as completed, just decrement pending
                     $campaign->decrement('pending_calls');
+                    Log::info('Auto-dialer campaign stats: voicemail retry', [
+                        'campaign_id' => $campaign->id,
+                        'action' => 'decrement_pending',
+                    ]);
                 } else {
                     $campaign->increment('completed_calls');
                     $campaign->decrement('pending_calls');
+                    Log::info('Auto-dialer campaign stats: call completed', [
+                        'campaign_id' => $campaign->id,
+                        'action' => 'increment_completed_decrement_pending',
+                    ]);
                 }
 
                 // Increment voicemail counter if AMD detected voicemail
                 if ($amdResult === 'voicemail') {
                     $campaign->increment('voicemail_calls');
+                    Log::info('Auto-dialer campaign stats: voicemail detected', [
+                        'campaign_id' => $campaign->id,
+                        'voicemail_calls_before' => $campaign->voicemail_calls,
+                        'action' => 'increment_voicemail',
+                    ]);
                 }
+            } else {
+                Log::warning('Auto-dialer campaign not found for stats update', [
+                    'campaign_id' => $session->campaign_id,
+                    'session_token' => $sessionToken,
+                ]);
             }
 
             // Decrement the CAC counter directly in Redis.

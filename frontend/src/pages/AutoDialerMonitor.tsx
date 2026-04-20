@@ -624,7 +624,7 @@ export default function AutoDialerMonitor() {
 
                   <CardContent className="pt-0 space-y-4">
                     {/* Metric Cards Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Destinations</p>
                         <p className="text-xl font-bold">{campaign.total_destinations.toLocaleString()}</p>
