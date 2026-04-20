@@ -257,7 +257,7 @@ class AutoDialerCampaignController extends Controller
      */
     public function resetCac(AutoDialerCampaign $campaign): JsonResponse
     {
-        $this->authorize('manage', $campaign);
+        $this->authorize('update', $campaign);
 
         try {
             $redis = \Illuminate\Support\Facades\Redis::connection('dialer');
