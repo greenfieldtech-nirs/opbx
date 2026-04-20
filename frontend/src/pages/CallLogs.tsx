@@ -452,7 +452,9 @@ export default function CallLogs() {
                       <div className="text-sm text-green-900">
                         {((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.confidence !== undefined)
                           ? `${((selectedCdr.raw_cdr?.session as any)?.profile?.amd?.confidence * 100).toFixed(0)}%`
-                          : 'N/A'}
+                          : (selectedCdr.amd_confidence !== undefined)
+                            ? `${(selectedCdr.amd_confidence * 100).toFixed(0)}%`
+                            : 'N/A'}
                       </div>
                     </div>
                     <div className="min-w-0">

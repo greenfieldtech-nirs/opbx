@@ -851,10 +851,33 @@ class CloudonixWebhookController extends Controller
                 ]);
             }
 
-            // Update CDR to mark as auto-dialer call (always do this when session is found)
+            // Update CDR with AMD data and auto-dialer linkage
+            // If Cloudonix CDR payload is missing AMD profile, inject it from
+            // the local session record so the Call Log shows the detection result.
+            $rawCdr = $cdr->raw_cdr ?? [];
+            $sessionProfile = $rawCdr['session']['profile'] ?? [];
+            $cdrHasAmd = isset($sessionProfile['amd']['result']);
+
+            if (! $cdrHasAmd && $amdResult) {
+                // Inject AMD data into raw_cdr JSON so frontend Call Log can display it
+                $rawCdr['session']['profile']['amd'] = [
+                    'result' => $amdResult,
+                    'confidence' => $session->amd_confidence,
+                    'timestamp' => $session->updated_at?->toIso8601String(),
+                ];
+                Log::info('Auto-dialer: Injected AMD data into CDR raw payload', [
+                    'call_id' => $callId,
+                    'session_token' => $sessionToken,
+                    'amd_result' => $amdResult,
+                ]);
+            }
+
             $cdr->update([
                 'is_auto_dialer' => true,
                 'auto_dialer_campaign_id' => $session->campaign_id,
+                'amd_result' => $amdResult,
+                'amd_confidence' => $session->amd_confidence,
+                'raw_cdr' => $rawCdr,
             ]);
 
             Log::info('Auto-dialer CDR processed', [

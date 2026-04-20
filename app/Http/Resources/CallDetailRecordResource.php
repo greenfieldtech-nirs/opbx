@@ -63,6 +63,8 @@ class CallDetailRecordResource extends JsonResource
 
             // AMD status indicator
             'amd_status' => $this->amd_status,
+            'amd_result' => $this->amd_result,
+            'amd_confidence' => $this->amd_confidence ? (float) $this->amd_confidence : null,
 
             // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
             'raw_cdr' => $this->when(
