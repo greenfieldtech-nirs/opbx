@@ -250,6 +250,37 @@ class AutoDialerCampaignController extends Controller
     }
 
     /**
+     * Reset the CAC counter for a campaign.
+     *
+     * This is useful when the CAC counter gets stuck due to missed CDR
+     * webhooks, preventing new calls from being initiated.
+     */
+    public function resetCac(AutoDialerCampaign $campaign): JsonResponse
+    {
+        $this->authorize('manage', $campaign);
+
+        try {
+            $redis = \Illuminate\Support\Facades\Redis::connection('dialer');
+            $key = "dialer:cac:{$campaign->id}:active";
+            $currentValue = $redis->get($key);
+
+            $redis->set($key, 0);
+
+            return response()->json([
+                'message' => 'CAC counter reset successfully',
+                'campaign_id' => $campaign->id,
+                'previous_value' => $currentValue ? (int) $currentValue : 0,
+                'new_value' => 0,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to reset CAC counter',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Archive a campaign.
      */
     public function archive(AutoDialerCampaign $campaign): JsonResponse

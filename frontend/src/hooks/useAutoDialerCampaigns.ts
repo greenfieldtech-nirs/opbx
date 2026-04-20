@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { autoDialerCampaignsApi } from '@/services/autoDialerCampaignsApi';
 import type {
   CampaignParams,
@@ -123,6 +124,21 @@ export function useResumeCampaign() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+    },
+  });
+}
+
+export function useResetCac() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => autoDialerCampaignsApi.resetCac(id),
+    onSuccess: (data) => {
+      toast.success(`CAC counter reset (was ${data.previous_value}, now 0)`);
+      queryClient.invalidateQueries({ queryKey: ['monitor'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to reset CAC counter');
     },
   });
 }

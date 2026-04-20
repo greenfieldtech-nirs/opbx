@@ -229,6 +229,13 @@ export const autoDialerCampaignsApi = {
       .patch<{ data: AutoDialerCampaign; message: string }>(`/auto-dialer-campaigns/${id}/archive`)
       .then((r) => r.data),
 
+  resetCac: (id: string) =>
+    api
+      .post<{ message: string; campaign_id: number; previous_value: number; new_value: number }>(
+        `/auto-dialer-campaigns/${id}/reset-cac`
+      )
+      .then((r) => r.data),
+
   // List Management
   getList: (campaignId: string) =>
     api

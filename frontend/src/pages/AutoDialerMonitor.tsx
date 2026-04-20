@@ -24,6 +24,7 @@ import {
   BarChart3,
   Loader2,
   Voicemail,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +35,7 @@ import {
 import {
   usePauseCampaign,
   useResumeCampaign,
+  useResetCac,
 } from '@/hooks/useAutoDialerCampaigns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -341,6 +343,7 @@ export default function AutoDialerMonitor() {
   // Mutations
   const pauseMutation = usePauseCampaign();
   const resumeMutation = useResumeCampaign();
+  const resetCacMutation = useResetCac();
 
   // Persist refresh interval
   useEffect(() => {
@@ -422,7 +425,17 @@ export default function AutoDialerMonitor() {
     }
   }, [resumeMutation, refreshMonitor]);
 
-  const isActionLoading = pauseMutation.isPending || resumeMutation.isPending;
+  const handleResetCac = useCallback(async (campaign: MonitorCampaign) => {
+    try {
+      await resetCacMutation.mutateAsync(campaign.id.toString());
+      toast.success(`CAC counter reset for "${campaign.name}"`);
+      refreshMonitor();
+    } catch {
+      toast.error('Failed to reset CAC counter');
+    }
+  }, [resetCacMutation, refreshMonitor]);
+
+  const isActionLoading = pauseMutation.isPending || resumeMutation.isPending || resetCacMutation.isPending;
 
   // Computed values
   const selectedCampaign = useMemo(() => {
@@ -611,7 +624,24 @@ export default function AutoDialerMonitor() {
                         </Badge>
                         <span className="text-xs text-muted-foreground">{campaign.routing_destination_label}</span>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          disabled={isActionLoading}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResetCac(campaign);
+                          }}
+                          title="Reset CAC counter if stuck"
+                        >
+                          {resetCacMutation.isPending && resetCacMutation.variables === campaign.id.toString() ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Zap className="h-4 w-4" />
+                          )}
+                        </Button>
                         <CampaignActionButton
                           campaign={campaign}
                           onPause={handlePause}
@@ -725,12 +755,29 @@ export default function AutoDialerMonitor() {
               onManualRefresh={handleManualRefresh}
             />
             {selectedCampaign && (
-              <CampaignActionButton
-                campaign={selectedCampaign}
-                onPause={handlePause}
-                onResume={handleResume}
-                isLoading={isActionLoading}
-              />
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                  disabled={isActionLoading}
+                  onClick={() => handleResetCac(selectedCampaign)}
+                  title="Reset CAC counter if stuck"
+                >
+                  {resetCacMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                  Reset CAC
+                </Button>
+                <CampaignActionButton
+                  campaign={selectedCampaign}
+                  onPause={handlePause}
+                  onResume={handleResume}
+                  isLoading={isActionLoading}
+                />
+              </>
             )}
           </div>
         </div>

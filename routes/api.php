@@ -406,6 +406,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('auto-dialer-campaigns.pause');
     Route::patch('auto-dialer-campaigns/{campaign}/resume', [AutoDialerCampaignController::class, 'resume'])
         ->name('auto-dialer-campaigns.resume');
+    Route::post('auto-dialer-campaigns/{campaign}/reset-cac', [AutoDialerCampaignController::class, 'resetCac'])
+        ->name('auto-dialer-campaigns.reset-cac');
     Route::patch('auto-dialer-campaigns/{campaign}/archive', [AutoDialerCampaignController::class, 'archive'])
         ->name('auto-dialer-campaigns.archive');
     Route::post('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'uploadList'])
