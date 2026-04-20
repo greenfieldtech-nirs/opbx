@@ -20,6 +20,8 @@ import {
   PhoneOff,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -32,6 +34,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { CallStatus, getCallStatusColor, getCallStatusLabel, LiveCallStatuses } from '@/types/call.types';
 import type { ActiveCall as ApiActiveCall } from '@/types/api.types';
 import { toast } from 'sonner';
@@ -196,9 +210,59 @@ export default function LiveCalls() {
     },
   });
 
+  // Disconnect all calls state
+  const [isDisconnectingAll, setIsDisconnectingAll] = useState(false);
+  const [disconnectProgress, setDisconnectProgress] = useState(0);
+  const [totalToDisconnect, setTotalToDisconnect] = useState(0);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
   const handleDisconnect = (sessionId: number) => {
     if (confirm('Are you sure you want to disconnect this call?')) {
       disconnectMutation.mutate(sessionId);
+    }
+  };
+
+  const handleDisconnectAll = async () => {
+    const callsWithSessionId = liveCalls.filter((call) => call.session_id);
+    if (callsWithSessionId.length === 0) {
+      toast.info('No active calls to disconnect');
+      setShowConfirmDialog(false);
+      return;
+    }
+
+    setShowConfirmDialog(false);
+    setIsDisconnectingAll(true);
+    setTotalToDisconnect(callsWithSessionId.length);
+    setDisconnectProgress(0);
+
+    const sessionIds = callsWithSessionId.map((call) => call.session_id!);
+    let completed = 0;
+    let failed = 0;
+
+    // Disconnect calls sequentially to avoid overwhelming the server
+    for (const sessionId of sessionIds) {
+      try {
+        await sessionUpdatesService.disconnectSession(sessionId);
+        completed++;
+      } catch (error) {
+        failed++;
+        console.error(`Failed to disconnect session ${sessionId}:`, error);
+      }
+      completed++;
+      setDisconnectProgress(completed);
+      // Small delay between requests
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    // Refresh the calls list
+    await queryClient.invalidateQueries({ queryKey: ['active-calls'] });
+
+    setIsDisconnectingAll(false);
+
+    if (failed > 0) {
+      toast.warning(`Disconnected ${completed} calls, ${failed} failed`);
+    } else {
+      toast.success(`All ${completed} calls disconnected successfully`);
     }
   };
 
@@ -236,6 +300,48 @@ export default function LiveCalls() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Disconnect All Calls Button */}
+          {!isReadOnly && liveCalls.length > 0 && (
+            <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2 bg-red-600 hover:bg-red-700"
+                  disabled={isDisconnectingAll}
+                >
+                  <PhoneOff className="h-4 w-4" />
+                  Disconnect All Calls
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    Dangerous Operation
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p>
+                      Are you sure you want to disconnect all <strong>{liveCalls.length}</strong> active calls?
+                    </p>
+                    <p className="text-red-600 font-medium">
+                      This action cannot be undone. All ongoing calls will be forcibly terminated.
+                    </p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDisconnectAll}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Yes, Disconnect All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
           {/* Refresh Rate Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Refresh:</span>
@@ -321,6 +427,44 @@ export default function LiveCalls() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Disconnect All Overlay */}
+      {isDisconnectingAll && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+          <div className="bg-background rounded-lg shadow-lg p-8 max-w-md w-full mx-4 space-y-6">
+            <div className="text-center space-y-2">
+              <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto" />
+              <h3 className="text-lg font-semibold">Disconnecting All Calls</h3>
+              <p className="text-muted-foreground">
+                Please wait while all active calls are being terminated...
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span className="font-medium">
+                  {disconnectProgress} of {totalToDisconnect}
+                </span>
+              </div>
+              <Progress
+                value={(disconnectProgress / totalToDisconnect) * 100}
+                className="h-3"
+              />
+              <p className="text-xs text-muted-foreground text-center">
+                {Math.round((disconnectProgress / totalToDisconnect) * 100)}% complete
+              </p>
+            </div>
+
+            <div className="text-center text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                Do not close or refresh this page
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Active Calls List */}
       {isLoading ? (
