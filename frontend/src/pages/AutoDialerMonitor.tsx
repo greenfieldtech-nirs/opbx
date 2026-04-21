@@ -24,7 +24,6 @@ import {
   BarChart3,
   Loader2,
   Voicemail,
-  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -35,8 +34,8 @@ import {
 import {
   usePauseCampaign,
   useResumeCampaign,
-  useResetCac,
 } from '@/hooks/useAutoDialerCampaigns';
+import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -247,10 +246,12 @@ function RefreshSelector({
   refreshInterval,
   onIntervalChange,
   onManualRefresh,
+  isRefreshing,
 }: {
   refreshInterval: number;
   onIntervalChange: (value: string) => void;
   onManualRefresh: () => void;
+  isRefreshing?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -267,9 +268,9 @@ function RefreshSelector({
           ))}
         </SelectContent>
       </Select>
-      <Button variant="outline" className="h-9" onClick={onManualRefresh}>
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Refresh Now
+      <Button variant="outline" className="h-9" onClick={onManualRefresh} disabled={isRefreshing}>
+        <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
+        Refresh
       </Button>
     </div>
   );
@@ -332,6 +333,7 @@ export default function AutoDialerMonitor() {
   });
   const [previousSnapshot, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
   const [callsPerMinute, setCallsPerMinute] = useState<Map<number, number | null>>(new Map());
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // Queries
   const summaryQuery = useMonitorSummary(refreshInterval > 0 ? refreshInterval : false);
@@ -343,7 +345,6 @@ export default function AutoDialerMonitor() {
   // Mutations
   const pauseMutation = usePauseCampaign();
   const resumeMutation = useResumeCampaign();
-  const resetCacMutation = useResetCac();
 
   // Persist refresh interval
   useEffect(() => {
@@ -387,13 +388,15 @@ export default function AutoDialerMonitor() {
     setRefreshInterval(parseInt(value, 10));
   }, []);
 
-  const handleManualRefresh = useCallback(() => {
+  const handleManualRefresh = useCallback(async () => {
+    setIsManualRefreshing(true);
     refreshMonitor();
     if (selectedCampaignId) {
-      detailQuery.refetch();
+      await detailQuery.refetch();
     } else {
-      summaryQuery.refetch();
+      await summaryQuery.refetch();
     }
+    setIsManualRefreshing(false);
   }, [refreshMonitor, selectedCampaignId, detailQuery, summaryQuery]);
 
   const handleCampaignClick = useCallback((campaign: MonitorCampaign) => {
@@ -425,17 +428,7 @@ export default function AutoDialerMonitor() {
     }
   }, [resumeMutation, refreshMonitor]);
 
-  const handleResetCac = useCallback(async (campaign: MonitorCampaign) => {
-    try {
-      await resetCacMutation.mutateAsync(campaign.id.toString());
-      toast.success(`CAC counter reset for "${campaign.name}"`);
-      refreshMonitor();
-    } catch {
-      toast.error('Failed to reset CAC counter');
-    }
-  }, [resetCacMutation, refreshMonitor]);
-
-  const isActionLoading = pauseMutation.isPending || resumeMutation.isPending || resetCacMutation.isPending;
+  const isActionLoading = pauseMutation.isPending || resumeMutation.isPending;
 
   // Computed values
   const selectedCampaign = useMemo(() => {
@@ -444,6 +437,12 @@ export default function AutoDialerMonitor() {
   }, [selectedCampaignId, summaryQuery.data]);
 
   const currentCPM = selectedCampaignId ? callsPerMinute.get(selectedCampaignId) : null;
+  const isMonitorRefreshing = selectedCampaignId
+    ? detailQuery.isFetching || isManualRefreshing
+    : summaryQuery.isFetching || isManualRefreshing;
+
+  // Register refresh timer with AppLayout bar
+  useRefreshTimer(refreshInterval, isMonitorRefreshing);
 
   // Loading state
   if (summaryQuery.isLoading) {
@@ -490,8 +489,8 @@ export default function AutoDialerMonitor() {
                   ? summaryQuery.error.message
                   : 'An error occurred while loading monitor data'}
               </p>
-              <Button onClick={() => summaryQuery.refetch()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <Button onClick={() => summaryQuery.refetch()} disabled={summaryQuery.isFetching}>
+                <RefreshCw className={cn('h-4 w-4 mr-2', summaryQuery.isFetching && 'animate-spin')} />
                 Try Again
               </Button>
             </div>
@@ -525,6 +524,7 @@ export default function AutoDialerMonitor() {
               refreshInterval={refreshInterval}
               onIntervalChange={handleRefreshIntervalChange}
               onManualRefresh={handleManualRefresh}
+              isRefreshing={isManualRefreshing}
             />
           </div>
 
@@ -624,24 +624,7 @@ export default function AutoDialerMonitor() {
                         </Badge>
                         <span className="text-xs text-muted-foreground">{campaign.routing_destination_label}</span>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                          disabled={isActionLoading}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleResetCac(campaign);
-                          }}
-                          title="Reset CAC counter if stuck"
-                        >
-                          {resetCacMutation.isPending && resetCacMutation.variables === campaign.id.toString() ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Zap className="h-4 w-4" />
-                          )}
-                        </Button>
+                      <div onClick={(e) => e.stopPropagation()}>
                         <CampaignActionButton
                           campaign={campaign}
                           onPause={handlePause}
@@ -753,31 +736,15 @@ export default function AutoDialerMonitor() {
               refreshInterval={refreshInterval}
               onIntervalChange={handleRefreshIntervalChange}
               onManualRefresh={handleManualRefresh}
+              isRefreshing={isManualRefreshing}
             />
             {selectedCampaign && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
-                  disabled={isActionLoading}
-                  onClick={() => handleResetCac(selectedCampaign)}
-                  title="Reset CAC counter if stuck"
-                >
-                  {resetCacMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Zap className="h-4 w-4" />
-                  )}
-                  Reset CAC
-                </Button>
-                <CampaignActionButton
-                  campaign={selectedCampaign}
-                  onPause={handlePause}
-                  onResume={handleResume}
-                  isLoading={isActionLoading}
-                />
-              </>
+              <CampaignActionButton
+                campaign={selectedCampaign}
+                onPause={handlePause}
+                onResume={handleResume}
+                isLoading={isActionLoading}
+              />
             )}
           </div>
         </div>

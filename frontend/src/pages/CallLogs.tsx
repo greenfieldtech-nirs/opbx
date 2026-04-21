@@ -2,7 +2,7 @@
  * Call Logs Page
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
 import { extensionsService } from '@/services/extensions.service';
@@ -23,6 +23,7 @@ import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Lock } from 'lu
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
+import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,9 @@ export default function CallLogs() {
     to_date: '',
     disposition: '',
   });
+
+  // Auto-refresh interval state (default: 30 seconds)
+  const [refreshInterval, setRefreshInterval] = useState<number>(30000);
 
   // For PBX Users, find their extension number
   const [userExtensionNumber, setUserExtensionNumber] = useState<string | null>(null);
@@ -86,10 +90,14 @@ export default function CallLogs() {
   const {
     data: cdrData,
     isLoading: cdrIsLoading,
+    isFetching: cdrIsFetching,
     refetch: refetchCdr,
   } = useQuery({
     queryKey: ['cdrs', cdrPage, cdrFilters],
     queryFn: () => cdrService.getAll({ ...cdrFilters, page: cdrPage }),
+    refetchInterval: refreshInterval,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
   });
 
   const handleExportCdr = async () => {
@@ -143,6 +151,11 @@ export default function CallLogs() {
     }
   };
 
+  const handleRefresh = useCallback(() => refetchCdr(), [refetchCdr]);
+
+  // Register refresh timer with AppLayout bar
+  useRefreshTimer(refreshInterval, cdrIsFetching);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-start">
@@ -156,6 +169,27 @@ export default function CallLogs() {
             <span>Dashboard</span>
             <span>/</span>
             <span className="text-foreground">Call Logs</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {/* Refresh Rate Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Refresh:</span>
+            <Select
+              value={String(refreshInterval)}
+              onValueChange={(value) => setRefreshInterval(Number(value))}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Manual</SelectItem>
+                <SelectItem value="5000">5 Seconds</SelectItem>
+                <SelectItem value="10000">10 Seconds</SelectItem>
+                <SelectItem value="30000">30 Seconds</SelectItem>
+                <SelectItem value="60000">60 Seconds</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
@@ -175,9 +209,9 @@ export default function CallLogs() {
                 variant="outline"
                 size="sm"
                 onClick={() => refetchCdr()}
-                disabled={cdrIsLoading}
+                disabled={cdrIsFetching}
               >
-                <RefreshCw className={cn('h-4 w-4 mr-2', cdrIsLoading && 'animate-spin')} />
+                <RefreshCw className={cn('h-4 w-4 mr-2', cdrIsFetching && 'animate-spin')} />
                 Refresh
               </Button>
               {!isReadOnly && (

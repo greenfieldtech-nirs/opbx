@@ -5,11 +5,12 @@
  * Falls back to HTTP polling since WebSocket updates are unreliable
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { useAuth } from '@/hooks/useAuth';
 import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
+import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Activity,
@@ -117,8 +118,18 @@ export default function LiveCalls() {
   // State for merged calls (initial HTTP + WebSocket updates)
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
 
+  // Track call IDs that were recently disconnected so they don't reappear
+  // while Cloudonix is still processing the disconnection
+  const [recentlyDisconnected, setRecentlyDisconnected] = useState<Set<string>>(new Set());
+  const recentlyDisconnectedRef = useRef<Set<string>>(new Set());
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    recentlyDisconnectedRef.current = recentlyDisconnected;
+  }, [recentlyDisconnected]);
+
   // Initial data fetch via HTTP with configurable refresh
-  const { data: initialData, isLoading, error } = useQuery({
+  const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['active-calls'],
     queryFn: () => sessionUpdatesService.getActiveCalls(),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
@@ -131,22 +142,31 @@ export default function LiveCalls() {
   // We use call_ids from the API if available, otherwise fall back to session_id
   useEffect(() => {
     if (initialData?.data) {
-      const calls: LiveCall[] = initialData.data.map((call: ApiActiveCall) => {
-        // Use first call_id from array, or fall back to session_id as string
-        const callId = call.call_ids?.[0] || String(call.session_id);
-        return {
-          id: callId,
-          call_id: callId,
-          session_id: call.session_id,
-          caller_id: call.caller_id || 'Unknown Caller',
-          destination: call.destination || 'Unknown',
-          direction: call.direction || 'unknown',
-          status: call.status,
-          session_created_at: call.session_created_at,
-          duration_seconds: call.duration_seconds || 0,
-          formatted_duration: call.formatted_duration || '0s',
-        };
-      });
+      const disconnected = recentlyDisconnectedRef.current;
+      const calls: LiveCall[] = initialData.data
+        .filter((call: ApiActiveCall) => {
+          // Filter out calls that were recently disconnected — the backend
+          // may still report them as active while Cloudonix processes the
+          // disconnection. We give it a grace period before showing them again.
+          const callId = call.call_ids?.[0] || String(call.session_id);
+          return !disconnected.has(callId);
+        })
+        .map((call: ApiActiveCall) => {
+          // Use first call_id from array, or fall back to session_id as string
+          const callId = call.call_ids?.[0] || String(call.session_id);
+          return {
+            id: callId,
+            call_id: callId,
+            session_id: call.session_id,
+            caller_id: call.caller_id || 'Unknown Caller',
+            destination: call.destination || 'Unknown',
+            direction: call.direction || 'unknown',
+            status: call.status,
+            session_created_at: call.session_created_at,
+            duration_seconds: call.duration_seconds || 0,
+            formatted_duration: call.formatted_duration || '0s',
+          };
+        });
       setLiveCalls(calls);
     }
   }, [initialData]);
@@ -157,12 +177,18 @@ export default function LiveCalls() {
 
     console.log('[LiveCalls] WebSocket calls received:', wsActiveCalls);
 
+    const disconnected = recentlyDisconnectedRef.current;
+
     setLiveCalls((prevCalls) => {
       // Create a map of existing calls by call_id (consistent with WebSocket)
       const callsMap = new Map(prevCalls.map((c) => [c.call_id, c]));
 
-      // Merge or add WebSocket calls
+      // Merge or add WebSocket calls, but skip recently disconnected ones
       wsActiveCalls.forEach((wsCall) => {
+        // Skip calls that were recently disconnected — WebSocket may still
+        // emit events for them while Cloudonix processes the disconnection
+        if (disconnected.has(wsCall.call_id)) return;
+
         const existing = callsMap.get(wsCall.call_id);
 
         if (existing) {
@@ -221,6 +247,19 @@ export default function LiveCalls() {
 
   const handleDisconnect = (sessionId: number) => {
     if (confirm('Are you sure you want to disconnect this call?')) {
+      // Mark the call as recently disconnected so it doesn't reappear
+      // while Cloudonix processes the disconnection
+      const call = liveCalls.find((c) => c.session_id === sessionId);
+      if (call) {
+        const newDisconnected = new Set(recentlyDisconnectedRef.current);
+        newDisconnected.add(call.call_id);
+        setRecentlyDisconnected(newDisconnected);
+        recentlyDisconnectedRef.current = newDisconnected;
+
+        // Also optimistically remove from local state
+        setLiveCalls((prev) => prev.filter((c) => c.session_id !== sessionId));
+      }
+
       disconnectMutation.mutate(sessionId);
     }
   };
@@ -258,18 +297,31 @@ export default function LiveCalls() {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
-    // IMPORTANT: Clear local state for ALL calls, not just those with session_id.
-    // WebSocket calls may not have session_id and cannot be disconnected via API.
-    // Stale records persist when WebSocket 'call_ended' events are missed.
+    // IMPORTANT: Mark all calls as recently disconnected so they don't
+    // reappear while Cloudonix is still processing the disconnection.
+    // The backend and WebSocket may continue to report them as active
+    // for a few seconds — we filter them out during the grace period.
+    const allCallIds = liveCalls.map((call) => call.call_id);
+    const newDisconnected = new Set(recentlyDisconnectedRef.current);
+    allCallIds.forEach((id) => newDisconnected.add(id));
+    setRecentlyDisconnected(newDisconnected);
+    recentlyDisconnectedRef.current = newDisconnected;
+
+    // Clear local state and query cache immediately for instant feedback
     setLiveCalls([]);
     clearActiveCalls();
+    queryClient.setQueryData(['active-calls'], { data: [] });
 
-    // DO NOT call invalidateQueries here. It triggers an immediate background
-    // refetch that brings back any calls the backend still considers active
-    // (either disconnection failed, or they are stale WebSocket records).
-    // Let the automatic polling (every 5s) refresh the list instead.
-    // This gives the user immediate visual feedback (calls disappear)
-    // while the backend catches up.
+    // Remove call IDs from the recently-disconnected set after a grace
+    // period so that genuinely new calls with the same ID can still appear.
+    setTimeout(() => {
+      setRecentlyDisconnected((prev) => {
+        const next = new Set(prev);
+        allCallIds.forEach((id) => next.delete(id));
+        recentlyDisconnectedRef.current = next;
+        return next;
+      });
+    }, 10000);
 
     // Small delay so the user sees the progress bar hit 100%
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -295,6 +347,11 @@ export default function LiveCalls() {
     ringing: liveCalls.filter((c) => c.status === CallStatus.RINGING).length,
     connected: liveCalls.filter((c) => c.status === CallStatus.CONNECTED).length,
   };
+
+  const handleRefresh = useCallback(() => refetch(), [refetch]);
+
+  // Register refresh timer with AppLayout bar
+  useRefreshTimer(refreshInterval, isFetching);
 
   return (
     <div className="space-y-6">
