@@ -50,6 +50,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList, useUnassignListFromCampaign } from '@/hooks/useDistributionLists';
 import { useAutoDialerCampaigns } from '@/hooks/useAutoDialerCampaigns';
+import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { DistributionListsEmpty } from './DistributionLists/components/DistributionListsEmpty';
@@ -90,7 +91,7 @@ export default function DistributionLists() {
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
   const [assignList, setAssignList] = useState<AutoDialerList | null>(null);
 
-  const { data, isLoading, error } = useDistributionLists({
+  const { data, isLoading, isFetching, error } = useDistributionLists({
     page,
     per_page: 25,
     search: search || undefined,
@@ -241,9 +242,10 @@ export default function DistributionLists() {
               variant="outline"
               size="icon"
               onClick={() => queryClient.invalidateQueries({ queryKey: distributionListKeys.all })}
+              disabled={isFetching}
               title="Refresh"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
             </Button>
 
             {/* Status Filter */}

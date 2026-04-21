@@ -329,7 +329,8 @@ export default function AutoDialerCampaigns() {
               <p className="text-muted-foreground mb-4">
                 {error instanceof Error ? error.message : 'An error occurred while loading campaigns'}
               </p>
-              <Button onClick={() => refetch()}>
+              <Button onClick={() => refetch()} disabled={isRefetching}>
+                <RefreshCw className={cn('h-4 w-4 mr-2', isRefetching && 'animate-spin')} />
                 Try Again
               </Button>
             </div>
