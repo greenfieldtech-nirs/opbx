@@ -135,6 +135,30 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Clear organization-level caches after model mutations.
+     *
+     * This method is called automatically after every successful store,
+     * update, and destroy operation. Override it in controllers that
+     * manage cached resources (extensions, business hours, etc.) to
+     * ensure stale cache data is invalidated.
+     *
+     * @param  Model  $model  The model that was mutated
+     */
+    protected function clearOrganizationCaches(Model $model): void
+    {
+        // Default implementation - no cache clearing
+        // Controllers should override this to clear specific caches
+    }
+
+    /**
+     * Hook method called after deleting a model.
+     */
+    protected function afterDestroy(Model $model, Request $request): void
+    {
+        // Default implementation - no action
+    }
+
+    /**
      * Check if a resource is referenced elsewhere before deletion.
      *
      * This method should be called from beforeDestroy() hooks in controllers
@@ -158,14 +182,6 @@ abstract class AbstractApiCrudController extends Controller
         if ($result['has_references']) {
             throw new \App\Exceptions\ResourceInUseException($resourceType, $result['references']);
         }
-    }
-
-    /**
-     * Hook method called after deleting a model.
-     */
-    protected function afterDestroy(Model $model, Request $request): void
-    {
-        // Default implementation - no action
     }
 
     /**
@@ -640,6 +656,9 @@ abstract class AbstractApiCrudController extends Controller
                 $this->afterStore($model, $request);
             }
 
+            // Clear organization caches after mutation
+            $this->clearOrganizationCaches($model);
+
             $this->logOperationCompleted($this->getResourceKey(), 'creation', [
                 'creator_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
@@ -780,6 +799,9 @@ abstract class AbstractApiCrudController extends Controller
             // Reload model
             $model->refresh();
 
+            // Clear organization caches after mutation
+            $this->clearOrganizationCaches($model);
+
             $this->logOperationCompleted($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,
                 'organization_id' => $currentUser->organization_id,
@@ -868,6 +890,9 @@ abstract class AbstractApiCrudController extends Controller
                 // Apply after hook
                 $this->afterDestroy($model, $request);
             }
+
+            // Clear organization caches after mutation
+            $this->clearOrganizationCaches($model);
 
             $this->logOperationCompleted($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,

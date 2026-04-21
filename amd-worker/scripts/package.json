@@ -1,0 +1,16 @@
+{
+  "name": "amd-worker-test-client",
+  "version": "1.0.0",
+  "scripts": {
+    "test-ws": "ts-node test-websocket.ts"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/ws": "^8.5.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}

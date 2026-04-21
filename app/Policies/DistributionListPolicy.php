@@ -57,6 +57,17 @@ class DistributionListPolicy
     }
 
     /**
+     * Determine whether the user can reset dial attempts for destinations in the list.
+     */
+    public function resetDialAttempts(User $user, AutoDialerList $list): bool
+    {
+        // Must be in same organization and have management role
+        // Allowed even if list is locked because this is a destination management operation
+        return $user->organization_id === $list->organization_id
+            && ($user->isOwner() || $user->isPBXAdmin());
+    }
+
+    /**
      * Determine whether the user can upload destinations to the list.
      */
     public function upload(User $user, AutoDialerList $list): bool

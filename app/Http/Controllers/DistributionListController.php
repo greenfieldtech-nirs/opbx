@@ -9,6 +9,7 @@ use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerList;
+use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\ListManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class DistributionListController extends Controller
 {
     public function __construct(
         private ListManagementService $listService,
+        private DestinationManagementService $destinationService,
     ) {}
 
     /**
@@ -442,6 +444,86 @@ class DistributionListController extends Controller
                 'error' => 'Failed to assign list to campaign: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Reset dial attempts for a single destination.
+     */
+    public function resetDialAttempts(AutoDialerList $list, int $destinationId): JsonResponse
+    {
+        $this->authorize('resetDialAttempts', $list);
+
+        $destination = AutoDialerDestination::where('list_id', $list->id)
+            ->where('id', $destinationId)
+            ->first();
+
+        if (! $destination) {
+            return response()->json([
+                'error' => 'Destination not found in this list',
+            ], 404);
+        }
+
+        $this->destinationService->resetDialAttempts($destination);
+
+        return response()->json([
+            'message' => 'Dial attempts reset successfully',
+            'data' => [
+                'destination_id' => $destination->id,
+                'phone_number' => $destination->phone_number,
+            ],
+        ]);
+    }
+
+    /**
+     * Bulk reset dial attempts for multiple destinations.
+     */
+    public function bulkResetDialAttempts(Request $request, AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('resetDialAttempts', $list);
+
+        $validated = $request->validate([
+            'destination_ids' => ['required', 'array'],
+            'destination_ids.*' => ['integer'],
+        ]);
+
+        $destinationIds = $validated['destination_ids'];
+
+        // Verify all destinations belong to this list
+        $validCount = AutoDialerDestination::where('list_id', $list->id)
+            ->whereIn('id', $destinationIds)
+            ->count();
+
+        if ($validCount !== count($destinationIds)) {
+            return response()->json([
+                'error' => 'One or more destinations not found in this list',
+            ], 422);
+        }
+
+        $updatedCount = $this->destinationService->bulkResetDialAttempts($destinationIds);
+
+        return response()->json([
+            'message' => "Dial attempts reset for {$updatedCount} destinations",
+            'data' => [
+                'updated_count' => $updatedCount,
+            ],
+        ]);
+    }
+
+    /**
+     * Reset all pending destinations in a list.
+     */
+    public function resetPendingDestinations(AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('resetDialAttempts', $list);
+
+        $updatedCount = $this->destinationService->resetPendingDestinations($list->id);
+
+        return response()->json([
+            'message' => "Reset {$updatedCount} pending destinations",
+            'data' => [
+                'updated_count' => $updatedCount,
+            ],
+        ]);
     }
 
     /**

@@ -38,16 +38,16 @@ export interface AutoDialerCampaign {
   // Optional/advanced fields
   time_limit?: number;
   record_calls?: boolean;
-  amd_enabled?: boolean;
-  amd_mode?: 'Enabled' | 'DetectMessageEnd';
-  amd_timeout?: number;
-  amd_speech_threshold?: number;
-  amd_speech_end_threshold?: number;
-  amd_silence_timeout?: number;
+  // WebSocket-based AMD action fields
+  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
+  action_human?: 'HANGUP' | 'CONTINUE' | string;
+  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  retry_on_voicemail?: boolean;
   statistics: {
     total_destinations: number;
     completed_calls: number;
     failed_calls: number;
+    voicemail_calls: number;
     pending_calls: number;
     progress_percentage: number;
   };
@@ -82,12 +82,11 @@ export interface CreateCampaignRequest {
   timezone: string;
   time_limit?: number;
   record_calls?: boolean;
-  amd_enabled?: boolean;
-  amd_mode?: 'Enabled' | 'DetectMessageEnd';
-  amd_timeout?: number;
-  amd_speech_threshold?: number;
-  amd_speech_end_threshold?: number;
-  amd_silence_timeout?: number;
+  // WebSocket-based AMD action fields
+  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
+  action_human?: 'HANGUP' | 'CONTINUE' | string;
+  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  retry_on_voicemail?: boolean;
   auto_start?: boolean;
 }
 
@@ -116,12 +115,11 @@ export interface UpdateCampaignRequest {
   timezone?: string;
   time_limit?: number;
   record_calls?: boolean;
-  amd_enabled?: boolean;
-  amd_mode?: 'Enabled' | 'DetectMessageEnd';
-  amd_timeout?: number;
-  amd_speech_threshold?: number;
-  amd_speech_end_threshold?: number;
-  amd_silence_timeout?: number;
+  // WebSocket-based AMD action fields
+  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
+  action_human?: 'HANGUP' | 'CONTINUE' | string;
+  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  retry_on_voicemail?: boolean;
   auto_start?: boolean;
 }
 
@@ -160,7 +158,7 @@ export interface CallerIdPoolItem {
   did_id: number;
   phone_number: string;
   friendly_name?: string;
-  weight: number;
+  weight?: number;
 }
 
 export interface AvailableCallerId {
@@ -229,6 +227,13 @@ export const autoDialerCampaignsApi = {
   archive: (id: string) =>
     api
       .patch<{ data: AutoDialerCampaign; message: string }>(`/auto-dialer-campaigns/${id}/archive`)
+      .then((r) => r.data),
+
+  resetCac: (id: string) =>
+    api
+      .post<{ message: string; campaign_id: number; previous_value: number; new_value: number }>(
+        `/auto-dialer-campaigns/${id}/reset-cac`
+      )
       .then((r) => r.data),
 
   // List Management

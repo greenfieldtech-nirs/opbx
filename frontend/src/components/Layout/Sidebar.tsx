@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import opbxLogo from '@/assets/opbx_logo.png';
@@ -52,17 +52,6 @@ const sidebarSections: SidebarSection[] = [
     accentColor: 'default',
     items: [
       { name: 'Dashboard', href: '/ui/dashboard', icon: 'codicon-dashboard' },
-      { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter'] },
-    ],
-  },
-  {
-    id: 'analytics',
-    title: 'Analytics',
-    icon: 'codicon-graph',
-    accentColor: 'default',
-    items: [
-      { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-      { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
     ],
   },
   {
@@ -99,6 +88,17 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
     ],
   },
+  {
+    id: 'analytics',
+    title: 'Analytics',
+    icon: 'codicon-graph',
+    accentColor: 'default',
+    items: [
+      { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
+    ],
+  },
 ];
 
 // Platform Management section (shown only to platform managers)
@@ -118,6 +118,7 @@ const platformSection: SidebarSection = {
 export function Sidebar() {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Selected section state
   const [selectedSectionId, setSelectedSectionId] = useState<string>('dashboards');
@@ -304,7 +305,12 @@ export function Sidebar() {
               return (
                 <button
                   key={section.id}
-                  onClick={() => setSelectedSectionId(section.id)}
+                  onClick={() => {
+                    setSelectedSectionId(section.id);
+                    if (section.id === 'dashboards') {
+                      navigate('/ui/dashboard');
+                    }
+                  }}
                   className={cn(
                     'w-full flex items-center justify-center py-3 transition-all duration-150 relative group',
                     isSelected

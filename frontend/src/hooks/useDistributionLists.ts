@@ -226,6 +226,76 @@ export function useValidationErrors(listId: string | number) {
 }
 
 /**
+ * Hook to reset dial attempts for a single destination
+ */
+export function useResetDialAttempts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      listId,
+      destinationId,
+    }: {
+      listId: string | number;
+      destinationId: number;
+    }) => distributionListsApi.resetDialAttempts(listId, destinationId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.destinations(variables.listId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.detail(variables.listId),
+      });
+    },
+  });
+}
+
+/**
+ * Hook to bulk reset dial attempts for multiple destinations
+ */
+export function useBulkResetDialAttempts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      listId,
+      destinationIds,
+    }: {
+      listId: string | number;
+      destinationIds: number[];
+    }) => distributionListsApi.bulkResetDialAttempts(listId, destinationIds),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.destinations(variables.listId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.detail(variables.listId),
+      });
+    },
+  });
+}
+
+/**
+ * Hook to reset all pending destinations in a list
+ */
+export function useResetPendingDestinations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ listId }: { listId: string | number }) =>
+      distributionListsApi.resetPendingDestinations(listId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.destinations(variables.listId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: distributionListKeys.detail(variables.listId),
+      });
+    },
+  });
+}
+
+/**
  * Hook to delete a list
  */
 export function useDeleteList() {

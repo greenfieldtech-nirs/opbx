@@ -293,6 +293,26 @@ sequenceDiagram
    - **ngrok Dashboard**: http://localhost:4040
    - **MinIO Console**: http://localhost:9001
 
+### ⚠️ Database Persistence
+
+MySQL data is stored in a Docker named volume (`mysql_data`) that **survives container restarts and recreation**. However, it **will be deleted** if you run:
+
+```bash
+# NEVER run this unless you want to erase all data!
+docker compose down -v
+```
+
+**Always backup before major changes:**
+```bash
+# Create a backup
+./scripts/backup-database.sh
+
+# Restore from backup (if needed)
+./scripts/restore-database.sh backups/opbx-daily.sql.gz
+```
+
+See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full details.
+
 ### Docker Services
 
 | Service | Description | Port |

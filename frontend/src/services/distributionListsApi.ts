@@ -147,6 +147,45 @@ export const distributionListsApi = {
   },
 
   /**
+   * Reset dial attempts for a single destination
+   */
+  resetDialAttempts: async (
+    listId: string | number,
+    destinationId: number
+  ): Promise<{ message: string; data: { destination_id: number; phone_number: string } }> => {
+    const response = await api.post(
+      `/auto-dialer-campaigns/lists/${listId}/destinations/${destinationId}/reset-dial-attempts`
+    );
+    return response.data;
+  },
+
+  /**
+   * Bulk reset dial attempts for multiple destinations
+   */
+  bulkResetDialAttempts: async (
+    listId: string | number,
+    destinationIds: number[]
+  ): Promise<{ message: string; data: { updated_count: number } }> => {
+    const response = await api.post(
+      `/auto-dialer-campaigns/lists/${listId}/destinations/bulk-reset-dial-attempts`,
+      { destination_ids: destinationIds }
+    );
+    return response.data;
+  },
+
+  /**
+   * Reset all pending destinations in a list
+   */
+  resetPendingDestinations: async (
+    listId: string | number,
+  ): Promise<{ message: string; data: { updated_count: number } }> => {
+    const response = await api.post(
+      `/auto-dialer-campaigns/lists/${listId}/reset-pending-destinations`,
+    );
+    return response.data;
+  },
+
+  /**
    * Get version history
    */
   getVersions: async (listId: string | number): Promise<{ data: AutoDialerList[] }> => {

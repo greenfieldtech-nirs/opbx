@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\AutoDialer;
 
-use App\Enums\AmdMode;
 use App\Enums\RoutingDestinationType;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
@@ -92,7 +91,11 @@ class AutoDialerCloudonixService
                 'destination_id' => $destination->id,
                 'phone_number' => substr($destination->phone_number, 0, 8).'...',
                 'routing_type' => $campaign->routing_destination_type,
-                'amd_enabled' => $campaign->amd_enabled,
+                'amd_actions' => [
+                    'voicemail' => $campaign->action_voicemail,
+                    'human' => $campaign->action_human,
+                    'unknown' => $campaign->action_unknown,
+                ],
             ]);
 
             // Make the API call
@@ -192,27 +195,6 @@ class AutoDialerCloudonixService
             $payload['recordingStatusCallbackEvent'] = 'completed';
         }
 
-        // Optional: AMD (Answering Machine Detection)
-        if ($campaign->amd_enabled) {
-            $payload['machineDetection'] = $this->mapAmdMode($campaign->amd_mode);
-
-            if ($campaign->amd_timeout) {
-                $payload['machineDetectionTimeout'] = $campaign->amd_timeout;
-            }
-
-            if ($campaign->amd_speech_threshold) {
-                $payload['machineDetectionSpeechThreshold'] = $campaign->amd_speech_threshold;
-            }
-
-            if ($campaign->amd_speech_end_threshold) {
-                $payload['machineDetectionSpeechEndThreshold'] = $campaign->amd_speech_end_threshold;
-            }
-
-            if ($campaign->amd_silence_timeout) {
-                $payload['machineDetectionSilenceTimeout'] = $campaign->amd_silence_timeout;
-            }
-        }
-
         // Optional: Callback URL for session status updates
         $payload['callback'] = $webhookUrl;
 
@@ -259,25 +241,32 @@ class AutoDialerCloudonixService
 
             switch ($routingType) {
                 case 'ai_assistant':
-                    return $this->generateAiAssistantCxml($campaign, $cloudonixParams);
+                    $innerCxml = $this->generateAiAssistantCxml($campaign, $cloudonixParams);
+                    break;
 
                 case 'ai_load_balancer':
-                    return $this->generateAiLoadBalancerCxml($campaign, $cloudonixParams);
+                    $innerCxml = $this->generateAiLoadBalancerCxml($campaign, $cloudonixParams);
+                    break;
 
                 case 'extension':
-                    return $this->generateExtensionCxml($campaign);
+                    $innerCxml = $this->generateExtensionCxml($campaign);
+                    break;
 
                 case 'ring_group':
-                    return $this->generateRingGroupCxml($campaign);
+                    $innerCxml = $this->generateRingGroupCxml($campaign);
+                    break;
 
                 case 'conference_room':
-                    return $this->generateConferenceRoomCxml($campaign);
+                    $innerCxml = $this->generateConferenceRoomCxml($campaign);
+                    break;
 
                 case 'ivr_menu':
-                    return $this->generateIvrMenuCxml($campaign);
+                    $innerCxml = $this->generateIvrMenuCxml($campaign);
+                    break;
 
                 case 'hangup':
-                    return $this->buildHangupCxml();
+                    $innerCxml = $this->buildHangupCxml();
+                    break;
 
                 default:
                     Log::warning('AutoDialer: Unknown routing destination type', [
@@ -285,8 +274,11 @@ class AutoDialerCloudonixService
                         'routing_type' => $routingType,
                     ]);
 
-                    return $this->buildHangupCxml();
+                    $innerCxml = $this->buildHangupCxml();
             }
+
+            // Wrap with WebSocket-based AMD stream if actions are configured
+            return $this->wrapCxmlWithAmdStream($campaign, $innerCxml);
         } catch (\Exception $e) {
             Log::error('AutoDialer: Failed to generate CXML for campaign', [
                 'campaign_id' => $campaign->id,
@@ -886,6 +878,100 @@ class AutoDialerCloudonixService
     }
 
     /**
+     * Wrap CXML with WebSocket-based AMD stream if campaign has actions configured.
+     *
+     * Extracts inner content from the existing CXML and rebuilds with
+     * <Start><Stream url="..."><Parameter .../></Stream></Start> prepended.
+     */
+    private function wrapCxmlWithAmdStream(AutoDialerCampaign $campaign, string $cxml): string
+    {
+        // If no AMD actions are configured, return CXML as-is
+        if (empty($campaign->action_voicemail) && empty($campaign->action_human) && empty($campaign->action_unknown)) {
+            return $cxml;
+        }
+
+        $streamUrl = $this->buildAmdStreamUrl($campaign);
+        if (! $streamUrl) {
+            Log::warning('AutoDialer: Cannot build AMD stream URL, returning CXML without AMD', [
+                'campaign_id' => $campaign->id,
+            ]);
+
+            return $cxml;
+        }
+
+        // Extract inner content from existing <Response>...</Response>
+        $innerContent = $this->extractResponseInnerContent($cxml);
+
+        // Build AMD stream parameters
+        $params = [];
+        if ($campaign->action_voicemail) {
+            $params[] = $this->buildAmdParameter('action_voicemail', $campaign->action_voicemail);
+        }
+        if ($campaign->action_human) {
+            $params[] = $this->buildAmdParameter('action_human', $campaign->action_human);
+        }
+        if ($campaign->action_unknown) {
+            $params[] = $this->buildAmdParameter('action_unknown', $campaign->action_unknown);
+        }
+
+        $parametersXml = implode("\n        ", $params);
+
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Start>
+    <Stream url="{$streamUrl}">
+        {$parametersXml}
+    </Stream>
+  </Start>
+  {$innerContent}
+</Response>
+XML;
+    }
+
+    /**
+     * Build the AMD stream WebSocket URL from Cloudonix settings.
+     */
+    private function buildAmdStreamUrl(AutoDialerCampaign $campaign): ?string
+    {
+        $settings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        if (! $settings) {
+            return null;
+        }
+
+        $baseUrl = rtrim($settings->webhook_base_url ?? config('app.url'), '/');
+        // Convert https:// to wss:// and http:// to ws://
+        $baseUrl = preg_replace('/^https:\/\//', 'wss://', $baseUrl);
+        $baseUrl = preg_replace('/^http:\/\//', 'ws://', $baseUrl);
+
+        return "{$baseUrl}/ws/amd/detect";
+    }
+
+    /**
+     * Extract inner content from a <Response>...</Response> XML string.
+     */
+    private function extractResponseInnerContent(string $cxml): string
+    {
+        // Strip XML declaration
+        $cxml = preg_replace('/<\?xml[^?]*\?>/', '', $cxml);
+        // Strip <Response> and </Response> tags
+        $cxml = preg_replace('/<Response>\s*/', '', $cxml);
+        $cxml = preg_replace('/\s*<\/Response>/', '', $cxml);
+
+        return trim($cxml);
+    }
+
+    /**
+     * Build a single AMD action parameter XML element.
+     */
+    private function buildAmdParameter(string $name, string $value): string
+    {
+        $escapedValue = htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+        return "<Parameter name=\"{$name}\" value=\"{$escapedValue}\" />";
+    }
+
+    /**
      * Determine outbound trunk based on whitelist rules.
      *
      * @return string|null Returns trunk name if whitelist rule found, null otherwise
@@ -967,32 +1053,6 @@ class AutoDialerCloudonixService
         ]);
 
         return null;
-    }
-
-    /**
-     * Map AMD mode to Cloudonix format.
-     *
-     * @param  AmdMode|string|null  $mode
-     */
-    /**
-     * Map AMD mode to Cloudonix API value.
-     *
-     * Cloudonix accepts: 'Enable' or 'DetectMessageEnd'
-     */
-    private function mapAmdMode($mode): string
-    {
-        if ($mode instanceof AmdMode) {
-            return match ($mode) {
-                AmdMode::ENABLED => 'Enable',
-                AmdMode::DETECT_MESSAGE_END => 'DetectMessageEnd',
-            };
-        }
-
-        return match ($mode) {
-            'Enabled', 'detect', 'detect_wait' => 'Enable',
-            'DetectMessageEnd', 'detect_beep' => 'DetectMessageEnd',
-            default => 'Enable',
-        };
     }
 
     /**

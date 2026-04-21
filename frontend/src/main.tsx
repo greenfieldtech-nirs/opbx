@@ -10,7 +10,9 @@ import './index.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-// Create React Query client with enhanced error handling
+// Create React Query client with NO client-side caching
+// Server-side caching is fast enough; client-side caching introduces
+// stale data bugs that are hard to debug and fix.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -24,7 +26,8 @@ const queryClient = new QueryClient({
         return failureCount < 1;
       },
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 0, // DISABLED: Data is never considered "fresh", always refetch
+      gcTime: 0,    // DISABLED: Don't keep inactive data in memory
     },
     mutations: {
       // Don't retry mutations (they're typically side effects)

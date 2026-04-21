@@ -52,6 +52,9 @@ class CampaignLifecycleService
             'started_at' => now(),
         ]);
 
+        // Reset CAC counter to ensure clean state on campaign start
+        $this->resetCacCounter($campaign->id);
+
         $this->monitorService->bustMonitorCache($campaign->organization_id, $campaign->id);
 
         Log::info('Campaign started', [
@@ -133,6 +136,9 @@ class CampaignLifecycleService
         $campaign->update([
             'status' => CampaignStatus::ACTIVE,
         ]);
+
+        // Reset CAC counter to ensure clean state on resume
+        $this->resetCacCounter($campaign->id);
 
         // Bust monitor cache
         $this->monitorService->bustMonitorCache($campaign->organization_id, $campaign->id);

@@ -70,16 +70,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | UserCheck Email Validation Service
+    | AMD Worker Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for the UserCheck.com email validation API.
-    | All validation rules are individually configurable via environment
-    | variables to allow flexible security policies.
+    | Authentication token shared between the AMD worker and Laravel
+    | for validating action callback requests.
     |
-    | IMPORTANT: This is a BLOCKING validation. If the API is unavailable,
-    | registration will be blocked for security reasons.
-    |
+    */
+    'amd_worker' => [
+        'api_token' => env('AMD_WORKER_API_TOKEN'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | UserCheck Email Validation Service
+    |--------------------------------------------------------------------------
     */
     'usercheck' => [
         'enabled' => env('USERCHECK_ENABLED', true),

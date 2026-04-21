@@ -374,6 +374,12 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('distribution-lists.destinations.add');
     Route::post('auto-dialer-campaigns/lists/{list}/destinations/batch', [\App\Http\Controllers\DistributionListController::class, 'addDestinationsBatch'])
         ->name('distribution-lists.destinations.batch');
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'resetDialAttempts'])
+        ->name('distribution-lists.destinations.reset-dial-attempts');
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'bulkResetDialAttempts'])
+        ->name('distribution-lists.destinations.bulk-reset-dial-attempts');
+    Route::post('auto-dialer-campaigns/lists/{list}/reset-pending-destinations', [\App\Http\Controllers\DistributionListController::class, 'resetPendingDestinations'])
+        ->name('distribution-lists.reset-pending-destinations');
     Route::get('auto-dialer-campaigns/lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'getDestinations'])
         ->name('distribution-lists.destinations');
     Route::get('auto-dialer-campaigns/lists/{list}/versions', [\App\Http\Controllers\DistributionListController::class, 'getVersions'])
@@ -406,6 +412,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('auto-dialer-campaigns.pause');
     Route::patch('auto-dialer-campaigns/{campaign}/resume', [AutoDialerCampaignController::class, 'resume'])
         ->name('auto-dialer-campaigns.resume');
+    Route::post('auto-dialer-campaigns/{campaign}/reset-cac', [AutoDialerCampaignController::class, 'resetCac'])
+        ->name('auto-dialer-campaigns.reset-cac');
     Route::patch('auto-dialer-campaigns/{campaign}/archive', [AutoDialerCampaignController::class, 'archive'])
         ->name('auto-dialer-campaigns.archive');
     Route::post('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'uploadList'])

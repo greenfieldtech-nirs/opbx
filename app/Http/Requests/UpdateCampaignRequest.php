@@ -133,13 +133,11 @@ class UpdateCampaignRequest extends FormRequest
             'time_limit' => ['sometimes', 'nullable', 'integer', 'min:30', 'max:14400'],
             'record_calls' => ['sometimes', 'boolean'],
 
-            // AMD
-            'amd_enabled' => ['sometimes', 'boolean'],
-            'amd_mode' => ['sometimes', 'nullable', Rule::enum(\App\Enums\AmdMode::class)],
-            'amd_timeout' => ['sometimes', 'nullable', 'integer', 'min:5', 'max:120'],
-            'amd_speech_threshold' => ['sometimes', 'nullable', 'integer', 'min:500', 'max:5000'],
-            'amd_speech_end_threshold' => ['sometimes', 'nullable', 'integer', 'min:500', 'max:5000'],
-            'amd_silence_timeout' => ['sometimes', 'nullable', 'integer', 'min:500', 'max:10000'],
+            // Answering Machine Detection (WebSocket-based)
+            'action_voicemail' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
+            'action_human' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
+            'action_unknown' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
+            'retry_on_voicemail' => ['sometimes', 'boolean'],
 
             'auto_start' => ['sometimes', 'boolean'],
 

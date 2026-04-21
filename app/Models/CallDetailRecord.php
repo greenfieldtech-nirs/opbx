@@ -127,6 +127,12 @@ class CallDetailRecord extends Model
     public static function createFromWebhook(array $payload, int $organizationId): self
     {
         $session = $payload['session'] ?? [];
+        $profile = $session['profile'] ?? [];
+        $amd = $profile['amd'] ?? null;
+
+        // Extract AMD data from CDR payload if present
+        $amdResult = $amd['result'] ?? null;
+        $amdConfidence = isset($amd['confidence']) ? (float) $amd['confidence'] : null;
 
         return self::create([
             'organization_id' => $organizationId,
@@ -160,6 +166,8 @@ class CallDetailRecord extends Model
                 ? Carbon::createFromTimestampMs($session['callAnswerTime'])
                 : null,
             'status' => $session['status'] ?? null,
+            'amd_result' => $amdResult,
+            'amd_confidence' => $amdConfidence,
             'raw_cdr' => $payload,
         ]);
     }
@@ -201,6 +209,34 @@ class CallDetailRecord extends Model
     public function scopeWithDisposition($query, string $disposition)
     {
         return $query->where('disposition', $disposition);
+    }
+
+    /**
+     * Get AMD status for display.
+     *
+     * Returns "Enabled::{result}" if AMD result exists (from raw CDR or
+     * fallback to the dedicated amd_result column), or "Disabled" if no
+     * AMD data is present.
+     */
+    public function getAmdStatusAttribute(): string
+    {
+        // Primary: read from raw CDR payload (Cloudonix-provided)
+        $rawCdr = $this->raw_cdr ?? [];
+        $session = $rawCdr['session'] ?? [];
+        $profile = $session['profile'] ?? [];
+        $amd = $profile['amd'] ?? null;
+
+        if ($amd && isset($amd['result'])) {
+            return 'Enabled::'.$amd['result'];
+        }
+
+        // Fallback: read from dedicated column (populated from local session
+        // data when Cloudonix CDR payload is missing AMD profile)
+        if ($this->amd_result) {
+            return 'Enabled::'.$this->amd_result;
+        }
+
+        return 'Disabled';
     }
 
     /**

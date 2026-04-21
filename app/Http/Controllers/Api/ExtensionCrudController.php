@@ -345,6 +345,30 @@ class ExtensionCrudController extends AbstractApiCrudController
     }
 
     /**
+     * Clear organization caches after extension mutations.
+     *
+     * Invalidates the voice routing extension cache to ensure
+     * stale extension data is not used for call routing.
+     */
+    protected function clearOrganizationCaches(Model $model): void
+    {
+        /** @var Extension $extension */
+        $extension = $model;
+
+        $cacheService = app(\App\Services\VoiceRouting\VoiceRoutingCacheService::class);
+        $cacheService->invalidateExtension(
+            $extension->organization_id,
+            $extension->extension_number
+        );
+
+        \Log::debug('Extension cache cleared after mutation', [
+            'extension_id' => $extension->id,
+            'extension_number' => $extension->extension_number,
+            'organization_id' => $extension->organization_id,
+        ]);
+    }
+
+    /**
      * Hook called before deleting an extension.
      *
      * Unsyncs USER type extensions from Cloudonix.

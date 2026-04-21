@@ -336,9 +336,19 @@ class CloudonixWebhookController extends Controller
         $callId = $request->input('call_id');
         $organizationId = $request->input('_organization_id');
 
+        // Extract AMD result from session profile for logging
+        $sessionProfile = $request->input('session.profile', []);
+        $amdResult = $sessionProfile['amd']['result'] ?? null;
+        $amdConfidence = $sessionProfile['amd']['confidence'] ?? null;
+
         Log::info('Received CDR webhook', [
             'call_id' => $callId,
             'organization_id' => $organizationId,
+            'disposition' => $request->input('disposition'),
+            'amd_result' => $amdResult,
+            'amd_confidence' => $amdConfidence,
+            'session_token' => $request->input('session.token') ?? $request->input('session_token'),
+            'has_amd_in_profile' => isset($sessionProfile['amd']),
             'payload' => $request->all(),
         ]);
 
@@ -415,12 +425,20 @@ class CloudonixWebhookController extends Controller
             }
 
             // Check if this is an auto-dialer call and update destination
+            Log::info('CDR: Checking auto-dialer processing', [
+                'call_id' => $callId,
+                'session_token' => $request->input('session.token') ?? $request->input('session_token'),
+            ]);
             try {
                 $this->processAutoDialerCDR($request, $cdr);
+                Log::info('CDR: Auto-dialer processing completed', [
+                    'call_id' => $callId,
+                ]);
             } catch (\Exception $e) {
                 Log::error('Failed to process auto-dialer CDR', [
                     'call_id' => $callId,
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
                 // Don't fail the entire CDR processing
             }
@@ -709,6 +727,16 @@ class CloudonixWebhookController extends Controller
         $sessionToken = $request->input('session.token') ?? $request->input('session_token');
         $callId = $request->input('call_id');
 
+        // Log entry into processAutoDialerCDR
+        $sessionProfile = $request->input('session.profile', []);
+        $amdResult = $sessionProfile['amd']['result'] ?? null;
+        Log::info('processAutoDialerCDR: ENTRY', [
+            'call_id' => $callId,
+            'session_token' => $sessionToken,
+            'amd_result' => $amdResult,
+            'session_profile' => $sessionProfile,
+        ]);
+
         if (! $sessionToken) {
             Log::debug('Auto-dialer CDR skipped: no session token found', [
                 'call_id' => $callId,
@@ -729,6 +757,26 @@ class CloudonixWebhookController extends Controller
                 return;
             }
 
+            // Check for AMD result in session profile from CDR payload
+            // NOTE: Due to race conditions, the CDR may not include the updated
+            // profile if the call ended immediately after AMD detection. Fall back
+            // to the locally stored AMD result from the AmdActionController.
+            $sessionProfile = $request->input('session.profile', []);
+            $cdrAmdResult = $sessionProfile['amd']['result'] ?? null;
+
+            // Use locally stored AMD result if CDR doesn't have it
+            $amdResult = $cdrAmdResult ?? $session->amd_result;
+
+            Log::info('Auto-dialer: AMD result resolution', [
+                'session_token' => $sessionToken,
+                'cdr_amd_result' => $cdrAmdResult,
+                'local_amd_result' => $session->amd_result,
+                'resolved_amd_result' => $amdResult,
+            ]);
+
+            // Load campaign for retry logic
+            $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+
             // Update the session itself with CDR data
             $disposition = $request->input('disposition', 'unknown');
             $isCompleted = in_array(strtoupper($disposition), ['ANSWER', 'ANSWERED', 'COMPLETED'], true);
@@ -740,40 +788,170 @@ class CloudonixWebhookController extends Controller
                 'completed_at' => now(),
             ]);
 
+            // Store AMD result on session if present (from CDR or already stored locally)
+            if ($amdResult) {
+                $session->update([
+                    'amd_result' => $amdResult,
+                    'amd_confidence' => $sessionProfile['amd']['confidence'] ?? $session->amd_confidence,
+                ]);
+                Log::info('Auto-dialer: AMD result stored on session', [
+                    'session_id' => $session->id,
+                    'amd_result' => $amdResult,
+                ]);
+            }
+
             // Update destination record
             $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
+            $shouldRetryVoicemail = false;
 
             if ($destination) {
-                $destination->update([
-                    'status' => $this->mapDispositionToStatus($request->input('disposition')),
-                    'last_disposition' => $request->input('disposition'),
-                    'duration' => $request->input('duration', 0),
-                    'billsec' => $request->input('billsec', 0),
-                    'last_cdr_id' => $cdr->id,
-                ]);
+                // Check for voicemail retry
+                $shouldRetryVoicemail = ($amdResult === 'voicemail')
+                    && $campaign
+                    && $campaign->retry_on_voicemail
+                    && ($destination->dial_attempts < $campaign->max_dial_attempts);
 
-                // Note: dial_attempts is already incremented in DialerWorkerController::initiateCall()
-                // Do NOT increment again here — double-counting causes destinations to exceed max_dial_attempts.
+                if ($shouldRetryVoicemail) {
+                    // Schedule retry for voicemail
+                    $nextRetry = now()->addMinutes(5 * (2 ** ($destination->dial_attempts - 1)));
+                    if ($nextRetry->diffInMinutes(now()) > 60) {
+                        $nextRetry = now()->addMinutes(60);
+                    }
 
-                // Update CDR to mark as auto-dialer call
-                $cdr->update([
-                    'is_auto_dialer' => true,
-                    'auto_dialer_campaign_id' => $session->campaign_id,
-                ]);
+                    $destination->update([
+                        'status' => \App\Enums\DestinationStatus::PENDING,
+                        'next_retry_at' => $nextRetry,
+                        'last_disposition' => 'voicemail',
+                        'duration' => $request->input('duration', 0),
+                        'billsec' => $request->input('billsec', 0),
+                        'last_cdr_id' => $cdr->id,
+                    ]);
 
-                Log::info('Auto-dialer CDR processed', [
+                    Log::info('Auto-dialer destination scheduled for voicemail retry', [
+                        'destination_id' => $destination->id,
+                        'attempts' => $destination->dial_attempts,
+                        'next_retry_at' => $nextRetry,
+                    ]);
+                } else {
+                    $destination->update([
+                        'status' => $this->mapDispositionToStatus($request->input('disposition')),
+                        'last_disposition' => $request->input('disposition'),
+                        'duration' => $request->input('duration', 0),
+                        'billsec' => $request->input('billsec', 0),
+                        'last_cdr_id' => $cdr->id,
+                    ]);
+                }
+
+                Log::info('Auto-dialer destination updated', [
                     'call_id' => $callId,
                     'session_token' => $sessionToken,
                     'destination_id' => $destination->id,
                     'campaign_id' => $session->campaign_id,
+                    'amd_result' => $amdResult,
                 ]);
             }
 
+            // Update CDR with AMD data and auto-dialer linkage
+            // If Cloudonix CDR payload is missing AMD profile, inject it from
+            // the local session record so the Call Log shows the detection result.
+            $rawCdr = $cdr->raw_cdr ?? [];
+            $sessionProfile = $rawCdr['session']['profile'] ?? [];
+            $cdrHasAmd = isset($sessionProfile['amd']['result']);
+
+            if (! $cdrHasAmd && $amdResult) {
+                // Inject AMD data into raw_cdr JSON so frontend Call Log can display it
+                $rawCdr['session']['profile']['amd'] = [
+                    'result' => $amdResult,
+                    'confidence' => $session->amd_confidence,
+                    'timestamp' => $session->updated_at?->toIso8601String(),
+                ];
+                Log::info('Auto-dialer: Injected AMD data into CDR raw payload', [
+                    'call_id' => $callId,
+                    'session_token' => $sessionToken,
+                    'amd_result' => $amdResult,
+                ]);
+            }
+
+            $cdr->update([
+                'is_auto_dialer' => true,
+                'auto_dialer_campaign_id' => $session->campaign_id,
+                'amd_result' => $amdResult,
+                'amd_confidence' => $session->amd_confidence,
+                'raw_cdr' => $rawCdr,
+            ]);
+
+            Log::info('Auto-dialer CDR processed', [
+                'call_id' => $callId,
+                'session_token' => $sessionToken,
+                'campaign_id' => $session->campaign_id,
+                'destination_id' => $destination ? $destination->id : null,
+                'amd_result' => $amdResult,
+                'should_retry_voicemail' => $shouldRetryVoicemail,
+            ]);
+
             // Update campaign statistics
+            Log::info('Auto-dialer: Starting campaign stats update', [
+                'session_token' => $sessionToken,
+                'campaign_id' => $session->campaign_id,
+                'amd_result' => $amdResult,
+                'should_retry_voicemail' => $shouldRetryVoicemail,
+                'disposition' => $disposition,
+            ]);
+
             $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
             if ($campaign) {
-                $campaign->increment('completed_calls');
-                $campaign->decrement('pending_calls');
+                Log::info('Auto-dialer: Campaign found, current stats', [
+                    'campaign_id' => $campaign->id,
+                    'voicemail_calls' => $campaign->voicemail_calls,
+                    'completed_calls' => $campaign->completed_calls,
+                    'pending_calls' => $campaign->pending_calls,
+                ]);
+
+                if ($amdResult === 'voicemail' && $shouldRetryVoicemail) {
+                    // Voicemail with retry: don't count as completed, just decrement pending
+                    $campaign->decrement('pending_calls');
+                    Log::info('Auto-dialer campaign stats: voicemail retry', [
+                        'campaign_id' => $campaign->id,
+                        'action' => 'decrement_pending',
+                    ]);
+                } else {
+                    $campaign->increment('completed_calls');
+                    $campaign->decrement('pending_calls');
+                    Log::info('Auto-dialer campaign stats: call completed', [
+                        'campaign_id' => $campaign->id,
+                        'action' => 'increment_completed_decrement_pending',
+                    ]);
+                }
+
+                // Increment voicemail counter if AMD detected voicemail
+                Log::info('Auto-dialer: Checking voicemail counter condition', [
+                    'campaign_id' => $campaign->id,
+                    'amd_result' => $amdResult,
+                    'is_voicemail' => $amdResult === 'voicemail',
+                    'will_increment' => $amdResult === 'voicemail',
+                ]);
+
+                if ($amdResult === 'voicemail') {
+                    $voicemailBefore = $campaign->voicemail_calls;
+                    $campaign->increment('voicemail_calls');
+                    $campaign->refresh(); // Get fresh data after increment
+                    Log::info('Auto-dialer campaign stats: voicemail detected - COUNTER INCREMENTED', [
+                        'campaign_id' => $campaign->id,
+                        'voicemail_calls_before' => $voicemailBefore,
+                        'voicemail_calls_after' => $campaign->voicemail_calls,
+                        'action' => 'increment_voicemail',
+                    ]);
+                } else {
+                    Log::info('Auto-dialer: Not a voicemail, skipping counter increment', [
+                        'campaign_id' => $campaign->id,
+                        'amd_result' => $amdResult,
+                    ]);
+                }
+            } else {
+                Log::warning('Auto-dialer campaign not found for stats update', [
+                    'campaign_id' => $session->campaign_id,
+                    'session_token' => $sessionToken,
+                ]);
             }
 
             // Decrement the CAC counter directly in Redis.

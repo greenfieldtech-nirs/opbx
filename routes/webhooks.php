@@ -45,6 +45,7 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
 |
 */
 
+use App\Http\Controllers\Voice\AmdActionController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
 Route::prefix('voice')->group(function (): void {
@@ -61,6 +62,10 @@ Route::prefix('voice')->group(function (): void {
     // Voice routing health check
     Route::get('/health', [VoiceRoutingController::class, 'health'])
         ->name('voice.health');
+
+    // AMD action handler — receives detection results from AMD worker
+    Route::post('/amd-action', [AmdActionController::class, 'handle'])
+        ->name('voice.amd-action');
 });
 
 // Action-related callbacks

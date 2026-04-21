@@ -4,6 +4,7 @@
  * Main dashboard with statistics and recent activity
  */
 
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { extensionsService } from '@/services/extensions.service';
@@ -14,13 +15,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Phone, Users, PhoneCall, Activity, LayoutDashboard } from 'lucide-react';
 import { formatPhoneNumber, formatTimeAgo, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
+import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord } from '@/types/api.types';
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   // Fetch active calls count
-  const { data: activeCallsResponse, isLoading: activeCallsLoading } = useQuery({
+  const { data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching, refetch: refetchActiveCalls } = useQuery({
     queryKey: ['active-calls-dashboard'],
     queryFn: async () => {
       return await sessionUpdatesService.getActiveCalls();
@@ -32,7 +34,7 @@ export default function Dashboard() {
   const activeCalls = activeCallsResponse?.meta.total_active_calls || 0;
 
   // Fetch extensions count
-  const { data: extensionsCount, isLoading: extensionsLoading } = useQuery({
+  const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching, refetch: refetchExtensions } = useQuery({
     queryKey: ['extensions-count'],
     queryFn: async () => {
       const response = await extensionsService.getAll({ per_page: 1 });
@@ -43,7 +45,7 @@ export default function Dashboard() {
   });
 
   // Fetch conference rooms count
-  const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading } = useQuery({
+  const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading, isFetching: conferenceRoomsFetching, refetch: refetchConferenceRooms } = useQuery({
     queryKey: ['conference-rooms-count'],
     queryFn: async () => {
       const response = await conferenceRoomsService.getAll({ per_page: 1 });
@@ -54,7 +56,7 @@ export default function Dashboard() {
   });
 
   // Fetch phone numbers count
-  const { data: phoneNumbersCount, isLoading: phoneNumbersLoading } = useQuery({
+  const { data: phoneNumbersCount, isLoading: phoneNumbersLoading, isFetching: phoneNumbersFetching, refetch: refetchPhoneNumbers } = useQuery({
     queryKey: ['phone-numbers-count'],
     queryFn: async () => {
       const response = await phoneNumbersService.getAll({ per_page: 1 });
@@ -65,7 +67,7 @@ export default function Dashboard() {
   });
 
   // Fetch last 10 CDR records
-  const { data: lastCalls, isLoading: lastCallsLoading } = useQuery({
+  const { data: lastCalls, isLoading: lastCallsLoading, isFetching: lastCallsFetching, refetch: refetchLastCalls } = useQuery({
     queryKey: ['last-calls'],
     queryFn: async () => {
       const response = await cdrService.getAll({ per_page: 10 });
@@ -76,6 +78,18 @@ export default function Dashboard() {
   });
 
   const isLoading = activeCallsLoading || extensionsLoading || conferenceRoomsLoading || phoneNumbersLoading || lastCallsLoading;
+  const isRefreshing = activeCallsFetching || extensionsFetching || conferenceRoomsFetching || phoneNumbersFetching || lastCallsFetching;
+
+  const handleRefresh = useCallback(() => {
+    refetchActiveCalls();
+    refetchExtensions();
+    refetchConferenceRooms();
+    refetchPhoneNumbers();
+    refetchLastCalls();
+  }, [refetchActiveCalls, refetchExtensions, refetchConferenceRooms, refetchPhoneNumbers, refetchLastCalls]);
+
+  // Register refresh timer with AppLayout bar
+  useRefreshTimer(15000, isRefreshing);
 
   const statCards = [
     {

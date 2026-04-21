@@ -5,11 +5,12 @@
  * Falls back to HTTP polling since WebSocket updates are unreliable
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionUpdatesService } from '@/services/sessionUpdates.service';
 import { useAuth } from '@/hooks/useAuth';
 import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
+import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Activity,
@@ -20,6 +21,8 @@ import {
   PhoneOff,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -32,6 +35,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { CallStatus, getCallStatusColor, getCallStatusLabel, LiveCallStatuses } from '@/types/call.types';
 import type { ActiveCall as ApiActiveCall } from '@/types/api.types';
 import { toast } from 'sonner';
@@ -98,13 +113,23 @@ export default function LiveCalls() {
   const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(5000);
 
   // WebSocket real-time call presence
-  const { activeCalls: wsActiveCalls, isConnected: isWsConnected, connectionState } = useCallPresence();
+  const { activeCalls: wsActiveCalls, isConnected: isWsConnected, connectionState, clearActiveCalls } = useCallPresence();
 
   // State for merged calls (initial HTTP + WebSocket updates)
   const [liveCalls, setLiveCalls] = useState<LiveCall[]>([]);
 
+  // Track call IDs that were recently disconnected so they don't reappear
+  // while Cloudonix is still processing the disconnection
+  const [recentlyDisconnected, setRecentlyDisconnected] = useState<Set<string>>(new Set());
+  const recentlyDisconnectedRef = useRef<Set<string>>(new Set());
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    recentlyDisconnectedRef.current = recentlyDisconnected;
+  }, [recentlyDisconnected]);
+
   // Initial data fetch via HTTP with configurable refresh
-  const { data: initialData, isLoading, error } = useQuery({
+  const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['active-calls'],
     queryFn: () => sessionUpdatesService.getActiveCalls(),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
@@ -117,22 +142,31 @@ export default function LiveCalls() {
   // We use call_ids from the API if available, otherwise fall back to session_id
   useEffect(() => {
     if (initialData?.data) {
-      const calls: LiveCall[] = initialData.data.map((call: ApiActiveCall) => {
-        // Use first call_id from array, or fall back to session_id as string
-        const callId = call.call_ids?.[0] || String(call.session_id);
-        return {
-          id: callId,
-          call_id: callId,
-          session_id: call.session_id,
-          caller_id: call.caller_id || 'Unknown Caller',
-          destination: call.destination || 'Unknown',
-          direction: call.direction || 'unknown',
-          status: call.status,
-          session_created_at: call.session_created_at,
-          duration_seconds: call.duration_seconds || 0,
-          formatted_duration: call.formatted_duration || '0s',
-        };
-      });
+      const disconnected = recentlyDisconnectedRef.current;
+      const calls: LiveCall[] = initialData.data
+        .filter((call: ApiActiveCall) => {
+          // Filter out calls that were recently disconnected — the backend
+          // may still report them as active while Cloudonix processes the
+          // disconnection. We give it a grace period before showing them again.
+          const callId = call.call_ids?.[0] || String(call.session_id);
+          return !disconnected.has(callId);
+        })
+        .map((call: ApiActiveCall) => {
+          // Use first call_id from array, or fall back to session_id as string
+          const callId = call.call_ids?.[0] || String(call.session_id);
+          return {
+            id: callId,
+            call_id: callId,
+            session_id: call.session_id,
+            caller_id: call.caller_id || 'Unknown Caller',
+            destination: call.destination || 'Unknown',
+            direction: call.direction || 'unknown',
+            status: call.status,
+            session_created_at: call.session_created_at,
+            duration_seconds: call.duration_seconds || 0,
+            formatted_duration: call.formatted_duration || '0s',
+          };
+        });
       setLiveCalls(calls);
     }
   }, [initialData]);
@@ -143,12 +177,18 @@ export default function LiveCalls() {
 
     console.log('[LiveCalls] WebSocket calls received:', wsActiveCalls);
 
+    const disconnected = recentlyDisconnectedRef.current;
+
     setLiveCalls((prevCalls) => {
       // Create a map of existing calls by call_id (consistent with WebSocket)
       const callsMap = new Map(prevCalls.map((c) => [c.call_id, c]));
 
-      // Merge or add WebSocket calls
+      // Merge or add WebSocket calls, but skip recently disconnected ones
       wsActiveCalls.forEach((wsCall) => {
+        // Skip calls that were recently disconnected — WebSocket may still
+        // emit events for them while Cloudonix processes the disconnection
+        if (disconnected.has(wsCall.call_id)) return;
+
         const existing = callsMap.get(wsCall.call_id);
 
         if (existing) {
@@ -196,9 +236,107 @@ export default function LiveCalls() {
     },
   });
 
+  // Disconnect all calls state
+  const [isDisconnectingAll, setIsDisconnectingAll] = useState(false);
+  const [disconnectProgress, setDisconnectProgress] = useState(0);
+  const [totalToDisconnect, setTotalToDisconnect] = useState(0);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // Check for stale calls (WebSocket-only calls without session_id)
+  const staleCallsCount = liveCalls.filter((call) => !call.session_id).length;
+
   const handleDisconnect = (sessionId: number) => {
     if (confirm('Are you sure you want to disconnect this call?')) {
+      // Mark the call as recently disconnected so it doesn't reappear
+      // while Cloudonix processes the disconnection
+      const call = liveCalls.find((c) => c.session_id === sessionId);
+      if (call) {
+        const newDisconnected = new Set(recentlyDisconnectedRef.current);
+        newDisconnected.add(call.call_id);
+        setRecentlyDisconnected(newDisconnected);
+        recentlyDisconnectedRef.current = newDisconnected;
+
+        // Also optimistically remove from local state
+        setLiveCalls((prev) => prev.filter((c) => c.session_id !== sessionId));
+      }
+
       disconnectMutation.mutate(sessionId);
+    }
+  };
+
+  const handleDisconnectAll = async () => {
+    const callsWithSessionId = liveCalls.filter((call) => call.session_id);
+    const totalCalls = liveCalls.length;
+
+    if (totalCalls === 0) {
+      toast.info('No active calls to disconnect');
+      setShowConfirmDialog(false);
+      return;
+    }
+
+    setShowConfirmDialog(false);
+    setIsDisconnectingAll(true);
+    setTotalToDisconnect(callsWithSessionId.length);
+    setDisconnectProgress(0);
+
+    const sessionIds = callsWithSessionId.map((call) => call.session_id!);
+    let completed = 0;
+    let failed = 0;
+
+    // Disconnect calls sequentially to avoid overwhelming the server
+    for (const sessionId of sessionIds) {
+      try {
+        await sessionUpdatesService.disconnectSession(sessionId);
+        completed++;
+      } catch (error) {
+        failed++;
+        console.error(`Failed to disconnect session ${sessionId}:`, error);
+      }
+      setDisconnectProgress(completed);
+      // Small delay between requests
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    // IMPORTANT: Mark all calls as recently disconnected so they don't
+    // reappear while Cloudonix is still processing the disconnection.
+    // The backend and WebSocket may continue to report them as active
+    // for a few seconds — we filter them out during the grace period.
+    const allCallIds = liveCalls.map((call) => call.call_id);
+    const newDisconnected = new Set(recentlyDisconnectedRef.current);
+    allCallIds.forEach((id) => newDisconnected.add(id));
+    setRecentlyDisconnected(newDisconnected);
+    recentlyDisconnectedRef.current = newDisconnected;
+
+    // Clear local state and query cache immediately for instant feedback
+    setLiveCalls([]);
+    clearActiveCalls();
+    queryClient.setQueryData(['active-calls'], { data: [] });
+
+    // Remove call IDs from the recently-disconnected set after a grace
+    // period so that genuinely new calls with the same ID can still appear.
+    setTimeout(() => {
+      setRecentlyDisconnected((prev) => {
+        const next = new Set(prev);
+        allCallIds.forEach((id) => next.delete(id));
+        recentlyDisconnectedRef.current = next;
+        return next;
+      });
+    }, 10000);
+
+    // Small delay so the user sees the progress bar hit 100%
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    setIsDisconnectingAll(false);
+
+    const disconnectedCount = sessionIds.length;
+    const skippedCount = totalCalls - disconnectedCount;
+
+    if (failed > 0) {
+      toast.warning(`Disconnected ${completed} calls, ${failed} failed`);
+    } else if (skippedCount > 0) {
+      toast.success(`Disconnected ${completed} calls. ${skippedCount} stale records cleared.`);
+    } else {
+      toast.success(`All ${completed} calls disconnected successfully`);
     }
   };
 
@@ -209,6 +347,11 @@ export default function LiveCalls() {
     ringing: liveCalls.filter((c) => c.status === CallStatus.RINGING).length,
     connected: liveCalls.filter((c) => c.status === CallStatus.CONNECTED).length,
   };
+
+  const handleRefresh = useCallback(() => refetch(), [refetch]);
+
+  // Register refresh timer with AppLayout bar
+  useRefreshTimer(refreshInterval, isFetching);
 
   return (
     <div className="space-y-6">
@@ -236,6 +379,72 @@ export default function LiveCalls() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Disconnect All Calls Button */}
+          {!isReadOnly && liveCalls.length > 0 && (
+            <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2 bg-red-600 hover:bg-red-700"
+                  disabled={isDisconnectingAll}
+                >
+                  <PhoneOff className="h-4 w-4" />
+                  Disconnect All Calls
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    Dangerous Operation
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p>
+                      Are you sure you want to disconnect all <strong>{liveCalls.length}</strong> active calls?
+                    </p>
+                    {staleCallsCount > 0 && (
+                      <p className="text-yellow-600 text-sm">
+                        Note: {staleCallsCount} call{staleCallsCount > 1 ? 's' : ''} without session ID will be cleared from display only.
+                      </p>
+                    )}
+                    <p className="text-red-600 font-medium">
+                      This action cannot be undone. All ongoing calls will be forcibly terminated.
+                    </p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDisconnectAll}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Yes, Disconnect All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Clear Stale Records Button */}
+          {!isReadOnly && staleCallsCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+              onClick={() => {
+                if (confirm(`Clear ${staleCallsCount} stale record(s) without session ID from display?`)) {
+                  setLiveCalls((prev) => prev.filter((call) => call.session_id));
+                  clearActiveCalls();
+                  toast.info(`Cleared ${staleCallsCount} stale record(s)`);
+                }
+              }}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Clear Stale ({staleCallsCount})
+            </Button>
+          )}
+
           {/* Refresh Rate Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Refresh:</span>
@@ -321,6 +530,44 @@ export default function LiveCalls() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Disconnect All Overlay */}
+      {isDisconnectingAll && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+          <div className="bg-background rounded-lg shadow-lg p-8 max-w-md w-full mx-4 space-y-6">
+            <div className="text-center space-y-2">
+              <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto" />
+              <h3 className="text-lg font-semibold">Disconnecting All Calls</h3>
+              <p className="text-muted-foreground">
+                Please wait while all active calls are being terminated...
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span className="font-medium">
+                  {disconnectProgress} of {totalToDisconnect}
+                </span>
+              </div>
+              <Progress
+                value={(disconnectProgress / totalToDisconnect) * 100}
+                className="h-3"
+              />
+              <p className="text-xs text-muted-foreground text-center">
+                {Math.round((disconnectProgress / totalToDisconnect) * 100)}% complete
+              </p>
+            </div>
+
+            <div className="text-center text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                Do not close or refresh this page
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Active Calls List */}
       {isLoading ? (
