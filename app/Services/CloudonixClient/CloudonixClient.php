@@ -120,6 +120,18 @@ class CloudonixClient
     }
 
     /**
+     * Switch an active session to a new voice application.
+     *
+     * @param  string  $sessionToken  The Cloudonix session token
+     * @param  string  $url  The URL of the new voice application CXML endpoint
+     * @return bool True on success, false on failure
+     */
+    public function switchVoiceApplication(string $sessionToken, string $url): bool
+    {
+        return $this->callsClient->switchVoiceApplication($sessionToken, $url);
+    }
+
+    /**
      * Get list of calls with optional filters.
      *
      * @param  array<string, mixed>  $filters
@@ -334,6 +346,18 @@ class CloudonixClient
     public function disconnectSession(int|string $sessionId): bool
     {
         return $this->sessionsClient->disconnectSession($sessionId);
+    }
+
+    /**
+     * Update a session's profile data.
+     *
+     * @param  int|string  $sessionId  The Cloudonix session token
+     * @param  array<string, mixed>  $profile  Profile data to update
+     * @return bool True on success, false on failure
+     */
+    public function updateSessionProfile(int|string $sessionId, array $profile): bool
+    {
+        return $this->sessionsClient->updateSessionProfile($sessionId, $profile);
     }
 
     // =========================================================================

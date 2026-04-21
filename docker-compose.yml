@@ -175,9 +175,15 @@ services:
       - MYSQL_USER=${DB_USERNAME:-opbx}
       - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
+      # PERSISTENCE: This named volume stores MySQL data on the host filesystem.
+      # Data survives container restarts and even container removal.
+      # WARNING: 'docker compose down -v' or 'docker volume rm' WILL DELETE this data!
+      # Always backup before major changes: ./scripts/backup-database.sh
       - mysql_data:/var/lib/mysql
     networks:
       - opbx
+    # Restart policy ensures MySQL comes back up after host reboots
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -267,6 +273,43 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # AMD Worker - Java/Vert.x 5 voicemail detection service
+  # Receives audio streams from Cloudonix via nginx WebSocket proxy at /ws/amd/
+  # Logs detection results locally (OPBX HTTP callbacks planned for Phase 4)
+  amd-worker:
+    build:
+      context: ./amd-worker
+      dockerfile: Dockerfile
+    container_name: opbx_amd_worker
+    restart: unless-stopped
+    # No external ports - all traffic proxied through nginx
+    environment:
+      - AMD_WEBSOCKET_PORT=8082
+      - AMD_HTTP_PORT=8083
+      - AMD_WORKER_API_TOKEN=${AMD_WORKER_API_TOKEN:-dev-amd-token-change-in-production}
+      - AMD_MODEL_PATH=/app/models/beep_detector.onnx
+      - AMD_MAX_CONCURRENT_STREAMS=${AMD_MAX_CONCURRENT_STREAMS:-100}
+      - AMD_LOG_LEVEL=info
+      - AMD_DUMP_AUDIO=${AMD_DUMP_AUDIO:-false}
+      - AMD_DUMP_AUDIO_PATH=${AMD_DUMP_AUDIO_PATH:-/tmp/amd-dumps}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - ./amd-worker/models:/app/models:ro
+      - ./volumes/amd-dumps:/tmp/amd-dumps
+    depends_on:
+      - nginx
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - opbx
+
   # Auto Dialer Worker - Go-based service for outbound campaigns
   # Receives CDR events from Laravel via webhook at /webhooks/cdr
   dialer-worker:
@@ -308,11 +351,18 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: opbx_ngrok
+    # Use a shell command to conditionally add --url when NGROK_DOMAIN is set
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "http"
-      - "nginx:80"
+      - |
+        if [ -n "${NGROK_DOMAIN}" ]; then
+          exec ngrok http nginx:80 --url=${NGROK_DOMAIN}
+        else
+          exec ngrok http nginx:80
+        fi
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+      NGROK_DOMAIN: ${NGROK_DOMAIN:-}
     depends_on:
       - nginx
     networks:
@@ -322,6 +372,7 @@ services:
     restart: unless-stopped
     # Note: Get your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
     # Set NGROK_AUTHTOKEN in .env
+    # Optional: Set NGROK_DOMAIN to use a custom domain (e.g., opbx.ngrok.io)
     # Public URL will be shown in logs: docker compose logs ngrok
 
 networks:

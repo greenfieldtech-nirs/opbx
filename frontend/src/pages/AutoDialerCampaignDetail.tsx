@@ -25,6 +25,7 @@ import {
   Shuffle,
   ListOrdered,
   Timer,
+  Voicemail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -264,7 +265,7 @@ export default function AutoDialerCampaignDetail() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Destinations</CardTitle>
@@ -292,6 +293,16 @@ export default function AutoDialerCampaignDetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{campaign.statistics.failed_calls}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Voicemail</CardTitle>
+            <Voicemail className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{campaign.statistics.voicemail_calls || 0}</div>
           </CardContent>
         </Card>
 
@@ -565,28 +576,37 @@ export default function AutoDialerCampaignDetail() {
                 </div>
               </div>
 
-              {/* Answering Machine Detection */}
+              {/* Answering Machine Detection Actions */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Mic className="h-4 w-4 text-muted-foreground" />
                   Answering Machine Detection
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">AMD Enabled</span>
-                    <span className="font-medium">{campaign.amd_enabled ? 'Yes' : 'No'}</span>
-                  </div>
-                  {campaign.amd_enabled && (
+                  {(campaign.action_voicemail || campaign.action_human || campaign.action_unknown) ? (
                     <>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">AMD Mode</span>
-                        <span className="font-medium">{campaign.amd_mode || '-'}</span>
+                        <span className="text-muted-foreground">Voicemail Action</span>
+                        <span className="font-medium">{campaign.action_voicemail || '—'}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">AMD Timeout</span>
-                        <span className="font-medium">{campaign.amd_timeout || 30}s</span>
+                        <span className="text-muted-foreground">Human Action</span>
+                        <span className="font-medium">{campaign.action_human || '—'}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Unknown Action</span>
+                        <span className="font-medium">{campaign.action_unknown || '—'}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Retry on Voicemail</span>
+                        <span className="font-medium">{campaign.retry_on_voicemail ? 'Yes' : 'No'}</span>
                       </div>
                     </>
+                  ) : (
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">AMD</span>
+                      <span className="font-medium">Not configured</span>
+                    </div>
                   )}
                 </div>
               </div>

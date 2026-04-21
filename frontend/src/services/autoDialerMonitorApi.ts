@@ -16,6 +16,7 @@ export interface MonitorCampaign {
   total_destinations: number;
   completed_calls: number;
   failed_calls: number;
+  voicemail_calls: number;
   pending_calls: number;
   dialing_calls: number;
   concurrent_active_calls: number;
@@ -70,6 +71,7 @@ export interface MonitorDetailStatistics {
   total_destinations: number;
   completed_calls: number;
   failed_calls: number;
+  voicemail_calls: number;
   pending_calls: number;
   progress_percentage: number;
   avg_duration_seconds: number;

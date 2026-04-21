@@ -21,12 +21,20 @@ const api: AxiosInstance = axios.create({
   timeout: 30000, // 30 seconds
 });
 
-// Request interceptor: Add auth token
+// Request interceptor: Add auth token and cache-busting headers
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = storage.getToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Prevent browser caching of API responses
+    // This ensures stale data is never served after mutations
+    if (config.method?.toLowerCase() === 'get') {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
     }
 
     // For FormData, let the browser set the Content-Type with boundary

@@ -91,7 +91,7 @@ const campaignSchema = z.object({
       friendly_name: z.string().optional().nullable().transform(val => val || undefined),
       weight: z.number().int().min(1).max(100).optional(),
     })
-  ).max(100, 'Maximum 100 Caller IDs allowed'),
+  ).max(100, 'Maximum 100 Caller IDs allowed') as z.ZodType<CallerIdPoolItem[]>,
   max_dial_attempts: z.number().min(1).max(5).default(1),
   concurrent_active_calls: z.number().min(1).max(50).default(1),
   calls_per_second: z.number().min(1).max(30).default(1),
@@ -104,11 +104,10 @@ const campaignSchema = z.object({
   time_limit: z.number().min(30).max(14400).default(3600),
   record_calls: z.boolean().default(false),
   amd_enabled: z.boolean().default(false),
-  amd_mode: z.enum(['Enabled', 'DetectMessageEnd']).optional(),
-  amd_timeout: z.number().min(5).max(120).default(30),
-  amd_speech_threshold: z.number().min(500).max(5000).default(1500),
-  amd_speech_end_threshold: z.number().min(500).max(5000).default(2500),
-  amd_silence_timeout: z.number().min(500).max(10000).default(3500),
+  action_voicemail: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  action_human: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  action_unknown: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  retry_on_voicemail: z.boolean().default(false),
   auto_start: z.boolean().default(false),
 });
 
@@ -189,6 +188,100 @@ function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPool
   }];
 }
 
+/**
+ * AMD Action Selector Component (Left Column)
+ * Dropdown to select HANGUP, CONTINUE, or Remote CXML URL
+ */
+interface AmdActionSelectorProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function AmdActionSelector({ label, value, onChange }: AmdActionSelectorProps) {
+  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+  const selectValue = isCustomUrl ? 'CUSTOM_URL' : (value || 'HANGUP');
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm">{label}</Label>
+      <Select
+        value={selectValue}
+        onValueChange={(selected) => {
+          if (selected === 'CUSTOM_URL') {
+            onChange('https://example.com'); // Trigger URL input in right column
+          } else {
+            onChange(selected);
+          }
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select action" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="CONTINUE">Continue to destination</SelectItem>
+          <SelectItem value="HANGUP">Hang up</SelectItem>
+          <SelectItem value="CUSTOM_URL">Remote CXML URL</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/**
+ * AMD URL Input Component (Right Column)
+ * Shown only when the corresponding action is set to Remote CXML URL
+ */
+interface AmdUrlInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function AmdUrlInput({ label, value, onChange }: AmdUrlInputProps) {
+  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+  const [urlValue, setUrlValue] = useState(isCustomUrl ? value : '');
+
+  // Sync when external value changes
+  useEffect(() => {
+    const externalIsUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
+    if (externalIsUrl) {
+      setUrlValue(value);
+    } else {
+      setUrlValue('');
+    }
+  }, [value]);
+
+  if (!isCustomUrl) {
+    return (
+      <div className="space-y-2 opacity-50">
+        <Label className="text-sm">{label}</Label>
+        <Input
+          type="url"
+          placeholder="Select 'Remote CXML URL' on the left..."
+          disabled
+          value=""
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm">{label}</Label>
+      <Input
+        type="url"
+        placeholder="https://your-domain.com/voicemail-cxml"
+        value={urlValue}
+        onChange={(e) => {
+          setUrlValue(e.target.value);
+          onChange(e.target.value);
+        }}
+      />
+    </div>
+  );
+}
+
 export default function AutoDialerCampaignForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -246,17 +339,16 @@ export default function AutoDialerCampaignForm() {
       time_limit: 3600,
       record_calls: false,
       amd_enabled: false,
-      amd_timeout: 30,
-      amd_speech_threshold: 1500,
-      amd_speech_end_threshold: 2500,
-      amd_silence_timeout: 3500,
+      action_voicemail: undefined,
+      action_human: undefined,
+      action_unknown: undefined,
+      retry_on_voicemail: false,
       auto_start: false,
     },
   });
 
   // Watch values for conditional fields
   const routingType = watch('routing_destination_type');
-  const amdEnabled = watch('amd_enabled');
   const startTime = watch('start_time');
   const endTime = watch('end_time');
   const callerIdPool = watch('caller_id_pool');
@@ -302,12 +394,11 @@ export default function AutoDialerCampaignForm() {
         timezone: existingCampaign.timezone,
         time_limit: existingCampaign.time_limit,
         record_calls: existingCampaign.record_calls,
-        amd_enabled: existingCampaign.amd_enabled,
-        amd_mode: existingCampaign.amd_mode || undefined,
-        amd_timeout: existingCampaign.amd_timeout,
-        amd_speech_threshold: existingCampaign.amd_speech_threshold,
-        amd_speech_end_threshold: existingCampaign.amd_speech_end_threshold,
-        amd_silence_timeout: existingCampaign.amd_silence_timeout,
+        amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
+        action_voicemail: (existingCampaign as any).action_voicemail || undefined,
+        action_human: (existingCampaign as any).action_human || undefined,
+        action_unknown: (existingCampaign as any).action_unknown || undefined,
+        retry_on_voicemail: (existingCampaign as any).retry_on_voicemail ?? false,
         auto_start: existingCampaign.auto_start,
       });
       // Use schedule from campaign if available, otherwise convert from legacy format
@@ -364,12 +455,13 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
-          amd_enabled: data.amd_enabled,
-          amd_mode: data.amd_mode,
-          amd_timeout: data.amd_timeout,
-          amd_speech_threshold: data.amd_speech_threshold,
-          amd_speech_end_threshold: data.amd_speech_end_threshold,
-          amd_silence_timeout: data.amd_silence_timeout,
+          // Only include AMD actions if AMD is enabled
+          ...(data.amd_enabled ? {
+            action_voicemail: data.action_voicemail,
+            action_human: data.action_human,
+            action_unknown: data.action_unknown,
+            retry_on_voicemail: data.retry_on_voicemail,
+          } : {}),
         };
         
         // Add routing fields only if provided
@@ -403,12 +495,13 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
-          amd_enabled: data.amd_enabled,
-          amd_mode: data.amd_mode,
-          amd_timeout: data.amd_timeout,
-          amd_speech_threshold: data.amd_speech_threshold,
-          amd_speech_end_threshold: data.amd_speech_end_threshold,
-          amd_silence_timeout: data.amd_silence_timeout,
+          // Only include AMD actions if AMD is enabled
+          ...(data.amd_enabled ? {
+            action_voicemail: data.action_voicemail,
+            action_human: data.action_human,
+            action_unknown: data.action_unknown,
+            retry_on_voicemail: data.retry_on_voicemail,
+          } : {}),
           auto_start: data.auto_start,
           // Include Caller ID Pool fields
           caller_id_strategy: data.caller_id_strategy,
@@ -456,9 +549,10 @@ export default function AutoDialerCampaignForm() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="amd">Answering Machine Detection</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
           </TabsList>
 
@@ -629,6 +723,105 @@ export default function AutoDialerCampaignForm() {
             </Card>
           </TabsContent>
 
+          {/* Answering Machine Detection Tab */}
+          <TabsContent value="amd" className="space-y-6 max-h-[calc(100vh-360px)] overflow-y-auto pr-2">
+            <Card>
+              <CardContent className="space-y-6 pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="amd_enabled" className="text-base font-medium">Enable Detection</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Detect voicemail and handle calls accordingly
+                    </p>
+                  </div>
+                  <Switch
+                    id="amd_enabled"
+                    checked={watch('amd_enabled')}
+                    onCheckedChange={(checked) => {
+                      setValue('amd_enabled', checked);
+                      if (checked) {
+                        // Set defaults when enabling
+                        setValue('action_voicemail', 'HANGUP');
+                        setValue('action_human', 'CONTINUE');
+                        setValue('action_unknown', 'HANGUP');
+                      } else {
+                        // Clear values when disabling
+                        setValue('action_voicemail', undefined);
+                        setValue('action_human', undefined);
+                        setValue('action_unknown', undefined);
+                        setValue('retry_on_voicemail', false);
+                      }
+                    }}
+                  />
+                </div>
+
+                {watch('amd_enabled') && (
+                  <div className="space-y-4 pl-4 border-l-2 border-muted">
+                    {/* Two-column layout: 25% actions / 75% URL inputs */}
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      {/* Left Column - Action Selectors (25%) */}
+                      <div className="lg:w-[25%] space-y-4">
+                        <AmdActionSelector
+                          label="If Voicemail Detected"
+                          value={watch('action_voicemail') || ''}
+                          onChange={(value) => setValue('action_voicemail', value)}
+                        />
+
+                        <AmdActionSelector
+                          label="If Human Detected"
+                          value={watch('action_human') || ''}
+                          onChange={(value) => setValue('action_human', value)}
+                        />
+
+                        <AmdActionSelector
+                          label="If Detection Unclear"
+                          value={watch('action_unknown') || ''}
+                          onChange={(value) => setValue('action_unknown', value)}
+                        />
+
+                        {/* Retry on Voicemail */}
+                        <div className="flex items-center justify-between pt-4 border-t">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="retry_on_voicemail">Retry on Voicemail</Label>
+                            <p className="text-sm text-muted-foreground">
+                              Auto-retry if voicemail detected
+                            </p>
+                          </div>
+                          <Switch
+                            id="retry_on_voicemail"
+                            checked={watch('retry_on_voicemail')}
+                            onCheckedChange={(checked) => setValue('retry_on_voicemail', checked)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right Column - CXML URL Inputs (75%) */}
+                      <div className="lg:w-[75%] space-y-4">
+                        <AmdUrlInput
+                          label="Voicemail CXML URL"
+                          value={watch('action_voicemail') || ''}
+                          onChange={(value) => setValue('action_voicemail', value)}
+                        />
+
+                        <AmdUrlInput
+                          label="Human CXML URL"
+                          value={watch('action_human') || ''}
+                          onChange={(value) => setValue('action_human', value)}
+                        />
+
+                        <AmdUrlInput
+                          label="Unknown CXML URL"
+                          value={watch('action_unknown') || ''}
+                          onChange={(value) => setValue('action_unknown', value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Advanced Tab */}
           <TabsContent value="advanced" className="space-y-6 max-h-[calc(100vh-360px)] overflow-y-auto pr-2">
             <Card>
@@ -750,11 +943,11 @@ export default function AutoDialerCampaignForm() {
                     </div>
                   </div>
 
-                  {/* Right Column: Record Calls, Answering Machine Detection */}
+                  {/* Right Column: Record Calls */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label htmlFor="record_calls">Record Calls</Label>
+                        <Label htmlFor="record_calls" className="text-base font-medium">Record Calls</Label>
                         <p className="text-sm text-muted-foreground">
                           Record all calls for quality assurance
                         </p>
@@ -764,146 +957,6 @@ export default function AutoDialerCampaignForm() {
                         checked={watch('record_calls')}
                         onCheckedChange={(checked) => setValue('record_calls', checked)}
                       />
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="amd_enabled">Answering Machine Detection</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Detect if call is answered by human or machine
-                          </p>
-                        </div>
-                        <Switch
-                          id="amd_enabled"
-                          checked={amdEnabled}
-                          onCheckedChange={(checked) => setValue('amd_enabled', checked)}
-                        />
-                      </div>
-
-                      {amdEnabled && (
-                        <TooltipProvider>
-                          <div className="pl-6 space-y-4 border-l-2 border-muted">
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Label htmlFor="amd_mode" className="whitespace-nowrap">AMD Mode <span className="text-red-500">*</span></Label>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    <p>Enabled: Basic machine detection.</p>
-                                    <p className="mt-1">Detect Message End: Waits for the beep to finish before connecting.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
-                              <Select
-                                value={watch('amd_mode')}
-                                onValueChange={(value: 'Enabled' | 'DetectMessageEnd') =>
-                                  setValue('amd_mode', value)
-                                }
-                              >
-                                <SelectTrigger className={amdEnabled && !watch('amd_mode') ? 'border-red-500' : ''}>
-                                  <SelectValue placeholder="Select AMD mode" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Enabled">Enabled</SelectItem>
-                                  <SelectItem value="DetectMessageEnd">Detect Message End</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              {amdEnabled && !watch('amd_mode') && (
-                                <p className="text-sm text-red-500">AMD Mode is required</p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Label htmlFor="amd_timeout" className="whitespace-nowrap">Detection Timeout (sec)</Label>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    Maximum time to wait for AMD analysis before giving up and treating the call as answered.
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
-                              <Input
-                                id="amd_timeout"
-                                type="number"
-                                {...register('amd_timeout', { valueAsNumber: true })}
-                                min={5}
-                                max={120}
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-1">
-                                  <Label htmlFor="amd_speech_threshold" className="text-xs whitespace-nowrap">Speech Threshold (ms)</Label>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      Minimum volume level that must be detected to qualify as human speech.
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                                <Input
-                                  id="amd_speech_threshold"
-                                  type="number"
-                                  {...register('amd_speech_threshold', { valueAsNumber: true })}
-                                  min={500}
-                                  max={5000}
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-1">
-                                  <Label htmlFor="amd_speech_end_threshold" className="text-xs whitespace-nowrap">Speech End (ms)</Label>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      Amount of silence required after speech to determine the message has ended.
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                                <Input
-                                  id="amd_speech_end_threshold"
-                                  type="number"
-                                  {...register('amd_speech_end_threshold', { valueAsNumber: true })}
-                                  min={500}
-                                  max={5000}
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-1">
-                                  <Label htmlFor="amd_silence_timeout" className="text-xs whitespace-nowrap">Silence Timeout (ms)</Label>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      Maximum silence duration before considering the greeting finished.
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                                <Input
-                                  id="amd_silence_timeout"
-                                  type="number"
-                                  {...register('amd_silence_timeout', { valueAsNumber: true })}
-                                  min={500}
-                                  max={10000}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </TooltipProvider>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -920,11 +973,6 @@ export default function AutoDialerCampaignForm() {
               Please fix the errors above before submitting.
             </div>
           )}
-          {amdEnabled && !watch('amd_mode') && (
-            <div className="mr-auto text-sm text-red-500">
-              Please select an AMD Mode when Answering Machine Detection is enabled.
-            </div>
-          )}
           <Button
             type="button"
             variant="outline"
@@ -936,8 +984,7 @@ export default function AutoDialerCampaignForm() {
             type="submit"
             disabled={
               createMutation.isPending ||
-              updateMutation.isPending ||
-              (amdEnabled && !watch('amd_mode'))
+              updateMutation.isPending
             }
             onClick={() => {
               console.log('Form submit clicked', { isEditing, isDirty, errors });

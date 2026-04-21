@@ -166,4 +166,68 @@ class CloudonixSessionsClient extends CloudonixBaseClient
             fallbackValue: false
         );
     }
+
+    /**
+     * Update a session's profile data.
+     *
+     * Makes a PUT request to /customers/self/domains/{domain-id}/sessions/{session-id}
+     * to update custom profile data for the session.
+     *
+     * @see https://developers.cloudonix.com/cloudonixRestOpenAPI#/operations/updateSession
+     *
+     * @param  int|string  $sessionId  The Cloudonix session token
+     * @param  array<string, mixed>  $profile  Profile data to update
+     * @return bool True on success, false on failure
+     */
+    public function updateSessionProfile(int|string $sessionId, array $profile): bool
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($sessionId, $profile) {
+                try {
+                    $url = "/customers/{$this->getCustomerId()}/domains/{$this->getDomainUuid()}/sessions/{$sessionId}";
+                    $fullUrl = $this->getBaseUrl().$url;
+
+                    Log::info('CloudonixClient: Updating session profile', [
+                        'session_id' => $sessionId,
+                        'url' => $fullUrl,
+                        'profile' => $profile,
+                    ]);
+
+                    $response = $this->client()
+                        ->put($url, ['profile' => $profile]);
+
+                    $statusCode = $response->status();
+
+                    if ($response->successful()) {
+                        Log::info('CloudonixClient: Session profile updated successfully', [
+                            'session_id' => $sessionId,
+                            'status_code' => $statusCode,
+                        ]);
+
+                        return true;
+                    }
+
+                    Log::warning('CloudonixClient: Failed to update session profile', [
+                        'session_id' => $sessionId,
+                        'url' => $fullUrl,
+                        'status_code' => $statusCode,
+                        'response_body' => $response->body(),
+                    ]);
+
+                    return false;
+                } catch (\Exception $e) {
+                    Log::error('CloudonixClient: Exception while updating session profile', [
+                        'session_id' => $sessionId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null,
+            fallbackValue: false
+        );
+    }
 }

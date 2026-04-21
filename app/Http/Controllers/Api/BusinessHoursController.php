@@ -183,6 +183,20 @@ class BusinessHoursController extends AbstractApiCrudController
     }
 
     /**
+     * Clear organization caches after business hours mutations.
+     */
+    protected function clearOrganizationCaches(Model $model): void
+    {
+        $cacheService = app(\App\Services\VoiceRouting\VoiceRoutingCacheService::class);
+        $cacheService->invalidateBusinessHoursSchedule($model->organization_id);
+
+        \Log::debug('Business hours cache cleared after mutation', [
+            'schedule_id' => $model->id,
+            'organization_id' => $model->organization_id,
+        ]);
+    }
+
+    /**
      * Hook method called after deleting a model.
      */
     protected function afterDestroy(Model $model, Request $request): void

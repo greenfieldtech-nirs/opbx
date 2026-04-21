@@ -23,6 +23,7 @@ import {
   Clock,
   BarChart3,
   Loader2,
+  Voicemail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +35,7 @@ import {
   usePauseCampaign,
   useResumeCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
+import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -244,10 +246,12 @@ function RefreshSelector({
   refreshInterval,
   onIntervalChange,
   onManualRefresh,
+  isRefreshing,
 }: {
   refreshInterval: number;
   onIntervalChange: (value: string) => void;
   onManualRefresh: () => void;
+  isRefreshing?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -264,9 +268,9 @@ function RefreshSelector({
           ))}
         </SelectContent>
       </Select>
-      <Button variant="outline" className="h-9" onClick={onManualRefresh}>
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Refresh Now
+      <Button variant="outline" className="h-9" onClick={onManualRefresh} disabled={isRefreshing}>
+        <RefreshCw className={cn('h-4 w-4 mr-2', isRefreshing && 'animate-spin')} />
+        Refresh
       </Button>
     </div>
   );
@@ -329,6 +333,7 @@ export default function AutoDialerMonitor() {
   });
   const [previousSnapshot, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
   const [callsPerMinute, setCallsPerMinute] = useState<Map<number, number | null>>(new Map());
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // Queries
   const summaryQuery = useMonitorSummary(refreshInterval > 0 ? refreshInterval : false);
@@ -383,13 +388,15 @@ export default function AutoDialerMonitor() {
     setRefreshInterval(parseInt(value, 10));
   }, []);
 
-  const handleManualRefresh = useCallback(() => {
+  const handleManualRefresh = useCallback(async () => {
+    setIsManualRefreshing(true);
     refreshMonitor();
     if (selectedCampaignId) {
-      detailQuery.refetch();
+      await detailQuery.refetch();
     } else {
-      summaryQuery.refetch();
+      await summaryQuery.refetch();
     }
+    setIsManualRefreshing(false);
   }, [refreshMonitor, selectedCampaignId, detailQuery, summaryQuery]);
 
   const handleCampaignClick = useCallback((campaign: MonitorCampaign) => {
@@ -430,6 +437,12 @@ export default function AutoDialerMonitor() {
   }, [selectedCampaignId, summaryQuery.data]);
 
   const currentCPM = selectedCampaignId ? callsPerMinute.get(selectedCampaignId) : null;
+  const isMonitorRefreshing = selectedCampaignId
+    ? detailQuery.isFetching || isManualRefreshing
+    : summaryQuery.isFetching || isManualRefreshing;
+
+  // Register refresh timer with AppLayout bar
+  useRefreshTimer(refreshInterval, isMonitorRefreshing);
 
   // Loading state
   if (summaryQuery.isLoading) {
@@ -476,8 +489,8 @@ export default function AutoDialerMonitor() {
                   ? summaryQuery.error.message
                   : 'An error occurred while loading monitor data'}
               </p>
-              <Button onClick={() => summaryQuery.refetch()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <Button onClick={() => summaryQuery.refetch()} disabled={summaryQuery.isFetching}>
+                <RefreshCw className={cn('h-4 w-4 mr-2', summaryQuery.isFetching && 'animate-spin')} />
                 Try Again
               </Button>
             </div>
@@ -511,6 +524,7 @@ export default function AutoDialerMonitor() {
               refreshInterval={refreshInterval}
               onIntervalChange={handleRefreshIntervalChange}
               onManualRefresh={handleManualRefresh}
+              isRefreshing={isManualRefreshing}
             />
           </div>
 
@@ -623,7 +637,7 @@ export default function AutoDialerMonitor() {
 
                   <CardContent className="pt-0 space-y-4">
                     {/* Metric Cards Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Destinations</p>
                         <p className="text-xl font-bold">{campaign.total_destinations.toLocaleString()}</p>
@@ -641,6 +655,10 @@ export default function AutoDialerMonitor() {
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Failed</p>
                         <p className="text-xl font-bold text-red-600">{campaign.failed_calls.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-3 text-center">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Voicemail</p>
+                        <p className="text-xl font-bold text-purple-600">{(campaign.voicemail_calls || 0).toLocaleString()}</p>
                       </div>
                       <div className="rounded-lg border bg-card p-3 text-center">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Dialing</p>
@@ -718,6 +736,7 @@ export default function AutoDialerMonitor() {
               refreshInterval={refreshInterval}
               onIntervalChange={handleRefreshIntervalChange}
               onManualRefresh={handleManualRefresh}
+              isRefreshing={isManualRefreshing}
             />
             {selectedCampaign && (
               <CampaignActionButton
@@ -765,6 +784,10 @@ export default function AutoDialerMonitor() {
                       <span>
                         <span className="text-muted-foreground">Failed:</span>{' '}
                         <span className="font-medium text-red-600">{detail.statistics.failed_calls}</span>
+                      </span>
+                      <span>
+                        <span className="text-muted-foreground">Voicemail:</span>{' '}
+                        <span className="font-medium text-purple-600">{detail.statistics.voicemail_calls || 0}</span>
                       </span>
                       <span>
                         <span className="text-muted-foreground">Pending:</span>{' '}
@@ -891,6 +914,24 @@ export default function AutoDialerMonitor() {
                     </div>
                     <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
                       <Activity className="h-6 w-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Voicemail Detected</p>
+                      <p className="text-2xl font-bold mt-1 text-purple-600">
+                        {detail.statistics.voicemail_calls || 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total voicemail hits
+                      </p>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Voicemail className="h-6 w-6 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>

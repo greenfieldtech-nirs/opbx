@@ -8,6 +8,7 @@ OpBX is an open-source business PBX platform built on Laravel (PHP 8.4) and Reac
 - **Backend**: Laravel 12 API with MySQL + Redis
 - **Frontend**: React 18 SPA with Vite, TanStack Query, shadcn/ui
 - **Dialer Worker**: Go-based service for outbound campaigns
+- **AMD Worker**: Java (Vert.x 5) service for stream-based voicemail detection
 - **Architecture**: Multi-tenant, uses Cloudonix CPaaS for VoIP
 
 ## Project Memory
@@ -46,6 +47,14 @@ npm run type-check           # TypeScript check only (tsc --noEmit)
 cd dialer-worker
 make build                   # Build binary
 make run                     # Run locally
+```
+
+### AMD Worker (Java)
+```bash
+cd amd-worker
+mvn compile                  # Compile
+mvn package -DskipTests -B   # Build shaded JAR
+# Docker image is built from amd-worker/Dockerfile
 ```
 
 ### Docker
@@ -144,6 +153,7 @@ Key variables (see `.env.example`):
 - `CLOUDONIX_WEBHOOK_SECRET` - Webhook signature verification
 - `NGROK_AUTHTOKEN` - Local webhook testing
 - `DIALER_WORKER_API_TOKEN` - Dialer worker authentication
+- `AMD_WORKER_API_TOKEN` - AMD worker authentication
 
 Never commit `.env` files or secrets to git.
 
@@ -158,5 +168,5 @@ Never commit `.env` files or secrets to git.
 
 ---
 
-**Last Updated**: 2026-04-06
-**Agent Instructions Version**: 2.0
+**Last Updated**: 2026-04-16
+**Agent Instructions Version**: 2.1

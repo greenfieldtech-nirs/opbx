@@ -658,6 +658,15 @@ export interface CallDetailRecord {
   approx_cost?: number;
   sell_cost?: number;
 
+  // AMD status (Enabled::{result} or Disabled)
+  amd_status: string;
+
+  // AMD detection result (human, voicemail, unknown)
+  amd_result?: string;
+
+  // AMD detection confidence (0.00 - 1.00)
+  amd_confidence?: number;
+
   // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
   raw_cdr?: Record<string, unknown>;
 

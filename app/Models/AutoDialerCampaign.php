@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\AmdMode;
 use App\Enums\CallerIdStrategy;
 use App\Enums\CampaignStatus;
 use App\Enums\RoutingDestinationType;
@@ -70,15 +69,14 @@ class AutoDialerCampaign extends Model
         'schedule', // Full weekly schedule
         'time_limit',
         'record_calls',
-        'amd_enabled',
-        'amd_mode',
-        'amd_timeout',
-        'amd_speech_threshold',
-        'amd_speech_end_threshold',
-        'amd_silence_timeout',
+        'action_voicemail',
+        'action_human',
+        'action_unknown',
+        'retry_on_voicemail',
         'total_destinations',
         'completed_calls',
         'failed_calls',
+        'voicemail_calls',
         'pending_calls',
         'pause_reason',
         'resume_at',
@@ -101,8 +99,8 @@ class AutoDialerCampaign extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'record_calls' => 'boolean',
-        'amd_enabled' => 'boolean',
-        'amd_mode' => AmdMode::class,
+        'retry_on_voicemail' => 'boolean',
+        'voicemail_calls' => 'integer',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'concurrent_active_calls' => 'integer',
