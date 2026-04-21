@@ -32,7 +32,7 @@ return new class extends Migration
             $table->timestamp('completed_at')->nullable();
 
             // AMD Results
-            $table->enum('amd_result', ['human', 'machine', 'unknown'])->nullable();
+            $table->enum('amd_result', ['human', 'voicemail', 'unknown'])->nullable();
             $table->decimal('amd_confidence', 5, 2)->nullable();
 
             $table->timestamps();
