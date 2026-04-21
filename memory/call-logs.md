@@ -6,7 +6,7 @@ Call history page powered by the **Call Detail Records (CDR)** API. Displays a s
 ## Source Files
 | File | Purpose |
 |------|---------|
-| `frontend/src/pages/CallLogs.tsx` | Main page: CDR table, filters, detail dialog with AMD result section |
+| `frontend/src/pages/CallLogs.tsx` | Main page: CDR table, filters, detail dialog with AMD result section, auto-refresh with timer |
 | `frontend/src/services/cdr.service.ts` | CDR API client |
 | `frontend/src/types/api.types.ts` | `CallDetailRecord` interface (includes `amd_status`) |
 
@@ -69,6 +69,11 @@ Shows voice application executions from `raw_cdr.session.profile.application` wi
 
 ### Raw Data Tab
 JSON viewer for the complete `raw_cdr` payload.
+
+## Auto-Refresh
+- Configurable refresh interval: Manual, 10s, 30s, 1m, 5m (default: 30s)
+- `RefreshTimer` component shows progress bar + countdown to next refresh
+- Refresh button animates during fetch
 
 ## Related Modules
 - [Call Detail Records](call-detail-records.md) - Backend CDR processing

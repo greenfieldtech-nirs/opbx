@@ -8,7 +8,7 @@ Application-level configuration exposed to the frontend SPA. Controls deployment
 |------|---------|
 | `app/Http/Controllers/Api/ConfigurationController.php` | Config endpoint (28 lines) |
 | `app/Services/ApplicationConfig.php` | Config management (145 lines) |
-| `frontend/src/pages/Dashboard.tsx` | Main dashboard page |
+| `frontend/src/pages/Dashboard.tsx` | Main dashboard page with auto-refresh timer |
 | `frontend/src/contexts/ConfigContext.tsx` | Config state provider |
 | `frontend/src/services/config.service.ts` | Config API calls |
 | `frontend/src/services/dashboard.service.ts` | Dashboard data API |
@@ -49,6 +49,11 @@ Application-level configuration exposed to the frontend SPA. Controls deployment
 
 ## Frontend Dashboard
 The Dashboard page displays organization statistics (extensions, DIDs, users, etc.) and system status. Uses TanStack Query for data fetching.
+
+### Auto-Refresh
+- Multiple queries refresh at different intervals: active calls (15s), everything else (30s)
+- `RefreshTimer` component shows progress bar cycling every 15s (most frequent interval)
+- Manual refresh triggers all queries simultaneously
 
 ## Related Modules
 - [Settings & Cloudonix](settings-cloudonix.md) - Per-org webhook URL configuration

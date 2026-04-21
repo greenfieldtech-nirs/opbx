@@ -33,7 +33,7 @@ Outbound calling campaigns that automatically dial phone numbers from distributi
 | `frontend/src/pages/AutoDialerCampaignForm.tsx` | Create/edit form |
 | `frontend/src/services/autoDialerCampaignsApi.ts` | API calls |
 | `frontend/src/hooks/useAutoDialerCampaigns.ts` | Campaign queries/mutations |
-| `frontend/src/pages/AutoDialerMonitor.tsx` | Real-time monitor (bird's-eye + drill-down) |
+| `frontend/src/pages/AutoDialerMonitor.tsx` | Real-time monitor (bird's-eye + drill-down) with refresh timer |
 | `frontend/src/services/autoDialerMonitorApi.ts` | Monitor API client |
 | `frontend/src/hooks/useAutoDialerMonitor.ts` | Monitor queries with configurable refresh |
 
@@ -130,6 +130,7 @@ Exponential backoff: `5 * 2^(attempt-1)` minutes, capped at 60 minutes. Retryabl
 - `total_destinations` computed live from distribution lists (not model column)
 - `active_sessions` query outside cache block (always fresh)
 - Refresh intervals: Manual, 1s, 5s, 10s (default), 20s-60s. "Refresh Now" button always visible. Persisted in localStorage.
+- `RefreshTimer` component shows progress bar + countdown to next refresh in both bird's-eye and drill-down views
 - Worker health proxied from Go worker via `config('services.dialer_worker.health_url')`
 - Summary cached 5s, detail statistics cached 10s in Redis
 
