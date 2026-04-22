@@ -53,6 +53,7 @@ export interface AutoDialerCampaign {
   };
   is_runnable: boolean;
   has_list: boolean;
+  lists_count: number;
   created_at: string;
   updated_at: string;
 }

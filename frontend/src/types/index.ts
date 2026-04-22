@@ -1249,6 +1249,8 @@ export interface AutoDialerList {
   can_assign: boolean;
   can_upload: boolean;
   can_copy: boolean;
+  can_delete: boolean;
+  can_unassign: boolean;
   created_at: string;
   processed_at: string | null;
   archived_at: string | null;

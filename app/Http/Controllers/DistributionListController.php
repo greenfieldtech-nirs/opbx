@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\CampaignStatus;
 use App\Enums\ListStatus;
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
@@ -413,7 +414,21 @@ class DistributionListController extends Controller
         // Check if campaign can accept a list
         if (! $campaign->canAcceptList()) {
             return response()->json([
-                'error' => 'Campaign cannot accept a list in its current status',
+                'error' => sprintf(
+                    'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (but not yet running).',
+                    $campaign->name,
+                    $campaign->status->label()
+                ),
+            ], 422);
+        }
+
+        // Additional check: active campaigns can only accept lists if they haven't started running yet
+        if ($campaign->status === CampaignStatus::ACTIVE && $campaign->isRunnable()) {
+            return response()->json([
+                'error' => sprintf(
+                    'Cannot assign list to "%s" because it is currently running. Pause the campaign first, then assign the list.',
+                    $campaign->name
+                ),
             ], 422);
         }
 
@@ -537,6 +552,13 @@ class DistributionListController extends Controller
         if (! $list->campaign_id) {
             return response()->json([
                 'error' => 'List is not assigned to any campaign',
+            ], 422);
+        }
+
+        // Check if all destinations are pending with zero dial attempts
+        if (! $list->canUnassign()) {
+            return response()->json([
+                'error' => 'Cannot unassign list: some destinations have already been dialed or are not in pending status. All entries must be pending with zero dial attempts.',
             ], 422);
         }
 

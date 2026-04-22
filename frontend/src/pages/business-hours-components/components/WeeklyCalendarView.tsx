@@ -157,16 +157,56 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
     onScheduleChange(newSchedule);
   };
 
+  /**
+   * Toggle all hours for a specific day on or off.
+   * If the day has any enabled hours, disable it completely.
+   * If the day has no enabled hours, enable all 24 hours (00:00 - 24:00).
+   */
+  const handleDayToggle = (day: DayOfWeek) => {
+    const newSchedule = { ...schedule };
+    const daySchedule = newSchedule[day];
+
+    // Check if day currently has any open hours
+    const hasOpenHours = daySchedule.enabled && daySchedule.time_ranges.length > 0;
+
+    if (hasOpenHours) {
+      // Disable the entire day
+      daySchedule.enabled = false;
+      daySchedule.time_ranges = [];
+    } else {
+      // Enable all 24 hours with a single range 00:00 - 24:00
+      daySchedule.enabled = true;
+      daySchedule.time_ranges = [{ id: getNextTimeRangeId(), start_time: '00:00', end_time: '24:00' }];
+    }
+
+    onScheduleChange(newSchedule);
+  };
+
   return (
     <div className="border rounded-lg overflow-hidden">
       <div className={expandHeight ? 'overflow-y-auto' : 'max-h-96 overflow-y-auto'}>
         <div className="grid grid-cols-[5fr_3fr_3fr_3fr_3fr_3fr_3fr_3fr] bg-muted/50 border-b">
           <div className="p-3 font-medium text-sm border-r">Time</div>
-          {days.map(({ key, shortLabel }) => (
-            <div key={key} className="p-3 font-medium text-sm text-center border-r last:border-r-0">
-              {shortLabel}
-            </div>
-          ))}
+          {days.map(({ key, shortLabel }) => {
+            const daySchedule = schedule[key];
+            const hasOpenHours = daySchedule.enabled && daySchedule.time_ranges.length > 0;
+
+            return (
+              <div
+                key={key}
+                className={cn(
+                  'p-3 font-medium text-sm text-center border-r last:border-r-0 cursor-pointer select-none transition-colors',
+                  hasOpenHours
+                    ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                    : 'text-muted-foreground hover:bg-gray-100'
+                )}
+                onClick={() => handleDayToggle(key)}
+                title={`Click to ${hasOpenHours ? 'disable' : 'enable'} all hours for ${shortLabel}`}
+              >
+                {shortLabel}
+              </div>
+            );
+          })}
         </div>
 
         {timeSlots.map(({ hour }) => (

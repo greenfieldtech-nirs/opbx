@@ -71,9 +71,16 @@ enum CampaignStatus: string
 
     /**
      * Check if the campaign can accept a list assignment.
+     *
+     * Rules:
+     * - Draft campaigns: always accept
+     * - Paused campaigns: accept (not currently running)
+     * - Active campaigns: accept only if schedule hasn't started yet
+     *   (checked separately via isRunnable() in the controller)
+     * - Completed/Archived: never accept
      */
     public function canAcceptList(): bool
     {
-        return in_array($this, [self::DRAFT, self::ACTIVE], true);
+        return in_array($this, [self::DRAFT, self::PAUSED, self::ACTIVE], true);
     }
 }

@@ -116,6 +116,7 @@ class AutoDialerCampaignResource extends JsonResource
             // Computed
             'is_runnable' => $this->isRunnable(),
             'has_list' => $this->hasList(),
+            'lists_count' => $this->whenLoaded('lists', fn () => $this->lists->count(), 0),
         ];
     }
 }
