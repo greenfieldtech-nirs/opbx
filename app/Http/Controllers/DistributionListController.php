@@ -411,19 +411,23 @@ class DistributionListController extends Controller
         }
 
         // Check if campaign can accept a list
-        // Rules: campaign must not be currently running (active + schedule reached)
-        // or must be in draft/paused status, or schedule hasn't started yet
         if (! $campaign->canAcceptList()) {
             return response()->json([
-                'error' => 'Campaign cannot accept a list in its current status',
+                'error' => sprintf(
+                    'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (but not yet running).',
+                    $campaign->name,
+                    $campaign->status->label()
+                ),
             ], 422);
         }
 
-        // Additional check: if campaign is active, ensure it's not currently runnable
-        // (i.e., schedule hasn't been reached yet)
+        // Additional check: active campaigns can only accept lists if they haven't started running yet
         if ($campaign->status === CampaignStatus::ACTIVE && $campaign->isRunnable()) {
             return response()->json([
-                'error' => 'Cannot assign list to a campaign that is currently running. Pause the campaign first or assign before the schedule starts.',
+                'error' => sprintf(
+                    'Cannot assign list to "%s" because it is currently running. Pause the campaign first, then assign the list.',
+                    $campaign->name
+                ),
             ], 422);
         }
 
