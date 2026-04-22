@@ -155,8 +155,16 @@ export default function DistributionLists() {
   };
 
   const handleUploadSuccess = () => {
-    // Refresh the list to show updated status
-    queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
+    // Force immediate refetch of the list to show updated status after upload
+    queryClient.invalidateQueries({
+      queryKey: distributionListKeys.all,
+      refetchType: 'all',
+    });
+    // Also force a direct refetch to ensure the UI updates immediately
+    queryClient.refetchQueries({
+      queryKey: distributionListKeys.all,
+      type: 'active',
+    });
   };
 
   if (isLoading) {

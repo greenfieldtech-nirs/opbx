@@ -84,11 +84,15 @@ export function UnifiedUploadDialog({
   // Auto-close on completion and trigger success callback
   useEffect(() => {
     const status = progressData?.data?.status;
-    
+
     if (status === 'completed' && uploadResult && !autoCloseTimerRef.current) {
+      // Immediately trigger success callback so parent refreshes the list
+      if (onSuccess) {
+        onSuccess(uploadResult.listId || list.id);
+      }
       // Set a timer to auto-close after 2 seconds
       autoCloseTimerRef.current = setTimeout(() => {
-        handleClose(true);
+        handleClose(false); // Don't call onSuccess again, already done above
       }, 2000);
     }
 
@@ -99,12 +103,12 @@ export function UnifiedUploadDialog({
     };
   }, [progressData?.data?.status, uploadResult]);
 
-  const handleClose = (completed = false) => {
-    // Call onSuccess callback - same list ID is updated, no navigation needed
-    if (completed && onSuccess) {
-      onSuccess(list.id);
+  const handleClose = (triggerSuccess = false) => {
+    // Call onSuccess callback if explicitly requested (e.g. manual close after completion)
+    if (triggerSuccess && onSuccess) {
+      onSuccess(uploadResult?.listId || list.id);
     }
-    
+
     // Reset state
     setFile(null);
     setJobId(null);
@@ -123,7 +127,7 @@ export function UnifiedUploadDialog({
   const progress = progressData?.data?.percentage || 0;
 
   return (
-    <Dialog open={open} onOpenChange={() => handleClose(false)}>
+    <Dialog open={open} onOpenChange={(value) => !value && handleClose(false)}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Upload Destinations</DialogTitle>
