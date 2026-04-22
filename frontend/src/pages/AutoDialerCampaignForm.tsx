@@ -74,14 +74,16 @@ import {
 } from '@/components/AutoDialer/CallerIdPoolSelector';
 
 // Validation schema with Caller ID Pooling support
+// NOTE: Many fields use .nullish().transform() because the API returns null
+// for nullable database fields, but react-hook-form/zod need clean defaults.
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'hangup']),
-  routing_destination_id: z.string().optional().nullable(),
+  routing_destination_id: z.string().nullish(),
   dial_timeout: z.number().min(1).max(300).default(60),
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
   // Legacy single caller ID (for backward compatibility)
-  caller_id: z.string().optional(),
+  caller_id: z.string().nullish(),
   // New Caller ID Pool fields
   caller_id_strategy: z.enum(['round_robin', 'random', 'least_recently_used']).default('round_robin'),
   caller_id_pool: z.array(
@@ -102,14 +104,14 @@ const campaignSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   timezone: z.string().default('UTC'),
-  time_limit: z.number().min(30).max(14400).default(3600),
-  record_calls: z.boolean().default(false),
-  amd_enabled: z.boolean().default(false),
+  time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 3600),
+  record_calls: z.boolean().nullish().transform(v => v ?? false),
+  amd_enabled: z.boolean().nullish().transform(v => v ?? false),
   action_voicemail: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
   action_human: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
   action_unknown: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
-  retry_on_voicemail: z.boolean().default(false),
-  auto_start: z.boolean().default(false),
+  retry_on_voicemail: z.boolean().nullish().transform(v => v ?? false),
+  auto_start: z.boolean().nullish().transform(v => v ?? false),
 });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
@@ -381,26 +383,26 @@ export default function AutoDialerCampaignForm() {
         routing_destination_id: existingCampaign.routing_destination_id ? String(existingCampaign.routing_destination_id) : undefined,
         dial_timeout: existingCampaign.dial_timeout,
         destination_connect: existingCampaign.destination_connect,
-        caller_id: existingCampaign.caller_id,
+        caller_id: existingCampaign.caller_id || undefined,
         caller_id_strategy: ((existingCampaign as any).caller_id_strategy as CallerIdStrategy) || 'round_robin',
         caller_id_pool: pool,
         max_dial_attempts: existingCampaign.max_dial_attempts,
         concurrent_active_calls: existingCampaign.concurrent_active_calls,
         calls_per_second: existingCampaign.calls_per_second ?? 1,
-        days_active: existingCampaign.days_active,
-        start_time: existingCampaign.start_time,
-        end_time: existingCampaign.end_time,
+        days_active: existingCampaign.days_active || [],
+        start_time: existingCampaign.start_time ?? 9,
+        end_time: existingCampaign.end_time ?? 17,
         start_date: existingCampaign.start_date,
         end_date: existingCampaign.end_date,
         timezone: existingCampaign.timezone,
-        time_limit: existingCampaign.time_limit,
-        record_calls: existingCampaign.record_calls,
+        time_limit: existingCampaign.time_limit ?? 3600,
+        record_calls: existingCampaign.record_calls ?? false,
         amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
         action_voicemail: (existingCampaign as any).action_voicemail || undefined,
         action_human: (existingCampaign as any).action_human || undefined,
         action_unknown: (existingCampaign as any).action_unknown || undefined,
         retry_on_voicemail: (existingCampaign as any).retry_on_voicemail ?? false,
-        auto_start: existingCampaign.auto_start,
+        auto_start: existingCampaign.auto_start ?? false,
       });
       // Use schedule from campaign if available, otherwise convert from legacy format
       if (existingCampaign.schedule) {
@@ -988,7 +990,10 @@ export default function AutoDialerCampaignForm() {
               updateMutation.isPending
             }
             onClick={() => {
-              console.log('Form submit clicked', { isEditing, isDirty, errors });
+              console.log('Form submit clicked', { isEditing, isDirty, errors, values: watch() });
+              if (Object.keys(errors).length > 0) {
+                console.error('Validation errors preventing submit:', JSON.stringify(errors, null, 2));
+              }
             }}
           >
             {(createMutation.isPending || updateMutation.isPending) && (
