@@ -291,11 +291,11 @@ class AutoDialerCampaign extends Model
     }
 
     /**
-     * Check if campaign has a list uploaded.
+     * Check if campaign has a list assigned.
      */
     public function hasList(): bool
     {
-        return $this->list !== null && $this->list->status === 'ready';
+        return $this->list !== null;
     }
 
     /**
