@@ -411,9 +411,19 @@ class DistributionListController extends Controller
         }
 
         // Check if campaign can accept a list
+        // Rules: campaign must not be currently running (active + schedule reached)
+        // or must be in draft/paused status, or schedule hasn't started yet
         if (! $campaign->canAcceptList()) {
             return response()->json([
                 'error' => 'Campaign cannot accept a list in its current status',
+            ], 422);
+        }
+
+        // Additional check: if campaign is active, ensure it's not currently runnable
+        // (i.e., schedule hasn't been reached yet)
+        if ($campaign->status === CampaignStatus::ACTIVE && $campaign->isRunnable()) {
+            return response()->json([
+                'error' => 'Cannot assign list to a campaign that is currently running. Pause the campaign first or assign before the schedule starts.',
             ], 422);
         }
 
@@ -537,6 +547,13 @@ class DistributionListController extends Controller
         if (! $list->campaign_id) {
             return response()->json([
                 'error' => 'List is not assigned to any campaign',
+            ], 422);
+        }
+
+        // Check if all destinations are pending with zero dial attempts
+        if (! $list->canUnassign()) {
+            return response()->json([
+                'error' => 'Cannot unassign list: some destinations have already been dialed or are not in pending status. All entries must be pending with zero dial attempts.',
             ], 422);
         }
 
