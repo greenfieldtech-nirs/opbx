@@ -95,9 +95,10 @@ const campaignSchema = z.object({
   max_dial_attempts: z.number().min(1).max(5).default(1),
   concurrent_active_calls: z.number().min(1).max(50).default(1),
   calls_per_second: z.number().min(1).max(30).default(1),
-  days_active: z.array(z.string()).min(1, 'Select at least one day'),
-  start_time: z.number().min(0).max(23).default(9),
-  end_time: z.number().min(0).max(23).default(17),
+  // Legacy fields - optional since form uses schedule instead
+  days_active: z.array(z.string()).optional().default([]),
+  start_time: z.number().min(0).max(23).optional().default(9),
+  end_time: z.number().min(0).max(23).optional().default(17),
   start_date: z.string(),
   end_date: z.string(),
   timezone: z.string().default('UTC'),
