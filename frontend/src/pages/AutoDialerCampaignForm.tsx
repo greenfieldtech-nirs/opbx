@@ -99,8 +99,8 @@ const campaignSchema = z.object({
   calls_per_second: z.number().min(1).max(30).default(1),
   // Legacy fields - optional since form uses schedule instead
   days_active: z.array(z.string()).optional().default([]),
-  start_time: z.number().min(0).max(23).optional().default(9),
-  end_time: z.number().min(0).max(23).optional().default(17),
+  start_time: z.number().min(0).max(24).optional().default(9),
+  end_time: z.number().min(0).max(24).optional().default(17),
   start_date: z.string(),
   end_date: z.string(),
   timezone: z.string().default('UTC'),
