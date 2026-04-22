@@ -127,7 +127,17 @@ class AutoDialerCampaign extends Model
     }
 
     /**
-     * Get the list for this campaign.
+     * Get the lists assigned to this campaign.
+     */
+    public function lists(): HasMany
+    {
+        return $this->hasMany(AutoDialerList::class, 'campaign_id');
+    }
+
+    /**
+     * Get the first/primary list for this campaign (backward compatibility).
+     *
+     * @deprecated Use lists() instead
      */
     public function list(): HasOne
     {

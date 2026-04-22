@@ -521,7 +521,7 @@ export default function AutoDialerCampaigns() {
                 {
                   header: 'Lists',
                   cell: (campaign) => (
-                    <span className="text-sm">{campaign.has_list ? '1 list' : 'No lists'}</span>
+                    <span className="text-sm">{campaign.lists_count > 0 ? `${campaign.lists_count} list${campaign.lists_count !== 1 ? 's' : ''}` : 'No lists'}</span>
                   )
                 },
                 {

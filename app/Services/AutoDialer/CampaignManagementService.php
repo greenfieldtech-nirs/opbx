@@ -27,7 +27,7 @@ class CampaignManagementService
     public function listCampaigns(int $organizationId, array $filters = []): LengthAwarePaginator
     {
         $query = AutoDialerCampaign::forOrganization($organizationId)
-            ->with(['callerIds', 'list']);
+            ->with(['callerIds', 'lists']);
 
         // Apply status filter
         if (! empty($filters['status'])) {
