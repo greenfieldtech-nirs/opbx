@@ -27,7 +27,7 @@ class CampaignManagementService
     public function listCampaigns(int $organizationId, array $filters = []): LengthAwarePaginator
     {
         $query = AutoDialerCampaign::forOrganization($organizationId)
-            ->with('callerIds');
+            ->with(['callerIds', 'list']);
 
         // Apply status filter
         if (! empty($filters['status'])) {
@@ -52,7 +52,7 @@ class CampaignManagementService
      * @param  AutoDialerCampaign  $campaign  The campaign to load
      * @param  array<int, string>  $relations  Relations to eager load
      */
-    public function getCampaign(AutoDialerCampaign $campaign, array $relations = ['callerIds']): AutoDialerCampaign
+    public function getCampaign(AutoDialerCampaign $campaign, array $relations = ['callerIds', 'list']): AutoDialerCampaign
     {
         if (! empty($relations)) {
             $campaign->load($relations);
