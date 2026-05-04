@@ -51,7 +51,7 @@ export type Status = 'active' | 'inactive';
 export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
 
 // Extension Types
-export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward';
+export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward' | 'ai_load_balancer';
 
 // Call Status
 export type CallStatus =
@@ -76,7 +76,7 @@ export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 
 export type RingGroupStatus = 'active' | 'inactive';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
 
 // IVR Destination Type
 export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'hangup';
@@ -208,6 +208,7 @@ export interface DIDNumber {
   routing_config: {
     extension_id?: string;
     ai_assistant_id?: string;
+    ai_load_balancer_id?: string;
     ring_group_id?: string;
     business_hours_schedule_id?: string;
     conference_room_id?: string;

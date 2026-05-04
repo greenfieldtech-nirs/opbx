@@ -50,7 +50,7 @@ class WebhookDispatcherTest extends TestCase
     protected function tearDown(): void
     {
         parent::tearDown();
-        Mockery::close();
+        \Mockery::close();
     }
 
     public function test_dispatch_returns_true_on_successful_delivery(): void

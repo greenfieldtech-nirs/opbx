@@ -27,16 +27,17 @@ import type { DIDNumber, CreateDIDRequest, UpdateDIDRequest, RoutingType } from 
 
 // Validation schema
 const didSchema = z.object({
-  did_number: z.string().min(10, 'Phone number must be at least 10 digits'),
-  country_code: z.string().min(1, 'Country code is required'),
-   routing_type: z.enum(['extension', 'ai_assistant', 'ring_group', 'business_hours', 'conference_room', 'ivr_menu', 'voicemail'] as const),
+  phone_number: z.string().min(10, 'Phone number must be at least 10 digits'),
+  friendly_name: z.string().optional(),
+  routing_type: z.enum(['extension', 'ai_assistant', 'ring_group', 'business_hours', 'conference_room', 'ivr_menu', 'voicemail', 'ai_load_balancer'] as const),
   routing_config: z.object({
     extension_id: z.string().optional(),
+    ai_assistant_id: z.string().optional(),
     ring_group_id: z.string().optional(),
-    business_hours_id: z.string().optional(),
+    business_hours_schedule_id: z.string().optional(),
     conference_room_id: z.string().optional(),
     ivr_menu_id: z.string().optional(),
-    voicemail_greeting: z.string().optional(),
+    ai_load_balancer_id: z.string().optional(),
   }),
   status: z.enum(['active', 'inactive'] as const),
 });
@@ -86,16 +87,17 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
   } = useForm<DIDFormData>({
     resolver: zodResolver(didSchema),
     defaultValues: {
-      did_number: did?.did_number || '',
-      country_code: did?.country_code || '+1',
+      phone_number: did?.phone_number || '',
+      friendly_name: did?.friendly_name || '',
       routing_type: did?.routing_type || 'extension',
       routing_config: {
         extension_id: did?.routing_config?.extension_id || '',
+        ai_assistant_id: did?.routing_config?.ai_assistant_id || '',
         ring_group_id: did?.routing_config?.ring_group_id || '',
-        business_hours_id: did?.routing_config?.business_hours_id || '',
+        business_hours_schedule_id: did?.routing_config?.business_hours_schedule_id || '',
         conference_room_id: did?.routing_config?.conference_room_id || '',
         ivr_menu_id: did?.routing_config?.ivr_menu_id || '',
-        voicemail_greeting: did?.routing_config?.voicemail_greeting || '',
+        ai_load_balancer_id: did?.routing_config?.ai_load_balancer_id || '',
       },
       status: did?.status || 'active',
     },
@@ -106,8 +108,8 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
 
   const handleFormSubmit = (data: DIDFormData) => {
     const submitData: CreateDIDRequest | UpdateDIDRequest = {
-      did_number: data.did_number,
-      country_code: data.country_code,
+      phone_number: data.phone_number,
+      friendly_name: data.friendly_name,
       routing_type: data.routing_type,
       routing_config: data.routing_config,
       status: data.status,
@@ -119,44 +121,33 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* Phone Number */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="col-span-1 space-y-2">
-          <Label htmlFor="country_code">
-            Country <span className="text-destructive">*</span>
-          </Label>
-          <Select
-            value={watch('country_code')}
-            onValueChange={(value) => setValue('country_code', value)}
-            disabled={isLoading || isEdit}
-          >
-            <SelectTrigger id="country_code">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="+1">+1 (US/CA)</SelectItem>
-              <SelectItem value="+44">+44 (UK)</SelectItem>
-              <SelectItem value="+972">+972 (IL)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone_number">
+          Phone Number <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="phone_number"
+          {...register('phone_number')}
+          placeholder="+1234567890"
+          disabled={isLoading || isEdit}
+        />
+        {isEdit && (
+          <p className="text-xs text-muted-foreground">Phone number cannot be changed</p>
+        )}
+        {errors.phone_number && (
+          <p className="text-sm text-destructive">{errors.phone_number.message}</p>
+        )}
+      </div>
 
-        <div className="col-span-3 space-y-2">
-          <Label htmlFor="did_number">
-            Phone Number <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="did_number"
-            {...register('did_number')}
-            placeholder="1234567890"
-            disabled={isLoading || isEdit}
-          />
-          {isEdit && (
-            <p className="text-xs text-muted-foreground">Phone number cannot be changed</p>
-          )}
-          {errors.did_number && (
-            <p className="text-sm text-destructive">{errors.did_number.message}</p>
-          )}
-        </div>
+      {/* Friendly Name */}
+      <div className="space-y-2">
+        <Label htmlFor="friendly_name">Friendly Name</Label>
+        <Input
+          id="friendly_name"
+          {...register('friendly_name')}
+          placeholder="Main Office Line"
+          disabled={isLoading}
+        />
       </div>
 
       {/* Status */}
@@ -201,11 +192,13 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="extension">Direct to Extension</SelectItem>
+            <SelectItem value="ai_assistant">AI Assistant</SelectItem>
             <SelectItem value="ring_group">Ring Group</SelectItem>
             <SelectItem value="ivr_menu">IVR Menu</SelectItem>
             <SelectItem value="business_hours">Business Hours Routing</SelectItem>
             <SelectItem value="conference_room">Conference Room</SelectItem>
             <SelectItem value="voicemail">Voicemail</SelectItem>
+            <SelectItem value="ai_load_balancer">AI Load Balancer</SelectItem>
           </SelectContent>
         </Select>
         {errors.routing_type && (
@@ -291,15 +284,15 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
 
         {routingType === 'business_hours' && (
           <div className="space-y-2">
-            <Label htmlFor="business_hours_id">
+            <Label htmlFor="business_hours_schedule_id">
               Business Hours Rule <span className="text-destructive">*</span>
             </Label>
             <Select
-              value={watch('routing_config.business_hours_id') || ''}
-              onValueChange={(value) => setValue('routing_config.business_hours_id', value)}
+              value={watch('routing_config.business_hours_schedule_id') || ''}
+              onValueChange={(value) => setValue('routing_config.business_hours_schedule_id', value)}
               disabled={isLoading}
             >
-              <SelectTrigger id="business_hours_id">
+              <SelectTrigger id="business_hours_schedule_id">
                 <SelectValue placeholder="Select business hours" />
               </SelectTrigger>
               <SelectContent>
@@ -310,24 +303,6 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        )}
-
-        {routingType === 'voicemail' && (
-          <div className="space-y-2">
-            <Label htmlFor="voicemail_greeting">
-              Voicemail Greeting <span className="text-xs text-muted-foreground">(optional)</span>
-            </Label>
-            <Textarea
-              id="voicemail_greeting"
-              {...register('routing_config.voicemail_greeting')}
-              placeholder="Enter custom greeting message..."
-              rows={3}
-              disabled={isLoading}
-            />
-            <p className="text-xs text-muted-foreground">
-              Custom greeting message for voicemail. Leave blank to use default.
-            </p>
           </div>
         )}
       </div>

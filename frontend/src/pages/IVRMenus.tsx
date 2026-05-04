@@ -26,7 +26,14 @@ import type {
   CreateIvrMenuRequest,
   UpdateIvrMenuRequest,
 } from '@/types/api.types';
-import type { CloudonixSettings } from '@/types';
+import type {
+  CloudonixSettings,
+  CloudonixVoice,
+  CloudonixVoiceFilters,
+  CloudonixVoiceLanguage,
+  Extension,
+  Recording,
+} from '@/types';
 
 // Create recordings service
 const recordingsService = createResourceService('recordings');
@@ -513,7 +520,8 @@ export default function IVRMenus() {
       toast.success('IVR menu created successfully');
     },
     onError: (error: Error | unknown) => {
-      toast.error(error.response?.data?.message || 'Failed to create IVR menu');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create IVR menu');
     },
   });
 
@@ -530,7 +538,8 @@ export default function IVRMenus() {
       toast.success('IVR menu updated successfully');
     },
     onError: (error: Error | unknown) => {
-      toast.error(error.response?.data?.message || 'Failed to update IVR menu');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to update IVR menu');
     },
   });
 
@@ -545,7 +554,8 @@ export default function IVRMenus() {
       toast.success('IVR menu deleted successfully');
     },
     onError: (error: Error | unknown) => {
-      toast.error(error.response?.data?.message || 'Failed to delete IVR menu');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to delete IVR menu');
     },
   });
 
@@ -558,7 +568,8 @@ export default function IVRMenus() {
       toast.success('IVR menu status updated');
     },
     onError: (error: Error | unknown) => {
-      toast.error(error.response?.data?.message || 'Failed to update IVR menu status');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to update IVR menu status');
     },
   });
 
@@ -801,7 +812,7 @@ export default function IVRMenus() {
             >
               <RefreshCw className={isRefetching ? 'animate-spin' : ''} />
             </Button>
-            <Select value={statusFilter} onValueChange={(value: string) => setStatusFilter(value)}>
+            <Select value={statusFilter} onValueChange={(value: string) => setStatusFilter(value as 'all' | IvrMenuStatus)}>
               <SelectTrigger className="w-full md:w-48">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />

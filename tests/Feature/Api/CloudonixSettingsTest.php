@@ -607,7 +607,13 @@ class CloudonixSettingsTest extends TestCase
      */
     protected function tearDown(): void
     {
-        Mockery::close();
+        try {
+            \Mockery::close();
+        } catch (\Throwable $e) {
+            // Ignore Mockery exceptions – we must still run parent::tearDown()
+            // so that HandleExceptions::flushState() cleans up error handlers.
+        }
+
         parent::tearDown();
     }
 }
