@@ -175,11 +175,11 @@ services:
       - MYSQL_USER=${DB_USERNAME:-opbx}
       - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
     volumes:
-      # PERSISTENCE: This named volume stores MySQL data on the host filesystem.
-      # Data survives container restarts and even container removal.
-      # WARNING: 'docker compose down -v' or 'docker volume rm' WILL DELETE this data!
+      # PERSISTENCE: Bind mount stores MySQL data in ./volumes/mysql on the host.
+      # Data survives container restarts, recreation, and even 'docker compose down -v'.
+      # The directory is gitignored so it won't be committed.
       # Always backup before major changes: ./scripts/backup-database.sh
-      - mysql_data:/var/lib/mysql
+      - ./volumes/mysql:/var/lib/mysql
     networks:
       - opbx
     # Restart policy ensures MySQL comes back up after host reboots
@@ -199,7 +199,10 @@ services:
     ports:
       - "${REDIS_EXPOSE_PORT:-}:6379"
     volumes:
-      - redis_data:/data
+      # PERSISTENCE: Bind mount stores Redis data in ./volumes/redis on the host.
+      # AOF is enabled so data is written to disk and survives container removal.
+      # The directory is gitignored so it won't be committed.
+      - ./volumes/redis:/data
     networks:
       - opbx
     command: >
@@ -378,9 +381,3 @@ services:
 networks:
   opbx:
     driver: bridge
-
-volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local

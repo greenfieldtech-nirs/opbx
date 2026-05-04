@@ -161,6 +161,7 @@ reports/
 /backups/
 /volumes/minio/
 /volumes/mysql/
+/volumes/redis/
 /volumes/amd-dumps/
 
 # ============================================================================
