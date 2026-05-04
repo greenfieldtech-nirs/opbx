@@ -1,483 +1,384 @@
-# OPBX Frontend - React Admin Interface
+# OpBX Frontend
 
-Modern, production-ready React SPA for the OPBX business PBX administration interface.
+The **OpBX Frontend** is the React-based single-page application (SPA) that serves as the administrative interface for the OpBX open-source business PBX platform. It provides a modern, responsive web UI for managing phone systems, users, call routing, auto-dialer campaigns, real-time call monitoring, and platform-level administration.
 
-## Features
+## Overview
 
-- **Modern Stack**: React 18, TypeScript, Vite, Tailwind CSS
-- **State Management**: TanStack Query (React Query) for server state
-- **UI Components**: shadcn/ui (Radix UI + Tailwind)
-- **Real-time Updates**: WebSocket integration for live call presence
-- **Authentication**: JWT token-based auth with Laravel Sanctum
-- **Form Handling**: React Hook Form with Zod validation
-- **Type Safety**: Strict TypeScript with comprehensive type definitions
-- **Responsive Design**: Mobile-first, fully responsive layouts
-- **Code Splitting**: Lazy-loaded routes for optimal performance
-- **Production Ready**: Docker containerization, nginx serving, optimized builds
+OpBX is a multi-tenant business PBX platform built on Laravel (backend) and React (frontend). This frontend application communicates with the Laravel API to provide a comprehensive web interface for PBX administrators and platform managers.
+
+**Key Capabilities:**
+
+- **User & Extension Management** — Manage SIP extensions, users, and ring groups
+- **Phone Number Management** — Configure DID numbers and inbound routing
+- **IVR & Call Flows** — Build interactive voice response menus and business hours
+- **Auto-Dialer** — Create and monitor outbound campaigns with real-time statistics
+- **Live Call Monitoring** — Real-time call presence via WebSocket (Soketi/Pusher)
+- **Call Analytics** — Searchable call logs, recordings, and CDR data
+- **AI Assistants** — Configure AI-powered voice assistants and load balancers
+- **Platform Administration** — Multi-tenant organization and user management
 
 ## Technology Stack
 
-### Core
-- **React 18.3** - UI library with hooks
-- **TypeScript 5.6** - Type safety and developer experience
-- **Vite 5.4** - Fast build tool and dev server
-- **React Router v6** - Client-side routing
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Framework** | React 18 | UI library with concurrent features |
+| **Language** | TypeScript | Type-safe development (strict mode: off) |
+| **Build Tool** | Vite 7 | Fast dev server and optimized production builds |
+| **Routing** | React Router 6 | Declarative routing with lazy loading |
+| **Server State** | TanStack Query 5 | Data fetching, caching, and synchronization |
+| **Client State** | React Context | Global state for Auth and Config |
+| **Forms** | react-hook-form + Zod | Type-safe form handling with schema validation |
+| **UI Components** | shadcn/ui | Accessible components built on Radix UI primitives |
+| **Styling** | Tailwind CSS 3 | Utility-first CSS framework |
+| **HTTP Client** | Axios | API requests with interceptors for auth and error handling |
+| **Real-time** | Laravel Echo + Pusher JS | WebSocket connections for live call updates |
+| **Drag & Drop** | @dnd-kit | Sortable lists for IVR menus and call flows |
+| **Icons** | Lucide React | Consistent, lightweight iconography |
+| **Testing** | Playwright | End-to-end testing framework |
 
-### State & Data
-- **TanStack Query 5.x** - Server state management and caching
-- **Axios 1.7** - HTTP client with interceptors
-- **WebSocket API** - Native WebSocket for real-time updates
-
-### UI & Styling
-- **Tailwind CSS 3.4** - Utility-first CSS framework
-- **shadcn/ui** - High-quality React components (Radix UI)
-- **Lucide React** - Beautiful icon set
-- **Sonner** - Toast notifications
-
-### Forms & Validation
-- **React Hook Form 7.x** - Performant form management
-- **Zod 3.x** - TypeScript-first schema validation
-
-## Project Structure
+## Directory Structure
 
 ```
 frontend/
+├── public/                    # Static assets
 ├── src/
-│   ├── components/          # React components
-│   │   ├── Layout/          # Layout components (Sidebar, Header, AppLayout)
-│   │   ├── Auth/            # Authentication components
-│   │   ├── Dashboard/       # Dashboard components
-│   │   ├── Users/           # User management components
-│   │   ├── DIDs/            # DID management components
-│   │   ├── RingGroups/      # Ring group components
-│   │   ├── BusinessHours/   # Business hours components
-│   │   ├── CallLogs/        # Call logs components
-│   │   ├── LiveCalls/       # Live calls components
-│   │   └── ui/              # Reusable UI components (shadcn/ui)
-│   ├── pages/               # Page components (routes)
-│   │   ├── Login.tsx
+│   ├── components/            # Reusable UI components
+│   │   ├── ui/               # shadcn/ui components (Button, Dialog, Table, etc.)
+│   │   ├── Layout/           # AppLayout, Sidebar, Header
+│   │   ├── Auth/             # ProtectedRoute, OwnerRoute
+│   │   └── ...               # Shared components
+│   ├── pages/                # Route-level page components (33+ pages)
 │   │   ├── Dashboard.tsx
-│   │   ├── Users.tsx
-│   │   ├── Extensions.tsx
-│   │   ├── DIDs.tsx
-│   │   ├── RingGroups.tsx
+│   │   ├── UsersComplete.tsx
+│   │   ├── Extensions/
+│   │   ├── PhoneNumbers.tsx
+│   │   ├── RingGroups/
+│   │   ├── IVRMenus/
 │   │   ├── BusinessHours.tsx
+│   │   ├── ConferenceRooms.tsx
+│   │   ├── AiAssistants.tsx
+│   │   ├── AutoDialerCampaigns.tsx
+│   │   ├── AutoDialerMonitor.tsx
 │   │   ├── CallLogs.tsx
-│   │   └── LiveCalls.tsx
-│   ├── services/            # API service layer
-│   │   ├── api.ts           # Axios instance with interceptors
+│   │   ├── LiveCalls.tsx
+│   │   ├── Settings.tsx
+│   │   ├── platform/         # Platform management pages
+│   │   └── ...
+│   ├── services/             # API service layer
+│   │   ├── api.ts            # Axios instance with interceptors
 │   │   ├── auth.service.ts
-│   │   ├── users.service.ts
-│   │   ├── extensions.service.ts
-│   │   ├── dids.service.ts
-│   │   ├── ringGroups.service.ts
-│   │   ├── businessHours.service.ts
-│   │   ├── callLogs.service.ts
-│   │   └── websocket.service.ts
-│   ├── hooks/               # Custom React hooks
-│   │   ├── useAuth.ts
-│   │   └── useWebSocket.ts
-│   ├── context/             # React contexts
-│   │   └── AuthContext.tsx
-│   ├── types/               # TypeScript type definitions
-│   │   └── api.types.ts     # API response types
-│   ├── utils/               # Utility functions
-│   │   ├── storage.ts       # LocalStorage helpers
-│   │   └── formatters.ts    # Formatting utilities
-│   ├── lib/                 # Third-party library configs
-│   │   └── utils.ts         # cn() helper for Tailwind
-│   ├── App.tsx              # Root component
-│   ├── main.tsx             # Application entry point
-│   ├── router.tsx           # Route definitions
-│   └── index.css            # Global styles (Tailwind)
-├── public/                  # Static assets
-├── docker/                  # Docker configs
-│   └── nginx.conf          # nginx configuration
-├── index.html              # HTML entry point
-├── package.json            # Dependencies
-├── tsconfig.json           # TypeScript config
-├── vite.config.ts          # Vite config
-├── tailwind.config.js      # Tailwind config
-├── Dockerfile              # Docker build instructions
-└── README.md               # This file
+│   │   ├── echo.service.ts   # WebSocket/Laravel Echo
+│   │   └── ...               # Domain-specific API services
+│   ├── hooks/                # Custom React hooks
+│   ├── context/              # React Context providers
+│   │   ├── AuthContext.tsx   # Authentication state
+│   │   └── ConfigContext.tsx # Application configuration
+│   ├── types/                # TypeScript type definitions
+│   ├── schemas/              # Zod validation schemas
+│   ├── utils/                # Utility functions
+│   ├── router.tsx            # Route definitions with lazy loading
+│   ├── main.tsx              # Application entry point
+│   └── index.css             # Global styles + Tailwind directives
+├── .env.example              # Environment variable template
+├── package.json
+├── tsconfig.json             # TypeScript configuration (strict: false)
+├── vite.config.ts            # Vite configuration with proxy and code splitting
+└── tailwind.config.js        # Tailwind CSS theme customization
 ```
 
-## Getting Started
+## Development Setup
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- Backend API running on `http://localhost:8000`
+- **Node.js** 18+ (recommended: 20 LTS)
+- **npm** 9+ or **yarn**
+- Running **Laravel backend** on `http://localhost:8000` (or configured API URL)
+- (Optional) **Soketi/WebSocket server** for real-time features
 
 ### Installation
 
-1. **Clone and navigate to frontend directory:**
-
 ```bash
 cd frontend
-```
-
-2. **Install dependencies:**
-
-```bash
 npm install
 ```
 
-3. **Configure environment:**
+### Environment Configuration
+
+Copy `.env.example` to `.env` and adjust values:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VITE_API_BASE_URL` | Laravel API base URL | `http://localhost:8000/api/v1` |
+| `VITE_PUSHER_APP_KEY` | Pusher app key for WebSocket | `pbxappkey` |
+| `VITE_PUSHER_APP_CLUSTER` | Pusher cluster | `mt1` |
+| `VITE_WS_HOST` | WebSocket server host | `localhost` |
+| `VITE_WS_PORT` | WebSocket server port | `6001` |
+| `VITE_WS_SCHEME` | WebSocket scheme (`http` or `https`) | `http` |
+| `VITE_APP_NAME` | Application display name | `OPBX - Open Source Business PBX` |
 
-```env
-VITE_API_BASE_URL=http://localhost:8000/api
-VITE_WS_URL=ws://localhost:6001
-```
-
-### Development
-
-**Start development server:**
+### Running the Development Server
 
 ```bash
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`
+The Vite dev server starts on **port 3000** (configurable in `vite.config.ts`). It proxies `/api` requests to the Laravel backend automatically.
 
-**Type checking:**
+**Access the app:**
+- Frontend: `http://localhost:3000`
+- API proxy: `http://localhost:3000/api` → `http://localhost:8000/api`
+
+### Docker Development
+
+When using the project's `docker-compose.yml`, the frontend container runs automatically. No manual `.env` file is needed — variables are injected by Docker Compose.
 
 ```bash
-npm run type-check
+docker compose up -d
+# Access at http://localhost:3000
 ```
 
-**Linting:**
+## Build Commands
 
-```bash
-npm run lint
-```
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server on `:3000` with HMR |
+| `npm run build` | Production build (TypeScript compile + Vite bundle) |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Run ESLint on `.ts` and `.tsx` files |
+| `npm run type-check` | Run TypeScript compiler check only (`tsc --noEmit`) |
 
-### Building for Production
-
-**Create optimized production build:**
+### Production Build
 
 ```bash
 npm run build
 ```
 
-Build output will be in `dist/` directory.
+Output is written to `frontend/dist/` with:
+- Code splitting into vendor chunks (React, Query, UI)
+- Source maps enabled
+- Optimized and minified assets
 
-**Preview production build:**
+## Architecture Overview
 
-```bash
-npm run preview
+```mermaid
+graph TB
+    subgraph "Browser"
+        A[React 18 SPA]
+        B[TanStack Query]
+        C[React Context]
+        D[React Router]
+        E[Laravel Echo]
+    end
+
+    subgraph "Frontend Services"
+        F[Axios API Client]
+        G[Auth Service]
+        H[Echo Service]
+        I[Domain Services]
+    end
+
+    subgraph "Backend"
+        J[Laravel API]
+        K[Soketi/WebSocket]
+        L[MySQL + Redis]
+    end
+
+    A --> D
+    A --> B
+    A --> C
+    A --> E
+    B --> F
+    C --> G
+    E --> H
+    F --> J
+    G --> J
+    I --> J
+    H --> K
+    J --> L
+    K --> J
 ```
 
-## Docker Deployment
+### Application Bootstrap Flow
 
-### Build Docker Image
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant main.tsx
+    participant AuthContext
+    participant ConfigContext
+    participant Router
 
-```bash
-docker build -t opbx-frontend .
+    Browser->>main.tsx: Load SPA
+    main.tsx->>main.tsx: Create QueryClient<br/>(no client-side caching)
+    main.tsx->>AuthContext: Initialize auth state
+    AuthContext->>AuthContext: Verify token via /auth/me
+    main.tsx->>ConfigContext: Fetch app configuration
+    ConfigContext->>ConfigContext: GET /config
+    main.tsx->>Router: Render route tree
+    Router->>Browser: Lazy-load page component
 ```
 
-### Run Container
+## State Management
 
-```bash
-docker run -d \
-  -p 3000:80 \
-  --name opbx-frontend \
-  opbx-frontend
-```
+### Server State: TanStack Query
 
-### Using Docker Compose
-
-Add to main `docker-compose.yml`:
-
-```yaml
-services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - app
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-```
-
-Then run:
-
-```bash
-docker-compose up -d frontend
-```
-
-## API Integration
-
-### Authentication Flow
-
-1. User submits login credentials
-2. Frontend sends POST to `/api/auth/login`
-3. Backend returns JWT token and user object
-4. Token stored in localStorage
-5. Axios interceptor adds token to all requests
-6. Protected routes check authentication state
-
-### API Services
-
-All API calls are made through service modules in `src/services/`:
+All server data is managed via **TanStack Query** (`@tanstack/react-query`). The QueryClient is configured with **client-side caching explicitly disabled** to prevent stale data bugs:
 
 ```typescript
-// Example: Fetch users
-import { usersService } from '@/services/users.service';
-
-const users = await usersService.getAll({ page: 1, per_page: 20 });
-```
-
-### Real-time WebSocket
-
-WebSocket connection is established automatically when authenticated:
-
-```typescript
-// Subscribe to call events
-useWebSocket('call.initiated', (data) => {
-  console.log('New call:', data.call);
-});
-```
-
-## Key Features Explained
-
-### 1. Type-Safe API Integration
-
-All API responses are fully typed:
-
-```typescript
-import type { User, PaginatedResponse } from '@/types/api.types';
-
-const response: PaginatedResponse<User> = await usersService.getAll();
-```
-
-### 2. Automatic Token Management
-
-Axios interceptor automatically:
-- Adds Bearer token to requests
-- Handles 401 errors (redirects to login)
-- Provides error messages
-
-### 3. Real-time Call Presence
-
-Live Calls page shows active calls with:
-- WebSocket updates for call events
-- Automatic duration counter
-- Visual status indicators
-- Fallback polling (5s) if WebSocket fails
-
-### 4. Optimized Performance
-
-- **Code splitting**: Routes lazy-loaded
-- **React Query caching**: 5-minute stale time
-- **Optimistic updates**: Instant UI feedback
-- **Memoization**: Prevents unnecessary re-renders
-
-### 5. Role-Based Access Control
-
-Navigation automatically filters based on user role:
-
-```typescript
-// Only owners and admins see Users page
-{ name: 'Users', href: '/users', roles: ['owner', 'admin'] }
-```
-
-### 6. Responsive Design
-
-All pages are fully responsive:
-- Mobile-first approach
-- Breakpoints: sm (640px), md (768px), lg (1024px), xl (1280px)
-- Touch-friendly UI elements
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_BASE_URL` | Backend API base URL | `http://localhost:8000/api` |
-| `VITE_WS_URL` | WebSocket server URL | `ws://localhost:6001` |
-| `VITE_APP_NAME` | Application name | `OPBX Admin` |
-
-## Pages Overview
-
-### Dashboard (`/dashboard`)
-- Active calls count
-- Total extensions and DIDs
-- Calls today statistics
-- Recent call activity
-
-### Users (`/users`)
-- User list with pagination
-- Search by name/email
-- Create/edit/delete users
-- Role and status management
-
-### Extensions (`/extensions`)
-- Extension cards grid view
-- Extension status indicators
-- SIP configuration
-- Voicemail settings
-
-### Phone Numbers (`/dids`)
-- DID list with routing info
-- Routing type configuration
-- Direct extension routing
-- Ring group routing
-- Business hours routing
-
-### Ring Groups (`/ring-groups`)
-- Ring group cards
-- Strategy selection (simultaneous, round-robin, sequential)
-- Member management
-- Timeout and fallback config
-
-### Business Hours (`/business-hours`)
-- Schedule creation
-- Weekly hours configuration
-- Holiday management
-- Open/closed routing
-
-### Call Logs (`/call-logs`)
-- Full call history
-- Advanced filters (date range, status, DID)
-- Export to CSV
-- Pagination (50 per page)
-
-### Live Calls (`/live-calls`)
-- Real-time active call list
-- WebSocket updates
-- Call duration counter
-- Caller ID and destination info
-
-## Development Guidelines
-
-### Adding a New Page
-
-1. Create page component in `src/pages/`
-2. Add route in `src/router.tsx`
-3. Add navigation item in `src/components/Layout/Sidebar.tsx`
-4. Create service methods if needed
-5. Add TypeScript types in `src/types/api.types.ts`
-
-### Adding a New API Service
-
-1. Create service file in `src/services/`
-2. Import `api` instance from `@/services/api`
-3. Define service methods with typed responses
-4. Export service object
-
-### Using React Query
-
-```typescript
-// Fetch data
-const { data, isLoading, error } = useQuery({
-  queryKey: ['users', page],
-  queryFn: () => usersService.getAll({ page }),
-});
-
-// Mutate data
-const mutation = useMutation({
-  mutationFn: (data) => usersService.create(data),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['users'] });
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,      // Data is never "fresh" — always refetch
+      gcTime: 0,         // Don't keep inactive data in memory
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        // Don't retry on 401/403
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          return false;
+        }
+        return failureCount < 1;
+      },
+    },
+    mutations: { retry: false },
   },
 });
 ```
 
-## Troubleshooting
+**Why no client-side caching?** The backend's server-side caching is fast enough. Disabling client-side caching eliminates an entire class of stale-data bugs that are difficult to reproduce and fix.
 
-### API Connection Issues
+### Client State: React Context
 
-If frontend can't connect to backend:
+Two global contexts manage client-side state:
 
-1. Check `.env` has correct `VITE_API_BASE_URL`
-2. Ensure backend is running
-3. Check browser console for CORS errors
-4. Verify Vite proxy config in `vite.config.ts`
+#### AuthContext
+- Stores `user`, `token`, `isAuthenticated`
+- Handles login, register, logout, and token verification
+- Clears TanStack Query cache on auth state changes
+- Persists auth data to `localStorage`
 
-### WebSocket Not Connecting
+#### ConfigContext
+- Stores `ApplicationConfig` (mode, webhooks, warnings)
+- Provides `isProduction`, `shouldHideWebhookFields`, `isValidConfiguration`
+- Falls back to development defaults on API error
 
-1. Check `VITE_WS_URL` in `.env`
-2. Ensure Laravel WebSocket server is running
-3. Check browser console for WebSocket errors
-4. Verify auth token is valid
+### API Layer: Axios with Interceptors
 
-### Build Errors
+The centralized `api.ts` client provides:
 
-1. Clear node_modules and reinstall:
-   ```bash
-   rm -rf node_modules package-lock.json
-   npm install
-   ```
+- **Auth header injection** — Bearer token from `localStorage`
+- **Cache-busting headers** on GET requests (`Cache-Control: no-cache`)
+- **Automatic 401 handling** — Clears storage and redirects to `/ui/login`
+- **FormData support** — Removes `Content-Type` header for multipart uploads
+- **Error message extraction** — Parses validation errors from API responses
 
-2. Check TypeScript errors:
-   ```bash
-   npm run type-check
-   ```
+## Key Features
 
-## Performance Optimization
+### PBX Administration
 
-### Production Build Analysis
+| Feature | Page | Description |
+|---------|------|-------------|
+| **Dashboard** | `/ui/dashboard` | Overview with call statistics and system status |
+| **Users** | `/ui/users` | Manage organization users and roles |
+| **Extensions** | `/ui/extensions` | SIP extension configuration and status |
+| **Phone Numbers** | `/ui/phone-numbers` | DID number management and routing |
+| **Ring Groups** | `/ui/ring-groups` | Call distribution groups with strategies |
+| **IVR Menus** | `/ui/ivr-menus` | Interactive voice response tree builder |
+| **Business Hours** | `/ui/business-hours` | Time-based call routing rules |
+| **Conference Rooms** | `/ui/conference-rooms` | Audio conference bridge management |
 
-Analyze bundle size:
+### Auto-Dialer
 
-```bash
-npm run build
-```
+| Feature | Page | Description |
+|---------|------|-------------|
+| **Campaigns** | `/ui/auto-dialer/campaigns` | Create and manage outbound campaigns |
+| **Campaign Detail** | `/ui/auto-dialer/campaigns/:id` | Campaign statistics and control |
+| **Upload Lists** | `/ui/auto-dialer/campaigns/:id/upload` | Upload destination phone number lists |
+| **Distribution Lists** | `/ui/auto-dialer/distribution-lists` | Reusable contact lists for campaigns |
+| **Monitor** | `/ui/auto-dialer/monitor` | Real-time campaign progress dashboard |
 
-Check `dist/` folder size and chunking in build output.
+### Call Management
 
-### Lazy Loading
+| Feature | Page | Description |
+|---------|------|-------------|
+| **Live Calls** | `/ui/live-calls` | Real-time active call monitoring via WebSocket |
+| **Call Logs** | `/ui/call-logs` | Searchable CDR with filters and playback |
+| **Announcements** | `/ui/announcements` | Manage system audio announcements |
+| **Call Notifications** | `/ui/call-notifications` | Configure call alert settings |
 
-All pages are lazy-loaded:
+### AI & Advanced
 
-```typescript
-const Users = lazy(() => import('@/pages/Users'));
-```
+| Feature | Page | Description |
+|---------|------|-------------|
+| **AI Assistants** | `/ui/ai-assistants` | Configure AI voice assistants |
+| **AI Load Balancers** | `/ui/ai-assistant-load-balancers` | Distribute AI assistant traffic |
+| **Outbound Whitelist** | `/ui/outbound-whitelist` | Restrict outbound dialing (owner only) |
+| **Inbound Blacklist** | `/ui/inbound-blacklist` | Block unwanted incoming numbers |
 
-### React Query Caching
+### Platform Management (Platform Manager Role)
 
-Configured for optimal performance:
-- 5-minute stale time
-- 1 retry on failure
-- No refetch on window focus
+| Feature | Page | Description |
+|---------|------|-------------|
+| **Platform Dashboard** | `/ui/platform/dashboard` | Cross-tenant system overview |
+| **Organizations** | `/ui/platform/organizations` | Manage tenant organizations |
+| **Platform Users** | `/ui/platform/users` | Cross-organization user management |
+| **Audit Log** | `/ui/platform/audit-log` | System-wide activity logging |
 
-## Security Considerations
+### Route Guards
 
-1. **Token Storage**: Tokens stored in localStorage (consider httpOnly cookies for enhanced security)
-2. **XSS Protection**: All user input sanitized by React
-3. **CORS**: Backend must allow frontend origin
-4. **HTTPS**: Use HTTPS in production
-5. **Content Security Policy**: Configure CSP headers in nginx
+- **ProtectedRoute** — Requires authentication for all `/ui/*` routes
+- **OwnerRoute** — Restricts access to organization owners (Settings, Outbound Whitelist)
+- **PlatformManagerRoute** — Restricts platform admin pages to platform managers
 
-## Contributing
+## Real-Time Features (WebSocket)
 
-1. Follow existing code style
-2. Use TypeScript strict mode
-3. Add types for all props and API responses
-4. Use existing UI components from `src/components/ui/`
-5. Test responsiveness on mobile/tablet/desktop
+The frontend connects to a **Soketi** WebSocket server via **Laravel Echo** for live call presence updates:
+
+**Events subscribed per organization:**
+- `call.initiated` — New inbound/outbound call started
+- `call.answered` — Call picked up by an extension
+- `call.ended` — Call terminated with duration
+- Presence channel — Active admin users viewing the dashboard
+
+**Connection features:**
+- Automatic reconnection with exponential backoff (max 5 retries)
+- Connection state tracking (`disconnected` → `connecting` → `connected`)
+- Auth via Bearer token on the `/broadcasting/auth` endpoint
+
+## Code Conventions
+
+- **Components**: `PascalCase` filenames (e.g., `BusinessHoursForm.tsx`)
+- **Hooks**: `camelCase` starting with `use` (e.g., `useAuth()`)
+- **Types/Interfaces**: `PascalCase` (e.g., `BusinessHoursConfig`)
+- **Imports**: `@/` path alias for `src/` directory
+- **Functional components only** — No class components
+- **2-space indentation** for all TypeScript/TSX files
+
+## Environment Variables Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_API_BASE_URL` | Yes | Full URL to Laravel API (e.g., `http://localhost:8000/api/v1`) |
+| `VITE_PUSHER_APP_KEY` | No | Pusher app key for Laravel Echo |
+| `VITE_PUSHER_APP_CLUSTER` | No | Pusher cluster identifier |
+| `VITE_WS_HOST` | No | WebSocket server hostname |
+| `VITE_WS_PORT` | No | WebSocket server port |
+| `VITE_WS_SCHEME` | No | `http` or `https` |
+| `VITE_APP_NAME` | No | Display name in browser title |
+| `VITE_API_PROXY_TARGET` | No | Proxy target for dev server (default: `http://localhost:8000`) |
+| `VITE_ALLOWED_HOSTS` | No | Comma-separated list of allowed hosts for Vite dev server |
+
+## Related Documentation
+
+- [OpBX Backend Documentation](../README.md) — Laravel API and architecture
+- [Cloudonix Docs](https://developers.cloudonix.com/) — CPaaS platform documentation
+- [OpBX REST API](https://developers.cloudonix.com/opbxRestOpenAPI) — API endpoint reference
+- [Laravel Docs](https://laravel.com/docs/12.x) — Backend framework documentation
+- [shadcn/ui](https://ui.shadcn.com/) — UI component library documentation
 
 ## License
 
-This project is part of the OPBX open-source PBX system.
-
-## Support
-
-For issues and questions:
-- Check backend API documentation
-- Review Cloudonix developer docs: https://developers.cloudonix.com/
-- Inspect browser console for errors
-- Check network tab for failed API requests
+This project is open-source. See the root repository for license details.

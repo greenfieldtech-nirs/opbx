@@ -43,7 +43,8 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Campaign Management**: Create, schedule, and monitor outbound calling campaigns
 - **Distribution Lists**: CSV-based phone number lists with validation and versioning
 - **Rate Limiting**: Concurrent Active Calls (CAC, 1-50) + Calls Per Second (CPS, 1-5) for precise call pacing
-- **Answering Machine Detection**: AMD with configurable speech/silence thresholds
+- **Answering Machine Detection**: Java/Vert.x 5 AMD worker with ML + energy-based tone detection for voicemail beep detection
+- **Caller ID Pooling**: Multi-DID caller ID rotation with round-robin, random, and LRU strategies
 - **Real-Time Monitor**: Command-center dashboard with bird's-eye campaign cards and drill-down views
 - **Go Dialer Worker**: Dedicated microservice for rate-limited call execution with Redis-based CAC counters
 - **Campaign Scheduling**: Weekly calendar with per-day time ranges, timezone support, and date ranges
@@ -59,7 +60,7 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Auto Dialer Monitor**: Real-time campaign monitoring with active calls, disposition pie charts, and KPI cards
 - **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export
 - **Call Statistics**: Volume, duration, and disposition metrics
-- **Call Notifications**: Webhook-based notifications for call events
+- **Call Notifications**: Webhook-based notifications for call events with SSRF protection and retry logic
 
 ### Performance & Reliability
 - **Redis Caching Layer**: 50-90% faster routing lookups with automatic cache invalidation
@@ -68,6 +69,8 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Queue Workers**: Async job processing for non-blocking operations
 - **Service Architecture**: Modular voice routing with dedicated services for outbound, business hours, and IVR handling
 - **CAC Counter Reconciliation**: Self-healing Redis counters for the auto dialer worker
+- **Circuit Breaker**: Fault tolerance for Cloudonix API calls with automatic fallback
+- **Resilient Cache**: Graceful degradation from Redis to database when Redis is unavailable
 
 ### Multi-Tenant Architecture
 - **Organization Isolation**: Complete data separation between tenants via global query scopes
@@ -111,6 +114,10 @@ graph TB
         GOWORKER[Go Dialer Worker<br/>10s Poll Cycle]
     end
 
+    subgraph "AMD Service"
+        AMD[AMD Worker<br/>Java/Vert.x 5]
+    end
+
     subgraph "Voice Routing Services"
         VRM[VoiceRoutingManager]
         ORS[OutboundRoutingService]
@@ -143,6 +150,8 @@ graph TB
     APP --> CX
     GOWORKER -->|Poll API| APP
     GOWORKER --> REDIS
+    AMD -->|Audio Stream| CX
+    AMD -->|AMD Result| APP
     QUEUE --> REDIS
     QUEUE --> MYSQL
     SCHEDULER --> APP
@@ -719,6 +728,14 @@ Comprehensive Docusaurus-compatible documentation (30 pages):
 - [Database Schema](docs/architecture/database-schema.md)
 - [Docker Setup](docs/architecture/docker-setup.md)
 
+### Module Documentation
+- [Backend (Laravel)](app/) — API controllers, models, services, middleware
+- [Frontend (React)](frontend/) — React SPA with TypeScript, TanStack Query, shadcn/ui
+- [Dialer Worker (Go)](dialer-worker/) — Auto-dialer campaign execution microservice
+- [AMD Worker (Java)](amd-worker/) — Stream-based voicemail detection microservice
+- [Docker Infrastructure](docker/) — Docker Compose stack, Nginx, PHP-FPM configs
+- [Tests](tests/) — PHPUnit test suite with feature, unit, and integration tests
+
 ### Feature Specifications
 - [Auto Dialer Worker v2.0](docs/specifications/auto-dialer-worker-v2.md)
 - [CPS Parameter](docs/specifications/auto-dialer-cps-parameter.md)
@@ -732,9 +749,23 @@ Comprehensive Docusaurus-compatible documentation (30 pages):
 - Auto Dialer campaign management with scheduling, AMD, and retry logic
 - Go-based dialer worker with 10-second poll cycle and Redis CAC counters
 - CPS (Calls Per Second) parameter for independent rate control (1-5 calls/sec)
+- Caller ID pooling with multi-DID rotation (round-robin, random, LRU strategies)
 - Real-time monitor with card-row campaign view, drill-down KPIs, and disposition pie charts
 - Distribution list management with CSV upload, validation, and versioning
 - Comprehensive documentation: 30-page user guide + OpenAPI spec (162 endpoints)
+
+### AMD Worker (Answering Machine Detection)
+- Java/Vert.x 5 microservice for stream-based voicemail detection
+- ML-based beep detection (ONNX Runtime) + energy-based tone detection
+- WebSocket audio streaming from Cloudonix `<Start><Stream>` CXML verb
+- Automatic action execution (HANGUP, CONTINUE, URL redirect) based on detection result
+- AMD results stored in Cloudonix session profile and displayed in Call Logs
+
+### Call Notifications
+- Webhook notifications for call events (initiated, answered, ended, etc.)
+- Per-organization configuration with event filtering
+- SSRF protection, rate limiting, and retry with exponential backoff
+- Delivery audit logging with request/response capture
 
 ### UI/UX Improvements
 - Campaign Manager with status toggle, archive workflow, and edit gating

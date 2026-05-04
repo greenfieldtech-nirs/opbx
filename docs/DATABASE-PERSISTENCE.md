@@ -1,179 +1,521 @@
 # Database Persistence Guide
 
+This document describes how OpBX persists data in Docker and how to protect, back up, and recover that data.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Persistence Architecture](#persistence-architecture)
+3. [Volume Details](#volume-details)
+4. [What Survives vs. What Does Not](#what-survives-vs-what-does-not)
+5. [Backup Procedures](#backup-procedures)
+6. [Restore Procedures](#restore-procedures)
+7. [Migration Safety](#migration-safety)
+8. [Troubleshooting](#troubleshooting)
+9. [Disaster Recovery](#disaster-recovery)
+
+---
+
 ## Overview
 
-OPBX uses **Docker named volumes** for MySQL data persistence. This ensures your database data survives container restarts, updates, and even container removals.
+OpBX uses Docker Compose to run its services. Three services store state that must persist across container restarts, host reboots, and deployments:
 
-## Current Configuration
+| Service | Technology | Purpose |
+|---------|-----------|---------|
+| **MySQL** | MySQL 8.0 | Primary relational database for all application data |
+| **Redis** | Redis 7 (Alpine) | Caching, queues, sessions, real-time state |
+| **MinIO** | MinIO (latest) | S3-compatible object storage for call recordings and files |
 
-MySQL is configured in `docker-compose.yml` with:
+Each service uses a different persistence strategy. Understanding these strategies is essential for operating OpBX in production and avoiding accidental data loss.
+
+---
+
+## Persistence Architecture
+
+```mermaid
+flowchart TB
+    subgraph Host["Host Machine"]
+        subgraph DockerVolumes["Docker Named Volumes"]
+            mysql_data[("mysql_data\n/var/lib/mysql")]
+            redis_data[("redis_data\n/data")]
+        end
+        subgraph HostBindMounts["Host Bind Mounts"]
+            minio_data[("./volumes/minio\n/data")]
+        end
+        subgraph Backups["Backups (Host Filesystem)"]
+            backup_files["./backups/*.sql.gz"]
+        end
+    end
+
+    subgraph Containers["Docker Containers"]
+        mysql["MySQL 8.0\nopbx_mysql"]
+        redis["Redis 7\nopbx_redis"]
+        minio["MinIO\nopbx_minio"]
+    end
+
+    mysql_data -->|"mounted at"| mysql
+    redis_data -->|"mounted at"| redis
+    minio_data -->|"mounted at"| minio
+    backup_files -.->|"restore from"| mysql
+    mysql -.->|"backup to"| backup_files
+```
+
+### Key Design Decisions
+
+1. **MySQL and Redis use Docker named volumes** (`mysql_data`, `redis_data`) rather than bind mounts. This isolates database files from the host filesystem, prevents permission issues, and allows Docker to manage the storage lifecycle.
+
+2. **MinIO uses a host bind mount** (`./volumes/minio:/data`) so that object storage files are directly visible and accessible on the host filesystem. This simplifies browsing, backup, and recovery of large binary objects.
+
+3. **Neither MySQL nor Redis expose ports by default**. External access is disabled unless explicitly configured via `.env` variables (`DB_EXPOSE_PORT`, `REDIS_EXPOSE_PORT`). Both remain fully accessible within the Docker network.
+
+---
+
+## Volume Details
+
+### MySQL
+
+| Attribute | Value |
+|-----------|-------|
+| **Image** | `mysql:8.0` |
+| **Container Name** | `opbx_mysql` |
+| **Volume Name** | `mysql_data` |
+| **Mount Point** | `/var/lib/mysql` |
+| **Port Exposure** | Not exposed by default (`DB_EXPOSE_PORT` is empty) |
+| **Restart Policy** | `unless-stopped` |
+| **Custom Config** | `docker/mysql/my.cnf` |
+
+**Configuration highlights** (`docker/mysql/my.cnf`):
+
+```ini
+[mysqld]
+default-authentication-plugin=mysql_native_password
+bind-address=0.0.0.0
+innodb_buffer_pool_size=256M
+innodb_log_file_size=64M
+max_connections=100
+```
+
+The `mysql_data` named volume stores all table data, indexes, user accounts, and schema definitions. It is managed by the Docker daemon and typically resides in Docker's internal storage area on the host (e.g., `/var/lib/docker/volumes/` on Linux, or a Docker Desktop-managed location on macOS/Windows).
+
+### Redis
+
+| Attribute | Value |
+|-----------|-------|
+| **Image** | `redis:7-alpine` |
+| **Container Name** | `opbx_redis` |
+| **Volume Name** | `redis_data` |
+| **Mount Point** | `/data` |
+| **Port Exposure** | Not exposed by default (`REDIS_EXPOSE_PORT` is empty) |
+| **Restart Policy** | No explicit restart policy set |
+| **Persistence Mode** | AOF (Append-Only File) |
+
+**Command-line flags**:
 
 ```yaml
-volumes:
-  - mysql_data:/var/lib/mysql
+command: >
+  redis-server
+  --appendonly yes
+  --requirepass ${REDIS_PASSWORD}
+  --bind 0.0.0.0
+  --protected-mode yes
 ```
 
-The `mysql_data` volume is a **named Docker volume** that stores data on the host filesystem at:
-- Linux: `/var/lib/docker/volumes/opbxcloudonixcom_mysql_data/_data`
-- macOS: `~/Library/Containers/com.docker.docker/Data/volumes/opbxcloudonixcom_mysql_data/_data`
-- Windows: `\\wsl$\docker-desktop-data\data\docker\volumes\opbxcloudonixcom_mysql_data\_data`
+With `--appendonly yes`, Redis writes every mutating operation to an append-only file (`/data/appendonly.aof`). On restart, Redis replays this file to reconstruct the dataset. This provides durable persistence comparable to a write-ahead log.
 
-## ⚠️ DANGER: Commands That WILL Delete Your Data
+### MinIO
 
-### NEVER run these unless you intentionally want to erase everything:
+| Attribute | Value |
+|-----------|-------|
+| **Image** | `minio/minio:latest` |
+| **Container Name** | `opbx_minio` |
+| **Volume Type** | Host bind mount |
+| **Host Path** | `./volumes/minio` |
+| **Container Path** | `/data` |
+| **Port Exposure** | Not exposed by default (`MINIO_EXPOSE_PORT`, `MINIO_CONSOLE_EXPOSE_PORT` are empty) |
+| **Restart Policy** | `unless-stopped` |
+
+MinIO stores objects as regular files on disk inside the bind-mounted directory. This makes it trivial to browse, back up, or archive object data using standard host filesystem tools.
+
+---
+
+## What Survives vs. What Does Not
+
+### Data Survives
+
+| Event | MySQL | Redis | MinIO |
+|-------|-------|-------|-------|
+| Container restart (`docker compose restart`) | Yes | Yes | Yes |
+| Container recreation (`docker compose up --force-recreate`) | Yes | Yes | Yes |
+| Host reboot | Yes | Yes | Yes |
+| Docker daemon restart | Yes | Yes | Yes |
+| `docker compose down` (without `-v`) | Yes | Yes | Yes |
+| Image update / pull new version | Yes | Yes | Yes |
+
+### Data Is Lost
+
+| Event | MySQL | Redis | MinIO |
+|-------|-------|-------|-------|
+| `docker compose down -v` | **Lost** | **Lost** | **Lost** |
+| `docker volume rm mysql_data` | **Lost** | N/A | N/A |
+| `docker volume rm redis_data` | N/A | **Lost** | N/A |
+| `docker volume prune` | **Lost** | **Lost** | N/A |
+| `rm -rf ./volumes/minio` | N/A | N/A | **Lost** |
+| Docker Desktop "Clean / Purge Data" | **Lost** | **Lost** | **Lost** |
+| Deleting the project directory (if MinIO data is inside) | N/A | N/A | **Lost** |
+
+> **Critical Warning**: `docker compose down -v` is the most common cause of accidental data loss in development environments. The `-v` flag removes named volumes. Always verify you are not using `-v` unless you explicitly intend to destroy all data.
+
+---
+
+## Backup Procedures
+
+OpBX includes an automated backup script at `scripts/backup-database.sh`.
+
+### Creating a Timestamped Backup
 
 ```bash
-# DESTROYS all data - removes volumes!
-docker compose down -v
-
-# DESTROYS only MySQL data
-docker volume rm opbxcloudonixcom_mysql_data
-
-# DESTROYS all unused volumes (including mysql_data if container is stopped)
-docker volume prune
-
-# Docker Desktop "Clean / Purge data" or "Reset to factory defaults"
-```
-
-### Safe commands (preserves data):
-
-```bash
-# Stops containers but keeps volumes
-docker compose down
-
-# Restarts containers (preserves all data)
-docker compose restart
-
-# Recreates containers (preserves volumes)
-docker compose up -d --force-recreate
-```
-
-## Backup Strategy
-
-### Automated Daily Backups
-
-Set up a cron job for daily backups:
-
-```bash
-# Edit crontab
-crontab -e
-
-# Add this line for daily backups at 2 AM
-0 2 * * * cd /path/to/opbx.cloudonix.com && ./scripts/backup-database.sh daily
-
-# Add this line for weekly backups on Sundays at 3 AM
-0 3 * * 0 cd /path/to/opbx.cloudonix.com && ./scripts/backup-database.sh weekly
-```
-
-### Manual Backup
-
-```bash
-# Create a timestamped backup
 ./scripts/backup-database.sh
+```
 
-# Create daily backup (overwrites previous daily)
+This creates a compressed SQL dump in `./backups/opbx-backup-YYYYMMDD_HHMMSS.sql.gz` and automatically retains the last 10 timestamped backups.
+
+### Creating a Daily Backup
+
+```bash
 ./scripts/backup-database.sh daily
+```
 
-# Create weekly backup (overwrites previous weekly)
+This overwrites `./backups/opbx-daily.sql.gz` with the latest dump. Suitable for cron jobs.
+
+### Creating a Weekly Backup
+
+```bash
 ./scripts/backup-database.sh weekly
 ```
 
-Backups are stored in `./backups/` and are NOT stored in Docker volumes (they persist on your host filesystem).
+This overwrites `./backups/opbx-weekly.sql.gz`.
 
-### Restore from Backup
+### What the Backup Script Does
+
+1. Loads environment variables from `.env`
+2. Verifies the MySQL container (`opbx_mysql`) is running
+3. Runs `mysqldump` with:
+   - `--single-transaction` (consistent snapshot without locking)
+   - `--routines` (stored procedures and functions)
+   - `--triggers`
+   - `--databases` (includes `CREATE DATABASE` and `USE` statements)
+4. Compresses output with `gzip`
+5. Verifies the backup file is non-empty
+6. Prints table row counts for confirmation
+7. Cleans up old timestamped backups (keeps last 10)
+
+### Backing Up MinIO Object Storage
+
+Because MinIO uses a host bind mount, you can back it up with standard tools:
 
 ```bash
-# List available backups
-ls -la backups/
+# Full archive
+tar czf minio-backup-$(date +%Y%m%d).tar.gz ./volumes/minio
 
-# Restore from a specific backup
+# Or sync to remote storage
+rsync -avz ./volumes/minio/ user@backup-server:/backups/opbx-minio/
+```
+
+### Backing Up Redis
+
+Redis AOF files live in the `redis_data` named volume. You can back them up via Docker:
+
+```bash
+# Create a tarball of the Redis volume
+docker run --rm -v opbx_redis_data:/data -v $(pwd)/backups:/backup alpine \
+  tar czf /backup/redis-backup-$(date +%Y%m%d).tar.gz -C /data .
+```
+
+> **Note**: On macOS/Windows with Docker Desktop, volume names may be prefixed with the project name (e.g., `opbxcloudonixcom_redis_data`). Run `docker volume ls` to confirm the exact name.
+
+### Automated Backup Recommendations
+
+For production environments, configure a cron job or CI/CD pipeline:
+
+```cron
+# Daily at 2:00 AM
+0 2 * * * cd /path/to/opbx && ./scripts/backup-database.sh daily
+
+# Weekly on Sundays at 3:00 AM
+0 3 * * 0 cd /path/to/opbx && ./scripts/backup-database.sh weekly
+```
+
+Store backups off-site (S3, NFS, remote server) to protect against host-level failures.
+
+---
+
+## Restore Procedures
+
+### Restoring MySQL from Backup
+
+Use the provided restore script:
+
+```bash
 ./scripts/restore-database.sh backups/opbx-backup-20260115_120000.sql.gz
-
-# Or restore the daily backup
-./scripts/restore-database.sh backups/opbx-daily.sql.gz
 ```
 
-## Data Verification
+The script will:
+1. Verify the backup file exists
+2. Verify the MySQL container is running
+3. Show current database record counts
+4. Prompt for confirmation (`yes` / `no`)
+5. Restore the database (supports both `.sql.gz` and plain `.sql` files)
+6. Verify restored data with record counts
 
-To check if your data is intact:
+**Manual restore** (if the script is unavailable):
 
 ```bash
-# Check database contents
-docker compose exec mysql mysql -u root -p -e "USE opbx; SELECT COUNT(*) as extensions FROM extensions; SELECT COUNT(*) as campaigns FROM auto_dialer_campaigns;"
+# From a gzipped backup
+gunzip < backups/opbx-backup-YYYYMMDD_HHMMSS.sql.gz | \
+  docker compose exec -T mysql mysql -u root -p'YOUR_ROOT_PASSWORD'
 
-# Check volume info
-docker volume inspect opbxcloudonixcom_mysql_data
+# From a plain SQL file
+docker compose exec -T mysql mysql -u root -p'YOUR_ROOT_PASSWORD' < backup.sql
 ```
+
+### Restoring MinIO Object Storage
+
+```bash
+# Extract archive
+tar xzf minio-backup-YYYYMMDD.tar.gz -C ./volumes/
+
+# Or sync from remote
+rsync -avz user@backup-server:/backups/opbx-minio/ ./volumes/minio/
+```
+
+Restart the MinIO container if it was running during the restore:
+
+```bash
+docker compose restart minio
+```
+
+### Restoring Redis
+
+```bash
+# Stop Redis
+docker compose stop redis
+
+# Extract backup into the volume
+docker run --rm -v opbx_redis_data:/data -v $(pwd)/backups:/backup alpine \
+  sh -c "cd /data && tar xzf /backup/redis-backup-YYYYMMDD.tar.gz"
+
+# Start Redis
+docker compose up -d redis
+```
+
+---
 
 ## Migration Safety
 
-Database migrations are safe and do NOT delete data. They only:
-- Add new columns
-- Modify column types
-- Create new tables
-- Drop old columns (after data migration)
+### Before Major Changes
 
-Always backup before running migrations on production data:
+Always create a backup before:
 
-```bash
-./scripts/backup-database.sh
-docker compose exec app php artisan migrate
-```
+- Running database migrations (`php artisan migrate`)
+- Upgrading MySQL or Redis images
+- Modifying `docker-compose.yml` volume definitions
+- Switching Docker contexts or moving to a new host
+- Any `docker compose down -v` operation
+
+### Safe Migration Checklist
+
+1. **Back up**: `./scripts/backup-database.sh`
+2. **Verify backup**: `ls -lh ./backups/`
+3. **Document current state**: note running container versions
+4. **Apply changes**: migrate, upgrade, or reconfigure
+5. **Verify application**: run smoke tests
+6. **Keep backup until confirmed**: do not delete the backup immediately
+
+### Moving to a New Host
+
+1. On the old host:
+   ```bash
+   ./scripts/backup-database.sh
+   tar czf minio-backup.tar.gz ./volumes/minio
+   docker run --rm -v opbx_redis_data:/data -v $(pwd):/backup alpine \
+     tar czf /backup/redis-backup.tar.gz -C /data .
+   ```
+
+2. Transfer `./backups/`, `minio-backup.tar.gz`, and `redis-backup.tar.gz` to the new host.
+
+3. On the new host:
+   ```bash
+   docker compose up -d mysql redis minio
+   ./scripts/restore-database.sh backups/opbx-backup-YYYYMMDD_HHMMSS.sql.gz
+   tar xzf minio-backup.tar.gz -C ./volumes/
+   # Restore Redis volume as described above
+   ```
+
+---
 
 ## Troubleshooting
 
-### "Database is empty after restart"
+### MySQL Container Fails to Start
 
-1. Check if volume still exists: `docker volume ls | grep mysql`
-2. If missing, it was likely deleted by `docker compose down -v`
-3. Restore from backup: `./scripts/restore-database.sh backups/opbx-daily.sql.gz`
+**Symptom**: `opbx_mysql` exits immediately or loops in restart.
 
-### "Permission denied on volume"
-
-On Linux/macOS, Docker volumes may have permission issues:
-
+**Check logs**:
 ```bash
-# Fix ownership (Linux only)
-sudo chown -R $USER:$USER /var/lib/docker/volumes/opbxcloudonixcom_mysql_data
-```
-
-### "Container won't start"
-
-```bash
-# Check logs
 docker compose logs mysql
-
-# Check if port is already in use
-lsof -i :3306
 ```
 
-## Best Practices
+**Common causes**:
+- **Corrupted data**: Restore from backup.
+- **Permission issues**: Ensure the named volume is not mounted over a host directory with conflicting permissions.
+- **Port conflict**: If `DB_EXPOSE_PORT` is set, verify the port is not in use.
 
-1. **Always backup before major changes** (migrations, updates, etc.)
-2. **Never use `docker compose down -v`** unless you explicitly want to erase data
-3. **Set up automated backups** via cron
-4. **Test your restores** periodically
-5. **Keep backups outside the project directory** for extra safety
+### Redis Data Disappears After Restart
 
-## Docker Volume Persistence Test
+**Symptom**: Keys are missing after container restart.
 
-To verify persistence is working:
-
+**Check AOF is enabled**:
 ```bash
-# 1. Create some test data
-docker compose exec mysql mysql -u root -p -e "CREATE TABLE IF NOT EXISTS opbx.persistence_test (id INT); INSERT INTO opbx.persistence_test VALUES (1);"
-
-# 2. Stop and remove the container (NOT the volume!)
-docker compose down
-
-# 3. Start it again
-docker compose up -d mysql
-
-# 4. Check if data is still there
-docker compose exec mysql mysql -u root -p -e "SELECT * FROM opbx.persistence_test;"
-
-# 5. Clean up test table
-docker compose exec mysql mysql -u root -p -e "DROP TABLE opbx.persistence_test;"
+docker compose exec redis redis-cli -a $REDIS_PASSWORD CONFIG GET appendonly
 ```
 
-If the test data survives, your persistence is working correctly.
+Expected output:
+```
+1) "appendonly"
+2) "yes"
+```
+
+If AOF is disabled, data was stored only in memory and is lost on restart. Re-enable it in `docker-compose.yml` and restart.
+
+### MinIO Data Not Visible
+
+**Symptom**: Buckets or objects are missing.
+
+**Check the bind mount**:
+```bash
+ls -la ./volumes/minio/
+```
+
+If the directory is empty, the bind mount may not be working. Verify the path in `docker-compose.yml` and ensure the directory exists on the host before starting MinIO.
+
+### "Data Loss Warning" on Startup
+
+The application runs `scripts/check-data-protection.sh` on startup. If you see:
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║                    ⚠️  DATA LOSS WARNING  ⚠️                    ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+This means the database appears empty. Possible causes:
+- First-time setup (expected)
+- Previous `docker compose down -v`
+- Volume was deleted or corrupted
+
+**Action**: If this is unexpected, restore from backup immediately.
+
+### Docker Volume Not Found
+
+**Symptom**: `docker volume ls` does not show `mysql_data` or `redis_data`.
+
+**Cause**: Docker Compose prefixes volume names with the project name. The actual name may be `opbxcloudonixcom_mysql_data`.
+
+**List all volumes**:
+```bash
+docker volume ls
+```
+
+**Inspect a specific volume**:
+```bash
+docker volume inspect opbxcloudonixcom_mysql_data
+```
+
+---
+
+## Disaster Recovery
+
+### Scenario 1: Accidental `docker compose down -v`
+
+1. **Do not panic**. The volumes are gone, but backups remain on the host filesystem.
+2. **Verify backups exist**:
+   ```bash
+   ls -lh ./backups/
+   ```
+3. **Recreate volumes and containers**:
+   ```bash
+   docker compose up -d mysql redis minio
+   ```
+4. **Restore MySQL**:
+   ```bash
+   ./scripts/restore-database.sh backups/opbx-daily.sql.gz
+   ```
+5. **Restore MinIO** from your latest archive.
+6. **Restore Redis** from your latest AOF backup (or accept loss of transient cache/queue data).
+7. **Verify application functionality**.
+
+### Scenario 2: Host Disk Failure
+
+1. **Provision new host** or reinstall the OS.
+2. **Clone the OpBX repository**.
+3. **Copy backups** from off-site storage (S3, NAS, remote server) to `./backups/`.
+4. **Follow the "Moving to a New Host"** procedure above.
+
+### Scenario 3: Database Corruption
+
+1. **Stop the MySQL container**:
+   ```bash
+   docker compose stop mysql
+   ```
+2. **Rename the corrupted volume** (do not delete yet):
+   ```bash
+   docker volume rename opbxcloudonixcom_mysql_data mysql_data_corrupted_$(date +%Y%m%d)
+   ```
+3. **Start a fresh MySQL container** (creates a new empty volume).
+4. **Restore from backup**:
+   ```bash
+   ./scripts/restore-database.sh backups/opbx-daily.sql.gz
+   ```
+5. **Verify data integrity**.
+6. **Delete the corrupted volume** only after confirming the restore is successful.
+
+### Scenario 4: Ransomware or Malicious Deletion
+
+1. **Isolate the affected host** from the network.
+2. **Assess backup integrity**: verify backups were not also compromised.
+3. **Restore from the most recent clean backup** to a new, clean host.
+4. **Rotate all credentials** (database passwords, API tokens, MinIO keys).
+5. **Review access logs** and patch any vulnerabilities.
+
+### Recovery Time Objectives (RTO) and Recovery Point Objectives (RPO)
+
+| Service | RPO Target | RTO Target | Strategy |
+|---------|-----------|-----------|----------|
+| MySQL | 24 hours (daily backups) | 1 hour | Daily automated backups + manual restore |
+| Redis | Best effort (AOF) | 15 minutes | AOF persistence + periodic volume backups |
+| MinIO | 24 hours | 1 hour | Host bind mount + periodic `tar` archives |
+
+For stricter RPO/RTO requirements, consider:
+- **MySQL**: Binary log replication to a secondary instance
+- **Redis**: Redis Sentinel or Cluster for high availability
+- **MinIO**: MinIO erasure coding or bucket replication
+
+---
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Back up database (timestamped) | `./scripts/backup-database.sh` |
+| Back up database (daily) | `./scripts/backup-database.sh daily` |
+| Restore database | `./scripts/restore-database.sh <file.sql.gz>` |
+| List Docker volumes | `docker volume ls` |
+| Inspect MySQL volume | `docker volume inspect <project>_mysql_data` |
+| View MySQL logs | `docker compose logs mysql` |
+| View Redis logs | `docker compose logs redis` |
+| Restart all services | `docker compose restart` |
+| Safe shutdown (keeps data) | `docker compose down` |
+| Dangerous shutdown (destroys data) | `docker compose down -v` |
+
+---
+
+*Last updated: 2026-05-03*

@@ -168,7 +168,7 @@ generate_crud "recordings" "Recording" "Recordings" "Recording" "recording"
 log_info "CRUD endpoints generated successfully!"
 EOF
 
-chmod +x /Users/nirs/Documents/repos/opbx.cloudonix.com/docs/openapi/generate_endpoints.sh
+chmod +x /Users/nirs/Documents/repos/opbx.cloudonix.com/docs/opbx-openapi/generate_endpoints.sh
 
 echo "Generator script created. Running..."
-/Users/nirs/Documents/repos/opbx.cloudonix.com/docs/openapi/generate_endpoints.sh
+/Users/nirs/Documents/repos/opbx.cloudonix.com/docs/opbx-openapi/generate_endpoints.sh

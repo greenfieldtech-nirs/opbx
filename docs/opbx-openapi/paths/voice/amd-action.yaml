@@ -1,0 +1,60 @@
+paths:
+  /voice/amd-action:
+    post:
+      tags:
+        - Voice Routing
+      summary: AMD action handler
+      description: |
+        Receives detection results from the AMD (Answering Machine Detection) worker.
+        Processes the AMD result and determines the next action for the call.
+        
+        Middleware: None (public endpoint)
+      operationId: amdAction
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id:
+                  type: string
+                  description: Call session ID
+                  example: CA550e8400e29b41d4a716446655440000
+                result:
+                  type: string
+                  enum: [human, machine, unknown]
+                  description: AMD detection result
+                  example: human
+                confidence:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 1
+                  description: Confidence score of the detection
+                  example: 0.95
+                duration:
+                  type: integer
+                  description: Detection duration in milliseconds
+                  example: 2500
+              required:
+                - session_id
+                - result
+      responses:
+        '200':
+          description: AMD action processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: processed
+                  action:
+                    type: string
+                    enum: [connect, leave_voicemail, hangup]
+                    example: connect
+        '400':
+          $ref: '../../components/responses/BadRequest.yaml'

@@ -12,7 +12,7 @@ paths:
         Middleware: webhook.signature (no rate limiting)
       operationId: sessionUpdateWebhook
       security:
-        - webhookSignature: []
+        - webhookBearer: []
       requestBody:
         required: true
         content:

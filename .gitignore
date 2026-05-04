@@ -166,3 +166,5 @@ reports/
 # Agent Memory (AI coding agent context files)
 # ============================================================================
 /memory/
+/.my_agent/
+.my_agent/

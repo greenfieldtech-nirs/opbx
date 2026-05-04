@@ -22,7 +22,7 @@ Before you begin, ensure your system meets these requirements:
 | Docker Compose | 2.0+ | Latest |
 | Git | 2.30+ | Latest |
 
-You also need ports 80, 3306, 6379, 9000, and 6001 available on your host machine.
+You also need ports 80, 3000, 6001, 4040, and 8081 available on your host machine.
 
 ## Installation Steps
 
@@ -69,12 +69,10 @@ This command downloads images and starts the following services:
 | Service | Port | Description |
 |---------|------|-------------|
 | nginx | 80 | Reverse proxy and static file server |
-| app | 9000 | Laravel PHP-FPM backend |
 | frontend | 3000 | Vite development server (dev mode) |
-| mysql | 3306 | MySQL 8 database |
-| redis | 6379 | Redis cache and queue |
-| minio | 9000 | S3-compatible object storage |
 | soketi | 6001 | WebSocket server for real-time updates |
+| ngrok | 4040 | Webhook tunneling interface |
+| dialer-worker | 8081 | CDR webhook listener |
 
 :::tip First Boot
 The database automatically migrates on first startup. This process takes 30-60 seconds depending on your hardware.
