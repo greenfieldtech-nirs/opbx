@@ -113,6 +113,7 @@ desktop.ini
 # ============================================================================
 # Docker & Deployment (may contain secrets)
 # ============================================================================
+docker-compose.yml
 docker-compose.override.yml
 .dockerignore.local
 

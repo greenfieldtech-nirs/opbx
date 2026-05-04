@@ -265,10 +265,12 @@ sequenceDiagram
    cd opbx.cloudonix.com
    ```
 
-2. **Configure environment**
+2. **Copy configuration files**
    ```bash
+   cp docker-compose.yml.example docker-compose.yml
    cp .env.example .env
    ```
+   > The `docker-compose.yml` file is ignored by git so you can customize it for your environment without affecting the repository.
 
    Edit `.env` with your settings:
    ```env
