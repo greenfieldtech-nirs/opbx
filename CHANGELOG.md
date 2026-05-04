@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - 2026-05-04
+
+#### Dependency Vulnerability Remediation
+- Resolved **21 security vulnerabilities** (8 high, 13 moderate) identified by GitHub Dependabot
+- **npm (root)**: Fixed axios, minimatch, picomatch, rollup, brace-expansion, follow-redirects, postcss via `npm audit fix`
+- **npm (frontend)**: Fixed axios, follow-redirects, postcss, rollup via `npm audit fix`
+- **composer (production)**: Updated aws-sdk-php (3.369.8 → 3.379.11), league/commonmark (2.8.0 → 2.9.0), paragonie/sodium_compat, symfony/process via `composer update`
+- **composer (dev)**: Updated phpunit, psy/psysh to patched versions
+- All audits now report **0 vulnerabilities**: `npm audit` (root + frontend), `composer audit --no-dev`, `composer audit`
+
 ### Added - 2026-04-09
 
 #### Auto Dialer Real-Time Monitor
