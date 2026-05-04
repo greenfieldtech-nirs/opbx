@@ -12,6 +12,7 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {toast} from 'sonner';
 import {useAuth} from '@/hooks/useAuth';
+import type { LoginRequest } from '@/types/api.types';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
@@ -53,7 +54,7 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            await login(data, () => navigate('/ui/dashboard'));
+            await login(data as LoginRequest, () => navigate('/ui/dashboard'));
             try {
                 toast.success('Login successful!');
             } catch {
@@ -174,7 +175,7 @@ export default function Login() {
                                             <Checkbox
                                                 id="remember"
                                                 checked={rememberMe}
-                                                onCheckedChange={setRememberMe}
+                                                onCheckedChange={(checked) => setRememberMe(checked === true)}
                                                 disabled={isLoading}
                                             />
                                             <Label

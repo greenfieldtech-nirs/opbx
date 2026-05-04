@@ -189,7 +189,7 @@ const BusinessHours: React.FC = () => {
               <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
             </Button>
 
-            <Select value={statusFilter} onValueChange={(value: string) => setStatusFilter(value)}>
+            <Select value={statusFilter} onValueChange={(value: string) => setStatusFilter(value as 'all' | ScheduleStatus)}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
@@ -201,7 +201,7 @@ const BusinessHours: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <Select value={sortBy} onValueChange={(value: string) => setSortBy(value)}>
+            <Select value={sortBy} onValueChange={(value: string) => setSortBy(value as 'status' | 'name' | 'created_at' | 'updated_at')}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -227,7 +227,7 @@ const BusinessHours: React.FC = () => {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(schedule) => schedule.name}
-            getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayNameSimple(schedule.open_routing_type)} when open`}
+            getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayNameSimple(schedule.open_hours_action?.type)} when open`}
             onIdentityClick={handleEdit}
             sortField={sortBy}
             sortDirection="asc"

@@ -76,7 +76,7 @@ export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 
 export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
 
 // ============================================================================
 // Entity Types

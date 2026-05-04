@@ -22,7 +22,7 @@ class Logger {
   private isDevelopment: boolean;
 
   constructor() {
-    this.isDevelopment = import.meta.env.DEV === 'true';
+    this.isDevelopment = Boolean(import.meta.env.DEV);
   }
 
   /**

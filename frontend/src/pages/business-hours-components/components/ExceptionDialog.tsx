@@ -20,7 +20,7 @@ interface ExceptionDialogProps {
   onOpenChange: (open: boolean) => void;
   editing: boolean;
   formData: Partial<ExceptionDate>;
-  onFormChange: (field: string, value: string | boolean | Record<string, unknown>) => void;
+  onFormChange: (field: string, value: unknown) => void;
   onSave: () => void;
 }
 

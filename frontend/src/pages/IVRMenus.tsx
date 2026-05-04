@@ -461,7 +461,7 @@ export default function IVRMenus() {
   });
 
   const voices = voicesData?.data || [];
-  const filters = voicesData?.filters || {};
+  const filters = voicesData?.filters || { languages: [], genders: [], providers: [] };
 
   // Fetch Cloudonix settings to check package tier
   const { data: cloudonixSettings } = useQuery({
