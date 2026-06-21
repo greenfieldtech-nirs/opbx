@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\CloudonixClient;
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -58,7 +59,7 @@ class CloudonixDomainsClient extends CloudonixBaseClient
             $timeout = (int) config('cloudonix.api.timeout', 30);
 
             // Create temporary client with provided credentials
-            $tempClient = \Illuminate\Support\Facades\Http::timeout($timeout)
+            $tempClient = Http::timeout($timeout)
                 ->withHeaders([
                     'Authorization' => 'Bearer '.$apiKey,
                     'Accept' => 'application/json',
@@ -226,6 +227,70 @@ class CloudonixDomainsClient extends CloudonixBaseClient
             return [
                 'success' => false,
                 'message' => "Exception during voice application creation: {$e->getMessage()}",
+                'data' => null,
+            ];
+        }
+    }
+
+    /**
+     * List voice applications for a domain.
+     *
+     * Makes a GET request to /customers/{customer-id}/domains/{domain-id}/applications
+     * to retrieve all applications associated with the domain.
+     *
+     * @param  string  $domainUuid  The domain UUID
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @return array{success: bool, message: string|null, data: array<int, array<string, mixed>>|null}
+     */
+    public function getDomainApplications(string $domainUuid, string $apiKey): array
+    {
+        try {
+            Log::info('Listing Cloudonix domain applications', [
+                'domain_uuid' => $domainUuid,
+                'api_key_prefix' => substr($apiKey, 0, 4).'...',
+            ]);
+
+            $tempClient = $this->createTemporaryClient($apiKey);
+
+            $response = $tempClient->get(
+                "/customers/{$this->getCustomerId()}/domains/{$domainUuid}/applications"
+            );
+
+            $success = $response->successful();
+            $responseBody = $response->json();
+
+            Log::info('Cloudonix domain applications list result', [
+                'domain_uuid' => $domainUuid,
+                'status_code' => $response->status(),
+                'success' => $success,
+                'count' => is_array($responseBody) ? count($responseBody) : null,
+            ]);
+
+            if (! $success) {
+                $errorMessage = $responseBody['message'] ?? $response->body() ?? 'Unknown error';
+
+                return [
+                    'success' => false,
+                    'message' => "Failed to list domain applications: {$errorMessage}",
+                    'data' => null,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Domain applications listed successfully.',
+                'data' => is_array($responseBody) ? $responseBody : null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Cloudonix domain applications list failed', [
+                'domain_uuid' => $domainUuid,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => "Exception during domain applications list: {$e->getMessage()}",
                 'data' => null,
             ];
         }

@@ -237,6 +237,18 @@ class CloudonixClient
         return $this->domainsClient->updateVoiceApplication($domainUuid, $apiKey, $applicationName, $applicationData);
     }
 
+    /**
+     * List voice applications for a domain.
+     *
+     * @param  string  $domainUuid  The domain UUID
+     * @param  string  $apiKey  The API key (Bearer token) to authenticate with
+     * @return array{success: bool, message: string|null, data: array<int, array<string, mixed>>|null}
+     */
+    public function getDomainApplications(string $domainUuid, string $apiKey): array
+    {
+        return $this->domainsClient->getDomainApplications($domainUuid, $apiKey);
+    }
+
     // =========================================================================
     // Subscriber Management Methods (Delegated to CloudonixSubscribersClient)
     // =========================================================================
