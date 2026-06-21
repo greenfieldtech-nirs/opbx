@@ -301,22 +301,22 @@ class CloudonixDomainsClient extends CloudonixBaseClient
     /**
      * Update a voice application in Cloudonix.
      *
-     * Makes a PUT request to /customers/{customer-id}/domains/{domain-id}/applications/{application-id}
+     * Makes a PUT request to /customers/{customer-id}/domains/{domain-id}/applications/{application-name}
      * to update the voice application configuration, including the URL endpoint.
      *
      * @param  string  $domainUuid  The domain UUID
      * @param  string  $apiKey  The API key (Bearer token) to authenticate with
-     * @param  int  $applicationId  The application ID to update
+     * @param  string  $applicationName  The voice application name to update
      * @param  array<string, mixed>  $applicationData  Application configuration to update (url, method, profile, etc.)
      * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
      */
-    public function updateVoiceApplication(string $domainUuid, string $apiKey, int $applicationId, array $applicationData): array
+    public function updateVoiceApplication(string $domainUuid, string $apiKey, string $applicationName, array $applicationData): array
     {
         try {
             Log::info('Updating Cloudonix voice application', [
                 'domain_uuid' => $domainUuid,
                 'api_key_prefix' => substr($apiKey, 0, 4).'...',
-                'application_id' => $applicationId,
+                'application_name' => $applicationName,
                 'application_data' => $applicationData,
             ]);
 
@@ -324,7 +324,7 @@ class CloudonixDomainsClient extends CloudonixBaseClient
             $tempClient = $this->createTemporaryClient($apiKey);
 
             $response = $tempClient->put(
-                "/customers/{$this->getCustomerId()}/domains/{$domainUuid}/applications/{$applicationId}",
+                "/customers/{$this->getCustomerId()}/domains/{$domainUuid}/applications/".rawurlencode($applicationName),
                 $applicationData
             );
 
@@ -333,7 +333,7 @@ class CloudonixDomainsClient extends CloudonixBaseClient
 
             Log::info('Cloudonix voice application update result', [
                 'domain_uuid' => $domainUuid,
-                'application_id' => $applicationId,
+                'application_name' => $applicationName,
                 'status_code' => $response->status(),
                 'success' => $success,
             ]);
@@ -356,7 +356,7 @@ class CloudonixDomainsClient extends CloudonixBaseClient
         } catch (\Exception $e) {
             Log::error('Cloudonix voice application update failed', [
                 'domain_uuid' => $domainUuid,
-                'application_id' => $applicationId,
+                'application_name' => $applicationName,
                 'error' => $e->getMessage(),
                 'exception' => get_class($e),
             ]);

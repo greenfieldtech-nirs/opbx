@@ -228,13 +228,13 @@ class CloudonixClient
      *
      * @param  string  $domainUuid  The domain UUID
      * @param  string  $apiKey  The API key (Bearer token) to authenticate with
-     * @param  int  $applicationId  The application ID to update
+     * @param  string  $applicationName  The voice application name to update
      * @param  array<string, mixed>  $applicationData  Application configuration to update
      * @return array{success: bool, message: string|null, data: array<string, mixed>|null}
      */
-    public function updateVoiceApplication(string $domainUuid, string $apiKey, int $applicationId, array $applicationData): array
+    public function updateVoiceApplication(string $domainUuid, string $apiKey, string $applicationName, array $applicationData): array
     {
-        return $this->domainsClient->updateVoiceApplication($domainUuid, $apiKey, $applicationId, $applicationData);
+        return $this->domainsClient->updateVoiceApplication($domainUuid, $apiKey, $applicationName, $applicationData);
     }
 
     // =========================================================================

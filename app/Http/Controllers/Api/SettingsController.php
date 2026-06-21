@@ -680,17 +680,33 @@ class SettingsController extends Controller
         int $organizationId
     ): array {
         $applicationId = $settings->voice_application_id;
+        $applicationName = $settings->voice_application_name;
+
+        if (empty($applicationName)) {
+            Log::warning('[VOICE_APP_SETUP] Cannot update voice application URL: name missing', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'webhook_url' => $webhookUrl,
+            ]);
+
+            return [
+                'application_id' => $applicationId,
+                'app_data' => null,
+                'error' => null,
+            ];
+        }
 
         Log::info('[VOICE_APP_SETUP] Updating existing voice application URL', [
             'request_id' => $requestId,
             'application_id' => $applicationId,
+            'application_name' => $applicationName,
             'webhook_url' => $webhookUrl,
         ]);
 
         $result = $this->getCloudonixClient()->updateVoiceApplication(
             $settings->domain_uuid,
             $settings->domain_api_key,
-            $applicationId,
+            $applicationName,
             [
                 'url' => $webhookUrl,
                 'method' => 'POST',
@@ -703,12 +719,14 @@ class SettingsController extends Controller
             Log::warning('[VOICE_APP_SETUP] Failed to update voice application URL', [
                 'request_id' => $requestId,
                 'application_id' => $applicationId,
+                'application_name' => $applicationName,
                 'error' => $result['message'],
             ]);
         } else {
             Log::info('[VOICE_APP_SETUP] Voice application URL updated successfully', [
                 'request_id' => $requestId,
                 'application_id' => $applicationId,
+                'application_name' => $applicationName,
             ]);
         }
 
