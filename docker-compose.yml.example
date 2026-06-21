@@ -359,13 +359,15 @@ services:
     command:
       - |
         if [ -n "${NGROK_DOMAIN}" ]; then
-          exec ngrok http nginx:80 --url=${NGROK_DOMAIN}
+          exec ngrok http nginx:80 --url=${NGROK_DOMAIN} --config /etc/ngrok.yml
         else
-          exec ngrok http nginx:80
+          exec ngrok http nginx:80 --config /etc/ngrok.yml
         fi
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
       NGROK_DOMAIN: ${NGROK_DOMAIN:-}
+    volumes:
+      - ./docker/ngrok/ngrok.yml:/etc/ngrok.yml:ro
     depends_on:
       - nginx
     networks:
