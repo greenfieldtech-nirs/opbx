@@ -2,38 +2,46 @@ paths:
   /callbacks/voice/albs-follow-through:
     post:
       tags:
-        - Voice Routing
+      - Voice Routing
       summary: ALB follow-through callback
-      description: |
-        Handle AI Load Balancer follow-through callback from Cloudonix.
+      description: 'Handle AI Load Balancer follow-through callback from Cloudonix.
+
         Called when a call to an AI Assistant fails (busy, no-answer, failed, canceled, unknown)
+
         and the load balancer needs to try the next available AI assistant.
-        
+
+
         Query Parameters:
+
         - `albs_id`: Load balancer ID
+
         - `current_assistant_id`: ID of the AI assistant that just failed
-        
+
+
         Middleware: voice.webhook.auth, rate_limit_org:voice_routing
-        
+
+
         Authentication: Bearer token (per-organization domain_requests_api_key)
+
+        '
       operationId: albsFollowThrough
       security:
-        - voiceWebhookAuth: []
+      - voiceWebhookAuth: []
       parameters:
-        - name: albs_id
-          in: query
-          required: true
-          schema:
-            type: integer
-          description: AI Load Balancer ID
-          example: 5
-        - name: current_assistant_id
-          in: query
-          required: true
-          schema:
-            type: integer
-          description: ID of the AI assistant that failed
-          example: 12
+      - name: albs_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: AI Load Balancer ID
+        example: 5
+      - name: current_assistant_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: ID of the AI assistant that failed
+        example: 12
       requestBody:
         required: true
         content:
@@ -54,28 +62,44 @@ paths:
                   description: Called number
                   example: '+1987654321'
                 DialCallStatus:
-                  type: string
-                  enum: [busy, no-answer, failed, canceled, unknown, completed]
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - busy
+                  - no-answer
+                  - failed
+                  - canceled
+                  - unknown
+                  - completed
                   description: Dial action status (preferred source)
                   example: busy
                 CallStatus:
-                  type: string
-                  enum: [busy, no-answer, failed, canceled, unknown, completed]
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - busy
+                  - no-answer
+                  - failed
+                  - canceled
+                  - unknown
+                  - completed
                   description: Alternative status field
                   example: busy
                 Domain:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   description: Cloudonix domain
                   example: example.cloudonix.io
                 _organization_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                   description: Organization ID (set by VerifyVoiceWebhookAuth middleware)
               required:
-                - CallSid
+              - CallSid
           application/x-www-form-urlencoded:
             schema:
               type: object
@@ -102,25 +126,16 @@ paths:
           content:
             application/xml:
               schema:
-                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
               examples:
                 routeToNextAssistant:
                   summary: Route to next AI assistant
-                  value: |
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <Response>
-                      <Connect>
-                        <Stream url="wss://ai.example.com/stream/next" name="ai-assistant"/>
-                      </Connect>
-                    </Response>
+                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Connect>\n    <Stream url=\"wss://ai.example.com/stream/next\"\
+                    \ name=\"ai-assistant\"/>\n  </Connect>\n</Response>\n"
                 fallbackHangup:
                   summary: All assistants failed - hangup
-                  value: |
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <Response>
-                      <Say>All AI assistants are unavailable. Goodbye.</Say>
-                      <Hangup/>
-                    </Response>
+                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Say>All AI assistants are unavailable.\
+                    \ Goodbye.</Say>\n  <Hangup/>\n</Response>\n"
         '204':
           description: Empty response when follow-through is not needed
         '401':

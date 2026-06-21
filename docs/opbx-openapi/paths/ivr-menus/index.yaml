@@ -54,9 +54,9 @@ paths:
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
-  /v1/ivr-menus/{ivr_menu}:
+  /v1/ivr-menus/{ivrMenu}:
     parameters:
-      - name: ivr_menu
+      - name: ivrMenu
         in: path
         required: true
         schema:

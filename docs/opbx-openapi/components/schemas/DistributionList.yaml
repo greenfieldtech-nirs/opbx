@@ -9,12 +9,13 @@ properties:
   name:
     type: string
     description: List name
-    example: "Sales Leads Q1"
+    example: Sales Leads Q1
   description:
-    type: string
-    nullable: true
+    type:
+    - string
+    - 'null'
     description: List description
-    example: "Qualified sales leads for Q1 2024"
+    example: Qualified sales leads for Q1 2024
   version_number:
     type: integer
     description: Version number of this list
@@ -26,39 +27,42 @@ properties:
   status:
     type: string
     enum:
-      - draft
-      - processing
-      - ready
-      - in_use
-      - used
-      - failed
-      - archived
+    - draft
+    - processing
+    - ready
+    - in_use
+    - used
+    - failed
+    - archived
     description: Current list status
-    example: "ready"
+    example: ready
   status_label:
     type: string
     description: Human-readable status label
-    example: "Ready"
+    example: Ready
   status_color:
     type: string
     description: Status color for UI display
-    example: "green"
+    example: green
   campaign_id:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
     description: ID of the campaign this list is assigned to
     example: 5
   used_by_campaign_id:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
     description: ID of the campaign that used this list
     example: 3
   used_at:
-    type: string
+    type:
+    - string
+    - 'null'
     format: date-time
-    nullable: true
     description: When the list was last used
-    example: "2024-01-15 14:30:00"
+    example: '2024-01-15 14:30:00'
   statistics:
     type: object
     description: List statistics
@@ -76,8 +80,9 @@ properties:
         description: Number of invalid rows
         example: 50
   parent_list_id:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
     description: ID of the parent list (for versioned lists)
     example: null
   has_versions:
@@ -104,22 +109,25 @@ properties:
     type: string
     format: date-time
     description: Creation timestamp
-    example: "2024-01-10 08:00:00"
+    example: '2024-01-10 08:00:00'
   processed_at:
-    type: string
+    type:
+    - string
+    - 'null'
     format: date-time
-    nullable: true
     description: When the list was last processed
-    example: "2024-01-10 08:05:00"
+    example: '2024-01-10 08:05:00'
   archived_at:
-    type: string
+    type:
+    - string
+    - 'null'
     format: date-time
-    nullable: true
     description: When the list was archived
     example: null
   campaign:
-    type: object
-    nullable: true
+    type:
+    - object
+    - 'null'
     description: Associated campaign (when loaded)
     properties:
       id:
@@ -127,10 +135,11 @@ properties:
         example: 5
       name:
         type: string
-        example: "Q1 Sales Campaign"
+        example: Q1 Sales Campaign
   used_by_campaign:
-    type: object
-    nullable: true
+    type:
+    - object
+    - 'null'
     description: Campaign that used this list (when loaded)
     properties:
       id:
@@ -138,10 +147,10 @@ properties:
         example: 3
       name:
         type: string
-        example: "Previous Campaign"
+        example: Previous Campaign
 required:
-  - id
-  - name
-  - version_number
-  - is_latest_version
-  - status
+- id
+- name
+- version_number
+- is_latest_version
+- status

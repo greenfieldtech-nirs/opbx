@@ -15,23 +15,41 @@ OPBX provides a comprehensive set of modules for managing your business phone sy
 | Module | Description |
 |--------|-------------|
 | [User Management](/modules/user-management) | Create and manage user accounts with role-based access control |
-| [Extensions Management](/modules/extensions) | Configure phone extensions with SIP credentials and Cloudonix sync |
+| [Extensions](/modules/extensions) | Configure phone extensions with SIP credentials and Cloudonix sync |
+| [Phone Numbers](/modules/phone-numbers) | Manage DID numbers and configure inbound call routing |
 | [Ring Groups](/modules/ring-groups) | Distribute incoming calls across groups of extensions |
 | [IVR Menus](/modules/ivr-menus) | Build interactive voice response menus with digit-based navigation |
 | [Business Hours](/modules/business-hours) | Route calls based on time of day with weekly schedules and holidays |
-| [Phone Numbers](/modules/phone-numbers) | Manage DID numbers and configure inbound call routing |
-| [Audio Recordings](/modules/recordings) | Upload and manage audio files for IVR prompts and announcements |
 | [Conference Rooms](/modules/conference-rooms) | Set up multi-party conference bridges with PIN protection |
-| [Call Notifications](/modules/call-notifications) | Real-time webhook notifications for call events with per-organization configuration, event filtering, and retry logic |
-| [Reporting and Analytics](/modules/reporting) | View call detail records, live calls, and export reports |
+| [AI Assistants](/modules/ai-assistants) | Configure AI-powered voice agents |
+| [AI Load Balancers](/modules/ai-load-balancers) | Distribute calls across multiple AI providers |
+| [Call Logs](/modules/call-logs) | View and export call detail records |
+| [Live Calls](/modules/live-calls) | Monitor and disconnect active calls in real time |
+| [Call Notifications](/modules/call-notifications) | Configure webhook notifications for call events |
+| [Recordings](/modules/recordings) | Upload and manage audio files for IVR prompts and announcements |
+| [Inbound Blacklist](/modules/inbound-blacklist) | Block unwanted inbound callers |
+| [Outbound Whitelist](/modules/outbound-whitelist) | Control which external numbers users can dial |
+| [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) | Run outbound calling campaigns |
+| [Distribution Lists](/modules/distribution-lists) | Manage contact lists for auto-dialer campaigns |
+| [Settings](/modules/settings) | Configure Cloudonix integration and organization settings |
 
 ## Getting Started
 
 If you are setting up OPBX for the first time, we recommend configuring the modules in this order:
 
-1. **Users** -- Create accounts for your team members
-2. **Extensions** -- Assign phone extensions to each user
-3. **Phone Numbers** -- Add your DID numbers and configure routing
-4. **Ring Groups** -- Set up call distribution for departments
-5. **Business Hours** -- Configure time-based routing rules
-6. **IVR Menus** -- Build automated phone menus for callers
+1. **Users** — Create accounts for your team members
+2. **Extensions** — Assign phone extensions to each user
+3. **Phone Numbers** — Add your DID numbers and configure routing
+4. **Ring Groups** — Set up call distribution for departments
+5. **Business Hours** — Configure time-based routing rules
+6. **IVR Menus** — Build automated phone menus for callers
+
+## Module Documentation Format
+
+Each module guide includes:
+
+- **Purpose** — What the module does
+- **Permissions** — Which roles can access and modify the module
+- **UI Workflow** — Step-by-step instructions for common tasks
+- **Related API Endpoints** — Links to the OPBX REST API reference
+- **Key Data Fields** — Important database fields and enums

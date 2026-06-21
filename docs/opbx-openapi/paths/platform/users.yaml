@@ -24,7 +24,7 @@ paths:
       tags:
         - Platform
       summary: Get user details
-      operationId: getUser
+      operationId: getPlatformUser
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -36,7 +36,7 @@ paths:
       tags:
         - Platform
       summary: Update user
-      operationId: updateUser
+      operationId: updatePlatformUser
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -48,7 +48,7 @@ paths:
       tags:
         - Platform
       summary: Delete user
-      operationId: deleteUser
+      operationId: deletePlatformUser
       security:
         - bearerAuth: []
         - cookieAuth: []

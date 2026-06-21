@@ -14,14 +14,14 @@ properties:
         name:
           type: string
           description: Campaign name
-          example: "Q1 Sales Campaign"
+          example: Q1 Sales Campaign
         status:
           type: string
           enum:
-            - active
-            - paused
+          - active
+          - paused
           description: Campaign status
-          example: "active"
+          example: active
         progress_percentage:
           type: number
           format: float
@@ -64,38 +64,40 @@ properties:
               description: Whether campaign is rate limited
               example: false
             pause_reason:
-              type: string
-              nullable: true
+              type:
+              - string
+              - 'null'
               description: Reason for pause
               example: null
             resumes_at:
-              type: string
+              type:
+              - string
+              - 'null'
               format: date-time
-              nullable: true
               description: When the campaign can resume
               example: null
         caller_id:
           type: string
           description: Campaign caller ID
-          example: "+14155551212"
+          example: '+14155551212'
         routing_destination_type:
           type: string
           description: Routing destination type
-          example: "ai_assistant"
+          example: ai_assistant
         routing_destination_label:
           type: string
           description: Routing destination label
-          example: "Sales AI Assistant"
+          example: Sales AI Assistant
         start_date:
           type: string
           format: date
           description: Campaign start date
-          example: "2024-01-01"
+          example: '2024-01-01'
         end_date:
           type: string
           format: date
           description: Campaign end date
-          example: "2024-12-31"
+          example: '2024-12-31'
   totals:
     type: object
     description: Aggregated totals across all campaigns
@@ -128,12 +130,12 @@ properties:
       status:
         type: string
         enum:
-          - healthy
-          - degraded
-          - offline
-          - unknown
+        - healthy
+        - degraded
+        - offline
+        - unknown
         description: Worker health status
-        example: "healthy"
+        example: healthy
       active_campaigns:
         type: integer
         description: Number of campaigns being processed
@@ -147,6 +149,6 @@ properties:
         description: Current queue depth
         example: 0
 required:
-  - campaigns
-  - totals
-  - worker_health
+- campaigns
+- totals
+- worker_health

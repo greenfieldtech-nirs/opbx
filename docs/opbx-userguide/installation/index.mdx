@@ -22,7 +22,15 @@ Before you begin, ensure your system meets these requirements:
 | Docker Compose | 2.0+ | Latest |
 | Git | 2.30+ | Latest |
 
-You also need ports 80, 3000, 6001, 4040, and 8081 available on your host machine.
+You also need these ports available on your host machine (all can be remapped via `.env`):
+
+| Default Port | Service |
+|--------------|---------|
+| 80 | Nginx reverse proxy |
+| 3000 | React frontend (Vite dev server) |
+| 6001 | Soketi WebSocket server |
+| 4040 | ngrok web interface |
+| 8081 | Dialer worker webhook listener |
 
 ## Installation Steps
 
@@ -41,19 +49,38 @@ Copy the example environment file and customize it for your deployment:
 
 ```bash
 cp .env.example .env
+cp docker-compose.yml.example docker-compose.yml
 ```
 
-Edit the `.env` file and set these required variables:
+Edit the `.env` file and set these required variables at minimum:
+
+| Variable | Description | How to Generate |
+|----------|-------------|-----------------|
+| `APP_KEY` | Laravel encryption key | `php artisan key:generate` |
+| `DB_PASSWORD` | MySQL `opbx` user password | `openssl rand -base64 32` |
+| `DB_ROOT_PASSWORD` | MySQL root password | `openssl rand -base64 32` |
+| `REDIS_PASSWORD` | Redis authentication password | `openssl rand -base64 32` |
+| `PUSHER_APP_SECRET` | Soketi application secret | `openssl rand -base64 64` |
+| `DIALER_WORKER_API_TOKEN` | Go worker authentication token | `openssl rand -hex 32` |
+| `AMD_WORKER_API_TOKEN` | AMD worker callback authentication token | `openssl rand -hex 32` |
+| `APP_URL` | Your domain or IP address | `http://localhost` for local use |
+
+Optional but commonly configured variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `APP_URL` | Your domain or IP address | `http://localhost` |
-| `DB_PASSWORD` | MySQL root password | `changeme` |
-| `APP_PORT` | HTTP port for the application | `80` |
-| `REDIS_PASSWORD` | Redis authentication password | `null` |
+| `APP_PORT` | Host port for Nginx | `80` |
+| `FRONTEND_PORT` | Host port for Vite dev server | `3000` |
+| `NGROK_AUTHTOKEN` | ngrok authtoken for local webhook development | *(empty)* |
+| `NGROK_DOMAIN` | Custom ngrok domain (paid plans) | *(empty)* |
+| `USERCHECK_API_TOKEN` | UserCheck email validation token | *(empty)* |
 
 :::note Cloudonix Configuration
 Cloudonix integration is configured through the web UI after your first login. Do not add Cloudonix credentials to the `.env` file.
+:::
+
+:::danger Security Notice
+Never commit `.env` or `docker-compose.yml` files to version control. The `.env.example` and `docker-compose.yml.example` templates are safe to commit because they contain no secrets.
 :::
 
 ### 3. Start the Services
@@ -64,18 +91,25 @@ Launch all OPBX services with Docker Compose:
 docker compose up -d
 ```
 
-This command downloads images and starts the following services:
+This command builds images and starts the following services:
 
-| Service | Port | Description |
-|---------|------|-------------|
-| nginx | 80 | Reverse proxy and static file server |
-| frontend | 3000 | Vite development server (dev mode) |
-| soketi | 6001 | WebSocket server for real-time updates |
-| ngrok | 4040 | Webhook tunneling interface |
-| dialer-worker | 8081 | CDR webhook listener |
+| Service | Container | Purpose | Exposed Port |
+|---------|-----------|---------|--------------|
+| `app` | `opbx_app` | Laravel PHP-FPM backend | 9000 (internal) |
+| `nginx` | `opbx_nginx` | Reverse proxy and static file server | `APP_PORT` (default 80) |
+| `frontend` | `opbx_frontend` | React Vite dev server | `FRONTEND_PORT` (default 3000) |
+| `mysql` | `opbx_mysql` | MySQL 8 database | *(internal by default)* |
+| `redis` | `opbx_redis` | Cache, sessions, queues, locks | *(internal by default)* |
+| `minio` | `opbx_minio` | S3-compatible object storage | *(internal by default)* |
+| `soketi` | `opbx_websocket` | WebSocket server | 6001 |
+| `queue-worker` | `opbx_queue_worker` | Laravel queue worker | — |
+| `scheduler` | `opbx_scheduler` | Laravel task scheduler | — |
+| `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker | 8081 |
+| `amd-worker` | `opbx_amd_worker` | Java/Vert.x AMD worker | *(internal)* |
+| `ngrok` | `opbx_ngrok` | Webhook tunnel (dev only) | 4040 |
 
 :::tip First Boot
-The database automatically migrates on first startup. This process takes 30-60 seconds depending on your hardware.
+The PHP entrypoint runs migrations, seeds, and configuration validation on first startup. Wait **120 seconds** after starting containers before testing.
 :::
 
 ### 4. Verify Installation
@@ -86,13 +120,20 @@ Check that all services are running:
 docker compose ps
 ```
 
-Test the API health endpoint:
+Test the public health endpoint:
 
 ```bash
 curl http://localhost/api/health
 ```
 
-You should receive a JSON response indicating the system is healthy.
+You should receive a JSON response similar to:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-06-22T12:00:00+00:00"
+}
+```
 
 ### 5. Access the Application
 
@@ -101,7 +142,8 @@ Open your browser and navigate to:
 | URL | Purpose |
 |-----|---------|
 | `http://localhost/ui` | OPBX web application |
-| `http://localhost/api` | API base URL |
+| `http://localhost/api/health` | Public health check |
+| `http://localhost:4040` | ngrok dashboard (when enabled) |
 
 :::tip Next Steps
 Proceed to [First Login](./first-login) to create your organization and admin account.
@@ -111,15 +153,16 @@ Proceed to [First Login](./first-login) to create your organization and admin ac
 
 ### Port Conflicts
 
-If you see errors about ports already in use, change the `APP_PORT` in your `.env` file:
+If you see errors about ports already in use, change the corresponding variable in your `.env` file:
 
 ```bash
-APP_PORT=8080  # Use port 8080 instead of 80
+APP_PORT=8080        # Use port 8080 instead of 80
+FRONTEND_PORT=3001   # Use port 3001 instead of 3000
 ```
 
 ### MySQL Slow Start
 
-MySQL may take longer to initialize on first boot. Wait 60 seconds after starting containers before testing:
+MySQL may take longer to initialize on first boot. Wait up to 120 seconds after starting containers before testing:
 
 ```bash
 docker compose logs -f mysql
@@ -142,7 +185,24 @@ Check individual service logs for errors:
 docker compose logs -f [service-name]
 ```
 
-Common service names: `app`, `nginx`, `mysql`, `redis`.
+Common service names: `app`, `nginx`, `mysql`, `redis`, `queue-worker`, `dialer-worker`, `amd-worker`.
+
+### Migrations Do Not Run
+
+The `app` container runs migrations only when `RUN_MIGRATIONS=true` (the default). If you set it to `false`, run migrations manually:
+
+```bash
+docker compose exec app php artisan migrate
+```
+
+### Webhooks Not Receiving in Local Development
+
+For Cloudonix to reach your local instance, enable ngrok:
+
+1. Add your `NGROK_AUTHTOKEN` to `.env`.
+2. Restart the stack: `docker compose up -d`.
+3. Find your public HTTPS URL in the ngrok dashboard (`http://localhost:4040`) or logs.
+4. Enter that URL as the webhook base URL in **Settings > Cloudonix**.
 
 ## Updating OPBX
 
@@ -163,7 +223,7 @@ docker compose up -d
 ```
 
 :::warning Data Preservation
-The `docker compose down` command preserves database volumes by default. Your data remains intact across updates.
+Database and object-storage data are persisted in `./volumes/` bind mounts. These survive `docker compose down`. **Data will be lost** if you run `docker compose down -v` or delete the `volumes/` directory.
 :::
 
 ## Production Deployment
@@ -171,12 +231,15 @@ The `docker compose down` command preserves database volumes by default. Your da
 For production environments, consider these additional steps:
 
 1. Use a reverse proxy (nginx, traefik) with SSL termination
-2. Configure automated backups for MySQL and MinIO data
-3. Set strong passwords for all services
-4. Enable Redis persistence
-5. Configure log aggregation
-6. Set up monitoring and alerting
+2. Configure automated backups for MySQL (`./scripts/backup-database.sh`) and MinIO data
+3. Set strong passwords for all services and rotate tokens regularly
+4. Do not expose MySQL, Redis, or MinIO ports publicly
+5. Enable Redis persistence (already enabled via AOF in the example compose file)
+6. Configure log aggregation
+7. Set up monitoring and alerting
+8. Set `APP_ENV=production` and `APP_DEBUG=false`
+9. Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domain
 
 :::danger Security Notice
-Never expose the MySQL or Redis ports to the public internet. Use Docker networks or private IPs for inter-service communication.
+Never expose the MySQL, Redis, or MinIO ports to the public internet. Use Docker networks or private IPs for inter-service communication.
 :::

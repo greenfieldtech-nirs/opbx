@@ -1,0 +1,123 @@
+---
+sidebar_position: 19
+slug: /modules/ai-load-balancers
+sidebar_class_name: cxGuidesSidebar
+title: "AI Load Balancers"
+description: "Distribute calls across multiple AI providers"
+---
+
+# AI Load Balancers
+
+AI Load Balancers distribute calls across multiple AI assistants for redundancy and capacity management. They support several distribution strategies and follow-through failover.
+
+## Purpose
+
+Use this module to:
+
+- Group multiple AI assistants into a single endpoint
+- Choose a distribution strategy
+- Enable cascading failover between assistants
+- Configure fallback actions when all assistants fail
+
+## Distribution Strategies
+
+| Strategy | Algorithm |
+|----------|-----------|
+| Round Robin | Redis atomic counter + modulo. Falls back to random if Redis fails. |
+| Priority | First active member ordered by priority ascending. |
+| Percentage | Weighted random based on member weights. |
+
+## Follow-Through Failover
+
+When `follow_through` is enabled:
+
+1. If the selected AI assistant fails, the failed assistant is added to a tried list
+2. The load balancer selects the next untried assistant using the configured strategy
+3. The call routes to the next assistant with a new callback URL
+4. If no assistants remain, the fallback action executes
+
+When `follow_through` is disabled, the fallback action executes immediately on failure.
+
+## Fallback Actions
+
+| Action | Description |
+|--------|-------------|
+| Extension | Route to a specific extension |
+| Ring Group | Route to a ring group |
+| IVR Menu | Route to an IVR menu |
+| AI Assistant | Route to another AI assistant (without follow-through) |
+| Hangup | Disconnect the call |
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View load balancers | Yes | Yes | Yes | Yes |
+| Create load balancers | Yes | Yes | No | No |
+| Update load balancers | Yes | Yes | No | No |
+| Delete load balancers | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Create a Load Balancer
+
+1. Navigate to **AI Load Balancers** in the sidebar
+2. Click **Create Load Balancer**
+3. Enter a name
+4. Select a strategy
+5. Enable or disable follow-through
+6. Add AI assistant members with priorities or weights
+7. Choose a fallback action
+8. Save
+
+### Link to an Extension
+
+1. Go to **Extensions**
+2. Create or edit an extension
+3. Set the type to **AI Load Balancer**
+4. Select the load balancer
+5. Save
+
+## Key Data Fields
+
+### `ai_assistant_load_balancers` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope, soft deletes |
+| `name` | string | Unique per org |
+| `strategy` | enum | round_robin, priority, percentage |
+| `follow_through` | boolean | Cascade to next assistant on failure |
+| `status` | enum | active, inactive |
+| `fallback_action` | enum | See fallback actions |
+| `fallback_extension_id` | FK nullable | |
+| `fallback_ring_group_id` | FK nullable | |
+| `fallback_ivr_menu_id` | FK nullable | |
+| `fallback_ai_assistant_id` | FK nullable | |
+
+### `ai_assistant_load_balancer_members` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `load_balancer_id` | FK | Parent load balancer |
+| `ai_assistant_id` | FK | Member assistant |
+| `priority` | integer | Lower = higher (PRIORITY strategy) |
+| `weight` | integer 0-100 | PERCENTAGE strategy |
+| `position` | integer | ROUND_ROBIN order |
+| `status` | enum | active, inactive |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/ai-assistant-load-balancers[/{loadBalancer}]` | Standard CRUD |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [AI Assistants](/modules/ai-assistants) — Members are AI assistants
+- [Extensions](/modules/extensions) — AI_LOAD_BALANCER type extensions
+- [Phone Numbers](/modules/phone-numbers) — DIDs can route to load balancers
+- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Campaign routing destinations

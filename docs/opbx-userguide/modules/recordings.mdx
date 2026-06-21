@@ -1,148 +1,98 @@
 ---
-sidebar_position: 7
+sidebar_position: 10
 slug: /modules/recordings
 sidebar_class_name: cxGuidesSidebar
-title: "Audio Recordings (Announcements)"
-description: Managing announcements and audio files
+title: "Recordings"
+description: "Upload and manage audio files for IVR prompts and announcements"
 ---
 
-# Audio Recordings
+# Recordings
 
-Audio Recordings store audio files used for IVR prompts, announcements, and hold music. Upload your own recordings or reference external URLs for flexible audio management.
+The Recordings module manages audio files for IVR prompts, announcements, and other PBX audio.
+
+## Purpose
+
+Use this module to:
+
+- Upload audio files to MinIO storage
+- Reference external audio URLs
+- Manage file metadata
+- Generate secure download links
 
 ## Recording Types
 
-OPBX supports two types of audio recordings:
+| Type | Storage | Access |
+|------|---------|--------|
+| Upload | MinIO bucket (`recordings/{org_id}/{random}_{name}.{ext}`) | Encrypted token or HMAC-signed URL |
+| Remote | External URL reference | Direct URL |
 
-| Type | Storage | Access Method |
-|------|---------|---------------|
-| Upload | MinIO (S3-compatible) internal storage | Encrypted token + HMAC-signed URLs |
-| Remote | External URL reference | Direct URL access |
+## Upload Security
 
-### Upload Recordings
+The upload pipeline validates every file:
 
-Files uploaded to OPBX storage benefit from:
+1. Size validation (configurable, default 5 MB)
+2. MIME whitelist (`audio/mpeg`, `audio/wav`)
+3. Extension whitelist (`.mp3`, `.wav`)
+4. Binary file signature verification
+5. Script injection detection
+6. Filename sanitization
 
-- Secure internal storage
-- Time-limited access URLs
-- Automatic validation and sanitization
-- Version control
+## Permissions
 
-### Remote Recordings
+Recordings are generally Owner/Admin-only.
 
-External URLs provide flexibility for:
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View recordings | Yes | Yes | No | No |
+| Create recordings | Yes | Yes | No | No |
+| Update recordings | Yes | Yes | No | No |
+| Delete recordings | Yes | Yes | No | No |
 
-- Content Delivery Networks (CDNs)
-- Third-party audio services
-- Dynamic content generation
+## UI Workflow
 
-:::tip
-Use remote recordings when you need to update audio content frequently without accessing OPBX.
-:::
+### Upload a Recording
 
-## Supported Formats
+1. Navigate to **Recordings** in the sidebar
+2. Click **Upload Recording**
+3. Enter a name
+4. Choose the file or enter a remote URL
+5. Save
 
-| Format | Extension | Recommended Use |
-|--------|-----------|-----------------|
-| MP3 | .mp3 | General purpose, smaller file size |
-| WAV | .wav | Higher quality, IVR prompts |
+### Use a Recording in an IVR Menu
 
-Maximum file size: 5MB (configurable by your administrator).
+1. Open the IVR menu editor
+2. Select **Recording** as the audio source
+3. Choose the uploaded recording from the dropdown
+4. Save the menu
 
-## Uploading Audio Files
+## Key Data Fields
 
-1. Navigate to **Recordings** or **Announcements** in the sidebar
-2. Click **Upload**
-3. Select an audio file from your computer
-4. Enter a descriptive name
-5. Click **Save**
+### `recordings` Table
 
-:::note
-The upload process includes a validation pipeline to ensure file safety and compatibility.
-:::
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Display name |
+| `type` | enum | upload, remote |
+| `file_path` | string nullable | MinIO path |
+| `original_url` | string nullable | Remote URL |
+| `mime_type` | string nullable | |
+| `size` | integer nullable | Bytes |
+| `duration` | integer nullable | Seconds |
 
-## Security Validation
+## Related API Endpoints
 
-All uploaded files pass through a security pipeline:
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/recordings[/{recording}]` | Standard CRUD |
+| GET | `/v1/recordings/{recording}/download` | Generate access token |
+| GET | `/v1/recordings/secure-download` | Serve file via token |
+| GET | `/storage/recordings/{path}` | Public HMAC-signed access (for Cloudonix) |
 
-| Check | Purpose |
-|-------|---------|
-| MIME Type Check | Verifies the file content matches the declared format |
-| Extension Check | Validates the file extension is allowed |
-| Binary Signature | Confirms the file is a valid audio file, not a disguised script |
-| Script Injection Detection | Scans for embedded malicious code |
-| Filename Sanitization | Removes dangerous characters from filenames |
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-:::warning
-Files that fail validation are rejected. If your legitimate file is rejected, try converting it to a standard format or contact your administrator.
-:::
+## Related Modules
 
-## Using Recordings
-
-Once uploaded, use recordings throughout OPBX:
-
-| Feature | How to Select |
-|---------|---------------|
-| IVR Menus | Choose from the audio dropdown when creating menu options |
-| Hold Music | Select as the music source in queue settings |
-| Announcements | Assign to time-based or event-based announcements |
-
-## Downloading Recordings
-
-To download a recording:
-
-1. Navigate to the Recordings list
-2. Find the recording you need
-3. Click the **Download** button
-4. The system generates a time-limited access URL
-5. Your browser downloads the file
-
-:::info
-Download URLs expire after a short time for security. If the link expires, request a new download.
-:::
-
-## Managing Remote Recordings
-
-When using remote recordings:
-
-1. Enter a descriptive name
-2. Provide the full URL to the audio file
-3. Ensure the URL is publicly accessible
-4. Test the recording to verify it plays correctly
-
-:::warning
-Remote recordings depend on external availability. If the external service is down, the audio will not play.
-:::
-
-## Best Practices
-
-### File Naming
-
-Use descriptive names that indicate the content and purpose:
-
-- "Main_Menu_Welcome_v2"
-- "Support_Hold_Music"
-- "After_Hours_Message"
-
-### Audio Quality
-
-| Use Case | Recommended Format | Bitrate |
-|----------|-------------------|---------|
-| IVR Prompts | WAV | 128 kbps |
-| Hold Music | MP3 | 192 kbps |
-| Announcements | MP3 | 128 kbps |
-
-### Storage Management
-
-- Delete unused recordings to free storage space
-- Use version numbers in filenames when updating (e.g., "Welcome_v2.mp3")
-- Document which recordings are used where for easier maintenance
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Upload fails | Check file size (max 5MB) and format (MP3/WAV) |
-| Recording does not play | Verify the file is not corrupted; try re-uploading |
-| Remote recording fails | Check the URL is accessible and returns audio content |
-| Poor audio quality | Use higher bitrate files or WAV format |
+- [IVR Menus](/modules/ivr-menus) — Audio source for IVR prompts
+- [Conference Rooms](/modules/conference-rooms) — Hold music and announcements

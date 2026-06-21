@@ -36,7 +36,7 @@ paths:
       tags:
         - Platform
       summary: Update organization
-      operationId: updateOrganization
+      operationId: updatePlatformOrganization
       security:
         - bearerAuth: []
         - cookieAuth: []

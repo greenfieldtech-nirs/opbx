@@ -1,0 +1,54 @@
+---
+sidebar_position: 4
+slug: /workers
+sidebar_class_name: cxGuidesSidebar
+title: "Worker Services"
+description: "Operational guides for OPBX worker services"
+---
+
+# Worker Services
+
+OPBX uses two standalone worker services for specialized runtime tasks:
+
+| Worker | Technology | Purpose |
+|--------|------------|---------|
+| [Dialer Worker](/workers/dialer-worker) | Go | Executes outbound auto-dialer campaigns |
+| [AMD Worker](/workers/amd-worker) | Java/Vert.x 5 | Detects voicemail beeps in live audio streams |
+
+Both workers run as Docker services in the standard Docker Compose stack. They communicate with the Laravel backend through REST APIs and Redis.
+
+## When to Read These Guides
+
+Read the worker guides when you need to:
+
+- Understand how outbound campaigns are executed
+- Build or run a worker locally
+- Configure worker environment variables
+- Troubleshoot campaign or AMD issues
+- Scale the dialer worker horizontally
+
+## Common Commands
+
+### View Worker Logs
+
+```bash
+docker compose logs -f dialer-worker
+docker compose logs -f amd-worker
+```
+
+### Scale the Dialer Worker
+
+```bash
+docker compose up -d --scale dialer-worker=3
+```
+
+### Restart a Worker
+
+```bash
+docker compose restart dialer-worker
+docker compose restart amd-worker
+```
+
+:::tip
+Wait 120 seconds after restarting the full stack before testing worker functionality.
+:::

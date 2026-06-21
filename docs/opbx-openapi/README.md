@@ -2,6 +2,24 @@
 
 This directory contains the complete OpenAPI 3.1 specification for the OPBX (Open Source Business PBX) API.
 
+## Regenerating from source
+
+The `paths` block is generated from the Laravel route list. To refresh it after route changes:
+
+```bash
+php artisan route:list --json > docs/superpowers/work/route-list.json
+```
+
+After regenerating the route list, update the `$ref` entries in `openapi.yaml` and the path files under `paths/` so that every route is documented.
+
+## Validation
+
+Lint the specification with Redocly before committing:
+
+```bash
+npx @redocly/cli lint docs/opbx-openapi/openapi.yaml
+```
+
 ## Structure
 
 ```
@@ -12,11 +30,10 @@ docs/opbx-openapi/
 │   ├── schemas/                # Data models
 │   │   ├── User.yaml
 │   │   ├── Extension.yaml
-│   │   ├── Organization.yaml
-│   │   ├── RingGroup.yaml
-│   │   ├── ConferenceRoom.yaml
-│   │   ├── CallLog.yaml
-│   │   ├── CallDetailRecord.yaml
+    │   │   ├── Organization.yaml
+    │   │   ├── RingGroup.yaml
+    │   │   ├── ConferenceRoom.yaml
+    │   │   ├── CallDetailRecord.yaml
 │   │   └── ... (all entity schemas)
 │   ├── parameters/             # Reusable parameters
 │   │   ├── path/              # Path parameters (id, user_id, etc.)
@@ -32,9 +49,8 @@ docs/opbx-openapi/
     ├── extensions/            # Extension management
     ├── ring-groups/           # Ring group management
     ├── conference-rooms/      # Conference room management
-    ├── call-logs/             # Call history
     ├── call-detail-records/   # CDR records
-    ├── webhooks/              # Cloudonix webhooks
+    ├── webhooks/              # Cloudonix and auto-dialer webhooks
     ├── voice/                 # Voice routing (CXML)
     └── platform/              # Platform manager endpoints
 ```
@@ -94,7 +110,6 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | **Phone Numbers** | DID management |
 | **AI Assistants** | AI assistant configuration |
 | **AI Load Balancers** | Load balancer configuration |
-| **Call Logs** | Read-only call history |
 | **Call Detail Records** | CDR records and export |
 | **Recordings** | Recording management and download |
 | **Inbound Blacklist** | Blocked caller management |
@@ -111,6 +126,9 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | `POST /webhooks/cloudonix/call-status` | Call status updates |
 | `POST /webhooks/cloudonix/cdr` | Call detail records |
 | `POST /webhooks/cloudonix/session-update` | Session updates (high velocity) |
+| `POST /webhooks/cloudonix/dialer` | Auto-dialer webhook proxy |
+| `POST /webhooks/auto-dialer/call-status` | Auto-dialer call status |
+| `POST /webhooks/auto-dialer/amd-result` | Auto-dialer AMD result |
 
 ### Voice Routing (CXML)
 

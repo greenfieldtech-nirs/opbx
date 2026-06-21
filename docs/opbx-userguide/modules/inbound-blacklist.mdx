@@ -1,105 +1,121 @@
 ---
-sidebar_position: 10
+sidebar_position: 8
 slug: /modules/inbound-blacklist
 sidebar_class_name: cxGuidesSidebar
 title: "Inbound Blacklist"
-description: "Blocking unwanted inbound calls with pattern matching rules"
+description: "Block unwanted inbound callers"
 ---
 
 # Inbound Blacklist
 
-The Inbound Blacklist allows you to block unwanted callers using flexible pattern matching. You can define rules that apply globally across all your phone numbers or target specific DIDs, and choose how blocked calls are handled.
+The Inbound Blacklist module blocks unwanted inbound calls using pattern matching. Rules can apply globally or to specific DIDs.
 
-## Accessing the Blacklist
+## Purpose
 
-Navigate to **Inbound Blacklist** in the sidebar. This feature is available to **Owners** and **PBX Admins**.
+Use this module to:
+
+- Block spam, robocalls, or unwanted callers
+- Match caller IDs by exact number, prefix, or wildcard
+- Choose how blocked calls are handled (drop, reject, or torment)
+- Review blocked call logs and statistics
 
 ## Match Types
 
-Each blacklist rule specifies a caller ID pattern and a match type that determines how the pattern is evaluated:
-
-| Match Type | Pattern Example | Matches |
-|------------|----------------|---------|
-| **Exact** | `+14155551234` | Only that specific phone number |
-| **Prefix** | `+1415` | Any number starting with `+1415` (e.g., all San Francisco numbers) |
-| **Wildcard** | `+1415555????` | Numbers matching the wildcard pattern (`*` = any characters, `?` = single character) |
-
-:::tip
-Use **Prefix** matching to block all calls from a specific area code or country code. Use **Wildcard** for more complex patterns.
-:::
+| Type | Behavior | Example |
+|------|----------|---------|
+| Exact | Exact match | `+14155551234` |
+| Prefix | Starts with pattern | `+1415` |
+| Wildcard | `fnmatch` pattern with `*` and `?` | `+1*555*` |
 
 ## Rejection Strategies
 
-When a call matches a blacklist rule, OPBX handles it according to the configured rejection strategy:
+| Strategy | Behavior |
+|----------|----------|
+| Drop | Silent hangup |
+| Reject | Play a rejection message, then hang up |
+| Torment | Put the caller into a conference with hold music for a configurable timeout |
 
-| Strategy | Behavior | Caller Experience |
-|----------|----------|-------------------|
-| **Drop** | Silently hang up the call | Caller hears nothing (call appears to fail) |
-| **Reject** | Play a rejection message, then hang up | Caller hears "Your call has been rejected" |
-| **Torment** | Place the caller in a conference room with hold music | Caller is held in a loop with music for a configurable duration |
+## Scope
 
-:::note
-The **Torment** strategy is useful for persistent spam callers. It ties up their line while playing hold music, discouraging further calls. You can configure the music timeout to control how long the caller is held.
-:::
+Rules can be:
 
-## Rule Scope
+- **Global**: Apply to all inbound calls for the organization
+- **Per-DID**: Apply only to calls arriving on selected DIDs
 
-Blacklist rules can be applied at two levels:
+## Permissions
 
-- **Global**: The rule applies to all phone numbers (DIDs) in your organization. Any inbound call matching the pattern is blocked regardless of which number was dialed.
-- **Per-DID**: The rule only applies to specific phone numbers that you select. Calls to other numbers from the same caller are not affected.
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View blacklist | Yes | Yes | Yes | Yes |
+| Create blacklist entries | Yes | Yes | No | No |
+| Update blacklist entries | Yes | Yes | No | No |
+| Delete blacklist entries | Yes | Yes | No | No |
 
-## Creating a Blacklist Rule
+## UI Workflow
 
-1. Navigate to **Inbound Blacklist** and click **Add Rule**
-2. Enter the **Caller ID Pattern** (the number or pattern to block)
-3. Select the **Match Type** (Exact, Prefix, or Wildcard)
-4. Choose the **Rejection Strategy** (Drop, Reject, or Torment)
-5. Set the **Scope**:
-   - Toggle **Global** to apply to all DIDs
-   - Or select specific phone numbers the rule should apply to
-6. Set the **Status** to Active
-7. Click **Save**
+### Add a Blacklist Entry
 
-## Managing Rules
+1. Navigate to **Inbound Blacklist** in the sidebar
+2. Click **Add Rule**
+3. Enter the caller ID pattern
+4. Select the match type
+5. Choose the rejection strategy
+6. Select whether the rule is global or apply it to specific DIDs
+7. Save
 
-- **Toggle Status**: Click the status toggle to enable or disable a rule without deleting it
-- **Edit**: Click a rule to modify its pattern, strategy, or scope
-- **Delete**: Remove a rule permanently
+### Review Blocked Calls
 
-## Blocked Call Logs
+1. Open the **Blocked Calls** tab
+2. View the caller ID, called number, rejection strategy, and timestamp
+3. Use this data to refine your rules
 
-OPBX maintains a log of all blocked calls. Access it from the **Blocked Calls** section on the Inbound Blacklist page.
+### View Statistics
 
-Each log entry records:
-- Caller ID of the blocked caller
-- Phone number that was dialed
-- Which blacklist rule matched
-- Rejection strategy that was applied
-- Timestamp
+The **Statistics** endpoint returns cached aggregate metrics, such as total blocked calls and breakdowns by strategy.
 
-## Statistics
+## Key Data Fields
 
-The blacklist statistics panel shows aggregate data including:
-- Total number of blocked calls
-- Breakdown by rejection strategy
-- Most frequently blocked callers
+### `inbound_blacklists` Table
 
-:::warning
-Blacklist rules are evaluated **before** call routing. If a caller matches a blacklist rule, the call is blocked immediately and never reaches any routing destination (extension, ring group, IVR, etc.).
-:::
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `match_type` | enum | exact, prefix, wildcard |
+| `caller_id_pattern` | string | Pattern to match |
+| `is_global` | boolean | Apply to all DIDs |
+| `rejection_strategy` | enum | drop, reject, torment |
+| `torment_room_prefix` | string | |
+| `torment_music_timeout` | integer | |
+| `status` | enum | active, inactive |
+| `blocked_count` | integer | |
 
-## How It Works
+### `blocked_call_logs` Table
 
-When an inbound call arrives, OPBX checks the caller ID against all active blacklist rules for the organization:
+| Column | Type | Notes |
+|--------|------|-------|
+| `organization_id` | FK | Tenant scope |
+| `inbound_blacklist_id` | FK | Matching rule |
+| `did_number_id` | FK | Target DID |
+| `caller_id` | string | |
+| `called_number` | string | |
+| `call_sid` | string | |
+| `session_id` | string | |
+| `rejection_strategy` | enum | |
+| `blocked_at` | datetime | |
 
-1. First, **global rules** are checked (rules that apply to all DIDs)
-2. Then, **per-DID rules** are checked for the specific phone number that was dialed
-3. If any rule matches, the configured rejection strategy is executed
-4. If no rules match, the call proceeds to normal routing
+## Related API Endpoints
 
-## Next Steps
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/inbound-blacklist[/{inboundBlacklist}]` | Standard CRUD |
+| PATCH | `/v1/inbound-blacklist/{inboundBlacklist}/toggle-status` | Toggle active status |
+| GET | `/v1/inbound-blacklist/blocked-calls` | Blocked call logs |
+| GET | `/v1/inbound-blacklist/statistics` | Aggregate statistics |
 
-- [Phone Numbers](/modules/phone-numbers) -- Configure the DIDs that blacklist rules can target
-- [Call Routing Overview](/installation/call-routing-overview) -- Understand how blacklist fits into the routing pipeline
-- [Outbound Whitelist](/modules/outbound-whitelist) -- Control outbound dialing destinations
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [Phone Numbers](/modules/phone-numbers) — Per-DID blacklist rules
+- [Voice Routing Engine](/installation/concepts) — Blacklist is checked before routing

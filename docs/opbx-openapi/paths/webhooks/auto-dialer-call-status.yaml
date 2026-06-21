@@ -1,0 +1,65 @@
+paths:
+  /webhooks/auto-dialer/call-status:
+    post:
+      tags:
+        - Auto Dialer Webhooks
+      summary: Auto-dialer call status
+      description: |
+        Receives call status updates for auto-dialer calls from Cloudonix.
+
+        Updates the associated call session and destination based on the
+        reported status (`answered`, `connected`, `completed`, `failed`,
+        `busy`, `no-answer`).
+      operationId: autoDialerCallStatus
+      security:
+        - webhookBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_token:
+                  type: string
+                  description: Auto-dialer session token
+                  example: "sess-abc123"
+                call_id:
+                  type: string
+                  description: Cloudonix call ID
+                  example: "call-xyz789"
+                status:
+                  type: string
+                  enum: [answered, connected, completed, failed, busy, no-answer]
+                  example: "completed"
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+        '400':
+          description: Bad request (missing session token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "not_found"

@@ -1,5 +1,5 @@
 paths:
-  /v1/ivr-menus/{ivr_menu}/toggle-status:
+  /v1/ivr-menus/{ivrMenu}/toggle-status:
     patch:
       tags:
         - IVR Menus
@@ -9,7 +9,7 @@ paths:
         - bearerAuth: []
         - cookieAuth: []
       parameters:
-        - name: ivr_menu
+        - name: ivrMenu
           in: path
           required: true
           schema:

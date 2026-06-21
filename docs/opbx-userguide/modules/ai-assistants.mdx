@@ -1,0 +1,106 @@
+---
+sidebar_position: 18
+slug: /modules/ai-assistants
+sidebar_class_name: cxGuidesSidebar
+title: "AI Assistants"
+description: "Configure AI-powered voice agents"
+---
+
+# AI Assistants
+
+AI Assistants connect calls to AI providers via SIP or WebSocket protocols. They can be linked to extensions or used as routing destinations for auto-dialer campaigns and other PBX features.
+
+## Purpose
+
+Use this module to:
+
+- Create AI assistant configurations
+- Select from supported providers
+- Configure provider-specific settings
+- Link assistants to extensions
+
+## Supported Providers
+
+OPBX uses a registry-based provider system with 19 supported providers. Common providers include:
+
+- OpenAI
+- Anthropic
+- Google
+- Azure
+- Bland AI
+- Retell AI
+- Vapi
+- Ultravox
+- Custom CXML endpoint providers
+
+Each provider defines its own JSON configuration schema with required fields, validation rules, and default values.
+
+## Extension Integration
+
+Extensions of type `AI_ASSISTANT` link to an `AiAssistant` record via `ai_assistant_id`.
+
+### CXML Endpoint Proxying
+
+When an AI_ASSISTANT extension is dialed internally and its provider is a `cxml_endpoint` with a `proxy_did_number`, OPBX forwards the call to the remote endpoint as if it were an inbound call to the proxy DID. This allows inbound-only CXML endpoints to handle extension calls.
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View AI assistants | Yes | Yes | Yes | Yes |
+| Create AI assistants | Yes | Yes | No | No |
+| Update AI assistants | Yes | Yes | No | No |
+| Delete AI assistants | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Create an AI Assistant
+
+1. Navigate to **AI Assistants** in the sidebar
+2. Click **Create AI Assistant**
+3. Enter a name
+4. Select a provider
+5. Fill in the provider-specific configuration form
+6. Optionally enter a phone number
+7. Save
+
+### Link to an Extension
+
+1. Go to **Extensions**
+2. Create or edit an extension
+3. Set the type to **AI Assistant**
+4. Select the AI assistant
+5. Save
+
+## Key Data Fields
+
+### `ai_assistants` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Display name |
+| `provider` | string | Provider key from registry |
+| `configuration` | JSON | Provider-specific settings |
+| `phone_number` | string nullable | Associated phone number |
+| `status` | enum | active, inactive |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/ai-assistants[/{assistant}]` | Standard CRUD |
+| GET | `/v1/ai-assistant/providers` | List available providers |
+| GET | `/v1/ai-assistant/providers/{provider}` | Provider details |
+| GET | `/v1/ai-assistant/providers/{provider}/schema` | Provider config schema |
+| GET | `/v1/ai-assistant/providers/protocol/{protocol}` | Providers by protocol |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [Extensions](/modules/extensions) — AI_ASSISTANT type extensions
+- [AI Load Balancers](/modules/ai-load-balancers) — Distribute across AI assistants
+- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Campaign routing destinations
+- [Phone Numbers](/modules/phone-numbers) — DIDs can route to AI assistants

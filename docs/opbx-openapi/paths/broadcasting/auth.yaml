@@ -1,0 +1,43 @@
+paths:
+  /v1/broadcasting/auth:
+    post:
+      tags:
+        - Broadcasting
+      summary: Authenticate broadcasting channel
+      description: |
+        Laravel Echo broadcasting authentication endpoint.
+
+        Returns the authentication payload needed to subscribe to private
+        or presence channels from the SPA.
+      operationId: authenticateBroadcastingChannel
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                socket_id:
+                  type: string
+                  example: "1234.5678"
+                channel_name:
+                  type: string
+                  example: "private-organization.1"
+              required:
+                - socket_id
+                - channel_name
+      responses:
+        '200':
+          description: Channel authentication payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

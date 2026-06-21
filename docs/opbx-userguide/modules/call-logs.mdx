@@ -1,0 +1,127 @@
+---
+sidebar_position: 13
+slug: /modules/call-logs
+sidebar_class_name: cxGuidesSidebar
+title: "Call Logs"
+description: "View and export call detail records"
+---
+
+# Call Logs
+
+Call Logs display the Call Detail Records (CDR) created from Cloudonix CDR webhooks. They provide a complete history of calls with disposition, duration, and AMD status.
+
+## Purpose
+
+Use this module to:
+
+- Search and filter call history
+- View call details including raw CDR payload
+- Export records to CSV
+- View aggregate statistics
+- Inspect AMD (Answering Machine Detection) results
+
+## Table Columns
+
+| Column | Description |
+|--------|-------------|
+| From | Caller number |
+| To | Callee number |
+| Session Time | Call timestamp |
+| Disposition | Call outcome (ANSWER, BUSY, FAILED, etc.) |
+| AMD Status | `Enabled::{result}` or `Disabled` |
+| Duration | Total call duration |
+| Connected Time | Billable seconds |
+
+## AMD Status
+
+When AMD is enabled, the CDR includes the detection result:
+
+| Status | Meaning |
+|--------|---------|
+| `Enabled::human` | Likely human answered |
+| `Enabled::voicemail` | Voicemail beep detected |
+| `Enabled::unknown` | Detection timed out or inconclusive |
+| `Disabled` | AMD was not used |
+
+The detail dialog shows:
+
+- Result
+- Confidence percentage
+- Detection time in milliseconds
+- Timestamp
+- Reason string
+
+## Filters
+
+| Filter | Description |
+|--------|-------------|
+| From Number | Caller ID or origin number (LIKE) |
+| To Number | Destination number (LIKE) |
+| Disposition | Exact disposition match |
+| Date Range | Start and end dates |
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View call logs | Yes | Yes | Own only | Yes |
+| Export call logs | Yes | Yes | Own only | Yes |
+| View statistics | Yes | Yes | Own only | Yes |
+
+## UI Workflow
+
+### View Call Logs
+
+1. Navigate to **Call Logs** in the sidebar
+2. Use filters to narrow results
+3. Click on any record for detailed information
+
+### Export CDR Data
+
+1. Apply your desired filters
+2. Click **Export**
+3. The system streams the export in chunks of 1000 records
+
+### View Statistics
+
+1. Apply filters
+2. Click **Statistics**
+3. Review totals, averages, and disposition breakdowns
+
+## Key Data Fields
+
+### `call_detail_records` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `call_id` | string | Cloudonix call ID |
+| `session_id` | string | |
+| `from` | string | Caller number |
+| `to` | string | Callee number |
+| `disposition` | string | Final disposition |
+| `duration` | integer | Total seconds |
+| `billsec` | integer | Billable seconds |
+| `session_timestamp` | datetime | |
+| `rated_cost` | decimal | |
+| `approx_cost` | decimal | |
+| `sell_cost` | decimal(4) | |
+| `raw_cdr` | JSON | Full Cloudonix payload |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/call-detail-records` | List CDR records |
+| GET | `/v1/call-detail-records/{call_detail_record}` | Show a CDR record |
+| GET | `/v1/call-detail-records/export` | Export to CSV |
+| GET | `/v1/call-detail-records/statistics` | Aggregate statistics |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [Live Calls](/modules/live-calls) — Real-time monitoring
+- [AMD Worker](/workers/amd-worker) — Voicemail detection service
+- [Call Notifications](/modules/call-notifications) — Webhook notifications for call events

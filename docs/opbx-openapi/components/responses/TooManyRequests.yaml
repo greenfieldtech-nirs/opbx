@@ -7,13 +7,13 @@ content:
       error: TOO_MANY_REQUESTS
       message: Rate limit exceeded. Please try again later.
       code: RATE_LIMIT_EXCEEDED
-    headers:
-      X-RateLimit-Limit:
-        $ref: ../headers/X-RateLimit-Limit.yaml
-      X-RateLimit-Remaining:
-        $ref: ../headers/X-RateLimit-Remaining.yaml
-      Retry-After:
-        schema:
-          type: integer
-        description: Seconds to wait before retrying
-        example: 60
+headers:
+  X-RateLimit-Limit:
+    $ref: ../headers/X-RateLimit-Limit.yaml
+  X-RateLimit-Remaining:
+    $ref: ../headers/X-RateLimit-Remaining.yaml
+  Retry-After:
+    schema:
+      type: integer
+    description: Seconds to wait before retrying
+    example: 60

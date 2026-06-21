@@ -1,194 +1,122 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 slug: /modules/ivr-menus
 sidebar_class_name: cxGuidesSidebar
-title: IVR Menus
-description: Creating interactive voice response menus
+title: "IVR Menus"
+description: "Build interactive voice response menus with digit-based navigation"
 ---
 
 # IVR Menus
 
-Interactive Voice Response (IVR) menus guide callers through automated phone menus using digit presses. They help route callers to the right destination without human intervention.
+IVR (Interactive Voice Response) menus provide automated phone navigation. Callers press digits on their keypad to route their call.
 
-## What Is an IVR Menu
+## Purpose
 
-An IVR menu plays audio instructions and waits for the caller to press digits on their phone. Based on the input, the call routes to a destination.
+Use this module to:
 
-Example: "Press 1 for Sales, 2 for Support, 3 for Billing."
+- Build menu trees with digit-based options
+- Play audio files, remote URLs, or text-to-speech greetings
+- Configure timeouts and invalid-input handling
+- Set failover destinations
 
 ## Audio Sources
 
-IVR menus require audio to instruct callers. Choose one of these mutually exclusive sources:
+A menu must have exactly one audio source:
 
-### 1. Audio Recording
+| Source | Description |
+|--------|-------------|
+| Recording | Audio file uploaded to MinIO |
+| Remote URL | External audio file URL |
+| Text-to-Speech | Plain text rendered by Cloudonix TTS |
 
-Upload an audio file through the Recordings page, then select it for the IVR menu.
+## Option Destination Types
 
-**Supported formats**: MP3, WAV
+Each menu option routes to one of:
 
-**Best for**: Professional recordings, custom greetings, branded audio
-
-### 2. Remote URL
-
-Link to an audio file hosted externally.
-
-**Best for**: Dynamic content, integration with external systems, large audio libraries
-
-### 3. Text-to-Speech
-
-Enter text and select a Cloudonix TTS voice. The text converts to speech when the menu plays.
-
-**Best for**: Quick setup, frequently changing content, testing
-
-:::tip
-Use TTS for initial setup and testing. Replace with professional recordings before going live.
-:::
-
-## Creating an IVR Menu
-
-To create a new IVR menu:
-
-1. Navigate to **IVR Menus** in the sidebar
-2. Click **Create IVR Menu**
-3. Enter a descriptive name
-4. Choose an audio source and configure it
-5. Set timeout values
-6. Add menu options
-7. Configure failover
-8. Save the menu
-
-### Timeout Configuration
-
-| Setting | Range | Description |
-|---------|-------|-------------|
-| Max Timeout | 1-30 seconds | Time to wait for first digit input |
-| Inter-Digit Timeout | 1-30 seconds | Time between digits for multi-digit input |
-| Max Turns | 1-9 | Number of times to replay audio on invalid input |
-
-## Menu Options
-
-Each option maps a digit input to a destination. Callers press the digit to route to that destination.
-
-### Option Configuration
-
-- **Digits**: The digit(s) callers press (1-10 characters)
-- **Destination Type**: Where to route the call
-- **Destination**: The specific extension, ring group, etc.
-
-### Destination Types
-
-| Type | Use Case |
-|------|----------|
-| Extension | Direct to a person |
-| Ring Group | Department or team |
-| Conference Room | Join a conference |
-| IVR Menu | Sub-menu for more options |
-| Business Hours | Time-based routing |
-| AI Assistant | Automated agent |
-| AI Load Balancer | Distributed AI routing |
-| Hangup | End the call |
-
-:::note
-You can create up to 20 options per menu. Use sub-menus if you need more options.
-:::
+| Type | Description |
+|------|-------------|
+| Extension | A specific extension |
+| Ring Group | A ring group |
+| Conference Room | A conference room |
+| IVR Menu | A sub-menu |
+| Business Hours | A business hours schedule |
+| AI Assistant | An AI assistant |
+| AI Load Balancer | An AI load balancer |
+| Hangup | Disconnect the call |
 
 ## Failover
 
-Failover handles cases where the caller does not enter valid input after max_turns attempts.
+After `max_turns` invalid inputs, the call routes to the failover destination. The failover supports the same destination types as options, except business hours.
 
-Configure failover with:
-- **Destination Type**: Where to route when failover occurs
-- **Destination**: The specific target
+## Permissions
 
-Common failover destinations:
-- Receptionist extension
-- General ring group
-- Voicemail IVR
-- Hangup (with a goodbye message)
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View IVR menus | Yes | Yes | Yes | Yes |
+| Create IVR menus | Yes | Yes | No | No |
+| Update IVR menus | Yes | Yes | No | No |
+| Delete IVR menus | Yes | Yes | No | No |
 
-## Self-Reference Prevention
+## UI Workflow
 
-OPBX prevents you from creating circular menu structures. A menu cannot route to itself directly or through a chain that leads back to itself.
+### Create an IVR Menu
 
-:::warning
-If you attempt to create a circular reference, OPBX will reject the configuration and display an error.
-:::
+1. Navigate to **IVR Menus** in the sidebar
+2. Click **Create IVR Menu**
+3. Enter a name
+4. Choose an audio source (recording, URL, or TTS)
+5. Configure `max_timeout`, `inter_digit_timeout`, and `max_turns`
+6. Add menu options with digit input and destinations
+7. Set a failover destination
+8. Save
 
-## TTS Voices
+### Toggle Status
 
-When using Text-to-Speech, select from available Cloudonix voices:
+Use the status toggle to enable or disable a menu. Disabled menus are not used for routing.
 
-- Voices are grouped by language
-- Each language has multiple voices (male, female, different accents)
-- Preview voices before selecting
+## Key Data Fields
 
-### Available Languages
+### `ivr_menus` Table
 
-Voices are available for major languages including:
-- English (US, UK, AU)
-- Spanish
-- French
-- German
-- Portuguese
-- And 30+ more
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Menu name |
+| `audio_file_path` | string nullable | Audio URL or MinIO path |
+| `tts_text` | string nullable | TTS content (max 1000) |
+| `tts_voice` | string nullable | Voice identifier |
+| `max_timeout` | integer | Wait for first input (1-30s) |
+| `inter_digit_timeout` | integer | Between digits (1-30s) |
+| `max_turns` | integer | Replays on invalid input (1-9) |
+| `failover_destination_type` | enum | Where to route after max turns |
+| `failover_destination_id` | integer nullable | Target entity ID |
+| `status` | enum | active, inactive |
 
-## IVR Menu Examples
+### `ivr_menu_options` Table
 
-### Simple Main Menu
+| Column | Type | Notes |
+|--------|------|-------|
+| `ivr_menu_id` | FK | Parent menu |
+| `input_digits` | string | DTMF digits (1-10 chars) |
+| `description` | string nullable | |
+| `destination_type` | enum | Target type |
+| `destination_id` | integer | Target entity ID |
+| `priority` | integer | Display order (1-20) |
 
-```
-"Thank you for calling ACME Corporation.
-Press 1 for Sales, 2 for Support, 3 for Billing,
-or stay on the line to speak with an operator."
-```
+## Related API Endpoints
 
-| Digit | Destination |
-|-------|-------------|
-| 1 | Sales Ring Group |
-| 2 | Support Ring Group |
-| 3 | Billing Extension |
-| (timeout) | Receptionist |
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/ivr-menus/voices` | List available TTS voices |
+| GET/POST/PUT/DELETE | `/v1/ivr-menus[/{ivrMenu}]` | Standard CRUD |
+| PATCH | `/v1/ivr-menus/{ivrMenu}/toggle-status` | Toggle active status |
 
-### Multi-Level Menu
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-**Main Menu** routes to **Sales Sub-Menu** when caller presses 1:
+## Related Modules
 
-```
-"Sales Department. Press 1 for New Orders,
-2 for Existing Orders, 9 to return to main menu."
-```
-
-| Digit | Destination |
-|-------|-------------|
-| 1 | New Sales Queue |
-| 2 | Customer Service |
-| 9 | Main Menu (IVR) |
-
-## Best Practices
-
-### Audio Design
-
-- Keep instructions clear and concise
-- Speak slowly enough for callers to understand
-- Repeat the digit options at the end
-- Offer a "speak to operator" option
-
-### Option Layout
-
-- Use single digits (0-9) when possible
-- Reserve 0 for operator/receptionist
-- Use 9 for "return to previous menu"
-- Group related options together
-
-### Timeout Settings
-
-- Max timeout: 5-10 seconds (longer for complex menus)
-- Inter-digit timeout: 3-5 seconds
-- Max turns: 3 attempts before failover
-
-### Testing
-
-- Test every option path
-- Verify failover behavior
-- Check timeout handling
-- Listen to audio quality
+- [Recordings](/modules/recordings) — Audio file sources
+- [Phone Numbers](/modules/phone-numbers) — DIDs can route to IVR menus
+- [Ring Groups](/modules/ring-groups) — IVR options can route to ring groups
+- [Business Hours](/modules/business-hours) — IVR options can route to business hours

@@ -12,17 +12,17 @@ properties:
       name:
         type: string
         description: Campaign name
-        example: "Q1 Sales Campaign"
+        example: Q1 Sales Campaign
       status:
         type: string
         enum:
-          - active
-          - paused
-          - draft
-          - completed
-          - archived
+        - active
+        - paused
+        - draft
+        - completed
+        - archived
         description: Campaign status
-        example: "active"
+        example: active
       concurrent_active_calls:
         type: integer
         description: Maximum allowed concurrent calls
@@ -110,14 +110,16 @@ properties:
         description: Whether campaign is rate limited
         example: false
       pause_reason:
-        type: string
-        nullable: true
+        type:
+        - string
+        - 'null'
         description: Reason for pause
         example: null
       resumes_at:
-        type: string
+        type:
+        - string
+        - 'null'
         format: date-time
-        nullable: true
         description: When the campaign can resume
         example: null
       can_resume_now:
@@ -137,31 +139,31 @@ properties:
         phone_number:
           type: string
           description: Destination phone number
-          example: "+14155551212"
+          example: '+14155551212'
         status:
           type: string
           enum:
-            - initiated
-            - ringing
-            - answered
+          - initiated
+          - ringing
+          - answered
           description: Current call status
-          example: "answered"
+          example: answered
         call_id:
           type: string
           description: Cloudonix call ID
-          example: "call-abc123"
+          example: call-abc123
         initiated_at:
           type: string
           format: date-time
           description: When the call was initiated
-          example: "2024-01-15T14:30:00Z"
+          example: '2024-01-15T14:30:00Z'
         duration_seconds:
           type: integer
           description: Call duration in seconds
           example: 45
 required:
-  - campaign
-  - statistics
-  - dispositions
-  - rate_limit_status
-  - active_sessions
+- campaign
+- statistics
+- dispositions
+- rate_limit_status
+- active_sessions

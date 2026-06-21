@@ -2,15 +2,17 @@ paths:
   /v1/profile:
     get:
       tags:
-        - Profile
+      - Profile
       summary: Get user profile
-      description: |
-        Returns current authenticated user's profile including
+      description: 'Returns current authenticated user''s profile including
+
         organization details and contact information.
+
+        '
       operationId: getProfile
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: User profile
@@ -36,23 +38,29 @@ paths:
                       status:
                         type: string
                       phone:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       street_address:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       city:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       state_province:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       postal_code:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       country:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       created_at:
                         type: string
                         format: date-time
@@ -60,23 +68,25 @@ paths:
                         type: string
                         format: date-time
                       organization:
-                        $ref: '../../components/schemas/Organization.yaml'
+                        $ref: ../../components/schemas/Organization.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
+          $ref: ../../components/responses/Unauthorized.yaml
     put:
       tags:
-        - Profile
+      - Profile
       summary: Update user profile
-      description: |
-        Update current user's profile information.
+      description: 'Update current user''s profile information.
+
         Only fields provided will be updated.
-        
+
+
         **Note**: Role changes require Owner permission.
+
+        '
       operationId: updateProfile
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -96,44 +106,54 @@ paths:
                   description: Email address (must be unique)
                   example: john.doe@example.com
                 phone:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 20
-                  nullable: true
                   description: Phone number
                   example: +1-555-123-4567
                 street_address:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 500
-                  nullable: true
                   description: Street address
                   example: 123 Main St
                 city:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                   description: City
                   example: New York
                 state_province:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                   description: State or province
                   example: NY
                 postal_code:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 20
-                  nullable: true
                   description: Postal code
                   example: 10001
                 country:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                   description: Country
                   example: USA
                 role:
                   type: string
-                  enum: [owner, pbx_admin, pbx_user, reporter]
+                  enum:
+                  - owner
+                  - pbx_admin
+                  - pbx_user
+                  - reporter
                   description: User role (Owner only)
                   example: pbx_admin
       responses:
@@ -163,31 +183,37 @@ paths:
                       status:
                         type: string
                       phone:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       street_address:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       city:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       state_province:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       postal_code:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       country:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                       updated_at:
                         type: string
                         format: date-time
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          $ref: ../../components/responses/ValidationError.yaml
         '500':
-          $ref: '../../components/responses/ServerError.yaml'
+          $ref: ../../components/responses/ServerError.yaml

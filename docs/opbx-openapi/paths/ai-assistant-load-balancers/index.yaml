@@ -2,39 +2,52 @@ paths:
   /v1/ai-assistant-load-balancers:
     get:
       tags:
-        - AI Load Balancers
+      - AI Load Balancers
       summary: List AI load balancers
-      description: |
-        Get paginated list of AI assistant load balancers with member details.
+      description: 'Get paginated list of AI assistant load balancers with member details.
+
         Supports filtering by strategy, status, and search.
+
+        '
       operationId: listAiLoadBalancers
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: sort_by
-          in: query
-          schema:
-            type: string
-            enum: [name, strategy, status, created_at, updated_at]
-            default: created_at
-        - $ref: '../../components/parameters/query/SortOrder.yaml'
-        - name: strategy
-          in: query
-          schema:
-            type: string
-            enum: [round_robin, priority, weighted, least_connections]
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [active, inactive]
-        - name: search
-          in: query
-          schema:
-            type: string
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: sort_by
+        in: query
+        schema:
+          type: string
+          enum:
+          - name
+          - strategy
+          - status
+          - created_at
+          - updated_at
+          default: created_at
+      - $ref: ../../components/parameters/query/SortOrder.yaml
+      - name: strategy
+        in: query
+        schema:
+          type: string
+          enum:
+          - round_robin
+          - priority
+          - weighted
+          - least_connections
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - active
+          - inactive
+      - name: search
+        in: query
+        schema:
+          type: string
       responses:
         '200':
           description: List of load balancers
@@ -46,23 +59,24 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '../../components/schemas/AiAssistantLoadBalancer.yaml'
+                      $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
+          $ref: ../../components/responses/Unauthorized.yaml
     post:
       tags:
-        - AI Load Balancers
+      - AI Load Balancers
       summary: Create AI load balancer
-      description: |
-        Create a new AI assistant load balancer with members.
+      description: 'Create a new AI assistant load balancer with members.
+
         Fallback action determines which fallback fields are used.
+
+        '
       operationId: createAiLoadBalancer
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -74,34 +88,50 @@ paths:
                   type: string
                   example: Support Load Balancer
                 description:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                 strategy:
                   type: string
-                  enum: [round_robin, priority, weighted, least_connections]
+                  enum:
+                  - round_robin
+                  - priority
+                  - weighted
+                  - least_connections
                   example: round_robin
                 timeout:
                   type: integer
                   default: 30
                 fallback_action:
                   type: string
-                  enum: [hangup, extension, ring_group, ivr_menu, ai_assistant]
+                  enum:
+                  - hangup
+                  - extension
+                  - ring_group
+                  - ivr_menu
+                  - ai_assistant
                   default: hangup
                 fallback_extension_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 fallback_ring_group_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 fallback_ivr_menu_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 fallback_ai_assistant_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 status:
                   type: string
-                  enum: [active, inactive]
+                  enum:
+                  - active
+                  - inactive
                   default: active
                 members:
                   type: array
@@ -122,11 +152,13 @@ paths:
                         default: 0
                       status:
                         type: string
-                        enum: [active, inactive]
+                        enum:
+                        - active
+                        - inactive
                         default: active
               required:
-                - name
-                - strategy
+              - name
+              - strategy
       responses:
         '201':
           description: Load balancer created
@@ -138,29 +170,27 @@ paths:
                   message:
                     type: string
                   data:
-                    $ref: '../../components/schemas/AiAssistantLoadBalancer.yaml'
+                    $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/ai-assistant-load-balancers/{ai_assistant_load_balancer}:
     parameters:
-      - name: ai_assistant_load_balancer
-        in: path
-        required: true
-        schema:
-          type: integer
-
+    - name: ai_assistant_load_balancer
+      in: path
+      required: true
+      schema:
+        type: integer
     get:
       tags:
-        - AI Load Balancers
+      - AI Load Balancers
       summary: Get AI load balancer
       description: Get load balancer details with members and fallback configuration
       operationId: getAiLoadBalancer
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Load balancer details
@@ -170,23 +200,24 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '../../components/schemas/AiAssistantLoadBalancer.yaml'
+                    $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
     put:
       tags:
-        - AI Load Balancers
+      - AI Load Balancers
       summary: Update AI load balancer
-      description: |
-        Update load balancer configuration. Members are replaced if provided.
+      description: 'Update load balancer configuration. Members are replaced if provided.
+
         Uses distributed locking to prevent concurrent updates.
+
+        '
       operationId: updateAiLoadBalancer
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -200,27 +231,42 @@ paths:
                   type: string
                 strategy:
                   type: string
-                  enum: [round_robin, priority, weighted, least_connections]
+                  enum:
+                  - round_robin
+                  - priority
+                  - weighted
+                  - least_connections
                 timeout:
                   type: integer
                 fallback_action:
                   type: string
-                  enum: [hangup, extension, ring_group, ivr_menu, ai_assistant]
+                  enum:
+                  - hangup
+                  - extension
+                  - ring_group
+                  - ivr_menu
+                  - ai_assistant
                 fallback_extension_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 fallback_ring_group_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 fallback_ivr_menu_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 fallback_ai_assistant_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                 status:
                   type: string
-                  enum: [active, inactive]
+                  enum:
+                  - active
+                  - inactive
                 members:
                   type: array
                   items:
@@ -236,7 +282,9 @@ paths:
                         type: integer
                       status:
                         type: string
-                        enum: [active, inactive]
+                        enum:
+                        - active
+                        - inactive
       responses:
         '200':
           description: Load balancer updated
@@ -248,45 +296,151 @@ paths:
                   message:
                     type: string
                   data:
-                    $ref: '../../components/schemas/AiAssistantLoadBalancer.yaml'
+                    $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '409':
           description: Concurrent modification conflict
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
                 error: Conflict
                 message: Load balancer is currently being modified. Please try again.
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          $ref: ../../components/responses/ValidationError.yaml
+    patch:
+      tags:
+      - AI Load Balancers
+      summary: Partially update AI load balancer
+      description: 'Update load balancer configuration. Members are replaced if provided.
 
+        Uses distributed locking to prevent concurrent updates.
+
+        '
+      operationId: patchAiLoadBalancer
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                strategy:
+                  type: string
+                  enum:
+                  - round_robin
+                  - priority
+                  - weighted
+                  - least_connections
+                timeout:
+                  type: integer
+                fallback_action:
+                  type: string
+                  enum:
+                  - hangup
+                  - extension
+                  - ring_group
+                  - ivr_menu
+                  - ai_assistant
+                fallback_extension_id:
+                  type:
+                  - integer
+                  - 'null'
+                fallback_ring_group_id:
+                  type:
+                  - integer
+                  - 'null'
+                fallback_ivr_menu_id:
+                  type:
+                  - integer
+                  - 'null'
+                fallback_ai_assistant_id:
+                  type:
+                  - integer
+                  - 'null'
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                members:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ai_assistant_id:
+                        type: integer
+                      priority:
+                        type: integer
+                      weight:
+                        type: integer
+                      position:
+                        type: integer
+                      status:
+                        type: string
+                        enum:
+                        - active
+                        - inactive
+      responses:
+        '200':
+          description: Load balancer updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '409':
+          description: Concurrent modification conflict
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Conflict
+                message: Load balancer is currently being modified. Please try again.
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
     delete:
       tags:
-        - AI Load Balancers
+      - AI Load Balancers
       summary: Delete AI load balancer
       description: Delete load balancer if not referenced by extensions
       operationId: deleteAiLoadBalancer
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: Load balancer deleted
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '409':
           description: Load balancer in use
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
                 error: CONFLICT
                 message: Cannot delete load balancer that is in use

@@ -54,9 +54,9 @@ paths:
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
-  /v1/inbound-blacklist/{inboundBlacklist}:
+  /v1/inbound-blacklist/{inbound_blacklist}:
     parameters:
-      - name: inboundBlacklist
+      - name: inbound_blacklist
         in: path
         required: true
         schema:
@@ -83,6 +83,29 @@ paths:
         - Inbound Blacklist
       summary: Update Inbound Blacklist Entry
       operationId: updateInboundBlacklistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Inbound Blacklist Entry updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+    patch:
+      tags:
+        - Inbound Blacklist
+      summary: Partially update Inbound Blacklist Entry
+      operationId: patchInboundBlacklistEntry
       security:
         - bearerAuth: []
         - cookieAuth: []

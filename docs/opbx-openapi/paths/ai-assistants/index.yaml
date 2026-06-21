@@ -2,43 +2,55 @@ paths:
   /v1/ai-assistants:
     get:
       tags:
-        - AI Assistants
+      - AI Assistants
       summary: List AI assistants
-      description: |
-        Get paginated list of AI assistants in the organization.
+      description: 'Get paginated list of AI assistants in the organization.
+
         Supports filtering by status, protocol, provider, and search.
+
+        '
       operationId: listAiAssistants
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: sort_by
-          in: query
-          schema:
-            type: string
-            enum: [name, provider, protocol, status, created_at, updated_at]
-            default: name
-        - $ref: '../../components/parameters/query/SortOrder.yaml'
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [active, inactive]
-        - name: protocol
-          in: query
-          schema:
-            type: string
-            enum: [sip, websocket]
-        - name: provider
-          in: query
-          schema:
-            type: string
-        - name: search
-          in: query
-          schema:
-            type: string
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: sort_by
+        in: query
+        schema:
+          type: string
+          enum:
+          - name
+          - provider
+          - protocol
+          - status
+          - created_at
+          - updated_at
+          default: name
+      - $ref: ../../components/parameters/query/SortOrder.yaml
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - active
+          - inactive
+      - name: protocol
+        in: query
+        schema:
+          type: string
+          enum:
+          - sip
+          - websocket
+      - name: provider
+        in: query
+        schema:
+          type: string
+      - name: search
+        in: query
+        schema:
+          type: string
       responses:
         '200':
           description: List of AI assistants
@@ -50,23 +62,24 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '../../components/schemas/AiAssistant.yaml'
+                      $ref: ../../components/schemas/AiAssistant.yaml
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
+          $ref: ../../components/responses/Unauthorized.yaml
     post:
       tags:
-        - AI Assistants
+      - AI Assistants
       summary: Create AI assistant
-      description: |
-        Create a new AI assistant. Protocol is auto-detected from provider
+      description: 'Create a new AI assistant. Protocol is auto-detected from provider
+
         if not specified.
+
+        '
       operationId: createAiAssistant
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -79,17 +92,21 @@ paths:
                   description: AI assistant name
                   example: Support Bot
                 description:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   example: Customer support AI assistant
                 provider:
                   type: string
                   description: Provider key (e.g., openai, anthropic)
                   example: openai
                 protocol:
-                  type: string
-                  enum: [sip, websocket]
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - sip
+                  - websocket
                   description: Auto-detected from provider if not specified
                   example: websocket
                 configuration:
@@ -97,11 +114,13 @@ paths:
                   description: Provider-specific configuration
                 status:
                   type: string
-                  enum: [active, inactive]
+                  enum:
+                  - active
+                  - inactive
                   default: active
               required:
-                - name
-                - provider
+              - name
+              - provider
       responses:
         '201':
           description: AI assistant created
@@ -114,29 +133,27 @@ paths:
                     type: string
                     example: AI Assistant created successfully.
                   data:
-                    $ref: '../../components/schemas/AiAssistant.yaml'
+                    $ref: ../../components/schemas/AiAssistant.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/ai-assistants/{ai_assistant}:
     parameters:
-      - name: ai_assistant
-        in: path
-        required: true
-        schema:
-          type: integer
-
+    - name: ai_assistant
+      in: path
+      required: true
+      schema:
+        type: integer
     get:
       tags:
-        - AI Assistants
+      - AI Assistants
       summary: Get AI assistant
       description: Get AI assistant details including usage information
       operationId: getAiAssistant
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: AI assistant details
@@ -146,21 +163,20 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '../../components/schemas/AiAssistant.yaml'
+                    $ref: ../../components/schemas/AiAssistant.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
     put:
       tags:
-        - AI Assistants
+      - AI Assistants
       summary: Update AI assistant
       description: Update AI assistant configuration
       operationId: updateAiAssistant
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -171,18 +187,23 @@ paths:
                 name:
                   type: string
                 description:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                 provider:
                   type: string
                 protocol:
                   type: string
-                  enum: [sip, websocket]
+                  enum:
+                  - sip
+                  - websocket
                 configuration:
                   type: object
                 status:
                   type: string
-                  enum: [active, inactive]
+                  enum:
+                  - active
+                  - inactive
       responses:
         '200':
           description: AI assistant updated
@@ -194,37 +215,91 @@ paths:
                   message:
                     type: string
                   data:
-                    $ref: '../../components/schemas/AiAssistant.yaml'
+                    $ref: ../../components/schemas/AiAssistant.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
+    patch:
+      tags:
+      - AI Assistants
+      summary: Partially update AI assistant
+      description: Update AI assistant configuration
+      operationId: patchAiAssistant
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type:
+                  - string
+                  - 'null'
+                provider:
+                  type: string
+                protocol:
+                  type: string
+                  enum:
+                  - sip
+                  - websocket
+                configuration:
+                  type: object
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+      responses:
+        '200':
+          description: AI assistant updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: ../../components/schemas/AiAssistant.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
     delete:
       tags:
-        - AI Assistants
+      - AI Assistants
       summary: Delete AI assistant
-      description: |
-        Delete an AI assistant. Cannot delete if in use by extensions.
+      description: 'Delete an AI assistant. Cannot delete if in use by extensions.
+
+        '
       operationId: deleteAiAssistant
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: AI assistant deleted
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '409':
           description: AI assistant in use
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
                 error: CONFLICT
-                message: 'Cannot delete AI Assistant that is in use by 3 extension(s). Please reassign these extensions first.'
+                message: Cannot delete AI Assistant that is in use by 3 extension(s). Please reassign these extensions first.

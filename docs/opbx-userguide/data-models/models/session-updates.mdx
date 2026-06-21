@@ -1,0 +1,75 @@
+---
+sidebar_position: 11
+slug: /data-models/models/session-updates
+sidebar_class_name: cxGuidesSidebar
+title: SessionUpdate Model
+---
+
+# SessionUpdate Model
+
+The `SessionUpdate` model stores real-time session update events from Cloudonix for monitoring and debugging.
+
+**Table:** `session_updates`  
+**Model:** `App\Models\SessionUpdate`
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | bigint unsigned | No | Primary key |
+| `organization_id` | bigint unsigned | No | Tenant scope |
+| `session_id` | bigint unsigned | No | Cloudonix session ID |
+| `session_token` | string | Yes | Token for Cloudonix API disconnect |
+| `event_id` | string | No | Idempotency key |
+| `domain_id` | int | No | Cloudonix domain ID |
+| `domain` | string | No | Domain name |
+| `subscriber_id` | int | No | Subscriber ID |
+| `outgoing_subscriber_id` | int | Yes | Outgoing subscriber ID |
+| `caller_id` | string | No | Caller number |
+| `destination` | string | No | Callee number |
+| `direction` | string | No | inbound / outbound |
+| `status` | string | No | Current status |
+| `session_created_at` | datetime | No | Session creation time |
+| `session_modified_at` | datetime | No | Last modification time |
+| `call_start_time` | bigint | Yes | Start timestamp (ms) |
+| `start_time` | datetime | Yes | Parsed start time |
+| `call_answer_time` | bigint | Yes | Answer timestamp (ms) |
+| `answer_time` | datetime | Yes | Parsed answer time |
+| `time_limit` | int | Yes | Call time limit |
+| `vapp_server` | string | Yes | Voice app server |
+| `action` | string | No | |
+| `reason` | string | No | |
+| `last_error` | string | Yes | |
+| `call_ids` | JSON | No | Associated call IDs |
+| `profile` | JSON | No | Session profile (QoS, AMD) |
+| `processed_at` | datetime | No | When OPBX processed the event |
+| `created_at` | datetime | No | |
+| `updated_at` | datetime | No | |
+
+## Relationships
+
+```php
+$sessionUpdate->organization() → Organization
+```
+
+## Scopes
+
+```php
+SessionUpdate::forOrganization($orgId)
+SessionUpdate::forSession($sessionId)
+SessionUpdate::withStatus($status)
+SessionUpdate::withDirection($direction)
+SessionUpdate::search($term) // caller_id or destination
+```
+
+## Usage Notes
+
+- The Live Calls module queries this table to display active sessions.
+- The `profile` field may contain AMD results written by the AMD worker.
+- Session updates are processed idempotently using `event_id`.
+
+## Related Documentation
+
+- [Live Calls Module](../../modules/live-calls)
+- [Call Logs Module](../../modules/call-logs)
+- [AMD Worker](../../workers/amd-worker)

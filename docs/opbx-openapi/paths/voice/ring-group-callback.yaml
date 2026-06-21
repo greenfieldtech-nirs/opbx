@@ -2,19 +2,24 @@ paths:
   /callbacks/voice/ring-group-callback:
     post:
       tags:
-        - Voice Routing
+      - Voice Routing
       summary: Ring group callback
-      description: |
-        Handle ring group member callback from Cloudonix.
+      description: 'Handle ring group member callback from Cloudonix.
+
         Called when a ring group member finishes ringing (answered, busy, no-answer, etc.)
+
         or to get the next member in sequence.
-        
+
+
         Middleware: voice.webhook.auth, rate_limit_org:voice_routing
-        
+
+
         Authentication: Bearer token (per-organization domain_requests_api_key)
+
+        '
       operationId: ringGroupCallback
       security:
-        - voiceWebhookAuth: []
+      - voiceWebhookAuth: []
       requestBody:
         required: true
         content:
@@ -31,21 +36,28 @@ paths:
                   description: ID of the ring group being processed
                   example: 11
                 action:
-                  type: string
-                  enum: [next_member, timeout, completed, failed]
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - next_member
+                  - timeout
+                  - completed
+                  - failed
                   description: Action type for this callback
                   example: next_member
                 current_index:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 0
-                  nullable: true
                   description: Current member index in the ring sequence
                   example: 0
                 attempt_count:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 1
-                  nullable: true
                   description: Number of attempts made so far
                   example: 1
                 From:
@@ -57,25 +69,34 @@ paths:
                   description: Called number in E.164 format or extension
                   example: '+1987654321'
                 Domain:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   description: Cloudonix domain
                   example: example.cloudonix.io
                 CallStatus:
-                  type: string
-                  enum: [ringing, answered, completed, failed, busy, no-answer]
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - ringing
+                  - answered
+                  - completed
+                  - failed
+                  - busy
+                  - no-answer
                   description: Current call status
                   example: no-answer
                 _organization_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                   description: Organization ID (set by VerifyVoiceWebhookAuth middleware)
               required:
-                - CallSid
-                - ring_group_id
-                - From
-                - To
+              - CallSid
+              - ring_group_id
+              - From
+              - To
           application/x-www-form-urlencoded:
             schema:
               type: object
@@ -104,14 +125,9 @@ paths:
           content:
             application/xml:
               schema:
-                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
-              example: |
-                <?xml version="1.0" encoding="UTF-8"?>
-                <Response>
-                  <Connect>
-                    <Stream url="wss://ai.example.com/stream" name="ai-assistant"/>
-                  </Connect>
-                </Response>
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
+              example: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Connect>\n    <Stream url=\"wss://ai.example.com/stream\"\
+                \ name=\"ai-assistant\"/>\n  </Connect>\n</Response>\n"
         '204':
           description: Empty response to continue call normally
         '401':

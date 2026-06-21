@@ -1,0 +1,127 @@
+paths:
+  /v1/auto-dialer-campaigns/{campaign}/list:
+    parameters:
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Auto Dialer Campaigns
+      summary: Get campaign list
+      description: 'Get the distribution list currently assigned to a campaign.
+
+
+        Returns 404 if no list has been uploaded or assigned.
+
+        '
+      operationId: getCampaignList
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign list details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+    post:
+      tags:
+      - Auto Dialer Campaigns
+      summary: Upload campaign list
+      description: 'Upload a CSV distribution list directly to a campaign.
+
+
+        The file must be a valid CSV or TXT file up to 10 MB.
+
+        An optional list name can be provided.
+
+        '
+      operationId: uploadCampaignList
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV/TXT file containing phone numbers and optional descriptions
+                name:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Optional name for the uploaded list
+              required:
+              - file
+      responses:
+        '200':
+          description: List uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: List uploaded successfully
+                  data:
+                    type: object
+                    additionalProperties: true
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+    delete:
+      tags:
+      - Auto Dialer Campaigns
+      summary: Delete campaign list
+      description: 'Remove the distribution list currently assigned to a campaign.
+
+        '
+      operationId: deleteCampaignList
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: List deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: List deleted successfully
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml

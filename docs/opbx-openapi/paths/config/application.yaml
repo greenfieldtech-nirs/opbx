@@ -2,17 +2,20 @@ paths:
   /v1/config/application:
     get:
       tags:
-        - Configuration
+      - Configuration
       summary: Get application configuration
-      description: |
-        Get application-level configuration for the frontend.
-        
+      description: 'Get application-level configuration for the frontend.
+
+
         Returns configuration details including SaaS mode, webhook URL
+
         settings, reCAPTCHA configuration, and validation warnings.
+
+        '
       operationId: getApplicationConfig
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Application configuration
@@ -23,9 +26,11 @@ paths:
                 properties:
                   mode:
                     type: string
-                    enum: [development, production]
+                    enum:
+                    - development
+                    - production
                     description: Application deployment mode
-                    example: "production"
+                    example: production
                   is_production:
                     type: boolean
                     description: Whether the application is in production mode
@@ -43,7 +48,7 @@ paths:
                     description: Configuration warnings (if any)
                     items:
                       type: string
-                      example: "Production mode requires OPBX_APPLICATION_WEBHOOK_BASEURL to be set"
+                      example: Production mode requires OPBX_APPLICATION_WEBHOOK_BASEURL to be set
                   hide_webhook_fields:
                     type: boolean
                     description: Whether webhook fields should be hidden in the UI
@@ -57,9 +62,10 @@ paths:
                         description: Whether reCAPTCHA is enabled
                         example: true
                       site_key:
-                        type: string
-                        nullable: true
+                        type:
+                        - string
+                        - 'null'
                         description: reCAPTCHA site key (if enabled)
-                        example: "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+                        example: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml

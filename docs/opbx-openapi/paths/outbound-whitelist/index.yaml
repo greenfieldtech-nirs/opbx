@@ -54,9 +54,9 @@ paths:
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
-  /v1/outbound-whitelist/{outboundWhitelist}:
+  /v1/outbound-whitelist/{outbound_whitelist}:
     parameters:
-      - name: outboundWhitelist
+      - name: outbound_whitelist
         in: path
         required: true
         schema:
@@ -83,6 +83,29 @@ paths:
         - Outbound Whitelist
       summary: Update Outbound Whitelist Entry
       operationId: updateOutboundWhitelistEntry
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Outbound Whitelist Entry updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+    patch:
+      tags:
+        - Outbound Whitelist
+      summary: Partially update Outbound Whitelist Entry
+      operationId: patchOutboundWhitelistEntry
       security:
         - bearerAuth: []
         - cookieAuth: []

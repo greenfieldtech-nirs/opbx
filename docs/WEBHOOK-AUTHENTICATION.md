@@ -1,6 +1,6 @@
 # Webhook Authentication
 
-This document describes the webhook authentication implementation in OpBX. All webhook endpoints use **Bearer token authentication** (not HMAC-SHA256 signatures).
+This document describes the webhook authentication implementation in OpBX. Webhooks use **Bearer token authentication**; there are no HMAC-SHA256 webhook signatures.
 
 ## Table of Contents
 
@@ -11,6 +11,7 @@ This document describes the webhook authentication implementation in OpBX. All w
 - [Idempotency Mechanism](#idempotency-mechanism)
 - [Auto-Dialer Webhooks](#auto-dialer-webhooks)
 - [AMD Action Callback](#amd-action-callback)
+- [Dialer Worker Authentication](#dialer-worker-authentication)
 - [Configuration](#configuration)
 - [Error Responses](#error-responses)
 - [Security Properties](#security-properties)
@@ -20,16 +21,16 @@ This document describes the webhook authentication implementation in OpBX. All w
 
 ## Overview
 
-OpBX receives webhooks from Cloudonix CPaaS for voice routing, call status updates, CDRs, and auto-dialer events. Authentication is implemented via middleware that validates Bearer tokens against per-organization API keys stored in `cloudonix_settings.domain_requests_api_key`.
+OpBX receives webhooks from Cloudonix CPaaS for voice routing, call status updates, CDRs, and auto-dialer events. Authentication is implemented via middleware that validates Bearer tokens against organization settings or global worker secrets.
 
 There are four distinct authentication contexts:
 
 | Context | Middleware | Auth Method | Response Format | Routes |
 |---------|-----------|-------------|-----------------|--------|
-| Voice Routing | `VerifyVoiceWebhookAuth` (`voice.webhook.auth`) | Bearer token (required) | CXML | `/voice/*`, `/callbacks/voice/*` |
-| Status/CDR | `VerifyCloudonixSignature` (`webhook.signature`) | Bearer token (conditional) | JSON | `/webhooks/cloudonix/*` |
-| Auto-Dialer | `VerifyCloudonixSignature` + `EnsureWebhookIdempotency` | Bearer token (conditional) | JSON | `/webhooks/auto-dialer/*` |
-| AMD Action | Inline in `AmdActionController` | Bearer token (required) | JSON | `/voice/amd-action` |
+| Voice Routing | `VerifyVoiceWebhookAuth` (`voice.webhook.auth`) | Bearer token (required) | CXML | `/api/voice/*`, `/api/callbacks/voice/*` |
+| Status/CDR | `VerifyCloudonixSignature` (`webhook.signature`) | Bearer token (conditional) | JSON | `/api/webhooks/cloudonix/*` |
+| Auto-Dialer | `VerifyCloudonixSignature` + `EnsureWebhookIdempotency` | Bearer token (conditional) | JSON | `/api/webhooks/auto-dialer/*`, `/api/webhooks/cloudonix/dialer` |
+| AMD Action | Inline in `AmdActionController` | Bearer token (required) | JSON | `/api/voice/amd-action` |
 
 ---
 
@@ -38,18 +39,18 @@ There are four distinct authentication contexts:
 ```mermaid
 flowchart TD
     subgraph Voice["Voice Routing Webhooks (CXML)"]
-        V1[POST /voice/route] --> VM[VerifyVoiceWebhookAuth]
-        V2[POST /voice/ivr-input] --> VM
-        V3[POST /callbacks/voice/ring-group-callback] --> VM
-        V4[POST /callbacks/voice/albs-follow-through] --> VM
+        V1[POST /api/voice/route] --> VM[VerifyVoiceWebhookAuth]
+        V2[POST /api/voice/ivr-input] --> VM
+        V3[POST /api/callbacks/voice/ring-group-callback] --> VM
+        V4[POST /api/callbacks/voice/albs-follow-through] --> VM
     end
 
     subgraph Status["Status/CDR Webhooks (JSON)"]
-        S1[POST /webhooks/cloudonix/call-initiated] --> SM[VerifyCloudonixSignature]
-        S2[POST /webhooks/cloudonix/call-status] --> SM
-        S3[POST /webhooks/cloudonix/cdr] --> SM
-        S4[POST /webhooks/cloudonix/session-update] --> SM
-        S5[POST /webhooks/cloudonix/dialer] --> SM
+        S1[POST /api/webhooks/cloudonix/call-initiated] --> SM[VerifyCloudonixSignature]
+        S2[POST /api/webhooks/cloudonix/call-status] --> SM
+        S3[POST /api/webhooks/cloudonix/cdr] --> SM
+        S4[POST /api/webhooks/cloudonix/session-update] --> SM
+        S5[POST /api/webhooks/cloudonix/dialer] --> SM
     end
 
     subgraph Idemp["Idempotency Layer"]
@@ -57,13 +58,13 @@ flowchart TD
     end
 
     subgraph Dialer["Auto-Dialer Webhooks"]
-        D1[POST /webhooks/auto-dialer/call-status] --> SM2[VerifyCloudonixSignature]
-        D2[POST /webhooks/auto-dialer/amd-result] --> SM2
+        D1[POST /api/webhooks/auto-dialer/call-status] --> SM2[VerifyCloudonixSignature]
+        D2[POST /api/webhooks/auto-dialer/amd-result] --> SM2
         SM2 --> IM2[EnsureWebhookIdempotency]
     end
 
     subgraph AMD["AMD Action Callback"]
-        A1[POST /voice/amd-action] --> AC[Inline Bearer Check]
+        A1[POST /api/voice/amd-action] --> AC[Inline Bearer Check]
     end
 
     VM --> VT{Token matches<br/>domain_requests_api_key?}
@@ -109,43 +110,6 @@ Voice routing webhooks are real-time CXML requests from Cloudonix that determine
 | `/api/voice/ivr-input` | POST | `VoiceRoutingController@handleIvrInput` | IVR digit input callback |
 | `/api/callbacks/voice/ring-group-callback` | POST | `VoiceRoutingController@handleRingGroupCallback` | Ring group sequential routing |
 | `/api/callbacks/voice/albs-follow-through` | POST | `AlbsFollowThroughController@handle` | ALB failover routing |
-
-### Code Reference
-
-```php
-// app/Http/Middleware/VerifyVoiceWebhookAuth.php
-class VerifyVoiceWebhookAuth
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        $authHeader = $request->header('Authorization');
-        if (empty($authHeader) || !str_starts_with($authHeader, 'Bearer ')) {
-            return $this->unauthorizedResponse(); // CXML 401
-        }
-
-        $providedToken = substr($authHeader, 7);
-        $payload = $request->json()->all();
-        $domain = $payload['Domain'] ?? $payload['domain'] ?? null;
-
-        // Find settings by domain
-        $settings = CloudonixSettings::where('domain_name', $domain)
-            ->orWhere('domain_uuid', $domain)
-            ->first();
-
-        // Token MUST match and MUST be configured
-        if (empty($settings->domain_requests_api_key)) {
-            return $this->unauthorizedResponse();
-        }
-
-        if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
-            return $this->unauthorizedResponse();
-        }
-
-        $request->merge(['_organization_id' => $settings->organization_id]);
-        return $next($request);
-    }
-}
-```
 
 ### Error Responses
 
@@ -199,36 +163,6 @@ if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
 | `/api/webhooks/cloudonix/cdr` | `webhook.signature`, `webhook.idempotency` | Call detail records |
 | `/api/webhooks/cloudonix/session-update` | `webhook.signature` | High-velocity session updates |
 | `/api/webhooks/cloudonix/dialer` | `webhook.signature`, `webhook.idempotency` | Dialer proxy events |
-
-### Code Reference
-
-```php
-// app/Http/Middleware/VerifyCloudonixSignature.php
-class VerifyCloudonixSignature
-{
-    private function authenticateRequest(Request $request, CloudonixSettings $settings): array
-    {
-        $providedToken = $this->extractBearerToken($request);
-
-        // Case 1: Organization has webhook auth configured
-        if (!empty($settings->domain_requests_api_key)) {
-            if (!$providedToken) {
-                return ['success' => false, 'reason' => 'Bearer token required'];
-            }
-            if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
-                return ['success' => false, 'reason' => 'Invalid Bearer token'];
-            }
-            return ['success' => true, 'method' => 'bearer_token'];
-        }
-
-        // Case 2: No auth configured — allow regardless of token presence
-        return [
-            'success' => true,
-            'method' => $providedToken ? 'bearer_token_ignored' : 'none',
-        ];
-    }
-}
-```
 
 ### Backward Compatibility
 
@@ -328,6 +262,7 @@ Auto-dialer webhooks reuse the same middleware stack as status/CDR webhooks:
 |-------|-----------|------------|
 | `/api/webhooks/auto-dialer/call-status` | `webhook.signature`, `webhook.idempotency` | `AutoDialerWebhookController@callStatus` |
 | `/api/webhooks/auto-dialer/amd-result` | `webhook.signature`, `webhook.idempotency` | `AutoDialerWebhookController@amdResult` |
+| `/api/webhooks/cloudonix/dialer` | `webhook.signature`, `webhook.idempotency` | `DialerWebhookProxyController@handleCloudonixWebhook` |
 
 Authentication follows the **unified flow** described in [Status/CDR Webhook Authentication](#statuscdr-webhook-authentication):
 
@@ -373,6 +308,28 @@ if (!str_starts_with($authHeader, 'Bearer ') || !hash_equals('Bearer '.$expected
 | `confidence` | numeric | No | Detection confidence |
 | `detectionTimeMs` | integer | No | Detection time in milliseconds |
 | `reason` | string | No | Detection reason |
+
+---
+
+## Dialer Worker Authentication
+
+**Middleware:** `App\Http\Middleware\DialerWorkerAuth`  
+**Alias:** `dialer.worker.auth`
+
+The Go dialer worker authenticates to Laravel API routes under `/api/v1/dialer/worker/*` using a Bearer token.
+
+### Behavior
+
+1. Extracts the Bearer token from the `Authorization` header.
+2. Compares it to `config('services.dialer_worker.token')` (`DIALER_WORKER_API_TOKEN`).
+3. Optionally accepts a secondary token (`DIALER_WORKER_API_TOKEN_SECONDARY`) for zero-downtime rotation.
+4. Uses `hash_equals()` for constant-time comparison.
+
+If the primary token is not configured, the middleware returns `503 Service Unavailable`.
+
+### Protected Routes
+
+See `routes/api.php` for the full `/api/v1/dialer/worker/*` route group.
 
 ---
 
@@ -483,11 +440,11 @@ This applies to:
 The `domain_requests_api_key` is:
 - **Encrypted at rest** via Laravel's `encrypted` cast.
 - **Masked in API responses** (only last 4 characters shown).
-- **Excluded from logs** via `LogSanitizer` and exception context filtering.
+- **Excluded from logs** via exception context filtering.
 
 ### Log Sanitization
 
-The following fields are automatically redacted from logs:
+The following fields are automatically redacted from exception context:
 
 ```php
 // bootstrap/app.php
@@ -610,6 +567,7 @@ curl https://your-opbx.com/api/health
 - [`app/Http/Middleware/VerifyCloudonixSignature.php`](../app/Http/Middleware/VerifyCloudonixSignature.php)
 - [`app/Http/Middleware/EnsureWebhookIdempotency.php`](../app/Http/Middleware/EnsureWebhookIdempotency.php)
 - [`app/Http/Controllers/Voice/AmdActionController.php`](../app/Http/Controllers/Voice/AmdActionController.php)
+- [`app/Http/Middleware/DialerWorkerAuth.php`](../app/Http/Middleware/DialerWorkerAuth.php)
 - [`routes/webhooks.php`](../routes/webhooks.php)
 - [`config/webhooks.php`](../config/webhooks.php)
 - [Cloudonix API Security Documentation](https://developers.cloudonix.com/Documentation/apiSecurity)

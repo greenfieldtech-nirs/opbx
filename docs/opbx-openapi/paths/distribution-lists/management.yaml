@@ -1,27 +1,28 @@
 paths:
   /v1/auto-dialer-campaigns/lists/{list}/versions:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: List versions
-      description: |
-        Get version history for a distribution list.
-        
+      description: 'Get version history for a distribution list.
+
+
         Returns all versions of the list, ordered by version number.
+
+        '
       operationId: listListVersions
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: List of versions
@@ -33,38 +34,39 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '../../components/schemas/DistributionList.yaml'
+                      $ref: ../../components/schemas/DistributionList.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
   /v1/auto-dialer-campaigns/lists/{list}/copy:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     post:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Copy list
-      description: |
-        Create a copy of a distribution list.
-        
+      description: 'Create a copy of a distribution list.
+
+
         The new list will have the same destinations as the original
-        but will be in 'draft' status and unassigned.
+
+        but will be in ''draft'' status and unassigned.
+
+        '
       operationId: copyDistributionList
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -76,9 +78,9 @@ paths:
                   type: string
                   maxLength: 255
                   description: Name for the new list
-                  example: "Sales Leads Q1 - Copy"
+                  example: Sales Leads Q1 - Copy
               required:
-                - new_name
+              - new_name
       responses:
         '201':
           description: List copied successfully
@@ -89,42 +91,43 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "List copied successfully"
+                    example: List copied successfully
                   data:
-                    $ref: '../../components/schemas/DistributionList.yaml'
+                    $ref: ../../components/schemas/DistributionList.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/auto-dialer-campaigns/lists/{list}/archive:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     patch:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Archive list
-      description: |
-        Archive a distribution list.
-        
+      description: 'Archive a distribution list.
+
+
         Archived lists cannot be assigned to campaigns or modified.
-        Only lists in 'ready' or 'used' status can be archived.
+
+        Only lists in ''ready'' or ''used'' status can be archived.
+
+        '
       operationId: archiveDistributionList
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: List archived successfully
@@ -135,48 +138,49 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "List archived successfully"
+                    example: List archived successfully
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
           description: Cannot archive list
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
-                error: "ARCHIVE_FAILED"
-                message: "List cannot be archived in its current status"
-                code: "INVALID_STATUS"
-
+                error: ARCHIVE_FAILED
+                message: List cannot be archived in its current status
+                code: INVALID_STATUS
   /v1/auto-dialer-campaigns/lists/{list}/download:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Download list as CSV
-      description: |
-        Download a distribution list as a CSV file.
-        
+      description: 'Download a distribution list as a CSV file.
+
+
         The file includes all destinations with their phone numbers
+
         and descriptions.
+
+        '
       operationId: downloadDistributionList
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: CSV file download
@@ -191,35 +195,35 @@ paths:
                 type: string
               description: Attachment filename
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
   /v1/auto-dialer-campaigns/lists/{list}/validation-errors:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Get validation errors
-      description: |
-        Get validation errors for a failed list upload.
-        
-        Only available for lists in 'failed' status.
+      description: 'Get validation errors for a failed list upload.
+
+
+        Only available for lists in ''failed'' status.
+
+        '
       operationId: getListValidationErrors
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Validation errors
@@ -238,54 +242,55 @@ paths:
                           example: 15
                         column:
                           type: string
-                          example: "phone_number"
+                          example: phone_number
                         value:
                           type: string
-                          example: "invalid"
+                          example: invalid
                         message:
                           type: string
-                          example: "Invalid phone number format"
+                          example: Invalid phone number format
         '400':
           description: List is not in failed status
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
-                error: "BAD_REQUEST"
-                message: "Validation errors only available for failed lists"
-                code: "NOT_FAILED"
+                error: BAD_REQUEST
+                message: Validation errors only available for failed lists
+                code: NOT_FAILED
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
   /v1/auto-dialer-campaigns/lists/{list}/assign:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     post:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Assign list to campaign
-      description: |
-        Assign a distribution list to an auto-dialer campaign.
-        
-        The list must be in 'ready' status and the campaign must
+      description: 'Assign a distribution list to an auto-dialer campaign.
+
+
+        The list must be in ''ready'' status and the campaign must
+
         be able to accept a list assignment.
+
+        '
       operationId: assignListToCampaign
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -298,7 +303,7 @@ paths:
                   description: ID of the campaign to assign the list to
                   example: 5
               required:
-                - campaign_id
+              - campaign_id
       responses:
         '200':
           description: List assigned successfully
@@ -309,7 +314,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "List assigned to campaign successfully"
+                    example: List assigned to campaign successfully
                   data:
                     type: object
                     properties:
@@ -321,48 +326,49 @@ paths:
                         example: 5
                       campaign_name:
                         type: string
-                        example: "Q1 Sales Campaign"
+                        example: Q1 Sales Campaign
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
           description: Cannot assign list
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
-                error: "ASSIGN_FAILED"
-                message: "List is not ready for assignment"
-                code: "LIST_NOT_READY"
-
+                error: ASSIGN_FAILED
+                message: List is not ready for assignment
+                code: LIST_NOT_READY
   /v1/auto-dialer-campaigns/lists/{list}/unassign:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     post:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Unassign list from campaign
-      description: |
-        Unassign a distribution list from its campaign.
-        
+      description: 'Unassign a distribution list from its campaign.
+
+
         The list must be currently assigned to a campaign.
-        After unassignment, the list returns to 'ready' status.
+
+        After unassignment, the list returns to ''ready'' status.
+
+        '
       operationId: unassignListFromCampaign
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: List unassigned successfully
@@ -373,7 +379,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "List unassigned from campaign successfully"
+                    example: List unassigned from campaign successfully
                   data:
                     type: object
                     properties:
@@ -381,22 +387,70 @@ paths:
                         type: integer
                         example: 1
                       previous_campaign_name:
-                        type: string
-                        nullable: true
-                        example: "Q1 Sales Campaign"
+                        type:
+                        - string
+                        - 'null'
+                        example: Q1 Sales Campaign
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
           description: Cannot unassign list
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
-                error: "UNASSIGN_FAILED"
-                message: "List is not assigned to any campaign"
-                code: "NOT_ASSIGNED"
+                error: UNASSIGN_FAILED
+                message: List is not assigned to any campaign
+                code: NOT_ASSIGNED
+  /v1/auto-dialer-campaigns/lists/{list}/reset-pending-destinations:
+    parameters:
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    post:
+      tags:
+      - Distribution Lists
+      summary: Reset pending destinations
+      description: 'Reset all pending destinations in a list to zero dial attempts.
+
+
+        Only destinations in pending status are affected.
+
+        '
+      operationId: resetListPendingDestinations
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Pending destinations reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Reset 150 pending destinations
+                  data:
+                    type: object
+                    properties:
+                      updated_count:
+                        type: integer
+                        example: 150
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml

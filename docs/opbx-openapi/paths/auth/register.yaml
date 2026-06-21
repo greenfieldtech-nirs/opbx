@@ -2,17 +2,23 @@ paths:
   /v1/auth/register:
     post:
       tags:
-        - Authentication
+      - Authentication
       summary: Register new organization
-      description: |
-        Register a new organization with an owner user.
-        
+      description: 'Register a new organization with an owner user.
+
+
         Creates:
+
         1. New organization with default settings
+
         2. Owner user with full permissions
+
         3. API token for immediate access
-        
+
+
         Rate limited for registration attempts.
+
+        '
       operationId: register
       security: []
       requestBody:
@@ -39,12 +45,12 @@ paths:
                       type: string
                       minLength: 2
                       maxLength: 50
-                      pattern: '^[a-z0-9\-]+$'
+                      pattern: ^[a-z0-9\-]+$
                       description: URL-friendly slug (auto-generated if not provided)
                       example: acme-corporation
                   required:
-                    - name
-                    - timezone
+                  - name
+                  - timezone
                 admin:
                   type: object
                   properties:
@@ -64,29 +70,35 @@ paths:
                       type: string
                       format: password
                       minLength: 8
-                      description: |
-                        Password must contain:
+                      description: 'Password must contain:
+
                         - At least 8 characters
+
                         - Upper and lowercase letters
+
                         - At least one number
+
                         - At least one special character
+
+                        '
                       example: SecurePass123!
                     password_confirmation:
                       type: string
                       description: Password confirmation (must match password)
                       example: SecurePass123!
                   required:
-                    - name
-                    - email
-                    - password
-                    - password_confirmation
+                  - name
+                  - email
+                  - password
+                  - password_confirmation
                 recaptcha_token:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   description: reCAPTCHA v3 token (if enabled)
               required:
-                - organization
-                - admin
+              - organization
+              - admin
       responses:
         '201':
           description: Organization registered successfully
@@ -99,9 +111,9 @@ paths:
                     type: string
                     example: Organization registered successfully
                   user:
-                    $ref: '../../components/schemas/User.yaml'
+                    $ref: ../../components/schemas/User.yaml
                   organization:
-                    $ref: '../../components/schemas/Organization.yaml'
+                    $ref: ../../components/schemas/Organization.yaml
                   access_token:
                     type: string
                     description: Bearer token for immediate access
@@ -132,13 +144,13 @@ paths:
                 token_type: Bearer
                 expires_in: 86400
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          $ref: ../../components/responses/ValidationError.yaml
         '500':
           description: Registration failed
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
                 error:
                   code: REGISTRATION_FAILED

@@ -2,133 +2,110 @@
 sidebar_position: 1
 slug: /modules/user-management
 sidebar_class_name: cxGuidesSidebar
-title: User Management
-description: Managing users and roles in your organization
+title: "User Management"
+description: "Create and manage user accounts with role-based access control"
 ---
 
 # User Management
 
-OPBX uses a role-based access control system to manage what users can do within your organization. This page explains how to create, edit, and manage users.
+The User Management module controls who can access your OPBX organization and what they can do. Each user belongs to exactly one organization and has one of four roles.
 
-## Accessing User Management
+## Purpose
 
-Navigate to the Users section using the sidebar menu. You will see a list of all users in your organization. The actions available to you depend on your role.
+Use this module to:
+
+- Create and deactivate user accounts
+- Assign roles and permissions
+- Reset user passwords
+- Manage user profile information
+- Control access to PBX features
 
 ## Role Hierarchy
 
-OPBX has four predefined roles with a clear hierarchy:
+OPBX uses four roles with decreasing permissions:
 
-**Owner > PBX Admin > PBX User > Reporter**
+| Role | Level | Capabilities |
+|------|-------|--------------|
+| Owner | 1 | Full access; can manage other owners and system-wide settings |
+| PBX Admin | 2 | Manage extensions, routing, users (except owners and other PBX admins) |
+| PBX User | 3 | View assigned resources; update own extension settings |
+| Reporter | 4 | Read-only access to call logs, reports, and dashboards |
 
-Each role has specific capabilities. Higher roles can perform all actions of lower roles, with some exceptions noted below.
-
-## Role Capabilities
-
-| Capability | Owner | PBX Admin | PBX User | Reporter |
-|-----------|-------|-----------|----------|----------|
-| View users | Yes | Yes | No | No |
-| Create users | Yes | Yes | No | No |
-| Edit all users | Yes | Yes (not owners) | No | No |
-| Delete users | Yes (not self) | PBX User/Reporter only | No | No |
-| Change roles | Yes (not self) | No | No | No |
-| Reset passwords | Yes | PBX User/Reporter only | No | No |
-| Edit own profile | Yes | Yes | Yes | No |
-| Manage settings | Yes | No | No | No |
-
-:::note
-Owners have full control except they cannot delete themselves or change their own role. This prevents accidental lockout from the organization.
+:::info Role Assignment
+Only Owners can assign the Owner role. PBX Admins cannot create or modify other PBX Admins or Owners.
 :::
 
-## Creating a User
+## Permissions
 
-To add a new user to your organization:
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View users | Yes | Yes | Self only | No |
+| Create users | Yes | Yes (non-owner) | No | No |
+| Update users | Yes | Yes (non-owner, non-admin) | Self only | No |
+| Delete users | Yes | PBX User / Reporter only | No | No |
+| Update role | Yes (not self) | No | No | No |
+| Update password | Others only | PBX User / Reporter only | No | No |
 
-1. Click **Create User** on the Users page
-2. Enter the user's full name
-3. Enter a valid email address (used for login)
-4. Set a temporary password
-5. Select the appropriate role
-6. Save the user
+## UI Workflow
 
-The new user receives login credentials and can access OPBX immediately. They should change their password on first login.
+### Create a User
 
-:::tip
-Use descriptive names that help identify users across the system, especially if they will be assigned to extensions.
-:::
+1. Navigate to **Users** in the sidebar
+2. Click **Add User**
+3. Enter the user's name and email
+4. Select a role
+5. Optionally assign an extension
+6. Click **Save**
 
-## Editing Users
+The new user receives an email invitation if transactional email is configured.
 
-Click any user row to open the edit form. You can modify:
+### Deactivate a User
 
-- Name
-- Email address
-- Role
-- Status
+1. Find the user in the Users list
+2. Click **Edit**
+3. Change **Status** to `Inactive`
+4. Save the change
 
-:::warning
-You cannot change your own role. This restriction prevents accidental self-demotion. Only another owner can change your role.
-:::
+Inactive users cannot log in but their history remains available.
 
-## Deactivating Users
+### Reset a Password
 
-Set a user's status to **Inactive** to prevent login while preserving all data and history. This is useful for:
+1. Open the user details
+2. Click **Reset Password**
+3. Enter and confirm the new password
+4. Save
 
-- Temporary leave
-- Seasonal workers
-- Investigation periods
+Password changes made by an administrator force the user to log in again.
 
-Inactive users:
-- Cannot log in
-- Do not count toward license limits
-- Retain all call history and recordings
-- Can be reactivated at any time
+## Key Data Fields
 
-## Deleting Users
+### `users` Table
 
-Deleting a user removes them permanently from the system. This action:
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Display name |
+| `email` | string | Globally unique |
+| `password` | string | Hashed with bcrypt |
+| `role` | enum | owner, pbx_admin, pbx_user, reporter |
+| `status` | enum | active, inactive |
+| `is_platform_manager` | boolean | Cross-tenant admin flag |
 
-- Cannot be undone
-- Removes the user from all extensions and assignments
-- Preserves call history (attributed to "Deleted User")
+## Related API Endpoints
 
-:::danger
-You cannot delete yourself. You cannot delete the last owner in the organization. At least one owner must remain at all times.
-:::
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/users` | List users |
+| POST | `/v1/users` | Create user |
+| GET | `/v1/users/{user}` | Show user |
+| PUT | `/v1/users/{user}` | Update user |
+| DELETE | `/v1/users/{user}` | Delete user |
+| PATCH | `/v1/users/{user}/password` | Update user password |
 
-## Password Management
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full request/response schemas.
 
-### Resetting Passwords
+## Related Modules
 
-- **Owners** can reset any user's password
-- **PBX Admins** can reset passwords for PBX Users and Reporters only
-- Password resets generate a new temporary password
-
-:::warning
-When a password is changed, all active sessions and API tokens for that user are revoked. The user must log in again with the new password.
-:::
-
-### Password Requirements
-
-Passwords must meet your organization's security policy. By default, OPBX requires:
-
-- Minimum 8 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one number
-
-## Profile Management
-
-Each user can edit their own profile through the top-right user menu:
-
-1. Click your name in the top-right corner
-2. Select **Profile**
-3. Update your information:
-   - Full name
-   - Phone number
-   - Physical address
-
-:::note
-Reporters cannot edit their own profile. An owner or PBX Admin must make profile changes for Reporter users.
-:::
-
-Profile information appears throughout the system, including call logs and reports.
+- [Extensions](/modules/extensions) — Assign extensions to users
+- [Settings](/modules/settings) — Organization-wide configuration

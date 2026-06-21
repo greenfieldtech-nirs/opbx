@@ -1,0 +1,182 @@
+---
+sidebar_position: 2
+slug: /workers/amd-worker
+sidebar_class_name: cxGuidesSidebar
+title: "AMD Worker"
+description: "Java/Vert.x stream-based voicemail detection service"
+---
+
+# AMD Worker
+
+The AMD Worker is a Java/Vert.x 5 microservice that performs real-time Answering Machine Detection (AMD). It receives live audio streams from Cloudonix via WebSocket, analyzes audio for voicemail beep tones, and posts detection results to the Laravel backend.
+
+## Purpose
+
+The worker handles:
+
+- Receiving WebSocket audio streams from Cloudonix
+- Decoding mu-law audio to PCM and resampling to 16 kHz
+- Detecting voicemail beeps with ML and energy-based detectors
+- Posting results to Laravel's `/api/voice/amd-action` endpoint
+- Closing the WebSocket after a result or timeout
+
+## When It Is Triggered
+
+The AMD worker is triggered when:
+
+1. An outbound auto-dialer campaign has AMD enabled
+2. A call is answered
+3. Laravel returns CXML with a `<Start><Stream url="wss://.../ws/amd/detect">` verb
+4. Cloudonix opens a WebSocket to the AMD worker and begins streaming audio
+
+It is also used for any other call flow that wraps CXML with the AMD stream verb.
+
+## Architecture
+
+```mermaid
+graph TB
+    CXML[CXML Application]
+    STREAM[WebSocket Audio Stream]
+    WS[WebSocket Server port 8082]
+    HTTP[HTTP Health Server port 8083]
+    SH[StreamHandler]
+    SS[StreamSession]
+    VAD[EnergyVAD]
+    DP[DetectionPipeline]
+    BML[BeepMlDetector]
+    TED[ToneEnergyDetector]
+    CB[Callback Client]
+    API[/api/voice/amd-action]
+
+    CXML --> STREAM
+    STREAM --> WS
+    WS --> SH
+    SH --> SS
+    SS --> VAD
+    SS --> DP
+    DP --> BML
+    DP --> TED
+    BML --> ML[ONNX Model]
+    TED --> EA[EnergyAnalyzer]
+    DP --> CB
+    CB --> API
+    HTTP --> Health[Health / Metrics]
+```
+
+## Build and Run
+
+### Docker Compose (Recommended)
+
+The worker starts automatically with the full OPBX stack:
+
+```bash
+docker compose up -d
+```
+
+### Local Build
+
+```bash
+cd amd-worker
+
+# Compile
+mvn compile
+
+# Run tests
+mvn test
+
+# Build shaded JAR
+mvn package -DskipTests -B
+
+# Run locally
+java -jar target/amd-worker-1.0.0.jar
+```
+
+### Docker Build
+
+```bash
+cd amd-worker
+docker build -t amd-worker:latest .
+docker run -p 8082:8082 -p 8083:8083 \
+  -e AMD_WORKER_API_TOKEN=your-token \
+  -e AMD_ACTION_CALLBACK_URL=http://host.docker.internal/api/voice/amd-action \
+  amd-worker:latest
+```
+
+## Environment Variables
+
+| Variable | Default | Required | Description |
+|----------|---------|----------|-------------|
+| `AMD_WEBSOCKET_PORT` | `8082` | No | WebSocket listener port |
+| `AMD_HTTP_PORT` | `8083` | No | Health/metrics HTTP port |
+| `AMD_MODEL_PATH` | `./models/beep_detector.onnx` | No | ONNX model file path |
+| `AMD_MAX_CONCURRENT_STREAMS` | `100` | No | Max simultaneous streams |
+| `AMD_DEFAULT_TIMEOUT_SECONDS` | `30` | No | Detection timeout per stream |
+| `AMD_DETECTORS` | `beep_ml,tone_energy` | No | Enabled detectors |
+| `AMD_LOG_LEVEL` | `info` | No | SLF4J log level |
+| `AMD_DUMP_AUDIO` | `false` | No | Dump streams to WAV for debugging |
+| `AMD_DUMP_AUDIO_PATH` | `/tmp/amd-dumps` | No | Dump directory |
+| `AMD_WORKER_API_TOKEN` | — | **Yes** | Bearer token for callback auth |
+| `AMD_ACTION_CALLBACK_URL` | `http://nginx/api/voice/amd-action` | No | Laravel callback URL |
+
+:::danger
+`AMD_WORKER_API_TOKEN` must match the value configured in OPBX (`AMD_WORKER_API_TOKEN` in `.env`). The callback uses constant-time comparison to prevent timing attacks.
+:::
+
+## Detection Pipeline
+
+1. Cloudonix sends a `connected` event
+2. Cloudonix sends a `start` event with custom parameters (actions)
+3. The worker stores `action_human`, `action_voicemail`, and `action_unknown`
+4. Cloudonix sends `media` events every 20 ms with Base64 mu-law audio
+5. The worker decodes to PCM16 and resamples to 16 kHz
+6. Energy VAD segments speech
+7. After ~11.5 seconds, a rolling buffer tone scan checks for beeps
+8. The detection pipeline resolves to `voicemail`, `human`, or `unknown`
+9. The worker POSTs the result to `/api/voice/amd-action`
+10. Laravel updates the session profile and executes the configured action
+
+## Action Options
+
+Actions are passed via `<Parameter>` elements inside the CXML `<Stream>` verb:
+
+```xml
+<Stream url="wss://.../ws/amd/detect" track="outbound">
+  <Parameter name="action_voicemail" value="HANGUP"/>
+  <Parameter name="action_human" value="CONTINUE"/>
+  <Parameter name="action_unknown" value="CONTINUE"/>
+</Stream>
+```
+
+| Action Value | Behavior |
+|--------------|----------|
+| URL (`https://...`) | Switch the call to the given voice application URL |
+| `HANGUP` | Disconnect the session |
+| `CONTINUE` | Close the WebSocket and take no further action |
+
+Default behavior:
+
+- Voicemail → `HANGUP`
+- Human or Unknown → `CONTINUE`
+
+## Health Endpoint
+
+```bash
+curl http://localhost:8083/health
+```
+
+Returns JSON with status, model load state, active streams, detection counts, and uptime.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| AMD results not appearing | Verify `AMD_WORKER_API_TOKEN` matches OPBX; check `docker compose logs -f amd-worker` |
+| High false-positive rate | Review dumped audio with `OfflineToneTest` and tune detector parameters |
+| Model fails to load | Ensure `AMD_MODEL_PATH` points to a valid ONNX file; the worker falls back to energy detection |
+| Streams rejected | Check concurrent stream count against `AMD_MAX_CONCURRENT_STREAMS` |
+
+## Related Modules
+
+- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Campaigns that trigger AMD
+- [Call Logs](/modules/call-logs) — CDR includes AMD results
+- [AMD Worker Memory](/.my_agent/memory/amd-worker.md) — Deep technical reference

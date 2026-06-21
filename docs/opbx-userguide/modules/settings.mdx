@@ -1,0 +1,123 @@
+---
+sidebar_position: 15
+slug: /modules/settings
+sidebar_class_name: cxGuidesSidebar
+title: "Settings"
+description: "Configure Cloudonix integration and organization settings"
+---
+
+# Settings
+
+The Settings module contains organization-wide configuration, including Cloudonix CPaaS credentials and webhook settings.
+
+## Purpose
+
+Use this module to:
+
+- Connect OPBX to your Cloudonix domain
+- Validate and store API credentials
+- Configure webhook base URLs
+- Generate webhook authentication keys
+- List available outbound trunks
+
+:::note Owner-Only Access
+Only users with the Owner role can access and modify Cloudonix settings.
+:::
+
+## Cloudonix Settings
+
+Cloudonix integration is stored per organization in the `cloudonix_settings` table. Credentials are encrypted at rest.
+
+### Required Fields
+
+| Field | Description |
+|-------|-------------|
+| Domain UUID | Cloudonix domain UUID |
+| Domain API Key | Cloudonix domain API key |
+
+### Optional Fields
+
+| Field | Description |
+|-------|-------------|
+| Webhook Base URL | Override URL for Cloudonix callbacks |
+| No Answer Timeout | Default ring timeout |
+| Recording Format | Preferred recording format |
+
+## Webhook URL Resolution
+
+OPBX resolves the effective webhook base URL in this priority order:
+
+1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable (production mode)
+2. `webhook_base_url` saved in Cloudonix settings
+3. `APP_URL` from `.env`
+
+The resulting callback endpoints are:
+
+| Purpose | Path |
+|---------|------|
+| Session updates | `{base_url}/api/webhooks/cloudonix/session-update` |
+| CDR events | `{base_url}/api/webhooks/cloudonix/cdr` |
+| Voice routing | `{base_url}/api/voice/route` |
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View Cloudonix settings | Yes | No | No | No |
+| Update Cloudonix settings | Yes | No | No | No |
+| Generate webhook key | Yes | No | No | No |
+
+## UI Workflow
+
+### Configure Cloudonix
+
+1. Navigate to **Settings** in the sidebar
+2. Enter the Domain UUID
+3. Enter the Domain API Key
+4. Click **Validate Credentials**
+5. Click **Save Cloudonix Settings**
+6. Optionally click **Generate Webhook API Key**
+
+### Override Webhook Base URL
+
+1. Expand **Advanced Options**
+2. Enter the public HTTPS URL
+3. Save
+
+## Key Data Fields
+
+### `cloudonix_settings` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | One-to-one with organization |
+| `domain_uuid` | string | Cloudonix domain UUID |
+| `domain_name` | string | Cloudonix domain name |
+| `domain_api_key` | string | **Encrypted** at rest |
+| `domain_requests_api_key` | string | **Encrypted** webhook auth key |
+| `webhook_base_url` | string nullable | Override URL |
+| `voice_application_id` | string nullable | Cloudonix voice app ID |
+| `voice_application_uuid` | string nullable | |
+| `voice_application_name` | string nullable | |
+| `no_answer_timeout` | integer nullable | |
+| `recording_format` | string nullable | |
+| `cloudonix_package` | string nullable | free_tier, standard, etc. |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/settings/cloudonix` | Get settings (masked keys) |
+| PUT | `/v1/settings/cloudonix` | Update settings and sync voice app |
+| POST | `/v1/settings/cloudonix/validate` | Validate credentials |
+| POST | `/v1/settings/cloudonix/generate-requests-key` | Generate webhook auth key |
+| GET | `/v1/settings/cloudonix/outbound-trunks` | List voice trunks |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [Cloudonix Integration](/installation/cloudonix-setup) — Setup guide
+- [Extensions](/modules/extensions) — Cloudonix subscriber sync requires settings
+- [Phone Numbers](/modules/phone-numbers) — Outbound trunks are used for routing

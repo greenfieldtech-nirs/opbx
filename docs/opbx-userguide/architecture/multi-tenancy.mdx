@@ -1,0 +1,177 @@
+---
+sidebar_position: 2
+slug: /architecture/multi-tenancy
+sidebar_class_name: cxGuidesSidebar
+title: "Multi-Tenancy"
+description: "How OPBX isolates organizations with OrganizationScope, tenant scoping, and platform managers"
+---
+
+# Multi-Tenancy
+
+OPBX is multi-tenant. Every data record belongs to exactly one organization, and the API enforces that boundary automatically. This document explains the scope mechanism, the bypass pattern, and the platform manager role.
+
+---
+
+## Organization Isolation
+
+All tenant models use Laravel's `#[ScopedBy([OrganizationScope::class])]` attribute. When any query runs, `OrganizationScope` automatically adds a `where organization_id = :current_org` clause.
+
+- If a user is authenticated, the scope reads `auth()->user()->organization_id`.
+- If no user is authenticated, the scope forces `where 1 = 0`, returning no rows.
+- Webhooks and CLI commands have no authenticated user, so they must explicitly bypass the scope.
+
+This prevents one organization from reading another organization's extensions, DIDs, call logs, or any other tenant data.
+
+---
+
+## OrganizationScope
+
+`App\Scopes\OrganizationScope` is a global Eloquent scope applied to every tenant model.
+
+### Key Behaviors
+
+| Scenario | Behavior |
+|----------|----------|
+| Authenticated user | Query is scoped to the user's `organization_id`. |
+| Unauthenticated request | Query returns zero rows (`where 1 = 0`). |
+| Inside `OrganizationScope::bypass()` | Scope is disabled for the duration of the callback. |
+
+The bypass implementation uses a counter, so nested bypass calls are safe:
+
+```php
+OrganizationScope::bypass(function () {
+    // All queries inside here ignore organization_id scoping.
+    return DidNumber::where('phone_number', $number)->first();
+});
+```
+
+### When to Bypass
+
+Bypass the scope only when there is no authenticated user context or when a platform manager needs cross-tenant access:
+
+- Webhook handlers (Cloudonix sends requests, no user session)
+- Auto-dialer CDR processing and AMD action callbacks
+- Call notification dispatching
+- Platform administration
+- Artisan commands and background jobs that operate across organizations
+
+:::warning Security Critical
+Forgetting to bypass `OrganizationScope` inside a webhook handler will cause the handler to return zero rows for every lookup, silently breaking routing, CDRs, and campaign updates.
+:::
+
+---
+
+## EnsureTenantScope Middleware
+
+`App\Http\Middleware\EnsureTenantScope` (alias `tenant.scope`) validates the tenant context on API routes. It is applied to the protected API route group in `routes/api.php`.
+
+### What It Does
+
+1. Confirms the request is authenticated.
+2. Allows platform managers to pass through without an organization check.
+3. Confirms the user has an `organization_id`.
+4. Confirms the organization exists and is active (not `suspended` or `deleted`).
+5. Falls back to `isActive()` for legacy compatibility.
+
+### Error Responses
+
+| Condition | HTTP Status | Message |
+|-----------|-------------|---------|
+| Unauthenticated | 401 | `Unauthenticated.` |
+| No organization | 403 | `User does not belong to an organization.` |
+| Organization not found | 403 | `Organization not found.` |
+| Organization suspended | 403 | `Your organization has been suspended.` |
+| Organization deleted | 403 | `Organization is not active.` |
+
+---
+
+## Platform Manager Role
+
+A platform manager is a user with `is_platform_manager = true`. Platform managers operate above the tenant boundary and can manage multiple organizations through the platform API.
+
+### Capabilities
+
+- Access platform admin routes in `routes/platform.php` (`auth:sanctum` + `platform.manager`).
+- Bypass `EnsureTenantScope` organization checks.
+- Manage organizations, users, and audit logs across tenants.
+
+### What Platform Managers Are Not
+
+Platform managers are not regular tenant users. They do not have an `organization_id`-scoped view of data by default. Any cross-tenant query a platform manager performs must explicitly use `OrganizationScope::bypass()` or request the target organization context.
+
+---
+
+## Role Hierarchy Inside an Organization
+
+Within each organization, users have one of four roles. `OrganizationScope` isolates data between organizations; roles isolate permissions within an organization.
+
+| Role | Scope |
+|------|-------|
+| Owner | Full access to the organization, including billing and user management. |
+| PBX Admin | Manage extensions, DIDs, routing, and most settings. Cannot manage owners. |
+| PBX User | Limited access; can update own extension and view assigned resources. |
+| Reporter | Read-only access to call logs and reports. |
+
+---
+
+## Data Model
+
+### Organization
+
+`App\Models\Organization` represents a tenant. Key attributes include:
+
+- `name`, `slug`, `timezone`
+- `status` — `active`, `suspended`, or `deleted`
+- One-to-one `cloudonixSettings` relationship
+- One-to-many `users`
+
+### CloudonixSettings
+
+`App\Models\CloudonixSettings` stores the Cloudonix domain and API credentials for one organization. It is the lookup table that maps a Cloudonix domain to an `organization_id` during webhook authentication.
+
+### User
+
+`App\Models\User` belongs to exactly one organization via `organization_id`. It also has:
+
+- `role` — Owner, PBX Admin, PBX User, Reporter
+- `is_platform_manager` — cross-tenant admin flag
+- `status` — active, inactive, etc.
+
+---
+
+## Common Patterns
+
+### Scoped Query (Default)
+
+```php
+// Automatically filtered to the authenticated user's organization.
+$extensions = Extension::all();
+```
+
+### Bypass for Webhooks
+
+```php
+// Inside CloudonixWebhookController::sessionUpdate
+$settings = OrganizationScope::bypass(function () use ($organizationId) {
+    return CallNotificationsSettings::forOrganization($organizationId)
+        ->active()
+        ->first();
+});
+```
+
+### Platform Manager Cross-Tenant Query
+
+```php
+// Platform manager listing organizations does not need bypass,
+// because the Organization model itself is not tenant-scoped.
+$organizations = Organization::query()->paginate();
+```
+
+---
+
+## Related Documentation
+
+- [Architecture Overview](./index)
+- [Security](./security)
+- [Webhooks](./webhooks)
+- [Platform Management](/administration/platform-management)

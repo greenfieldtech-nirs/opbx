@@ -119,6 +119,32 @@ paths:
                     type: string
                   data:
                     $ref: '../../components/schemas/ConferenceRoom.yaml'
+    patch:
+      tags:
+        - Conference Rooms
+      summary: Partially update conference room
+      operationId: patchConferenceRoom
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/ConferenceRoom.yaml'
+      responses:
+        '200':
+          description: Conference room updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/ConferenceRoom.yaml'
 
     delete:
       tags:

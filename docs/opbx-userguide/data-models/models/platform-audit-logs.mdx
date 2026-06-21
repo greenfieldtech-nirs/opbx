@@ -1,0 +1,49 @@
+---
+sidebar_position: 15
+slug: /data-models/models/platform-audit-logs
+sidebar_class_name: cxGuidesSidebar
+title: PlatformAuditLog Model
+---
+
+# PlatformAuditLog Model
+
+The `PlatformAuditLog` model records all cross-tenant actions performed by platform managers.
+
+**Table:** `platform_audit_logs`  
+**Model:** `App\Models\PlatformAuditLog`
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | bigint unsigned | No | Primary key |
+| `platform_manager_user_id` | bigint unsigned | No | Acting user |
+| `target_organization_id` | bigint unsigned | No | Target organization |
+| `action` | string | No | create, update, delete, view |
+| `target_entity_type` | string | No | Model affected |
+| `target_entity_id` | int | No | Record ID |
+| `before_state` | JSON | Yes | Values before change |
+| `after_state` | JSON | Yes | Values after change |
+| `reason` | string | Yes | Reason for action |
+| `ip_address` | string | Yes | Request IP |
+| `user_agent` | string | Yes | Request user agent |
+| `created_at` | datetime | No | |
+| `updated_at` | datetime | No | |
+
+## Relationships
+
+```php
+$log->platformManager() → User
+$log->targetOrganization() → Organization
+```
+
+## Usage Notes
+
+- Platform audit logs are not tenant-scoped.
+- They are used for compliance, debugging, and security auditing.
+- `before_state` and `after_state` store snapshots of the affected record.
+
+## Related Documentation
+
+- [Platform Management Memory](https://github.com/greenfieldtech-nirs/opbx/blob/main/.my_agent/memory/platform-management.md)
+- User Model (`App\Models\User`)

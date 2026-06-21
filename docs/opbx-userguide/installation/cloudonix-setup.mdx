@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 slug: /installation/cloudonix-setup
 sidebar_class_name: cxGuidesSidebar
 title: "Cloudonix Integration"
@@ -19,13 +19,13 @@ Cloudonix is the cloud communications platform that handles all VoIP and telepho
 | Web interface and APIs | Telephony infrastructure |
 | Call data and reporting | Carrier connectivity |
 
-When a call comes in, OPBX tells Cloudonix how to handle it. Cloudonix then manages the actual voice connection.
+When a call comes in, OPBX returns CXML instructions that tell Cloudonix how to handle it. Cloudonix then manages the actual voice connection.
 
 ## Prerequisites
 
 Before configuring the integration, you need:
 
-1. A Cloudonix account - Sign up at [cockpit.cloudonix.io](https://cockpit.cloudonix.io)
+1. A Cloudonix account — sign up at [cockpit.cloudonix.io](https://cockpit.cloudonix.io)
 2. A domain created in your Cloudonix account
 3. Domain API key from the Cloudonix cockpit
 
@@ -57,7 +57,7 @@ Paste this UUID into the **Domain UUID** field in OPBX settings.
 
 Generate or copy your API key:
 
-1. In the Cloudonix cockpit, go to **API Keys** section
+1. In the Cloudonix cockpit, go to the **API Keys** section
 2. Create a new key or use an existing one
 3. Copy the key value
 
@@ -65,9 +65,13 @@ Paste this key into the **Domain API Key** field in OPBX settings.
 
 ### 4. Validate Credentials
 
-Click the **Validate Credentials** button. OPBX tests the connection to Cloudonix and verifies your credentials.
+Click **Validate Credentials**. OPBX tests the connection to Cloudonix and verifies your credentials.
 
-If validation succeeds, the system automatically creates a voice application on Cloudonix for handling your calls.
+If validation succeeds, click **Save Cloudonix Settings**. The system automatically:
+
+- Creates or updates a voice application on Cloudonix
+- Sets that voice application as the domain default
+- Stores the application ID and UUID in OPBX
 
 ### 5. Generate Webhook API Key
 
@@ -77,13 +81,21 @@ Click **Generate Webhook API Key** to create a secure key for webhook authentica
 Store the webhook API key securely. Anyone with this key could potentially send fake call events to your system.
 :::
 
-## Webhook Configuration
+## Webhook URL Configuration
 
-OPBX automatically configures the webhook URL for Cloudonix callbacks. The default URL follows this pattern:
+OPBX automatically configures the webhook URLs for Cloudonix callbacks. The effective base URL is resolved in this priority order:
 
-```
-https://your-opbx-domain/api/v1/webhooks/cloudonix
-```
+1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable (when `OPBX_APPLICATION_MODE=production`)
+2. The **Webhook Base URL** field saved in Cloudonix settings
+3. `APP_URL` from the `.env` file
+
+The resulting callback URLs are:
+
+| Purpose | URL Pattern |
+|---------|-------------|
+| Session updates | `{base_url}/api/webhooks/cloudonix/session-update` |
+| CDR events | `{base_url}/api/webhooks/cloudonix/cdr` |
+| Voice routing | `{base_url}/api/voice/route` |
 
 ### Behind NAT or Firewall
 
@@ -91,15 +103,16 @@ If your OPBX instance is behind a NAT device or firewall, Cloudonix cannot reach
 
 **Option 1: Environment Variable**
 
-Set the `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable in your `.env` file:
+Set the application-level webhook base URL in your `.env` file:
 
 ```bash
+OPBX_APPLICATION_MODE=production
 OPBX_APPLICATION_WEBHOOK_BASEURL=https://your-public-domain
 ```
 
 **Option 2: Settings Page**
 
-Configure the webhook base URL directly in the Settings page under **Advanced Options**.
+Configure the webhook base URL directly in **Settings > Cloudonix > Advanced Options**.
 
 ### Local Development with Ngrok
 
@@ -112,15 +125,15 @@ For local development, use ngrok to expose your local OPBX instance:
 
 2. Restart the containers:
    ```bash
-   docker compose restart
+   docker compose up -d
    ```
 
-3. Access the ngrok dashboard at `http://localhost:4040` to see your public URL
+3. Access the ngrok dashboard at `http://localhost:4040` to see your public URL.
 
-4. Copy the HTTPS URL and set it as your webhook base URL in OPBX settings
+4. Copy the HTTPS URL and set it as your webhook base URL in OPBX settings.
 
 :::tip Ngrok Free Tier
-The free ngrok tier provides temporary URLs that change on restart. For persistent development domains, consider upgrading to a paid plan.
+The free ngrok tier provides temporary URLs that change on restart. For persistent development domains, consider upgrading to a paid plan or set `NGROK_DOMAIN`.
 :::
 
 ## Syncing Extensions
@@ -128,12 +141,12 @@ The free ngrok tier provides temporary URLs that change on restart. For persiste
 After Cloudonix integration is active, sync your user extensions as Cloudonix subscribers:
 
 1. Go to **Extensions** in the sidebar
-2. Click the **Sync to Cloudonix** button
+2. Click **Sync to Cloudonix**
 3. The system creates SIP subscribers for all USER-type extensions
 4. Each user receives SIP credentials for their phone configuration
 
 :::note Extension Types
-Only USER-type extensions sync to Cloudonix as SIP subscribers. Other extension types (conference, IVR, ring groups) are handled internally by OPBX.
+Only USER-type extensions sync to Cloudonix as SIP subscribers. Other extension types (conference, IVR, ring groups, AI assistants) are handled internally by OPBX.
 :::
 
 ## Verification
@@ -147,6 +160,18 @@ Test your integration by making a call:
 
 Check the call logs in both OPBX and the Cloudonix cockpit to confirm proper call flow.
 
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/settings/cloudonix` | Retrieve current Cloudonix settings (masked keys) |
+| PUT | `/v1/settings/cloudonix` | Update settings and sync to Cloudonix |
+| POST | `/v1/settings/cloudonix/validate` | Validate domain credentials |
+| POST | `/v1/settings/cloudonix/generate-requests-key` | Generate webhook auth key |
+| GET | `/v1/settings/cloudonix/outbound-trunks` | List available voice trunks |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -155,6 +180,7 @@ Check the call logs in both OPBX and the Cloudonix cockpit to confirm proper cal
 | Webhooks not received | Check webhook base URL is publicly accessible; verify firewall rules |
 | Calls fail to connect | Ensure extensions are synced to Cloudonix; check SIP credentials |
 | No audio on calls | Verify NAT settings; check Cloudonix media server connectivity |
+| Voice app update fails | OPBX reconciles stale voice apps automatically; verify the stored `voice_application_name` matches Cloudonix |
 
 :::info Support
 For Cloudonix-specific issues, consult the [Cloudonix documentation](https://developers.cloudonix.com/). For OPBX integration issues, check the application logs with `docker compose logs -f app`.

@@ -1,90 +1,82 @@
 ---
-sidebar_position: 11
+sidebar_position: 9
 slug: /modules/outbound-whitelist
 sidebar_class_name: cxGuidesSidebar
 title: "Outbound Whitelist"
-description: "Controlling which external numbers your PBX users can dial"
+description: "Control which external numbers PBX users can dial"
 ---
 
 # Outbound Whitelist
 
-The Outbound Whitelist controls which external phone numbers your PBX users are allowed to dial. By defining country and prefix rules, you can restrict international dialing, enforce compliance policies, and manage call costs.
+The Outbound Whitelist controls which external numbers PBX users can dial. Entries define country and prefix rules with associated outbound trunks.
 
-## Accessing the Whitelist
+## Purpose
 
-Navigate to **Outbound Whitelist** in the sidebar. This feature is available to **Owners** and **PBX Admins**.
+Use this module to:
 
-## How It Works
-
-Each whitelist entry defines an allowed dialing destination with three components:
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| **Name** | A descriptive label for the rule | "US Domestic" |
-| **Destination Country** | The country code this rule applies to | United States (+1) |
-| **Destination Prefix** | Optional prefix within the country | `415` (San Francisco area code) |
-| **Outbound Trunk** | The voice trunk used to route the call | `sbc00.example.net` |
-
-When a user attempts to place an outbound call, OPBX checks the dialed number against all active whitelist entries. If no matching entry is found, the call is rejected.
+- Restrict outbound dialing by destination country and prefix
+- Assign outbound trunks to specific destinations
+- Enable or disable rules per destination
 
 ## Matching Algorithm
 
-OPBX uses a scoring system to find the best matching whitelist entry for a dialed number:
+The `OutboundRoutingService` uses a scoring system to select the best matching rule:
 
-1. **Country match** adds 10 points
-2. **Prefix match** adds points equal to the prefix length (longer prefixes score higher)
-3. The entry with the **highest total score** wins
+- Country match: `+10`
+- Full international prefix match: `+length of prefix`
+- Local prefix match: `+length of prefix`
 
-This means more specific rules (with longer prefixes) take priority over general country-wide rules.
+The entry with the highest score wins. A prefix that does not match rejects the call entirely.
 
-### Example
+## Permissions
 
-If you have two rules:
-- Rule A: Country = US, Prefix = (none), Trunk = `trunk-general`
-- Rule B: Country = US, Prefix = `415`, Trunk = `trunk-sf`
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View whitelist | Yes | Yes | Yes | Yes |
+| Create whitelist entries | Yes | Yes | No | No |
+| Update whitelist entries | Yes | Yes | No | No |
+| Delete whitelist entries | Yes | Yes | No | No |
 
-A call to `+14155551234` matches both rules, but Rule B scores higher (10 + 3 = 13 vs 10 + 0 = 10), so the call routes through `trunk-sf`.
+## UI Workflow
 
-## Creating a Whitelist Entry
+### Add a Whitelist Entry
 
-1. Navigate to **Outbound Whitelist** and click **Create**
-2. Enter a **Name** for the rule
-3. Select the **Destination Country**
-4. Optionally enter a **Destination Prefix** (digits after the country code)
-5. Select the **Outbound Trunk** to use for matching calls
-6. Set the **Status** to Active
-7. Click **Save**
+1. Navigate to **Outbound Whitelist** in the sidebar
+2. Click **Add Rule**
+3. Enter a name
+4. Select the destination country
+5. Enter the destination prefix
+6. Select the outbound trunk name
+7. Save
 
-:::tip
-To allow all calls to a specific country, create an entry with just the country selected and no prefix. To restrict to specific area codes, add the area code as the prefix.
-:::
+### Toggle Status
 
-## Managing Entries
+Use the status toggle to enable or disable a rule. Disabled rules are not used for outbound routing.
 
-- **Toggle Status**: Enable or disable an entry without deleting it
-- **Edit**: Modify the country, prefix, or trunk assignment
-- **Delete**: Remove an entry permanently
+## Key Data Fields
 
-## Common Use Cases
+### `outbound_whitelists` Table
 
-| Use Case | Configuration |
-|----------|--------------|
-| Allow all domestic calls | Country = your country, no prefix |
-| Allow calls to a specific city | Country + city area code prefix |
-| Block all international dialing | Only create entries for your own country |
-| Route different regions to different trunks | Multiple entries with different prefixes and trunks |
-| Gradual rollout of international access | Add country entries one at a time |
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | |
+| `destination_country` | string | |
+| `destination_prefix` | string | |
+| `outbound_trunk_name` | string | |
+| `status` | enum | active, inactive |
 
-## Outbound Trunks
+## Related API Endpoints
 
-Outbound trunks are voice routes configured in your Cloudonix account. They determine the physical path outbound calls take. You can view available trunks in [Organization Settings](/administration) under the Cloudonix integration section.
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/outbound-whitelist[/{outboundWhitelist}]` | Standard CRUD |
+| PATCH | `/v1/outbound-whitelist/{outboundWhitelist}/toggle-status` | Toggle active status |
 
-:::warning
-If no whitelist entries are configured, outbound dialing behavior depends on your Cloudonix account settings. It is recommended to create explicit whitelist rules to maintain control over outbound call routing and costs.
-:::
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Next Steps
+## Related Modules
 
-- [Organization Settings](/administration) -- View available outbound trunks from Cloudonix
-- [Inbound Blacklist](/modules/inbound-blacklist) -- Block unwanted inbound callers
-- [Phone Numbers](/modules/phone-numbers) -- Manage your inbound DID numbers
+- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Outbound trunk selection for campaigns
+- [Voice Routing Engine](/installation/concepts) — OutboundRoutingService is used during call routing

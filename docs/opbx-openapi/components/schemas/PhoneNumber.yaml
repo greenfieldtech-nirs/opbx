@@ -9,18 +9,26 @@ properties:
     type: string
     example: '+1987654321'
   label:
-    type: string
-    nullable: true
+    type:
+    - string
+    - 'null'
     example: Main Line
   status:
     type: string
-    enum: [active, inactive]
+    enum:
+    - active
+    - inactive
   routing_type:
     type: string
-    enum: [extension, ring_group, ivr_menu, ai_assistant]
+    enum:
+    - extension
+    - ring_group
+    - ivr_menu
+    - ai_assistant
   routing_target_id:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
   created_at:
     type: string
     format: date-time
@@ -28,7 +36,7 @@ properties:
     type: string
     format: date-time
 required:
-  - id
-  - organization_id
-  - phone_number
-  - status
+- id
+- organization_id
+- phone_number
+- status

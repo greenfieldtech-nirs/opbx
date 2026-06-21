@@ -1,0 +1,62 @@
+paths:
+  /webhooks/auto-dialer/amd-result:
+    post:
+      tags:
+      - Auto Dialer Webhooks
+      summary: Auto-dialer AMD result
+      description: 'Receives Answering Machine Detection (AMD) results for auto-dialer calls.
+
+
+        The result is stored on the matching call session.
+
+        '
+      operationId: autoDialerAmdResult
+      security:
+      - webhookBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_token:
+                  type: string
+                  description: Auto-dialer session token
+                  example: sess-abc123
+                result:
+                  type: string
+                  enum:
+                  - human
+                  - machine
+                  - unknown
+                  description: AMD detection result
+                  example: human
+                confidence:
+                  type:
+                  - number
+                  - 'null'
+                  format: float
+                  description: Confidence score
+                  example: 0.95
+      responses:
+        '200':
+          description: Result processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '400':
+          description: Bad request (missing session token)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error

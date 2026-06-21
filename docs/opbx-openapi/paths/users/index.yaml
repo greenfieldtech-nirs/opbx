@@ -2,46 +2,60 @@ paths:
   /v1/users:
     get:
       tags:
-        - Users
+      - Users
       summary: List users
-      description: |
-        Get a paginated list of users in the organization.
+      description: 'Get a paginated list of users in the organization.
+
         Supports filtering and sorting.
+
+        '
       operationId: listUsers
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: sort_by
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [name, email, role, status, created_at, updated_at]
-            default: created_at
-        - $ref: '../../components/parameters/query/SortOrder.yaml'
-        - name: role
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [owner, pbx_admin, pbx_user, reporter]
-          description: Filter by user role
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [active, inactive]
-          description: Filter by user status
-        - name: search
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Search in name and email
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - name
+          - email
+          - role
+          - status
+          - created_at
+          - updated_at
+          default: created_at
+      - $ref: ../../components/parameters/query/SortOrder.yaml
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - owner
+          - pbx_admin
+          - pbx_user
+          - reporter
+        description: Filter by user role
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - active
+          - inactive
+        description: Filter by user status
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Search in name and email
       responses:
         '200':
           description: List of users
@@ -53,30 +67,34 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '../../components/schemas/User.yaml'
+                      $ref: ../../components/schemas/User.yaml
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
-
+          $ref: ../../components/responses/Forbidden.yaml
     post:
       tags:
-        - Users
+      - Users
       summary: Create user
-      description: |
-        Create a new user in the organization.
-        
+      description: 'Create a new user in the organization.
+
+
         **Role Restrictions:**
+
         - Owner role cannot be assigned (single owner per organization)
+
         - PBX Admins can only create PBX Users or Reporters
-        
+
+
         Default status is `active` if not specified.
+
+        '
       operationId: createUser
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -100,54 +118,70 @@ paths:
                   type: string
                   format: password
                   minLength: 8
-                  description: |
-                    Password requirements:
+                  description: 'Password requirements:
+
                     - At least 8 characters
+
                     - Upper and lowercase letters
+
                     - At least one number
+
+                    '
                   example: SecurePass123
                 role:
                   type: string
-                  enum: [pbx_admin, pbx_user, reporter]
+                  enum:
+                  - pbx_admin
+                  - pbx_user
+                  - reporter
                   description: User role (owner cannot be assigned)
                   example: pbx_user
                 status:
-                  type: string
-                  enum: [active, inactive]
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - active
+                  - inactive
                   default: active
                   description: Account status
                   example: active
                 phone:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 50
-                  nullable: true
                   example: +1-555-123-4567
                 street_address:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 255
-                  nullable: true
                 city:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                 state_province:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                 postal_code:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 20
-                  nullable: true
                 country:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
               required:
-                - name
-                - email
-                - password
-                - role
+              - name
+              - email
+              - password
+              - role
       responses:
         '201':
           description: User created successfully
@@ -160,26 +194,25 @@ paths:
                     type: string
                     example: User created successfully.
                   data:
-                    $ref: '../../components/schemas/User.yaml'
+                    $ref: ../../components/schemas/User.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/users/{user}:
     get:
       tags:
-        - Users
+      - Users
       summary: Get user
       description: Get a specific user by ID
       operationId: getUser
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/path/UserId.yaml'
+      - $ref: ../../components/parameters/path/UserId.yaml
       responses:
         '200':
           description: User details
@@ -189,31 +222,35 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '../../components/schemas/User.yaml'
+                    $ref: ../../components/schemas/User.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
     put:
       tags:
-        - Users
+      - Users
       summary: Update user
-      description: |
-        Update an existing user.
-        
+      description: 'Update an existing user.
+
+
         **Restrictions:**
+
         - Users cannot change their own role
+
         - Owner role cannot be assigned
+
         - PBX Admins cannot modify Owner or PBX Admin users
+
+        '
       operationId: updateUser
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/path/UserId.yaml'
+      - $ref: ../../components/parameters/path/UserId.yaml
       requestBody:
         required: true
         content:
@@ -239,36 +276,47 @@ paths:
                   example: NewSecurePass123
                 role:
                   type: string
-                  enum: [pbx_admin, pbx_user, reporter]
+                  enum:
+                  - pbx_admin
+                  - pbx_user
+                  - reporter
                   example: pbx_admin
                 status:
                   type: string
-                  enum: [active, inactive]
+                  enum:
+                  - active
+                  - inactive
                   example: active
                 phone:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 50
-                  nullable: true
                 street_address:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 255
-                  nullable: true
                 city:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                 state_province:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
                 postal_code:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 20
-                  nullable: true
                 country:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 100
-                  nullable: true
       responses:
         '200':
           description: User updated successfully
@@ -281,45 +329,155 @@ paths:
                     type: string
                     example: User updated successfully.
                   data:
-                    $ref: '../../components/schemas/User.yaml'
+                    $ref: ../../components/schemas/User.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          $ref: ../../components/responses/ValidationError.yaml
+    patch:
+      tags:
+      - Users
+      summary: Partially update user
+      description: 'Update an existing user.
 
+
+        **Restrictions:**
+
+        - Users cannot change their own role
+
+        - Owner role cannot be assigned
+
+        - PBX Admins cannot modify Owner or PBX Admin users
+
+        '
+      operationId: patchUser
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - $ref: ../../components/parameters/path/UserId.yaml
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 255
+                  example: Jane Smith Updated
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  example: jane.smith.new@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  description: Leave empty to keep current password
+                  example: NewSecurePass123
+                role:
+                  type: string
+                  enum:
+                  - pbx_admin
+                  - pbx_user
+                  - reporter
+                  example: pbx_admin
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  example: active
+                phone:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 50
+                street_address:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                city:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                state_province:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                postal_code:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                country:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User updated successfully.
+                  data:
+                    $ref: ../../components/schemas/User.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
     delete:
       tags:
-        - Users
+      - Users
       summary: Delete user
-      description: |
-        Delete a user from the organization.
-        
+      description: 'Delete a user from the organization.
+
+
         **Restriction:** Cannot delete the last owner in the organization.
+
+        '
       operationId: deleteUser
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/path/UserId.yaml'
+      - $ref: ../../components/parameters/path/UserId.yaml
       responses:
         '204':
           description: User deleted successfully
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '409':
           description: Cannot delete last owner
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
                 success: false
                 message: Cannot delete the last owner in the organization.

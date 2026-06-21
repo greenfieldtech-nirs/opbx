@@ -4,7 +4,7 @@ paths:
       tags:
         - Call Detail Records
       summary: List Call Detail Records
-      description: Get paginated list of Call Detail Records
+      description: Get a paginated, filterable list of Call Detail Records for the current organization.
       operationId: listCallDetailRecords
       security:
         - bearerAuth: []
@@ -12,6 +12,26 @@ paths:
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Start of the date range (ISO 8601).
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: End of the date range (ISO 8601).
+        - name: extension_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Filter by destination extension.
       responses:
         '200':
           description: List of Call Detail Records
@@ -29,30 +49,55 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
-    post:
+  /v1/call-detail-records/export:
+    get:
       tags:
         - Call Detail Records
-      summary: Create Call Detail Record
-      operationId: createCallDetailRecord
+      summary: Export Call Detail Records
+      description: Export CDRs as CSV/Excel for the current organization.
+      operationId: exportCallDetailRecords
       security:
         - bearerAuth: []
         - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
+      parameters:
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [csv, xlsx]
+            default: csv
+          description: Export format.
       responses:
-        '201':
-          description: Call Detail Record created
+        '200':
+          description: Exported CDR file
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
-        '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/call-detail-records/statistics:
+    get:
+      tags:
+        - Call Detail Records
+      summary: CDR Statistics
+      description: Aggregate statistics for CDRs in the current organization.
+      operationId: callDetailRecordStatistics
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Statistics object
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
 
   /v1/call-detail-records/{call_detail_record}:
     parameters:
@@ -66,6 +111,7 @@ paths:
       tags:
         - Call Detail Records
       summary: Get Call Detail Record
+      description: Retrieve a single CDR by ID.
       operationId: getCallDetailRecord
       security:
         - bearerAuth: []
@@ -73,46 +119,10 @@ paths:
       responses:
         '200':
           description: Call Detail Record details
-        '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-        '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
-    put:
-      tags:
-        - Call Detail Records
-      summary: Update Call Detail Record
-      operationId: updateCallDetailRecord
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '200':
-          description: Call Detail Record updated
-        '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-        '404':
-          $ref: '../../components/responses/NotFound.yaml'
-        '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
-    delete:
-      tags:
-        - Call Detail Records
-      summary: Delete Call Detail Record
-      operationId: deleteCallDetailRecord
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        '204':
-          description: Call Detail Record deleted
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/CallDetailRecord.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':

@@ -1,146 +1,145 @@
 ---
-sidebar_position: 1
+sidebar_position: 2
 slug: /data-models/enums/index
 sidebar_class_name: cxGuidesSidebar
-title: Enumerations
+title: "Enumerations"
 ---
 
 # Enumerations
 
+OPBX uses PHP 8.1+ backed enums for fixed value sets.
+
 ## Auto Dialer Enums
 
 ### CallerIdStrategy
-Distribution strategy for Caller ID Pool.
 
-**File:** `App\Enums\CallerIdStrategy`
+Distribution strategy for Caller ID pools.
+
+**File:** `App\Enums\CallerIdStrategy`  
 **Table Column:** `auto_dialer_campaigns.caller_id_strategy`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `ROUND_ROBIN` | round_robin | Sequential cycling through pool |
-| `RANDOM` | random | Random selection per call |
+| `ROUND_ROBIN` | round_robin | Sequential cycling |
+| `RANDOM` | random | Random selection |
 | `LEAST_RECENTLY_USED` | least_recently_used | Select least recently used |
 
-**Methods:**
-```php
-$strategy->label(): string;        // "Round Robin"
-$strategy->description(): string;  // "Cycle through Caller IDs sequentially"
-```
-
 ### CampaignStatus
+
 Campaign lifecycle states.
 
-**File:** `App\Enums\CampaignStatus`
+**File:** `App\Enums\CampaignStatus`  
 **Table Column:** `auto_dialer_campaigns.status`
 
-| Case | Value | Label | Description |
-|------|-------|-------|-------------|
-| `DRAFT` | draft | Draft | Initial configuration state |
-| `ACTIVE` | active | Running | Currently dialing |
-| `PAUSED` | paused | Paused | Temporarily stopped |
-| `COMPLETED` | completed | Completed | All destinations processed |
-| `ARCHIVED` | archived | Archived | Soft-deleted |
-
-**Methods:**
-```php
-$status->label(): string;
-$status->canTransitionTo(CampaignStatus $newStatus): bool;
-```
+| Case | Value | Description |
+|------|-------|-------------|
+| `DRAFT` | draft | Initial configuration |
+| `ACTIVE` | active | Currently dialing |
+| `PAUSED` | paused | Temporarily stopped |
+| `COMPLETED` | completed | All destinations processed |
+| `ARCHIVED` | archived | Soft-deleted |
 
 ### DestinationStatus
+
 Status of a destination (phone number) in a campaign.
 
-**File:** `App\Enums\DestinationStatus`
+**File:** `App\Enums\DestinationStatus`  
 **Table Column:** `auto_dialer_destinations.status`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `PENDING` | pending | Waiting to be called |
 | `DIALING` | dialing | Currently being dialed |
+| `CONNECTED` | connected | Call connected |
 | `COMPLETED` | completed | Successfully completed |
 | `FAILED` | failed | Failed after all retries |
-| `SKIPPED` | skipped | Manually skipped |
+| `INVALID` | invalid | Invalid number |
 
 ### AmdMode
+
 Answering Machine Detection modes.
 
-**File:** `App\Enums\AmdMode`
+**File:** `App\Enums\AmdMode`  
 **Table Column:** `auto_dialer_campaigns.amd_mode`
 
-| Case | Value | API Value | Description |
-|------|-------|-----------|-------------|
-| `ENABLED` | Enabled | Enable | Basic human/machine detection |
-| `DETECT_MESSAGE_END` | DetectMessageEnd | DetectMessageEnd | Wait for greeting to complete |
+| Case | Value | Description |
+|------|-------|-------------|
+| `ENABLED` | Enabled | Detect human or machine |
+| `DETECT_MESSAGE_END` | DetectMessageEnd | Wait for greeting to end |
 
 ### ListStatus
+
 Distribution list states.
 
-**File:** `App\Enums\ListStatus`
+**File:** `App\Enums\ListStatus`  
 **Table Column:** `auto_dialer_lists.status`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `DRAFT` | draft | Creating/uploading |
-| `ACTIVE` | active | Ready for use |
+| `PENDING` | pending | Awaiting processing |
+| `PROCESSING` | processing | CSV being processed |
+| `READY` | ready | Available for use |
+| `FAILED` | failed | Upload/processing failed |
+| `IN_USE` | in_use | Assigned to campaign |
+| `USED` | used | Campaign completed |
 | `ARCHIVED` | archived | No longer used |
 
 ## Core PBX Enums
 
 ### ExtensionType
+
 Types of PBX extensions.
 
-**File:** `App\Enums\ExtensionType`
+**File:** `App\Enums\ExtensionType`  
 **Table Column:** `extensions.type`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `USER` | user | Human user extension |
+| `CONFERENCE` | conference | Conference room endpoint |
+| `RING_GROUP` | ring_group | Ring group endpoint |
+| `IVR` | ivr | IVR menu endpoint |
 | `AI_ASSISTANT` | ai_assistant | AI assistant endpoint |
 | `AI_LOAD_BALANCER` | ai_load_balancer | Load balancer endpoint |
-| `RING_GROUP` | ring_group | Ring group endpoint |
-| `CONFERENCE` | conference | Conference room endpoint |
-| `IVR` | ivr | IVR menu endpoint |
 | `FORWARD` | forward | Call forwarding |
 | `CUSTOM_LOGIC` | custom_logic | Custom routing logic |
 
 ### RoutingDestinationType
+
 Destination types for call routing.
 
-**File:** `App\Enums\RoutingDestinationType`
+**File:** `App\Enums\RoutingDestinationType`  
 **Table Column:** `auto_dialer_campaigns.routing_destination_type`
 
-| Case | Value | Label | Description |
-|------|-------|-------|-------------|
-| `AI_ASSISTANT` | ai_assistant | AI Assistant | Route to AI assistant |
-| `AI_LOAD_BALANCER` | ai_load_balancer | AI Load Balancer | Route via load balancer |
-| `RING_GROUP` | ring_group | Ring Group | Route to ring group |
-| `IVR_MENU` | ivr_menu | IVR Menu | Route to IVR menu |
-| `EXTENSION` | extension | Extension | Route to extension |
-| `CONFERENCE_ROOM` | conference_room | Conference Room | Route to conference |
-| `HANGUP` | hangup | Hang Up | Disconnect call |
-
-**Methods:**
-```php
-$type->label(): string;
-$type->isAiRelated(): bool;
-```
+| Case | Value | Description |
+|------|-------|-------------|
+| `EXTENSION` | extension | Route to extension |
+| `RING_GROUP` | ring_group | Route to ring group |
+| `CONFERENCE_ROOM` | conference_room | Route to conference room |
+| `IVR_MENU` | ivr_menu | Route to IVR menu |
+| `AI_ASSISTANT` | ai_assistant | Route to AI assistant |
+| `AI_LOAD_BALANCER` | ai_load_balancer | Route via load balancer |
+| `HANGUP` | hangup | Disconnect call |
 
 ### RingGroupStrategy
-Call distribution strategies for ring groups.
 
-**File:** `App\Enums\RingGroupStrategy`
+Call distribution strategies.
+
+**File:** `App\Enums\RingGroupStrategy`  
 **Table Column:** `ring_groups.strategy`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `SIMULTANEOUS` | simultaneous | Ring all members at once |
 | `ROUND_ROBIN` | round_robin | Rotate through members |
-| `SEQUENTIAL` | sequential | Ring in order until answered |
+| `SEQUENTIAL` | sequential | Ring in order |
 
 ### RingGroupStatus
-Ring group operational states.
 
-**File:** `App\Enums\RingGroupStatus`
+Ring group states.
+
+**File:** `App\Enums\RingGroupStatus`  
 **Table Column:** `ring_groups.status`
 
 | Case | Value | Description |
@@ -149,48 +148,53 @@ Ring group operational states.
 | `INACTIVE` | inactive | Disabled |
 
 ### RingGroupFallbackAction
-Actions when ring group fails.
 
-**File:** `App\Enums\RingGroupFallbackAction`
+Actions when a ring group fails.
+
+**File:** `App\Enums\RingGroupFallbackAction`  
 **Table Column:** `ring_groups.fallback_action`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `VOICEMAIL` | voicemail | Send to voicemail |
-| `EXTENSION` | extension | Route to extension |
-| `FORWARD` | forward | Forward externally |
-| `HANGUP` | hangup | Disconnect |
+| `EXTENSION` | extension | Forward to extension |
+| `RING_GROUP` | ring_group | Forward to ring group |
+| `IVR_MENU` | ivr_menu | Forward to IVR menu |
+| `AI_ASSISTANT` | ai_assistant | Forward to AI assistant |
+| `AI_LOAD_BALANCER` | ai_load_balancer | Forward to AI load balancer |
+| `HANGUP` | hangup | End call |
 
 ## AI Integration Enums
 
 ### AiAssistantStatus
-AI assistant operational states.
 
-**File:** `App\Enums\AiAssistantStatus`
+AI assistant states.
+
+**File:** `App\Enums\AiAssistantStatus`  
 **Table Column:** `ai_assistants.status`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `ACTIVE` | active | Ready to receive calls |
 | `INACTIVE` | inactive | Disabled |
-| `MAINTENANCE` | maintenance | Under maintenance |
 
 ### AlbsStrategy
+
 Load balancer distribution strategies.
 
-**File:** `App\Enums\AlbsStrategy`
+**File:** `App\Enums\AlbsStrategy`  
 **Table Column:** `ai_assistant_load_balancers.strategy`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `ROUND_ROBIN` | round_robin | Rotate through assistants |
-| `WEIGHTED_RANDOM` | weighted_random | Random based on weights |
-| `SEQUENTIAL` | sequential | Try in order |
+| `PRIORITY` | priority | First active by priority |
+| `PERCENTAGE` | percentage | Weighted random |
 
 ### AlbsStatus
+
 Load balancer states.
 
-**File:** `App\Enums\AlbsStatus`
+**File:** `App\Enums\AlbsStatus`  
 **Table Column:** `ai_assistant_load_balancers.status`
 
 | Case | Value | Description |
@@ -201,9 +205,10 @@ Load balancer states.
 ## User & Organization Enums
 
 ### UserRole
-Role-based access control levels.
 
-**File:** `App\Enums\UserRole`
+Role-based access control.
+
+**File:** `App\Enums\UserRole`  
 **Table Column:** `users.role`
 
 | Case | Value | Level | Description |
@@ -213,17 +218,11 @@ Role-based access control levels.
 | `PBX_USER` | pbx_user | 3 | Basic PBX usage |
 | `REPORTER` | reporter | 4 | View-only access |
 
-**Methods:**
-```php
-$role->level(): int;              // Numeric level (1-4)
-$role->can(string $permission): bool;
-$role->label(): string;           // "Owner", "PBX Admin", etc.
-```
-
 ### UserStatus
+
 User account states.
 
-**File:** `App\Enums\UserStatus`
+**File:** `App\Enums\UserStatus`  
 **Table Column:** `users.status`
 
 | Case | Value | Description |
@@ -232,19 +231,22 @@ User account states.
 | `INACTIVE` | inactive | Suspended |
 
 ### OrganizationStatus
-Organization operational states.
 
-**File:** `App\Enums\OrganizationStatus`
+Organization states.
+
+**File:** `App\Enums\OrganizationStatus`  
 **Table Column:** `organizations.status`
 
 | Case | Value | Description |
 |------|-------|-------------|
 | `ACTIVE` | active | Normal operation |
 | `SUSPENDED` | suspended | Access restricted |
+| `DELETED` | deleted | Soft-deleted |
 
 ## Call & Logging Enums
 
 ### CallStatus
+
 Call session states.
 
 **File:** `App\Enums\CallStatus`
@@ -257,25 +259,11 @@ Call session states.
 | `COMPLETED` | completed | Call ended normally |
 | `FAILED` | failed | Call failed |
 
-### CallDisposition
-Final call outcomes.
-
-**File:** `App\Enums\CallDisposition`
-
-| Case | Value | Description |
-|------|-------|-------------|
-| `ANSWERED` | answered | Human answered |
-| `COMPLETED` | completed | Successful completion |
-| `BUSY` | busy | Line busy |
-| `NO_ANSWER` | no_answer | No answer |
-| `FAILED` | failed | Technical failure |
-| `CANCELLED` | cancelled | Cancelled |
-| `CONGESTION` | congestion | Network congestion |
-
 ## Business Hours Enums
 
 ### BusinessHoursStatus
-Business hours configuration states.
+
+Schedule states.
 
 **File:** `App\Enums\BusinessHoursStatus`
 
@@ -285,29 +273,33 @@ Business hours configuration states.
 | `INACTIVE` | inactive | Not in use |
 
 ### BusinessHoursActionType
-Actions when business hours are closed.
+
+Actions for business hours routing.
 
 **File:** `App\Enums\BusinessHoursActionType`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `VOICEMAIL` | voicemail | Send to voicemail |
-| `FORWARD` | forward | Forward to number |
-| `MESSAGE` | message | Play message |
-| `HANGUP` | hangup | Disconnect |
+| `EXTENSION` | extension | Route to extension |
+| `RING_GROUP` | ring_group | Route to ring group |
+| `CONFERENCE_ROOM` | conference_room | Route to conference room |
+| `IVR_MENU` | ivr_menu | Route to IVR menu |
+| `AI_ASSISTANT` | ai_assistant | Route to AI assistant |
+| `AI_LOAD_BALANCER` | ai_load_balancer | Route to AI load balancer |
 
 ### BusinessHoursExceptionType
-Types of schedule exceptions.
+
+Schedule exception types.
 
 **File:** `App\Enums\BusinessHoursExceptionType`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `HOLIDAY` | holiday | Public holiday |
-| `SPECIAL` | special | Special event |
-| `MAINTENANCE` | maintenance | Scheduled maintenance |
+| `CLOSED` | closed | Closed all day |
+| `SPECIAL_HOURS` | special_hours | Special operating hours |
 
 ### DayOfWeek
+
 Days for scheduling.
 
 **File:** `App\Enums\DayOfWeek`
@@ -322,42 +314,40 @@ Days for scheduling.
 | `SATURDAY` | saturday |
 | `SUNDAY` | sunday |
 
-**Methods:**
-```php
-$day->label(): string;        // "Monday"
-$day->shortLabel(): string;   // "Mon"
-$day->isWeekend(): bool;
-```
-
 ## Security Enums
 
 ### InboundBlacklistMatchType
+
 Pattern matching strategies.
 
-**File:** `App\Enums\InboundBlacklistMatchType`
+**File:** `App\Enums\InboundBlacklistMatchType`  
 **Table Column:** `inbound_blacklists.match_type`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `EXACT` | exact | Exact number match |
+| `EXACT` | exact | Exact match |
 | `PREFIX` | prefix | Starts with pattern |
-| `WILDCARD` | wildcard | Pattern with wildcards |
+| `WILDCARD` | wildcard | fnmatch pattern |
 
 ### InboundBlacklistRejectionStrategy
-How to handle blocked calls.
 
-**File:** `App\Enums\InboundBlacklistRejectionStrategy`
+How blocked calls are handled.
+
+**File:** `App\Enums\InboundBlacklistRejectionStrategy`  
+**Table Column:** `inbound_blacklists.rejection_strategy`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `HANGUP` | hangup | Silent hangup |
-| `BUSY` | busy | Play busy tone |
-| `MESSAGE` | message | Play rejection message |
+| `DROP` | drop | Silent hangup |
+| `REJECT` | reject | Play rejection message |
+| `TORMENT` | torment | Conference hold music |
 
 ### InboundBlacklistStatus
+
 Blacklist entry states.
 
-**File:** `App\Enums\InboundBlacklistStatus`
+**File:** `App\Enums\InboundBlacklistStatus`  
+**Table Column:** `inbound_blacklists.status`
 
 | Case | Value | Description |
 |------|-------|-------------|
@@ -365,9 +355,10 @@ Blacklist entry states.
 | `INACTIVE` | inactive | Not enforced |
 
 ### WhitelistStatus
+
 Whitelist entry states.
 
-**File:** `App\Enums\WhitelistStatus`
+**File:** `App\Enums\WhitelistStatus`  
 **Table Column:** `outbound_whitelists.status`
 
 | Case | Value | Description |
@@ -378,6 +369,7 @@ Whitelist entry states.
 ## IVR Enums
 
 ### IvrMenuStatus
+
 IVR menu states.
 
 **File:** `App\Enums\IvrMenuStatus`
@@ -388,72 +380,41 @@ IVR menu states.
 | `INACTIVE` | inactive | Disabled |
 
 ### IvrDestinationType
+
 IVR option routing types.
 
-**File:** `App\Enums\IvrDestinationType`
+**File:** `App\Enums\IvrDestinationType`  
+**Table Column:** `ivr_menu_options.destination_type`
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `AI_ASSISTANT` | ai_assistant | Route to AI |
-| `AI_LOAD_BALANCER` | ai_load_balancer | Route to ALBS |
 | `EXTENSION` | extension | Route to extension |
 | `RING_GROUP` | ring_group | Route to ring group |
+| `CONFERENCE_ROOM` | conference_room | Route to conference room |
 | `IVR_MENU` | ivr_menu | Sub-menu |
-| `CONFERENCE_ROOM` | conference_room | Conference |
-| `HANGUP` | hangup | Disconnect |
+| `BUSINESS_HOURS` | business_hours | Business hours schedule |
+| `AI_ASSISTANT` | ai_assistant | Route to AI assistant |
+| `AI_LOAD_BALANCER` | ai_load_balancer | Route to AI load balancer |
+| `HANGUP` | hangup | End call |
 
 ## Using Enums
 
-### In Code
-
 ```php
 use App\Enums\CampaignStatus;
-use App\Enums\CallerIdStrategy;
 
-// Create from value
+// From value
 $status = CampaignStatus::from('active');
 
-// Create safely (returns null if invalid)
+// Safely
 $status = CampaignStatus::tryFrom($value);
 
-// Get all cases
-$allStatuses = CampaignStatus::cases();
+// All cases
+$all = CampaignStatus::cases();
 
-// Get value and label
-$value = $status->value;        // "active"
-$label = $status->label();      // "Running"
+// Value and label
+$value = $status->value;
+$label = $status->label();
 
-// Comparisons
-if ($status === CampaignStatus::ACTIVE) {
-    // Campaign is running
-}
-
-// Match expression
-$canEdit = match($status) {
-    CampaignStatus::DRAFT, CampaignStatus::PAUSED => true,
-    default => false,
-};
-```
-
-### In Validation
-
-```php
-// Form Request
-public function rules(): array
-{
-    return [
-        'status' => ['required', Rule::enum(CampaignStatus::class)],
-        'caller_id_strategy' => ['required', Rule::enum(CallerIdStrategy::class)],
-    ];
-}
-```
-
-### In Database Queries
-
-```php
-// Query by enum value
-$campaigns = AutoDialerCampaign::where('status', CampaignStatus::ACTIVE->value)->get();
-
-// Using scope with enum
-$campaigns = AutoDialerCampaign::whereStatus(CampaignStatus::ACTIVE)->get();
+// Validation
+Rule::enum(CampaignStatus::class)
 ```

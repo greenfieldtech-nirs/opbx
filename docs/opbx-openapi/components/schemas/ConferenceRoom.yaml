@@ -13,8 +13,9 @@ properties:
     description: Conference room name
     example: Weekly Standup
   description:
-    type: string
-    nullable: true
+    type:
+    - string
+    - 'null'
     example: Team weekly meeting
   max_participants:
     type: integer
@@ -23,12 +24,13 @@ properties:
   status:
     type: string
     enum:
-      - active
-      - inactive
+    - active
+    - inactive
     example: active
   pin:
-    type: string
-    nullable: true
+    type:
+    - string
+    - 'null'
     description: Participant PIN
     example: '1234'
   pin_required:
@@ -36,8 +38,9 @@ properties:
     description: Whether PIN is required to join
     example: true
   host_pin:
-    type: string
-    nullable: true
+    type:
+    - string
+    - 'null'
     description: Host PIN for moderator access
     example: '5678'
   recording_enabled:
@@ -47,9 +50,10 @@ properties:
     type: boolean
     example: false
   recording_webhook_url:
-    type: string
+    type:
+    - string
+    - 'null'
     format: uri
-    nullable: true
     example: https://example.com/webhooks/recording
   wait_for_host:
     type: boolean
@@ -68,9 +72,10 @@ properties:
     type: boolean
     example: false
   talk_detection_webhook_url:
-    type: string
+    type:
+    - string
+    - 'null'
     format: uri
-    nullable: true
   created_at:
     type: string
     format: date-time
@@ -78,8 +83,8 @@ properties:
     type: string
     format: date-time
 required:
-  - id
-  - organization_id
-  - name
-  - max_participants
-  - status
+- id
+- organization_id
+- name
+- max_participants
+- status
