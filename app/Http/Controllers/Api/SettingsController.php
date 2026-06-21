@@ -743,6 +743,15 @@ class SettingsController extends Controller
                     ];
                 }
             }
+
+            // Reconciliation failed: treat stored app as deleted and create a new one
+            Log::warning('[VOICE_APP_SETUP] No OPBX routing application found for reconciliation, creating new one', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'application_name' => $applicationName,
+            ]);
+
+            return $this->createNewVoiceApplication($settings, $webhookUrl, $requestId, $userId, $organizationId);
         }
 
         if (! $result['success']) {
