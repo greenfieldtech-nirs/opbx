@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\CallTrackingAnalyticsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
+use App\Http\Controllers\Api\CallTrackingDniController;
 use App\Http\Controllers\Api\CallTrackingNotificationSettingsController;
 use App\Http\Controllers\Api\CallTrackingNumberController;
 use App\Http\Controllers\Api\ConferenceRoomController;
@@ -178,6 +179,11 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/validate-email', [EmailValidationController::class, 'validate'])
         ->middleware('throttle:10,1')
         ->name('validate-email');
+
+    // Call Tracking DNI swap endpoint (public, rate limited)
+    Route::get('call-tracking-dni/swap', [CallTrackingDniController::class, 'swap'])
+        ->middleware(['throttle:call-tracking-dni'])
+        ->name('call-tracking.dni.swap');
 
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {

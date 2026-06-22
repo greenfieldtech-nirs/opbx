@@ -329,6 +329,11 @@ class AppServiceProvider extends ServiceProvider
                 });
         });
 
+        // Call Tracking DNI swap endpoint - 60 requests per minute per organization/IP
+        RateLimiter::for('call-tracking-dni', function (Request $request) {
+            return Limit::perMinute(60)->by($request->input('organization_id').'|'.$request->ip());
+        });
+
         // Webhook routes - 100 requests per minute per IP
         RateLimiter::for('webhooks', function (Request $request) {
             return Limit::perMinute(config('rate_limiting.webhooks', 100))
