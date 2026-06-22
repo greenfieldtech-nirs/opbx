@@ -34,6 +34,8 @@ class CallTrackingCampaignResource extends JsonResource
             'destination_config' => $this->destination_config,
             'conversion_rule' => $this->conversion_rule,
             'tracking_numbers_count' => $this->whenCounted('tracking_numbers', fn () => $this->tracking_numbers_count),
+            'google_ads_upload_enabled' => $this->google_ads_upload_enabled,
+            'meta_upload_enabled' => $this->meta_upload_enabled,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

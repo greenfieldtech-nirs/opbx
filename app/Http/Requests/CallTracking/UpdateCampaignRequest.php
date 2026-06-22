@@ -58,6 +58,8 @@ class UpdateCampaignRequest extends FormRequest
             'conversion_rule.min_answered_duration_seconds' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'conversion_rule.requires_answered_disposition' => ['sometimes', 'nullable', 'boolean'],
             'conversion_rule.conversion_value' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'google_ads_upload_enabled' => ['sometimes', 'nullable', 'boolean'],
+            'meta_upload_enabled' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
 

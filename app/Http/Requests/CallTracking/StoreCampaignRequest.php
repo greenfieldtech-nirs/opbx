@@ -52,6 +52,8 @@ class StoreCampaignRequest extends FormRequest
             'conversion_rule.min_answered_duration_seconds' => ['nullable', 'integer', 'min:0'],
             'conversion_rule.requires_answered_disposition' => ['nullable', 'boolean'],
             'conversion_rule.conversion_value' => ['nullable', 'numeric', 'min:0'],
+            'google_ads_upload_enabled' => ['nullable', 'boolean'],
+            'meta_upload_enabled' => ['nullable', 'boolean'],
         ];
     }
 
