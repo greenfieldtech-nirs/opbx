@@ -29,6 +29,8 @@ class CallTrackingCampaign extends Model
         'destination_type',
         'destination_config',
         'conversion_rule',
+        'google_ads_upload_enabled',
+        'meta_upload_enabled',
     ];
 
     protected function casts(): array
@@ -38,6 +40,8 @@ class CallTrackingCampaign extends Model
             'destination_type' => CallTrackingDestinationType::class,
             'destination_config' => 'array',
             'conversion_rule' => 'array',
+            'google_ads_upload_enabled' => 'boolean',
+            'meta_upload_enabled' => 'boolean',
         ];
     }
 
