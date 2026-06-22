@@ -4,11 +4,72 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
+use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerList;
+use App\Models\BlockedCallLog;
+use App\Models\BusinessHoursException;
+use App\Models\BusinessHoursSchedule;
+use App\Models\BusinessHoursScheduleDay;
+use App\Models\BusinessHoursTimeRange;
+use App\Models\CallDetailRecord;
+use App\Models\CloudonixSettings;
+use App\Models\ConferenceRoom;
+use App\Models\Extension;
+use App\Models\InboundBlacklist;
+use App\Models\Organization;
+use App\Models\Recording;
+use App\Models\User;
+use App\Observers\BusinessHoursCacheObserver;
+use App\Observers\ExtensionCacheObserver;
+use App\Policies\AiAssistantLoadBalancerPolicy;
+use App\Policies\AiAssistantPolicy;
+use App\Policies\AutoDialerCampaignPolicy;
+use App\Policies\CallDetailRecordPolicy;
+use App\Policies\CloudonixSettingsPolicy;
+use App\Policies\ConferenceRoomPolicy;
+use App\Policies\DistributionListPolicy;
+use App\Policies\ExtensionPolicy;
+use App\Policies\InboundBlacklistPolicy;
+use App\Policies\RecordingPolicy;
+use App\Policies\UserPolicy;
+use App\Scopes\OrganizationScope;
+use App\Services\AutoDialer\AutoDialerCloudonixService;
+use App\Services\CallRouting\CallRoutingService;
+use App\Services\CallStateManager\CallStateManager;
+use App\Services\CallTracking\CallTrackingDestinationResolver;
+use App\Services\Cloudonix\CloudonixVoiceService;
+use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\EmailValidation\Contracts\EmailValidatorInterface;
+use App\Services\EmailValidation\UserCheckEmailValidator;
+use App\Services\InboundBlacklist\InboundBlacklistService;
+use App\Services\IvrStateService;
+use App\Services\PasswordGenerator;
+use App\Services\RoutingSentryService;
+use App\Services\VoiceRouting\BusinessHoursRoutingService;
+use App\Services\VoiceRouting\ExtensionRoutingService;
+use App\Services\VoiceRouting\InboundRoutingService;
+use App\Services\VoiceRouting\IvrRoutingService;
+use App\Services\VoiceRouting\OutboundRoutingService;
+use App\Services\VoiceRouting\RingGroupRoutingService;
+use App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\CallTrackingRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\ConferenceRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\RingGroupRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\UserRoutingStrategy;
+use App\Services\VoiceRouting\VoiceRoutingCacheService;
+use App\Services\VoiceRouting\VoiceRoutingManager;
+use App\Services\VoiceRouting\VoiceRoutingStrategyExecutor;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,10 +81,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register service singletons
         $this->app->singleton(
-            \App\Services\CloudonixClient\CloudonixClient::class,
+            CloudonixClient::class,
             function ($app) {
                 // Instantiate without requiring credentials for ad-hoc validation use cases
-                return new \App\Services\CloudonixClient\CloudonixClient(
+                return new CloudonixClient(
                     settings: null,
                     requireCredentials: false
                 );
@@ -31,94 +92,101 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(
-            \App\Services\CallStateManager\CallStateManager::class
+            CallStateManager::class
         );
 
         $this->app->singleton(
-            \App\Services\CallRouting\CallRoutingService::class
+            CallRoutingService::class
         );
 
         $this->app->singleton(
-            \App\Services\VoiceRouting\VoiceRoutingCacheService::class
+            VoiceRoutingCacheService::class
         );
 
         $this->app->singleton(
-            \App\Services\IvrStateService::class
+            IvrStateService::class
         );
 
         $this->app->singleton(
-            \App\Services\RoutingSentryService::class
+            RoutingSentryService::class
         );
 
         $this->app->singleton(
-            \App\Services\Cloudonix\CloudonixVoiceService::class
+            CloudonixVoiceService::class
         );
 
         // Register Auto Dialer Cloudonix Service
         $this->app->singleton(
-            \App\Services\AutoDialer\AutoDialerCloudonixService::class
+            AutoDialerCloudonixService::class
         );
 
         $this->app->singleton(
-            \App\Services\PasswordGenerator::class
+            PasswordGenerator::class
         );
 
         // Register Voice Routing Strategies
         // Note: QueueRoutingStrategy is reserved for Phase 4+ Call Center features
         $this->app->tag([
-            \App\Services\VoiceRouting\Strategies\UserRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\RingGroupRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\ConferenceRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy::class,
-            \App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy::class,
+            UserRoutingStrategy::class,
+            RingGroupRoutingStrategy::class,
+            ConferenceRoutingStrategy::class,
+            IvrRoutingStrategy::class,
+            AiAgentRoutingStrategy::class,
+            AiLoadBalancerRoutingStrategy::class,
+            ForwardRoutingStrategy::class,
+            CallTrackingRoutingStrategy::class,
         ], 'voice_routing.strategies');
 
         // Register Inbound Blacklist Service
         $this->app->singleton(
-            \App\Services\InboundBlacklist\InboundBlacklistService::class
+            InboundBlacklistService::class
         );
 
         // Register Email Validation Service
         $this->app->singleton(
-            \App\Services\EmailValidation\Contracts\EmailValidatorInterface::class,
-            \App\Services\EmailValidation\UserCheckEmailValidator::class
+            EmailValidatorInterface::class,
+            UserCheckEmailValidator::class
         );
 
         // Register Voice Routing Manager
         $this->app->singleton(
-            \App\Services\VoiceRouting\VoiceRoutingManager::class,
+            VoiceRoutingManager::class,
             function ($app) {
-                $strategyExecutor = new \App\Services\VoiceRouting\VoiceRoutingStrategyExecutor(
+                $strategyExecutor = new VoiceRoutingStrategyExecutor(
                     $app->tagged('voice_routing.strategies')
                 );
 
-                $inboundRouting = new \App\Services\VoiceRouting\InboundRoutingService(
-                    $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class),
-                    $app->make(\App\Services\VoiceRouting\ExtensionRoutingService::class),
-                    $strategyExecutor
+                $callTrackingStrategy = new CallTrackingRoutingStrategy(
+                    $strategyExecutor,
+                    new CallTrackingDestinationResolver
                 );
 
-                $extensionRouting = new \App\Services\VoiceRouting\ExtensionRoutingService(
-                    $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class)
+                $inboundRouting = new InboundRoutingService(
+                    $app->make(VoiceRoutingCacheService::class),
+                    $app->make(ExtensionRoutingService::class),
+                    $strategyExecutor,
+                    $callTrackingStrategy
                 );
 
-                $ivrRouting = new \App\Services\VoiceRouting\IvrRoutingService(
-                    $app->make(\App\Services\IvrStateService::class),
+                $extensionRouting = new ExtensionRoutingService(
+                    $app->make(VoiceRoutingCacheService::class)
+                );
+
+                $ivrRouting = new IvrRoutingService(
+                    $app->make(IvrStateService::class),
                     $extensionRouting,
                     $strategyExecutor
                 );
 
-                $ringGroupRouting = new \App\Services\VoiceRouting\RingGroupRoutingService(
+                $ringGroupRouting = new RingGroupRoutingService(
                     $strategyExecutor
                 );
 
-                return new \App\Services\VoiceRouting\VoiceRoutingManager(
-                    $app->make(\App\Services\VoiceRouting\VoiceRoutingCacheService::class),
-                    $app->make(\App\Services\InboundBlacklist\InboundBlacklistService::class),
-                    $app->make(\App\Services\VoiceRouting\OutboundRoutingService::class),
-                    $app->make(\App\Services\VoiceRouting\BusinessHoursRoutingService::class),
+                return new VoiceRoutingManager(
+                    $app->make(VoiceRoutingCacheService::class),
+                    $app->make(InboundBlacklistService::class),
+                    $app->make(OutboundRoutingService::class),
+                    $app->make(BusinessHoursRoutingService::class),
                     $inboundRouting,
                     $extensionRouting,
                     $ivrRouting,
@@ -156,43 +224,43 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Register model policies
-        Gate::policy(\App\Models\Extension::class, \App\Policies\ExtensionPolicy::class);
-        Gate::policy(\App\Models\User::class, \App\Policies\UserPolicy::class);
-        Gate::policy(\App\Models\ConferenceRoom::class, \App\Policies\ConferenceRoomPolicy::class);
-        Gate::policy(\App\Models\CloudonixSettings::class, \App\Policies\CloudonixSettingsPolicy::class);
-        Gate::policy(\App\Models\Recording::class, \App\Policies\RecordingPolicy::class);
-        Gate::policy(\App\Models\CallDetailRecord::class, \App\Policies\CallDetailRecordPolicy::class);
-        Gate::policy(\App\Models\AiAssistant::class, \App\Policies\AiAssistantPolicy::class);
-        Gate::policy(\App\Models\AiAssistantLoadBalancer::class, \App\Policies\AiAssistantLoadBalancerPolicy::class);
-        Gate::policy(\App\Models\InboundBlacklist::class, \App\Policies\InboundBlacklistPolicy::class);
-        Gate::policy(\App\Models\BlockedCallLog::class, \App\Policies\InboundBlacklistPolicy::class);
-        Gate::policy(\App\Models\AutoDialerCampaign::class, \App\Policies\AutoDialerCampaignPolicy::class);
-        Gate::policy(\App\Models\AutoDialerList::class, \App\Policies\DistributionListPolicy::class);
+        Gate::policy(Extension::class, ExtensionPolicy::class);
+        Gate::policy(User::class, UserPolicy::class);
+        Gate::policy(ConferenceRoom::class, ConferenceRoomPolicy::class);
+        Gate::policy(CloudonixSettings::class, CloudonixSettingsPolicy::class);
+        Gate::policy(Recording::class, RecordingPolicy::class);
+        Gate::policy(CallDetailRecord::class, CallDetailRecordPolicy::class);
+        Gate::policy(AiAssistant::class, AiAssistantPolicy::class);
+        Gate::policy(AiAssistantLoadBalancer::class, AiAssistantLoadBalancerPolicy::class);
+        Gate::policy(InboundBlacklist::class, InboundBlacklistPolicy::class);
+        Gate::policy(BlockedCallLog::class, InboundBlacklistPolicy::class);
+        Gate::policy(AutoDialerCampaign::class, AutoDialerCampaignPolicy::class);
+        Gate::policy(AutoDialerList::class, DistributionListPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes
-        \Illuminate\Support\Facades\Route::bind('organization', function (string $value) {
+        Route::bind('organization', function (string $value) {
             if (request()->is('api/v1/platform/*')) {
-                return \App\Scopes\OrganizationScope::bypass(
-                    fn () => \App\Models\Organization::findOrFail($value)
+                return OrganizationScope::bypass(
+                    fn () => Organization::findOrFail($value)
                 );
             }
 
-            return \App\Models\Organization::findOrFail($value);
+            return Organization::findOrFail($value);
         });
 
         // Configure rate limiting
         $this->configureRateLimiting();
 
         // Register model observers for cache invalidation (Phase 1 Step 8)
-        \App\Models\Extension::observe(\App\Observers\ExtensionCacheObserver::class);
+        Extension::observe(ExtensionCacheObserver::class);
 
         // Register consolidated business hours cache observer for all related models
-        $businessHoursObserver = app(\App\Observers\BusinessHoursCacheObserver::class);
-        \App\Models\BusinessHoursSchedule::observe($businessHoursObserver);
-        \App\Models\BusinessHoursScheduleDay::observe($businessHoursObserver);
-        \App\Models\BusinessHoursTimeRange::observe($businessHoursObserver);
-        \App\Models\BusinessHoursException::observe($businessHoursObserver);
+        $businessHoursObserver = app(BusinessHoursCacheObserver::class);
+        BusinessHoursSchedule::observe($businessHoursObserver);
+        BusinessHoursScheduleDay::observe($businessHoursObserver);
+        BusinessHoursTimeRange::observe($businessHoursObserver);
+        BusinessHoursException::observe($businessHoursObserver);
 
         // Disable model events for CLI commands if needed
         if ($this->app->runningInConsole()) {
