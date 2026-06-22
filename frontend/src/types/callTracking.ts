@@ -74,6 +74,15 @@ export interface CallTrackingNotificationSettings {
   updated_at: string;
 }
 
+export interface NotificationSettingsFormData {
+  webhook_url: string;
+  auth_method: 'none' | 'bearer_token' | 'basic_auth';
+  auth_username: string | null;
+  auth_secret: string | null;
+  enabled_events: string[];
+  is_active: boolean;
+}
+
 export interface CallTrackingNotificationLog {
   id: number;
   call_id: string;
