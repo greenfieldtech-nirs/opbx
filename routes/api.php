@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CallTrackingCampaignController;
 use App\Http\Controllers\Api\CallTrackingDniController;
 use App\Http\Controllers\Api\CallTrackingNotificationSettingsController;
 use App\Http\Controllers\Api\CallTrackingNumberController;
+use App\Http\Controllers\Api\CallTrackingSessionController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\EmailValidationController;
@@ -292,6 +293,10 @@ Route::prefix('v1')->group(function (): void {
             ->name('call-tracking-analytics.index');
         Route::get('call-tracking-analytics/export', [CallTrackingAnalyticsController::class, 'export'])
             ->name('call-tracking-analytics.export');
+
+        // Call Tracking Sessions
+        Route::get('call-tracking-sessions', [CallTrackingSessionController::class, 'index'])
+            ->name('call-tracking-sessions.index');
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
