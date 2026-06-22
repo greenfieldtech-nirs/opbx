@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, LayoutGrid, List } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import {
   Select,
   SelectContent,
@@ -31,24 +33,36 @@ export default function CallTrackingCampaigns() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [status, setStatus] = useState<'' | 'active' | 'inactive'>('');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
-  const canCreate = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const [campaignToDelete, setCampaignToDelete] = useState<CallTrackingCampaign | null>(null);
+  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading, isError, error } = useCallTrackingCampaigns({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status || undefined,
   });
 
   const deleteMutation = useDeleteCallTrackingCampaign();
 
   const campaigns = data?.data ?? [];
-  const meta = data?.meta;
   const hasActiveFilters = search !== '' || status !== '';
 
-  const handleDelete = (campaign: CallTrackingCampaign) => {
-    if (!window.confirm(`Delete campaign "${campaign.name}"?`)) return;
-    deleteMutation.mutate(campaign.id);
+  const handleDelete = async () => {
+    if (!campaignToDelete) return;
+    try {
+      await deleteMutation.mutateAsync(campaignToDelete.id);
+      toast.success('Campaign deleted successfully');
+      setCampaignToDelete(null);
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Failed to delete campaign');
+    }
   };
 
   if (isLoading) {
@@ -67,7 +81,7 @@ export default function CallTrackingCampaigns() {
     <div className="p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold">Call Tracking Campaigns</h1>
-        {canCreate && (
+        {canManage && (
           <Button onClick={() => navigate('/ui/call-tracking/campaigns/new')}>
             <Plus className="h-4 w-4 mr-2" />
             New Campaign
@@ -87,7 +101,7 @@ export default function CallTrackingCampaigns() {
         </div>
         <Select value={status} onValueChange={(value) => setStatus(value as '' | 'active' | 'inactive')}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All statuses" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All statuses</SelectItem>
@@ -115,7 +129,7 @@ export default function CallTrackingCampaigns() {
                 ? 'Try adjusting your filters'
                 : 'Get started by creating your first campaign'}
             </p>
-            {canCreate && !hasActiveFilters && (
+            {canManage && !hasActiveFilters && (
               <Button onClick={() => navigate('/ui/call-tracking/campaigns/new')}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Campaign
@@ -155,12 +169,12 @@ export default function CallTrackingCampaigns() {
                       <Button variant="outline" size="sm" onClick={() => navigate(`/ui/call-tracking/campaigns/${campaign.id}`)}>
                         View
                       </Button>
-                      {canCreate && (
+                      {canManage && (
                         <>
                           <Button variant="outline" size="sm" onClick={() => navigate(`/ui/call-tracking/campaigns/${campaign.id}/edit`)}>
                             Edit
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(campaign)}>
+                          <Button variant="destructive" size="sm" onClick={() => setCampaignToDelete(campaign)} disabled={deleteMutation.isPending}>
                             Delete
                           </Button>
                         </>
@@ -186,10 +200,10 @@ export default function CallTrackingCampaigns() {
                 <p className="text-sm text-muted-foreground">Source: {campaign.source || '—'} · Medium: {campaign.medium || '—'}</p>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" size="sm" onClick={() => navigate(`/ui/call-tracking/campaigns/${campaign.id}`)}>View</Button>
-                  {canCreate && (
+                  {canManage && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => navigate(`/ui/call-tracking/campaigns/${campaign.id}/edit`)}>Edit</Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(campaign)}>Delete</Button>
+                      <Button variant="destructive" size="sm" onClick={() => setCampaignToDelete(campaign)} disabled={deleteMutation.isPending}>Delete</Button>
                     </>
                   )}
                 </div>
@@ -199,11 +213,22 @@ export default function CallTrackingCampaigns() {
         </div>
       )}
 
-      {meta && meta.total > meta.per_page && (
+      {campaigns.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          Showing {campaigns.length} of {meta.total} campaigns
+          {campaigns.length} campaign{campaigns.length === 1 ? '' : 's'}
         </p>
       )}
+
+      <ConfirmDialog
+        open={!!campaignToDelete}
+        onOpenChange={(open) => !open && setCampaignToDelete(null)}
+        title="Delete Campaign"
+        description={`Are you sure you want to delete "${campaignToDelete?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }
