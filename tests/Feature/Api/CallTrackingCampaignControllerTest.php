@@ -326,4 +326,43 @@ class CallTrackingCampaignControllerTest extends TestCase
         $this->putJson('/api/v1/call-tracking-campaigns/'.$campaign->id, [])->assertStatus(403);
         $this->deleteJson('/api/v1/call-tracking-campaigns/'.$campaign->id)->assertStatus(403);
     }
+
+    public function test_create_accepts_ad_platform_upload_toggles(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $response = $this->postJson('/api/v1/call-tracking-campaigns', [
+            'name' => 'Toggled Campaign',
+            'status' => 'active',
+            'destination_type' => 'forward',
+            'destination_config' => ['forward_to' => '+14155551234'],
+            'google_ads_upload_enabled' => true,
+            'meta_upload_enabled' => true,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.google_ads_upload_enabled', true)
+            ->assertJsonPath('data.meta_upload_enabled', true);
+    }
+
+    public function test_update_accepts_ad_platform_upload_toggles(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+
+        $response = $this->putJson(
+            '/api/v1/call-tracking-campaigns/'.$campaign->id,
+            [
+                'google_ads_upload_enabled' => true,
+                'meta_upload_enabled' => false,
+            ]
+        );
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.google_ads_upload_enabled', true)
+            ->assertJsonPath('data.meta_upload_enabled', false);
+    }
 }
