@@ -3,6 +3,7 @@ import type {
   CallTrackingNotificationSettings,
   CallTrackingNotificationLog,
 } from '@/types/callTracking';
+import type { PaginatedResponse } from '@/types/pagination';
 
 export interface NotificationSettingsFormData {
   webhook_url: string;
@@ -40,7 +41,7 @@ export const callTrackingNotificationSettingsApi = {
 
   getLogs: (campaignId: string | number, params?: NotificationLogParams) =>
     api
-      .get<{ data: CallTrackingNotificationLog[]; meta: { current_page: number; last_page: number; per_page: number; total: number } }>(
+      .get<PaginatedResponse<CallTrackingNotificationLog>>(
         `/call-tracking-campaigns/${campaignId}/notification-logs`,
         { params }
       )

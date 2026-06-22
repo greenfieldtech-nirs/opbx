@@ -22,25 +22,30 @@ export interface CallTrackingCampaign {
   updated_at: string;
 }
 
+export type CallTrackingNumberStatus = 'active' | 'inactive';
+
 export interface CallTrackingNumber {
   id: number;
   organization_id: number;
   call_tracking_campaign_id: number;
   did_number_id: number;
+  phone_number?: string;
   friendly_name: string | null;
-  status: CallTrackingCampaignStatus;
-  did?: {
-    id: number;
-    phone_number: string;
-  };
+  status: CallTrackingNumberStatus;
   created_at: string;
   updated_at: string;
 }
 
 export interface CallTrackingSession {
   id: number;
+  organization_id: number;
+  call_tracking_campaign_id: number;
+  call_tracking_number_id: number | null;
+  did_number_id: number | null;
   call_id: string;
+  session_id: string | null;
   caller_number: string;
+  caller_country: string | null;
   called_number: string;
   campaign_name: string | null;
   source: string | null;
@@ -50,6 +55,9 @@ export interface CallTrackingSession {
   disposition: string;
   is_answered: boolean;
   is_converted: boolean;
+  conversion_value: number | null;
+  answered_at: string | null;
+  ended_at: string | null;
   started_at: string;
 }
 
@@ -61,15 +69,20 @@ export interface CallTrackingNotificationSettings {
   auth_username: string | null;
   enabled_events: string[];
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CallTrackingNotificationLog {
   id: number;
+  call_id: string;
+  event_id: string;
   event_type: string;
   webhook_url: string;
   response_status_code: number | null;
   response_time_ms: number | null;
   is_success: boolean;
+  attempt_number: number;
   error_message: string | null;
   created_at: string;
 }
@@ -93,7 +106,7 @@ export interface CallTrackingAnalytics {
     unique_callers: number;
     answered_calls: number;
     missed_calls: number;
-    avg_duration: number;
+    average_duration: number;
     conversions: number;
     conversion_rate: number;
   };
@@ -103,13 +116,13 @@ export interface CallTrackingAnalytics {
     conversions: number;
   }>;
   top_campaigns: Array<{
+    campaign_id: number;
     campaign_name: string;
     calls: number;
     conversions: number;
   }>;
   top_sources: Array<{
     source: string;
-    medium: string | null;
     calls: number;
     conversions: number;
   }>;
@@ -117,8 +130,5 @@ export interface CallTrackingAnalytics {
     start_date: string;
     end_date: string;
     group_by: string;
-    campaign_ids?: number[];
-    sources?: string[];
-    mediums?: string[];
   };
 }

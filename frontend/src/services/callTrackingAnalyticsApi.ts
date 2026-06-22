@@ -12,7 +12,7 @@ export interface AnalyticsParams {
 
 export const callTrackingAnalyticsApi = {
   getAnalytics: (params: AnalyticsParams) =>
-    api.get<{ data: CallTrackingAnalytics }>('/call-tracking-analytics', { params }).then((r) => r.data.data),
+    api.get<CallTrackingAnalytics>('/call-tracking-analytics', { params }).then((r) => r.data),
 
   exportCsv: (params: AnalyticsParams) =>
     api.get('/call-tracking-analytics/export', { params, responseType: 'blob' }).then((r) => r.data as Blob),

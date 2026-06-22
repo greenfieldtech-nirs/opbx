@@ -1,5 +1,6 @@
 import api from '@/services/api';
 import type { CallTrackingCampaign } from '@/types/callTracking';
+import type { PaginatedResponse } from '@/types/pagination';
 
 export interface CampaignListParams {
   search?: string;
@@ -28,10 +29,7 @@ export interface CampaignFormData {
 export const callTrackingCampaignsApi = {
   getAll: (params?: CampaignListParams) =>
     api
-      .get<{ data: CallTrackingCampaign[]; meta: { current_page: number; last_page: number; per_page: number; total: number } }>(
-        '/call-tracking-campaigns',
-        { params }
-      )
+      .get<PaginatedResponse<CallTrackingCampaign>>('/call-tracking-campaigns', { params })
       .then((r) => r.data),
 
   getById: (id: string | number) =>
