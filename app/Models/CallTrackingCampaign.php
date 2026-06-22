@@ -8,6 +8,7 @@ use App\Enums\CallTrackingCampaignStatus;
 use App\Enums\CallTrackingDestinationType;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -68,6 +69,20 @@ class CallTrackingCampaign extends Model
     public function scopeActive($query)
     {
         return $query->where('status', CallTrackingCampaignStatus::ACTIVE);
+    }
+
+    public function scopeWithStatus($query, CallTrackingCampaignStatus $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeSearch($query, string $term)
+    {
+        return $query->where(function (Builder $q) use ($term) {
+            $q->where('name', 'like', '%'.$term.'%')
+                ->orWhere('source', 'like', '%'.$term.'%')
+                ->orWhere('medium', 'like', '%'.$term.'%');
+        });
     }
 
     public function isActive(): bool
