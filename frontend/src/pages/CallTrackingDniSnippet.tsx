@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Check, Copy, Code } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,13 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+const escapeJsString = (value: string): string =>
+  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
 export default function CallTrackingDniSnippet() {
   const [apiUrl, setApiUrl] = useState(
     typeof window !== 'undefined'
       ? `${window.location.origin}/api/v1/call-tracking-dni/swap`
       : 'https://your-domain.com/api/v1/call-tracking-dni/swap'
   );
+  const [defaultNumber, setDefaultNumber] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
   const [copied, setCopied] = useState(false);
+
+  const escapedApiUrl = useMemo(() => escapeJsString(apiUrl), [apiUrl]);
+  const escapedDefaultNumber = useMemo(
+    () => escapeJsString(defaultNumber),
+    [defaultNumber]
+  );
+  const escapedOrganizationId = useMemo(
+    () => escapeJsString(organizationId),
+    [organizationId]
+  );
 
   const snippet = useMemo(
     () =>
@@ -22,34 +38,63 @@ export default function CallTrackingDniSnippet() {
     var phoneElements = document.querySelectorAll('[data-ct-phone]');
     if (phoneElements.length === 0) return;
 
+    var url = '${escapedApiUrl}';
+    var params = [];
+    if (${organizationId ? `'${escapedOrganizationId}'` : 'null'}) {
+      params.push('organization_id=' + encodeURIComponent('${escapedOrganizationId}'));
+    }
+    if (${defaultNumber ? `'${escapedDefaultNumber}'` : 'null'}) {
+      params.push('default_number=' + encodeURIComponent('${escapedDefaultNumber}'));
+    }
+    var referrer = document.referrer || 'direct';
+    if (referrer) {
+      params.push('utm_source=' + encodeURIComponent(referrer));
+    }
+    if (params.length) {
+      url += '?' + params.join('&');
+    }
+
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', '${apiUrl}?source=' + encodeURIComponent(document.referrer || 'direct'));
+    xhr.open('GET', url);
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.onload = function() {
       if (xhr.status !== 200) return;
       try {
         var response = JSON.parse(xhr.responseText);
-        if (!response.phone_number) return;
+        if (!response.tracking_number) return;
         phoneElements.forEach(function(el) {
-          el.textContent = response.phone_number;
+          el.textContent = response.tracking_number;
           if (el.tagName === 'A') {
-            el.href = 'tel:' + response.phone_number.replace(/\\D/g, '');
+            el.href = 'tel:' + response.tracking_number.replace(/\\D/g, '');
           }
         });
       } catch (e) {
         console.error('Call tracking DNI swap failed', e);
       }
     };
+    xhr.onerror = function() {
+      console.error('Call tracking DNI swap request failed');
+    };
     xhr.send();
   })();
 \u003c/script\u003e`,
-    [apiUrl]
+    [
+      escapedApiUrl,
+      escapedDefaultNumber,
+      escapedOrganizationId,
+      organizationId,
+      defaultNumber,
+    ]
   );
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy snippet to clipboard');
+    }
   };
 
   return (
@@ -75,6 +120,24 @@ export default function CallTrackingDniSnippet() {
             <Label htmlFor="api-url">API URL</Label>
             <Input id="api-url" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="default-number">Default Number</Label>
+            <Input
+              id="default-number"
+              value={defaultNumber}
+              onChange={(e) => setDefaultNumber(e.target.value)}
+              placeholder="+1234567890"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="organization-id">Organization ID</Label>
+            <Input
+              id="organization-id"
+              value={organizationId}
+              onChange={(e) => setOrganizationId(e.target.value)}
+              placeholder="123"
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -87,7 +150,7 @@ export default function CallTrackingDniSnippet() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Textarea value={snippet} readOnly rows={20} className="font-mono text-sm" />
+          <Textarea value={snippet} readOnly rows={24} className="font-mono text-sm" />
         </CardContent>
       </Card>
     </div>
