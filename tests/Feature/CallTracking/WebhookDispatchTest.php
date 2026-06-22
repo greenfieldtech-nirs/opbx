@@ -240,4 +240,52 @@ class WebhookDispatchTest extends TestCase
         $this->assertFalse($log->is_success);
         $this->assertSame('Invalid or unsafe webhook URL.', $log->error_message);
     }
+
+    public function test_ipv4_localhost_url_is_rejected_and_logged_as_failure(): void
+    {
+        $settings = $this->createSettings(['webhook_url' => 'http://127.0.0.1/webhook']);
+        $session = $this->createSession();
+
+        $log = $this->dispatcher->dispatch(
+            $settings,
+            $session,
+            CallTrackingEventType::CALL_RECEIVED->value,
+            'evt-ipv4-localhost',
+        );
+
+        $this->assertFalse($log->is_success);
+        $this->assertSame('Invalid or unsafe webhook URL.', $log->error_message);
+    }
+
+    public function test_ipv6_loopback_url_is_rejected(): void
+    {
+        $settings = $this->createSettings(['webhook_url' => 'http://[::1]/webhook']);
+        $session = $this->createSession();
+
+        $log = $this->dispatcher->dispatch(
+            $settings,
+            $session,
+            CallTrackingEventType::CALL_RECEIVED->value,
+            'evt-ipv6-loopback',
+        );
+
+        $this->assertFalse($log->is_success);
+        $this->assertSame('Invalid or unsafe webhook URL.', $log->error_message);
+    }
+
+    public function test_ipv6_link_local_url_is_rejected(): void
+    {
+        $settings = $this->createSettings(['webhook_url' => 'http://[fe80::1]/webhook']);
+        $session = $this->createSession();
+
+        $log = $this->dispatcher->dispatch(
+            $settings,
+            $session,
+            CallTrackingEventType::CALL_RECEIVED->value,
+            'evt-ipv6-link-local',
+        );
+
+        $this->assertFalse($log->is_success);
+        $this->assertSame('Invalid or unsafe webhook URL.', $log->error_message);
+    }
 }

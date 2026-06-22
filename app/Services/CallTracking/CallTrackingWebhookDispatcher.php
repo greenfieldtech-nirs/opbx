@@ -126,6 +126,11 @@ class CallTrackingWebhookDispatcher
             return false;
         }
 
+        // Strip IPv6 brackets so FILTER_VALIDATE_IP works on the actual address.
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            $host = substr($host, 1, -1);
+        }
+
         $lowerHost = strtolower($host);
 
         if (
