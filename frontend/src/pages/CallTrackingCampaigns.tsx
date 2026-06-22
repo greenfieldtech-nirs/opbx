@@ -52,7 +52,7 @@ export default function CallTrackingCampaigns() {
   const deleteMutation = useDeleteCallTrackingCampaign();
 
   const campaigns = data?.data ?? [];
-  const hasActiveFilters = search !== '' || status !== '';
+  const hasActiveFilters = debouncedSearch !== '' || status !== '';
 
   const handleDelete = async () => {
     if (!campaignToDelete) return;
