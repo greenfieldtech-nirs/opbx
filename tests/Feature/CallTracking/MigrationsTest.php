@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CallTracking;
 
+use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -25,7 +26,7 @@ class MigrationsTest extends TestCase
 
     public function test_did_numbers_routing_type_includes_call_tracking(): void
     {
-        $organization = \App\Models\Organization::factory()->create();
+        $organization = Organization::factory()->create();
 
         DB::table('did_numbers')->insert([
             'organization_id' => $organization->id,
