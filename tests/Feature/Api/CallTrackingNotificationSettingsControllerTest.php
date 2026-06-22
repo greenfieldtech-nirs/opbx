@@ -289,8 +289,11 @@ class CallTrackingNotificationSettingsControllerTest extends TestCase
             'organization_id' => $this->organization->id,
             'webhook_url' => 'https://example.com/webhooks/new',
             'auth_method' => 'bearer_token',
-            'auth_secret' => 'secret-token',
         ]);
+
+        $settings = CallTrackingNotificationSettings::forCampaign($campaign->id)->first();
+        $this->assertNotNull($settings);
+        $this->assertSame('secret-token', $settings->auth_secret);
     }
 
     public function test_update_validates_required_fields(): void

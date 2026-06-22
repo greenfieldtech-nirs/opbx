@@ -33,6 +33,7 @@ class CallTrackingNotificationSettings extends Model
         return [
             'enabled_events' => 'array',
             'is_active' => 'boolean',
+            'auth_secret' => 'encrypted',
         ];
     }
 
