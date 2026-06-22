@@ -288,6 +288,14 @@ Route::prefix('v1')->group(function (): void {
             ->name('call-tracking-campaigns.notification-settings.show');
         Route::put('call-tracking-campaigns/{callTrackingCampaign}/notification-settings', [CallTrackingNotificationSettingsController::class, 'update'])
             ->name('call-tracking-campaigns.notification-settings.update');
+        Route::post('call-tracking-campaigns/{callTrackingCampaign}/notification-settings/test', [
+            CallTrackingNotificationSettingsController::class, 'test',
+        ])->middleware(['throttle:5,1'])
+            ->name('call-tracking-campaigns.notification-settings.test');
+
+        Route::get('call-tracking-campaigns/{callTrackingCampaign}/notification-logs', [
+            CallTrackingNotificationSettingsController::class, 'logs',
+        ])->name('call-tracking-campaigns.notification-logs.index');
 
         // Call Tracking Analytics
         Route::get('call-tracking-analytics', [CallTrackingAnalyticsController::class, 'index'])

@@ -6,6 +6,7 @@ namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
 use App\Models\CallTrackingCampaign;
+use App\Models\CallTrackingNotificationLog;
 use App\Models\CallTrackingNotificationSettings;
 use App\Models\Organization;
 use App\Models\User;
@@ -434,6 +435,83 @@ class CallTrackingNotificationSettingsControllerTest extends TestCase
         );
 
         $response->assertStatus(404);
+    }
+
+    public function test_owner_can_send_test_notification(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->createSettings($campaign);
+
+        $response = $this->postJson(
+            '/api/v1/call-tracking-campaigns/'.$campaign->id.'/notification-settings/test'
+        );
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.event_type', 'call.received');
+
+        $this->assertDatabaseHas('call_tracking_notification_logs', [
+            'call_tracking_campaign_id' => $campaign->id,
+            'event_type' => 'call.received',
+        ]);
+    }
+
+    public function test_test_notification_returns_422_when_settings_not_configured(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+
+        $response = $this->postJson(
+            '/api/v1/call-tracking-campaigns/'.$campaign->id.'/notification-settings/test'
+        );
+
+        $response->assertStatus(422);
+    }
+
+    public function test_agent_cannot_send_test_notification(): void
+    {
+        Sanctum::actingAs($this->agent);
+
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->createSettings($campaign);
+
+        $response = $this->postJson(
+            '/api/v1/call-tracking-campaigns/'.$campaign->id.'/notification-settings/test'
+        );
+
+        $response->assertStatus(403);
+    }
+
+    public function test_owner_can_list_notification_logs(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+
+        CallTrackingNotificationLog::factory()->create([
+            'organization_id' => $this->organization->id,
+            'call_tracking_campaign_id' => $campaign->id,
+            'event_type' => 'call.converted',
+            'is_success' => true,
+        ]);
+
+        $response = $this->getJson(
+            '/api/v1/call-tracking-campaigns/'.$campaign->id.'/notification-logs'
+        );
+
+        $response->assertStatus(200)
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.event_type', 'call.converted');
     }
 
     /**
