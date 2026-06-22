@@ -8,9 +8,9 @@ export interface NumberFormData {
 }
 
 export const callTrackingNumbersApi = {
-  getForCampaign: (campaignId: string | number, params?: { page?: number; per_page?: number }) =>
+  getForCampaign: (campaignId: string | number) =>
     api
-      .get<{ data: CallTrackingNumber[] }>(`/call-tracking-campaigns/${campaignId}/call-tracking-numbers`, { params })
+      .get<{ data: CallTrackingNumber[] }>(`/call-tracking-campaigns/${campaignId}/call-tracking-numbers`)
       .then((r) => r.data.data),
 
   create: (campaignId: string | number, data: NumberFormData) =>

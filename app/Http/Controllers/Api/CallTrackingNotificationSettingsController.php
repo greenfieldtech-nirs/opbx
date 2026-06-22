@@ -184,6 +184,8 @@ class CallTrackingNotificationSettingsController extends Controller
             'data' => CallTrackingNotificationLogResource::collection($logs->items()),
             'meta' => [
                 'current_page' => $logs->currentPage(),
+                'from' => $logs->firstItem(),
+                'to' => $logs->lastItem(),
                 'last_page' => $logs->lastPage(),
                 'per_page' => $logs->perPage(),
                 'total' => $logs->total(),

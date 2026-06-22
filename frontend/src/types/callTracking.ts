@@ -63,6 +63,7 @@ export interface CallTrackingSession {
 
 export interface CallTrackingNotificationSettings {
   id: number;
+  organization_id: number;
   call_tracking_campaign_id: number;
   webhook_url: string;
   auth_method: 'none' | 'bearer_token' | 'basic_auth';

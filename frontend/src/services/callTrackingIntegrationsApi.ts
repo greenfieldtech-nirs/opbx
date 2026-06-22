@@ -19,5 +19,5 @@ export const callTrackingIntegrationsApi = {
   update: (data: AdPlatformIntegrationFormData) =>
     api
       .put<{ data: CallTrackingAdPlatformIntegration; message: string }>('/call-tracking-ad-platform-integrations', data)
-      .then((r) => r.data),
+      .then((r) => r.data.data),
 };
