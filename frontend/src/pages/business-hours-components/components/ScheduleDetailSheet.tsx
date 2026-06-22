@@ -19,7 +19,7 @@ import {
 import { getActionDisplayName } from '../utils/helpers';
 import { formatExceptionDate } from '@/utils/businessHours';
 import type { BusinessHoursSchedule } from '@/types';
-import type { Extension, RingGroup } from '@/types';
+import type { Extension, RingGroup, IvrMenu } from '@/types';
 
 interface ScheduleDetailSheetProps {
   open: boolean;
@@ -27,7 +27,7 @@ interface ScheduleDetailSheetProps {
   schedule: BusinessHoursSchedule | null;
   extensions: Extension[];
   ringGroups: RingGroup[];
-  ivrMenus: Extension[];
+  ivrMenus: IvrMenu[];
 }
 
 export const ScheduleDetailSheet: React.FC<ScheduleDetailSheetProps> = ({

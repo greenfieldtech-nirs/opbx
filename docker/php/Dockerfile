@@ -62,6 +62,7 @@ RUN chown -R www-data:www-data /var/www/html \
 # Copy PHP configuration
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+RUN chmod 644 /usr/local/etc/php/conf.d/custom.ini /usr/local/etc/php/conf.d/opcache.ini
 
 # Copy entrypoint script
 COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh

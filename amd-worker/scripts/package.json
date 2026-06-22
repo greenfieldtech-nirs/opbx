@@ -5,7 +5,7 @@
     "test-ws": "ts-node test-websocket.ts"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

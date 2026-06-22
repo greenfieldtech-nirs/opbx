@@ -50,12 +50,12 @@ export function UserTable({ users, loading, onEdit, onDelete, onViewDetails }: U
             <TableCell className="font-medium">{user.name}</TableCell>
             <TableCell>{user.email}</TableCell>
             <TableCell>
-              <Badge variant={getRoleColor(user.role)}>
+              <Badge className={getRoleColor(user.role)}>
                 {getRoleDisplayName(user.role)}
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge variant={getStatusColor(user.status)}>
+              <Badge className={getStatusColor(user.status)}>
                 {user.status}
               </Badge>
             </TableCell>

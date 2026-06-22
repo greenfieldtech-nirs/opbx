@@ -24,8 +24,8 @@ const userSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
-  role: z.enum(['owner', 'admin', 'agent'] as const),
-  status: z.enum(['active', 'inactive'] as const),
+  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter'] as const),
+  status: z.enum(['active', 'inactive', 'suspended'] as const),
   extension_number: z.string().optional(),
 });
 
@@ -53,7 +53,7 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
       name: user?.name || '',
       email: user?.email || '',
       password: '',
-      role: user?.role || 'agent',
+      role: user?.role || 'pbx_user',
       status: user?.status || 'active',
       extension_number: user?.extension?.extension_number || '',
     },

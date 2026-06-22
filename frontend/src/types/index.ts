@@ -76,7 +76,7 @@ export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 
 export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
 
 // ============================================================================
 // Entity Types
@@ -894,7 +894,7 @@ export interface ChangePasswordRequest {
   new_password_confirmation: string;
 }
 
-export type UserStatus = Status;
+export type UserStatus = 'active' | 'inactive' | 'suspended';
 export type ExtensionStatus = Status;
 
 // ============================================================================
@@ -1249,6 +1249,8 @@ export interface AutoDialerList {
   can_assign: boolean;
   can_upload: boolean;
   can_copy: boolean;
+  can_delete: boolean;
+  can_unassign: boolean;
   created_at: string;
   processed_at: string | null;
   archived_at: string | null;
@@ -1292,4 +1294,101 @@ export interface DistributionListParams extends PaginationParams {
   status?: DistributionListStatus;
   search?: string;
   campaign_id?: number;
+}
+
+// ============================================================================
+// AI Assistant Types
+// ============================================================================
+
+export interface AiAssistant {
+  id: string;
+  organization_id: string;
+  name: string;
+  provider: string;
+  protocol: 'sip' | 'websocket';
+  status: Status;
+  configuration?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AiProvider = string;
+
+// ============================================================================
+// IVR Menu Types
+// ============================================================================
+
+export interface IvrMenuOption {
+  id?: string;
+  ivr_menu_id?: string;
+  input_digits: string;
+  description?: string;
+  destination_type: string;
+  destination_id: string;
+  priority: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface IvrMenu {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  audio_file_path?: string;
+  recording_id?: number;
+  is_recording_url?: boolean;
+  tts_text?: string;
+  tts_voice?: string;
+  max_timeout: number;
+  inter_digit_timeout: number;
+  max_turns: number;
+  failover_destination_type: string;
+  failover_destination_id?: string;
+  status: string;
+  options: IvrMenuOption[];
+  options_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// Recording Types
+// ============================================================================
+
+export interface Recording {
+  id: string;
+  organization_id: string;
+  name: string;
+  file_path?: string;
+  duration?: number;
+  status: Status;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// Cloudonix Voice Types
+// ============================================================================
+
+export interface CloudonixVoiceLanguage {
+  code: string;
+  name: string;
+}
+
+export interface CloudonixVoice {
+  id: string;
+  name: string;
+  language: string;
+  gender: string;
+  provider?: string;
+  pricing?: string;
+  premium?: boolean;
+}
+
+export interface CloudonixVoiceFilters {
+  languages: CloudonixVoiceLanguage[];
+  genders: string[];
+  providers: string[];
+  pricing?: string[];
 }

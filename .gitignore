@@ -113,6 +113,7 @@ desktop.ini
 # ============================================================================
 # Docker & Deployment (may contain secrets)
 # ============================================================================
+docker-compose.yml
 docker-compose.override.yml
 .dockerignore.local
 
@@ -160,9 +161,17 @@ reports/
 /backups/
 /volumes/minio/
 /volumes/mysql/
+/volumes/redis/
 /volumes/amd-dumps/
+
+# ============================================================================
+# Git Worktrees
+# ============================================================================
+.worktrees/
 
 # ============================================================================
 # Agent Memory (AI coding agent context files)
 # ============================================================================
 /memory/
+/.my_agent/
+.my_agent/

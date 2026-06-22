@@ -18,7 +18,7 @@ paths:
         Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
       operationId: callInitiatedWebhook
       security:
-        - webhookSignature: []
+        - webhookBearer: []
       requestBody:
         required: true
         content:

@@ -13,9 +13,24 @@ OpBX is an open-source business PBX platform built on Laravel (PHP 8.4) and Reac
 
 ## Project Memory
 
-The `/memory/` directory contains per-module source maps documenting every file, route,
-model, service, and component. **Read `memory/_index.md` first** to find which module
+The `/.my_agent/memory/` directory contains per-module source maps documenting every file, route,
+model, service, and component. **Read `.my_agent/memory/_index.md` first** to find which module
 file(s) to consult before working on any feature. Update memory files after making changes.
+
+### Agent Workspace Structure
+
+The `/.my_agent/` directory is the agent's workspace and is gitignored:
+
+- **`/.my_agent/memory/`** — Per-module source maps and technical documentation.
+  Read `_index.md` first to orient. Update after making changes.
+- **`/.my_agent/specifications/`** — Technical specifications for features under development.
+  Move completed specs to `specifications/completed/`.
+- **`/.my_agent/workplans/`** — Implementation workplans with actionable steps.
+  Move completed workplans to `workplans/completed/`.
+- **`/.my_agent/platform/`** — Product-level documentation (features, architecture, roadmap).
+- **`/.my_agent/cold-storage/`** — **DISREGARD THIS FOLDER**. Contains obsolete, outdated, and superseded markdown files that have been moved from their original locations. These files are not maintained and should not be referenced for current development.
+
+**Legacy**: The old `/memory/` directory has been moved to `/.my_agent/cold-storage/memory/` and is deprecated. Use `/.my_agent/memory/` going forward. All files in `cold-storage/` are obsolete and should be disregarded.
 
 ## Build / Test / Lint Commands
 
@@ -168,5 +183,5 @@ Never commit `.env` files or secrets to git.
 
 ---
 
-**Last Updated**: 2026-04-16
-**Agent Instructions Version**: 2.1
+**Last Updated**: 2026-05-03
+**Agent Instructions Version**: 3.0

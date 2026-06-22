@@ -6,13 +6,14 @@ namespace Tests\Unit\Services;
 
 use App\Models\Organization;
 use App\Models\OutboundWhitelist;
-use App\Services\VoiceRouting\VoiceRoutingManager;
+use App\Services\VoiceRouting\OutboundRoutingService;
+use App\Services\VoiceRouting\VoiceRoutingCacheService;
+use App\Services\PhoneNumberService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Unit tests for outbound whitelist matching logic in VoiceRoutingManager.
+ * Unit tests for outbound whitelist matching logic in OutboundRoutingService.
  *
  * Tests the findOutboundWhitelistEntry method which is responsible for
  * determining which outbound trunk to use based on destination number matching.
@@ -21,7 +22,7 @@ class OutboundWhitelistMatchingTest extends TestCase
 {
     use RefreshDatabase;
 
-    private VoiceRoutingManager $voiceRoutingManager;
+    private OutboundRoutingService $outboundRoutingService;
     private Organization $organization;
     private Organization $otherOrganization;
 
@@ -29,18 +30,9 @@ class OutboundWhitelistMatchingTest extends TestCase
     {
         parent::setUp();
 
-        // Create outbound_whitelists table for testing
-        Schema::create('outbound_whitelists', function ($table) {
-            $table->id();
-            $table->foreignId('organization_id');
-            $table->string('name');
-            $table->string('destination_country');
-            $table->string('destination_prefix', 12);
-            $table->string('outbound_trunk_name');
-            $table->timestamps();
-        });
-
-        $this->voiceRoutingManager = app(VoiceRoutingManager::class);
+        $phoneNumberService = app(PhoneNumberService::class);
+        $cache = app(VoiceRoutingCacheService::class);
+        $this->outboundRoutingService = new OutboundRoutingService($phoneNumberService, $cache);
         $this->organization = Organization::factory()->create();
         $this->otherOrganization = Organization::factory()->create();
     }
@@ -207,8 +199,9 @@ class OutboundWhitelistMatchingTest extends TestCase
 
         $result = $this->invokePrivateMethod('findOutboundWhitelistEntry', [$this->organization->id, $destinationNumber]);
 
-        // Empty prefix should not match
-        $this->assertNull($result);
+        // Empty prefix means match any number in the country
+        $this->assertInstanceOf(OutboundWhitelist::class, $result);
+        $this->assertEquals('empty_prefix_trunk', $result->outbound_trunk_name);
     }
 
     /**
@@ -227,8 +220,9 @@ class OutboundWhitelistMatchingTest extends TestCase
 
         $result = $this->invokePrivateMethod('findOutboundWhitelistEntry', [$this->organization->id, $destinationNumber]);
 
-        // Null prefix should not match
-        $this->assertNull($result);
+        // Null prefix means match any number in the country
+        $this->assertInstanceOf(OutboundWhitelist::class, $result);
+        $this->assertEquals('null_prefix_trunk', $result->outbound_trunk_name);
     }
 
     /**
@@ -395,14 +389,14 @@ class OutboundWhitelistMatchingTest extends TestCase
     }
 
     /**
-     * Helper method to invoke private methods on VoiceRoutingManager.
+     * Helper method to invoke private methods on OutboundRoutingService.
      */
     private function invokePrivateMethod(string $methodName, array $parameters = [])
     {
-        $reflection = new \ReflectionClass(VoiceRoutingManager::class);
+        $reflection = new \ReflectionClass(OutboundRoutingService::class);
         $method = $reflection->getMethod($methodName);
         $method->setAccessible(true);
 
-        return $method->invokeArgs($this->voiceRoutingManager, $parameters);
+        return $method->invokeArgs($this->outboundRoutingService, $parameters);
     }
 }

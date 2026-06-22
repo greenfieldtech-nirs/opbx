@@ -89,7 +89,7 @@ const getDetailsBadge = (extension: Extension, conferenceRooms: any[], ringGroup
         if (typeof extension.configuration === 'object' && extension.configuration) {
           ivrId = extension.configuration.ivr_id || extension.configuration.ivr_menu_id;
         } else {
-          ivrId = extension.configuration;
+          ivrId = String(extension.configuration);
         }
         if (ivrId) {
           const ivrMenu = ivrMenus.find(menu => menu.id == ivrId);

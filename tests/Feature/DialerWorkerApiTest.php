@@ -43,7 +43,7 @@ class DialerWorkerApiTest extends TestCase
 
     protected function tearDown(): void
     {
-        Mockery::close();
+        \Mockery::close();
         parent::tearDown();
     }
 

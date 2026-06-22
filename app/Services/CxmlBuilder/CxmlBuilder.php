@@ -392,7 +392,7 @@ class CxmlBuilder
     public static function dummyAiMessage(): string
     {
         $builder = new self;
-        $builder->say('Hi There, this is not an AI assistant, this is just a small dummy audio message, that will ensure that your routing setup is functional and working. Thank you for using Cloudonix and O.P.B.X')
+        $builder->say('Hi There, this is not an AI assistant, this is just a small dummy audio message, that will ensure that your routing setup is functional and working. I know you expected more at this point, but it really doesn\'t get any better than this right now. Thank you for using Cloudonix and O.P.B.X - don\'t forget to visit cloudonix-dot-com for the most up to date information about cloudonix services.')
             ->hangup();
 
         return $builder->build();

@@ -137,8 +137,9 @@ export default function DistributionLists() {
     try {
       await unassignMutation.mutateAsync(listId);
       toast.success('List unassigned from campaign successfully');
-    } catch {
-      toast.error('Failed to unassign list from campaign');
+    } catch (err: any) {
+      const message = err?.response?.data?.error || 'Failed to unassign list from campaign';
+      toast.error('Unassign failed', { description: message });
     }
   };
 
@@ -155,8 +156,16 @@ export default function DistributionLists() {
   };
 
   const handleUploadSuccess = () => {
-    // Refresh the list to show updated status
-    queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
+    // Force immediate refetch of the list to show updated status after upload
+    queryClient.invalidateQueries({
+      queryKey: distributionListKeys.all,
+      refetchType: 'all',
+    });
+    // Also force a direct refetch to ensure the UI updates immediately
+    queryClient.refetchQueries({
+      queryKey: distributionListKeys.all,
+      type: 'active',
+    });
   };
 
   if (isLoading) {
@@ -321,7 +330,7 @@ export default function DistributionLists() {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {(list.campaign?.name || list.campaign_id || list.status === 'in_use') ? (
                           <div className="flex items-center gap-2">
-                            {canManage && (
+                            {canManage && list.can_unassign && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -335,6 +344,14 @@ export default function DistributionLists() {
                               >
                                 <Unlink className="h-4 w-4" />
                               </Button>
+                            )}
+                            {canManage && !list.can_unassign && (
+                              <span
+                                className="text-xs text-muted-foreground"
+                                title="Cannot unassign: some destinations have been dialed"
+                              >
+                                Locked
+                              </span>
                             )}
                             <span className="text-sm">{list.campaign?.name || 'Assigned'}</span>
                           </div>
@@ -397,6 +414,18 @@ export default function DistributionLists() {
                                 View Errors
                               </DropdownMenuItem>
                             )}
+                            {list.can_delete && canManage && (
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteList(list);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
                             {list.can_archive && canManage && list.status !== 'failed' && (
                               <DropdownMenuItem
                                 className="text-red-600"
@@ -407,18 +436,6 @@ export default function DistributionLists() {
                               >
                                 <Archive className="h-4 w-4 mr-2" />
                                 Archive
-                              </DropdownMenuItem>
-                            )}
-                            {list.status === 'failed' && canManage && (
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteList(list);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>

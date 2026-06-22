@@ -100,8 +100,11 @@ import type {
   ExtensionType,
   Status,
   CreateExtensionRequest,
-  UpdateExtensionRequest
+  UpdateExtensionRequest,
+  RingGroupMember,
+  IvrMenuOption
 } from '@/types';
+import type { ProviderDefinition } from '@/types/aiAssistant';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 
@@ -312,13 +315,14 @@ export default function ExtensionsComplete() {
       toast.success('Extension created successfully');
     },
     onError: (error: Error | unknown) => {
-      const errors = error.response?.data?.errors;
+      const err = error as { response?: { data?: { errors?: Record<string, string[]>; message?: string; error?: { message?: string } } } };
+      const errors = err.response?.data?.errors;
       if (errors) {
         // Show first validation error
         const firstError = Object.values(errors)[0];
         toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
       } else {
-        const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to create extension';
+        const message = err.response?.data?.message || err.response?.data?.error?.message || 'Failed to create extension';
         toast.error(message);
       }
     },
@@ -333,13 +337,14 @@ export default function ExtensionsComplete() {
       toast.success('Extension updated successfully');
     },
     onError: (error: Error | unknown) => {
-      const errors = error.response?.data?.errors;
+      const err = error as { response?: { data?: { errors?: Record<string, string[]>; message?: string; error?: { message?: string } } } };
+      const errors = err.response?.data?.errors;
       if (errors) {
         // Show first validation error
         const firstError = Object.values(errors)[0];
         toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
       } else {
-        const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to update extension';
+        const message = err.response?.data?.message || err.response?.data?.error?.message || 'Failed to update extension';
         toast.error(message);
       }
     },
@@ -353,7 +358,8 @@ export default function ExtensionsComplete() {
       toast.success('Extension deleted successfully');
     },
     onError: (error: Error | unknown) => {
-      const message = error.response?.data?.error?.message || 'Failed to delete extension';
+      const err = error as { response?: { data?: { error?: { message?: string } } } };
+      const message = err.response?.data?.error?.message || 'Failed to delete extension';
       toast.error(message);
     },
   });
@@ -397,7 +403,8 @@ export default function ExtensionsComplete() {
       }
     },
     onError: (error: Error | unknown) => {
-      const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to reset extension password';
+      const err = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
+      const message = err.response?.data?.message || err.response?.data?.error?.message || 'Failed to reset extension password';
       toast.error(message);
     },
   });
@@ -420,7 +427,8 @@ export default function ExtensionsComplete() {
       );
     },
     onError: (error: Error | unknown) => {
-      const message = error.response?.data?.message || error.response?.data?.error?.message || 'Failed to synchronize extensions';
+      const err = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
+      const message = err.response?.data?.message || err.response?.data?.error?.message || 'Failed to synchronize extensions';
       toast.error(message, { id: 'sync-extensions' });
     },
     onSettled: () => {
@@ -563,7 +571,7 @@ export default function ExtensionsComplete() {
             ivrId = extension.configuration.ivr_id || extension.configuration.ivr_menu_id;
           } else {
             // Configuration might be just the IVR menu ID
-            ivrId = extension.configuration;
+            ivrId = String(extension.configuration);
           }
           if (ivrId) {
             const ivrMenu = ivrMenus.find(menu => menu.id == ivrId);
@@ -1000,7 +1008,7 @@ export default function ExtensionsComplete() {
       ivrId = config.ivr_id || config.ivr_menu_id;
     } else {
       // Configuration might be just the IVR menu ID
-      ivrId = config;
+      ivrId = String(config);
     }
 
     setFormData({
@@ -1153,7 +1161,7 @@ export default function ExtensionsComplete() {
             <Select
               value={typeFilter}
               onValueChange={(value: string) => {
-                setTypeFilter(value);
+                setTypeFilter(value as ExtensionType | 'all');
                 setCurrentPage(1);
               }}
             >
@@ -1176,7 +1184,7 @@ export default function ExtensionsComplete() {
             <Select
               value={statusFilter}
               onValueChange={(value: string) => {
-                setStatusFilter(value);
+                setStatusFilter(value as Status | 'all');
                 setCurrentPage(1);
               }}
             >
@@ -1194,7 +1202,7 @@ export default function ExtensionsComplete() {
             <Select
               value={assignmentFilter}
               onValueChange={(value: string) => {
-                setAssignmentFilter(value);
+                setAssignmentFilter(value as 'all' | 'assigned' | 'unassigned');
                 setCurrentPage(1);
               }}
             >
@@ -1846,8 +1854,8 @@ export default function ExtensionsComplete() {
                                     <span className="text-sm text-muted-foreground">Member Extensions:</span>
                                     <div className="ml-4 space-y-1">
                                       {ringGroup.members.map((member: RingGroupMember, index: number) => (
-                                        <div key={member.id || index} className="flex justify-between text-xs">
-                                          <span>{member.extension_number || `Extension ${member.id}`}</span>
+                                        <div key={member.extension_id || index} className="flex justify-between text-xs">
+                                          <span>{member.extension_number || `Extension ${member.extension_id}`}</span>
                                           <span className="text-muted-foreground">
                                             Priority: {member.priority || index + 1}
                                           </span>
@@ -1896,7 +1904,7 @@ export default function ExtensionsComplete() {
                       )}
                       {selectedExtension.type === 'ai_assistant' && (() => {
                         const config = selectedExtension.configuration;
-                        const provider = aiProviders.find((p: AiProvider) => p.key === config?.provider);
+                        const provider = aiProviders.find((p: ProviderDefinition) => p.key === config?.provider);
                         const protocol = provider?.protocol || 'sip';
 
                         return (
@@ -2041,7 +2049,7 @@ export default function ExtensionsComplete() {
                               ivrId = selectedExtension.configuration.ivr_id || selectedExtension.configuration.ivr_menu_id;
                             } else {
                               // Configuration might be just the IVR menu ID
-                              ivrId = selectedExtension.configuration;
+                              ivrId = String(selectedExtension.configuration);
                             }
                             const ivrMenu = ivrId ? ivrMenus.find(menu => menu.id == ivrId) : null;
 

@@ -9,7 +9,7 @@ import { Phone, Users, Menu, Bot, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { BusinessHoursAction, WeeklySchedule, DaySchedule, DayOfWeek, TimeRange } from '@/types';
-import type { Extension, RingGroup } from '@/types';
+import type { Extension, RingGroup, IvrMenu } from '@/types';
 
 let timeRangeIdCounter = 0;
 let exceptionIdCounter = 0;
@@ -192,14 +192,14 @@ export const getActionDisplayName = (
   action: unknown,
   extensions: Extension[],
   ringGroups: RingGroup[],
-  ivrMenus: Extension[]
+  ivrMenus: IvrMenu[]
 ): JSX.Element => {
   if (!action) return <span className="text-muted-foreground">Not set</span>;
 
   if (typeof action === 'object' && (action as BusinessHoursAction).type && (action as BusinessHoursAction).target_id) {
     const actionObj = action as BusinessHoursAction;
 
-    let targetOption: Extension | RingGroup | undefined = undefined;
+    let targetOption: Extension | RingGroup | IvrMenu | undefined = undefined;
     let displayName = '';
     let displayType = '';
 

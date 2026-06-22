@@ -46,6 +46,8 @@ class DistributionListResource extends JsonResource
             'can_assign' => $this->status->canAssign(),
             'can_upload' => $this->status->canUpload(),
             'can_copy' => $this->status->canCopy(),
+            'can_delete' => $this->canDelete(),
+            'can_unassign' => $this->canUnassign(),
 
             // Timestamps
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),

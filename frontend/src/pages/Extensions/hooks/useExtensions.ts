@@ -364,7 +364,7 @@ export function useExtensions(currentUser: { role: string; id?: string } | null)
     if (typeof config === 'object' && config) {
       ivrId = config.ivr_id || config.ivr_menu_id;
     } else {
-      ivrId = config;
+      ivrId = String(config);
     }
 
     setFormData({

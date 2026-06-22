@@ -1,0 +1,449 @@
+paths:
+  /v1/dialer/worker/health:
+    get:
+      tags:
+        - Dialer Worker
+      summary: Dialer worker health check
+      description: |
+        Health check endpoint for the Go-based dialer worker service.
+        Used by the worker to verify connectivity to the API.
+      operationId: dialerWorkerHealth
+      security:
+        - dialerWorkerAuth: []
+      responses:
+        '200':
+          description: Worker service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/dialer/worker/campaigns/active:
+    get:
+      tags:
+        - Dialer Worker
+      summary: Get active campaigns
+      description: |
+        Retrieve all active auto-dialer campaigns that are ready for dialing.
+        Used by the dialer worker to discover campaigns to execute.
+      operationId: getActiveCampaigns
+      security:
+        - dialerWorkerAuth: []
+      responses:
+        '200':
+          description: List of active campaigns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/dialer/worker/campaigns/{campaign}/pause:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+    post:
+      tags:
+        - Dialer Worker
+      summary: Pause campaign
+      description: |
+        Pause an active campaign from the worker side.
+        Typically called when the campaign reaches its daily/hourly limits
+        or encounters errors.
+      operationId: pauseCampaignFromWorker
+      security:
+        - dialerWorkerAuth: []
+      responses:
+        '200':
+          description: Campaign paused successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Campaign paused successfully
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/dialer/worker/campaigns/{campaign}/destinations/pending:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+    get:
+      tags:
+        - Dialer Worker
+      summary: Get pending destinations
+      description: |
+        Retrieve pending destinations for a campaign.
+        Returns destinations that are ready to be dialed.
+      operationId: getPendingDestinations
+      security:
+        - dialerWorkerAuth: []
+      responses:
+        '200':
+          description: List of pending destinations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        phone_number:
+                          type: string
+                        dial_attempts:
+                          type: integer
+                        last_dial_attempt_at:
+                          type: string
+                          format: date-time
+                          nullable: true
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/dialer/worker/campaigns/{campaign}/destinations/retry:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+    get:
+      tags:
+        - Dialer Worker
+      summary: Get retry destinations
+      description: |
+        Retrieve destinations that need to be retried.
+        Returns destinations that failed previously and are eligible for retry.
+      operationId: getRetryDestinations
+      security:
+        - dialerWorkerAuth: []
+      responses:
+        '200':
+          description: List of retry destinations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        phone_number:
+                          type: string
+                        dial_attempts:
+                          type: integer
+                        last_dial_attempt_at:
+                          type: string
+                          format: date-time
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/dialer/worker/calls/initiate:
+    post:
+      tags:
+        - Dialer Worker
+      summary: Initiate call
+      description: |
+        Initiate an outbound call through Cloudonix.
+        Creates a call session and returns the call SID.
+      operationId: initiateCall
+      security:
+        - dialerWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destination_id:
+                  type: integer
+                campaign_id:
+                  type: integer
+                phone_number:
+                  type: string
+                caller_id:
+                  type: string
+              required:
+                - destination_id
+                - campaign_id
+                - phone_number
+                - caller_id
+      responses:
+        '200':
+          description: Call initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  call_sid:
+                    type: string
+                  session_id:
+                    type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/dialer/worker/calls/generate-cxml:
+    post:
+      tags:
+        - Dialer Worker
+      summary: Generate CXML for call
+      description: |
+        Generate CXML document for an outbound call.
+        Returns the CXML that will be used to connect the call.
+      operationId: generateCxml
+      security:
+        - dialerWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                campaign_id:
+                  type: integer
+                destination_id:
+                  type: integer
+              required:
+                - campaign_id
+                - destination_id
+      responses:
+        '200':
+          description: CXML generated
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/dialer/worker/calls/{session}/status:
+    parameters:
+      - name: session
+        in: path
+        required: true
+        description: Call session ID
+        schema:
+          type: string
+        example: CA550e8400e29b41d4a716446655440000
+    patch:
+      tags:
+        - Dialer Worker
+      summary: Update call status
+      description: |
+        Update the status of an active call session.
+        Used to track call progress and outcomes.
+      operationId: updateCallStatus
+      security:
+        - dialerWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [initiated, ringing, answered, completed, failed, busy, no_answer]
+                duration:
+                  type: integer
+                  nullable: true
+              required:
+                - status
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Status updated successfully
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/dialer/worker/calls/{session}/disposition:
+    parameters:
+      - name: session
+        in: path
+        required: true
+        description: Call session ID
+        schema:
+          type: string
+        example: CA550e8400e29b41d4a716446655440000
+    post:
+      tags:
+        - Dialer Worker
+      summary: Set call disposition
+      description: |
+        Set the final disposition of a call.
+        Records the outcome for reporting and analytics.
+      operationId: setDisposition
+      security:
+        - dialerWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disposition:
+                  type: string
+                  enum: [answered, voicemail, busy, no_answer, failed, fax_machine]
+                notes:
+                  type: string
+                  nullable: true
+              required:
+                - disposition
+      responses:
+        '200':
+          description: Disposition set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Disposition recorded successfully
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/dialer/worker/state/persist:
+    post:
+      tags:
+        - Dialer Worker
+      summary: Persist worker state
+      description: |
+        Persist the current state of a dialer worker.
+        Used for worker recovery and load balancing.
+      operationId: persistState
+      security:
+        - dialerWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                worker_id:
+                  type: string
+                state:
+                  type: object
+              required:
+                - worker_id
+                - state
+      responses:
+        '200':
+          description: State persisted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: State persisted successfully
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/dialer/worker/state/{workerId}:
+    parameters:
+      - name: workerId
+        in: path
+        required: true
+        description: Worker ID
+        schema:
+          type: string
+        example: worker-001
+    get:
+      tags:
+        - Dialer Worker
+      summary: Get worker state
+      description: |
+        Retrieve the persisted state of a dialer worker.
+        Used during worker startup to resume from previous state.
+      operationId: getState
+      security:
+        - dialerWorkerAuth: []
+      responses:
+        '200':
+          description: Worker state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  worker_id:
+                    type: string
+                  state:
+                    type: object
+                  updated_at:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

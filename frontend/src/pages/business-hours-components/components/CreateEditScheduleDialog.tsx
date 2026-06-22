@@ -45,7 +45,7 @@ interface CreateEditScheduleDialogProps {
   editing: boolean;
   formData: Partial<BusinessHoursSchedule>;
   formErrors: Record<string, string>;
-  onFormChange: (field: string, value: string | boolean | Record<string, unknown>) => void;
+  onFormChange: (field: string, value: unknown) => void;
   onDayScheduleChange: (day: DayOfWeek, enabled: boolean) => void;
   onTimeRangeChange: (day: DayOfWeek, rangeId: string, field: 'start_time' | 'end_time', value: string) => void;
   onAddTimeRange: (day: DayOfWeek) => void;

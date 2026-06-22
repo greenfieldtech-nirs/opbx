@@ -121,7 +121,8 @@ class SimulateOutboundCall extends Command
         $this->info('🚀 Making Cloudonix API call...');
         $this->newLine();
 
-        $apiKey = decrypt($settings->domain_requests_api_key);
+        // ponytail: model already decrypts via 'encrypted' cast; do not decrypt() again
+        $apiKey = $settings->domain_requests_api_key;
         $domain = $settings->domain_name;
 
         // Get proper webhook base URL (not localhost!)

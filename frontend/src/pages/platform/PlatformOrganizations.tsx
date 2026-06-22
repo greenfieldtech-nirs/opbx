@@ -193,6 +193,10 @@ export default function PlatformOrganizations() {
 
   const columns: Column<PlatformOrganization>[] = [
     {
+      header: 'ID',
+      cell: (org) => <span>{org.id}</span>,
+    },
+    {
       header: 'Users',
       sortKey: 'users_count',
       cell: (org) => (

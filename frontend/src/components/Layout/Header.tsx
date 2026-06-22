@@ -40,7 +40,7 @@ export function Header() {
     <header className="flex h-16 items-center justify-between border-b bg-white px-6">
       <div className="flex-1">
         <h2 className="text-lg font-semibold text-gray-900">
-          {user?.organization?.name || 'PBX Admin'}
+          {user?.name || 'PBX Admin'}
         </h2>
       </div>
 

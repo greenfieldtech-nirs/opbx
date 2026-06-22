@@ -20,7 +20,7 @@ export function useBusinessHours() {
   const { user } = useAuth();
   
   // Get organization timezone, fallback to UTC
-  const organizationTimezone = user?.organization?.timezone || 'UTC';
+  const organizationTimezone = 'UTC';
 
   // State for filters
   const [searchQuery, setSearchQuery] = useState('');

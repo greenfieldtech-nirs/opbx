@@ -5,7 +5,7 @@ This directory contains the complete OpenAPI 3.1 specification for the OPBX (Ope
 ## Structure
 
 ```
-docs/openapi/
+docs/opbx-openapi/
 ├── openapi.yaml                 # Main entry point - includes all paths and components
 ├── README.md                    # This file
 ├── components/                  # Reusable components
@@ -69,11 +69,11 @@ To validate the OpenAPI specification:
 ```bash
 # Using swagger-cli (npm)
 npm install -g swagger-cli
-swagger-cli validate docs/openapi/openapi.yaml
+swagger-cli validate docs/opbx-openapi/openapi.yaml
 
 # Using redocly
 npm install -g @redocly/cli
-redocly lint docs/openapi/openapi.yaml
+redocly lint docs/opbx-openapi/openapi.yaml
 ```
 
 ## API Overview

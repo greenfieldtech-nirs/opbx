@@ -23,7 +23,7 @@ interface AssignCampaignDialogProps {
   list: AutoDialerList;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  campaigns: Array<{ id: string; name: string; status: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; start_date?: string }>;
 }
 
 export function AssignCampaignDialog({
@@ -46,8 +46,9 @@ export function AssignCampaignDialog({
       toast.success('List assigned to campaign successfully');
       setSelectedCampaignId('');
       onOpenChange(false);
-    } catch {
-      toast.error('Failed to assign list to campaign');
+    } catch (err: any) {
+      const message = err?.response?.data?.error || 'Failed to assign list to campaign';
+      toast.error('Assignment failed', { description: message });
     }
   };
 
@@ -56,10 +57,29 @@ export function AssignCampaignDialog({
     onOpenChange(false);
   };
 
-  // Filter campaigns that can accept a list (draft or active status)
-  const availableCampaigns = campaigns.filter(
-    (campaign) => campaign.status === 'draft' || campaign.status === 'active'
-  );
+  // Filter campaigns based on assignment rules:
+  // - Campaign is not currently running (draft or paused), OR
+  // - Campaign schedule hasn't been reached yet (start_date is in the future)
+  const availableCampaigns = campaigns.filter((campaign) => {
+    // Draft campaigns are always available
+    if (campaign.status === 'draft') return true;
+
+    // Paused campaigns are available (not currently running)
+    if (campaign.status === 'paused') return true;
+
+    // Active campaigns: only available if schedule hasn't started yet
+    if (campaign.status === 'active') {
+      const startDate = campaign.start_date ? new Date(campaign.start_date) : null;
+      const now = new Date();
+      // Allow if start_date is in the future
+      if (startDate && startDate > now) return true;
+      // If no start_date or start_date has passed, campaign is running - don't allow
+      return false;
+    }
+
+    // Completed or archived campaigns cannot accept lists
+    return false;
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -74,7 +94,7 @@ export function AssignCampaignDialog({
         <div className="py-4">
           {availableCampaigns.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No available campaigns found. Create a campaign first or use a campaign in Draft or Active status.
+              No available campaigns found. Campaigns must be in Draft, Paused, or scheduled (not yet started) status to accept a list.
             </p>
           ) : (
             <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>

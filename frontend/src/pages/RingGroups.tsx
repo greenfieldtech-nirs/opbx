@@ -341,7 +341,7 @@ export default function RingGroups() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data),
+    mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data as Partial<RingGroup>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
       setIsCreateDialogOpen(false);
@@ -357,7 +357,7 @@ export default function RingGroups() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateRingGroupRequest }) =>
-      ringGroupsService.update(id, data),
+      ringGroupsService.update(id, data as Partial<RingGroup>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
       setIsEditDialogOpen(false);

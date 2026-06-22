@@ -266,8 +266,10 @@ class RecordingAccessServiceTest extends TestCase
         $result = $this->service->secureDelete($testFile);
 
         // Cleanup - restore permissions and delete
-        chmod($testFile, 0644);
-        @unlink($testFile);
+        if (file_exists($testFile)) {
+            @chmod($testFile, 0644);
+            @unlink($testFile);
+        }
 
         // Result may be true or false depending on system permissions
         $this->assertIsBool($result);

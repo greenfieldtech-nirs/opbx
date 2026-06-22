@@ -680,43 +680,170 @@ class SettingsController extends Controller
         int $organizationId
     ): array {
         $applicationId = $settings->voice_application_id;
+        $applicationName = $settings->voice_application_name;
+
+        if (empty($applicationName)) {
+            Log::warning('[VOICE_APP_SETUP] Cannot update voice application URL: name missing', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'webhook_url' => $webhookUrl,
+            ]);
+
+            return [
+                'application_id' => $applicationId,
+                'app_data' => null,
+                'error' => null,
+            ];
+        }
+
+        $payload = [
+            'url' => $webhookUrl,
+            'method' => 'POST',
+            'profile' => new \stdClass,
+        ];
 
         Log::info('[VOICE_APP_SETUP] Updating existing voice application URL', [
             'request_id' => $requestId,
             'application_id' => $applicationId,
+            'application_name' => $applicationName,
             'webhook_url' => $webhookUrl,
         ]);
 
-        $result = $this->getCloudonixClient()->updateVoiceApplication(
+        $client = $this->getCloudonixClient();
+        $result = $client->updateVoiceApplication(
             $settings->domain_uuid,
             $settings->domain_api_key,
-            $applicationId,
-            [
-                'url' => $webhookUrl,
-                'method' => 'POST',
-                'profile' => new \stdClass,
-            ]
+            $applicationName,
+            $payload
         );
+
+        // ponytail: if stored app was removed/renamed in Cloudonix, reconcile and retry once
+        if (! $result['success'] && str_contains($result['message'] ?? '', 'Not Found')) {
+            Log::warning('[VOICE_APP_SETUP] Stored voice application not found, attempting reconciliation', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'application_name' => $applicationName,
+            ]);
+
+            $reconciledApp = $this->reconcileVoiceApplication($settings, $client, $requestId);
+
+            if ($reconciledApp) {
+                $result = $client->updateVoiceApplication(
+                    $settings->domain_uuid,
+                    $settings->domain_api_key,
+                    $reconciledApp['name'],
+                    $payload
+                );
+
+                if ($result['success']) {
+                    return [
+                        'application_id' => $reconciledApp['id'],
+                        'app_data' => $reconciledApp,
+                        'error' => null,
+                    ];
+                }
+            }
+
+            // Reconciliation failed: treat stored app as deleted and create a new one
+            Log::warning('[VOICE_APP_SETUP] No OPBX routing application found for reconciliation, creating new one', [
+                'request_id' => $requestId,
+                'application_id' => $applicationId,
+                'application_name' => $applicationName,
+            ]);
+
+            return $this->createNewVoiceApplication($settings, $webhookUrl, $requestId, $userId, $organizationId);
+        }
 
         if (! $result['success']) {
             // Log warning but don't fail - app might still work with old URL
             Log::warning('[VOICE_APP_SETUP] Failed to update voice application URL', [
                 'request_id' => $requestId,
                 'application_id' => $applicationId,
+                'application_name' => $applicationName,
                 'error' => $result['message'],
             ]);
-        } else {
-            Log::info('[VOICE_APP_SETUP] Voice application URL updated successfully', [
-                'request_id' => $requestId,
+
+            return [
                 'application_id' => $applicationId,
-            ]);
+                'app_data' => null,
+                'error' => null,
+            ];
         }
+
+        Log::info('[VOICE_APP_SETUP] Voice application URL updated successfully', [
+            'request_id' => $requestId,
+            'application_id' => $applicationId,
+            'application_name' => $applicationName,
+        ]);
 
         return [
             'application_id' => $applicationId,
             'app_data' => null,
             'error' => null,
         ];
+    }
+
+    /**
+     * Reconcile stale local voice application details with Cloudonix.
+     *
+     * Looks up the domain applications list and tries to find the OPBX routing
+     * application by the stored name or by the opbx-routing-application-* pattern.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function reconcileVoiceApplication(
+        CloudonixSettings $settings,
+        CloudonixClient $client,
+        string $requestId
+    ): ?array {
+        $listResult = $client->getDomainApplications(
+            $settings->domain_uuid,
+            $settings->domain_api_key
+        );
+
+        if (! $listResult['success'] || ! is_array($listResult['data'])) {
+            Log::warning('[VOICE_APP_SETUP] Failed to list domain applications for reconciliation', [
+                'request_id' => $requestId,
+                'error' => $listResult['message'] ?? 'Unknown error',
+            ]);
+
+            return null;
+        }
+
+        $storedName = $settings->voice_application_name;
+
+        // First: exact name match
+        foreach ($listResult['data'] as $app) {
+            if (is_array($app) && ($app['name'] ?? null) === $storedName) {
+                Log::info('[VOICE_APP_SETUP] Reconciled voice application by exact name', [
+                    'request_id' => $requestId,
+                    'application_id' => $app['id'] ?? null,
+                    'application_name' => $app['name'] ?? null,
+                ]);
+
+                return $app;
+            }
+        }
+
+        // Second: OPBX routing application pattern match
+        foreach ($listResult['data'] as $app) {
+            if (is_array($app) && str_starts_with((string) ($app['name'] ?? ''), 'opbx-routing-application-')) {
+                Log::info('[VOICE_APP_SETUP] Reconciled voice application by pattern', [
+                    'request_id' => $requestId,
+                    'application_id' => $app['id'] ?? null,
+                    'application_name' => $app['name'] ?? null,
+                ]);
+
+                return $app;
+            }
+        }
+
+        Log::warning('[VOICE_APP_SETUP] No OPBX routing application found for reconciliation', [
+            'request_id' => $requestId,
+            'stored_name' => $storedName,
+        ]);
+
+        return null;
     }
 
     /**

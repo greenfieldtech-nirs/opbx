@@ -103,10 +103,17 @@ fi
 
 # Check if we have required files
 if [ ! -f "docker-compose.yml" ]; then
-    print_error "docker-compose.yml not found. Are you in the OPBX root directory?"
-    exit 1
+    if [ -f "docker-compose.yml.example" ]; then
+        print_info "Creating docker-compose.yml from docker-compose.yml.example..."
+        cp docker-compose.yml.example docker-compose.yml
+        print_success "docker-compose.yml created"
+    else
+        print_error "docker-compose.yml not found. Are you in the OPBX root directory?"
+        exit 1
+    fi
+else
+    print_success "docker-compose.yml found"
 fi
-print_success "docker-compose.yml found"
 
 print_header "Step 2: Environment Configuration"
 

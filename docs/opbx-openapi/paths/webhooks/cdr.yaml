@@ -15,7 +15,7 @@ paths:
         Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
       operationId: cdrWebhook
       security:
-        - webhookSignature: []
+        - webhookBearer: []
       requestBody:
         required: true
         content:

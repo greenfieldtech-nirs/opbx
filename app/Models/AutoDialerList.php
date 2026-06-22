@@ -184,6 +184,49 @@ class AutoDialerList extends Model
     }
 
     /**
+     * Check if all destinations in the list are pending with zero dial attempts.
+     */
+    public function allDestinationsArePendingAndFresh(): bool
+    {
+        if ($this->statistics['total_rows'] ?? $this->total_rows === 0) {
+            return true;
+        }
+
+        return $this->destinations()
+            ->where(function ($query) {
+                $query->where('status', '!=', 'pending')
+                    ->orWhere('dial_attempts', '>', 0);
+            })
+            ->doesntExist();
+    }
+
+    /**
+     * Check if the list can be deleted.
+     */
+    public function canDelete(): bool
+    {
+        // Not assigned to any campaign
+        if (! $this->campaign_id) {
+            return true;
+        }
+
+        // Assigned, but all entries are pending with zero dial attempts
+        return $this->allDestinationsArePendingAndFresh();
+    }
+
+    /**
+     * Check if the list can be unassigned from its campaign.
+     */
+    public function canUnassign(): bool
+    {
+        if (! $this->campaign_id) {
+            return false;
+        }
+
+        return $this->allDestinationsArePendingAndFresh();
+    }
+
+    /**
      * Check if the list is currently locked (in use or used).
      */
     public function isLocked(): bool

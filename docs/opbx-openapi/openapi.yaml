@@ -380,6 +380,8 @@ paths:
     $ref: './paths/auto-dialer-campaigns/destinations.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1destinations'
   /v1/auto-dialer-campaigns/{campaign}/concurrency:
     $ref: './paths/auto-dialer-campaigns/destinations.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1concurrency'
+  /v1/auto-dialer-campaigns/available-caller-ids:
+    $ref: './paths/auto-dialer-campaigns/index.yaml#/paths/~1v1~1auto-dialer-campaigns~1available-caller-ids'
   /v1/auto-dialer-campaigns/monitor/summary:
     $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1monitor~1summary'
   /v1/auto-dialer-campaigns/{campaign}/monitor/detail:
@@ -441,6 +443,54 @@ paths:
   /callbacks/voice/albs-follow-through:
     $ref: './paths/voice/albs-follow-through.yaml#/paths/~1callbacks~1voice~1albs-follow-through'
   
+  # Dialer Worker endpoints
+  /v1/dialer/worker/health:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1health'
+  /v1/dialer/worker/campaigns/active:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1campaigns~1active'
+  /v1/dialer/worker/campaigns/{campaign}/pause:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1campaigns~1{campaign}~1pause'
+  /v1/dialer/worker/campaigns/{campaign}/destinations/pending:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1campaigns~1{campaign}~1destinations~1pending'
+  /v1/dialer/worker/campaigns/{campaign}/destinations/retry:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1campaigns~1{campaign}~1destinations~1retry'
+  /v1/dialer/worker/calls/initiate:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1calls~1initiate'
+  /v1/dialer/worker/calls/generate-cxml:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1calls~1generate-cxml'
+  /v1/dialer/worker/calls/{session}/status:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1calls~1{session}~1status'
+  /v1/dialer/worker/calls/{session}/disposition:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1calls~1{session}~1disposition'
+  /v1/dialer/worker/state/persist:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1state~1persist'
+  /v1/dialer/worker/state/{workerId}:
+    $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1state~1{workerId}'
+
+  # Voice Routing endpoints
+  /voice/route:
+    $ref: './paths/voice/route.yaml#/paths/~1voice~1route'
+  /voice/ivr-input:
+    $ref: './paths/voice/ivr-input.yaml#/paths/~1voice~1ivr-input'
+  /voice/health:
+    $ref: './paths/voice/health.yaml#/paths/~1voice~1health'
+  /voice/amd-action:
+    $ref: './paths/voice/amd-action.yaml#/paths/~1voice~1amd-action'
+  /callbacks/voice/ring-group-callback:
+    $ref: './paths/voice/ring-group-callback.yaml#/paths/~1callbacks~1voice~1ring-group-callback'
+  /callbacks/voice/albs-follow-through:
+    $ref: './paths/voice/albs-follow-through.yaml#/paths/~1callbacks~1voice~1albs-follow-through'
+
+  # Webhooks endpoints (Cloudonix)
+  /webhooks/cloudonix/call-initiated:
+    $ref: './paths/webhooks/call-initiated.yaml#/paths/~1webhooks~1cloudonix~1call-initiated'
+  /webhooks/cloudonix/call-status:
+    $ref: './paths/webhooks/call-status.yaml#/paths/~1webhooks~1cloudonix~1call-status'
+  /webhooks/cloudonix/cdr:
+    $ref: './paths/webhooks/cdr.yaml#/paths/~1webhooks~1cloudonix~1cdr'
+  /webhooks/cloudonix/session-update:
+    $ref: './paths/webhooks/session-update.yaml#/paths/~1webhooks~1cloudonix~1session-update'
+
   # Platform Manager endpoints
   /v1/platform/dashboard:
     $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
@@ -475,16 +525,19 @@ components:
       in: cookie
       name: XSRF-TOKEN
       description: Cookie-based session authentication for SPAs
-    webhookSignature:
-      type: apiKey
-      in: header
-      name: X-Cloudonix-Signature
-      description: HMAC signature for Cloudonix webhooks
+    webhookBearer:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication for Cloudonix webhooks. Required only if domain_requests_api_key is configured in CloudonixSettings.
     voiceWebhookAuth:
       type: apiKey
       in: header
       name: Authorization
       description: Bearer token for voice routing webhooks (per-organization)
+    dialerWorkerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token for dialer worker authentication (DIALER_WORKER_API_TOKEN)
   
   schemas:
     # Common response schemas
@@ -651,5 +704,7 @@ tags:
     description: Incoming webhooks from Cloudonix
   - name: Voice Routing
     description: Real-time call routing (CXML responses)
+  - name: Dialer Worker
+    description: Go-based dialer worker service endpoints
   - name: Platform
     description: Platform manager administrative endpoints
