@@ -114,58 +114,58 @@ export const router = createBrowserRouter([
         path: 'phone-numbers',
         element: <PhoneNumbers />,
       },
-       {
-         path: 'ring-groups',
-         element: <RingGroups />,
-       },
-       {
-         path: 'ivr-menus',
-         element: <IVRMenus />,
-       },
-       {
-         path: 'business-hours',
-         element: <BusinessHours />,
-       },
+      {
+        path: 'ring-groups',
+        element: <RingGroups />,
+      },
+      {
+        path: 'ivr-menus',
+        element: <IVRMenus />,
+      },
+      {
+        path: 'business-hours',
+        element: <BusinessHours />,
+      },
       {
         path: 'call-logs',
         element: <CallLogs />,
       },
-       {
-         path: 'announcements',
-         element: <Announcements />,
-       },
-       {
-         path: 'recordings',
-         element: <Navigate to="/ui/announcements" replace />,
-       },
-       {
-         path: 'live-calls',
-         element: <LiveCalls />,
-       },
-       {
-         path: 'outbound-whitelist',
-         element: (
-           <OwnerRoute>
-             <OutboundWhitelistPage />
-           </OwnerRoute>
-         ),
-       },
-       {
-         path: 'inbound-blacklist',
-         element: <InboundBlacklistPage />,
-       },
-       {
-         path: 'profile',
-         element: <Profile />,
-       },
-        {
-          path: 'settings',
-          element: (
-            <OwnerRoute>
-              <Settings />
-            </OwnerRoute>
-          ),
-        },
+      {
+        path: 'announcements',
+        element: <Announcements />,
+      },
+      {
+        path: 'recordings',
+        element: <Navigate to="/ui/announcements" replace />,
+      },
+      {
+        path: 'live-calls',
+        element: <LiveCalls />,
+      },
+      {
+        path: 'outbound-whitelist',
+        element: (
+          <OwnerRoute>
+            <OutboundWhitelistPage />
+          </OwnerRoute>
+        ),
+      },
+      {
+        path: 'inbound-blacklist',
+        element: <InboundBlacklistPage />,
+      },
+      {
+        path: 'profile',
+        element: <Profile />,
+      },
+      {
+        path: 'settings',
+        element: (
+          <OwnerRoute>
+            <Settings />
+          </OwnerRoute>
+        ),
+      },
       {
         path: 'call-notifications',
         element: <CallNotificationsSettings />,
