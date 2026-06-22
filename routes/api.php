@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
+use App\Http\Controllers\Api\CallTrackingNumberController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\EmailValidationController;
@@ -267,6 +268,10 @@ Route::prefix('v1')->group(function (): void {
 
         // Call Tracking Campaigns
         Route::apiResource('call-tracking-campaigns', CallTrackingCampaignController::class);
+
+        // Call Tracking Numbers (nested under campaigns)
+        Route::apiResource('call-tracking-campaigns.call-tracking-numbers', CallTrackingNumberController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
