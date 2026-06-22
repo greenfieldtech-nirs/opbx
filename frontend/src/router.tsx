@@ -247,55 +247,54 @@ export const router = createBrowserRouter([
         ),
       },
       // Platform Management routes (platform manager only)
-{
-  path: 'platform',
-  element: (
-    <PlatformManagerRoute>
-      <Navigate to="/ui/platform/dashboard" replace />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/dashboard',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformDashboard />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/organizations',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformOrganizations />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/organizations/:id',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformOrganizationDetail />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/users',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformUsers />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/audit-log',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformAuditLog />
-    </PlatformManagerRoute>
-  ),
-},
-
-      ],
-   },
+      {
+        path: 'platform',
+        element: (
+          <PlatformManagerRoute>
+            <Navigate to="/ui/platform/dashboard" replace />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/dashboard',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformDashboard />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/organizations',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformOrganizations />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/organizations/:id',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformOrganizationDetail />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/users',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformUsers />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/audit-log',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformAuditLog />
+          </PlatformManagerRoute>
+        ),
+      },
+    ],
+  },
 ]);
