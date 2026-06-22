@@ -15,7 +15,6 @@ import type { CallTrackingNotificationSettings } from '@/types/callTracking';
 import type { NotificationSettingsFormData } from '@/services/callTrackingNotificationSettingsApi';
 
 interface Props {
-  campaignId: string | number;
   settings?: CallTrackingNotificationSettings;
   onSubmit: (data: NotificationSettingsFormData) => void;
   isSubmitting: boolean;
@@ -35,6 +34,7 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
   const [authMethod, setAuthMethod] = useState<NotificationSettingsFormData['auth_method']>(settings?.auth_method ?? 'none');
   const [authUsername, setAuthUsername] = useState(settings?.auth_username ?? '');
   const [authSecret, setAuthSecret] = useState('');
+  const [secretModified, setSecretModified] = useState(false);
   const [enabledEvents, setEnabledEvents] = useState<string[]>(settings?.enabled_events ?? []);
   const [isActive, setIsActive] = useState(settings?.is_active ?? true);
 
@@ -46,14 +46,19 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
+    const payload: NotificationSettingsFormData = {
       webhook_url: webhookUrl,
       auth_method: authMethod,
       auth_username: authUsername || null,
-      auth_secret: authSecret || null,
       enabled_events: enabledEvents,
       is_active: isActive,
-    });
+    };
+
+    if (secretModified) {
+      payload.auth_secret = authSecret || null;
+    }
+
+    onSubmit(payload);
   };
 
   return (
@@ -87,12 +92,12 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
       {authMethod !== 'none' && (
         <div className="space-y-2">
           <Label htmlFor="auth_secret">{authMethod === 'bearer_token' ? 'Token' : 'Password'}</Label>
-          <Input id="auth_secret" type="password" value={authSecret} onChange={(e) => setAuthSecret(e.target.value)} />
+          <Input id="auth_secret" type="password" value={authSecret} onChange={(e) => { setAuthSecret(e.target.value); setSecretModified(true); }} />
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label>Enabled Events</Label>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Enabled Events</legend>
         <div className="flex flex-wrap gap-2">
           {EVENT_OPTIONS.map((option) => (
             <label
@@ -109,7 +114,7 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
             </label>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       <div className="flex items-center gap-2">
         <Switch id="is_active" checked={isActive} onCheckedChange={setIsActive} />

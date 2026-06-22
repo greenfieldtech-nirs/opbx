@@ -127,7 +127,6 @@ export default function CallTrackingCampaignDetail() {
             <p className="text-muted-foreground">Loading settings...</p>
           ) : (
             <CallTrackingNotificationSettingsForm
-              campaignId={id!}
               settings={notificationSettings}
               onSubmit={(data) => updateSettingsMutation.mutate({ campaignId: id!, data })}
               isSubmitting={updateSettingsMutation.isPending}
