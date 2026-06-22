@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const escapeJsString = (value: string): string =>
-  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+function jsStringLiteral(value: string): string {
+  return JSON.stringify(value).replace(/\u003c/g, '\\u003c');
+}
 
 export default function CallTrackingDniSnippet() {
   const [apiUrl, setApiUrl] = useState(
@@ -21,13 +22,17 @@ export default function CallTrackingDniSnippet() {
   const [organizationId, setOrganizationId] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const escapedApiUrl = useMemo(() => escapeJsString(apiUrl), [apiUrl]);
-  const escapedDefaultNumber = useMemo(
-    () => escapeJsString(defaultNumber),
+  const isOrgIdValid = organizationId === '' || /^\d+$/.test(organizationId);
+  const isDefaultNumberValid = defaultNumber === '' || /^\+[1-9]\d{1,14}$/.test(defaultNumber);
+  const canCopy = isOrgIdValid && isDefaultNumberValid;
+
+  const literalApiUrl = useMemo(() => jsStringLiteral(apiUrl), [apiUrl]);
+  const literalDefaultNumber = useMemo(
+    () => jsStringLiteral(defaultNumber),
     [defaultNumber]
   );
-  const escapedOrganizationId = useMemo(
-    () => escapeJsString(organizationId),
+  const literalOrganizationId = useMemo(
+    () => jsStringLiteral(organizationId),
     [organizationId]
   );
 
@@ -38,24 +43,20 @@ export default function CallTrackingDniSnippet() {
     var phoneElements = document.querySelectorAll('[data-ct-phone]');
     if (phoneElements.length === 0) return;
 
-    var url = '${escapedApiUrl}';
+    var pageQuery = new URLSearchParams(window.location.search);
+    var utmSource = pageQuery.get('utm_source') || (document.referrer || 'direct');
+    var utmMedium = pageQuery.get('utm_medium');
+    var utmCampaign = pageQuery.get('utm_campaign');
+
     var params = [];
-    if (${organizationId ? `'${escapedOrganizationId}'` : 'null'}) {
-      params.push('organization_id=' + encodeURIComponent('${escapedOrganizationId}'));
-    }
-    if (${defaultNumber ? `'${escapedDefaultNumber}'` : 'null'}) {
-      params.push('default_number=' + encodeURIComponent('${escapedDefaultNumber}'));
-    }
-    var referrer = document.referrer || 'direct';
-    if (referrer) {
-      params.push('utm_source=' + encodeURIComponent(referrer));
-    }
-    if (params.length) {
-      url += '?' + params.join('&');
-    }
+    if (${literalOrganizationId}) params.push('organization_id=' + encodeURIComponent(${literalOrganizationId}));
+    if (${literalDefaultNumber}) params.push('default_number=' + encodeURIComponent(${literalDefaultNumber}));
+    if (utmSource) params.push('utm_source=' + encodeURIComponent(utmSource));
+    if (utmMedium) params.push('utm_medium=' + encodeURIComponent(utmMedium));
+    if (utmCampaign) params.push('utm_campaign=' + encodeURIComponent(utmCampaign));
 
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', url);
+    xhr.open('GET', ${literalApiUrl} + (params.length ? '?' + params.join('&') : ''));
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.onload = function() {
       if (xhr.status !== 200) return;
@@ -79,11 +80,9 @@ export default function CallTrackingDniSnippet() {
   })();
 \u003c/script\u003e`,
     [
-      escapedApiUrl,
-      escapedDefaultNumber,
-      escapedOrganizationId,
-      organizationId,
-      defaultNumber,
+      literalApiUrl,
+      literalDefaultNumber,
+      literalOrganizationId,
     ]
   );
 
@@ -128,6 +127,9 @@ export default function CallTrackingDniSnippet() {
               onChange={(e) => setDefaultNumber(e.target.value)}
               placeholder="+1234567890"
             />
+            {defaultNumber !== '' && !isDefaultNumberValid && (
+              <p className="text-sm text-red-600">Default number must be in E.164 format (e.g. +14155551234).</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="organization-id">Organization ID</Label>
@@ -137,6 +139,9 @@ export default function CallTrackingDniSnippet() {
               onChange={(e) => setOrganizationId(e.target.value)}
               placeholder="123"
             />
+            {organizationId !== '' && !isOrgIdValid && (
+              <p className="text-sm text-red-600">Organization ID must be numeric.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -144,7 +149,7 @@ export default function CallTrackingDniSnippet() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>JavaScript Snippet</CardTitle>
-          <Button variant="outline" size="sm" onClick={handleCopy}>
+          <Button variant="outline" size="sm" onClick={handleCopy} disabled={!canCopy}>
             {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
             {copied ? 'Copied' : 'Copy'}
           </Button>
