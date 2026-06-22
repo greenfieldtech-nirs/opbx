@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -33,13 +33,13 @@ const schema = z.object({
   destination_type: z.enum(['forward', 'extension', 'ring_group']),
   destination_config: z.object({
     forward_to: z.string().optional(),
-    extension_id: z.coerce.number().optional(),
-    ring_group_id: z.coerce.number().optional(),
+    extension_id: z.number().optional(),
+    ring_group_id: z.number().optional(),
   }),
   conversion_rule: z.object({
-    min_answered_duration_seconds: z.coerce.number().min(0).optional(),
+    min_answered_duration_seconds: z.number().min(0).optional(),
     requires_answered_disposition: z.boolean().optional(),
-    conversion_value: z.coerce.number().min(0).optional(),
+    conversion_value: z.number().min(0).optional(),
   }),
   google_ads_upload_enabled: z.boolean().default(false),
   meta_upload_enabled: z.boolean().default(false),
@@ -63,6 +63,23 @@ const DEFAULT_VALUES: FormData = {
   google_ads_upload_enabled: false,
   meta_upload_enabled: false,
 };
+
+const toPayload = (data: FormData): CampaignFormData => ({
+  name: data.name,
+  source: data.source || null,
+  medium: data.medium || null,
+  description: data.description || null,
+  status: data.status,
+  destination_type: data.destination_type,
+  destination_config: data.destination_config,
+  conversion_rule: {
+    min_answered_duration_seconds: data.conversion_rule.min_answered_duration_seconds,
+    requires_answered_disposition: data.conversion_rule.requires_answered_disposition,
+    conversion_value: data.conversion_rule.conversion_value ?? null,
+  },
+  google_ads_upload_enabled: data.google_ads_upload_enabled,
+  meta_upload_enabled: data.meta_upload_enabled,
+});
 
 export default function CallTrackingCampaignForm() {
   const { id } = useParams<{ id?: string }>();
@@ -105,16 +122,7 @@ export default function CallTrackingCampaignForm() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const payload = {
-        ...data,
-        source: data.source || null,
-        medium: data.medium || null,
-        description: data.description || null,
-        conversion_rule: {
-          ...data.conversion_rule,
-          conversion_value: data.conversion_rule.conversion_value ?? null,
-        },
-      } as CampaignFormData;
+      const payload = toPayload(data);
 
       if (isEdit) {
         await updateMutation.mutateAsync({ id: id!, data: payload });
@@ -128,6 +136,12 @@ export default function CallTrackingCampaignForm() {
       toast.error((err as Error)?.message || 'Failed to save campaign');
     }
   };
+
+  function FieldError({ name }: { name: string }) {
+    const { error } = form.getFieldState(name as never, form.formState);
+    if (!error) return null;
+    return <p className="text-sm text-red-600">{error.message?.toString()}</p>;
+  }
 
   if (isEdit && isLoading) {
     return <p className="p-6 text-muted-foreground">Loading campaign...</p>;
@@ -146,39 +160,50 @@ export default function CallTrackingCampaignForm() {
             <div className="grid grid-cols-1 gap-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" {...form.register('name')} />
-              {form.formState.errors.name && (
-                <p className="text-sm text-red-600">{form.formState.errors.name.message}</p>
-              )}
+              <FieldError name="name" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="source">Source</Label>
                 <Input id="source" {...form.register('source')} placeholder="e.g. google" />
+                <FieldError name="source" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="medium">Medium</Label>
                 <Input id="medium" {...form.register('medium')} placeholder="e.g. cpc" />
+                <FieldError name="medium" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" {...form.register('description')} rows={3} />
+              <FieldError name="description" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={form.watch('status')} onValueChange={(value) => form.setValue('status', value as 'active' | 'inactive')}>
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="status"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value as FormData['status'])}
+                    >
+                      <SelectTrigger id="status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError name="status" />
               </div>
             </div>
           </CardContent>
@@ -191,39 +216,77 @@ export default function CallTrackingCampaignForm() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="destination_type">Destination Type</Label>
-              <Select
-                value={destinationType}
-                onValueChange={(value) => form.setValue('destination_type', value as FormData['destination_type'])}
-              >
-                <SelectTrigger id="destination_type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="forward">Forward to Number</SelectItem>
-                  <SelectItem value="extension">Extension</SelectItem>
-                  <SelectItem value="ring_group">Ring Group</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                name="destination_type"
+                control={form.control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      field.onChange(value as FormData['destination_type']);
+                      form.setValue(
+                        'destination_config',
+                        value === 'forward'
+                          ? { forward_to: '' }
+                          : value === 'extension'
+                          ? { extension_id: undefined }
+                          : { ring_group_id: undefined }
+                      );
+                    }}
+                  >
+                    <SelectTrigger id="destination_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="forward">Forward to Number</SelectItem>
+                      <SelectItem value="extension">Extension</SelectItem>
+                      <SelectItem value="ring_group">Ring Group</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError name="destination_type" />
             </div>
 
             {destinationType === 'forward' && (
               <div className="space-y-2">
                 <Label htmlFor="forward_to">Forward To</Label>
-                <Input id="forward_to" {...form.register('destination_config.forward_to')} placeholder="+14155551234" />
+                <Input
+                  id="forward_to"
+                  {...form.register('destination_config.forward_to')}
+                  placeholder="+14155551234"
+                />
+                <FieldError name="destination_config.forward_to" />
               </div>
             )}
 
             {destinationType === 'extension' && (
               <div className="space-y-2">
                 <Label htmlFor="extension_id">Extension ID</Label>
-                <Input id="extension_id" type="number" {...form.register('destination_config.extension_id')} />
+                <Input
+                  id="extension_id"
+                  type="number"
+                  {...form.register('destination_config.extension_id', {
+                    setValueAs: (v) =>
+                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                  })}
+                />
+                <FieldError name="destination_config.extension_id" />
               </div>
             )}
 
             {destinationType === 'ring_group' && (
               <div className="space-y-2">
                 <Label htmlFor="ring_group_id">Ring Group ID</Label>
-                <Input id="ring_group_id" type="number" {...form.register('destination_config.ring_group_id')} />
+                <Input
+                  id="ring_group_id"
+                  type="number"
+                  {...form.register('destination_config.ring_group_id', {
+                    setValueAs: (v) =>
+                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                  })}
+                />
+                <FieldError name="destination_config.ring_group_id" />
               </div>
             )}
           </CardContent>
@@ -240,8 +303,12 @@ export default function CallTrackingCampaignForm() {
                 <Input
                   id="min_answered_duration"
                   type="number"
-                  {...form.register('conversion_rule.min_answered_duration_seconds')}
+                  {...form.register('conversion_rule.min_answered_duration_seconds', {
+                    setValueAs: (v) =>
+                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                  })}
                 />
+                <FieldError name="conversion_rule.min_answered_duration_seconds" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="conversion_value">Conversion Value</Label>
@@ -249,18 +316,29 @@ export default function CallTrackingCampaignForm() {
                   id="conversion_value"
                   type="number"
                   step="0.01"
-                  {...form.register('conversion_rule.conversion_value')}
+                  {...form.register('conversion_rule.conversion_value', {
+                    setValueAs: (v) =>
+                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                  })}
                 />
+                <FieldError name="conversion_rule.conversion_value" />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Switch
-                id="requires_answered_disposition"
-                checked={form.watch('conversion_rule.requires_answered_disposition')}
-                onCheckedChange={(checked) => form.setValue('conversion_rule.requires_answered_disposition', checked)}
+              <Controller
+                name="conversion_rule.requires_answered_disposition"
+                control={form.control}
+                render={({ field }) => (
+                  <Switch
+                    id="requires_answered_disposition"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
               <Label htmlFor="requires_answered_disposition">Require answered disposition</Label>
             </div>
+            <FieldError name="conversion_rule.requires_answered_disposition" />
           </CardContent>
         </Card>
 
@@ -274,23 +352,37 @@ export default function CallTrackingCampaignForm() {
                 <Label htmlFor="google_ads_upload_enabled">Google Ads</Label>
                 <p className="text-sm text-muted-foreground">Upload converted calls to Google Ads.</p>
               </div>
-              <Switch
-                id="google_ads_upload_enabled"
-                checked={form.watch('google_ads_upload_enabled')}
-                onCheckedChange={(checked) => form.setValue('google_ads_upload_enabled', checked)}
+              <Controller
+                name="google_ads_upload_enabled"
+                control={form.control}
+                render={({ field }) => (
+                  <Switch
+                    id="google_ads_upload_enabled"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
             </div>
+            <FieldError name="google_ads_upload_enabled" />
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="meta_upload_enabled">Meta Conversions</Label>
                 <p className="text-sm text-muted-foreground">Send offline conversions to Meta.</p>
               </div>
-              <Switch
-                id="meta_upload_enabled"
-                checked={form.watch('meta_upload_enabled')}
-                onCheckedChange={(checked) => form.setValue('meta_upload_enabled', checked)}
+              <Controller
+                name="meta_upload_enabled"
+                control={form.control}
+                render={({ field }) => (
+                  <Switch
+                    id="meta_upload_enabled"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
             </div>
+            <FieldError name="meta_upload_enabled" />
           </CardContent>
         </Card>
 
