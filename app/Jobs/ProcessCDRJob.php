@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\CallDetailRecord;
 use App\Models\CallLog;
+use App\Services\CallTracking\CallTrackingAdPlatformDispatcher;
 use App\Services\CallTracking\CallTrackingEventDispatcher;
 use App\Services\CallTracking\CallTrackingSessionService;
 use Illuminate\Bus\Queueable;
@@ -34,6 +35,7 @@ class ProcessCDRJob implements ShouldQueue
     public function handle(
         CallTrackingSessionService $callTrackingSessionService,
         CallTrackingEventDispatcher $eventDispatcher,
+        CallTrackingAdPlatformDispatcher $adPlatformDispatcher,
     ): void {
         $callId = $this->webhookData['call_id'] ?? null;
         $organizationId = $this->webhookData['_organization_id'] ?? null;
@@ -84,6 +86,10 @@ class ProcessCDRJob implements ShouldQueue
                 ]);
 
                 $eventDispatcher->dispatch($session);
+
+                if ($session && $session->is_converted) {
+                    $adPlatformDispatcher->dispatch($session);
+                }
             } else {
                 Log::info('No call tracking session created for CDR', [
                     'call_id' => $callId,
