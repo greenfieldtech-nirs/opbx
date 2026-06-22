@@ -12,6 +12,7 @@ use App\Models\CallTrackingNumber;
 use App\Models\CallTrackingSession;
 use App\Models\Organization;
 use App\Scopes\OrganizationScope;
+use App\Services\CallTracking\CallTrackingAdPlatformDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -42,7 +43,7 @@ class AdPlatformDispatchTest extends TestCase
             ])
         );
 
-        $dispatcher = app(\App\Services\CallTracking\CallTrackingAdPlatformDispatcher::class);
+        $dispatcher = app(CallTrackingAdPlatformDispatcher::class);
         $dispatcher->dispatch($session);
 
         Queue::assertPushed(UploadGoogleAdsConversionJob::class);
@@ -71,7 +72,7 @@ class AdPlatformDispatchTest extends TestCase
             ])
         );
 
-        $dispatcher = app(\App\Services\CallTracking\CallTrackingAdPlatformDispatcher::class);
+        $dispatcher = app(CallTrackingAdPlatformDispatcher::class);
         $dispatcher->dispatch($session);
 
         Queue::assertNothingPushed();

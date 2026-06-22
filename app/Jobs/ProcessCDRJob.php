@@ -87,7 +87,7 @@ class ProcessCDRJob implements ShouldQueue
 
                 $eventDispatcher->dispatch($session);
 
-                if ($session && $session->is_converted) {
+                if ($session->is_converted) {
                     $adPlatformDispatcher->dispatch($session);
                 }
             } else {
