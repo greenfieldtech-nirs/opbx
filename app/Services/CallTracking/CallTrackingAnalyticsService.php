@@ -157,6 +157,53 @@ class CallTrackingAnalyticsService
     }
 
     /**
+     * Get export rows grouped by date, campaign, source, and medium.
+     *
+     * @param array{
+     *     organization_id: int,
+     *     start_date: Carbon,
+     *     end_date: Carbon,
+     *     campaign_ids?: int[],
+     *     sources?: string[],
+     *     mediums?: string[],
+     *     group_by?: 'day'|'week'|'month',
+     * } $filters
+     * @return array<int, array{date: string, campaign_name: string, source: string, medium: string, calls: int, answered: int, missed: int, conversions: int, avg_duration: float}>
+     */
+    public function getExportRows(array $filters): array
+    {
+        $groupBy = $filters['group_by'] ?? 'day';
+        $column = $this->dateGroupColumn($groupBy, DB::getDriverName());
+
+        $rows = $this->baseQuery($filters)
+            ->selectRaw("{$column} as date")
+            ->selectRaw('campaign_name')
+            ->selectRaw('source')
+            ->selectRaw('medium')
+            ->selectRaw('COUNT(*) as calls')
+            ->selectRaw('SUM(is_answered) as answered')
+            ->selectRaw('COUNT(*) - SUM(is_answered) as missed')
+            ->selectRaw('SUM(is_converted) as conversions')
+            ->selectRaw('AVG(duration) as avg_duration')
+            ->groupBy(DB::raw($column), 'campaign_name', 'source', 'medium')
+            ->orderBy(DB::raw($column))
+            ->orderBy('campaign_name')
+            ->get();
+
+        return $rows->map(fn ($row) => [
+            'date' => (string) $row->date,
+            'campaign_name' => (string) $row->campaign_name,
+            'source' => (string) $row->source,
+            'medium' => (string) $row->medium,
+            'calls' => (int) $row->calls,
+            'answered' => (int) $row->answered,
+            'missed' => (int) $row->missed,
+            'conversions' => (int) $row->conversions,
+            'avg_duration' => (float) $row->avg_duration,
+        ])->all();
+    }
+
+    /**
      * Build the base filtered query for sessions.
      *
      * @param array{

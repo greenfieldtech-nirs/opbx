@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
+use App\Http\Controllers\Api\CallTrackingAnalyticsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
 use App\Http\Controllers\Api\CallTrackingNotificationSettingsController;
 use App\Http\Controllers\Api\CallTrackingNumberController;
@@ -279,6 +280,12 @@ Route::prefix('v1')->group(function (): void {
             ->name('call-tracking-campaigns.notification-settings.show');
         Route::put('call-tracking-campaigns/{callTrackingCampaign}/notification-settings', [CallTrackingNotificationSettingsController::class, 'update'])
             ->name('call-tracking-campaigns.notification-settings.update');
+
+        // Call Tracking Analytics
+        Route::get('call-tracking-analytics', [CallTrackingAnalyticsController::class, 'index'])
+            ->name('call-tracking-analytics.index');
+        Route::get('call-tracking-analytics/export', [CallTrackingAnalyticsController::class, 'export'])
+            ->name('call-tracking-analytics.export');
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
