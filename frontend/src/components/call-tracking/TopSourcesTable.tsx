@@ -26,8 +26,8 @@ export function TopSourcesTable({ sources }: TopSourcesTableProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {sources.map((source) => (
-          <TableRow key={source.source}>
+        {sources.map((source, index) => (
+          <TableRow key={`${source.source}-${index}`}>
             <TableCell>{source.source}</TableCell>
             <TableCell className="text-right">{source.calls}</TableCell>
             <TableCell className="text-right">{source.conversions}</TableCell>

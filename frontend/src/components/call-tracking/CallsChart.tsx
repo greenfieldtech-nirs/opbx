@@ -14,6 +14,10 @@ interface CallsChartProps {
 }
 
 export function CallsChart({ data }: CallsChartProps) {
+  if (data.length === 0) {
+    return <p className="text-muted-foreground text-center py-8">No chart data.</p>;
+  }
+
   return (
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">

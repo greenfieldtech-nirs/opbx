@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,13 +20,22 @@ export default function CallTrackingDashboard() {
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month'>('day');
 
-  const params = {
-    start_date: startDate ? format(startDate, 'yyyy-MM-dd') : format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-    end_date: endDate ? format(endDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-    group_by: groupBy,
-  };
+  const params = useMemo(
+    () => ({
+      start_date: startDate ? format(startDate, 'yyyy-MM-dd') : format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+      end_date: endDate ? format(endDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      group_by: groupBy,
+    }),
+    [startDate, endDate, groupBy]
+  );
 
-  const { data, isLoading } = useCallTrackingAnalytics(params);
+  const { data, isLoading, isError, error } = useCallTrackingAnalytics(params);
+
+  const handleReset = () => {
+    setStartDate(subDays(new Date(), 30));
+    setEndDate(new Date());
+    setGroupBy('day');
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -55,13 +64,17 @@ export default function CallTrackingDashboard() {
               <SelectItem value="month">Month</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => { setStartDate(subDays(new Date(), 30)); setEndDate(new Date()); setGroupBy('day'); }}>
+          <Button variant="outline" onClick={handleReset}>
             Reset
           </Button>
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="p-6">
+          <p className="text-red-600">Failed to load analytics: {error?.message || 'Unknown error'}</p>
+        </div>
+      ) : isLoading ? (
         <p className="text-muted-foreground">Loading analytics...</p>
       ) : data ? (
         <>
