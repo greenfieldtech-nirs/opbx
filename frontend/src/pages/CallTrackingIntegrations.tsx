@@ -138,7 +138,7 @@ export default function CallTrackingIntegrations() {
               <Switch
                 id="google_ads_enabled"
                 checked={googleAdsEnabled}
-                onCheckedChange={(checked) => form.setValue('google_ads_enabled', checked)}
+                onCheckedChange={(checked) => form.setValue('google_ads_enabled', checked, { shouldDirty: true })}
               />
               <Label htmlFor="google_ads_enabled">{googleAdsEnabled ? 'Enabled' : 'Disabled'}</Label>
             </div>
@@ -201,7 +201,7 @@ export default function CallTrackingIntegrations() {
               <Switch
                 id="meta_enabled"
                 checked={metaEnabled}
-                onCheckedChange={(checked) => form.setValue('meta_enabled', checked)}
+                onCheckedChange={(checked) => form.setValue('meta_enabled', checked, { shouldDirty: true })}
               />
               <Label htmlFor="meta_enabled">{metaEnabled ? 'Enabled' : 'Disabled'}</Label>
             </div>
