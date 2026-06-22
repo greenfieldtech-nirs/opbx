@@ -41,6 +41,13 @@ const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
 const AutoDialerMonitor = lazy(() => import('@/pages/AutoDialerMonitor'));
 const DistributionLists = lazy(() => import('@/pages/DistributionLists'));
 const DistributionListDetail = lazy(() => import('@/pages/DistributionListDetail'));
+const CallTrackingDashboard = lazy(() => import('@/pages/CallTrackingDashboard'));
+const CallTrackingCampaigns = lazy(() => import('@/pages/CallTrackingCampaigns'));
+const CallTrackingCampaignForm = lazy(() => import('@/pages/CallTrackingCampaignForm'));
+const CallTrackingCampaignDetail = lazy(() => import('@/pages/CallTrackingCampaignDetail'));
+const CallTrackingSessions = lazy(() => import('@/pages/CallTrackingSessions'));
+const CallTrackingDniSnippet = lazy(() => import('@/pages/CallTrackingDniSnippet'));
+const CallTrackingIntegrations = lazy(() => import('@/pages/CallTrackingIntegrations'));
 
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
@@ -198,6 +205,46 @@ export const router = createBrowserRouter([
       {
         path: 'auto-dialer/monitor',
         element: <AutoDialerMonitor />,
+      },
+      {
+        path: 'call-tracking',
+        element: <Navigate to="/ui/call-tracking/dashboard" replace />,
+      },
+      {
+        path: 'call-tracking/dashboard',
+        element: <CallTrackingDashboard />,
+      },
+      {
+        path: 'call-tracking/campaigns',
+        element: <CallTrackingCampaigns />,
+      },
+      {
+        path: 'call-tracking/campaigns/new',
+        element: <CallTrackingCampaignForm />,
+      },
+      {
+        path: 'call-tracking/campaigns/:id',
+        element: <CallTrackingCampaignDetail />,
+      },
+      {
+        path: 'call-tracking/campaigns/:id/edit',
+        element: <CallTrackingCampaignForm />,
+      },
+      {
+        path: 'call-tracking/sessions',
+        element: <CallTrackingSessions />,
+      },
+      {
+        path: 'call-tracking/dni-snippet',
+        element: <CallTrackingDniSnippet />,
+      },
+      {
+        path: 'call-tracking/integrations',
+        element: (
+          <OwnerRoute>
+            <CallTrackingIntegrations />
+          </OwnerRoute>
+        ),
       },
       // Platform Management routes (platform manager only)
 {

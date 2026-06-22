@@ -99,6 +99,19 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
     ],
   },
+  {
+    id: 'call-tracking',
+    title: 'Call Tracking',
+    icon: 'codicon-graph-line',
+    accentColor: 'default',
+    items: [
+      { name: 'Dashboard', href: '/ui/call-tracking/dashboard', icon: 'codicon-dashboard', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Campaigns', href: '/ui/call-tracking/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Sessions', href: '/ui/call-tracking/sessions', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'DNI Snippet', href: '/ui/call-tracking/dni-snippet', icon: 'codicon-code', roles: ['owner', 'pbx_admin'] },
+      { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner', 'pbx_admin'] },
+    ],
+  },
 ];
 
 // Platform Management section (shown only to platform managers)
