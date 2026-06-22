@@ -64,14 +64,6 @@ export default function CallTrackingSessions() {
 
   const isDateRangeValid = startDate <= endDate;
 
-  if (!isDateRangeValid) {
-    return (
-      <div className="p-6">
-        <p className="text-red-600">Start date must be before or equal to end date.</p>
-      </div>
-    );
-  }
-
   if (isLoading) {
     return <p className="p-6 text-muted-foreground">Loading sessions...</p>;
   }
@@ -84,7 +76,7 @@ export default function CallTrackingSessions() {
     );
   }
 
-  const hasActiveFilters = search || startDate !== format(thirtyDaysAgo, 'yyyy-MM-dd') || endDate !== format(today, 'yyyy-MM-dd') || convertedOnly;
+  const hasActiveFilters = debouncedSearch !== '' || convertedOnly || startDate !== format(thirtyDaysAgo, 'yyyy-MM-dd') || endDate !== format(today, 'yyyy-MM-dd');
 
   return (
     <div className="p-6 space-y-4">
@@ -109,7 +101,11 @@ export default function CallTrackingSessions() {
         </div>
       </div>
 
-      {sessions.length === 0 ? (
+      {!isDateRangeValid && (
+        <p className="text-red-600">Start date must be before or equal to end date.</p>
+      )}
+
+      {isDateRangeValid && (sessions.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -160,7 +156,7 @@ export default function CallTrackingSessions() {
             </TableBody>
           </Table>
         </Card>
-      )}
+      ))}
 
       {meta && meta.last_page > 1 && (
         <div className="flex items-center justify-between">
