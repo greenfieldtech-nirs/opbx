@@ -22,6 +22,7 @@ class MigrationsTest extends TestCase
         $this->assertTrue($schema->hasTable('call_tracking_sessions'));
         $this->assertTrue($schema->hasTable('call_tracking_notification_settings'));
         $this->assertTrue($schema->hasTable('call_tracking_notification_logs'));
+        $this->assertTrue($schema->hasTable('call_tracking_ad_platform_integrations'));
     }
 
     public function test_did_numbers_routing_type_includes_call_tracking(): void
@@ -45,6 +46,22 @@ class MigrationsTest extends TestCase
 
     public function test_migrations_can_be_rolled_back(): void
     {
+        $this->artisan('migrate:rollback', [
+            '--path' => 'database/migrations/2026_06_22_000008_add_ad_platform_columns_to_call_tracking_campaigns_table.php',
+        ])->assertSuccessful();
+
+        $schema = DB::getSchemaBuilder();
+        $this->assertFalse($schema->hasColumns('call_tracking_campaigns', [
+            'google_ads_upload_enabled',
+            'meta_upload_enabled',
+        ]));
+
+        $this->artisan('migrate:rollback', [
+            '--path' => 'database/migrations/2026_06_22_000007_create_call_tracking_ad_platform_integrations_table.php',
+        ])->assertSuccessful();
+
+        $this->assertFalse($schema->hasTable('call_tracking_ad_platform_integrations'));
+
         $this->artisan('migrate:rollback', ['--path' => 'database/migrations/2026_06_22_000006_add_call_tracking_to_did_numbers_routing_type.php'])
             ->assertSuccessful();
 
@@ -63,7 +80,6 @@ class MigrationsTest extends TestCase
         $this->artisan('migrate:rollback', ['--path' => 'database/migrations/2026_06_22_000001_create_call_tracking_campaigns_table.php'])
             ->assertSuccessful();
 
-        $schema = DB::getSchemaBuilder();
         $this->assertFalse($schema->hasTable('call_tracking_campaigns'));
         $this->assertFalse($schema->hasTable('call_tracking_numbers'));
         $this->assertFalse($schema->hasTable('call_tracking_sessions'));
