@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
+use App\Http\Controllers\Api\CallTrackingNotificationSettingsController;
 use App\Http\Controllers\Api\CallTrackingNumberController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
@@ -272,6 +273,12 @@ Route::prefix('v1')->group(function (): void {
         // Call Tracking Numbers (nested under campaigns)
         Route::apiResource('call-tracking-campaigns.call-tracking-numbers', CallTrackingNumberController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        // Call Tracking Notification Settings (singleton nested under campaigns)
+        Route::get('call-tracking-campaigns/{callTrackingCampaign}/notification-settings', [CallTrackingNotificationSettingsController::class, 'show'])
+            ->name('call-tracking-campaigns.notification-settings.show');
+        Route::put('call-tracking-campaigns/{callTrackingCampaign}/notification-settings', [CallTrackingNotificationSettingsController::class, 'update'])
+            ->name('call-tracking-campaigns.notification-settings.update');
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
