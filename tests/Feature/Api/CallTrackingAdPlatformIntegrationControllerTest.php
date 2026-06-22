@@ -17,11 +17,17 @@ class CallTrackingAdPlatformIntegrationControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private User $owner;
+
     private User $admin;
+
     private User $agent;
+
     private User $reporter;
+
     private User $otherOwner;
 
     protected function setUp(): void
@@ -171,5 +177,40 @@ class CallTrackingAdPlatformIntegrationControllerTest extends TestCase
 
         $integration = CallTrackingAdPlatformIntegration::forOrganization($this->organization->id)->first();
         $this->assertSame('existing-token', $integration->google_ads_developer_token);
+    }
+
+    public function test_show_enforces_tenant_isolation(): void
+    {
+        Sanctum::actingAs($this->otherOwner);
+
+        CallTrackingAdPlatformIntegration::factory()->create([
+            'organization_id' => $this->organization->id,
+            'google_ads_enabled' => true,
+        ]);
+
+        $response = $this->getJson('/api/v1/call-tracking-ad-platform-integrations');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.google_ads.enabled', false);
+    }
+
+    public function test_update_enforces_tenant_isolation(): void
+    {
+        Sanctum::actingAs($this->otherOwner);
+
+        $response = $this->putJson('/api/v1/call-tracking-ad-platform-integrations', [
+            'google_ads_enabled' => true,
+            'google_ads_developer_token' => 'hacked',
+            'google_ads_refresh_token' => 'hacked',
+            'google_ads_customer_id' => '123',
+            'google_ads_conversion_action_resource_name' => 'customers/123/actions/1',
+            'meta_enabled' => false,
+        ]);
+
+        $response->assertStatus(200);
+
+        $this->assertDatabaseMissing('call_tracking_ad_platform_integrations', [
+            'organization_id' => $this->organization->id,
+        ]);
     }
 }

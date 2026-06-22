@@ -64,6 +64,20 @@ class CallTrackingAdPlatformIntegrationResourceTest extends TestCase
         $this->assertFalse($resource['google_ads']['is_configured']);
     }
 
+    public function test_google_ads_is_not_configured_when_refresh_token_missing(): void
+    {
+        $integration = CallTrackingAdPlatformIntegration::factory()->create([
+            'google_ads_enabled' => true,
+            'google_ads_developer_token' => 'token',
+            'google_ads_customer_id' => '123',
+            'google_ads_conversion_action_resource_name' => 'customers/123/actions/1',
+        ]);
+
+        $resource = (new CallTrackingAdPlatformIntegrationResource($integration))->toArray(request());
+
+        $this->assertFalse($resource['google_ads']['is_configured']);
+    }
+
     public function test_meta_is_configured_requires_pixel_and_token(): void
     {
         $integration = CallTrackingAdPlatformIntegration::factory()->create([

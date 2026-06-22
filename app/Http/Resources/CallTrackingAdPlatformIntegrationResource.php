@@ -19,6 +19,7 @@ class CallTrackingAdPlatformIntegrationResource extends JsonResource
                 'enabled' => $this->google_ads_enabled,
                 'is_configured' => ! empty($this->google_ads_customer_id)
                     && ! empty($this->google_ads_developer_token)
+                    && ! empty($this->google_ads_refresh_token)
                     && ! empty($this->google_ads_conversion_action_resource_name),
             ],
             'meta' => [
