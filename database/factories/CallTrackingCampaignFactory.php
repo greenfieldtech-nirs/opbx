@@ -39,6 +39,8 @@ class CallTrackingCampaignFactory extends Factory
                 'min_answered_duration_seconds' => 60,
                 'requires_answered_disposition' => true,
             ],
+            'google_ads_upload_enabled' => false,
+            'meta_upload_enabled' => false,
         ];
     }
 
