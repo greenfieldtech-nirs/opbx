@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\CallDetailRecord;
 use App\Models\CallLog;
+use App\Services\CallTracking\CallTrackingSessionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,17 +21,16 @@ class ProcessCDRJob implements ShouldQueue
     /**
      * Create a new job instance.
      *
-     * @param array<string, mixed> $webhookData
+     * @param  array<string, mixed>  $webhookData
      */
     public function __construct(
         public array $webhookData
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(CallTrackingSessionService $callTrackingSessionService): void
     {
         $callId = $this->webhookData['call_id'] ?? null;
         $organizationId = $this->webhookData['_organization_id'] ?? null;
@@ -40,7 +40,7 @@ class ProcessCDRJob implements ShouldQueue
             'organization_id' => $organizationId,
         ]);
 
-        if (!$callId) {
+        if (! $callId) {
             Log::error('Invalid CDR webhook data - missing call_id', [
                 'webhook_data' => $this->webhookData,
             ]);
@@ -48,7 +48,7 @@ class ProcessCDRJob implements ShouldQueue
             return;
         }
 
-        if (!$organizationId) {
+        if (! $organizationId) {
             Log::error('Cannot determine organization for CDR - missing _organization_id', [
                 'call_id' => $callId,
             ]);
@@ -68,6 +68,23 @@ class ProcessCDRJob implements ShouldQueue
                 'duration' => $cdr->duration,
                 'billsec' => $cdr->billsec,
             ]);
+
+            // Create call tracking session if this CDR belongs to a tracking number
+            $session = $callTrackingSessionService->createFromCDR($cdr, $organizationId);
+
+            if ($session) {
+                Log::info('Call tracking session created from CDR', [
+                    'call_id' => $callId,
+                    'session_id' => $session->id,
+                    'campaign_id' => $session->call_tracking_campaign_id,
+                    'is_converted' => $session->is_converted,
+                ]);
+            } else {
+                Log::info('No call tracking session created for CDR', [
+                    'call_id' => $callId,
+                    'organization_id' => $organizationId,
+                ]);
+            }
         } catch (\Exception $e) {
             Log::error('Failed to create CDR', [
                 'call_id' => $callId,
@@ -92,7 +109,7 @@ class ProcessCDRJob implements ShouldQueue
             }
 
             // Extract duration if available and not already set
-            if (!$callLog->duration && isset($this->webhookData['duration'])) {
+            if (! $callLog->duration && isset($this->webhookData['duration'])) {
                 $updateData['duration'] = (int) $this->webhookData['duration'];
             }
 
