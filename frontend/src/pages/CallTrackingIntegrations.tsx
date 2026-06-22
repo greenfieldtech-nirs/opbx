@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,45 +10,105 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useCallTrackingIntegrations, useUpdateCallTrackingIntegrations } from '@/hooks/useCallTrackingIntegrations';
+import type { AdPlatformIntegrationFormData } from '@/services/callTrackingIntegrationsApi';
+
+const schema = z
+  .object({
+    google_ads_enabled: z.boolean(),
+    google_ads_developer_token: z.string().optional(),
+    google_ads_refresh_token: z.string().optional(),
+    google_ads_customer_id: z.string().optional(),
+    google_ads_conversion_action_resource_name: z.string().optional(),
+    meta_enabled: z.boolean(),
+    meta_pixel_id: z.string().optional(),
+    meta_access_token: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.google_ads_enabled) return true;
+      return (
+        data.google_ads_customer_id?.trim() !== '' &&
+        data.google_ads_conversion_action_resource_name?.trim() !== ''
+      );
+    },
+    {
+      message: 'Customer ID and Conversion Action are required when Google Ads is enabled',
+      path: ['google_ads_customer_id'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (!data.meta_enabled) return true;
+      return data.meta_pixel_id?.trim() !== '' && data.meta_access_token?.trim() !== '';
+    },
+    {
+      message: 'Pixel ID and Access Token are required when Meta is enabled',
+      path: ['meta_pixel_id'],
+    }
+  );
+
+type FormData = z.infer<typeof schema>;
+
+const DEFAULT_VALUES: FormData = {
+  google_ads_enabled: false,
+  google_ads_developer_token: '',
+  google_ads_refresh_token: '',
+  google_ads_customer_id: '',
+  google_ads_conversion_action_resource_name: '',
+  meta_enabled: false,
+  meta_pixel_id: '',
+  meta_access_token: '',
+};
+
+function toPayload(data: FormData): AdPlatformIntegrationFormData {
+  return {
+    google_ads_enabled: data.google_ads_enabled,
+    ...(data.google_ads_enabled && {
+      google_ads_developer_token: data.google_ads_developer_token?.trim() || undefined,
+      google_ads_refresh_token: data.google_ads_refresh_token?.trim() || undefined,
+      google_ads_customer_id: data.google_ads_customer_id?.trim() || undefined,
+      google_ads_conversion_action_resource_name: data.google_ads_conversion_action_resource_name?.trim() || undefined,
+    }),
+    meta_enabled: data.meta_enabled,
+    ...(data.meta_enabled && {
+      meta_pixel_id: data.meta_pixel_id?.trim() || undefined,
+      meta_access_token: data.meta_access_token?.trim() || undefined,
+    }),
+  };
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-sm text-red-600">{message}</p>;
+}
 
 export default function CallTrackingIntegrations() {
   const { data, isLoading, isError, error } = useCallTrackingIntegrations();
   const updateMutation = useUpdateCallTrackingIntegrations();
 
-  const [googleAdsEnabled, setGoogleAdsEnabled] = useState(false);
-  const [googleAdsDeveloperToken, setGoogleAdsDeveloperToken] = useState('');
-  const [googleAdsRefreshToken, setGoogleAdsRefreshToken] = useState('');
-  const [googleAdsCustomerId, setGoogleAdsCustomerId] = useState('');
-  const [googleAdsConversionAction, setGoogleAdsConversionAction] = useState('');
-  const [metaEnabled, setMetaEnabled] = useState(false);
-  const [metaPixelId, setMetaPixelId] = useState('');
-  const [metaAccessToken, setMetaAccessToken] = useState('');
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: DEFAULT_VALUES,
+  });
 
   useEffect(() => {
     if (data) {
-      setGoogleAdsEnabled(data.google_ads.enabled);
-      setMetaEnabled(data.meta.enabled);
-    }
-  }, [data]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateMutation.mutateAsync({
-        google_ads_enabled: googleAdsEnabled,
-        ...(googleAdsEnabled && {
-          google_ads_developer_token: googleAdsDeveloperToken || undefined,
-          google_ads_refresh_token: googleAdsRefreshToken || undefined,
-          google_ads_customer_id: googleAdsCustomerId || undefined,
-          google_ads_conversion_action_resource_name: googleAdsConversionAction || undefined,
-        }),
-        meta_enabled: metaEnabled,
-        ...(metaEnabled && {
-          meta_pixel_id: metaPixelId || undefined,
-          meta_access_token: metaAccessToken || undefined,
-        }),
+      form.reset({
+        ...DEFAULT_VALUES,
+        google_ads_enabled: data.google_ads.enabled,
+        meta_enabled: data.meta.enabled,
       });
+    }
+  }, [data, form]);
+
+  const googleAdsEnabled = form.watch('google_ads_enabled');
+  const metaEnabled = form.watch('meta_enabled');
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      await updateMutation.mutateAsync(toPayload(data));
       toast.success('Integration settings saved');
+      form.reset(data);
     } catch (err) {
       toast.error((err as Error)?.message || 'Failed to save integration settings');
     }
@@ -67,12 +130,16 @@ export default function CallTrackingIntegrations() {
     <div className="p-6 space-y-6 max-w-3xl">
       <h1 className="text-2xl font-bold">Call Tracking Integrations</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Google Ads</CardTitle>
             <div className="flex items-center gap-2">
-              <Switch id="google_ads_enabled" checked={googleAdsEnabled} onCheckedChange={setGoogleAdsEnabled} />
+              <Switch
+                id="google_ads_enabled"
+                checked={googleAdsEnabled}
+                onCheckedChange={(checked) => form.setValue('google_ads_enabled', checked)}
+              />
               <Label htmlFor="google_ads_enabled">{googleAdsEnabled ? 'Enabled' : 'Disabled'}</Label>
             </div>
           </CardHeader>
@@ -85,6 +152,7 @@ export default function CallTrackingIntegrations() {
                 <Badge variant="secondary">Not configured</Badge>
               )}
             </p>
+            <FieldError message={form.formState.errors.google_ads_customer_id?.message} />
             {googleAdsEnabled && (
               <>
                 <div className="space-y-2">
@@ -92,8 +160,7 @@ export default function CallTrackingIntegrations() {
                   <Input
                     id="google_ads_developer_token"
                     type="password"
-                    value={googleAdsDeveloperToken}
-                    onChange={(e) => setGoogleAdsDeveloperToken(e.target.value)}
+                    {...form.register('google_ads_developer_token')}
                     placeholder="Enter to update"
                   />
                 </div>
@@ -102,8 +169,7 @@ export default function CallTrackingIntegrations() {
                   <Input
                     id="google_ads_refresh_token"
                     type="password"
-                    value={googleAdsRefreshToken}
-                    onChange={(e) => setGoogleAdsRefreshToken(e.target.value)}
+                    {...form.register('google_ads_refresh_token')}
                     placeholder="Enter to update"
                   />
                 </div>
@@ -111,17 +177,15 @@ export default function CallTrackingIntegrations() {
                   <Label htmlFor="google_ads_customer_id">Customer ID</Label>
                   <Input
                     id="google_ads_customer_id"
-                    value={googleAdsCustomerId}
-                    onChange={(e) => setGoogleAdsCustomerId(e.target.value)}
+                    {...form.register('google_ads_customer_id')}
                     placeholder="e.g. 123-456-7890"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="google_ads_conversion_action">Conversion Action Resource Name</Label>
+                  <Label htmlFor="google_ads_conversion_action_resource_name">Conversion Action Resource Name</Label>
                   <Input
-                    id="google_ads_conversion_action"
-                    value={googleAdsConversionAction}
-                    onChange={(e) => setGoogleAdsConversionAction(e.target.value)}
+                    id="google_ads_conversion_action_resource_name"
+                    {...form.register('google_ads_conversion_action_resource_name')}
                     placeholder="customers/123/conversionActions/456"
                   />
                 </div>
@@ -134,7 +198,11 @@ export default function CallTrackingIntegrations() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Meta Conversions API</CardTitle>
             <div className="flex items-center gap-2">
-              <Switch id="meta_enabled" checked={metaEnabled} onCheckedChange={setMetaEnabled} />
+              <Switch
+                id="meta_enabled"
+                checked={metaEnabled}
+                onCheckedChange={(checked) => form.setValue('meta_enabled', checked)}
+              />
               <Label htmlFor="meta_enabled">{metaEnabled ? 'Enabled' : 'Disabled'}</Label>
             </div>
           </CardHeader>
@@ -147,24 +215,19 @@ export default function CallTrackingIntegrations() {
                 <Badge variant="secondary">Not configured</Badge>
               )}
             </p>
+            <FieldError message={form.formState.errors.meta_pixel_id?.message} />
             {metaEnabled && (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="meta_pixel_id">Pixel ID</Label>
-                  <Input
-                    id="meta_pixel_id"
-                    value={metaPixelId}
-                    onChange={(e) => setMetaPixelId(e.target.value)}
-                    placeholder="Enter to update"
-                  />
+                  <Input id="meta_pixel_id" {...form.register('meta_pixel_id')} placeholder="Enter to update" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="meta_access_token">Access Token</Label>
                   <Input
                     id="meta_access_token"
                     type="password"
-                    value={metaAccessToken}
-                    onChange={(e) => setMetaAccessToken(e.target.value)}
+                    {...form.register('meta_access_token')}
                     placeholder="Enter to update"
                   />
                 </div>
@@ -173,7 +236,7 @@ export default function CallTrackingIntegrations() {
           </CardContent>
         </Card>
 
-        <Button type="submit" disabled={updateMutation.isPending}>
+        <Button type="submit" disabled={!form.formState.isDirty || updateMutation.isPending}>
           {updateMutation.isPending ? 'Saving...' : 'Save Integrations'}
         </Button>
       </form>
