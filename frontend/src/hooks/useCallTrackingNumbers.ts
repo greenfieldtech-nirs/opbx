@@ -11,6 +11,7 @@ export function useCallTrackingNumbers(campaignId: string | number) {
   return useQuery({
     queryKey: callTrackingNumberKeys.list(campaignId),
     queryFn: () => callTrackingNumbersApi.getForCampaign(campaignId),
+    enabled: !!campaignId,
   });
 }
 

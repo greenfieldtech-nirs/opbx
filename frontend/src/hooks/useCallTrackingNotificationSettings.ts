@@ -17,6 +17,7 @@ export function useCallTrackingNotificationSettings(campaignId: string | number)
   return useQuery({
     queryKey: callTrackingNotificationKeys.settings(campaignId),
     queryFn: () => callTrackingNotificationSettingsApi.get(campaignId),
+    enabled: !!campaignId,
   });
 }
 
@@ -41,5 +42,6 @@ export function useCallTrackingNotificationLogs(campaignId: string | number, par
   return useQuery({
     queryKey: callTrackingNotificationKeys.logs(campaignId, params),
     queryFn: () => callTrackingNotificationSettingsApi.getLogs(campaignId, params),
+    enabled: !!campaignId,
   });
 }

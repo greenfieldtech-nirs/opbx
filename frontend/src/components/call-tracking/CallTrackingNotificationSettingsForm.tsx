@@ -10,7 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { CallTrackingNotificationSettings, NotificationSettingsFormData } from '@/types/callTracking';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { CallTrackingNotificationSettings } from '@/types/callTracking';
+import type { NotificationSettingsFormData } from '@/services/callTrackingNotificationSettingsApi';
 
 interface Props {
   campaignId: string | number;
@@ -93,11 +95,15 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
         <Label>Enabled Events</Label>
         <div className="flex flex-wrap gap-2">
           {EVENT_OPTIONS.map((option) => (
-            <label key={option.value} className="flex items-center gap-2 border rounded px-3 py-2">
-              <input
-                type="checkbox"
+            <label
+              key={option.value}
+              htmlFor={`event-${option.value}`}
+              className="flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+            >
+              <Checkbox
+                id={`event-${option.value}`}
                 checked={enabledEvents.includes(option.value)}
-                onChange={() => handleToggleEvent(option.value)}
+                onCheckedChange={() => handleToggleEvent(option.value)}
               />
               <span className="text-sm">{option.label}</span>
             </label>
