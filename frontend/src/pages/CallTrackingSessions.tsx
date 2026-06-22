@@ -58,11 +58,13 @@ export default function CallTrackingSessions() {
     [debouncedSearch, startDate, endDate, convertedOnly, page]
   );
 
-  const { data, isLoading, isError, error } = useCallTrackingSessions(params);
+  const isDateRangeValid = startDate <= endDate;
+
+  const { data, isLoading, isError, error } = useCallTrackingSessions(params, {
+    enabled: isDateRangeValid,
+  });
   const sessions = data?.data ?? [];
   const meta = data?.meta;
-
-  const isDateRangeValid = startDate <= endDate;
 
   if (isLoading) {
     return <p className="p-6 text-muted-foreground">Loading sessions...</p>;

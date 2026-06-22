@@ -7,9 +7,13 @@ export const callTrackingSessionKeys = {
   list: (params: SessionListParams) => [...callTrackingSessionKeys.lists(), params] as const,
 };
 
-export function useCallTrackingSessions(params?: SessionListParams) {
+export function useCallTrackingSessions(
+  params?: SessionListParams,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: callTrackingSessionKeys.list(params ?? {}),
     queryFn: () => callTrackingSessionsApi.getAll(params),
+    enabled: options?.enabled ?? true,
   });
 }
