@@ -11,6 +11,7 @@ use App\Models\CallTrackingNotificationSettings;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -38,6 +39,8 @@ class CallTrackingNotificationSettingsControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Http::fake();
 
         $this->organization = Organization::factory()->create();
         $this->otherOrganization = Organization::factory()->create();
@@ -512,6 +515,24 @@ class CallTrackingNotificationSettingsControllerTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.event_type', 'call.converted');
+    }
+
+    public function test_owner_can_send_test_notification_with_custom_event_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->createSettings($campaign);
+
+        $response = $this->postJson(
+            '/api/v1/call-tracking-campaigns/'.$campaign->id.'/notification-settings/test',
+            ['event_type' => 'call.converted']
+        );
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.event_type', 'call.converted');
     }
 
     /**

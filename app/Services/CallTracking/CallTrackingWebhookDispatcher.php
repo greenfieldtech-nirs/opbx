@@ -126,13 +126,35 @@ class CallTrackingWebhookDispatcher
             return false;
         }
 
-        $ip = filter_var($host, FILTER_VALIDATE_IP);
+        $lowerHost = strtolower($host);
 
-        if ($ip !== false) {
+        if (
+            $lowerHost === 'localhost'
+            || str_ends_with($lowerHost, '.localhost')
+            || str_ends_with($lowerHost, '.local')
+        ) {
             return false;
         }
 
-        return true;
+        $ip = filter_var($host, FILTER_VALIDATE_IP);
+
+        if ($ip !== false) {
+            return $this->isPublicIp($ip);
+        }
+
+        $resolved = gethostbyname($host);
+
+        if ($resolved === $host) {
+            // Could not resolve; still allow HTTP to fail naturally but do not allow obvious loopback names
+            return ! in_array($lowerHost, ['127.0.0.1', '::1'], true);
+        }
+
+        return $this->isPublicIp($resolved);
+    }
+
+    private function isPublicIp(string $ip): bool
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
     }
 
     /**
