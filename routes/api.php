@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
+use App\Http\Controllers\Api\CallTrackingAdPlatformIntegrationController;
 use App\Http\Controllers\Api\CallTrackingAnalyticsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
 use App\Http\Controllers\Api\CallTrackingDniController;
@@ -297,6 +298,15 @@ Route::prefix('v1')->group(function (): void {
         // Call Tracking Sessions
         Route::get('call-tracking-sessions', [CallTrackingSessionController::class, 'index'])
             ->name('call-tracking-sessions.index');
+
+        // Call Tracking Ad-Platform Integrations (organization singleton)
+        Route::get('call-tracking-ad-platform-integrations', [
+            CallTrackingAdPlatformIntegrationController::class, 'show',
+        ])->name('call-tracking-ad-platform-integrations.show');
+
+        Route::put('call-tracking-ad-platform-integrations', [
+            CallTrackingAdPlatformIntegrationController::class, 'update',
+        ])->name('call-tracking-ad-platform-integrations.update');
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);

@@ -16,6 +16,8 @@ class CallTrackingAdPlatformIntegrationController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
+        $this->authorize('view', [CallTrackingAdPlatformIntegration::class, $request->user()?->organization]);
+
         $user = $request->user();
         $integration = CallTrackingAdPlatformIntegration::forOrganization((int) $user->organization_id)->first();
 
