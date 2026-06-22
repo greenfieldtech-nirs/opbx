@@ -87,7 +87,7 @@ class CallTrackingSessionFactory extends Factory
             'organization_id' => $campaign->organization_id,
             'call_tracking_campaign_id' => $campaign->id,
             'call_tracking_number_id' => $number->id,
-            'did_number_id' => $number->did_id,
+            'did_number_id' => $number->did_number_id,
             'called_number' => $number->did->phone_number,
             'campaign_name' => $campaign->name,
             'source' => $campaign->source,
