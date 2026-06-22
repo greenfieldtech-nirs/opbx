@@ -75,6 +75,11 @@ class SsrfUrlValidator
             return false;
         }
 
+        // Strip IPv6 brackets so IP validation works on the actual address.
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            $host = substr($host, 1, -1);
+        }
+
         // Check blocked hostnames (case-insensitive)
         if (in_array(strtolower($host), self::BLOCKED_HOSTS, true)) {
             return false;

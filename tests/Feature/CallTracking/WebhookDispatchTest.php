@@ -13,6 +13,7 @@ use App\Models\Organization;
 use App\Scopes\OrganizationScope;
 use App\Services\CallTracking\CallTrackingWebhookDispatcher;
 use App\Services\CallTracking\NotificationPayloadBuilder;
+use App\Services\Security\SsrfUrlValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -36,7 +37,10 @@ class WebhookDispatchTest extends TestCase
         $this->campaign = CallTrackingCampaign::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
-        $this->dispatcher = new CallTrackingWebhookDispatcher(new NotificationPayloadBuilder);
+        $this->dispatcher = new CallTrackingWebhookDispatcher(
+            new NotificationPayloadBuilder,
+            new SsrfUrlValidator,
+        );
     }
 
     private function createSettings(array $overrides = []): CallTrackingNotificationSettings
@@ -128,7 +132,7 @@ class WebhookDispatchTest extends TestCase
 
         $log = CallTrackingNotificationLog::withoutGlobalScope(OrganizationScope::class)->where('event_id', 'evt-bearer')->first();
         $this->assertNotNull($log);
-        $this->assertSame('Bearer secret-token', $log->request_headers['Authorization']);
+        $this->assertSame('***REDACTED***', $log->request_headers['Authorization']);
     }
 
     public function test_basic_auth_adds_authorization_header(): void
@@ -159,7 +163,7 @@ class WebhookDispatchTest extends TestCase
 
         $log = CallTrackingNotificationLog::withoutGlobalScope(OrganizationScope::class)->where('event_id', 'evt-basic')->first();
         $this->assertNotNull($log);
-        $this->assertSame($expectedAuthorization, $log->request_headers['Authorization']);
+        $this->assertSame('***REDACTED***', $log->request_headers['Authorization']);
     }
 
     public function test_non_success_response_is_logged_as_failure(): void

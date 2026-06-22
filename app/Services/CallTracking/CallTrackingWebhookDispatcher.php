@@ -7,6 +7,7 @@ namespace App\Services\CallTracking;
 use App\Models\CallTrackingNotificationLog;
 use App\Models\CallTrackingNotificationSettings;
 use App\Models\CallTrackingSession;
+use App\Services\Security\SsrfUrlValidator;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -15,6 +16,7 @@ class CallTrackingWebhookDispatcher
 {
     public function __construct(
         private readonly NotificationPayloadBuilder $payloadBuilder,
+        private readonly SsrfUrlValidator $ssrfValidator,
     ) {}
 
     public function dispatch(
@@ -59,6 +61,8 @@ class CallTrackingWebhookDispatcher
 
         $requestHeaders = $this->buildRequestHeaders($settings, $requestHeaders);
 
+        $loggedHeaders = $this->sanitizeHeaders($requestHeaders);
+
         $startedAt = microtime(true);
 
         try {
@@ -71,7 +75,7 @@ class CallTrackingWebhookDispatcher
                 eventId: $eventId,
                 webhookUrl: $webhookUrl,
                 requestPayload: $payload,
-                requestHeaders: $requestHeaders,
+                requestHeaders: $loggedHeaders,
                 errorMessage: $exception->getMessage(),
             );
         } catch (Throwable $exception) {
@@ -82,7 +86,7 @@ class CallTrackingWebhookDispatcher
                 eventId: $eventId,
                 webhookUrl: $webhookUrl,
                 requestPayload: $payload,
-                requestHeaders: $requestHeaders,
+                requestHeaders: $loggedHeaders,
                 errorMessage: $exception->getMessage(),
             );
         }
@@ -97,7 +101,7 @@ class CallTrackingWebhookDispatcher
             'event_type' => $eventType,
             'webhook_url' => $webhookUrl,
             'request_payload' => $payload,
-            'request_headers' => $requestHeaders,
+            'request_headers' => $loggedHeaders,
             'response_body' => $response->body(),
             'response_headers' => $response->headers(),
             'response_status_code' => $response->status(),
@@ -110,56 +114,20 @@ class CallTrackingWebhookDispatcher
 
     private function isValidUrl(string $url): bool
     {
-        if (! filter_var($url, FILTER_VALIDATE_URL)) {
-            return false;
-        }
-
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-
-        if (! in_array($scheme, ['http', 'https'], true)) {
-            return false;
-        }
-
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (! $host) {
-            return false;
-        }
-
-        // Strip IPv6 brackets so FILTER_VALIDATE_IP works on the actual address.
-        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
-            $host = substr($host, 1, -1);
-        }
-
-        $lowerHost = strtolower($host);
-
-        if (
-            $lowerHost === 'localhost'
-            || str_ends_with($lowerHost, '.localhost')
-            || str_ends_with($lowerHost, '.local')
-        ) {
-            return false;
-        }
-
-        $ip = filter_var($host, FILTER_VALIDATE_IP);
-
-        if ($ip !== false) {
-            return $this->isPublicIp($ip);
-        }
-
-        $resolved = gethostbyname($host);
-
-        if ($resolved === $host) {
-            // Could not resolve; still allow HTTP to fail naturally but do not allow obvious loopback names
-            return ! in_array($lowerHost, ['127.0.0.1', '::1'], true);
-        }
-
-        return $this->isPublicIp($resolved);
+        return $this->ssrfValidator->isValid($url);
     }
 
-    private function isPublicIp(string $ip): bool
+    /**
+     * @param  array<string, string>  $headers
+     * @return array<string, string>
+     */
+    private function sanitizeHeaders(array $headers): array
     {
-        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        if (isset($headers['Authorization'])) {
+            $headers['Authorization'] = '***REDACTED***';
+        }
+
+        return $headers;
     }
 
     /**
