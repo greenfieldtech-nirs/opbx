@@ -28,7 +28,6 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   source: z.string().optional(),
   medium: z.string().optional(),
-  description: z.string().optional(),
   destination_type: z.enum(['forward', 'extension', 'ring_group']),
   destination_config: z.object({
     forward_to: z.string().optional(),
@@ -50,7 +49,6 @@ const DEFAULT_VALUES: FormData = {
   name: '',
   source: '',
   medium: '',
-  description: '',
   destination_type: 'forward',
   destination_config: { forward_to: '' },
   conversion_rule: {
@@ -66,7 +64,7 @@ const toPayload = (data: FormData): CampaignFormData => ({
   name: data.name,
   source: data.source || null,
   medium: data.medium || null,
-  description: data.description || null,
+  description: null,
   status: 'active',
   destination_type: data.destination_type,
   destination_config: data.destination_config,
@@ -99,7 +97,6 @@ export default function CallTrackingCampaignForm() {
         name: campaign.name,
         source: campaign.source ?? '',
         medium: campaign.medium ?? '',
-        description: campaign.description ?? '',
         destination_type: campaign.destination_type as FormData['destination_type'],
         destination_config: (campaign.destination_config as FormData['destination_config']) || {},
         conversion_rule: {
@@ -174,12 +171,50 @@ export default function CallTrackingCampaignForm() {
                     <FieldError name="medium" />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 gap-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" {...form.register('description')} rows={3} />
-                  <FieldError name="description" />
+            <Card>
+              <CardHeader>
+                <CardTitle>Ad-Platform Uploads</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="google_ads_upload_enabled">Google Ads</Label>
+                    <p className="text-sm text-muted-foreground">Upload converted calls to Google Ads.</p>
+                  </div>
+                  <Controller
+                    name="google_ads_upload_enabled"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Switch
+                        id="google_ads_upload_enabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
                 </div>
+                <FieldError name="google_ads_upload_enabled" />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="meta_upload_enabled">Meta Conversions</Label>
+                    <p className="text-sm text-muted-foreground">Send offline conversions to Meta.</p>
+                  </div>
+                  <Controller
+                    name="meta_upload_enabled"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Switch
+                        id="meta_upload_enabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
+                <FieldError name="meta_upload_enabled" />
               </CardContent>
             </Card>
           </div>
@@ -315,50 +350,6 @@ export default function CallTrackingCampaignForm() {
               <Label htmlFor="requires_answered_disposition">Require answered disposition</Label>
             </div>
             <FieldError name="conversion_rule.requires_answered_disposition" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Ad-Platform Uploads</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="google_ads_upload_enabled">Google Ads</Label>
-                <p className="text-sm text-muted-foreground">Upload converted calls to Google Ads.</p>
-              </div>
-              <Controller
-                name="google_ads_upload_enabled"
-                control={form.control}
-                render={({ field }) => (
-                  <Switch
-                    id="google_ads_upload_enabled"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-            </div>
-            <FieldError name="google_ads_upload_enabled" />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="meta_upload_enabled">Meta Conversions</Label>
-                <p className="text-sm text-muted-foreground">Send offline conversions to Meta.</p>
-              </div>
-              <Controller
-                name="meta_upload_enabled"
-                control={form.control}
-                render={({ field }) => (
-                  <Switch
-                    id="meta_upload_enabled"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-            </div>
-            <FieldError name="meta_upload_enabled" />
           </CardContent>
         </Card>
       </div>
