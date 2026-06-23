@@ -146,216 +146,214 @@ export default function CallTrackingCampaignForm() {
       <h1 className="text-2xl font-bold mb-6">{isEdit ? 'Edit Campaign' : 'New Campaign'}</h1>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" {...form.register('name')} />
+                <FieldError name="name" />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="source">Source</Label>
+                  <Input id="source" {...form.register('source')} placeholder="e.g. google" />
+                  <FieldError name="source" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="medium">Medium</Label>
+                  <Input id="medium" {...form.register('medium')} placeholder="e.g. cpc" />
+                  <FieldError name="medium" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Destination</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="destination_type">Destination Type</Label>
+                <Controller
+                  name="destination_type"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value as FormData['destination_type']);
+                        form.setValue(
+                          'destination_config',
+                          value === 'forward'
+                            ? { forward_to: '' }
+                            : value === 'extension'
+                            ? { extension_id: undefined }
+                            : { ring_group_id: undefined }
+                        );
+                      }}
+                    >
+                      <SelectTrigger id="destination_type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="forward">Forward to Number</SelectItem>
+                        <SelectItem value="extension">Extension</SelectItem>
+                        <SelectItem value="ring_group">Ring Group</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <FieldError name="destination_type" />
+              </div>
+
+              {destinationType === 'forward' && (
+                <div className="space-y-2">
+                  <Label htmlFor="forward_to">Forward To</Label>
+                  <Input
+                    id="forward_to"
+                    {...form.register('destination_config.forward_to')}
+                    placeholder="+14155551234"
+                  />
+                  <FieldError name="destination_config.forward_to" />
+                </div>
+              )}
+
+              {destinationType === 'extension' && (
+                <div className="space-y-2">
+                  <Label htmlFor="extension_id">Extension ID</Label>
+                  <Input
+                    id="extension_id"
+                    type="number"
+                    {...form.register('destination_config.extension_id', {
+                      setValueAs: (v) =>
+                        v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                    })}
+                  />
+                  <FieldError name="destination_config.extension_id" />
+                </div>
+              )}
+
+              {destinationType === 'ring_group' && (
+                <div className="space-y-2">
+                  <Label htmlFor="ring_group_id">Ring Group ID</Label>
+                  <Input
+                    id="ring_group_id"
+                    type="number"
+                    {...form.register('destination_config.ring_group_id', {
+                      setValueAs: (v) =>
+                        v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                    })}
+                  />
+                  <FieldError name="destination_config.ring_group_id" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-2 gap-6 items-start">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" {...form.register('name')} />
-                  <FieldError name="name" />
+          <Card>
+            <CardHeader>
+              <CardTitle>Ad-Platform Uploads</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="google_ads_upload_enabled">Google Ads</Label>
+                  <p className="text-sm text-muted-foreground">Upload converted calls to Google Ads.</p>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="source">Source</Label>
-                    <Input id="source" {...form.register('source')} placeholder="e.g. google" />
-                    <FieldError name="source" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="medium">Medium</Label>
-                    <Input id="medium" {...form.register('medium')} placeholder="e.g. cpc" />
-                    <FieldError name="medium" />
-                  </div>
+                <Controller
+                  name="google_ads_upload_enabled"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Switch
+                      id="google_ads_upload_enabled"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+              </div>
+              <FieldError name="google_ads_upload_enabled" />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="meta_upload_enabled">Meta Conversions</Label>
+                  <p className="text-sm text-muted-foreground">Send offline conversions to Meta.</p>
                 </div>
-              </CardContent>
-            </Card>
+                <Controller
+                  name="meta_upload_enabled"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Switch
+                      id="meta_upload_enabled"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+              </div>
+              <FieldError name="meta_upload_enabled" />
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Ad-Platform Uploads</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="google_ads_upload_enabled">Google Ads</Label>
-                    <p className="text-sm text-muted-foreground">Upload converted calls to Google Ads.</p>
-                  </div>
-                  <Controller
-                    name="google_ads_upload_enabled"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Switch
-                        id="google_ads_upload_enabled"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversion Rules</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="min_answered_duration">Min Answered Duration (seconds)</Label>
+                  <Input
+                    id="min_answered_duration"
+                    type="number"
+                    {...form.register('conversion_rule.min_answered_duration_seconds', {
+                      setValueAs: (v) =>
+                        v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                    })}
                   />
+                  <FieldError name="conversion_rule.min_answered_duration_seconds" />
                 </div>
-                <FieldError name="google_ads_upload_enabled" />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="meta_upload_enabled">Meta Conversions</Label>
-                    <p className="text-sm text-muted-foreground">Send offline conversions to Meta.</p>
-                  </div>
-                  <Controller
-                    name="meta_upload_enabled"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Switch
-                        id="meta_upload_enabled"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
+                <div className="space-y-2">
+                  <Label htmlFor="conversion_value">Conversion Value</Label>
+                  <Input
+                    id="conversion_value"
+                    type="number"
+                    step="0.01"
+                    {...form.register('conversion_rule.conversion_value', {
+                      setValueAs: (v) =>
+                        v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
+                    })}
                   />
+                  <FieldError name="conversion_rule.conversion_value" />
                 </div>
-                <FieldError name="meta_upload_enabled" />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Destination</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="destination_type">Destination Type</Label>
-              <Controller
-                name="destination_type"
-                control={form.control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      field.onChange(value as FormData['destination_type']);
-                      form.setValue(
-                        'destination_config',
-                        value === 'forward'
-                          ? { forward_to: '' }
-                          : value === 'extension'
-                          ? { extension_id: undefined }
-                          : { ring_group_id: undefined }
-                      );
-                    }}
-                  >
-                    <SelectTrigger id="destination_type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="forward">Forward to Number</SelectItem>
-                      <SelectItem value="extension">Extension</SelectItem>
-                      <SelectItem value="ring_group">Ring Group</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              <FieldError name="destination_type" />
-            </div>
-
-            {destinationType === 'forward' && (
-              <div className="space-y-2">
-                <Label htmlFor="forward_to">Forward To</Label>
-                <Input
-                  id="forward_to"
-                  {...form.register('destination_config.forward_to')}
-                  placeholder="+14155551234"
-                />
-                <FieldError name="destination_config.forward_to" />
               </div>
-            )}
-
-            {destinationType === 'extension' && (
-              <div className="space-y-2">
-                <Label htmlFor="extension_id">Extension ID</Label>
-                <Input
-                  id="extension_id"
-                  type="number"
-                  {...form.register('destination_config.extension_id', {
-                    setValueAs: (v) =>
-                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
-                  })}
+              <div className="flex items-center gap-2">
+                <Controller
+                  name="conversion_rule.requires_answered_disposition"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Switch
+                      id="requires_answered_disposition"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
                 />
-                <FieldError name="destination_config.extension_id" />
+                <Label htmlFor="requires_answered_disposition">Require answered disposition</Label>
               </div>
-            )}
+              <FieldError name="conversion_rule.requires_answered_disposition" />
+            </CardContent>
+          </Card>
+        </div>
 
-            {destinationType === 'ring_group' && (
-              <div className="space-y-2">
-                <Label htmlFor="ring_group_id">Ring Group ID</Label>
-                <Input
-                  id="ring_group_id"
-                  type="number"
-                  {...form.register('destination_config.ring_group_id', {
-                    setValueAs: (v) =>
-                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
-                  })}
-                />
-                <FieldError name="destination_config.ring_group_id" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Conversion Rules</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="min_answered_duration">Min Answered Duration (seconds)</Label>
-                <Input
-                  id="min_answered_duration"
-                  type="number"
-                  {...form.register('conversion_rule.min_answered_duration_seconds', {
-                    setValueAs: (v) =>
-                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
-                  })}
-                />
-                <FieldError name="conversion_rule.min_answered_duration_seconds" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="conversion_value">Conversion Value</Label>
-                <Input
-                  id="conversion_value"
-                  type="number"
-                  step="0.01"
-                  {...form.register('conversion_rule.conversion_value', {
-                    setValueAs: (v) =>
-                      v === '' || Number.isNaN(Number(v)) ? undefined : Number(v),
-                  })}
-                />
-                <FieldError name="conversion_rule.conversion_value" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Controller
-                name="conversion_rule.requires_answered_disposition"
-                control={form.control}
-                render={({ field }) => (
-                  <Switch
-                    id="requires_answered_disposition"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-              <Label htmlFor="requires_answered_disposition">Require answered disposition</Label>
-            </div>
-            <FieldError name="conversion_rule.requires_answered_disposition" />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-
-    <div className="flex gap-2">
+        <div className="flex gap-2">
       <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
         {isEdit ? 'Update Campaign' : 'Create Campaign'}
       </Button>
