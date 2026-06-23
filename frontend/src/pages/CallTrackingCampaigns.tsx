@@ -34,7 +34,7 @@ export default function CallTrackingCampaigns() {
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [status, setStatus] = useState<'' | 'active' | 'inactive'>('');
+  const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [campaignToDelete, setCampaignToDelete] = useState<CallTrackingCampaign | null>(null);
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
@@ -46,13 +46,13 @@ export default function CallTrackingCampaigns() {
 
   const { data, isLoading, isError, error } = useCallTrackingCampaigns({
     search: debouncedSearch || undefined,
-    status: status || undefined,
+    status: status === 'all' ? undefined : status,
   });
 
   const deleteMutation = useDeleteCallTrackingCampaign();
 
   const campaigns = data?.data ?? [];
-  const hasActiveFilters = debouncedSearch !== '' || status !== '';
+  const hasActiveFilters = debouncedSearch !== '' || status !== 'all';
 
   const handleDelete = async () => {
     if (!campaignToDelete) return;
@@ -99,12 +99,12 @@ export default function CallTrackingCampaigns() {
             className="pl-9"
           />
         </div>
-        <Select value={status} onValueChange={(value) => setStatus(value as '' | 'active' | 'inactive')}>
+        <Select value={status} onValueChange={(value) => setStatus(value as 'all' | 'active' | 'inactive')}>
           <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All statuses</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
