@@ -145,11 +145,11 @@ export default function CallTrackingCampaignForm() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">{isEdit ? 'Edit Campaign' : 'New Campaign'}</h1>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-2 gap-6 items-start">
           <div className="space-y-6">
             <Card>
               <CardHeader>
