@@ -29,7 +29,6 @@ const schema = z.object({
   source: z.string().optional(),
   medium: z.string().optional(),
   description: z.string().optional(),
-  status: z.enum(['active', 'inactive']),
   destination_type: z.enum(['forward', 'extension', 'ring_group']),
   destination_config: z.object({
     forward_to: z.string().optional(),
@@ -52,7 +51,6 @@ const DEFAULT_VALUES: FormData = {
   source: '',
   medium: '',
   description: '',
-  status: 'active',
   destination_type: 'forward',
   destination_config: { forward_to: '' },
   conversion_rule: {
@@ -69,7 +67,7 @@ const toPayload = (data: FormData): CampaignFormData => ({
   source: data.source || null,
   medium: data.medium || null,
   description: data.description || null,
-  status: data.status,
+  status: 'active',
   destination_type: data.destination_type,
   destination_config: data.destination_config,
   conversion_rule: {
@@ -102,7 +100,6 @@ export default function CallTrackingCampaignForm() {
         source: campaign.source ?? '',
         medium: campaign.medium ?? '',
         description: campaign.description ?? '',
-        status: campaign.status,
         destination_type: campaign.destination_type as FormData['destination_type'],
         destination_config: (campaign.destination_config as FormData['destination_config']) || {},
         conversion_rule: {
@@ -152,68 +149,47 @@ export default function CallTrackingCampaignForm() {
       <h1 className="text-2xl font-bold mb-6">{isEdit ? 'Edit Campaign' : 'New Campaign'}</h1>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" {...form.register('name')} />
-              <FieldError name="name" />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Basic Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" {...form.register('name')} />
+                  <FieldError name="name" />
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="source">Source</Label>
-                <Input id="source" {...form.register('source')} placeholder="e.g. google" />
-                <FieldError name="source" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="medium">Medium</Label>
-                <Input id="medium" {...form.register('medium')} placeholder="e.g. cpc" />
-                <FieldError name="medium" />
-              </div>
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="source">Source</Label>
+                    <Input id="source" {...form.register('source')} placeholder="e.g. google" />
+                    <FieldError name="source" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="medium">Medium</Label>
+                    <Input id="medium" {...form.register('medium')} placeholder="e.g. cpc" />
+                    <FieldError name="medium" />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...form.register('description')} rows={3} />
-              <FieldError name="description" />
-            </div>
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" {...form.register('description')} rows={3} />
+                  <FieldError name="description" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Controller
-                  name="status"
-                  control={form.control}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => field.onChange(value as FormData['status'])}
-                    >
-                      <SelectTrigger id="status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldError name="status" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Destination</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Destination</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="destination_type">Destination Type</Label>
               <Controller
@@ -385,16 +361,18 @@ export default function CallTrackingCampaignForm() {
             <FieldError name="meta_upload_enabled" />
           </CardContent>
         </Card>
-
-        <div className="flex gap-2">
-          <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-            {isEdit ? 'Update Campaign' : 'Create Campaign'}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => navigate('/ui/call-tracking/campaigns')}>
-            Cancel
-          </Button>
-        </div>
-      </form>
+      </div>
     </div>
+
+    <div className="flex gap-2">
+      <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+        {isEdit ? 'Update Campaign' : 'Create Campaign'}
+      </Button>
+      <Button type="button" variant="outline" onClick={() => navigate('/ui/call-tracking/campaigns')}>
+        Cancel
+      </Button>
+    </div>
+  </form>
+</div>
   );
 }
