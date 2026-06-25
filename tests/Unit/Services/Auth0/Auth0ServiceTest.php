@@ -48,6 +48,14 @@ class Auth0ServiceTest extends TestCase
         $this->assertTrue(Cache::has('auth0:state:'.$result['state']));
     }
 
+    public function test_build_authorize_url_includes_login_hint_when_email_provided(): void
+    {
+        $result = $this->service->buildAuthorizeUrl('google', 'login', null, 'user@example.com');
+
+        $this->assertStringContainsString('login_hint=', $result['url']);
+        $this->assertStringContainsString('user%40example.com', $result['url']);
+    }
+
     public function test_build_authorize_url_rejects_disabled_provider(): void
     {
         $this->expectException(InvalidArgumentException::class);
