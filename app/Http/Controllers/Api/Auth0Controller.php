@@ -166,6 +166,12 @@ class Auth0Controller extends Controller
             ], Response::HTTP_GONE);
         }
 
+        if (! ($profile['email_verified'] ?? false)) {
+            return response()->json([
+                'error' => ['code' => 'AUTH0_EMAIL_UNVERIFIED', 'message' => 'Please verify your email with the provider before continuing.'],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         try {
             $activatedUser = app(Auth0AccountResolver::class)->resolveInvitation($user, $profile);
         } catch (\RuntimeException $e) {
