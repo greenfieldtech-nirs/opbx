@@ -96,7 +96,7 @@ import {
   EmptyState
 } from '@/components/design-system';
 import { useAuth } from '@/hooks/useAuth';
-import type { User, UserRole, Status } from '@/types';
+import type { User, UserRole, UserStatus } from '@/types';
 import { usersService } from '@/services/createResourceService';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
 
@@ -110,7 +110,7 @@ interface UserFormData {
   email: string;
   password: string;
   role: UserRole;
-  status: Status;
+  status: UserStatus;
   phone: string;
   street_address: string;
   city: string;
@@ -129,7 +129,7 @@ export default function UsersComplete() {
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
   const [extensionFilter, setExtensionFilter] = useState<'all' | 'has' | 'none'>('all');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -385,7 +385,7 @@ export default function UsersComplete() {
 
   // Handle toggle status
   const handleToggleStatus = (user: User) => {
-    const newStatus: Status = user.status === 'active' ? 'inactive' : 'active';
+    const newStatus: UserStatus = user.status === 'active' ? 'inactive' : 'active';
     updateUserMutation.mutate({
       id: user.id,
       data: { status: newStatus },
@@ -592,7 +592,7 @@ export default function UsersComplete() {
             <Select
               value={statusFilter}
               onValueChange={(value) => {
-                setStatusFilter(value as Status | 'all');
+                setStatusFilter(value as UserStatus | 'all');
                 setCurrentPage(1);
               }}
             >
@@ -600,11 +600,12 @@ export default function UsersComplete() {
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
             </Select>
 
             <Select
@@ -890,7 +891,7 @@ export default function UsersComplete() {
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value as Status })}
+                  onValueChange={(value) => setFormData({ ...formData, status: value as UserStatus })}
                 >
                   <SelectTrigger id="status">
                     <SelectValue />
@@ -898,6 +899,7 @@ export default function UsersComplete() {
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

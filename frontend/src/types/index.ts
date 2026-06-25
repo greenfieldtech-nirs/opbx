@@ -45,7 +45,7 @@ export interface APIError {
 }
 
 // Common Status
-export type Status = 'active' | 'inactive' | 'pending';
+export type Status = 'active' | 'inactive';
 
 // User Roles
 export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
@@ -104,7 +104,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  status: Status;
+  status: UserStatus;
   is_platform_manager: boolean;
   phone?: string | null;
   street_address?: string | null;
@@ -472,7 +472,7 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   role: UserRole;
-  status?: Status;
+  status?: UserStatus;
   extension_number?: string; // Auto-create extension
 }
 
@@ -481,12 +481,12 @@ export interface UpdateUserRequest {
   email?: string;
   password?: string;
   role?: UserRole;
-  status?: Status;
+  status?: UserStatus;
 }
 
 export interface UsersFilterParams extends PaginationParams {
   role?: UserRole;
-  status?: Status;
+  status?: UserStatus;
   search?: string;
 }
 
@@ -895,7 +895,7 @@ export interface ChangePasswordRequest {
   new_password_confirmation: string;
 }
 
-export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type UserStatus = 'active' | 'inactive' | 'pending' | 'suspended';
 export type ExtensionStatus = Status;
 
 // ============================================================================

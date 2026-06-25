@@ -45,7 +45,7 @@ export interface APIError {
 }
 
 // Common Status
-export type Status = 'active' | 'inactive' | 'pending';
+export type Status = 'active' | 'inactive';
 
 // User Roles
 export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
@@ -744,7 +744,7 @@ export interface UpdateSentrySettingsRequest {
 }
 
 // User Status
-export type UserStatus = Status | 'suspended';
+export type UserStatus = 'active' | 'inactive' | 'pending' | 'suspended';
 
 // ============================================================================
 // Registration
