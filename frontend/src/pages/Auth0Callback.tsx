@@ -55,6 +55,22 @@ export default function Auth0Callback() {
             return;
           }
 
+          if (code === 'INVITE_EMAIL_MISMATCH') {
+            toast.error('Invitation email mismatch', {
+              description: 'The email address from your social account does not match the invited email.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
+          if (code === 'AUTH0_EMAIL_UNVERIFIED') {
+            toast.error('Email not verified', {
+              description: 'Please verify your email with your social provider before continuing.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
           toast.error(data.error.message);
           navigate('/ui/login');
           return;

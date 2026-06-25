@@ -42,6 +42,7 @@ const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm
 const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
 const AutoDialerMonitor = lazy(() => import('@/pages/AutoDialerMonitor'));
 const DistributionLists = lazy(() => import('@/pages/DistributionLists'));
+const AcceptInvitation = lazy(() => import('@/pages/AcceptInvitation'));
 const DistributionListDetail = lazy(() => import('@/pages/DistributionListDetail'));
 const CallTrackingDashboard = lazy(() => import('@/pages/CallTrackingDashboard'));
 const CallTrackingCampaigns = lazy(() => import('@/pages/CallTrackingCampaigns'));
@@ -82,6 +83,10 @@ export const router = createBrowserRouter([
   {
     path: '/ui/auth/onboarding',
     element: <Auth0Onboarding />,
+  },
+  {
+    path: '/ui/invite',
+    element: <AcceptInvitation />,
   },
   // Protected app routes (under /ui)
   {
