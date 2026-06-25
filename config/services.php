@@ -192,4 +192,15 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | User Invitations
+    |--------------------------------------------------------------------------
+    */
+    'invitation' => [
+        'token_ttl_hours' => (int) env('OPBX_INVITE_TOKEN_TTL_HOURS', 24),
+        'rate_limit_per_hour' => (int) env('OPBX_INVITE_RATE_LIMIT_PER_HOUR', 10),
+        'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+    ],
+
 ];
