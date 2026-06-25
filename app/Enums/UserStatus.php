@@ -8,12 +8,14 @@ enum UserStatus: string
 {
     case ACTIVE = 'active';
     case INACTIVE = 'inactive';
+    case PENDING = 'pending';
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::ACTIVE => 'Active',
             self::INACTIVE => 'Inactive',
+            self::PENDING => 'Pending',
         };
     }
 
@@ -25,5 +27,10 @@ enum UserStatus: string
     public function isInactive(): bool
     {
         return $this === self::INACTIVE;
+    }
+
+    public function isPending(): bool
+    {
+        return $this === self::PENDING;
     }
 }
