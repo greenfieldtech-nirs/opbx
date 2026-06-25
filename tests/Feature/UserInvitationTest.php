@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\SocialIdentityProvider;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\UserSocialIdentity;
 use App\Services\Auth0\Auth0StateStore;
 use App\Services\Email\Contracts\TransactionalEmailInterface;
 use App\Services\Email\DTOs\EmailMessage;
@@ -133,7 +135,10 @@ class UserInvitationTest extends TestCase
         $this->assertNotNull($capturedMessage);
         $this->assertSame('platform-manager@example.com', $capturedMessage->to[0]->email);
         $this->assertStringContainsString('Duplicate invitation attempt alert', $capturedMessage->subject);
-        $this->assertDatabaseHas('users', ['email' => 'platform-manager@example.com']);
+        $this->assertStringContainsString('active@example.com', $capturedMessage->htmlContent ?? '');
+        $this->assertStringContainsString($owner->name, $capturedMessage->htmlContent ?? '');
+        $this->assertStringContainsString($owner->email, $capturedMessage->htmlContent ?? '');
+        $this->assertStringContainsString($organization->name, $capturedMessage->htmlContent ?? '');
     }
 
     public function test_re_inviting_pending_user_invalidates_previous_token(): void
@@ -328,5 +333,175 @@ class UserInvitationTest extends TestCase
         $blockedResponse = $this->postJson('/api/v1/users/invite', ['email' => 'blocked@example.com']);
         $blockedResponse->assertStatus(429);
         $blockedResponse->assertJsonPath('error.code', 'INVITE_RATE_LIMITED');
+    }
+
+    public function test_auth0_callback_when_pending_user_already_activated_returns_invite_invalid_user(): void
+    {
+        $this->enableAuth0();
+
+        $organization = Organization::factory()->create();
+        $owner = User::factory()->owner()->create(['organization_id' => $organization->id]);
+
+        $emailService = $this->mock(TransactionalEmailInterface::class);
+        $emailService->shouldReceive('sendAsync')->andReturn('');
+
+        $service = new UserInvitationService($emailService);
+        $token = $service->invite($owner, 'pending@example.com')['token'];
+
+        $acceptResponse = $this->postJson('/api/v1/users/invite/accept', ['token' => $token]);
+        $acceptResponse->assertOk();
+
+        $redirectUrl = $acceptResponse->json('redirect_url');
+        parse_str(parse_url($redirectUrl, PHP_URL_QUERY) ?? '', $query);
+        $state = $query['state'] ?? '';
+
+        $pendingUser = User::where('email', 'pending@example.com')->first();
+        $this->assertNotNull($pendingUser);
+        $pendingUser->status = UserStatus::ACTIVE;
+        $pendingUser->save();
+
+        Http::fake([
+            'tenant.us.auth0.com/oauth/token' => Http::response(['access_token' => 'token'], 200),
+            'tenant.us.auth0.com/userinfo' => Http::response([
+                'sub' => 'google-oauth2|123',
+                'email' => 'pending@example.com',
+                'email_verified' => true,
+                'name' => 'Accepted User',
+            ], 200),
+        ]);
+
+        $callbackResponse = $this->getJson("/api/v1/auth/auth0/callback?code=valid&state={$state}");
+
+        $callbackResponse->assertStatus(410);
+        $callbackResponse->assertJsonPath('error.code', 'INVITE_INVALID_USER');
+    }
+
+    public function test_auth0_callback_with_missing_user_id_in_state_returns_invite_invalid_user(): void
+    {
+        $this->enableAuth0();
+
+        $state = app(Auth0StateStore::class)->create('google', 'invitation', 99999);
+
+        Http::fake([
+            'tenant.us.auth0.com/oauth/token' => Http::response(['access_token' => 'token'], 200),
+            'tenant.us.auth0.com/userinfo' => Http::response([
+                'sub' => 'google-oauth2|123',
+                'email' => 'pending@example.com',
+                'email_verified' => true,
+                'name' => 'Accepted User',
+            ], 200),
+        ]);
+
+        $callbackResponse = $this->getJson("/api/v1/auth/auth0/callback?code=valid&state={$state->state}");
+
+        $callbackResponse->assertStatus(410);
+        $callbackResponse->assertJsonPath('error.code', 'INVITE_INVALID_USER');
+    }
+
+    public function test_auth0_callback_with_unverified_email_returns_auth0_email_unverified(): void
+    {
+        $this->enableAuth0();
+
+        $organization = Organization::factory()->create();
+        $owner = User::factory()->owner()->create(['organization_id' => $organization->id]);
+
+        $emailService = $this->mock(TransactionalEmailInterface::class);
+        $emailService->shouldReceive('sendAsync')->andReturn('');
+
+        $service = new UserInvitationService($emailService);
+        $token = $service->invite($owner, 'pending@example.com')['token'];
+
+        $acceptResponse = $this->postJson('/api/v1/users/invite/accept', ['token' => $token]);
+        $acceptResponse->assertOk();
+
+        $redirectUrl = $acceptResponse->json('redirect_url');
+        parse_str(parse_url($redirectUrl, PHP_URL_QUERY) ?? '', $query);
+        $state = $query['state'] ?? '';
+
+        Http::fake([
+            'tenant.us.auth0.com/oauth/token' => Http::response(['access_token' => 'token'], 200),
+            'tenant.us.auth0.com/userinfo' => Http::response([
+                'sub' => 'google-oauth2|123',
+                'email' => 'pending@example.com',
+                'email_verified' => false,
+                'name' => 'Accepted User',
+            ], 200),
+        ]);
+
+        $callbackResponse = $this->getJson("/api/v1/auth/auth0/callback?code=valid&state={$state}");
+
+        $callbackResponse->assertStatus(422);
+        $callbackResponse->assertJsonPath('error.code', 'AUTH0_EMAIL_UNVERIFIED');
+        $callbackResponse->assertJsonPath('error.message', 'Please verify your email with the provider before continuing.');
+    }
+
+    public function test_auth0_callback_when_social_identity_already_linked_returns_invite_email_mismatch(): void
+    {
+        $this->enableAuth0();
+
+        $organization = Organization::factory()->create();
+        $owner = User::factory()->owner()->create(['organization_id' => $organization->id]);
+
+        $existingUser = User::factory()->create([
+            'organization_id' => $organization->id,
+            'email' => 'existing@example.com',
+            'status' => UserStatus::ACTIVE,
+        ]);
+        UserSocialIdentity::create([
+            'user_id' => $existingUser->id,
+            'provider' => SocialIdentityProvider::GOOGLE,
+            'provider_subject' => 'google-oauth2|123',
+            'provider_email' => 'existing@example.com',
+            'provider_data' => [],
+        ]);
+
+        $emailService = $this->mock(TransactionalEmailInterface::class);
+        $emailService->shouldReceive('sendAsync')->andReturn('');
+
+        $service = new UserInvitationService($emailService);
+        $token = $service->invite($owner, 'pending@example.com')['token'];
+
+        $acceptResponse = $this->postJson('/api/v1/users/invite/accept', ['token' => $token]);
+        $acceptResponse->assertOk();
+
+        $redirectUrl = $acceptResponse->json('redirect_url');
+        parse_str(parse_url($redirectUrl, PHP_URL_QUERY) ?? '', $query);
+        $state = $query['state'] ?? '';
+
+        Http::fake([
+            'tenant.us.auth0.com/oauth/token' => Http::response(['access_token' => 'token'], 200),
+            'tenant.us.auth0.com/userinfo' => Http::response([
+                'sub' => 'google-oauth2|123',
+                'email' => 'pending@example.com',
+                'email_verified' => true,
+                'name' => 'Accepted User',
+            ], 200),
+        ]);
+
+        $callbackResponse = $this->getJson("/api/v1/auth/auth0/callback?code=valid&state={$state}");
+
+        $callbackResponse->assertStatus(422);
+        $callbackResponse->assertJsonPath('error.code', 'INVITE_EMAIL_MISMATCH');
+    }
+
+    public function test_second_accept_call_with_same_token_returns_gone(): void
+    {
+        $this->enableAuth0();
+
+        $organization = Organization::factory()->create();
+        $owner = User::factory()->owner()->create(['organization_id' => $organization->id]);
+
+        $emailService = $this->mock(TransactionalEmailInterface::class);
+        $emailService->shouldReceive('sendAsync')->andReturn('');
+
+        $service = new UserInvitationService($emailService);
+        $token = $service->invite($owner, 'pending@example.com')['token'];
+
+        $firstAcceptResponse = $this->postJson('/api/v1/users/invite/accept', ['token' => $token]);
+        $firstAcceptResponse->assertOk();
+
+        $secondAcceptResponse = $this->postJson('/api/v1/users/invite/accept', ['token' => $token]);
+        $secondAcceptResponse->assertStatus(410);
+        $secondAcceptResponse->assertJsonPath('error.code', 'INVITE_EXPIRED_OR_INVALID');
     }
 }

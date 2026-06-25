@@ -16,6 +16,7 @@ use Tests\TestCase;
 class UserInvitationControllerAcceptTest extends TestCase
 {
     use RefreshDatabase;
+
     public function test_accept_returns_503_when_auth0_disabled_and_does_not_consume_token(): void
     {
         Config::set('services.auth0.enabled', false);
