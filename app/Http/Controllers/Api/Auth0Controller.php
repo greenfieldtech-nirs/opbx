@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth0\LinkRequest;
 use App\Http\Requests\Auth0\RedirectRequest;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\Auth0\Auth0AccountResolver;
 use App\Services\Auth0\Auth0Config;
 use App\Services\Auth0\Auth0Service;
@@ -95,6 +96,10 @@ class Auth0Controller extends Controller
             return $this->handleLink($profile);
         }
 
+        if (($profile['intent'] ?? '') === 'invitation' && ($profile['user_id'] ?? null) !== null) {
+            return $this->handleInvitation($profile);
+        }
+
         $resolver = app(Auth0AccountResolver::class);
         $resolution = $resolver->resolve($profile);
 
@@ -146,6 +151,30 @@ class Auth0Controller extends Controller
             ->delete();
 
         return response()->json(['message' => 'Identity unlinked.']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $profile
+     */
+    private function handleInvitation(array $profile): JsonResponse
+    {
+        $user = User::withoutGlobalScope(OrganizationScope::class)->find($profile['user_id']);
+
+        if ($user === null || ! $user->isPending()) {
+            return response()->json([
+                'error' => ['code' => 'INVITE_INVALID_USER', 'message' => 'Invitation user is invalid or has already been activated.'],
+            ], Response::HTTP_GONE);
+        }
+
+        try {
+            $activatedUser = app(Auth0AccountResolver::class)->resolveInvitation($user, $profile);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'error' => ['code' => 'INVITE_EMAIL_MISMATCH', 'message' => $e->getMessage()],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->buildAuthResponse($activatedUser);
     }
 
     /**

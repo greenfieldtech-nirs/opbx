@@ -113,6 +113,38 @@ class Auth0AccountResolver
         ]);
     }
 
+    /**
+     * Activate a pending user and bind their Auth0 identity from an invitation.
+     *
+     * @param  array<string, mixed>  $profile
+     *
+     * @throws \RuntimeException
+     */
+    public function resolveInvitation(User $pendingUser, array $profile): User
+    {
+        if (! ($profile['email_verified'] ?? false)) {
+            throw new \RuntimeException('Email not verified.');
+        }
+
+        if ($pendingUser->email !== $profile['email']) {
+            throw new \RuntimeException('Email does not match invitation.');
+        }
+
+        $pendingUser->status = UserStatus::ACTIVE;
+        $pendingUser->name = $profile['name'] ?: $pendingUser->name;
+        $pendingUser->save();
+
+        UserSocialIdentity::create([
+            'user_id' => $pendingUser->id,
+            'provider' => $profile['provider'],
+            'provider_subject' => $profile['subject'],
+            'provider_email' => $profile['email'],
+            'provider_data' => $profile['raw'] ?? [],
+        ]);
+
+        return $pendingUser;
+    }
+
     private function generateSlug(string $email): string
     {
         $base = strtolower(preg_replace('/[^a-z0-9]+/', '-', explode('@', $email)[0]));
