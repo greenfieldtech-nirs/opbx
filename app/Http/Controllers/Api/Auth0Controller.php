@@ -65,6 +65,13 @@ class Auth0Controller extends Controller
         $code = $request->query('code');
         $state = $request->query('state');
 
+        \Log::info('Auth0 callback received', [
+            'code_present' => is_string($code),
+            'state_present' => is_string($state),
+            'state_prefix' => is_string($state) ? substr($state, 0, 8) : null,
+            'user_agent' => $request->userAgent(),
+        ]);
+
         if (! is_string($code) || ! is_string($state)) {
             return response()->json([
                 'error' => ['code' => 'AUTH0_INVALID_CALLBACK', 'message' => 'Missing code or state.'],
@@ -74,6 +81,11 @@ class Auth0Controller extends Controller
         try {
             $profile = $this->auth0Service->handleCallback($code, $state);
         } catch (\RuntimeException $e) {
+            \Log::info('Auth0 callback runtime exception', [
+                'message' => $e->getMessage(),
+                'state_prefix' => substr($state, 0, 8),
+            ]);
+
             return response()->json([
                 'error' => ['code' => 'AUTH0_INVALID_STATE', 'message' => $e->getMessage()],
             ], Response::HTTP_BAD_REQUEST);

@@ -5,7 +5,7 @@
  * and routes the user based on the backend response.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth0Service, type Auth0RegistrationRequired } from '@/services/auth0.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,8 +18,13 @@ export default function Auth0Callback() {
   const navigate = useNavigate();
   const { setUser, setToken } = useAuth();
   const [status, setStatus] = useState('Processing login...');
+  const hasHandled = useRef(false);
 
   useEffect(() => {
+    if (hasHandled.current) {
+      return;
+    }
+
     const code = searchParams.get('code');
     const state = searchParams.get('state');
 
@@ -28,6 +33,8 @@ export default function Auth0Callback() {
       navigate('/ui/login');
       return;
     }
+
+    hasHandled.current = true;
 
     auth0Service
       .callback(code, state)
