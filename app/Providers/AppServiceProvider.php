@@ -23,6 +23,7 @@ use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\InboundBlacklist;
 use App\Models\Organization;
+use App\Models\OrganizationJoinRequest;
 use App\Models\Recording;
 use App\Models\User;
 use App\Observers\BusinessHoursCacheObserver;
@@ -40,6 +41,7 @@ use App\Policies\ConferenceRoomPolicy;
 use App\Policies\DistributionListPolicy;
 use App\Policies\ExtensionPolicy;
 use App\Policies\InboundBlacklistPolicy;
+use App\Policies\OrganizationJoinRequestPolicy;
 use App\Policies\RecordingPolicy;
 use App\Policies\UserPolicy;
 use App\Scopes\OrganizationScope;
@@ -248,6 +250,7 @@ class AppServiceProvider extends ServiceProvider
         // Register model policies
         Gate::policy(Extension::class, ExtensionPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
+        Gate::policy(OrganizationJoinRequest::class, OrganizationJoinRequestPolicy::class);
         Gate::policy(ConferenceRoom::class, ConferenceRoomPolicy::class);
         Gate::policy(CloudonixSettings::class, CloudonixSettingsPolicy::class);
         Gate::policy(Recording::class, RecordingPolicy::class);

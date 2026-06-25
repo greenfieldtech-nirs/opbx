@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
 use App\Http\Controllers\Api\InboundBlacklistController;
 use App\Http\Controllers\Api\IvrMenuController;
+use App\Http\Controllers\Api\OrganizationJoinRequestController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
@@ -222,6 +223,17 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/auth0/unlink', [Auth0Controller::class, 'unlink'])->name('auth.auth0.unlink');
         });
     });
+
+    // Organization join requests
+    Route::middleware(['auth:sanctum'])->group(function (): void {
+        Route::get('/organizations/join-requests', [OrganizationJoinRequestController::class, 'index'])->name('join-requests.index');
+        Route::post('/organizations/join-requests/{joinRequest}/approve', [OrganizationJoinRequestController::class, 'approve'])->name('join-requests.approve');
+        Route::post('/organizations/join-requests/{joinRequest}/reject', [OrganizationJoinRequestController::class, 'reject'])->name('join-requests.reject');
+    });
+
+    Route::post('/organizations/join-requests', [OrganizationJoinRequestController::class, 'store'])
+        ->name('join-requests.store')
+        ->middleware('throttle:auth');
 
     // Public token-authenticated routes (for HTML5 audio/video elements that can't send auth headers)
     // These routes use self-authenticating tokens instead of Sanctum middleware
