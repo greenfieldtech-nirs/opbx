@@ -23,6 +23,8 @@ class UserInvitationService
 
     private const CACHE_PREFIX = 'invite:';
 
+    private const USER_TOKEN_PREFIX = 'invite:user:';
+
     public function __construct(
         private readonly TransactionalEmailInterface $emailService,
     ) {}
@@ -70,6 +72,12 @@ class UserInvitationService
             $token = $this->createToken($user);
         } catch (QueryException $e) {
             if ($this->isDuplicateEmailError($e)) {
+                $existingUser = OrganizationScope::bypass(fn () => User::where('email', $email)->first());
+
+                if ($existingUser !== null && $existingUser->organization_id === $organizationId) {
+                    throw new InvalidArgumentException('A user with this email already exists in the organization.');
+                }
+
                 throw new InvalidArgumentException('A user with this email already exists.');
             }
 
@@ -86,9 +94,10 @@ class UserInvitationService
      */
     public function validateToken(string $token): ?User
     {
-        $payload = Cache::get(self::CACHE_PREFIX.$this->hashToken($token));
+        $tokenHash = $this->hashToken($token);
+        $payload = Cache::get(self::CACHE_PREFIX.$tokenHash);
 
-        if ($payload === null) {
+        if ($payload === null || ! $this->isCurrentToken($payload['user_id'] ?? null, $tokenHash)) {
             return null;
         }
 
@@ -106,9 +115,10 @@ class UserInvitationService
      */
     public function consumeToken(string $token): ?User
     {
-        $payload = Cache::pull(self::CACHE_PREFIX.$this->hashToken($token));
+        $tokenHash = $this->hashToken($token);
+        $payload = Cache::pull(self::CACHE_PREFIX.$tokenHash);
 
-        if ($payload === null) {
+        if ($payload === null || ! $this->isCurrentToken($payload['user_id'] ?? null, $tokenHash)) {
             return null;
         }
 
@@ -124,11 +134,18 @@ class UserInvitationService
     private function createToken(User $user): string
     {
         $token = $this->generateToken();
+        $tokenHash = $this->hashToken($token);
         $ttlSeconds = config('services.invitation.token_ttl_hours', 24) * 3600;
 
         Cache::put(
-            self::CACHE_PREFIX.$this->hashToken($token),
+            self::CACHE_PREFIX.$tokenHash,
             ['user_id' => $user->id, 'organization_id' => $user->organization_id, 'email' => $user->email],
+            $ttlSeconds
+        );
+
+        Cache::put(
+            self::USER_TOKEN_PREFIX.$user->id,
+            $tokenHash,
             $ttlSeconds
         );
 
@@ -145,6 +162,15 @@ class UserInvitationService
         return hash('sha256', $token);
     }
 
+    private function isCurrentToken(?int $userId, string $tokenHash): bool
+    {
+        if ($userId === null) {
+            return false;
+        }
+
+        return Cache::get(self::USER_TOKEN_PREFIX.$userId) === $tokenHash;
+    }
+
     private function placeholderNameFromEmail(string $email): string
     {
         return explode('@', $email)[0];
@@ -152,9 +178,7 @@ class UserInvitationService
 
     private function isDuplicateEmailError(QueryException $exception): bool
     {
-        $message = $exception->getMessage();
-
-        return str_contains($message, 'users.email') || str_contains($message, 'users_email');
+        return str_starts_with((string) $exception->getCode(), '23');
     }
 
     private function ensureRateLimit(int $organizationId): void
