@@ -205,6 +205,10 @@ Route::prefix('v1')->group(function (): void {
             ->name('auth.auth0.redirect')
             ->middleware('throttle:auth');
 
+        Route::get('/auth0/callback', [Auth0Controller::class, 'callback'])
+            ->name('auth.auth0.callback')
+            ->middleware('throttle:auth');
+
         Route::get('/register/validate', [RegisterController::class, 'validateRegistration'])
             ->name('auth.register.validate');
 
