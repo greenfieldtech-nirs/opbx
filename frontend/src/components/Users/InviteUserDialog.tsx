@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import axios, { AxiosError } from 'axios';
+import { toast } from 'sonner';
 import { Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { invite } from '@/services/invitation.service';
+import { invitationService } from '@/services/invitation.service';
 import type { APIError } from '@/types';
 
 const inviteSchema = z.object({
@@ -55,8 +56,9 @@ export default function InviteUserDialog({ open, onOpenChange, onSuccess }: Invi
     setApiError(null);
 
     try {
-      await invite({ email: data.email });
+      await invitationService.invite({ email: data.email });
       reset();
+      toast.success('Invitation sent successfully.');
       onSuccess();
       onOpenChange(false);
     } catch (error) {
@@ -65,7 +67,7 @@ export default function InviteUserDialog({ open, onOpenChange, onSuccess }: Invi
         const code = axiosError.response?.data?.error?.code;
 
         if (code === 'USER_ALREADY_EXISTS') {
-          setApiError('A user with this email already exists.');
+          setApiError(axiosError.response?.data?.error?.message || 'A user with this email already exists.');
           return;
         }
 
@@ -114,7 +116,7 @@ export default function InviteUserDialog({ open, onOpenChange, onSuccess }: Invi
           </div>
 
           {apiError && (
-            <p className="text-sm text-destructive">{apiError}</p>
+            <p className="text-sm text-destructive" aria-live="polite">{apiError}</p>
           )}
 
           <DialogFooter>
