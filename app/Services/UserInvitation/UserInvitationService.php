@@ -7,9 +7,11 @@ namespace App\Services\UserInvitation;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\Email\Contracts\TransactionalEmailInterface;
 use App\Services\Email\DTOs\EmailMessage;
 use App\Services\Email\DTOs\EmailRecipient;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
@@ -40,22 +42,40 @@ class UserInvitationService
 
         $this->ensureRateLimit($organizationId);
 
-        if (User::where('organization_id', $organizationId)->where('email', $email)->exists()) {
+        $existingUser = User::where('organization_id', $organizationId)->where('email', $email)->first();
+
+        if ($existingUser !== null) {
+            if ($existingUser->isPending()) {
+                $token = $this->createToken($existingUser);
+                $this->sendInvitationEmail($existingUser, $token);
+
+                return ['user' => $existingUser, 'token' => $token];
+            }
+
             $this->notifyPlatformManagersOfDuplicateInvite($email, $inviter);
 
             throw new InvalidArgumentException('A user with this email already exists in the organization.');
         }
 
-        $user = User::create([
-            'organization_id' => $organizationId,
-            'name' => $this->placeholderNameFromEmail($email),
-            'email' => $email,
-            'password' => null,
-            'role' => UserRole::PBX_USER,
-            'status' => UserStatus::PENDING,
-        ]);
+        try {
+            $user = User::create([
+                'organization_id' => $organizationId,
+                'name' => $this->placeholderNameFromEmail($email),
+                'email' => $email,
+                'password' => null,
+                'role' => UserRole::PBX_USER,
+                'status' => UserStatus::PENDING,
+            ]);
 
-        $token = $this->createToken($user);
+            $token = $this->createToken($user);
+        } catch (QueryException $e) {
+            if ($this->isDuplicateEmailError($e)) {
+                throw new InvalidArgumentException('A user with this email already exists.');
+            }
+
+            throw $e;
+        }
+
         $this->sendInvitationEmail($user, $token);
 
         return ['user' => $user, 'token' => $token];
@@ -72,7 +92,13 @@ class UserInvitationService
             return null;
         }
 
-        return User::find($payload['user_id'] ?? null);
+        $user = OrganizationScope::bypass(fn () => User::find($payload['user_id'] ?? null));
+
+        if ($user === null || $user->organization_id !== (int) $payload['organization_id'] || ! $user->isPending()) {
+            return null;
+        }
+
+        return $user;
     }
 
     /**
@@ -86,9 +112,9 @@ class UserInvitationService
             return null;
         }
 
-        $user = User::find($payload['user_id'] ?? null);
+        $user = OrganizationScope::bypass(fn () => User::find($payload['user_id'] ?? null));
 
-        if ($user === null || ! $user->isPending()) {
+        if ($user === null || $user->organization_id !== (int) $payload['organization_id'] || ! $user->isPending()) {
             return null;
         }
 
@@ -122,6 +148,13 @@ class UserInvitationService
     private function placeholderNameFromEmail(string $email): string
     {
         return explode('@', $email)[0];
+    }
+
+    private function isDuplicateEmailError(QueryException $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'users.email') || str_contains($message, 'users_email');
     }
 
     private function ensureRateLimit(int $organizationId): void
@@ -164,7 +197,7 @@ class UserInvitationService
 
     private function notifyPlatformManagersOfDuplicateInvite(string $email, User $inviter): void
     {
-        $managers = User::where('is_platform_manager', true)->get();
+        $managers = OrganizationScope::bypass(fn () => User::where('is_platform_manager', true)->get());
 
         if ($managers->isEmpty()) {
             return;
