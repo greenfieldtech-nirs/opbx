@@ -71,6 +71,22 @@ export default function Auth0Callback() {
             return;
           }
 
+          if (code === 'INVITE_INVALID_USER') {
+            toast.error('Invalid invitation', {
+              description: 'This invitation is not valid for the selected account.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
+          if (code === 'INVITE_EXPIRED_OR_INVALID') {
+            toast.error('Invitation expired', {
+              description: 'This invitation has expired or is no longer valid.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
           toast.error(data.error.message);
           navigate('/ui/login');
           return;
