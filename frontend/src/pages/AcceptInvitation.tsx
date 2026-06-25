@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios, { AxiosError } from 'axios';
 import { Loader2, Mail, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { validateToken, accept } from '@/services/invitation.service';
+import { invitationService } from '@/services/invitation.service';
 import type { APIError } from '@/types';
 
 type InvitationState =
@@ -27,6 +27,7 @@ type InvitationState =
 
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [state, setState] = useState<InvitationState>({ status: 'loading' });
   const [isAccepting, setIsAccepting] = useState(false);
 
@@ -38,7 +39,7 @@ export default function AcceptInvitation() {
       return;
     }
 
-    validateToken(token)
+    invitationService.validateToken(token)
       .then((response) => {
         setState({
           status: 'valid',
@@ -66,7 +67,7 @@ export default function AcceptInvitation() {
     setIsAccepting(true);
 
     try {
-      const response = await accept(token);
+      const response = await invitationService.accept(token);
       window.location.href = response.redirect_url;
     } catch (error) {
       setIsAccepting(false);
@@ -140,7 +141,7 @@ export default function AcceptInvitation() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => { window.location.href = '/ui/login'; }}
+                onClick={() => navigate('/ui/login')}
               >
                 Go to Login
               </Button>
