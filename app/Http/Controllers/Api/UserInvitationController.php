@@ -102,14 +102,6 @@ class UserInvitationController extends Controller
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        $user = $this->invitationService->consumeToken($token);
-
-        if ($user === null) {
-            return response()->json([
-                'error' => ['code' => 'INVITE_EXPIRED_OR_INVALID', 'message' => 'Invitation is invalid or has expired.'],
-            ], Response::HTTP_GONE);
-        }
-
         $config = Auth0Config::fromConfig();
 
         if (! $config->isEnabled()) {
@@ -124,6 +116,14 @@ class UserInvitationController extends Controller
             return response()->json([
                 'error' => ['code' => 'AUTH0_NOT_CONFIGURED', 'message' => 'No Auth0 provider configured.'],
             ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $user = $this->invitationService->consumeToken($token);
+
+        if ($user === null) {
+            return response()->json([
+                'error' => ['code' => 'INVITE_EXPIRED_OR_INVALID', 'message' => 'Invitation is invalid or has expired.'],
+            ], Response::HTTP_GONE);
         }
 
         $result = $this->auth0Service->buildAuthorizeUrl($provider->value, 'invitation', $user->id, $user->email);
