@@ -97,6 +97,7 @@ import {
 } from '@/components/design-system';
 import type { User, UserRole, Status } from '@/types';
 import { usersService } from '@/services/createResourceService';
+import InviteUserDialog from '@/components/Users/InviteUserDialog';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -134,6 +135,7 @@ export default function UsersComplete() {
 
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -527,10 +529,16 @@ export default function UsersComplete() {
             <span className="text-foreground">Users</span>
           </div>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
+            <Mail className="h-4 w-4 mr-2" />
+            Invite User
+          </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Filters Section */}
@@ -1416,6 +1424,12 @@ export default function UsersComplete() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <InviteUserDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+      />
     </div >
   );
 }
