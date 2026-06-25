@@ -10,10 +10,12 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Services\Email\Contracts\TransactionalEmailInterface;
 use App\Services\Email\DTOs\EmailMessage;
+use App\Services\Email\DTOs\EmailRecipient;
 use App\Services\UserInvitation\UserInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
+use RuntimeException;
 use Tests\TestCase;
 
 class UserInvitationServiceTest extends TestCase
@@ -136,7 +138,7 @@ class UserInvitationServiceTest extends TestCase
 
         $this->emailService->expects($this->once())->method('sendAsync')->with($this->callback(
             fn (EmailMessage $message) => in_array('manager@example.com', array_map(
-                fn ($recipient) => $recipient->email,
+                fn (EmailRecipient $recipient) => $recipient->email,
                 $message->to
             ), true)
         ))->willReturn('');
@@ -169,6 +171,52 @@ class UserInvitationServiceTest extends TestCase
         $this->assertNull($this->service->validateToken('invalid-token'));
     }
 
+    public function test_reinviting_pending_user_invalidates_old_token(): void
+    {
+        $org = Organization::factory()->create();
+        $inviter = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        User::factory()->create([
+            'organization_id' => $org->id,
+            'email' => 'pending@example.com',
+            'status' => UserStatus::PENDING,
+            'role' => UserRole::PBX_USER,
+        ]);
+
+        $firstInvite = $this->service->invite($inviter, 'pending@example.com');
+        $secondInvite = $this->service->invite($inviter, 'pending@example.com');
+
+        $this->assertSame($firstInvite['user']->id, $secondInvite['user']->id);
+        $this->assertNull($this->service->validateToken($firstInvite['token']));
+        $this->assertNotNull($this->service->validateToken($secondInvite['token']));
+    }
+
+    public function test_rate_limit_blocks_excessive_invites(): void
+    {
+        config(['services.invitation.rate_limit_per_hour' => 1]);
+        $org = Organization::factory()->create();
+        $inviter = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+
+        $this->service->invite($inviter, 'first@example.com');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Invitation rate limit exceeded for this organization.');
+
+        $this->service->invite($inviter, 'second@example.com');
+    }
+
+    public function test_cross_tenant_token_cannot_be_consumed(): void
+    {
+        $orgA = Organization::factory()->create();
+        $inviter = User::factory()->create(['organization_id' => $orgA->id, 'role' => UserRole::OWNER]);
+        $result = $this->service->invite($inviter, 'tenant@example.com');
+
+        $user = $result['user'];
+        $user->organization_id = Organization::factory()->create()->id;
+        $user->save();
+
+        $this->assertNull($this->service->consumeToken($result['token']));
+    }
+
     public function test_validate_token_returns_null_for_non_pending_user(): void
     {
         $org = Organization::factory()->create();
@@ -187,6 +235,7 @@ class UserInvitationServiceTest extends TestCase
             'organization_id' => $org->id,
             'email' => $activeUser->email,
         ], 3600);
+        Cache::put('invite:user:'.$activeUser->id, hash('sha256', $token), 3600);
 
         $this->assertNull($this->service->validateToken($token));
     }
