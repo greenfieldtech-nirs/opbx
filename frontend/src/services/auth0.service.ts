@@ -48,19 +48,19 @@ export interface Auth0Error {
 
 export const auth0Service = {
   redirect(provider: string, intent: 'login' | 'register' | 'link'): Promise<Auth0RedirectResponse> {
-    return api.post('/v1/auth/auth0/redirect', { provider, intent }).then((res) => res.data);
+    return api.post('/auth/auth0/redirect', { provider, intent }).then((res) => res.data);
   },
 
   callback(code: string, state: string): Promise<Auth0CallbackResponse | Auth0RegistrationRequired | Auth0Error> {
-    return api.get('/v1/auth/auth0/callback', { params: { code, state } }).then((res) => res.data);
+    return api.get('/auth/auth0/callback', { params: { code, state } }).then((res) => res.data);
   },
 
   initiateLink(provider: string): Promise<Auth0RedirectResponse> {
-    return api.post('/v1/auth/auth0/link', { provider }).then((res) => res.data);
+    return api.post('/auth/auth0/link', { provider }).then((res) => res.data);
   },
 
   unlink(provider: string): Promise<{ message: string }> {
-    return api.post('/v1/auth/auth0/unlink', { provider }).then((res) => res.data);
+    return api.post('/auth/auth0/unlink', { provider }).then((res) => res.data);
   },
 
   submitJoinRequest(data: {
@@ -70,6 +70,6 @@ export const auth0Service = {
     email: string;
     name: string;
   }): Promise<unknown> {
-    return api.post('/v1/organizations/join-requests', data).then((res) => res.data);
+    return api.post('/organizations/join-requests', data).then((res) => res.data);
   },
 };
