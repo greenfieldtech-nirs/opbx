@@ -95,6 +95,7 @@ import {
   Column,
   EmptyState
 } from '@/components/design-system';
+import { useAuth } from '@/hooks/useAuth';
 import type { User, UserRole, Status } from '@/types';
 import { usersService } from '@/services/createResourceService';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
@@ -122,6 +123,8 @@ interface UserFormData {
 
 export default function UsersComplete() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canCreateUsers = user?.role === 'owner' || user?.role === 'pbx_admin';
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -530,14 +533,18 @@ export default function UsersComplete() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
-            <Mail className="h-4 w-4 mr-2" />
-            Invite User
-          </Button>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
+          {canCreateUsers && (
+            <>
+              <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
+                <Mail className="h-4 w-4 mr-2" />
+                Invite User
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
