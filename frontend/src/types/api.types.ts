@@ -113,6 +113,7 @@ export interface User {
   is_platform_manager: boolean;
   extension?: Extension;
   organization?: Organization;
+  social_identities?: Array<{ provider: string; provider_email?: string }>;
   created_at: string;
   updated_at: string;
 }

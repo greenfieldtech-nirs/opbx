@@ -113,6 +113,7 @@ export interface User {
   postal_code?: string | null;
   country?: string | null;
   extension?: Extension | null;
+  social_identities?: Array<{ provider: string; provider_email?: string }>;
   created_at: string;
   updated_at: string;
 }
