@@ -217,6 +217,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
             Route::post('/refresh', [AuthController::class, 'refresh'])->name('auth.refresh');
             Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
+
+            Route::post('/auth0/link', [Auth0Controller::class, 'initiateLink'])->name('auth.auth0.link');
+            Route::post('/auth0/unlink', [Auth0Controller::class, 'unlink'])->name('auth.auth0.unlink');
         });
     });
 

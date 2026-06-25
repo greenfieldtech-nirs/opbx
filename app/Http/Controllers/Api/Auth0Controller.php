@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth0\LinkRequest;
 use App\Http\Requests\Auth0\RedirectRequest;
 use App\Models\User;
 use App\Services\Auth0\Auth0AccountResolver;
@@ -78,6 +79,10 @@ class Auth0Controller extends Controller
             ], Response::HTTP_BAD_REQUEST);
         }
 
+        if (($profile['intent'] ?? '') === 'link' && ($profile['user_id'] ?? null) !== null) {
+            return $this->handleLink($profile);
+        }
+
         $resolver = app(Auth0AccountResolver::class);
         $resolution = $resolver->resolve($profile);
 
@@ -98,6 +103,55 @@ class Auth0Controller extends Controller
                 'error' => ['code' => 'AUTH0_RESOLUTION_FAILED', 'message' => 'Unable to process Auth0 login.'],
             ], Response::HTTP_INTERNAL_SERVER_ERROR),
         };
+    }
+
+    public function initiateLink(LinkRequest $request): JsonResponse
+    {
+        $config = Auth0Config::fromConfig();
+
+        if (! $config->isEnabled()) {
+            return response()->json([
+                'error' => ['code' => 'AUTH0_NOT_CONFIGURED', 'message' => 'Auth0 is not enabled.'],
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $result = $this->auth0Service->buildAuthorizeUrl(
+            $request->input('provider'),
+            'link',
+            $request->user()->id
+        );
+
+        return response()->json([
+            'redirect_url' => $result['url'],
+            'state' => $result['state'],
+        ]);
+    }
+
+    public function unlink(LinkRequest $request): JsonResponse
+    {
+        $request->user()->socialIdentities()
+            ->where('provider', $request->input('provider'))
+            ->delete();
+
+        return response()->json(['message' => 'Identity unlinked.']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $profile
+     */
+    private function handleLink(array $profile): JsonResponse
+    {
+        $user = User::find($profile['user_id']);
+
+        if ($user === null || $user->email !== $profile['email']) {
+            return response()->json([
+                'error' => ['code' => 'AUTH0_LINK_EMAIL_MISMATCH', 'message' => 'Auth0 email does not match your account email.'],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        app(Auth0AccountResolver::class)->linkIdentity($user, $profile);
+
+        return response()->json(['message' => 'Identity linked successfully.']);
     }
 
     /**

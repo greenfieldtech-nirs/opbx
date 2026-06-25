@@ -7,8 +7,10 @@ namespace App\Models;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -79,6 +81,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the social identities linked to the user.
+     */
+    public function socialIdentities(): HasMany
+    {
+        return $this->hasMany(UserSocialIdentity::class);
+    }
+
+    /**
      * Get the extension associated with the user.
      */
     public function extension(): HasOne
@@ -145,7 +155,7 @@ class User extends Authenticatable
     /**
      * Get the platform audit logs for this user (as platform manager).
      */
-    public function platformAuditLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function platformAuditLogs(): HasMany
     {
         return $this->hasMany(PlatformAuditLog::class, 'platform_manager_user_id');
     }
@@ -162,8 +172,8 @@ class User extends Authenticatable
     /**
      * Scope query to users in a specific organization.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @return Builder
      */
     public function scopeForOrganization($query, int|string $organizationId)
     {
@@ -173,8 +183,8 @@ class User extends Authenticatable
     /**
      * Scope query to users with a specific role.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @return Builder
      */
     public function scopeWithRole($query, UserRole $role)
     {
@@ -184,8 +194,8 @@ class User extends Authenticatable
     /**
      * Scope query to users with a specific status.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @return Builder
      */
     public function scopeWithStatus($query, UserStatus $status)
     {
@@ -195,8 +205,8 @@ class User extends Authenticatable
     /**
      * Scope query to search users by name or email.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @return Builder
      */
     public function scopeSearch($query, string $search)
     {
