@@ -11,6 +11,8 @@ import { OwnerRoute } from '@/components/Auth/OwnerRoute';
 import { PlatformManagerRoute } from '@/components/platform/PlatformManagerRoute';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
+import Auth0Callback from '@/pages/Auth0Callback';
+import Auth0Onboarding from '@/pages/Auth0Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import Home from '@/pages/Home';
 
@@ -72,6 +74,14 @@ export const router = createBrowserRouter([
   {
     path: '/ui/register',
     element: <Register />,
+  },
+  {
+    path: '/ui/auth/callback',
+    element: <Auth0Callback />,
+  },
+  {
+    path: '/ui/auth/onboarding',
+    element: <Auth0Onboarding />,
   },
   // Protected app routes (under /ui)
   {
