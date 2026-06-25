@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AiAssistantProviderController;
+use App\Http\Controllers\Api\Auth0Controller;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
@@ -199,6 +200,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/register', [RegisterController::class, 'register'])
             ->middleware('throttle:registration')
             ->name('auth.register');
+
+        Route::post('/auth0/redirect', [Auth0Controller::class, 'redirect'])
+            ->name('auth.auth0.redirect')
+            ->middleware('throttle:auth');
 
         Route::get('/register/validate', [RegisterController::class, 'validateRegistration'])
             ->name('auth.register.validate');

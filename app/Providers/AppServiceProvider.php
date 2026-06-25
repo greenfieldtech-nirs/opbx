@@ -43,6 +43,10 @@ use App\Policies\InboundBlacklistPolicy;
 use App\Policies\RecordingPolicy;
 use App\Policies\UserPolicy;
 use App\Scopes\OrganizationScope;
+use App\Services\Auth0\Auth0Config;
+use App\Services\Auth0\Auth0ProfileNormalizer;
+use App\Services\Auth0\Auth0Service;
+use App\Services\Auth0\Auth0StateStore;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\CallRouting\CallRoutingService;
 use App\Services\CallStateManager\CallStateManager;
@@ -127,6 +131,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(
             AutoDialerCloudonixService::class
         );
+
+        // Register Auth0 services
+        $this->app->singleton(Auth0Config::class, fn () => Auth0Config::fromConfig());
+        $this->app->singleton(Auth0Service::class, function ($app) {
+            return new Auth0Service(
+                $app->make(Auth0Config::class),
+                new Auth0StateStore,
+                new Auth0ProfileNormalizer,
+            );
+        });
 
         $this->app->singleton(
             PasswordGenerator::class
