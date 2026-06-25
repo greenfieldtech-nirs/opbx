@@ -118,7 +118,15 @@ class UserInvitationController extends Controller
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        $result = $this->auth0Service->buildAuthorizeUrl('google', 'invitation', $user->id);
+        $provider = $config->providers[0] ?? null;
+
+        if ($provider === null) {
+            return response()->json([
+                'error' => ['code' => 'AUTH0_NOT_CONFIGURED', 'message' => 'No Auth0 provider configured.'],
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $result = $this->auth0Service->buildAuthorizeUrl($provider->value, 'invitation', $user->id, $user->email);
 
         return response()->json([
             'redirect_url' => $result['url'],
