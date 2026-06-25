@@ -45,7 +45,7 @@ export interface APIError {
 }
 
 // Common Status
-export type Status = 'active' | 'inactive';
+export type Status = 'active' | 'inactive' | 'pending';
 
 // User Roles
 export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';

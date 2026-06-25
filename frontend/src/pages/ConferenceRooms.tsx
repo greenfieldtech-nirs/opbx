@@ -90,7 +90,7 @@ type RoomFormData = {
   name: string;
   description: string;
   max_participants: string;
-  status: 'active' | 'inactive';
+  status: Status;
   pin: string;
   pin_required: boolean;
   host_pin: string;

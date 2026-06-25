@@ -25,7 +25,7 @@ const userSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
   role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter'] as const),
-  status: z.enum(['active', 'inactive', 'suspended'] as const),
+  status: z.enum(['active', 'inactive', 'suspended', 'pending'] as const),
   extension_number: z.string().optional(),
 });
 
@@ -172,6 +172,7 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
           <SelectContent>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
           </SelectContent>
         </Select>
         {errors.status && (

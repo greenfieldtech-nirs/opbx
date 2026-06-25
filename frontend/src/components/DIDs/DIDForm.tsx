@@ -23,7 +23,7 @@ import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService } from '@/services/createResourceService';
 import { businessHoursService } from '@/services/businessHours.service';
 import { ivrMenusService } from '@/services/createResourceService';
-import type { DIDNumber, CreateDIDRequest, UpdateDIDRequest, RoutingType } from '@/types/api.types';
+import type { DIDNumber, CreateDIDRequest, UpdateDIDRequest, RoutingType, Status } from '@/types/api.types';
 
 // Validation schema
 const didSchema = z.object({
@@ -39,7 +39,7 @@ const didSchema = z.object({
     ivr_menu_id: z.string().optional(),
     ai_load_balancer_id: z.string().optional(),
   }),
-  status: z.enum(['active', 'inactive'] as const),
+  status: z.enum(['active', 'inactive', 'pending'] as const),
 });
 
 type DIDFormData = z.infer<typeof didSchema>;
