@@ -19,6 +19,7 @@
 | `app/Models/User.php` | `isPending()` helper; allow nullable password |
 | `config/services.php` | Invitation config keys |
 | `.env.example` | New env variables |
+| `database/migrations/2026_06_25_000001_make_users_password_nullable.php` | Make `password` nullable for pending users |
 | `app/Services/UserInvitation/UserInvitationService.php` | Token creation/validation/consumption; email dispatch |
 | `app/Http/Requests/User/InviteUserRequest.php` | Email validation |
 | `app/Http/Controllers/Api/UserInvitationController.php` | Invite, validate, accept endpoints |
@@ -240,6 +241,58 @@ OPBX_INVITE_RATE_LIMIT_PER_HOUR=10
 ```bash
 git add config/services.php .env.example
 git commit -m "feat(invite): add invitation config"
+```
+
+---
+
+## Task 2.5: Make `users.password` nullable
+
+**Files:**
+- Create: `database/migrations/2026_06_25_000001_make_users_password_nullable.php`
+
+- [ ] **Step 1: Create migration**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('password')->nullable()->change();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            \DB::table('users')->whereNull('password')->update(['password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32))]);
+            $table->string('password')->nullable(false)->change();
+        });
+    }
+};
+```
+
+- [ ] **Step 2: Run migration**
+
+```bash
+docker compose exec app php artisan migrate
+```
+
+Expected: success.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add database/migrations/2026_06_25_000001_make_users_password_nullable.php
+git commit -m "feat(invite): make users.password nullable for pending users"
 ```
 
 ---

@@ -32,7 +32,7 @@ Existing enum cases:
 - `active`
 - `inactive`
 
-The `password` column may be `NULL` for pending users.
+The `password` column may be `NULL` for pending users. Add a migration to make `users.password` nullable.
 
 ### 3.2 Redis
 
