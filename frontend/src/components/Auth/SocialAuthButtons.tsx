@@ -31,24 +31,6 @@ const GoogleIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const FacebookIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
-      fill="#1877F2"
-    />
-  </svg>
-);
-
-const MicrosoftIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 21 21" aria-hidden="true">
-    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-  </svg>
-);
-
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
     <path
@@ -58,21 +40,9 @@ const GithubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const XIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-      fill="currentColor"
-    />
-  </svg>
-);
-
 const PROVIDERS = [
   { key: 'google', label: 'Google', icon: GoogleIcon, hoverClass: 'hover:bg-[#4285F4]/5 hover:border-[#4285F4]/30' },
-  { key: 'facebook', label: 'Facebook', icon: FacebookIcon, hoverClass: 'hover:bg-[#1877F2]/5 hover:border-[#1877F2]/30' },
-  { key: 'microsoft', label: 'Microsoft', icon: MicrosoftIcon, hoverClass: 'hover:bg-[#00a4ef]/5 hover:border-[#00a4ef]/30' },
   { key: 'github', label: 'GitHub', icon: GithubIcon, hoverClass: 'hover:bg-black/5 hover:border-black/20 dark:hover:bg-white/10' },
-  { key: 'x', label: 'X', icon: XIcon, hoverClass: 'hover:bg-black/5 hover:border-black/20 dark:hover:bg-white/10' },
 ];
 
 interface SocialAuthButtonsProps {
@@ -109,7 +79,7 @@ export function SocialAuthButtons({ intent }: SocialAuthButtonsProps) {
           </span>
         </div>
       </div>
-      <div className={cn('grid gap-3', enabledProviders.length > 3 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3')}>
+      <div className={cn('grid gap-3', enabledProviders.length > 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2')}>
         {enabledProviders.map((provider) => {
           const Icon = provider.icon;
           return (
