@@ -3,12 +3,14 @@ import { toast } from 'sonner';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { Plug } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/useAuth';
 import { useCallTrackingIntegrations, useUpdateCallTrackingIntegrations } from '@/hooks/useCallTrackingIntegrations';
 import type { AdPlatformIntegrationFormData } from '@/services/callTrackingIntegrationsApi';
 
@@ -83,6 +85,9 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export default function CallTrackingIntegrations() {
+  const { user } = useAuth();
+  const isReadOnly = ['reporter', 'pbx_user'].includes(user?.role || '');
+
   const { data, isLoading, isError, error } = useCallTrackingIntegrations();
   const updateMutation = useUpdateCallTrackingIntegrations();
 
@@ -115,20 +120,72 @@ export default function CallTrackingIntegrations() {
   };
 
   if (isLoading) {
-    return <p className="p-6 text-muted-foreground">Loading integrations...</p>;
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Plug className="h-8 w-8" />
+                Call Tracking Integrations
+              </h1>
+            </div>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">Loading integrations...</CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (isError) {
     return (
-      <div className="p-6">
-        <p className="text-red-600">Failed to load integrations: {(error as Error)?.message || 'Unknown error'}</p>
+      <div className="space-y-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Plug className="h-8 w-8" />
+                Call Tracking Integrations
+              </h1>
+            </div>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-red-600 mb-4">Failed to load integrations: {(error as Error)?.message || 'Unknown error'}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-bold">Call Tracking Integrations</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Plug className="h-8 w-8" />
+              Call Tracking Integrations
+            </h1>
+            {isReadOnly && (
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                Read-Only
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground mt-1">Configure Google Ads and Meta Conversions API uploads</p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground">Call Tracking Integrations</span>
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>

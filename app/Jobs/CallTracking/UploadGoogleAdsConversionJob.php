@@ -46,8 +46,19 @@ class UploadGoogleAdsConversionJob implements ShouldQueue
             'conversion_action_resource_name' => $integration->google_ads_conversion_action_resource_name,
         ];
 
+        $url = sprintf(
+            'https://googleads.googleapis.com/v16/customers/%s:uploadCallConversions',
+            str_replace('-', '', (string) $integration->google_ads_customer_id)
+        );
+
+        $requestPayload = [];
+        $requestHeaders = [];
+
         try {
             $result = $service->uploadCallConversion($session, $config);
+
+            $requestHeaders = $result['request_headers'] ?? [];
+            $requestPayload = $result['request_payload'] ?? [];
 
             CallTrackingNotificationLog::create([
                 'organization_id' => $session->organization_id,
@@ -55,19 +66,19 @@ class UploadGoogleAdsConversionJob implements ShouldQueue
                 'call_id' => $session->call_id,
                 'event_id' => 'ct_ad_google_'.uniqid(),
                 'event_type' => 'ad_platform.google_ads',
-                'webhook_url' => 'google-ads-api',
-                'request_payload' => [],
-                'request_headers' => [],
-                'response_body' => json_encode($result),
+                'webhook_url' => $url,
+                'request_payload' => $requestPayload,
+                'request_headers' => $this->sanitizeHeaders($requestHeaders),
+                'response_body' => json_encode($result['response_body'] ?? []),
                 'response_headers' => [],
-                'response_status_code' => 200,
+                'response_status_code' => $result['response_status'] ?? 200,
                 'response_time_ms' => 0,
                 'is_success' => true,
                 'attempt_number' => 1,
                 'error_message' => null,
             ]);
 
-            Log::info('Call tracking Google Ads upload queued', [
+            Log::info('Call tracking Google Ads upload succeeded', [
                 'session_id' => $session->id,
                 'campaign_id' => $session->call_tracking_campaign_id,
             ]);
@@ -78,9 +89,9 @@ class UploadGoogleAdsConversionJob implements ShouldQueue
                 'call_id' => $session->call_id,
                 'event_id' => 'ct_ad_google_'.uniqid(),
                 'event_type' => 'ad_platform.google_ads',
-                'webhook_url' => 'google-ads-api',
-                'request_payload' => [],
-                'request_headers' => [],
+                'webhook_url' => $url,
+                'request_payload' => $requestPayload ?? [],
+                'request_headers' => $this->sanitizeHeaders($requestHeaders ?? []),
                 'response_body' => null,
                 'response_headers' => [],
                 'response_status_code' => null,
@@ -95,5 +106,22 @@ class UploadGoogleAdsConversionJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @return array<string, string>
+     */
+    private function sanitizeHeaders(array $headers): array
+    {
+        $sensitive = ['Authorization', 'developer-token'];
+
+        foreach ($sensitive as $key) {
+            if (isset($headers[$key])) {
+                $headers[$key] = '***REDACTED***';
+            }
+        }
+
+        return $headers;
     }
 }

@@ -4,7 +4,7 @@ import path from 'path'
 
 // Parse allowed hosts from environment variable (comma-separated)
 const parseAllowedHosts = (): string[] => {
-  const defaultHosts = ['opbx_frontend', 'localhost', '.localhost']
+  const defaultHosts = ['opbx_frontend', 'localhost', '.localhost', 'opbx.ngrok.io']
   const envHosts = process.env.VITE_ALLOWED_HOSTS
   
   if (!envHosts) {

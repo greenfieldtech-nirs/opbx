@@ -229,10 +229,10 @@ class CallTrackingAnalyticsServiceTest extends TestCase
         ]);
 
         $this->assertCount(2, $series);
-        $this->assertSame('2026-23', $series[0]['date_key']);
+        $this->assertSame('2026-24', $series[0]['date_key']);
         $this->assertSame(1, $series[0]['calls']);
         $this->assertSame(1, $series[0]['conversions']);
-        $this->assertSame('2026-24', $series[1]['date_key']);
+        $this->assertSame('2026-25', $series[1]['date_key']);
         $this->assertSame(2, $series[1]['calls']);
         $this->assertSame(0, $series[1]['conversions']);
     }

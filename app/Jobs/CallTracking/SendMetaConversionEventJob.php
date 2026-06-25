@@ -44,8 +44,16 @@ class SendMetaConversionEventJob implements ShouldQueue
             'access_token' => $integration->meta_access_token,
         ];
 
+        $url = sprintf('https://graph.facebook.com/v18.0/%s/events', $integration->meta_pixel_id);
+
+        $requestPayload = [];
+        $requestHeaders = [];
+
         try {
             $result = $service->sendOfflineEvent($session, $config);
+
+            $requestHeaders = $result['request_headers'] ?? [];
+            $requestPayload = $result['request_payload'] ?? [];
 
             CallTrackingNotificationLog::create([
                 'organization_id' => $session->organization_id,
@@ -53,19 +61,19 @@ class SendMetaConversionEventJob implements ShouldQueue
                 'call_id' => $session->call_id,
                 'event_id' => 'ct_ad_meta_'.uniqid(),
                 'event_type' => 'ad_platform.meta',
-                'webhook_url' => 'meta-conversions-api',
-                'request_payload' => [],
-                'request_headers' => [],
-                'response_body' => json_encode($result),
+                'webhook_url' => $url,
+                'request_payload' => $requestPayload,
+                'request_headers' => $this->sanitizeHeaders($requestHeaders),
+                'response_body' => json_encode($result['response_body'] ?? []),
                 'response_headers' => [],
-                'response_status_code' => 200,
+                'response_status_code' => $result['response_status'] ?? 200,
                 'response_time_ms' => 0,
                 'is_success' => true,
                 'attempt_number' => 1,
                 'error_message' => null,
             ]);
 
-            Log::info('Call tracking Meta upload queued', [
+            Log::info('Call tracking Meta upload succeeded', [
                 'session_id' => $session->id,
                 'campaign_id' => $session->call_tracking_campaign_id,
             ]);
@@ -76,9 +84,9 @@ class SendMetaConversionEventJob implements ShouldQueue
                 'call_id' => $session->call_id,
                 'event_id' => 'ct_ad_meta_'.uniqid(),
                 'event_type' => 'ad_platform.meta',
-                'webhook_url' => 'meta-conversions-api',
-                'request_payload' => [],
-                'request_headers' => [],
+                'webhook_url' => $url,
+                'request_payload' => $requestPayload,
+                'request_headers' => $this->sanitizeHeaders($requestHeaders),
                 'response_body' => null,
                 'response_headers' => [],
                 'response_status_code' => null,
@@ -93,5 +101,18 @@ class SendMetaConversionEventJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @return array<string, string>
+     */
+    private function sanitizeHeaders(array $headers): array
+    {
+        if (isset($headers['Authorization'])) {
+            $headers['Authorization'] = '***REDACTED***';
+        }
+
+        return $headers;
     }
 }

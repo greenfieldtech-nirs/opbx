@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Edit, Plus, Trash2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Edit, Plus, Trash2, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -28,6 +28,7 @@ export default function CallTrackingCampaignDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const isReadOnly = ['reporter', 'pbx_user'].includes(user?.role || '');
   const [campaignToDelete, setCampaignToDelete] = useState(false);
 
   const { data: campaign, isLoading: campaignLoading, isError, error } = useCallTrackingCampaign(id);
@@ -51,41 +52,124 @@ export default function CallTrackingCampaignDetail() {
   };
 
   if (campaignLoading) {
-    return <p className="p-6 text-muted-foreground">Loading campaign...</p>;
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/ui/call-tracking/campaigns')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Target className="h-8 w-8" />
+            Campaign Details
+          </h1>
+        </div>
+        <p className="text-muted-foreground">Loading campaign...</p>
+      </div>
+    );
   }
 
   if (isError) {
     return (
-      <div className="p-6">
-        <p className="text-red-600">Failed to load campaign: {(error as Error)?.message || 'Unknown error'}</p>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/ui/call-tracking/campaigns')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Target className="h-8 w-8" />
+            Campaign Details
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-red-600 mb-4">Failed to load campaign: {(error as Error)?.message || 'Unknown error'}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (!campaign) {
-    return <p className="p-6 text-muted-foreground">Campaign not found.</p>;
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/ui/call-tracking/campaigns')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Target className="h-8 w-8" />
+            Campaign Details
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">Campaign not found.</CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigate('/ui/call-tracking/campaigns')}>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/ui/call-tracking/campaigns')}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{campaign.name}</h1>
-            <p className="text-sm text-muted-foreground">Source: {campaign.source || '—'} · Medium: {campaign.medium || '—'}</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Target className="h-8 w-8" />
+                {campaign.name}
+              </h1>
+              {isReadOnly && (
+                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                  Read-Only
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground mt-1">
+              Source: {campaign.source || '—'} · Medium: {campaign.medium || '—'}
+            </p>
+            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+              <span>Dashboard</span>
+              <span>/</span>
+              <span className="text-foreground">{campaign.name}</span>
+            </div>
           </div>
         </div>
         <div className="flex gap-2">
           {canManage && (
             <>
-              <Button variant="outline" onClick={() => navigate(`/ui/call-tracking/campaigns/${id}/edit`)}>
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/ui/call-tracking/campaigns/${id}/edit`)}
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-              <Button variant="destructive" onClick={() => setCampaignToDelete(true)} disabled={deleteMutation.isPending}>
+              <Button
+                variant="destructive"
+                onClick={() => setCampaignToDelete(true)}
+                disabled={deleteMutation.isPending}
+              >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </Button>
@@ -95,7 +179,12 @@ export default function CallTrackingCampaignDetail() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'}>{campaign.status}</Badge>
+        <Badge
+          variant={campaign.status === 'active' ? 'default' : 'secondary'}
+          className={campaign.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
+        >
+          {campaign.status}
+        </Badge>
         <Badge variant="outline">Destination: {campaign.destination_type}</Badge>
         {campaign.google_ads_upload_enabled && <Badge variant="outline">Google Ads</Badge>}
         {campaign.meta_upload_enabled && <Badge variant="outline">Meta</Badge>}
@@ -109,36 +198,57 @@ export default function CallTrackingCampaignDetail() {
         </TabsList>
 
         <TabsContent value="numbers" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Tracking Numbers</h2>
-            {canManage && (
-              <Button onClick={() => navigate(`/ui/call-tracking/campaigns/${id}/numbers/new`)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Number
-              </Button>
-            )}
-          </div>
-          <CallTrackingNumbersList numbers={numbers ?? []} isLoading={numbersLoading} campaignId={id!} canManage={canManage} />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Tracking Numbers</CardTitle>
+              {canManage && (
+                <Button onClick={() => navigate(`/ui/call-tracking/campaigns/${id}/numbers/new`)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Number
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              <CallTrackingNumbersList
+                numbers={numbers ?? []}
+                isLoading={numbersLoading}
+                campaignId={id!}
+                canManage={canManage}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-4">
-          <h2 className="text-lg font-semibold">Notification Settings</h2>
-          {settingsLoading ? (
-            <p className="text-muted-foreground">Loading settings...</p>
-          ) : (
-            <CallTrackingNotificationSettingsForm
-              settings={notificationSettings}
-              onSubmit={(data) => updateSettingsMutation.mutate({ campaignId: id!, data })}
-              isSubmitting={updateSettingsMutation.isPending}
-              onTest={(eventType) => testNotificationMutation.mutate({ campaignId: id!, eventType })}
-              isTesting={testNotificationMutation.isPending}
-            />
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {settingsLoading ? (
+                <p className="text-muted-foreground">Loading settings...</p>
+              ) : (
+                <CallTrackingNotificationSettingsForm
+                  settings={notificationSettings}
+                  onSubmit={(data) => updateSettingsMutation.mutate({ campaignId: id!, data })}
+                  isSubmitting={updateSettingsMutation.isPending}
+                  onTest={(eventType) => testNotificationMutation.mutate({ campaignId: id!, eventType })}
+                  isTesting={testNotificationMutation.isPending}
+                />
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
-          <h2 className="text-lg font-semibold">Notification Logs</h2>
-          <CallTrackingNotificationLogsTable logs={logs?.data ?? []} isLoading={logsLoading} />
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Logs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CallTrackingNotificationLogsTable logs={logs?.data ?? []} isLoading={logsLoading} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

@@ -231,7 +231,9 @@ class CallTrackingAnalyticsService
     private function dateGroupColumn(string $groupBy, string $driver): string
     {
         return match ($groupBy) {
-            'week' => $driver === 'sqlite' ? "strftime('%Y-%W', started_at)" : "DATE_FORMAT(started_at, '%Y-%u')",
+            'week' => $driver === 'sqlite'
+                ? "strftime('%Y-', started_at, 'weekday 4') || printf('%02d', (cast(strftime('%j', started_at, 'weekday 4') as integer) - 1) / 7 + 1)"
+                : "DATE_FORMAT(started_at, '%x-%v')",
             'month' => $driver === 'sqlite' ? "strftime('%Y-%m', started_at)" : "DATE_FORMAT(started_at, '%Y-%m')",
             default => $driver === 'sqlite' ? "strftime('%Y-%m-%d', started_at)" : "DATE_FORMAT(started_at, '%Y-%m-%d')",
         };

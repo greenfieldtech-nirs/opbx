@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { Target, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   useCallTrackingCampaign,
   useCreateCallTrackingCampaign,
@@ -138,15 +139,45 @@ export default function CallTrackingCampaignForm() {
   }
 
   if (isEdit && isLoading) {
-    return <p className="p-6 text-muted-foreground">Loading campaign...</p>;
+    return (
+      <div className="space-y-6">
+        <p className="text-muted-foreground">Loading campaign...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">{isEdit ? 'Edit Campaign' : 'New Campaign'}</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate('/ui/call-tracking/campaigns')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold flex items-center gap-2">
+                  <Target className="h-8 w-8" />
+                  {isEdit ? 'Edit Campaign' : 'New Campaign'}
+                </h1>
+              </div>
+              <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                <span>Dashboard</span>
+                <span>/</span>
+                <span className="text-foreground">{isEdit ? 'Edit Campaign' : 'New Campaign'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="h-full">
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
@@ -257,7 +288,7 @@ export default function CallTrackingCampaignForm() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <Card>
             <CardHeader>
               <CardTitle>Ad-Platform Uploads</CardTitle>
@@ -354,14 +385,14 @@ export default function CallTrackingCampaignForm() {
         </div>
 
         <div className="flex gap-2">
-      <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-        {isEdit ? 'Update Campaign' : 'Create Campaign'}
-      </Button>
-      <Button type="button" variant="outline" onClick={() => navigate('/ui/call-tracking/campaigns')}>
-        Cancel
-      </Button>
+          <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            {isEdit ? 'Update Campaign' : 'Create Campaign'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/ui/call-tracking/campaigns')}>
+            Cancel
+          </Button>
+        </div>
+      </form>
     </div>
-  </form>
-</div>
   );
 }
