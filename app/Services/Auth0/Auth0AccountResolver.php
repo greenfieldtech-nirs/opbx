@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\UserSocialIdentity;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -130,19 +131,30 @@ class Auth0AccountResolver
             throw new \RuntimeException('Email does not match invitation.');
         }
 
-        $pendingUser->status = UserStatus::ACTIVE;
-        $pendingUser->name = $profile['name'] ?: $pendingUser->name;
-        $pendingUser->save();
+        return DB::transaction(function () use ($pendingUser, $profile) {
+            $existingIdentity = UserSocialIdentity::withoutGlobalScope(OrganizationScope::class)
+                ->where('provider', $profile['provider'])
+                ->where('provider_subject', $profile['subject'])
+                ->first();
 
-        UserSocialIdentity::create([
-            'user_id' => $pendingUser->id,
-            'provider' => $profile['provider'],
-            'provider_subject' => $profile['subject'],
-            'provider_email' => $profile['email'],
-            'provider_data' => $profile['raw'] ?? [],
-        ]);
+            if ($existingIdentity !== null) {
+                throw new \RuntimeException('This Auth0 account is already linked to another user.');
+            }
 
-        return $pendingUser;
+            $pendingUser->status = UserStatus::ACTIVE;
+            $pendingUser->name = $profile['name'] ?: $pendingUser->name;
+            $pendingUser->save();
+
+            UserSocialIdentity::create([
+                'user_id' => $pendingUser->id,
+                'provider' => $profile['provider'],
+                'provider_subject' => $profile['subject'],
+                'provider_email' => $profile['email'],
+                'provider_data' => $profile['raw'] ?? [],
+            ]);
+
+            return $pendingUser;
+        });
     }
 
     private function generateSlug(string $email): string
