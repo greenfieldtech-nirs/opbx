@@ -257,4 +257,12 @@ class User extends Authenticatable
     {
         return $this->status === UserStatus::ACTIVE;
     }
+
+    /**
+     * Check if the user account is pending invitation acceptance.
+     */
+    public function isPending(): bool
+    {
+        return $this->status === UserStatus::PENDING;
+    }
 }
