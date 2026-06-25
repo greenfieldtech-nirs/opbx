@@ -189,6 +189,12 @@ Route::prefix('v1')->group(function (): void {
         ->middleware(['throttle:call-tracking-dni'])
         ->name('call-tracking.dni.swap');
 
+    // Application configuration (public)
+    // Required by the login/register pages before authentication to decide whether
+    // to show Auth0 social-provider buttons, reCAPTCHA, etc.
+    Route::get('config/application', [ConfigurationController::class, 'index'])
+        ->name('config.application');
+
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
@@ -242,10 +248,6 @@ Route::prefix('v1')->group(function (): void {
 
     // Protected API routes
     Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
-        // Application configuration (public to authenticated users)
-        Route::get('config/application', [ConfigurationController::class, 'index'])
-            ->name('config.application');
-
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
