@@ -55,6 +55,38 @@ export default function Auth0Callback() {
             return;
           }
 
+          if (code === 'INVITE_EMAIL_MISMATCH') {
+            toast.error('Invitation email mismatch', {
+              description: 'The email address from your social account does not match the invited email.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
+          if (code === 'AUTH0_EMAIL_UNVERIFIED') {
+            toast.error('Email not verified', {
+              description: 'Please verify your email with your social provider before continuing.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
+          if (code === 'INVITE_INVALID_USER') {
+            toast.error('Invalid invitation', {
+              description: 'This invitation is not valid for the selected account.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
+          if (code === 'INVITE_EXPIRED_OR_INVALID') {
+            toast.error('Invitation expired', {
+              description: 'This invitation has expired or is no longer valid.',
+            });
+            navigate('/ui/login');
+            return;
+          }
+
           toast.error(data.error.message);
           navigate('/ui/login');
           return;

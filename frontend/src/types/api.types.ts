@@ -73,7 +73,7 @@ export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
 
 // Ring Group Status
-export type RingGroupStatus = 'active' | 'inactive';
+export type RingGroupStatus = Status;
 
 // Routing Type
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
@@ -223,7 +223,7 @@ export interface DIDNumber {
     region?: string;
     carrier?: string;
   };
-  status: 'active' | 'inactive';
+  status: Status;
   extension?: Extension;
   ring_group?: RingGroup;
   business_hours_schedule?: BusinessHours;
@@ -265,7 +265,7 @@ export interface CreateDIDRequest {
     ivr_menu_id?: string;
     ai_load_balancer_id?: string;
   };
-  status?: 'active' | 'inactive';
+  status?: Status;
   enable_non_e164?: boolean;
 }
 
@@ -278,7 +278,7 @@ export interface UpdateDIDRequest {
     business_hours_schedule_id?: string;
     conference_room_id?: string;
   };
-  status?: 'active' | 'inactive';
+  status?: Status;
 }
 
 // ============================================================================
@@ -744,7 +744,7 @@ export interface UpdateSentrySettingsRequest {
 }
 
 // User Status
-export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type UserStatus = 'active' | 'inactive' | 'pending' | 'suspended';
 
 // ============================================================================
 // Registration
@@ -788,7 +788,7 @@ export interface RegisterValidationResponse {
     admin_email?: string[];
   };
 }
-export type ExtensionStatus = 'active' | 'inactive';
+export type ExtensionStatus = Status;
 
 // ============================================================================
 // Recordings

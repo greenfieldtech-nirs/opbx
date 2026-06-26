@@ -17,7 +17,7 @@ class Auth0Service
         private readonly Auth0ProfileNormalizer $normalizer,
     ) {}
 
-    public function buildAuthorizeUrl(string $provider, string $intent, ?int $userId = null): array
+    public function buildAuthorizeUrl(string $provider, string $intent, ?int $userId = null, ?string $email = null): array
     {
         $socialProvider = SocialIdentityProvider::tryFrom($provider);
 
@@ -28,7 +28,7 @@ class Auth0Service
         $state = $this->stateStore->create($provider, $intent, $userId);
         $codeChallenge = $this->base64UrlEncode(hash('sha256', $state->codeVerifier, true));
 
-        $url = $this->config->getAuthorizeUrl().'?'.http_build_query([
+        $query = [
             'response_type' => 'code',
             'client_id' => $this->config->clientId,
             'redirect_uri' => $this->config->redirectUri,
@@ -37,7 +37,13 @@ class Auth0Service
             'code_challenge' => $codeChallenge,
             'code_challenge_method' => 'S256',
             'connection' => $socialProvider->auth0Connection(),
-        ]);
+        ];
+
+        if ($email !== null && $email !== '') {
+            $query['login_hint'] = $email;
+        }
+
+        $url = $this->config->getAuthorizeUrl().'?'.http_build_query($query);
 
         return ['url' => $url, 'state' => $state->state];
     }

@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
@@ -266,6 +267,8 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('users', UsersController::class);
         Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
             ->name('users.password.update');
+        Route::post('users/invite', [UserInvitationController::class, 'invite'])
+            ->name('users.invite');
 
         // Extensions - Cloudonix sync (using ExtensionCloudonixController)
         // Must be defined BEFORE apiResource to avoid wildcard matching issues
@@ -407,6 +410,12 @@ Route::prefix('v1')->group(function (): void {
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
         });
 
+    });
+
+    // User invitations (public token-authenticated endpoints)
+    Route::prefix('users/invite')->middleware('throttle:auth')->group(function (): void {
+        Route::get('validate', [UserInvitationController::class, 'validateToken'])->name('users.invite.validate');
+        Route::post('accept', [UserInvitationController::class, 'accept'])->name('users.invite.accept');
     });
 
     // Session Updates - NOT rate limited (real-time polling endpoints)

@@ -66,10 +66,11 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Don't redirect if user is on public pages (homepage, register)
-      const isPublicPage = window.location.pathname === '/' || 
+      // Don't redirect if user is on public pages (homepage, register, invite)
+      const isPublicPage = window.location.pathname === '/' ||
                           window.location.pathname === '/ui/register' ||
-                          window.location.pathname === '/ui/login';
+                          window.location.pathname === '/ui/login' ||
+                          window.location.pathname === '/ui/invite';
       
       if (isPublicPage) {
         console.log('[API] 401 on public page, not redirecting');
@@ -101,6 +102,20 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+/**
+ * Public API client (no auth interceptor)
+ *
+ * Used for unauthenticated endpoints such as invitation validation/acceptance.
+ */
+export const publicApi: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+  timeout: 30000,
+});
 
 /**
  * API Error Handler
