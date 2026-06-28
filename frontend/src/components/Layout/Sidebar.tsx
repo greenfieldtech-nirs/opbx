@@ -30,6 +30,7 @@ interface SidebarSection {
   icon: string;
   items: NavItem[];
   accentColor?: 'default' | 'amber';
+  roles?: string[];
 }
 
 // Sidebar state storage keys
@@ -75,6 +76,7 @@ const sidebarSections: SidebarSection[] = [
     title: 'Apps and Security',
     icon: 'codicon-shield',
     accentColor: 'default',
+    roles: ['owner', 'pbx_admin', 'reporter'],
     items: [
       { name: 'Auto Dialer', href: '', icon: '', isHeader: true },
       { name: 'Campaign Manager', href: '/ui/auto-dialer/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin'] },
@@ -303,6 +305,11 @@ export function Sidebar() {
           <div className="flex-1 py-3 space-y-2">
             {sidebarSections.map(section => {
               const isSelected = selectedSectionId === section.id;
+
+              if (section.roles && (!user?.role || !section.roles.includes(user.role))) {
+                return null;
+              }
+
               const visibleNavigableItems = getVisibleItems(section.items).filter(item => !item.isHeader);
 
               if (visibleNavigableItems.length === 0) return null;
