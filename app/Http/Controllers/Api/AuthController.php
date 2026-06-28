@@ -207,15 +207,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'Login successful',
-                'user' => [
-                    'id' => $user->id,
-                    'organization_id' => $user->organization_id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role->value,
-                    'status' => $user->status,
-                    'is_platform_manager' => $user->is_platform_manager,
-                ],
+                'user' => $this->formatUserResponse($user),
             ]);
         }
 
@@ -236,15 +228,7 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type' => 'Bearer',
             'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
-            'user' => [
-                'id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role->value,
-                'status' => $user->status,
-                'is_platform_manager' => $user->is_platform_manager,
-            ],
+            'user' => $this->formatUserResponse($user),
         ]);
     }
 
@@ -412,22 +396,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'organization_id' => $user->organization_id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role->value,
-                'status' => $user->status,
-                'is_platform_manager' => $user->is_platform_manager,
-                'organization' => [
-                    'id' => $user->organization->id,
-                    'name' => $user->organization->name,
-                    'slug' => $user->organization->slug,
-                    'status' => $user->organization->status,
-                    'timezone' => $user->organization->timezone,
-                ],
-            ],
+            'user' => $this->formatUserResponse($user, true),
         ]);
     }
 
@@ -468,14 +437,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'Session refreshed successfully',
-                'user' => [
-                    'id' => $user->id,
-                    'organization_id' => $user->organization_id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role->value,
-                    'status' => $user->status,
-                ],
+                'user' => $this->formatUserResponse($user),
             ]);
         }
 
@@ -502,5 +464,41 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
         ]);
+    }
+
+    /**
+     * Format user data for API responses.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatUserResponse(User $user, bool $includeOrganization = false): array
+    {
+        $user->loadMissing('socialIdentities');
+
+        $data = [
+            'id' => $user->id,
+            'organization_id' => $user->organization_id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role->value,
+            'status' => $user->status->value,
+            'is_platform_manager' => $user->is_platform_manager,
+            'social_identities' => $user->socialIdentities->map(fn ($identity) => [
+                'provider' => $identity->provider->value,
+                'provider_email' => $identity->provider_email,
+            ])->all(),
+        ];
+
+        if ($includeOrganization && $user->organization) {
+            $data['organization'] = [
+                'id' => $user->organization->id,
+                'name' => $user->organization->name,
+                'slug' => $user->organization->slug,
+                'status' => $user->organization->status,
+                'timezone' => $user->organization->timezone,
+            ];
+        }
+
+        return $data;
     }
 }
