@@ -8,7 +8,10 @@ use App\Services\Email\Contracts\TransactionalEmailInterface;
 use App\Services\Email\DTOs\EmailMessage;
 use App\Services\Email\DTOs\EmailRecipient;
 use App\Services\Email\Exceptions\DriverException;
+use App\Services\Email\Exceptions\InvalidConfigurationException;
+use App\Services\Email\Jobs\SendTransactionalEmailJob;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Abstract Email Driver
@@ -36,8 +39,8 @@ abstract class AbstractEmailDriver implements TransactionalEmailInterface
      */
     public function sendAsync(EmailMessage $message): string
     {
-        $job = new \App\Services\Email\Jobs\SendTransactionalEmailJob($message, $this->getDriverName());
-        $jobId = (string) \Illuminate\Support\Str::uuid();
+        $job = new SendTransactionalEmailJob($message, $this->getDriverName());
+        $jobId = (string) Str::uuid();
 
         dispatch($job)->onQueue($this->config['queue'] ?? 'default');
 
@@ -96,13 +99,19 @@ abstract class AbstractEmailDriver implements TransactionalEmailInterface
     /**
      * Check if required configuration keys are present.
      *
-     * @throws \App\Services\Email\Exceptions\InvalidConfigurationException
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(array $keys): void
     {
         foreach ($keys as $key) {
             if (empty($this->config[$key])) {
-                throw new \App\Services\Email\Exceptions\InvalidConfigurationException(
+                Log::error('Email driver configuration missing required key', [
+                    'driver' => $this->getDriverName(),
+                    'missing_key' => $key,
+                    'available_keys' => array_keys($this->config),
+                ]);
+
+                throw new InvalidConfigurationException(
                     "Missing required configuration key: {$key}",
                     "transactional_email.providers.{$this->getDriverName()}.{$key}"
                 );

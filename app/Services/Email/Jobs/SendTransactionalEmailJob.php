@@ -48,21 +48,56 @@ class SendTransactionalEmailJob implements ShouldQueue
      */
     public function handle(TransactionalEmailInterface $emailService): void
     {
+        $to = $this->message->to[0]->email ?? 'unknown';
+
         Log::info('Processing queued email', [
             'correlation_id' => $this->message->correlationId,
-            'to' => $this->message->to[0]->email ?? 'unknown',
+            'to' => $to,
+            'subject' => $this->message->subject,
+            'driver' => $this->config['driver'] ?? 'unknown',
+            'provider' => $this->config['provider'] ?? 'unknown',
+            'queue' => $this->config['queue'] ?? 'default',
+            'attempt' => $this->attempts(),
         ]);
 
-        $result = $emailService->send($this->message);
+        try {
+            $result = $emailService->send($this->message);
 
-        if (! $result->success) {
-            throw new EmailException('Failed to send email');
+            if (! $result->success) {
+                throw new EmailException('Failed to send email: provider returned non-success result');
+            }
+
+            Log::info('Queued email sent successfully', [
+                'correlation_id' => $this->message->correlationId,
+                'to' => $to,
+                'message_id' => $result->messageId,
+            ]);
+        } catch (\Throwable $e) {
+            $configForLog = $this->config;
+            if (isset($configForLog['providers'])) {
+                foreach ($configForLog['providers'] as $providerName => $providerConfig) {
+                    foreach (['secret', 'key', 'api_key', 'apiKey'] as $secretKey) {
+                        if (! empty($providerConfig[$secretKey])) {
+                            $configForLog['providers'][$providerName][$secretKey] = '***REDACTED***';
+                        }
+                    }
+                }
+            }
+
+            Log::error('Queued email send failed', [
+                'correlation_id' => $this->message->correlationId,
+                'to' => $to,
+                'subject' => $this->message->subject,
+                'error' => $e->getMessage(),
+                'error_class' => get_class($e),
+                'error_code' => $e->getCode(),
+                'attempt' => $this->attempts(),
+                'config' => $configForLog,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
         }
-
-        Log::info('Queued email sent successfully', [
-            'correlation_id' => $this->message->correlationId,
-            'message_id' => $result->messageId,
-        ]);
     }
 
     /**
