@@ -303,10 +303,9 @@ export function Sidebar() {
           <div className="flex-1 py-3 space-y-2">
             {sidebarSections.map(section => {
               const isSelected = selectedSectionId === section.id;
-              const hasAccess = section.items.some(item => !item.roles || item.isHeader) ||
-                section.items.some(item => item.roles?.includes(user?.role || ''));
+              const visibleItems = getVisibleItems(section.items);
 
-              if (!hasAccess) return null;
+              if (visibleItems.length === 0) return null;
 
               return (
                 <button
