@@ -30,9 +30,7 @@ readonly class EmailSendResult
         public ?string $errorMessage = null,
         public array $metadata = [],
         public ?Carbon $timestamp = null
-    ) {
-        $this->timestamp ??= Carbon::now();
-    }
+    ) {}
 
     /**
      * Create a successful result.
@@ -46,7 +44,8 @@ readonly class EmailSendResult
             success: true,
             providerUsed: $providerUsed,
             messageId: $messageId,
-            metadata: $metadata
+            metadata: $metadata,
+            timestamp: Carbon::now()
         );
     }
 
@@ -62,7 +61,8 @@ readonly class EmailSendResult
             success: false,
             providerUsed: $providerUsed,
             errorMessage: $errorMessage,
-            metadata: $metadata
+            metadata: $metadata,
+            timestamp: Carbon::now()
         );
     }
 
