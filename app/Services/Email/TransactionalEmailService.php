@@ -50,13 +50,24 @@ class TransactionalEmailService implements TransactionalEmailInterface
 
         try {
             $result = $this->driver->send($message);
+
+            Log::info('Transactional email send completed', [
+                'correlation_id' => $message->correlationId,
+                'driver' => $driverName,
+                'success' => $result->success,
+                'provider' => $result->providerUsed,
+                'message_id' => $result->messageId,
+                'metadata' => $result->metadata,
+            ]);
+
             $this->logSuccess($result, $message);
 
             return $result;
         } catch (\Exception $e) {
-            Log::error('Transactional email driver send failed', [
+            Log::error('Transactional email send failed', [
                 'correlation_id' => $message->correlationId,
                 'driver' => $driverName,
+                'success' => false,
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e),
             ]);

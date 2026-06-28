@@ -34,7 +34,7 @@ class MailerLiteDriver extends AbstractEmailDriver
      * ⚠️ Creates a campaign and sends it immediately. This is NOT ideal
      * for transactional emails but works as a workaround.
      *
-     * @throws \App\Services\Email\Exceptions\DriverException
+     * @throws DriverException
      */
     public function send(EmailMessage $message): EmailSendResult
     {
@@ -55,15 +55,24 @@ class MailerLiteDriver extends AbstractEmailDriver
             'subject' => $message->subject,
         ]);
 
+        $requestContext = [
+            'correlation_id' => $message->correlationId,
+            'to' => array_map(fn ($r) => $r->email, $message->to),
+            'subject' => $message->subject,
+        ];
+
         try {
             // Step 1: Create a campaign
+            $campaignUrl = 'https://connect.mailerlite.com/api/campaigns';
+            $this->logApiCall('POST', $campaignUrl, $requestContext);
+
             $campaignResponse = Http::withHeaders([
                 'Authorization' => 'Bearer '.$this->config['api_key'],
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
             ])
                 ->timeout(30)
-                ->post('https://connect.mailerlite.com/api/campaigns', [
+                ->post($campaignUrl, [
                     'type' => 'regular',
                     'name' => 'Transactional: '.$message->subject.' ('.uniqid().')',
                     'emails' => [
@@ -77,12 +86,16 @@ class MailerLiteDriver extends AbstractEmailDriver
                 ]);
 
             if ($campaignResponse->failed()) {
+                $this->logApiResponse($campaignResponse, $message->correlationId, true);
+
                 $error = $campaignResponse->json();
                 throw new \Exception(
                     $error['message'] ?? 'MailerLite campaign creation failed',
                     $campaignResponse->status()
                 );
             }
+
+            $this->logApiResponse($campaignResponse, $message->correlationId);
 
             $campaignData = $campaignResponse->json();
             $campaignId = $campaignData['data']['id'] ?? null;
@@ -92,17 +105,22 @@ class MailerLiteDriver extends AbstractEmailDriver
             }
 
             // Step 2: Schedule/send the campaign immediately
+            $sendUrl = "https://connect.mailerlite.com/api/campaigns/{$campaignId}/send";
+            $this->logApiCall('POST', $sendUrl, $requestContext);
+
             $sendResponse = Http::withHeaders([
                 'Authorization' => 'Bearer '.$this->config['api_key'],
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
             ])
                 ->timeout(30)
-                ->post("https://connect.mailerlite.com/api/campaigns/{$campaignId}/send", [
+                ->post($sendUrl, [
                     'delivery' => 'instant',
                 ]);
 
             if ($sendResponse->failed()) {
+                $this->logApiResponse($sendResponse, $message->correlationId, true);
+
                 // Try to cancel the campaign since we couldn't send it
                 $this->cancelCampaign($campaignId);
 
@@ -112,6 +130,8 @@ class MailerLiteDriver extends AbstractEmailDriver
                     $sendResponse->status()
                 );
             }
+
+            $this->logApiResponse($sendResponse, $message->correlationId);
 
             $this->logSend($message, 'sent', [
                 'campaign_id' => $campaignId,
