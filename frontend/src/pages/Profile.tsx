@@ -203,12 +203,13 @@ export default function Profile() {
     loadProfile();
   }, [resetOrg, resetProfile]);
 
-  // Sync linked providers from user object
+  // Sync linked providers from user object or profile data
   useEffect(() => {
-    if (saasEnabled && user?.social_identities) {
-      setLinkedProviders(user.social_identities.map((i) => i.provider));
+    const identities = user?.social_identities ?? profileData?.social_identities;
+    if (saasEnabled && identities) {
+      setLinkedProviders(identities.map((i) => i.provider));
     }
-  }, [saasEnabled, user]);
+  }, [saasEnabled, user, profileData]);
 
   // Handle organization update
   const onUpdateOrganization = async (data: OrganizationFormData) => {

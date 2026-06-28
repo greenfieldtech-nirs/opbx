@@ -868,6 +868,7 @@ export interface ProfileData {
   country?: string | null;
   organization: Organization;
   extension?: Extension | null;
+  social_identities?: Array<{ provider: string; provider_email?: string }>;
   created_at: string;
   updated_at: string;
 }
