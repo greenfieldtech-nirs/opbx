@@ -1,0 +1,217 @@
+paths:
+  /v1/users/invite:
+    post:
+      tags:
+        - Users
+      summary: Invite a new user
+      description: |
+        Invite a new user to the organization by email. An invitation email
+        is sent with a magic-link token. The invited user must authenticate
+        via Auth0 to activate their account.
+      operationId: inviteUser
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: Email address of the user to invite
+                  example: jane.smith@example.com
+              required:
+                - email
+      responses:
+        '201':
+          description: User invited successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/UserInvitation.yaml'
+              example:
+                data:
+                  id: 124
+                  organization_id: 1
+                  name: Jane Smith
+                  email: jane.smith@example.com
+                  role: pbx_user
+                  status: inactive
+                  is_platform_manager: false
+                  created_at: '2024-01-15T10:30:00Z'
+                  updated_at: '2024-01-15T10:30:00Z'
+                invite_sent: true
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          description: Validation error or user already exists
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '../../components/responses/ValidationError.yaml'
+                  - $ref: '../../components/schemas/Error.yaml'
+              examples:
+                userAlreadyExists:
+                  summary: User already exists
+                  value:
+                    error:
+                      code: USER_ALREADY_EXISTS
+                      message: A user with this email already exists.
+        '429':
+          description: Invitation rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: INVITE_RATE_LIMITED
+                  message: Too many invitations sent to this email.
+        '503':
+          description: Auth0 is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_NOT_CONFIGURED
+                  message: Auth0 is not enabled.
+  /v1/users/invite/validate:
+    get:
+      tags:
+        - Users
+      summary: Validate invitation token
+      description: |
+        Validate an invitation token without consuming it. Returns the email
+        and organization name associated with the invitation.
+      operationId: validateInvitationToken
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Invitation magic-link token
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+                        format: email
+                        description: Email address of the invited user
+                        example: jane.smith@example.com
+                      organization_name:
+                        type: string
+                        description: Name of the inviting organization
+                        example: Acme Corporation
+                    required:
+                      - email
+                      - organization_name
+                required:
+                  - data
+        '400':
+          description: Token is required
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: INVITE_INVALID
+                  message: Token is required.
+        '410':
+          description: Invitation is invalid or has expired
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: INVITE_EXPIRED_OR_INVALID
+                  message: Invitation is invalid or has expired.
+  /v1/users/invite/accept:
+    post:
+      tags:
+        - Users
+      summary: Accept invitation and start Auth0 binding
+      description: |
+        Consume an invitation token and return an Auth0 authorize URL for the
+        invited user to authenticate and bind their social identity.
+      operationId: acceptInvitation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Invitation magic-link token
+                  example: abcdef1234567890
+              required:
+                - token
+      responses:
+        '200':
+          description: Auth0 redirect URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_url:
+                    type: string
+                    format: uri
+                    description: Auth0 authorize URL to redirect the user to
+                    example: https://example.auth0.com/authorize?client_id=...
+                required:
+                  - redirect_url
+        '400':
+          description: Token is required
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: INVITE_INVALID
+                  message: Token is required.
+        '410':
+          description: Invitation is invalid or has expired
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: INVITE_EXPIRED_OR_INVALID
+                  message: Invitation is invalid or has expired.
+        '503':
+          description: Auth0 is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_NOT_CONFIGURED
+                  message: Auth0 is not enabled.

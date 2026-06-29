@@ -1,0 +1,149 @@
+type: object
+description: Record of an inbound call routed through a call tracking campaign
+properties:
+  id:
+    type: integer
+    description: Unique session identifier
+    readOnly: true
+    example: 1
+  organization_id:
+    type: integer
+    description: ID of the organization this session belongs to
+    example: 1
+  call_tracking_campaign_id:
+    type: integer
+    description: ID of the campaign that handled the call
+    example: 5
+  call_tracking_number_id:
+    type: integer
+    description: ID of the tracking number that received the call
+    example: 8
+  did_number_id:
+    type: integer
+    description: ID of the underlying DID number
+    example: 12
+  call_id:
+    type: string
+    description: Cloudonix call identifier
+    example: call-abc123
+  session_id:
+    type: string
+    description: Cloudonix session identifier
+    example: sess-abc123
+  caller_number:
+    type: string
+    description: Caller number in E.164 format
+    example: '+14155559876'
+  caller_country:
+    type: string
+    description: ISO country code of the caller
+    example: US
+  called_number:
+    type: string
+    description: Tracked number that was called
+    example: '+12127773456'
+  source:
+    type:
+    - string
+    - 'null'
+    description: Marketing source attributed to the call
+    example: google
+  medium:
+    type:
+    - string
+    - 'null'
+    description: Marketing medium attributed to the call
+    example: cpc
+  campaign_name:
+    type:
+    - string
+    - 'null'
+    description: Name of the campaign at the time of the call
+    example: Google Ads - Spring Sale
+  disposition:
+    type:
+    - string
+    - 'null'
+    description: Call disposition
+    example: ANSWERED
+  duration:
+    type: integer
+    description: Total call duration in seconds
+    example: 45
+  billsec:
+    type: integer
+    description: Billed duration in seconds
+    example: 42
+  is_answered:
+    type: boolean
+    description: Whether the call was answered
+    example: true
+  is_converted:
+    type: boolean
+    description: Whether the call matched the conversion rule
+    example: true
+  conversion_value:
+    type:
+    - number
+    - 'null'
+    description: Conversion value assigned to the call
+    example: 25.5
+  started_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: When the call started
+    example: '2024-01-15T14:30:00Z'
+  answered_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: When the call was answered
+    example: '2024-01-15T14:30:05Z'
+  ended_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: When the call ended
+    example: '2024-01-15T14:30:50Z'
+  campaign:
+    type:
+    - object
+    - 'null'
+    description: Campaign summary (when loaded)
+    properties:
+      id:
+        type: integer
+        example: 5
+      name:
+        type: string
+        example: Google Ads - Spring Sale
+  did:
+    type:
+    - object
+    - 'null'
+    description: DID summary (when loaded)
+    properties:
+      id:
+        type: integer
+        example: 12
+      phone_number:
+        type: string
+        example: '+12127773456'
+required:
+- id
+- organization_id
+- call_tracking_campaign_id
+- call_tracking_number_id
+- did_number_id
+- call_id
+- session_id
+- caller_number
+- called_number
+- duration
+- billsec
+- is_answered
+- is_converted

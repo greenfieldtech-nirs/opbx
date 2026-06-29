@@ -1,0 +1,73 @@
+type: object
+description: Webhook notification settings for a call tracking campaign
+properties:
+  id:
+    type: integer
+    description: Unique settings identifier
+    readOnly: true
+    example: 1
+  organization_id:
+    type: integer
+    description: ID of the organization this settings belongs to
+    example: 1
+  call_tracking_campaign_id:
+    type: integer
+    description: ID of the campaign these settings belong to
+    example: 5
+  webhook_url:
+    type: string
+    format: uri
+    description: URL where webhook events are delivered
+    maxLength: 2048
+    example: https://example.com/webhooks/call-tracking
+  auth_method:
+    type: string
+    enum:
+    - none
+    - bearer_token
+    - basic_auth
+    description: Authentication method used for webhook requests
+    example: bearer_token
+  auth_username:
+    type:
+    - string
+    - 'null'
+    description: Basic auth username (only present when auth_method is basic_auth)
+    maxLength: 255
+    example: webhook_user
+  enabled_events:
+    type: array
+    description: List of event types that trigger webhook notifications
+    items:
+      type: string
+      enum:
+      - call.received
+      - call.answered
+      - call.missed
+      - call.converted
+      - call.failed
+    example:
+    - call.received
+    - call.converted
+  is_active:
+    type: boolean
+    description: Whether webhook notifications are active
+    example: true
+  created_at:
+    type: string
+    format: date-time
+    description: Creation timestamp
+    example: '2024-01-10T08:00:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: Last update timestamp
+    example: '2024-01-15T12:00:00Z'
+required:
+- id
+- organization_id
+- call_tracking_campaign_id
+- webhook_url
+- auth_method
+- enabled_events
+- is_active

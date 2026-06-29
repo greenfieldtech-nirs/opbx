@@ -1,0 +1,398 @@
+paths:
+  /v1/call-tracking-campaigns:
+    get:
+      tags:
+      - Call Tracking Campaigns
+      summary: List campaigns
+      description: |
+        Get a paginated list of call tracking campaigns for the authenticated
+        user's organization.
+      operationId: listCallTrackingCampaigns
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      responses:
+        '200':
+          description: List of campaigns
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/CallTrackingCampaign.yaml
+                  meta:
+                    $ref: ../../components/schemas/PaginationMeta.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+    post:
+      tags:
+      - Call Tracking Campaigns
+      summary: Create campaign
+      description: |
+        Create a new call tracking campaign. The campaign name must be unique
+        within the organization.
+      operationId: createCallTrackingCampaign
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: Campaign name
+                  example: Google Ads - Spring Sale
+                source:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: Marketing source
+                  example: google
+                medium:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: Marketing medium
+                  example: cpc
+                description:
+                  type:
+                  - string
+                  - 'null'
+                  description: Campaign description
+                  example: Spring sale campaign tracked via Google Ads
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  default: active
+                  description: Campaign status
+                  example: active
+                destination_type:
+                  type: string
+                  enum:
+                  - forward
+                  - extension
+                  - ring_group
+                  - business_hours
+                  - conference_room
+                  - ivr_menu
+                  - ai_assistant
+                  - ai_load_balancer
+                  default: forward
+                  description: Destination type for incoming calls
+                  example: forward
+                destination_config:
+                  type: object
+                  description: |
+                    Destination configuration. Required field depends on `destination_type`:
+                    - `forward`: `forward_to`
+                    - `extension`: `extension_id`
+                    - `ring_group`: `ring_group_id`
+                    - `business_hours`: `business_hours_schedule_id`
+                    - `conference_room`: `conference_room_id`
+                    - `ivr_menu`: `ivr_menu_id`
+                    - `ai_assistant`: `ai_assistant_id`
+                    - `ai_load_balancer`: `ai_load_balancer_id`
+                  properties:
+                    forward_to:
+                      type: string
+                      maxLength: 50
+                      description: External number to forward to
+                      example: '+14155551212'
+                    extension_id:
+                      type: integer
+                      description: Extension ID
+                      example: 5
+                    ring_group_id:
+                      type: integer
+                      description: Ring group ID
+                      example: 3
+                    business_hours_schedule_id:
+                      type: integer
+                      description: Business hours schedule ID
+                      example: 2
+                    conference_room_id:
+                      type: integer
+                      description: Conference room ID
+                      example: 4
+                    ivr_menu_id:
+                      type: integer
+                      description: IVR menu ID
+                      example: 6
+                    ai_assistant_id:
+                      type: integer
+                      description: AI assistant ID
+                      example: 7
+                    ai_load_balancer_id:
+                      type: integer
+                      description: AI assistant load balancer ID
+                      example: 8
+                conversion_rule:
+                  type:
+                  - object
+                  - 'null'
+                  description: Conversion rule configuration
+                  properties:
+                    min_answered_duration_seconds:
+                      type: integer
+                      minimum: 0
+                      description: Minimum answered duration in seconds
+                      example: 30
+                    requires_answered_disposition:
+                      type: boolean
+                      description: Whether answered disposition is required
+                      example: false
+                    conversion_value:
+                      type: number
+                      minimum: 0
+                      description: Monetary value for each conversion
+                      example: 25.5
+                google_ads_upload_enabled:
+                  type: boolean
+                  description: Enable Google Ads conversion upload
+                  example: false
+                meta_upload_enabled:
+                  type: boolean
+                  description: Enable Meta conversion upload
+                  example: false
+              required:
+              - name
+              - destination_config
+      responses:
+        '201':
+          description: Campaign created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Campaign created successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingCampaign.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+  /v1/call-tracking-campaigns/{call_tracking_campaign}:
+    parameters:
+    - name: call_tracking_campaign
+      in: path
+      required: true
+      description: Call tracking campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Call Tracking Campaigns
+      summary: Get campaign
+      description: Get a specific call tracking campaign by ID.
+      operationId: getCallTrackingCampaign
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Campaign details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: ../../components/schemas/CallTrackingCampaign.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+    put:
+      tags:
+      - Call Tracking Campaigns
+      summary: Update campaign
+      description: |
+        Update an existing call tracking campaign. The campaign name must remain
+        unique within the organization.
+      operationId: updateCallTrackingCampaign
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: Campaign name
+                  example: Updated Campaign Name
+                source:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: Marketing source
+                  example: google
+                medium:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: Marketing medium
+                  example: cpc
+                description:
+                  type:
+                  - string
+                  - 'null'
+                  description: Campaign description
+                  example: Updated description
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  description: Campaign status
+                  example: active
+                destination_type:
+                  type: string
+                  enum:
+                  - forward
+                  - extension
+                  - ring_group
+                  - business_hours
+                  - conference_room
+                  - ivr_menu
+                  - ai_assistant
+                  - ai_load_balancer
+                  description: Destination type for incoming calls
+                  example: forward
+                destination_config:
+                  type: object
+                  description: |
+                    Destination configuration. Required field depends on `destination_type`.
+                  properties:
+                    forward_to:
+                      type: string
+                      maxLength: 50
+                      description: External number to forward to
+                      example: '+14155551212'
+                    extension_id:
+                      type: integer
+                      description: Extension ID
+                      example: 5
+                    ring_group_id:
+                      type: integer
+                      description: Ring group ID
+                      example: 3
+                    business_hours_schedule_id:
+                      type: integer
+                      description: Business hours schedule ID
+                      example: 2
+                    conference_room_id:
+                      type: integer
+                      description: Conference room ID
+                      example: 4
+                    ivr_menu_id:
+                      type: integer
+                      description: IVR menu ID
+                      example: 6
+                    ai_assistant_id:
+                      type: integer
+                      description: AI assistant ID
+                      example: 7
+                    ai_load_balancer_id:
+                      type: integer
+                      description: AI assistant load balancer ID
+                      example: 8
+                conversion_rule:
+                  type:
+                  - object
+                  - 'null'
+                  description: Conversion rule configuration
+                  properties:
+                    min_answered_duration_seconds:
+                      type: integer
+                      minimum: 0
+                      description: Minimum answered duration in seconds
+                      example: 30
+                    requires_answered_disposition:
+                      type: boolean
+                      description: Whether answered disposition is required
+                      example: false
+                    conversion_value:
+                      type: number
+                      minimum: 0
+                      description: Monetary value for each conversion
+                      example: 25.5
+                google_ads_upload_enabled:
+                  type: boolean
+                  description: Enable Google Ads conversion upload
+                  example: false
+                meta_upload_enabled:
+                  type: boolean
+                  description: Enable Meta conversion upload
+                  example: false
+      responses:
+        '200':
+          description: Campaign updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Campaign updated successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingCampaign.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+    delete:
+      tags:
+      - Call Tracking Campaigns
+      summary: Delete campaign
+      description: Delete a call tracking campaign from the organization.
+      operationId: deleteCallTrackingCampaign
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Campaign deleted successfully
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml

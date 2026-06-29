@@ -1,0 +1,60 @@
+---
+sidebar_position: 61
+slug: /data-models/models/call-tracking-number
+sidebar_class_name: cxGuidesSidebar
+title: CallTrackingNumber Model
+---
+
+# CallTrackingNumber Model
+
+The `CallTrackingNumber` model links a DID number to a call tracking campaign. When a call arrives on the DID, OPBX uses the assigned campaign for attribution and routing.
+
+**Table:** `call_tracking_numbers`  
+**Model:** `App\Models\CallTrackingNumber`  
+**Resource:** `App\Http\Resources\CallTrackingNumberResource`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
+| `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
+| `did_number_id` | bigint unsigned | No | - | Linked DID |
+| `friendly_name` | varchar(255) | Yes | null | Display label |
+| `status` | varchar(20) | No | active | Number status enum |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Relationships
+
+### Belongs To
+
+```php
+$number->organization() → Organization
+$number->campaign() → CallTrackingCampaign
+$number->did() → DidNumber
+```
+
+### Has Many
+
+```php
+$number->sessions() → CallTrackingSession[]
+```
+
+## Status
+
+| Value | Description |
+|-------|-------------|
+| `active` | Number is live and receiving calls |
+| `inactive` | Number is paused |
+
+## Lifecycle
+
+When a tracking number is created, the associated DID's `routing_type` is updated to `call_tracking` and `routing_config.call_tracking_campaign_id` is set to the parent campaign.
+
+## Related Documentation
+
+- [Call Tracking Campaigns Module](../../modules/call-tracking-campaigns)
+- [CallTrackingCampaign](./call-tracking-campaign)
+- [CallTrackingSession](./call-tracking-session)

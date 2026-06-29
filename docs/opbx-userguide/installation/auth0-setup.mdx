@@ -1,0 +1,178 @@
+---
+sidebar_position: 4
+slug: /installation/auth0-setup
+sidebar_class_name: cxGuidesSidebar
+title: "Auth0 Setup"
+description: "Configure syndicated social authentication and user invitations"
+---
+
+# Auth0 Setup
+
+When OPBX runs in SaaS mode (`OPBX_SAAS_ENABLED=true`), you can let users sign up and log in through Auth0 social identity providers instead of a local password. This guide explains how to configure the Auth0 application, enable the supported providers, and verify the resulting login, linking, invitation, and join-request flows.
+
+## Prerequisites
+
+Before you start:
+
+- An Auth0 tenant (the free tier is sufficient).
+- OPBX deployed behind HTTPS. Auth0 requires TLS redirect URIs in production.
+- `OPBX_SAAS_ENABLED=true` in your OPBX `.env` file.
+- (Optional) Transactional email configured if you plan to send user invitations.
+
+## Supported Providers
+
+OPBX can syndicate authentication through the following social connections:
+
+| OPBX Provider | Auth0 Connection | Typical Email Verification |
+|---------------|------------------|----------------------------|
+| Google        | `google-oauth2`  | Verified by default        |
+| Facebook      | `facebook`       | Depends on Auth0 setup     |
+| Microsoft     | `windowslive`    | Verified by default        |
+| GitHub        | `github`         | Depends on Auth0 setup     |
+| X             | `twitter`        | Depends on Auth0 setup     |
+
+The providers that actually appear on the login and registration pages are controlled by the `AUTH0_PROVIDERS` environment variable.
+
+## Auth0 Application Setup
+
+1. Log in to the [Auth0 Dashboard](https://manage.auth0.com/).
+2. Go to **Applications > Applications** and click **Create Application**.
+3. Choose **Regular Web Application**.
+4. Note the **Domain**, **Client ID**, and **Client Secret**.
+5. In the application settings, configure the following URLs (replace `your-opbx-domain` with your actual domain):
+
+| Setting | Value |
+|---------|-------|
+| Allowed Callback URLs | `https://your-opbx-domain/ui/auth/callback` |
+| Allowed Logout URLs | `https://your-opbx-domain/ui/login` |
+| Allowed Web Origins | `https://your-opbx-domain` |
+| Allowed Origins (CORS) | `https://your-opbx-domain` |
+
+6. Go to **Authentication > Social** and enable each provider you want to support. Configure the provider's own API keys or secrets where Auth0 asks for them.
+7. For each social connection, ensure it returns `email_verified: true` for verified email addresses. Google and Microsoft usually do this by default; Facebook, GitHub, and X may need additional configuration.
+
+:::info Redirect URI
+The callback must point to the frontend route `/ui/auth/callback`. This page exchanges the OAuth code with the backend. The value you enter in Auth0 must exactly match the `AUTH0_REDIRECT_URI` environment variable.
+:::
+
+## OPBX Environment Configuration
+
+Add the following variables to your OPBX `.env` file:
+
+```bash
+OPBX_SAAS_ENABLED=true
+
+AUTH0_DOMAIN=your-tenant.us.auth0.com
+AUTH0_CLIENT_ID=your-client-id
+AUTH0_CLIENT_SECRET=your-client-secret
+AUTH0_REDIRECT_URI=https://your-opbx-domain/ui/auth/callback
+AUTH0_PROVIDERS=google,facebook,microsoft,github,x
+
+# Optional invitation tuning
+OPBX_INVITE_TOKEN_TTL_HOURS=24
+OPBX_INVITE_RATE_LIMIT_PER_HOUR=10
+```
+
+After editing `.env`, clear the configuration cache:
+
+```bash
+php artisan config:clear
+```
+
+## Verify Frontend Configuration
+
+The frontend reads SaaS and Auth0 state from `/api/v1/config/application`. Open your browser's developer tools and check that the response includes:
+
+```json
+{
+  "saas_enabled": true,
+  "auth0": {
+    "enabled": true,
+    "domain": "your-tenant.us.auth0.com",
+    "client_id": "your-client-id",
+    "redirect_uri": "https://your-opbx-domain/ui/auth/callback",
+    "providers": ["google", "facebook", "microsoft", "github", "x"]
+  }
+}
+```
+
+If `auth0.enabled` is `false`, confirm that all `AUTH0_*` variables are set and the config cache is cleared.
+
+## Login and Signup Flow
+
+Once configured, the **Login** (`/ui/login`) and **Register** (`/ui/register`) pages display social-provider buttons:
+
+1. The user clicks a provider button.
+2. The frontend calls `POST /v1/auth/auth0/redirect`.
+3. The backend builds an Auth0 `/authorize` URL with PKCE and redirects the user to Auth0.
+4. The user authenticates with the social provider and is redirected back to `/ui/auth/callback`.
+5. The frontend sends the authorization `code` and `state` to `GET /v1/auth/auth0/callback`.
+6. The backend resolves the profile and either logs the user in, creates an organization, or sends the user to onboarding.
+
+## Linking and Unlinking Identities
+
+Users who originally registered with an email and password can still use social login after linking their account:
+
+1. Log in with the existing email and password.
+2. Go to **Profile** settings and open **Linked Accounts**.
+3. Click **Connect** next to the desired provider.
+4. Complete the Auth0 flow with the **same verified email address**.
+5. The social identity is now linked; future logins can use that provider.
+
+To remove a linked provider, click **Disconnect** in **Linked Accounts**. The underlying OPBX account remains active and can still log in with its password.
+
+## Join Requests and Invitations
+
+### Inviting a User
+
+Owners and PBX Admins can invite users by email:
+
+1. Go to **Users** in the sidebar.
+2. Click **Invite User**.
+3. Enter the email address and send the invitation.
+
+OPBX creates a pending user and sends a magic-link email. When the invitee accepts, they complete Auth0 authentication with the invited email address and are activated as a **PBX User**.
+
+### Requesting to Join an Organization
+
+New users who do not want to create their own organization can request to join an existing one:
+
+1. Click a social provider on `/ui/register`.
+2. On the onboarding page, choose **Request to join an organization**.
+3. Enter the organization's slug.
+4. Submit the request.
+
+An Owner or PBX Admin of the target organization can approve or reject the request. Once approved, the user receives an access token and can log in.
+
+## Configuration Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPBX_SAAS_ENABLED` | Yes | `false` | Enables SaaS mode, which unlocks Auth0 features. |
+| `AUTH0_DOMAIN` | Yes (if SaaS enabled) | — | Your Auth0 tenant domain, e.g. `your-tenant.us.auth0.com`. |
+| `AUTH0_CLIENT_ID` | Yes (if SaaS enabled) | — | Client ID of the Auth0 Regular Web Application. |
+| `AUTH0_CLIENT_SECRET` | Yes (if SaaS enabled) | — | Client secret of the Auth0 application. |
+| `AUTH0_REDIRECT_URI` | Yes (if SaaS enabled) | — | Must match the **Allowed Callback URL** in Auth0. Use the frontend route `/ui/auth/callback`. |
+| `AUTH0_PROVIDERS` | Yes (if SaaS enabled) | — | Comma-separated list of enabled providers, e.g. `google,github`. |
+| `OPBX_INVITE_TOKEN_TTL_HOURS` | No | `24` | Lifetime of invitation magic links, in hours. |
+| `OPBX_INVITE_RATE_LIMIT_PER_HOUR` | No | `10` | Maximum invitations per organization per hour. |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/v1/auth/auth0/redirect` | Build an Auth0 authorization URL |
+| GET | `/v1/auth/auth0/callback` | Exchange an Auth0 code for a session |
+| POST | `/v1/auth/auth0/link` | Start the account-linking flow |
+| POST | `/v1/auth/auth0/unlink` | Remove a linked social identity |
+| POST | `/v1/users/invite` | Invite a user by email |
+| GET | `/v1/users/invite/validate` | Validate an invitation token |
+| POST | `/v1/users/invite/accept` | Accept an invitation and start Auth0 binding |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for request/response schemas.
+
+## Related Modules
+
+- [First Login](./first-login) — Create the first organization and local admin account
+- [User Management](../modules/user-management) — Manage users, roles, and local invitations
+- [Auth0 Syndicated Authentication](../modules/auth0-syndicated-auth) — End-user flows and permissions

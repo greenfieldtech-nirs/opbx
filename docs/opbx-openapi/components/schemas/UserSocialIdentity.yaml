@@ -1,0 +1,56 @@
+type: object
+description: Social identity linked to a user account
+properties:
+  id:
+    type: integer
+    description: Unique identity identifier
+    readOnly: true
+    example: 1
+  user_id:
+    type: integer
+    description: ID of the user this identity belongs to
+    example: 123
+  provider:
+    type: string
+    enum:
+      - google
+      - facebook
+      - microsoft
+      - github
+      - x
+    description: Social identity provider
+    example: google
+  provider_subject:
+    type: string
+    description: Provider-specific subject identifier
+    example: '112233445566778899001'
+  provider_email:
+    type: string
+    format: email
+    description: Email address returned by the provider
+    example: john.doe@gmail.com
+  provider_data:
+    type: object
+    description: Raw provider metadata
+    additionalProperties: true
+    example:
+      sub: '112233445566778899001'
+      email: john.doe@gmail.com
+  created_at:
+    type: string
+    format: date-time
+    description: Timestamp when the identity was created
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: Timestamp when the identity was last updated
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+required:
+  - id
+  - user_id
+  - provider
+  - provider_subject
+  - provider_email

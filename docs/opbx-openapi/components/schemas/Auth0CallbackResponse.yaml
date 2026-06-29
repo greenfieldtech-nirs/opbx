@@ -1,0 +1,100 @@
+type: object
+description: Successful Auth0 callback authentication response
+properties:
+  user:
+    type: object
+    description: Authenticated user details
+    properties:
+      id:
+        type: integer
+        description: Unique user identifier
+        example: 123
+      organization_id:
+        type: integer
+        description: ID of the organization the user belongs to
+        example: 1
+      name:
+        type: string
+        description: Full name of the user
+        example: John Doe
+      email:
+        type: string
+        format: email
+        description: User email address
+        example: john.doe@example.com
+      role:
+        type: string
+        enum:
+          - owner
+          - pbx_admin
+          - pbx_user
+          - reporter
+        description: User's role within the organization
+        example: owner
+      status:
+        type: string
+        enum:
+          - active
+          - inactive
+          - pending
+        description: Account status
+        example: active
+    required:
+      - id
+      - organization_id
+      - name
+      - email
+      - role
+      - status
+  organization:
+    type: object
+    description: Organization the user belongs to
+    properties:
+      id:
+        type: integer
+        description: Unique organization identifier
+        example: 1
+      name:
+        type: string
+        description: Organization name
+        example: Acme Corporation
+      slug:
+        type: string
+        description: URL-friendly identifier
+        example: acme-corporation
+      status:
+        type: string
+        enum:
+          - active
+          - inactive
+          - suspended
+        description: Organization status
+        example: active
+      timezone:
+        type: string
+        description: Default timezone for the organization
+        example: America/New_York
+    required:
+      - id
+      - name
+      - slug
+      - status
+      - timezone
+  access_token:
+    type: string
+    description: Bearer token for API authentication
+    example: 1|laravel_sanctum_token_xyz123
+  token_type:
+    type: string
+    description: Token type
+    example: Bearer
+  expires_in:
+    type: integer
+    description: Token expiration in seconds
+    example: 86400
+required:
+  - user
+  - organization
+  - access_token
+  - token_type
+  - expires_in

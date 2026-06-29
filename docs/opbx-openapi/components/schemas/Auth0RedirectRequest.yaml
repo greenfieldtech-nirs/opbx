@@ -1,0 +1,24 @@
+type: object
+description: Request body for initiating an Auth0 OAuth redirect
+properties:
+  provider:
+    type: string
+    enum:
+      - google
+      - facebook
+      - microsoft
+      - github
+      - x
+    description: Social identity provider to authenticate with
+    example: google
+  intent:
+    type: string
+    enum:
+      - login
+      - register
+      - link
+    description: Intended flow for the Auth0 authentication
+    example: login
+required:
+  - provider
+  - intent

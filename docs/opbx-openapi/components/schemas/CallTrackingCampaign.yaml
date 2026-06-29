@@ -1,0 +1,152 @@
+type: object
+description: Call tracking campaign for attributing inbound calls to marketing sources
+properties:
+  id:
+    type: integer
+    description: Unique campaign identifier
+    readOnly: true
+    example: 1
+  organization_id:
+    type: integer
+    description: ID of the organization this campaign belongs to
+    example: 1
+  name:
+    type: string
+    description: Campaign name
+    maxLength: 255
+    example: Google Ads - Spring Sale
+  source:
+    type:
+    - string
+    - 'null'
+    description: Marketing source (e.g. utm_source)
+    maxLength: 100
+    example: google
+  medium:
+    type:
+    - string
+    - 'null'
+    description: Marketing medium (e.g. utm_medium)
+    maxLength: 100
+    example: cpc
+  description:
+    type:
+    - string
+    - 'null'
+    description: Campaign description
+    example: Spring sale campaign tracked via Google Ads
+  status:
+    type: string
+    enum:
+    - active
+    - inactive
+    description: Current campaign status
+    example: active
+  destination_type:
+    type: string
+    enum:
+    - forward
+    - extension
+    - ring_group
+    - business_hours
+    - conference_room
+    - ivr_menu
+    - ai_assistant
+    - ai_load_balancer
+    description: Type of destination for incoming tracked calls
+    example: forward
+  destination_config:
+    type: object
+    description: |
+      Destination configuration. The required field depends on `destination_type`:
+      - `forward`: `forward_to`
+      - `extension`: `extension_id`
+      - `ring_group`: `ring_group_id`
+      - `business_hours`: `business_hours_schedule_id`
+      - `conference_room`: `conference_room_id`
+      - `ivr_menu`: `ivr_menu_id`
+      - `ai_assistant`: `ai_assistant_id`
+      - `ai_load_balancer`: `ai_load_balancer_id`
+    properties:
+      forward_to:
+        type: string
+        description: External number to forward calls to (E.164 format recommended)
+        maxLength: 50
+        example: '+14155551212'
+      extension_id:
+        type: integer
+        description: ID of the extension to route calls to
+        example: 5
+      ring_group_id:
+        type: integer
+        description: ID of the ring group to route calls to
+        example: 3
+      business_hours_schedule_id:
+        type: integer
+        description: ID of the business hours schedule to use
+        example: 2
+      conference_room_id:
+        type: integer
+        description: ID of the conference room to route calls to
+        example: 4
+      ivr_menu_id:
+        type: integer
+        description: ID of the IVR menu to route calls to
+        example: 6
+      ai_assistant_id:
+        type: integer
+        description: ID of the AI assistant to route calls to
+        example: 7
+      ai_load_balancer_id:
+        type: integer
+        description: ID of the AI assistant load balancer to route calls to
+        example: 8
+  conversion_rule:
+    type: object
+    description: Rules used to mark a call as converted
+    properties:
+      min_answered_duration_seconds:
+        type: integer
+        minimum: 0
+        description: Minimum answered duration in seconds for a call to count as converted
+        example: 30
+      requires_answered_disposition:
+        type: boolean
+        description: Whether the call must have an answered disposition to convert
+        example: true
+      conversion_value:
+        type: number
+        minimum: 0
+        description: Optional monetary value assigned to each conversion
+        example: 25.5
+  tracking_numbers_count:
+    type:
+    - integer
+    - 'null'
+    description: Number of tracking numbers assigned to the campaign (when counted)
+    example: 3
+  google_ads_upload_enabled:
+    type: boolean
+    description: Whether conversion uploads to Google Ads are enabled
+    example: false
+  meta_upload_enabled:
+    type: boolean
+    description: Whether conversion uploads to Meta are enabled
+    example: false
+  created_at:
+    type: string
+    format: date-time
+    description: Creation timestamp
+    example: '2024-01-10T08:00:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: Last update timestamp
+    example: '2024-01-15T12:00:00Z'
+required:
+- id
+- organization_id
+- name
+- status
+- destination_type
+- destination_config

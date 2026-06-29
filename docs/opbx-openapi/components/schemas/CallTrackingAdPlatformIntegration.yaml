@@ -1,0 +1,40 @@
+type: object
+description: Ad platform integration settings for conversion upload
+properties:
+  organization_id:
+    type: integer
+    description: ID of the organization these settings belong to
+    example: 1
+  google_ads:
+    type: object
+    description: Google Ads conversion upload configuration
+    properties:
+      enabled:
+        type: boolean
+        description: Whether Google Ads conversion upload is enabled
+        example: true
+      is_configured:
+        type: boolean
+        description: Whether all required Google Ads credentials are present
+        example: true
+  meta:
+    type: object
+    description: Meta (Facebook) pixel conversion configuration
+    properties:
+      enabled:
+        type: boolean
+        description: Whether Meta conversion upload is enabled
+        example: false
+      is_configured:
+        type: boolean
+        description: Whether all required Meta credentials are present
+        example: false
+  updated_at:
+    type: string
+    format: date-time
+    description: Last update timestamp
+    example: '2024-01-15T12:00:00Z'
+required:
+- organization_id
+- google_ads
+- meta

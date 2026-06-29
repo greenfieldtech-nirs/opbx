@@ -78,8 +78,11 @@ export type RingGroupStatus = Status;
 // Routing Type
 export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
 
-// IVR Destination Type
-export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'hangup';
+// IVR Destination Type (for menu options; hangup is allowed only on failover)
+export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours';
+
+// IVR Failover Destination Type (options + hangup)
+export type IvrFailoverDestinationType = IvrDestinationType | 'hangup';
 
 // IVR Menu Status
 export type IvrMenuStatus = 'active' | 'inactive';
@@ -368,7 +371,7 @@ export interface IvrMenu {
   max_timeout: number;
   inter_digit_timeout: number;
   max_turns: number;
-  failover_destination_type: IvrDestinationType;
+  failover_destination_type: IvrFailoverDestinationType;
   failover_destination_id?: string;
   status: IvrMenuStatus;
   options: IvrMenuOption[];
@@ -387,7 +390,7 @@ export interface CreateIvrMenuRequest {
   max_timeout: number;
   inter_digit_timeout: number;
   max_turns: number;
-  failover_destination_type: IvrDestinationType;
+  failover_destination_type: IvrFailoverDestinationType;
   failover_destination_id?: string;
   status: IvrMenuStatus;
   options: Array<{
@@ -409,7 +412,7 @@ export interface UpdateIvrMenuRequest {
   max_timeout?: number;
   inter_digit_timeout?: number;
   max_turns?: number;
-  failover_destination_type?: IvrDestinationType;
+  failover_destination_type?: IvrFailoverDestinationType;
   failover_destination_id?: string;
   status?: IvrMenuStatus;
   options?: Array<{

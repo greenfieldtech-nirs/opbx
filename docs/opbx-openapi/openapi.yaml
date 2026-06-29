@@ -28,7 +28,7 @@ info:
       | Resource | Endpoints |
       |----------|-----------|
       | **Health** | `GET /health`, `GET /storage/health`, `GET /websocket/health` |
-      | **Auth** | Login, logout, refresh, register, me |
+      | **Auth** | Login, logout, refresh, register, me, Auth0 social login |
       | **Profile** | Get/update profile, password, organization |
       | **Users** | CRUD operations for organization users |
       | **Extensions** | CRUD + sync + password management |
@@ -39,6 +39,7 @@ info:
       | **Phone Numbers** | DID management |
       | **AI Assistants** | AI assistant configuration |
       | **Call Detail Records** | CDR records and export |
+      | **Call Tracking** | Campaigns, DNI, sessions, analytics, ad-platform integrations |
       | **Recordings** | Recording management and download |
       | **Inbound Blacklist** | Blocked caller management |
       | **Outbound Whitelist** | Outbound dialing restrictions |
@@ -227,8 +228,56 @@ paths:
   /v1/auth/register/validate:
     $ref: './paths/auth/register-validate.yaml#/paths/~1v1~1auth~1register~1validate'
 
+  /v1/auth/auth0/callback:
+    $ref: './paths/auth/auth0.yaml#/paths/~1v1~1auth~1auth0~1callback'
+
+  /v1/auth/auth0/link:
+    $ref: './paths/auth/auth0.yaml#/paths/~1v1~1auth~1auth0~1link'
+
+  /v1/auth/auth0/redirect:
+    $ref: './paths/auth/auth0.yaml#/paths/~1v1~1auth~1auth0~1redirect'
+
+  /v1/auth/auth0/unlink:
+    $ref: './paths/auth/auth0.yaml#/paths/~1v1~1auth~1auth0~1unlink'
+
   /v1/broadcasting/auth:
     $ref: './paths/broadcasting/auth.yaml#/paths/~1v1~1broadcasting~1auth'
+
+  /v1/call-tracking-ad-platform-integrations:
+    $ref: './paths/call-tracking-ad-platform-integrations/index.yaml#/paths/~1v1~1call-tracking-ad-platform-integrations'
+
+  /v1/call-tracking-analytics:
+    $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics'
+
+  /v1/call-tracking-analytics/export:
+    $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics~1export'
+
+  /v1/call-tracking-campaigns:
+    $ref: './paths/call-tracking-campaigns/index.yaml#/paths/~1v1~1call-tracking-campaigns'
+
+  /v1/call-tracking-campaigns/{call_tracking_campaign}:
+    $ref: './paths/call-tracking-campaigns/index.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}'
+
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers:
+    $ref: './paths/call-tracking-campaigns/numbers.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1call-tracking-numbers'
+
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}:
+    $ref: './paths/call-tracking-campaigns/numbers.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1call-tracking-numbers~1{call_tracking_number}'
+
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-logs:
+    $ref: './paths/call-tracking-campaigns/notification-logs.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-logs'
+
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings:
+    $ref: './paths/call-tracking-campaigns/notification-settings.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-settings'
+
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings/test:
+    $ref: './paths/call-tracking-campaigns/notification-settings.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-settings~1test'
+
+  /v1/call-tracking-dni/swap:
+    $ref: './paths/call-tracking-dni/index.yaml#/paths/~1v1~1call-tracking-dni~1swap'
+
+  /v1/call-tracking-sessions:
+    $ref: './paths/call-tracking-campaigns/sessions.yaml#/paths/~1v1~1call-tracking-sessions'
 
   /v1/auto-dialer-campaigns:
     $ref: './paths/auto-dialer-campaigns/index.yaml#/paths/~1v1~1auto-dialer-campaigns'
@@ -452,6 +501,15 @@ paths:
   /v1/ivr-menus/{ivrMenu}/toggle-status:
     $ref: './paths/ivr-menus/toggle-status.yaml#/paths/~1v1~1ivr-menus~1{ivrMenu}~1toggle-status'
 
+  /v1/organizations/join-requests:
+    $ref: './paths/organizations/join-requests.yaml#/paths/~1v1~1organizations~1join-requests'
+
+  /v1/organizations/join-requests/{joinRequest}/approve:
+    $ref: './paths/organizations/join-requests.yaml#/paths/~1v1~1organizations~1join-requests~1{joinRequest}~1approve'
+
+  /v1/organizations/join-requests/{joinRequest}/reject:
+    $ref: './paths/organizations/join-requests.yaml#/paths/~1v1~1organizations~1join-requests~1{joinRequest}~1reject'
+
   /v1/outbound-whitelist:
     $ref: './paths/outbound-whitelist/index.yaml#/paths/~1v1~1outbound-whitelist'
 
@@ -557,6 +615,15 @@ paths:
   /v1/users/{user}/password:
     $ref: './paths/users/password.yaml#/paths/~1v1~1users~1{user}~1password'
 
+  /v1/users/invite:
+    $ref: './paths/users/invitations.yaml#/paths/~1v1~1users~1invite'
+
+  /v1/users/invite/accept:
+    $ref: './paths/users/invitations.yaml#/paths/~1v1~1users~1invite~1accept'
+
+  /v1/users/invite/validate:
+    $ref: './paths/users/invitations.yaml#/paths/~1v1~1users~1invite~1validate'
+
   /v1/validate-email:
     $ref: './paths/auth/validate-email.yaml#/paths/~1v1~1validate-email'
 
@@ -637,6 +704,16 @@ components:
     # Entity schemas
     User:
       $ref: './components/schemas/User.yaml'
+    UserSocialIdentity:
+      $ref: './components/schemas/UserSocialIdentity.yaml'
+    OrganizationJoinRequest:
+      $ref: './components/schemas/OrganizationJoinRequest.yaml'
+    UserInvitation:
+      $ref: './components/schemas/UserInvitation.yaml'
+    Auth0RedirectRequest:
+      $ref: './components/schemas/Auth0RedirectRequest.yaml'
+    Auth0CallbackResponse:
+      $ref: './components/schemas/Auth0CallbackResponse.yaml'
     Extension:
       $ref: './components/schemas/Extension.yaml'
     Organization:
@@ -671,6 +748,20 @@ components:
       $ref: './components/schemas/SessionUpdate.yaml'
     AutoDialerCampaign:
       $ref: './components/schemas/AutoDialerCampaign.yaml'
+    CallTrackingCampaign:
+      $ref: './components/schemas/CallTrackingCampaign.yaml'
+    CallTrackingNumber:
+      $ref: './components/schemas/CallTrackingNumber.yaml'
+    CallTrackingSession:
+      $ref: './components/schemas/CallTrackingSession.yaml'
+    CallTrackingAnalytics:
+      $ref: './components/schemas/CallTrackingAnalytics.yaml'
+    CallTrackingNotificationSettings:
+      $ref: './components/schemas/CallTrackingNotificationSettings.yaml'
+    CallTrackingNotificationLog:
+      $ref: './components/schemas/CallTrackingNotificationLog.yaml'
+    CallTrackingAdPlatformIntegration:
+      $ref: './components/schemas/CallTrackingAdPlatformIntegration.yaml'
     DistributionList:
       $ref: './components/schemas/DistributionList.yaml'
     MonitorSummary:
@@ -780,6 +871,12 @@ tags:
     description: Call notification configuration
   - name: Auto Dialer Campaigns
     description: Outbound campaign management with rate limiting and scheduling
+  - name: Call Tracking Campaigns
+    description: Marketing campaign call attribution and tracking
+  - name: Call Tracking Analytics
+    description: Call tracking analytics, reporting, and conversion tracking
+  - name: Call Tracking Ad Platform Integrations
+    description: Google Ads and Meta conversion upload integrations
   - name: Distribution Lists
     description: Phone number list management for auto-dialer campaigns
   - name: Configuration

@@ -1,0 +1,121 @@
+---
+sidebar_position: 60
+slug: /data-models/models/call-tracking-campaign
+sidebar_class_name: cxGuidesSidebar
+title: CallTrackingCampaign Model
+---
+
+# CallTrackingCampaign Model
+
+The `CallTrackingCampaign` model represents a marketing campaign that attributes inbound calls to sources, mediums, and individual tracking numbers. Campaigns can route calls to an external forward number or to existing OPBX destinations.
+
+**Table:** `call_tracking_campaigns`  
+**Model:** `App\Models\CallTrackingCampaign`  
+**Resource:** `App\Http\Resources\CallTrackingCampaignResource`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
+| `name` | varchar(255) | No | - | Campaign name (unique per organization) |
+| `source` | varchar(100) | Yes | null | Marketing source (e.g. utm_source) |
+| `medium` | varchar(100) | Yes | null | Marketing medium (e.g. utm_medium) |
+| `description` | text | Yes | null | Campaign description |
+| `status` | varchar(20) | No | active | Campaign status enum |
+| `destination_type` | varchar(50) | No | forward | Destination type enum |
+| `destination_config` | json | No | - | Destination-specific configuration |
+| `conversion_rule` | json | Yes | null | Conversion rule configuration |
+| `google_ads_upload_enabled` | boolean | No | false | Enable Google Ads conversion upload |
+| `meta_upload_enabled` | boolean | No | false | Enable Meta conversion upload |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Destination Configuration
+
+The required key inside `destination_config` depends on `destination_type`:
+
+| `destination_type` | Required Key | Example Value |
+|--------------------|--------------|---------------|
+| `forward` | `forward_to` | `+14155551212` |
+| `extension` | `extension_id` | `5` |
+| `ring_group` | `ring_group_id` | `3` |
+| `business_hours` | `business_hours_schedule_id` | `2` |
+| `conference_room` | `conference_room_id` | `4` |
+| `ivr_menu` | `ivr_menu_id` | `6` |
+| `ai_assistant` | `ai_assistant_id` | `7` |
+| `ai_load_balancer` | `ai_load_balancer_id` | `8` |
+
+## Conversion Rule
+
+`conversion_rule` is a JSON object that defines when a session counts as converted:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `min_answered_duration_seconds` | integer | Minimum answered duration for conversion |
+| `requires_answered_disposition` | boolean | Whether the call must be answered |
+| `conversion_value` | number | Monetary value of a conversion |
+
+## Relationships
+
+### Belongs To
+
+```php
+campaign.organization() → Organization
+```
+
+### Has Many
+
+```php
+campaign.trackingNumbers() → CallTrackingNumber[]
+campaign.sessions() → CallTrackingSession[]
+campaign.notificationSettings() → CallTrackingNotificationSettings
+campaign.notificationLogs() → CallTrackingNotificationLog[]
+```
+
+## Enums
+
+### CallTrackingCampaignStatus
+
+| Case | Value |
+|------|-------|
+| `ACTIVE` | active |
+| `INACTIVE` | inactive |
+
+### CallTrackingDestinationType
+
+| Case | Value |
+|------|-------|
+| `FORWARD` | forward |
+| `EXTENSION` | extension |
+| `RING_GROUP` | ring_group |
+| `BUSINESS_HOURS` | business_hours |
+| `CONFERENCE_ROOM` | conference_room |
+| `IVR_MENU` | ivr_menu |
+| `AI_ASSISTANT` | ai_assistant |
+| `AI_LOAD_BALANCER` | ai_load_balancer |
+
+## Methods
+
+### Scopes
+
+```php
+CallTrackingCampaign::forOrganization($orgId)
+CallTrackingCampaign::active()
+CallTrackingCampaign::inactive()
+```
+
+### Business Logic
+
+```php
+$campaign->isActive(): bool
+```
+
+## Related Documentation
+
+- [Call Tracking Campaigns Module](../../modules/call-tracking-campaigns)
+- [Call Tracking DNI](../../modules/call-tracking-dni)
+- [Call Tracking Analytics](../../modules/call-tracking-analytics)
+- [CallTrackingNumber](./call-tracking-number)
+- [CallTrackingSession](./call-tracking-session)

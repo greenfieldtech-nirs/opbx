@@ -1,0 +1,177 @@
+---
+sidebar_position: 2
+slug: /modules/auth0-syndicated-auth
+sidebar_class_name: cxGuidesSidebar
+title: "Auth0 Syndicated Authentication"
+description: "Social login, account linking, invitations, and organization join requests"
+---
+
+# Auth0 Syndicated Authentication
+
+When OPBX runs in SaaS mode, users can authenticate through Auth0 social identity providers. Auth0 syndicated authentication works **alongside** the existing email/password flow: existing password users can keep using their password, and they can optionally link one or more social providers to the same account.
+
+## Feature Overview
+
+Use this module for:
+
+- Signing up new organizations with a social account.
+- Logging in with a linked social provider.
+- Linking and unlinking social identities from a user's profile.
+- Inviting new team members by email and having them accept through Auth0.
+- Letting new users request membership in an existing organization.
+
+The feature is available only when `OPBX_SAAS_ENABLED=true` and the Auth0 tenant is configured. See [Auth0 Setup](../installation/auth0-setup) for configuration instructions.
+
+## User Flows
+
+### New User — Create an Organization
+
+1. Go to `/ui/register`.
+2. Click the social provider you want to use.
+3. Complete authentication with Auth0.
+4. OPBX creates a new organization and assigns the **Owner** role.
+5. The user is logged in and redirected to the Dashboard.
+
+This is the social equivalent of the local registration flow described in [First Login](../installation/first-login).
+
+### New User — Request to Join an Existing Organization
+
+1. Go to `/ui/register` and click a social provider.
+2. After Auth0 returns to OPBX, the onboarding page appears.
+3. Choose **Request to join an organization**.
+4. Enter the target organization's slug.
+5. Submit the request.
+
+An **Owner** or **PBX Admin** of the target organization reviews pending requests. Once approved, the user becomes an active **PBX User** in that organization.
+
+### Existing User — Social Login
+
+1. Go to `/ui/login`.
+2. Click the social provider that was previously linked.
+3. Complete authentication with Auth0.
+4. OPBX matches the provider identity and issues an access token.
+5. The user is redirected to the Dashboard.
+
+### Link an Existing Password Account
+
+1. Log in with the existing email and password.
+2. Go to **Profile** settings and open **Linked Accounts**.
+3. Click **Connect** next to the desired provider.
+4. Authenticate with Auth0 using the **same verified email address**.
+5. The provider is linked. From now on, login can use either the password or the linked provider.
+
+### Unlink a Social Identity
+
+1. Go to **Profile > Linked Accounts**.
+2. Click **Disconnect** next to the provider.
+3. The provider identity is removed, but the OPBX account and password remain active.
+
+### Accept an Invitation
+
+Owners and PBX Admins can invite users by email from the [User Management](./user-management) screen:
+
+1. The administrator sends an invitation to an email address.
+2. OPBX creates a pending user and sends a magic-link email.
+3. The invitee opens the link and authenticates with Auth0 using the invited email.
+4. OPBX activates the pending user as a **PBX User** and issues a session token.
+
+If the social provider does not return a verified email, or if the email does not match the invitation, the acceptance fails and the user is returned to the login page.
+
+## Organization Join Requests
+
+Join requests are created when a new user chooses to join an existing organization instead of creating one.
+
+### Submitting a Request
+
+New users submit a request from the Auth0 onboarding page. The request records:
+
+- The target organization slug.
+- The user's email, name, and social provider details.
+
+### Managing Requests
+
+Owners and PBX Admins can review pending requests and take one of the following actions:
+
+| Action | Result |
+|--------|--------|
+| **Approve** | Creates an active **PBX User**, links the social identity, and notifies the requester. |
+| **Reject** | Marks the request as rejected; the requester must create an organization or request to join a different one. |
+
+Requests that are not pending cannot be approved again.
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| Log in with a social provider | Yes | Yes | Yes | Yes |
+| Link/unlink own social identity | Yes | Yes | Yes | Yes |
+| Invite users by email | Yes | Yes | No | No |
+| Approve or reject join requests | Yes | Yes | No | No |
+
+:::info User Invitations
+Invited users are always created with the **PBX User** role. Only Owners and PBX Admins can send invitations.
+:::
+
+## Error Handling
+
+Common Auth0-related errors and how to resolve them:
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| `AUTH0_NOT_CONFIGURED` | SaaS mode or Auth0 variables are missing. | Verify `.env` and run `php artisan config:clear`. |
+| `AUTH0_INVALID_STATE` | The OAuth state expired or the callback was reused. | Try logging in again. |
+| `AUTH0_EMAIL_UNVERIFIED` | The social provider did not return a verified email. | Verify the email with the provider. |
+| `AUTH0_ACCOUNT_EXISTS` | The email already has a password account. | Log in with the password, then link the provider. |
+| `AUTH0_LINK_EMAIL_MISMATCH` | The Auth0 email does not match the logged-in account. | Use the same email or link a different provider. |
+| `INVITE_EXPIRED_OR_INVALID` | The invitation token is missing, expired, or already used. | Ask an administrator for a new invitation. |
+| `JOIN_REQUEST_PENDING` | The join request is waiting for approval. | Wait for an Owner or PBX Admin to approve it. |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/v1/auth/auth0/redirect` | Start the Auth0 authorization flow |
+| GET | `/v1/auth/auth0/callback` | Complete the flow and exchange the code |
+| POST | `/v1/auth/auth0/link` | Start account linking |
+| POST | `/v1/auth/auth0/unlink` | Unlink a provider identity |
+| POST | `/v1/users/invite` | Invite a user by email |
+| GET | `/v1/users/invite/validate` | Validate an invitation token |
+| POST | `/v1/users/invite/accept` | Accept an invitation and get the Auth0 redirect URL |
+| GET | `/v1/organizations/join-requests` | List pending join requests |
+| POST | `/v1/organizations/join-requests` | Submit a join request |
+| POST | `/v1/organizations/join-requests/{id}/approve` | Approve a join request |
+| POST | `/v1/organizations/join-requests/{id}/reject` | Reject a join request |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full request/response schemas.
+
+## Key Data Fields
+
+### `user_social_identities` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `user_id` | FK | Linked OPBX user |
+| `provider` | enum | `google`, `facebook`, `microsoft`, `github`, `x` |
+| `provider_subject` | string | Unique identifier from the social provider |
+| `provider_email` | string | Email returned by the provider at link time |
+| `provider_data` | json | Additional provider metadata |
+
+### `organization_join_requests` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Target organization |
+| `email` | string | Requester's email |
+| `name` | string | Requester's display name |
+| `provider` | enum | Social provider used |
+| `provider_subject` | string | Social provider subject |
+| `status` | enum | `pending`, `approved`, `rejected` |
+| `role` | enum | Defaults to `pbx_user` |
+
+## Related Modules
+
+- [User Management](./user-management) — Create and manage users, roles, and invitations
+- [Settings](./settings) — Configure organization-wide settings and linked accounts
+- [Auth0 Setup](../installation/auth0-setup) — Auth0 tenant and environment configuration

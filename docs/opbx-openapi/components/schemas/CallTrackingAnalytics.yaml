@@ -1,0 +1,76 @@
+type: object
+description: Aggregated call tracking analytics for a date range
+properties:
+  kpis:
+    type: object
+    description: Key performance indicators for the selected date range
+    additionalProperties: true
+    example:
+      total_calls: 150
+      answered_calls: 120
+      missed_calls: 30
+      conversion_rate: 0.65
+      total_conversions: 98
+      total_conversion_value: 2499.5
+  time_series:
+    type: array
+    description: Aggregated metrics grouped by the requested interval
+    items:
+      type: object
+      additionalProperties: true
+    example:
+    - period: '2024-01-15'
+      total_calls: 50
+      answered_calls: 42
+      conversions: 28
+  top_campaigns:
+    type: array
+    description: Top performing campaigns for the selected date range
+    items:
+      type: object
+      additionalProperties: true
+    example:
+    - id: 5
+      name: Google Ads - Spring Sale
+      total_calls: 100
+      conversions: 65
+  top_sources:
+    type: array
+    description: Top marketing sources for the selected date range
+    items:
+      type: object
+      additionalProperties: true
+    example:
+    - source: google
+      total_calls: 80
+      conversions: 52
+  filters:
+    type: object
+    description: Filters applied to the analytics query
+    properties:
+      start_date:
+        type: string
+        format: date
+        description: Start date of the analytics range
+        example: '2024-01-01'
+      end_date:
+        type: string
+        format: date
+        description: End date of the analytics range
+        example: '2024-01-31'
+      group_by:
+        type:
+        - string
+        - 'null'
+        enum:
+        - day
+        - week
+        - month
+        description: Time grouping applied to the time series
+        example: day
+required:
+- kpis
+- time_series
+- top_campaigns
+- top_sources
+- filters

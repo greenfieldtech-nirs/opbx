@@ -1,0 +1,12 @@
+type: object
+description: Response wrapper for a user invitation
+properties:
+  data:
+    $ref: ../../components/schemas/User.yaml
+  invite_sent:
+    type: boolean
+    description: Whether the invitation was successfully sent
+    example: true
+required:
+  - data
+  - invite_sent

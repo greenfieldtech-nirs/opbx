@@ -1,0 +1,79 @@
+paths:
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-logs:
+    parameters:
+    - name: call_tracking_campaign
+      in: path
+      required: true
+      description: Call tracking campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Call Tracking Campaigns
+      summary: List notification logs
+      description: |
+        Get a paginated list of webhook notification delivery logs for a
+        call tracking campaign.
+      operationId: listCallTrackingNotificationLogs
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: event_type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - call.received
+          - call.answered
+          - call.missed
+          - call.converted
+          - call.failed
+        description: Filter by event type
+      - name: success
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: Filter by delivery success
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Filter from date
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Filter to date
+      responses:
+        '200':
+          description: List of notification logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/CallTrackingNotificationLog.yaml
+                  meta:
+                    $ref: ../../components/schemas/PaginationMeta.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml

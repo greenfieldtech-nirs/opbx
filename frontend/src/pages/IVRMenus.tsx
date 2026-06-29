@@ -23,6 +23,7 @@ import type {
   IvrMenu,
   IvrMenuStatus,
   IvrDestinationType,
+  IvrFailoverDestinationType,
   CreateIvrMenuRequest,
   UpdateIvrMenuRequest,
 } from '@/types/api.types';
@@ -310,7 +311,7 @@ export default function IVRMenus() {
     max_timeout: number;
     inter_digit_timeout: number;
     max_turns: number;
-    failover_destination_type: IvrDestinationType;
+    failover_destination_type: IvrFailoverDestinationType;
     failover_destination_id?: string;
     status: IvrMenuStatus;
     options: Array<{
@@ -329,7 +330,7 @@ export default function IVRMenus() {
     max_timeout: 1,
     inter_digit_timeout: 1,
     max_turns: 1,
-    failover_destination_type: 'hangup' as IvrDestinationType,
+    failover_destination_type: 'hangup' as IvrFailoverDestinationType,
     status: 'active' as IvrMenuStatus,
     options: [],
   });
@@ -602,7 +603,7 @@ export default function IVRMenus() {
       max_timeout: 1,
       inter_digit_timeout: 1,
       max_turns: 1,
-      failover_destination_type: 'hangup' as IvrDestinationType,
+      failover_destination_type: 'hangup' as IvrFailoverDestinationType,
       status: 'active' as IvrMenuStatus,
       options: [],
     });
@@ -1272,7 +1273,7 @@ export default function IVRMenus() {
                       onChange={(type, destId) => {
                         setFormData({
                           ...formData,
-                          failover_destination_type: type as IvrDestinationType,
+                          failover_destination_type: type as IvrFailoverDestinationType,
                           failover_destination_id: destId || undefined
                         });
                       }}
@@ -1618,7 +1619,7 @@ export default function IVRMenus() {
                       onChange={(type, destId) => {
                         setFormData({
                           ...formData,
-                          failover_destination_type: type as IvrDestinationType,
+                          failover_destination_type: type as IvrFailoverDestinationType,
                           failover_destination_id: destId || undefined
                         });
                       }}

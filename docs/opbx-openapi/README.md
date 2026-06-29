@@ -99,7 +99,7 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | Resource | Endpoints |
 |----------|-----------|
 | **Health** | `GET /health`, `GET /storage/health`, `GET /websocket/health` |
-| **Auth** | Login, logout, refresh, register, me |
+| **Auth** | Login, logout, refresh, register, me, Auth0 social login |
 | **Profile** | Get/update profile, password, organization |
 | **Users** | CRUD operations for organization users |
 | **Extensions** | CRUD + sync + password management |
@@ -111,6 +111,7 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | **AI Assistants** | AI assistant configuration |
 | **AI Load Balancers** | Load balancer configuration |
 | **Call Detail Records** | CDR records and export |
+| **Call Tracking** | Campaigns, DNI, sessions, analytics, ad-platform integrations |
 | **Recordings** | Recording management and download |
 | **Inbound Blacklist** | Blocked caller management |
 | **Outbound Whitelist** | Outbound dialing restrictions |

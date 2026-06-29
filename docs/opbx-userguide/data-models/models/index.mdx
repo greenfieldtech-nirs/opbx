@@ -29,6 +29,15 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 - [EmailLog](./email-logs) — Transactional email log (`email_logs`)
 - [PlatformAuditLog](./platform-audit-logs) — Cross-tenant audit trail (`platform_audit_logs`)
 
+### Call Tracking
+
+- [CallTrackingCampaign](./call-tracking-campaign) — Marketing campaign attribution (`call_tracking_campaigns`)
+- [CallTrackingNumber](./call-tracking-number) — DID-to-campaign assignment (`call_tracking_numbers`)
+- [CallTrackingSession](./call-tracking-session) — Attributed call session (`call_tracking_sessions`)
+- [CallTrackingNotificationSettings](./call-tracking-notification-settings) — Per-campaign webhook settings (`call_tracking_notification_settings`)
+- `App\Models\CallTrackingNotificationLog` — Notification delivery log (`call_tracking_notification_logs`)
+- `App\Models\CallTrackingAdPlatformIntegration` — Google Ads / Meta settings (`call_tracking_ad_platform_integrations`)
+
 ### Core PBX
 
 - `App\Models\Extension` — PBX extensions (`extensions`)

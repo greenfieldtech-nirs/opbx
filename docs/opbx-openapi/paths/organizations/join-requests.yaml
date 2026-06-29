@@ -1,0 +1,186 @@
+paths:
+  /v1/organizations/join-requests:
+    get:
+      tags:
+        - Organizations
+      summary: List pending organization join requests
+      description: |
+        Returns all pending join requests for the authenticated user's
+        organization. Requires appropriate authorization.
+      operationId: listOrganizationJoinRequests
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of pending join requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '../../components/schemas/OrganizationJoinRequest.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+    post:
+      tags:
+        - Organizations
+      summary: Create organization join request
+      description: |
+        Submit a request to join an organization using a social identity.
+        The request must be approved by an organization administrator before
+        the user is created.
+      operationId: createOrganizationJoinRequest
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organization_slug:
+                  type: string
+                  description: Slug of the organization to join
+                  example: acme-corporation
+                provider:
+                  type: string
+                  enum:
+                    - google
+                    - facebook
+                    - microsoft
+                    - github
+                    - x
+                  description: Social identity provider
+                  example: google
+                provider_subject:
+                  type: string
+                  maxLength: 255
+                  description: Provider-specific subject identifier
+                  example: '112233445566778899001'
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: Email address of the requester
+                  example: jane.smith@example.com
+                name:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                  description: Display name of the requester
+                  example: Jane Smith
+              required:
+                - organization_slug
+                - provider
+                - provider_subject
+                - email
+      responses:
+        '201':
+          description: Join request created
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/OrganizationJoinRequest.yaml'
+        '400':
+          $ref: '../../components/responses/BadRequest.yaml'
+        '404':
+          description: Organization not found or inactive
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: ORGANIZATION_NOT_FOUND
+                  message: Organization not found.
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+  /v1/organizations/join-requests/{joinRequest}/approve:
+    post:
+      tags:
+        - Organizations
+      summary: Approve organization join request
+      description: |
+        Approve a pending join request. Creates a new user in the organization
+        with the `pbx_user` role and links the social identity.
+      operationId: approveOrganizationJoinRequest
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: joinRequest
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the join request to approve
+      responses:
+        '200':
+          description: Join request approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Join request approved.
+                  user:
+                    $ref: '../../components/schemas/User.yaml'
+                required:
+                  - message
+                  - user
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Request is not pending
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: JOIN_REQUEST_NOT_PENDING
+                  message: Request is not pending.
+  /v1/organizations/join-requests/{joinRequest}/reject:
+    post:
+      tags:
+        - Organizations
+      summary: Reject organization join request
+      description: Reject a pending organization join request.
+      operationId: rejectOrganizationJoinRequest
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: joinRequest
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the join request to reject
+      responses:
+        '200':
+          description: Join request rejected
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/SuccessMessage.yaml'
+              example:
+                message: Join request rejected.
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

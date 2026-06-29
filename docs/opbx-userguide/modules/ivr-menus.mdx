@@ -42,11 +42,10 @@ Each menu option routes to one of:
 | Business Hours | A business hours schedule |
 | AI Assistant | An AI assistant |
 | AI Load Balancer | An AI load balancer |
-| Hangup | Disconnect the call |
 
 ## Failover
 
-After `max_turns` invalid inputs, the call routes to the failover destination. The failover supports the same destination types as options, except business hours.
+After `max_turns` invalid inputs, the call routes to the failover destination. The failover supports the same destination types as options, plus `hangup`, except business hours.
 
 ## Permissions
 

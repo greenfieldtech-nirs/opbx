@@ -1,0 +1,279 @@
+---
+sidebar_position: 20
+slug: /modules/call-tracking-campaigns
+sidebar_class_name: cxGuidesSidebar
+title: "Call Tracking Campaigns"
+description: "Assign DIDs to marketing campaigns, route inbound calls, and attribute conversions"
+---
+
+# Call Tracking Campaigns
+
+Call Tracking lets you assign phone numbers to marketing campaigns, route inbound calls to a destination of your choice, and attribute calls to sources, mediums, and campaigns for analytics and conversion tracking.
+
+## Purpose
+
+Use this module to:
+
+- Create campaigns that represent marketing channels or initiatives
+- Assign one or more DIDs to each campaign as tracking numbers
+- Route inbound calls to external numbers or existing OPBX destinations
+- Define conversion rules based on call duration and disposition
+- Send converted calls to Google Ads and Meta for offline attribution
+- Deliver webhook notifications for call events
+
+## Campaigns
+
+A campaign groups together a source (for example, `google`), a medium (for example, `cpc`), a routing destination, and conversion rules. When a call arrives on a tracking number assigned to a campaign, OPBX creates a session and attributes it to that campaign.
+
+### Campaign Status
+
+| Status | Behavior |
+|--------|----------|
+| Active | Calls are tracked, routed, and reported |
+| Inactive | The campaign is ignored; calls to its tracking numbers are not attributed |
+
+Set a campaign to Inactive when you are not currently running the associated marketing initiative.
+
+## Destination Types
+
+Each campaign defines where inbound calls are sent.
+
+| Destination Type | Config Field | Best For |
+|------------------|--------------|----------|
+| Forward | `forward_to` | Route to any external E.164 number |
+| Extension | `extension_id` | Route to a specific user extension |
+| Ring Group | `ring_group_id` | Distribute across a department |
+| Business Hours | `business_hours_schedule_id` | Time-based open/closed routing |
+| Conference Room | `conference_room_id` | Dedicated conference bridge |
+| IVR Menu | `ivr_menu_id` | Automated menu routing |
+| AI Assistant | `ai_assistant_id` | AI voice agent handling |
+| AI Load Balancer | `ai_load_balancer_id` | Distributed AI agent routing |
+
+:::tip
+The campaign form in the web UI exposes Forward, Extension, and Ring Group by default. All destination types are available through the API.
+:::
+
+## DNI and Number Assignment
+
+Dynamic Number Insertion (DNI) swaps the phone number displayed on your website based on the visitor's UTM parameters. See [Call Tracking DNI](/modules/call-tracking-dni) for installation instructions.
+
+### Assign a Tracking Number
+
+1. Open a campaign and select the **Tracking Numbers** tab
+2. Click **Add Number**
+3. Choose an existing DID from the Phone Numbers module
+4. Enter an optional friendly name (for example, "Google Ads — San Francisco")
+5. Save
+
+When you assign a DID to a campaign, OPBX updates the DID's routing type to `call_tracking` and points it at the campaign. You can assign multiple numbers to one campaign or dedicate one number per campaign.
+
+### Tracking Number Status
+
+| Status | Behavior |
+|--------|----------|
+| Active | Eligible for DNI swaps and routes calls to the campaign |
+| Inactive | Ignored by DNI swaps; calls are still routed by the DID configuration |
+
+## Conversion Rules
+
+A conversion rule decides whether a tracked call counts as a conversion.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| Require answered disposition | `true` | Only `CONNECTED` or `ANSWERED` dispositions can convert |
+| Min answered duration (seconds) | `30` | The call must last at least this many billable seconds |
+| Conversion value | none | Optional monetary value attached to each conversion |
+
+OPBX evaluates the rule when a session is created from a Call Detail Record (CDR). If the call meets all enabled conditions, `is_converted` is set to `true` and the configured conversion value is stored on the session.
+
+## Ad-Platform Integration
+
+Call Tracking can upload converted calls to Google Ads and send them to the Meta Conversions API.
+
+### Enable Uploads
+
+1. Go to **Call Tracking → Integrations**
+2. Configure your organization-wide Google Ads and Meta credentials
+3. Open each campaign and enable the desired upload toggles
+4. Define the campaign conversion rules
+
+Both the organization integration and the campaign toggle must be enabled before conversions are uploaded.
+
+### Google Ads
+
+OPBX calls the Google Ads API `customers/{customer_id}:uploadCallConversions` endpoint for each converted session. Required settings:
+
+- Developer token
+- Refresh token
+- Customer ID
+- Conversion action resource name
+
+### Meta Conversions API
+
+OPBX posts a `Contact` event to the Meta Conversions API for each converted session. The caller phone number is SHA-256 hashed before being sent. Required settings:
+
+- Pixel ID
+- Access token
+
+## Notification Settings
+
+Each campaign can send webhook notifications for call events.
+
+### Supported Events
+
+| Event | Fired When |
+|-------|------------|
+| `call.received` | A call is received on a tracking number |
+| `call.answered` | The call is answered |
+| `call.completed` | The call ends |
+| `call.converted` | The call meets the conversion rule |
+
+### Authentication
+
+| Method | Behavior |
+|--------|----------|
+| None | No authentication header is sent |
+| Bearer Token | Sends `Authorization: Bearer <token>` |
+| Basic Auth | Sends `Authorization: Basic <username:password>` |
+
+:::tip
+Use the **Test Webhook** button to send a sample `call.received` payload and verify connectivity. Authorization headers are redacted in the delivery log.
+:::
+
+### Webhook Payload
+
+```json
+{
+  "event": "call.converted",
+  "event_id": "uuid",
+  "timestamp": "2026-06-25T12:34:56+00:00",
+  "organization_id": 1,
+  "campaign": { "id": 5, "name": "Google Ads — HVAC" },
+  "tracking_number": "+14155551234",
+  "caller_number": "+14155559876",
+  "source": "google",
+  "medium": "cpc",
+  "duration": 87,
+  "billsec": 72,
+  "is_answered": true,
+  "is_converted": true,
+  "conversion_value": 45.0
+}
+```
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View campaigns | Yes | Yes | Yes | Yes |
+| Create campaigns | Yes | Yes | No | No |
+| Update campaigns | Yes | Yes | No | No |
+| Delete campaigns | Yes | Yes | No | No |
+| View tracking numbers | Yes | Yes | Yes | Yes |
+| Create tracking numbers | Yes | Yes | No | No |
+| Update tracking numbers | Yes | Yes | No | No |
+| Delete tracking numbers | Yes | Yes | No | No |
+| Configure ad-platform integrations | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Create a Campaign
+
+1. Navigate to **Call Tracking → Campaigns**
+2. Click **New Campaign**
+3. Enter a campaign name
+4. Optionally enter a source and medium for attribution
+5. Choose a destination type and fill in the destination details
+6. Set conversion rules
+7. Enable Google Ads or Meta uploads if desired
+8. Save the campaign
+
+### Add a Tracking Number
+
+1. Open the campaign detail page
+2. Select the **Tracking Numbers** tab
+3. Click **Add Number**
+4. Select a DID and enter an optional friendly name
+5. Save
+
+### Configure Webhooks
+
+1. Open the campaign detail page
+2. Select the **Notifications** tab
+3. Enter the webhook URL
+4. Choose an authentication method
+5. Select the events to send
+6. Save and test the webhook
+
+## Key Data Fields
+
+### `call_tracking_campaigns` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Campaign display name |
+| `source` | string nullable | Attribution source, e.g. `google` |
+| `medium` | string nullable | Attribution medium, e.g. `cpc` |
+| `description` | text nullable | Optional description |
+| `status` | enum | `active` or `inactive` |
+| `destination_type` | enum | `forward`, `extension`, `ring_group`, `business_hours`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer` |
+| `destination_config` | JSON | `{forward_to: "..."}`, `{extension_id: N}`, etc. |
+| `conversion_rule` | JSON | `{min_answered_duration_seconds, requires_answered_disposition, conversion_value}` |
+| `google_ads_upload_enabled` | boolean | Upload converted calls to Google Ads |
+| `meta_upload_enabled` | boolean | Send converted calls to Meta |
+
+### `call_tracking_numbers` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `call_tracking_campaign_id` | FK | Parent campaign |
+| `did_number_id` | FK | Linked DID |
+| `friendly_name` | string nullable | Display label |
+| `status` | enum | `active` or `inactive` |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/call-tracking-campaigns` | List campaigns |
+| POST | `/v1/call-tracking-campaigns` | Create campaign |
+| GET | `/v1/call-tracking-campaigns/{campaign}` | Get campaign |
+| PUT | `/v1/call-tracking-campaigns/{campaign}` | Update campaign |
+| DELETE | `/v1/call-tracking-campaigns/{campaign}` | Delete campaign |
+| GET | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers` | List tracking numbers |
+| POST | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers` | Add tracking number |
+| PUT | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers/{number}` | Update tracking number |
+| DELETE | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers/{number}` | Remove tracking number |
+| GET | `/v1/call-tracking-campaigns/{campaign}/notification-settings` | Get notification settings |
+| PUT | `/v1/call-tracking-campaigns/{campaign}/notification-settings` | Update notification settings |
+| POST | `/v1/call-tracking-campaigns/{campaign}/notification-settings/test` | Test webhook |
+| GET | `/v1/call-tracking-campaigns/{campaign}/notification-logs` | View delivery logs |
+| GET/PUT | `/v1/call-tracking-ad-platform-integrations` | Manage ad-platform credentials |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Best Practices
+
+- Use consistent source and medium values that match your UTM parameters
+- Assign a unique tracking number per campaign for clean attribution
+- Set conversion rules that match your business definition of a qualified lead
+- Test webhook notifications before enabling them in production
+- Keep ad-platform credentials in the Integrations page up to date
+- Review notification logs regularly to catch delivery failures
+
+## Related Modules
+
+- [Phone Numbers (DIDs)](/modules/phone-numbers) — Provision and manage the numbers used as tracking numbers
+- [Call Tracking DNI](/modules/call-tracking-dni) — Dynamic Number Insertion for your website
+- [Call Tracking Analytics](/modules/call-tracking-analytics) — Dashboard, KPIs, and exports
+- [Extensions](/modules/extensions) — Extension routing target
+- [Ring Groups](/modules/ring-groups) — Ring group routing target
+- [Business Hours](/modules/business-hours) — Time-based routing target
+- [IVR Menus](/modules/ivr-menus) — IVR routing target
+- [Conference Rooms](/modules/conference-rooms) — Conference room routing target
+- [AI Assistants](/modules/ai-assistants) — AI assistant routing target
+- [AI Load Balancers](/modules/ai-load-balancers) — AI load balancer routing target

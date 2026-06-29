@@ -82,8 +82,6 @@ Retryable dispositions: `busy`, `no-answer`, `cancelled`.
 
 Backoff interval: `5 × 2^(attempt-1)` minutes, capped at 60 minutes.
 
-If `retry_on_voicemail` is enabled and AMD detects voicemail, the destination is rescheduled with the same backoff.
-
 ## Permissions
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
@@ -150,7 +148,6 @@ If `retry_on_voicemail` is enabled and AMD detects voicemail, the destination is
 | `action_voicemail` | string | AMD action |
 | `action_human` | string | AMD action |
 | `action_unknown` | string | AMD action |
-| `retry_on_voicemail` | boolean | |
 
 ## Related API Endpoints
 
