@@ -7,8 +7,12 @@ namespace App\Http\Controllers\Api;
 use App\Enums\BusinessHoursStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
+use App\Http\Requests\BusinessHours\ToggleBusinessHoursStatusRequest;
+use App\Http\Requests\BusinessHours\UpdateBusinessHoursScheduleRequest;
 use App\Http\Resources\BusinessHoursScheduleResource;
 use App\Models\BusinessHoursSchedule;
+use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -187,7 +191,7 @@ class BusinessHoursController extends AbstractApiCrudController
      */
     protected function clearOrganizationCaches(Model $model): void
     {
-        $cacheService = app(\App\Services\VoiceRouting\VoiceRoutingCacheService::class);
+        $cacheService = app(VoiceRoutingCacheService::class);
         $cacheService->invalidateBusinessHoursSchedule($model->organization_id);
 
         \Log::debug('Business hours cache cleared after mutation', [
@@ -418,6 +422,22 @@ class BusinessHoursController extends AbstractApiCrudController
     }
 
     /**
+     * Get the form request class for store operations.
+     */
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreBusinessHoursScheduleRequest::class;
+    }
+
+    /**
+     * Get the form request class for update operations.
+     */
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateBusinessHoursScheduleRequest::class;
+    }
+
+    /**
      * Get the view ability for the model.
      */
     protected function getViewAbility(): string
@@ -452,7 +472,7 @@ class BusinessHoursController extends AbstractApiCrudController
     /**
      * Toggle the status of a business hours schedule.
      */
-    public function toggleStatus(\App\Http\Requests\BusinessHours\ToggleBusinessHoursStatusRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
+    public function toggleStatus(ToggleBusinessHoursStatusRequest $request, BusinessHoursSchedule $businessHour): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 

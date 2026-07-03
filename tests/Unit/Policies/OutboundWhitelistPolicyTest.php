@@ -11,7 +11,6 @@ use App\Models\OutboundWhitelist;
 use App\Models\User;
 use App\Policies\OutboundWhitelistPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -25,55 +24,59 @@ class OutboundWhitelistPolicyTest extends TestCase
     use RefreshDatabase;
 
     private OutboundWhitelistPolicy $policy;
+
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private OutboundWhitelist $outboundWhitelist;
+
     private OutboundWhitelist $otherOrgOutboundWhitelist;
 
     private User $owner;
+
     private User $pbxAdmin;
+
     private User $pbxUser;
+
     private User $reporter;
+
     private User $otherOrgUser;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->policy = new OutboundWhitelistPolicy();
+        $this->policy = new OutboundWhitelistPolicy;
 
-        // Create mock users with different roles
-        $this->owner = $this->createMockUser(UserRole::OWNER, 1);
-        $this->pbxAdmin = $this->createMockUser(UserRole::PBX_ADMIN, 1);
-        $this->pbxUser = $this->createMockUser(UserRole::PBX_USER, 1);
-        $this->reporter = $this->createMockUser(UserRole::REPORTER, 1);
-        $this->otherOrgUser = $this->createMockUser(UserRole::OWNER, 2);
+        // Create real organizations and model instances so that organization_id
+        // comparisons in the policy work correctly.
+        $this->organization = Organization::factory()->create();
+        $this->otherOrganization = Organization::factory()->create();
 
-        // Create mock outbound whitelists
-        $this->outboundWhitelist = $this->createMockOutboundWhitelist(1);
-        $this->otherOrgOutboundWhitelist = $this->createMockOutboundWhitelist(2);
-    }
+        $this->owner = User::factory()->owner()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->pbxAdmin = User::factory()->admin()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->pbxUser = User::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->reporter = User::factory()->create([
+            'organization_id' => $this->organization->id,
+            'role' => UserRole::REPORTER,
+        ]);
+        $this->otherOrgUser = User::factory()->owner()->create([
+            'organization_id' => $this->otherOrganization->id,
+        ]);
 
-    /**
-     * Create a mock user with specified role and organization ID.
-     */
-    private function createMockUser(UserRole $role, int $organizationId): User
-    {
-        $user = $this->createMock(User::class);
-        $user->method('isOwner')->willReturn($role === UserRole::OWNER);
-        $user->method('isPBXAdmin')->willReturn($role === UserRole::PBX_ADMIN);
-        $user->organization_id = $organizationId;
-        return $user;
-    }
-
-    /**
-     * Create a mock outbound whitelist with specified organization ID.
-     */
-    private function createMockOutboundWhitelist(int $organizationId): OutboundWhitelist
-    {
-        $outboundWhitelist = $this->createMock(OutboundWhitelist::class);
-        $outboundWhitelist->organization_id = $organizationId;
-        return $outboundWhitelist;
+        $this->outboundWhitelist = OutboundWhitelist::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->otherOrgOutboundWhitelist = OutboundWhitelist::factory()->create([
+            'organization_id' => $this->otherOrganization->id,
+        ]);
     }
 
     /**

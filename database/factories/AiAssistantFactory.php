@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Enums\UserStatus;
+use App\Enums\AiAssistantStatus;
+use App\Models\AiAssistant;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /**
  * Factory for AI Assistant model.
  *
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\AiAssistant>
+ * @extends Factory<AiAssistant>
  */
 class AiAssistantFactory extends Factory
 {
@@ -27,7 +28,7 @@ class AiAssistantFactory extends Factory
             'organization_id' => Organization::factory(),
             'name' => fake()->words(3, true).' Bot',
             'description' => fake()->optional()->sentence(),
-            'status' => UserStatus::ACTIVE,
+            'status' => AiAssistantStatus::ACTIVE,
             'provider' => 'vapi',
             'protocol' => 'sip',
             'configuration' => [
@@ -44,7 +45,7 @@ class AiAssistantFactory extends Factory
     public function inactive(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => UserStatus::INACTIVE,
+            'status' => AiAssistantStatus::INACTIVE,
         ]);
     }
 

@@ -10,6 +10,7 @@ use App\Enums\UserStatus;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\UserSocialIdentity;
+use App\Scopes\OrganizationScope;
 use App\Services\Auth0\Auth0StateStore;
 use App\Services\Email\Contracts\TransactionalEmailInterface;
 use App\Services\Email\DTOs\EmailMessage;
@@ -103,8 +104,13 @@ class UserInvitationTest extends TestCase
     {
         $this->enableAuth0();
 
-        $organization = Organization::factory()->create();
-        $owner = User::factory()->owner()->create(['organization_id' => $organization->id]);
+        $organization = Organization::factory()->create([
+            'name' => 'Test Organization',
+        ]);
+        $owner = User::factory()->owner()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Test Owner',
+        ]);
         User::factory()->create([
             'organization_id' => $organization->id,
             'email' => 'active@example.com',
@@ -355,7 +361,7 @@ class UserInvitationTest extends TestCase
         parse_str(parse_url($redirectUrl, PHP_URL_QUERY) ?? '', $query);
         $state = $query['state'] ?? '';
 
-        $pendingUser = User::where('email', 'pending@example.com')->first();
+        $pendingUser = User::withoutGlobalScope(OrganizationScope::class)->where('email', 'pending@example.com')->first();
         $this->assertNotNull($pendingUser);
         $pendingUser->status = UserStatus::ACTIVE;
         $pendingUser->save();

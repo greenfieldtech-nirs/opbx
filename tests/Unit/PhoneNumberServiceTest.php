@@ -12,7 +12,7 @@ class PhoneNumberServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->phoneService = new PhoneNumberService();
+        $this->phoneService = new PhoneNumberService;
     }
 
     public function test_extract_calling_code_us_number()
@@ -54,7 +54,7 @@ class PhoneNumberServiceTest extends TestCase
     public function test_validate_and_format_valid_number()
     {
         // Use a more complete US number that's likely to be valid
-        $result = $this->phoneService->validateAndFormatPhoneNumber('+15551234567');
+        $result = $this->phoneService->validateAndFormatPhoneNumber('+12122011234');
 
         // The exact validation may vary, so just check that we get a result
         $this->assertIsArray($result);
@@ -72,7 +72,7 @@ class PhoneNumberServiceTest extends TestCase
 
     public function test_extract_phone_components()
     {
-        $result = $this->phoneService->extractPhoneComponents('+15551234567');
+        $result = $this->phoneService->extractPhoneComponents('+12122011234');
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('calling_code', $result);

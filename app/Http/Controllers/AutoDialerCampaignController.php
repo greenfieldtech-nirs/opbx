@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\CallerIdStrategy;
 use App\Enums\CampaignStatus;
 use App\Http\Requests\CreateCampaignRequest;
 use App\Http\Requests\UpdateCampaignRequest;
@@ -20,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 class AutoDialerCampaignController extends Controller
 {
@@ -260,7 +262,7 @@ class AutoDialerCampaignController extends Controller
         $this->authorize('update', $campaign);
 
         try {
-            $redis = \Illuminate\Support\Facades\Redis::connection('dialer');
+            $redis = Redis::connection('dialer');
             $key = "dialer:cac:{$campaign->id}:active";
             $currentValue = $redis->get($key);
 
@@ -480,7 +482,7 @@ class AutoDialerCampaignController extends Controller
             'dial_timeout' => $data['dial_timeout'],
             'destination_connect' => $data['destination_connect'],
             'caller_id' => $data['caller_id'],
-            'caller_id_strategy' => $data['caller_id_strategy'],
+            'caller_id_strategy' => $data['caller_id_strategy'] ?? CallerIdStrategy::ROUND_ROBIN->value,
             'caller_id_pool_enabled' => true,
             'max_dial_attempts' => $data['max_dial_attempts'],
             'concurrent_active_calls' => $data['concurrent_active_calls'],
@@ -492,7 +494,7 @@ class AutoDialerCampaignController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
             'timezone' => $data['timezone'],
-            'time_limit' => $data['time_limit'] ?? null,
+            'time_limit' => $data['time_limit'] ?? 3600,
             'record_calls' => $data['record_calls'] ?? false,
             'action_voicemail' => $data['action_voicemail'] ?? null,
             'action_human' => $data['action_human'] ?? null,

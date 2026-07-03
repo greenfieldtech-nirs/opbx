@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 
@@ -42,10 +43,11 @@ class ResetUserPassword extends Command
         $force = $this->option('force');
 
         // Find the user
-        $user = User::where('email', $email)->first();
+        $user = OrganizationScope::bypass(fn () => User::where('email', $email)->first());
 
-        if (!$user) {
+        if (! $user) {
             $this->error("User with email '{$email}' not found.");
+
             return Command::FAILURE;
         }
 
@@ -63,9 +65,10 @@ class ResetUserPassword extends Command
         );
 
         // Confirm if not forced
-        if (!$force) {
-            if (!$this->confirm("Reset password for user '{$user->name}' ({$user->email})?")) {
+        if (! $force) {
+            if (! $this->confirm("Reset password for user '{$user->name}' ({$user->email})?")) {
                 $this->info('Operation cancelled.');
+
                 return Command::SUCCESS;
             }
         }

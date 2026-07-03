@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Scopes\OrganizationScope;
+use App\Services\Recording\RecordingAccessService;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -113,11 +114,17 @@ class Recording extends Model
     public function getPublicUrl(): string
     {
         if ($this->isRemote()) {
-            return $this->remote_url;
+            return $this->remote_url ?? '';
         }
 
         if ($this->isUploaded()) {
-            return asset('storage/recordings/'.$this->organization_id.'/'.$this->file_path);
+            if (! $this->file_path) {
+                return '';
+            }
+
+            $url = asset('storage/recordings/'.$this->organization_id.'/'.$this->file_path);
+
+            return $url ?? '';
         }
 
         return '';
@@ -134,12 +141,12 @@ class Recording extends Model
     public function getPlaybackUrl(int $userId): string
     {
         if ($this->isRemote()) {
-            return $this->remote_url;
+            return $this->remote_url ?? '';
         }
 
         if ($this->isUploaded()) {
             // Use the same token-based approach as download
-            $accessService = app(\App\Services\Recording\RecordingAccessService::class);
+            $accessService = app(RecordingAccessService::class);
             $token = $accessService->generateAccessToken($this, $userId);
 
             // Use organization's webhook base URL (for external access like Cloudonix)
@@ -163,7 +170,7 @@ class Recording extends Model
     {
         if ($this->isUploaded()) {
             // Import the access service to generate a token
-            $accessService = app(\App\Services\Recording\RecordingAccessService::class);
+            $accessService = app(RecordingAccessService::class);
             $token = $accessService->generateAccessToken($this, $userId);
 
             // Use organization's webhook base URL (for external access like Cloudonix)

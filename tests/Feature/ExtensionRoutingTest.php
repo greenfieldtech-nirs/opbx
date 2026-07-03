@@ -3,17 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\ExtensionType;
+use App\Models\AiAssistant;
 use App\Models\CloudonixSettings;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\Organization;
 use App\Models\RingGroup;
-use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class ExtensionRoutingTest extends TestCase
@@ -21,6 +21,7 @@ class ExtensionRoutingTest extends TestCase
     use DatabaseTransactions;
 
     protected Organization $organization;
+
     protected VoiceRoutingManager $routingManager;
 
     protected function setUp(): void
@@ -42,7 +43,7 @@ class ExtensionRoutingTest extends TestCase
         $this->setupExtensions();
     }
 
-    private function setupExtensions()
+    private function setupExtensions(): void
     {
         // Create conference room
         $conferenceRoom = ConferenceRoom::factory()->create([
@@ -59,7 +60,7 @@ class ExtensionRoutingTest extends TestCase
             'timeout' => 30,
         ]);
 
-        // Add ring group members
+        // Add ring group members using the HasMany relation
         $member1 = Extension::factory()->create([
             'organization_id' => $this->organization->id,
             'extension_number' => '1001',
@@ -71,14 +72,29 @@ class ExtensionRoutingTest extends TestCase
             'type' => ExtensionType::USER,
         ]);
 
-        $ringGroup->members()->attach([$member1->id, $member2->id]);
+        $ringGroup->members()->create(['extension_id' => $member1->id, 'priority' => 1]);
+        $ringGroup->members()->create(['extension_id' => $member2->id, 'priority' => 2]);
 
         // Create IVR menu
-        $ivrMenu = IvrMenu::factory()->create([
+        $ivrMenu = IvrMenu::factory()->active()->create([
             'organization_id' => $this->organization->id,
             'name' => 'Main Menu',
             'tts_text' => 'Welcome to our company. Press 1 for sales.',
             'max_turns' => 3,
+        ]);
+
+        // Create AI assistant for the AI extension
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => 'active',
+            'protocol' => 'sip',
+        ]);
+
+        // Create target extension for the forward extension
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'extension_number' => '1003',
+            'type' => ExtensionType::USER,
         ]);
 
         // Create extensions
@@ -105,106 +121,91 @@ class ExtensionRoutingTest extends TestCase
 
         Extension::factory()->create([
             'organization_id' => $this->organization->id,
+            'ai_assistant_id' => $aiAssistant->id,
             'extension_number' => '3003',
             'type' => ExtensionType::AI_ASSISTANT,
-            'configuration' => ['service_url' => 'https://ai.example.com'],
+            'service_url' => 'https://ai.example.com',
         ]);
 
         Extension::factory()->create([
             'organization_id' => $this->organization->id,
             'extension_number' => '3004',
             'type' => ExtensionType::FORWARD,
-            'configuration' => ['forward_to' => '555-123-4567'],
+            'configuration' => ['forward_to' => '1003'],
         ]);
     }
 
-    public function test_conference_room_routing()
+    private function createRequest(string $to): Request
     {
-        $request = new Request();
+        $request = new Request;
         $request->merge([
-            'To' => '3000',
+            'To' => $to,
             'From' => '1001',
-            'CallSid' => 'test-call-3000',
+            'CallSid' => 'test-call-'.$to,
+            'Direction' => 'subscriber',
             '_organization_id' => $this->organization->id,
         ]);
 
-        $response = $this->routingManager->handleInbound($request);
-
-        $this->assertEquals(200, $response->getStatusCode());
-        $content = $response->getContent();
-        $this->assertStringContains('<Conference>', $content);
-        $this->assertStringContains('conference-', $content); // Conference room name/ID
+        return $request;
     }
 
-    public function test_ring_group_routing()
+    public function test_conference_room_routing(): void
     {
-        $request = new Request();
-        $request->merge([
-            'To' => '3001',
-            'From' => '1001',
-            'CallSid' => 'test-call-3001',
-            '_organization_id' => $this->organization->id,
-        ]);
+        $request = $this->createRequest('3000');
 
-        $response = $this->routingManager->handleInbound($request);
+        $response = OrganizationScope::bypass(fn () => $this->routingManager->handleInbound($request));
 
         $this->assertEquals(200, $response->getStatusCode());
         $content = $response->getContent();
-        $this->assertStringContains('<Dial>', $content);
-        $this->assertStringContains('<Number>', $content); // Should dial ring group members
+        $this->assertStringContainsString('<Conference ', $content);
+        $this->assertStringContainsString('conf_', $content); // Conference room name/ID
     }
 
-    public function test_ivr_menu_routing()
+    public function test_ring_group_routing(): void
     {
-        $request = new Request();
-        $request->merge([
-            'To' => '3002',
-            'From' => '1001',
-            'CallSid' => 'test-call-3002',
-            '_organization_id' => $this->organization->id,
-        ]);
+        $request = $this->createRequest('3001');
 
-        $response = $this->routingManager->handleInbound($request);
+        $response = OrganizationScope::bypass(fn () => $this->routingManager->handleInbound($request));
 
         $this->assertEquals(200, $response->getStatusCode());
         $content = $response->getContent();
-        $this->assertStringContains('<Gather>', $content);
-        $this->assertStringContains('Welcome to our company', $content);
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('<Number>', $content); // Should dial ring group members
     }
 
-    public function test_ai_assistant_routing()
+    public function test_ivr_menu_routing(): void
     {
-        $request = new Request();
-        $request->merge([
-            'To' => '3003',
-            'From' => '1001',
-            'CallSid' => 'test-call-3003',
-            '_organization_id' => $this->organization->id,
-        ]);
+        $request = $this->createRequest('3002');
 
-        $response = $this->routingManager->handleInbound($request);
+        $response = OrganizationScope::bypass(fn () => $this->routingManager->handleInbound($request));
 
         $this->assertEquals(200, $response->getStatusCode());
         $content = $response->getContent();
-        $this->assertStringContains('<Service>', $content);
-        $this->assertStringContains('ai.example.com', $content);
+        $this->assertStringContainsString('<Gather ', $content);
+        $this->assertStringContainsString('Welcome to our company', $content);
     }
 
-    public function test_forward_routing()
+    public function test_ai_assistant_routing(): void
     {
-        $request = new Request();
-        $request->merge([
-            'To' => '3004',
-            'From' => '1001',
-            'CallSid' => 'test-call-3004',
-            '_organization_id' => $this->organization->id,
-        ]);
+        $request = $this->createRequest('3003');
 
-        $response = $this->routingManager->handleInbound($request);
+        $response = OrganizationScope::bypass(fn () => $this->routingManager->handleInbound($request));
 
         $this->assertEquals(200, $response->getStatusCode());
         $content = $response->getContent();
-        $this->assertStringContains('<Dial>', $content);
-        $this->assertStringContains('555-123-4567', $content);
+        $this->assertStringContainsString('<Service>', $content);
+        $this->assertStringContainsString('ai.example.com', $content);
+    }
+
+    public function test_forward_routing(): void
+    {
+        $request = $this->createRequest('3004');
+
+        $response = OrganizationScope::bypass(fn () => $this->routingManager->handleInbound($request));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $content = $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1003', $content);
     }
 }

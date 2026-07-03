@@ -8,7 +8,9 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Rules\Recaptcha;
 use App\Rules\ValidEmailDomain;
+use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class RegisterRequest extends FormRequest
@@ -61,7 +63,7 @@ class RegisterRequest extends FormRequest
                 'max:255',
                 new ValidEmailDomain,
                 function ($attribute, $value, $fail) {
-                    if (User::where('email', $value)->exists()) {
+                    if (OrganizationScope::bypass(fn () => User::where('email', $value)->exists())) {
                         $fail('The admin email has already been taken.');
                     }
                 },
@@ -121,7 +123,7 @@ class RegisterRequest extends FormRequest
         $data = parent::validated();
 
         if (empty($data['organization']['slug'])) {
-            $data['organization']['slug'] = \Illuminate\Support\Str::slug($data['organization']['name']);
+            $data['organization']['slug'] = Str::slug($data['organization']['name']);
         }
 
         return $key ? data_get($data, $key, $default) : $data;

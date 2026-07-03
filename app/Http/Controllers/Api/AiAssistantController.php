@@ -6,11 +6,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\AiAssistantStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\AiAssistant\StoreAiAssistantRequest;
+use App\Http\Requests\AiAssistant\UpdateAiAssistantRequest;
 use App\Http\Resources\AiAssistantResource;
 use App\Models\AiAssistant;
 use App\Services\AiAssistant\ProviderRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -117,6 +120,78 @@ class AiAssistantController extends AbstractApiCrudController
     protected function getUpdateAbility(): string
     {
         return 'update';
+    }
+
+    /**
+     * Hook after showing an AI assistant.
+     *
+     * Loads extension details so the resource can include usage information.
+     */
+    protected function afterShow(Model $model, Request $request): void
+    {
+        /** @var AiAssistant $model */
+        $model->load([
+            'extensions' => function ($query) {
+                $query->select('id', 'extension_number', 'type', 'status', 'ai_assistant_id', 'organization_id')
+                    ->with('user:id,name,email')
+                    ->limit(10);
+            },
+        ]);
+    }
+
+    /**
+     * Remove the specified AI assistant.
+     *
+     * Returns 422 if the assistant is still referenced by extensions.
+     */
+    public function destroy(Request $request): JsonResponse
+    {
+        $model = $this->resolveModel($request);
+        $this->authorize($this->getDeleteAbility(), $model);
+
+        $currentUser = $this->getAuthenticatedUser();
+
+        if ($model->organization_id !== $currentUser->organization_id) {
+            \Log::warning('Cross-tenant ai assistant deletion attempt', [
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_ai_assistant_id' => $model->id,
+                'target_organization_id' => $model->organization_id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Ai assistant not found.',
+            ], 404);
+        }
+
+        /** @var AiAssistant $model */
+        if ($model->isInUse()) {
+            return $this->errorResponse(
+                'Cannot delete AI Assistant that is in use. Please reassign these extensions first.',
+                422,
+                'AI_ASSISTANT_IN_USE',
+                ['usage_count' => $model->usage_count]
+            );
+        }
+
+        return parent::destroy($request);
+    }
+
+    /**
+     * Get the form request class for store operations.
+     */
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreAiAssistantRequest::class;
+    }
+
+    /**
+     * Get the form request class for update operations.
+     */
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateAiAssistantRequest::class;
     }
 
     /**

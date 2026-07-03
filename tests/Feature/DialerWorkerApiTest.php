@@ -11,10 +11,13 @@ use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Mockery;
 use Tests\TestCase;
 
@@ -43,14 +46,14 @@ class DialerWorkerApiTest extends TestCase
 
     protected function tearDown(): void
     {
-        \Mockery::close();
+        Mockery::close();
         parent::tearDown();
     }
 
     /**
      * Helper: Make authenticated request to worker API
      */
-    private function workerRequest(string $method, string $uri, array $data = []): \Illuminate\Testing\TestResponse
+    private function workerRequest(string $method, string $uri, array $data = []): TestResponse
     {
         return $this->withHeaders([
             'Authorization' => 'Bearer '.self::WORKER_TOKEN,
@@ -116,14 +119,20 @@ class DialerWorkerApiTest extends TestCase
 
     public function test_get_active_campaigns_returns_running_campaigns(): void
     {
-        // Create active campaign with current schedule (using isRunnable-compatible fields)
+        $today = strtolower(now()->format('l'));
+
         [$campaign] = $this->createCampaignWithDestinations([
             'status' => CampaignStatus::ACTIVE,
             'start_date' => now()->subDay(),
             'end_date' => now()->addDay(),
-            'days_active' => [strtolower(now()->format('l'))],
-            'start_time' => 0,
-            'end_time' => 23,
+            'schedule' => [
+                $today => [
+                    'enabled' => true,
+                    'time_ranges' => [
+                        ['start_time' => '00:00', 'end_time' => '23:59'],
+                    ],
+                ],
+            ],
         ]);
 
         $response = $this->workerRequest('GET', '/campaigns/active');
@@ -331,6 +340,16 @@ class DialerWorkerApiTest extends TestCase
         ], 1, [
             'status' => DestinationStatus::PENDING,
             'phone_number' => '+1234567890',
+        ]);
+
+        CloudonixSettings::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+
+        config(['cloudonix.api.base_url' => 'https://api.cloudonix.io']);
+
+        Http::fake([
+            'api.cloudonix.io/*' => Http::response(['id' => 'call-test-123', 'token' => 'sess-test-123'], 200),
         ]);
 
         $destination = $destinations[0];

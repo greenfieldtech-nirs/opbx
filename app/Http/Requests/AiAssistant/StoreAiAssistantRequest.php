@@ -92,11 +92,17 @@ class StoreAiAssistantRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Validate provider exists in registry
-            $providerRegistry = app(ProviderRegistry::class);
             $provider = $this->input('provider');
 
-            if ($provider && ! $providerRegistry->getProvider($provider)) {
+            // Skip provider-specific validation when the field is missing/invalid;
+            // the required/string rules will already report the error.
+            if (! is_string($provider) || $provider === '') {
+                return;
+            }
+
+            // Validate provider exists in registry
+            $providerRegistry = app(ProviderRegistry::class);
+            if (! $providerRegistry->getProvider($provider)) {
                 $validator->errors()->add(
                     'provider',
                     "Unknown AI provider: {$provider}"

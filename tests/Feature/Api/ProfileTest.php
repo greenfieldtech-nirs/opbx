@@ -23,8 +23,6 @@ class ProfileTest extends TestCase
 
     /**
      * Create a test user with active organization.
-     *
-     * @return User
      */
     private function createTestUser(): User
     {
@@ -36,7 +34,7 @@ class ProfileTest extends TestCase
             'organization_id' => $organization->id,
             'email' => 'test@example.com',
             'password' => Hash::make('OldPassword123!'),
-            'role' => UserRole::ADMIN,
+            'role' => UserRole::PBX_ADMIN,
             'status' => 'active',
         ]);
     }
@@ -77,7 +75,7 @@ class ProfileTest extends TestCase
                     'email' => $user->email,
                     'name' => $user->name,
                     'role' => $user->role->value,
-                    'status' => $user->status,
+                    'status' => $user->status->value,
                 ],
             ]);
     }
@@ -130,6 +128,7 @@ class ProfileTest extends TestCase
 
         $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/profile', [
+                'name' => '',
                 'email' => 'test@example.com',
             ]);
 
@@ -147,6 +146,7 @@ class ProfileTest extends TestCase
         $response = $this->actingAs($user, 'sanctum')
             ->putJson('/api/v1/profile', [
                 'name' => 'Test User',
+                'email' => '',
             ]);
 
         $response->assertStatus(422)

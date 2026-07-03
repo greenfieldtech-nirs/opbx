@@ -8,6 +8,7 @@ use App\Enums\CallerIdStrategy;
 use App\Enums\CampaignStatus;
 use App\Enums\RoutingDestinationType;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -73,11 +74,13 @@ class AutoDialerCampaign extends Model
         'action_human',
         'action_unknown',
         'retry_on_voicemail',
+        'voicemail_calls',
         'total_destinations',
         'completed_calls',
         'failed_calls',
-        'voicemail_calls',
         'pending_calls',
+        'started_at',
+        'completed_at',
         'pause_reason',
         'resume_at',
         'caller_id_strategy',

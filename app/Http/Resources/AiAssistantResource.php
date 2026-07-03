@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\AiAssistant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * Transforms AI Assistant model data for API responses.
  *
- * @mixin \App\Models\AiAssistant
+ * @mixin AiAssistant
  */
 class AiAssistantResource extends JsonResource
 {
@@ -42,17 +43,22 @@ class AiAssistantResource extends JsonResource
             // Include extension details if loaded (for show endpoint)
             'used_by_extensions' => $this->when(
                 $this->relationLoaded('extensions') && $this->extensions->isNotEmpty(),
-                fn () => $this->extensions->map(fn ($ext) => [
-                    'id' => $ext->id,
-                    'extension_number' => $ext->extension_number,
-                    'type' => $ext->type,
-                    'status' => $ext->status->value,
-                    'user' => $ext->when($ext->relationLoaded('user') && $ext->user, [
-                        'id' => $ext->user?->id,
-                        'name' => $ext->user?->name,
-                        'email' => $ext->user?->email,
-                    ]),
-                ])
+                function () {
+                    return $this->extensions->map(fn ($ext) => [
+                        'id' => $ext->id,
+                        'extension_number' => $ext->extension_number,
+                        'type' => $ext->type,
+                        'status' => $ext->status->value,
+                        'user' => $this->when(
+                            $ext->relationLoaded('user') && $ext->user,
+                            fn () => [
+                                'id' => $ext->user->id,
+                                'name' => $ext->user->name,
+                                'email' => $ext->user->email,
+                            ]
+                        ),
+                    ]);
+                }
             ),
 
             // Audit fields

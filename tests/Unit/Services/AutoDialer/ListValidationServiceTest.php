@@ -32,10 +32,10 @@ class ListValidationServiceTest extends TestCase
     /** @test */
     public function it_validates_valid_uk_phone_number(): void
     {
-        $result = $this->service->validatePhoneNumber('+447700900123');
+        $result = $this->service->validatePhoneNumber('+447770123456');
 
         $this->assertTrue($result->valid);
-        $this->assertEquals('+447700900123', $result->normalizedNumber);
+        $this->assertEquals('+447770123456', $result->normalizedNumber);
     }
 
     /** @test */

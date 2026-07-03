@@ -8,7 +8,9 @@ use App\Enums\AiAssistantStatus;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderDefinition;
 use App\Services\AiAssistant\ProviderRegistry;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,13 +33,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property array $configuration
  * @property int|null $created_by
  * @property int|null $updated_by
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
- * @property \Carbon\Carbon|null $deleted_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property Carbon|null $deleted_at
  * @property-read Organization $organization
  * @property-read User|null $creator
  * @property-read User|null $updater
- * @property-read \Illuminate\Database\Eloquent\Collection|Extension[] $extensions
+ * @property-read Collection|Extension[] $extensions
  */
 #[ScopedBy([OrganizationScope::class])]
 class AiAssistant extends Model
@@ -114,8 +116,11 @@ class AiAssistant extends Model
      */
     public function extensions(): HasMany
     {
-        return $this->hasMany(Extension::class, 'ai_assistant_id')
-            ->where('organization_id', $this->organization_id);
+        // The Extension model's global OrganizationScope handles tenant filtering.
+        // Do not add a manual organization_id constraint here: during eager loading
+        // Laravel builds the relation from a fresh model instance, so $this->organization_id
+        // would be null and the query would become `where organization_id is null`.
+        return $this->hasMany(Extension::class, 'ai_assistant_id');
     }
 
     /**
@@ -222,7 +227,7 @@ class AiAssistant extends Model
     public function getUsageCountAttribute(): int
     {
         // Query directly without global scope to avoid organization scope conflicts
-        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return Extension::withoutGlobalScope(OrganizationScope::class)
             ->where('ai_assistant_id', $this->id)
             ->where('organization_id', $this->organization_id)
             ->count();

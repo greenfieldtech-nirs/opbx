@@ -130,7 +130,7 @@ class DistributionListApiTest extends TestCase
         $this->assertDatabaseHas('auto_dialer_lists', [
             'name' => 'Copied List',
             'organization_id' => $this->organization->id,
-            'parent_list_id' => $list->id,
+            'parent_list_id' => null,
         ]);
     }
 

@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Models\Organization;
 use App\Models\Recording;
 use App\Models\User;
+use App\Services\Recording\RecordingAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -25,10 +26,15 @@ class RecordingsControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private User $owner;
+
     private User $admin;
+
     private User $agent;
+
     private User $otherOrgOwner;
 
     protected function setUp(): void
@@ -59,7 +65,7 @@ class RecordingsControllerTest extends TestCase
         ]);
 
         // Use fake storage for testing
-        Storage::fake('local');
+        Storage::fake('recordings');
     }
 
     /**
@@ -75,7 +81,7 @@ class RecordingsControllerTest extends TestCase
         // Create recordings for other organization (should not be returned)
         Recording::factory()->count(2)->create(['organization_id' => $this->otherOrganization->id]);
 
-        $response = $this->getJson('/api/recordings');
+        $response = $this->getJson('/api/v1/recordings');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -92,12 +98,13 @@ class RecordingsControllerTest extends TestCase
                         'mime_type',
                         'duration_seconds',
                         'status',
+                        'created_by',
+                        'updated_by',
                         'created_at',
                         'updated_at',
-                        'creator',
-                        'updater',
                     ],
                 ],
+                'links',
                 'meta',
             ])
             ->assertJsonCount(3, 'data');
@@ -120,7 +127,7 @@ class RecordingsControllerTest extends TestCase
             'status' => 'inactive',
         ]);
 
-        $response = $this->getJson('/api/recordings?status=active');
+        $response = $this->getJson('/api/v1/recordings?status=active');
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data')
@@ -144,7 +151,7 @@ class RecordingsControllerTest extends TestCase
             'name' => 'Voicemail Message',
         ]);
 
-        $response = $this->getJson('/api/recordings?search=meeting');
+        $response = $this->getJson('/api/v1/recordings?search=meeting');
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data')
@@ -160,7 +167,7 @@ class RecordingsControllerTest extends TestCase
 
         Recording::factory()->create(['organization_id' => $this->organization->id]);
 
-        $response = $this->getJson('/api/recordings');
+        $response = $this->getJson('/api/v1/recordings');
 
         $response->assertStatus(200)
             ->assertJsonCount(1, 'data');
@@ -174,9 +181,15 @@ class RecordingsControllerTest extends TestCase
         Queue::fake(); // Prevent actual job dispatching
         Sanctum::actingAs($this->owner);
 
-        $file = UploadedFile::fake()->create('test.mp3', 1000, 'audio/mpeg');
+        $file = new UploadedFile(
+            base_path('tests/fixtures/sample.wav'),
+            'test.wav',
+            'audio/wav',
+            null,
+            true
+        );
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Test Recording',
             'type' => 'upload',
             'file' => $file,
@@ -215,7 +228,7 @@ class RecordingsControllerTest extends TestCase
         Queue::fake();
         Sanctum::actingAs($this->owner);
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Remote Recording',
             'type' => 'remote',
             'remote_url' => 'https://example.com/audio.mp3',
@@ -251,7 +264,7 @@ class RecordingsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        $response = $this->postJson('/api/recordings', []);
+        $response = $this->postJson('/api/v1/recordings', []);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['name', 'type']);
@@ -264,7 +277,7 @@ class RecordingsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Test Recording',
             'type' => 'upload',
             // Missing file
@@ -281,7 +294,7 @@ class RecordingsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Test Recording',
             'type' => 'remote',
             // Missing remote_url
@@ -300,7 +313,7 @@ class RecordingsControllerTest extends TestCase
 
         $invalidFile = UploadedFile::fake()->create('test.txt', 1000, 'text/plain');
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Test Recording',
             'type' => 'upload',
             'file' => $invalidFile,
@@ -317,7 +330,7 @@ class RecordingsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Test Recording',
             'type' => 'remote',
             'remote_url' => 'invalid-url',
@@ -336,7 +349,7 @@ class RecordingsControllerTest extends TestCase
 
         $file = UploadedFile::fake()->create('test.mp3', 1000, 'audio/mpeg');
 
-        $response = $this->postJson('/api/recordings', [
+        $response = $this->postJson('/api/v1/recordings', [
             'name' => 'Test Recording',
             'type' => 'upload',
             'file' => $file,
@@ -354,7 +367,7 @@ class RecordingsControllerTest extends TestCase
 
         $recording = Recording::factory()->create(['organization_id' => $this->organization->id]);
 
-        $response = $this->getJson("/api/recordings/{$recording->id}");
+        $response = $this->getJson("/api/v1/recordings/{$recording->id}");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -363,8 +376,8 @@ class RecordingsControllerTest extends TestCase
                     'name',
                     'type',
                     'status',
-                    'creator',
-                    'updater',
+                    'created_by',
+                    'updated_by',
                 ],
             ])
             ->assertJsonPath('data.id', $recording->id);
@@ -383,7 +396,7 @@ class RecordingsControllerTest extends TestCase
             'status' => 'active',
         ]);
 
-        $response = $this->putJson("/api/recordings/{$recording->id}", [
+        $response = $this->putJson("/api/v1/recordings/{$recording->id}", [
             'name' => 'Updated Name',
             'status' => 'inactive',
         ]);
@@ -408,7 +421,7 @@ class RecordingsControllerTest extends TestCase
 
         $recording = Recording::factory()->create(['organization_id' => $this->organization->id]);
 
-        $response = $this->putJson("/api/recordings/{$recording->id}", [
+        $response = $this->putJson("/api/v1/recordings/{$recording->id}", [
             'name' => 'Updated Name',
         ]);
 
@@ -426,16 +439,20 @@ class RecordingsControllerTest extends TestCase
             'organization_id' => $this->organization->id,
             'type' => 'upload',
             'file_path' => 'test.mp3',
+            'mime_type' => 'audio/mpeg',
             'original_filename' => 'original.mp3',
         ]);
 
-        $response = $this->getJson("/api/recordings/{$recording->id}/download");
+        $response = $this->getJson("/api/v1/recordings/{$recording->id}/download");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'download_url',
+                'download_endpoint',
+                'token',
                 'filename',
                 'expires_in',
+                'authorization_header',
+                'security_note',
             ])
             ->assertJsonPath('filename', 'original.mp3')
             ->assertJsonPath('expires_in', 1800);
@@ -454,7 +471,7 @@ class RecordingsControllerTest extends TestCase
             'remote_url' => 'https://example.com/audio.mp3',
         ]);
 
-        $response = $this->getJson("/api/recordings/{$recording->id}/download");
+        $response = $this->getJson("/api/v1/recordings/{$recording->id}/download");
 
         $response->assertStatus(400)
             ->assertJson(['error' => 'Only uploaded recordings can be downloaded']);
@@ -471,16 +488,17 @@ class RecordingsControllerTest extends TestCase
             'organization_id' => $this->organization->id,
             'type' => 'upload',
             'file_path' => 'test.mp3',
+            'mime_type' => 'audio/mpeg',
         ]);
 
         // Create a test file in storage
-        Storage::disk('local')->put("recordings/{$this->organization->id}/test.mp3", 'fake audio content');
+        Storage::disk('recordings')->put("{$this->organization->id}/test.mp3", 'fake audio content');
 
         // Generate access token manually (simulating the download endpoint)
-        $accessService = app(\App\Services\Recording\RecordingAccessService::class);
+        $accessService = app(RecordingAccessService::class);
         $token = $accessService->generateAccessToken($recording, $this->owner->id);
 
-        $response = $this->get("/api/recordings/download?token={$token}");
+        $response = $this->get("/api/v1/recordings/download?token={$token}");
 
         $response->assertStatus(200)
             ->assertHeader('Content-Type', 'audio/mpeg');
@@ -493,7 +511,7 @@ class RecordingsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        $response = $this->get('/api/recordings/download?token=invalid-token');
+        $response = $this->get('/api/v1/recordings/download?token=invalid-token');
 
         $response->assertStatus(403)
             ->assertJson(['error' => 'Access denied or token expired']);
@@ -510,13 +528,13 @@ class RecordingsControllerTest extends TestCase
             'organization_id' => $this->otherOrganization->id,
         ]);
 
-        $response = $this->getJson("/api/recordings/{$otherRecording->id}");
+        $response = $this->getJson("/api/v1/recordings/{$otherRecording->id}");
         $response->assertStatus(404);
 
-        $response = $this->putJson("/api/recordings/{$otherRecording->id}", ['name' => 'Updated']);
+        $response = $this->putJson("/api/v1/recordings/{$otherRecording->id}", ['name' => 'Updated']);
         $response->assertStatus(404);
 
-        $response = $this->deleteJson("/api/recordings/{$otherRecording->id}");
+        $response = $this->deleteJson("/api/v1/recordings/{$otherRecording->id}");
         $response->assertStatus(404);
     }
 
@@ -534,16 +552,18 @@ class RecordingsControllerTest extends TestCase
         ]);
 
         // Create a test file in storage
-        Storage::disk('local')->put("recordings/{$this->organization->id}/test.mp3", 'fake audio content');
+        Storage::disk('recordings')->put("{$this->organization->id}/test.mp3", 'fake audio content');
 
-        $response = $this->deleteJson("/api/recordings/{$recording->id}");
+        $response = $this->deleteJson("/api/v1/recordings/{$recording->id}");
 
         $response->assertStatus(200)
             ->assertJson(['message' => 'Recording deleted successfully']);
 
-        $this->assertSoftDeleted('recordings', ['id' => $recording->id]);
+        $this->assertModelMissing($recording);
+        // Recording model does not use SoftDeletes; verify it is removed from the database
+        $this->assertDatabaseMissing('recordings', ['id' => $recording->id]);
         // File should be securely deleted
-        Storage::disk('local')->assertMissing("recordings/{$this->organization->id}/test.mp3");
+        Storage::disk('recordings')->assertMissing("{$this->organization->id}/test.mp3");
     }
 
     /**
@@ -559,11 +579,13 @@ class RecordingsControllerTest extends TestCase
             'remote_url' => 'https://example.com/audio.mp3',
         ]);
 
-        $response = $this->deleteJson("/api/recordings/{$remoteRecording->id}");
+        $response = $this->deleteJson("/api/v1/recordings/{$remoteRecording->id}");
 
         $response->assertStatus(200);
 
-        $this->assertSoftDeleted('recordings', ['id' => $remoteRecording->id]);
+        $this->assertModelMissing($remoteRecording);
+        // Recording model does not use SoftDeletes; verify it is removed from the database
+        $this->assertDatabaseMissing('recordings', ['id' => $remoteRecording->id]);
     }
 
     /**
@@ -575,7 +597,7 @@ class RecordingsControllerTest extends TestCase
 
         $recording = Recording::factory()->create(['organization_id' => $this->organization->id]);
 
-        $response = $this->deleteJson("/api/recordings/{$recording->id}");
+        $response = $this->deleteJson("/api/v1/recordings/{$recording->id}");
 
         $response->assertStatus(403);
     }
@@ -585,10 +607,10 @@ class RecordingsControllerTest extends TestCase
      */
     public function test_unauthenticated_requests_are_rejected(): void
     {
-        $response = $this->getJson('/api/recordings');
+        $response = $this->getJson('/api/v1/recordings');
         $response->assertStatus(401);
 
-        $response = $this->postJson('/api/recordings', []);
+        $response = $this->postJson('/api/v1/recordings', []);
         $response->assertStatus(401);
     }
 }

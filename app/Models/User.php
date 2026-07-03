@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,12 +39,20 @@ class User extends Authenticatable
         'password',
         'role',
         'status',
+        'is_platform_manager',
         'phone',
         'street_address',
         'city',
         'state_province',
         'postal_code',
         'country',
+    ];
+
+    /**
+     * Default attribute values.
+     */
+    protected $attributes = [
+        'is_platform_manager' => false,
     ];
 
     /**

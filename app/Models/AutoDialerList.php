@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -241,9 +244,9 @@ class AutoDialerList extends Model
     /**
      * Get the version history for this list.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, self>
+     * @return Collection<int, self>
      */
-    public function getVersionHistory(): \Illuminate\Database\Eloquent\Collection
+    public function getVersionHistory(): Collection
     {
         // If this is the root list (no parent), get all children
         if ($this->parent_list_id === null) {
@@ -346,7 +349,7 @@ class AutoDialerList extends Model
                 'list_id' => $copy->id,
                 'phone_number' => $destination->phone_number,
                 'description' => $destination->description,
-                'status' => \App\Enums\DestinationStatus::PENDING,
+                'status' => DestinationStatus::PENDING,
                 'dial_attempts' => 0,
                 'duration' => 0,
                 'billsec' => 0,

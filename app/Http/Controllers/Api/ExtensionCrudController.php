@@ -9,9 +9,12 @@ use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\Extension\StoreExtensionRequest;
+use App\Http\Requests\Extension\UpdateExtensionRequest;
 use App\Http\Resources\ExtensionResource;
 use App\Models\Extension;
 use App\Services\CloudonixClient\CloudonixSubscriberService;
+use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -31,6 +34,22 @@ class ExtensionCrudController extends AbstractApiCrudController
     public function __construct(
         protected CloudonixSubscriberService $subscriberService
     ) {}
+
+    /**
+     * Get the form request class for store operations.
+     */
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreExtensionRequest::class;
+    }
+
+    /**
+     * Get the form request class for update operations.
+     */
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateExtensionRequest::class;
+    }
 
     /**
      * Get the filter configuration for the index method.
@@ -105,7 +124,7 @@ class ExtensionCrudController extends AbstractApiCrudController
      */
     protected function applyCustomFilters($query, Request $request): void
     {
-        // Filters are applied via AppliesFilters trait
+        $this->applyFilters($query, $request, $this->getFilterConfig());
     }
 
     /**
@@ -355,7 +374,7 @@ class ExtensionCrudController extends AbstractApiCrudController
         /** @var Extension $extension */
         $extension = $model;
 
-        $cacheService = app(\App\Services\VoiceRouting\VoiceRoutingCacheService::class);
+        $cacheService = app(VoiceRoutingCacheService::class);
         $cacheService->invalidateExtension(
             $extension->organization_id,
             $extension->extension_number

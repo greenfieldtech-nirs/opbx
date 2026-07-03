@@ -290,7 +290,7 @@ class AiAssistantControllerTest extends TestCase
         Extension::factory()->create([
             'organization_id' => $this->organization->id,
             'type' => 'ai_assistant',
-            'configuration' => ['ai_assistant_id' => $assistant->id],
+            'ai_assistant_id' => $assistant->id,
         ]);
 
         $response = $this->deleteJson("/api/v1/ai-assistants/{$assistant->id}");
@@ -485,7 +485,7 @@ class AiAssistantControllerTest extends TestCase
         Extension::factory()->count(2)->create([
             'organization_id' => $this->organization->id,
             'type' => 'ai_assistant',
-            'configuration' => ['ai_assistant_id' => $assistant->id],
+            'ai_assistant_id' => $assistant->id,
         ]);
 
         $response = $this->getJson("/api/v1/ai-assistants/{$assistant->id}");

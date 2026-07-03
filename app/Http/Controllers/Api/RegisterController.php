@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\Organization;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -128,9 +129,9 @@ class RegisterController extends Controller
         }
 
         if ($request->has('admin_email')) {
-            $response['admin_email_available'] = ! User::where(
+            $response['admin_email_available'] = ! OrganizationScope::bypass(fn () => User::where(
                 'email', $request->admin_email
-            )->exists();
+            )->exists());
         }
 
         if ($request->has('slug')) {

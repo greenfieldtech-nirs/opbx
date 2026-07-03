@@ -20,8 +20,11 @@ class ProfileManagementTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private User $owner;
+
     private User $admin;
+
     private User $agent;
 
     protected function setUp(): void
@@ -44,14 +47,14 @@ class ProfileManagementTest extends TestCase
 
         $this->admin = User::factory()->create([
             'organization_id' => $this->organization->id,
-            'role' => UserRole::ADMIN,
+            'role' => UserRole::PBX_ADMIN,
             'name' => 'Admin User',
             'email' => 'admin@example.com',
         ]);
 
         $this->agent = User::factory()->create([
             'organization_id' => $this->organization->id,
-            'role' => UserRole::AGENT,
+            'role' => UserRole::PBX_USER,
             'name' => 'Agent User',
             'email' => 'agent@example.com',
         ]);

@@ -25,11 +25,17 @@ class ExtensionControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private User $owner;
+
     private User $pbxAdmin;
+
     private User $pbxUser;
+
     private User $reporter;
+
     private User $otherOrgUser;
 
     /**
@@ -149,7 +155,6 @@ class ExtensionControllerTest extends TestCase
                         'updated_at',
                     ],
                 ],
-                'links',
                 'meta',
             ]);
 
@@ -302,7 +307,7 @@ class ExtensionControllerTest extends TestCase
         $response->assertStatus(201)
             ->assertJsonStructure([
                 'message',
-                'extension' => [
+                'data' => [
                     'id',
                     'organization_id',
                     'user_id',
@@ -428,7 +433,7 @@ class ExtensionControllerTest extends TestCase
         $response->assertStatus(201);
     }
 
-    public function test_user_type_extension_requires_user_id(): void
+    public function test_user_type_extension_can_be_unassigned(): void
     {
         Sanctum::actingAs($this->owner);
 
@@ -441,8 +446,13 @@ class ExtensionControllerTest extends TestCase
             'configuration' => [],
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['user_id']);
+        $response->assertStatus(201);
+
+        $this->assertDatabaseHas('extensions', [
+            'extension_number' => '1001',
+            'type' => 'user',
+            'user_id' => null,
+        ]);
     }
 
     public function test_conference_type_extension_requires_conference_room_id(): void
@@ -549,7 +559,7 @@ class ExtensionControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'extension' => [
+                'data' => [
                     'id',
                     'organization_id',
                     'user_id',
@@ -870,7 +880,7 @@ class ExtensionControllerTest extends TestCase
         $response = $this->getJson("/api/v1/extensions/{$extension->id}");
 
         $response->assertStatus(200);
-        $this->assertArrayNotHasKey('password', $response->json('extension'));
+        $this->assertArrayNotHasKey('password', $response->json('data'));
         $response->assertJsonMissing(['password' => $secretPassword]);
 
         // Test GET /extensions - list all extensions

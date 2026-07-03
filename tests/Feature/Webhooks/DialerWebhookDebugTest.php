@@ -10,6 +10,7 @@ use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Models\CloudonixSettings;
 use App\Models\Organization;
+use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,6 +24,7 @@ class DialerWebhookDebugTest extends TestCase
 
         $cloudonixSettings = CloudonixSettings::factory()->create([
             'organization_id' => $organization->id,
+            'domain_name' => 'test-debug.cloudonix.net',
             'domain_requests_api_key' => 'test-api-key',
         ]);
 
@@ -62,7 +64,7 @@ class DialerWebhookDebugTest extends TestCase
                 'type' => 'call.initiated',
                 'call_id' => 'test-call-id',
                 'session_token' => 'test-token-123',
-                'domain_uuid' => $cloudonixSettings->domain_uuid,
+                'domain' => $cloudonixSettings->domain_name,
             ],
             ['Authorization' => 'Bearer test-api-key']
         );
@@ -70,7 +72,7 @@ class DialerWebhookDebugTest extends TestCase
         $response->assertStatus(200);
 
         // Check session was updated (bypass organization scope)
-        $sessionStatus = \App\Scopes\OrganizationScope::bypass(fn () => $session->fresh()?->status);
+        $sessionStatus = OrganizationScope::bypass(fn () => $session->fresh()?->status);
         $this->assertEquals('ringing', $sessionStatus);
     }
 }

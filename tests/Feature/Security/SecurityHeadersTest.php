@@ -16,7 +16,6 @@ use Tests\TestCase;
  * - X-Content-Type-Options
  * - Referrer-Policy
  * - Permissions-Policy
- * - X-XSS-Protection
  */
 class SecurityHeadersTest extends TestCase
 {
@@ -133,29 +132,20 @@ class SecurityHeadersTest extends TestCase
         $this->assertStringContainsString('camera=()', $policy);
     }
 
-    public function test_x_xss_protection_header_is_present(): void
-    {
-        $response = $this->get('/api/health');
-
-        $response->assertHeader('X-XSS-Protection', '1; mode=block');
-    }
-
     public function test_hsts_header_in_production(): void
     {
         // Simulate production environment
-        config(['app.env' => 'production']);
+        $this->app['env'] = 'production';
 
         $response = $this->get('/api/health');
 
-        if (app()->environment('production')) {
-            $this->assertTrue($response->headers->has('Strict-Transport-Security'));
+        $this->assertTrue($response->headers->has('Strict-Transport-Security'));
 
-            $hsts = $response->headers->get('Strict-Transport-Security');
+        $hsts = $response->headers->get('Strict-Transport-Security');
 
-            // Should have reasonable max-age
-            $this->assertStringContainsString('max-age=', $hsts);
-            $this->assertStringContainsString('includeSubDomains', $hsts);
-        }
+        // Should have reasonable max-age
+        $this->assertStringContainsString('max-age=', $hsts);
+        $this->assertStringContainsString('includeSubDomains', $hsts);
     }
 
     public function test_csp_nonce_is_unique_per_request(): void

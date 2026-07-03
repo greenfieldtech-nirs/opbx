@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
-use App\Enums\BusinessHoursActionType;
-use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\UserRole;
 use App\Models\BusinessHoursSchedule;
@@ -25,10 +23,15 @@ class BusinessHoursControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private User $owner;
+
     private User $admin;
+
     private User $agent;
+
     private User $otherOrgOwner;
 
     protected function setUp(): void
@@ -125,13 +128,14 @@ class BusinessHoursControllerTest extends TestCase
         $scheduleData = [
             'name' => 'Main Office Hours',
             'status' => BusinessHoursStatus::ACTIVE->value,
+            'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
                 'target_id' => 'ext-101',
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-voicemail',
+                'target_id' => 'ext-100',
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -159,7 +163,7 @@ class BusinessHoursControllerTest extends TestCase
         $response = $this->postJson('/api/v1/business-hours', []);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['name', 'status', 'open_hours_action', 'closed_hours_action', 'schedule']);
+            ->assertJsonValidationErrors(['name', 'timezone', 'open_hours_action', 'closed_hours_action']);
     }
 
     /**
@@ -177,13 +181,14 @@ class BusinessHoursControllerTest extends TestCase
         $scheduleData = [
             'name' => 'Existing Schedule',
             'status' => BusinessHoursStatus::ACTIVE->value,
+            'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
                 'target_id' => 'ext-101',
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-voicemail',
+                'target_id' => 'ext-100',
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -217,13 +222,14 @@ class BusinessHoursControllerTest extends TestCase
         $updateData = [
             'name' => 'Updated Name',
             'status' => BusinessHoursStatus::INACTIVE->value,
+            'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
                 'target_id' => 'ext-102',
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-voicemail-2',
+                'target_id' => 'ext-100',
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '10:00', 'end_time' => '18:00']]],
@@ -264,13 +270,14 @@ class BusinessHoursControllerTest extends TestCase
         $updateData = [
             'name' => 'Updated Name',
             'status' => BusinessHoursStatus::INACTIVE->value,
+            'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
                 'target_id' => 'ext-102',
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-voicemail',
+                'target_id' => 'ext-100',
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],

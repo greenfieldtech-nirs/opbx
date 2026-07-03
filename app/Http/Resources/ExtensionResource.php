@@ -51,12 +51,12 @@ class ExtensionResource extends JsonResource
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
 
-        // Include password for USER type extensions when accessed by authorized users
-        // This allows the UI to display passwords for IP phone configuration
+        // Include sip_config metadata for USER type extensions.
+        // Password is intentionally excluded; use the dedicated password endpoints
+        // (extensions.password / extensions.reset-password) for authenticated access.
         if ($this->type->value === 'user') {
             $data['sip_config'] = [
                 'username' => $this->extension_number,
-                'password' => $this->getSipPassword(),
                 'server' => config('cloudonix.sip_server', 'sip.cloudonix.io'),
             ];
         }

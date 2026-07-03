@@ -80,7 +80,7 @@ class CampaignStatistics
      */
     private function calculateStats(AutoDialerCampaign $campaign): array
     {
-        $destinations = $campaign->destinations()->select('status')->get();
+        $destinations = $campaign->destinations()->select('auto_dialer_destinations.status')->get();
 
         $total = $destinations->count();
         $completed = $destinations->where('status', DestinationStatus::COMPLETED)->count();

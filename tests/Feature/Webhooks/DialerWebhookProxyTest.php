@@ -90,6 +90,7 @@ class DialerWebhookProxyTest extends TestCase
         $response = $this->postJson('/api/webhooks/cloudonix/dialer', [
             'type' => 'call.completed',
             'call_id' => 'test-call-id-456',
+            'domain' => $this->cloudonixSettings->domain_name,
         ]);
 
         $response->assertStatus(401);
@@ -108,7 +109,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -137,7 +138,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -172,7 +173,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -207,7 +208,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -245,7 +246,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -280,7 +281,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -298,9 +299,9 @@ class DialerWebhookProxyTest extends TestCase
     }
 
     /**
-     * Test AMD completed webhook.
+     * Test AMD completed webhook is ignored by the proxy endpoint.
      */
-    public function test_amd_completed_webhook_updates_session(): void
+    public function test_amd_completed_webhook_is_ignored(): void
     {
         $payload = [
             'type' => 'amd.completed',
@@ -312,7 +313,7 @@ class DialerWebhookProxyTest extends TestCase
                 'campaign_id' => $this->campaign->id,
                 'destination_id' => $this->destination->id,
             ],
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -322,12 +323,12 @@ class DialerWebhookProxyTest extends TestCase
         );
 
         $response->assertStatus(200)
-            ->assertJson(['status' => 'ok']);
+            ->assertJson(['status' => 'ignored', 'reason' => 'unknown_event_type']);
 
         $this->session = $this->session->fresh();
 
-        $this->assertEquals('human', $this->session->amd_result);
-        $this->assertEquals(0.95, $this->session->amd_confidence);
+        $this->assertNull($this->session->amd_result);
+        $this->assertNull($this->session->amd_confidence);
     }
 
     /**
@@ -339,7 +340,7 @@ class DialerWebhookProxyTest extends TestCase
             'type' => 'call.completed',
             'call_id' => 'non-existent-call-id',
             'session_token' => 'non-existent-token',
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -360,7 +361,7 @@ class DialerWebhookProxyTest extends TestCase
         $payload = [
             'type' => 'unknown.event',
             'call_id' => 'test-call-id-456',
-            'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+            'domain' => $this->cloudonixSettings->domain_name,
         ];
 
         $response = $this->postJson(
@@ -405,7 +406,7 @@ class DialerWebhookProxyTest extends TestCase
                 'type' => 'call.busy',
                 'call_id' => "test-call-id-{$attemptCount}",
                 'session_token' => "test-token-{$attemptCount}",
-                'domain_uuid' => $this->cloudonixSettings->domain_uuid,
+                'domain' => $this->cloudonixSettings->domain_name,
             ];
 
             $response = $this->postJson(

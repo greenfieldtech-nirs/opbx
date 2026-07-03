@@ -111,7 +111,7 @@ class WebSocketUrlBuilderTest extends TestCase
     public function test_throws_on_unsubstituted_placeholders(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Template contains unsubstituted placeholders');
+        $this->expectExceptionMessage('Template contains unsubstituted placeholder: {auth_token}');
 
         $template = 'wss://example.com/ws/{bot_id}/{auth_token}';
         $config = [

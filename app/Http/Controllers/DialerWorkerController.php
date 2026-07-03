@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\DestinationStatus;
 use App\Http\Resources\AutoDialerCampaignResource;
 use App\Http\Resources\ListDestinationResource;
+use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
@@ -248,7 +249,7 @@ class DialerWorkerController extends Controller
             'completed_at' => ['nullable', 'date'],
         ]);
 
-        $sessionModel = $this->callSessionService->findById($session);
+        $sessionModel = $this->callSessionService->findWithRelations($session);
 
         if (! $sessionModel) {
             return response()->json([
@@ -556,7 +557,7 @@ class DialerWorkerController extends Controller
     /**
      * Process disposition and return the resulting destination status.
      *
-     * @param  \App\Models\AutoDialerCallSession  $session
+     * @param  AutoDialerCallSession  $session
      * @param  AutoDialerCampaign  $campaign
      * @param  AutoDialerDestination  $destination
      * @param  array<string, mixed>  $validated
