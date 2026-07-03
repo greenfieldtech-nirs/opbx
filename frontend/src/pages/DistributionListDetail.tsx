@@ -469,7 +469,9 @@ export default function DistributionListDetail() {
                       />
                     </TableHead>
                     <TableHead>Phone Number</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Batch</TableHead>
+                    <TableHead>Metadata</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Dial Attempts</TableHead>
                     <TableHead>Last Call</TableHead>
@@ -480,13 +482,13 @@ export default function DistributionListDetail() {
                 <TableBody>
                   {isDestinationsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={10} className="text-center py-8">
                         Loading destinations...
                       </TableCell>
                     </TableRow>
                   ) : destinations.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No destinations found
                       </TableCell>
                     </TableRow>
@@ -508,7 +510,11 @@ export default function DistributionListDetail() {
                             <ExternalLink className="h-3 w-3" />
                           </button>
                         </TableCell>
-                        <TableCell>{destination.description || '-'}</TableCell>
+                        <TableCell>{destination.name || '-'}</TableCell>
+                        <TableCell>{destination.batch_identifier || '-'}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">
+                          {destination.metadata ? Object.keys(destination.metadata).length : 0} fields
+                        </TableCell>
                         <TableCell>
                           <Badge className={statusColors[destination.status] || 'bg-gray-100'}>
                             {destination.status_label}

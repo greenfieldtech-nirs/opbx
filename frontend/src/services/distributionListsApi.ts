@@ -4,7 +4,9 @@ import type { AutoDialerList, CreateListRequest, CsvMappingConfig, CsvPreview, D
 export interface ListDestination {
   id: number;
   phone_number: string;
-  description: string | null;
+  name: string | null;
+  batch_identifier: string | null;
+  metadata: Record<string, string> | null;
   status: string;
   status_label: string;
   dial_attempts: number;
