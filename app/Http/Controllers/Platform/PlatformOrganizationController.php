@@ -58,7 +58,20 @@ class PlatformOrganizationController extends Controller
 
             $perPage = $request->input('per_page', 25);
 
-            return $query->paginate(min($perPage, 100));
+            $paginator = $query->paginate(min($perPage, 100));
+
+            return [
+                'data' => $paginator->items(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                    'last_page' => $paginator->lastPage(),
+                    'from' => $paginator->firstItem(),
+                    'to' => $paginator->lastItem(),
+                    'has_more' => $paginator->hasMorePages(),
+                ],
+            ];
         });
 
         return response()->json($organizations);
