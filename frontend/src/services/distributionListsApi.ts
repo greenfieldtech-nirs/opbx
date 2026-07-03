@@ -1,5 +1,5 @@
 import api from '@/services/api';
-import type { AutoDialerList, CreateListRequest, DistributionListParams, PaginatedResponse } from '@/types';
+import type { AutoDialerList, CreateListRequest, CsvMappingConfig, CsvPreview, DistributionListParams, PaginatedResponse } from '@/types';
 
 export interface ListDestination {
   id: number;
@@ -72,6 +72,26 @@ export const distributionListsApi = {
   },
 
   /**
+   * Preview CSV file headers and rows before mapping
+   */
+  previewCsv: async (
+    listId: string | number,
+    file: File,
+    hasHeader: boolean = true,
+  ): Promise<{ data: CsvPreview }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('has_header', hasHeader ? '1' : '0');
+
+    const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/preview-csv`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  /**
    * Upload CSV file to list (unified endpoint)
    * 
    * If list can upload: uploads to current list
@@ -80,6 +100,7 @@ export const distributionListsApi = {
   uploadCsv: async (
     listId: string | number,
     file: File,
+    mapping: CsvMappingConfig,
   ): Promise<{
     message: string;
     data: {
@@ -94,6 +115,7 @@ export const distributionListsApi = {
   }> => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('mapping', JSON.stringify(mapping));
 
     const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/upload`, formData, {
       headers: {
@@ -127,7 +149,7 @@ export const distributionListsApi = {
    */
   addDestination: async (
     listId: string | number,
-    data: { phone_number: string; description?: string },
+    data: { phone_number: string; name?: string },
   ): Promise<{ message: string; data: ListDestination }> => {
     const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/destinations`, data);
     return response.data;
@@ -138,7 +160,7 @@ export const distributionListsApi = {
    */
   addDestinationsBatch: async (
     listId: string | number,
-    destinations: Array<{ phone_number: string; description?: string }>,
+    destinations: Array<{ phone_number: string; name?: string }>,
   ): Promise<{ message: string; data: BatchAddResult }> => {
     const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/destinations/batch`, {
       destinations,

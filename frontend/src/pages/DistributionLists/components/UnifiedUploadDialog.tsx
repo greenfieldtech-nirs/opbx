@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,11 +8,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, FileSpreadsheet, X, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
-import { useUploadList, useUploadProgress } from '@/hooks/useDistributionLists';
+import { useUploadList, useUploadProgress, usePreviewCsv } from '@/hooks/useDistributionLists';
 import { toast } from 'sonner';
-import type { AutoDialerList } from '@/types';
+import type { AutoDialerList, CsvMappingConfig } from '@/types';
 
 interface UnifiedUploadDialogProps {
   list: AutoDialerList;
@@ -21,6 +25,12 @@ interface UnifiedUploadDialogProps {
   onSuccess?: (newListId?: number) => void;
 }
 
+const REQUIRED_FIELDS = [
+  { key: 'phone', label: 'Phone Number *' },
+  { key: 'name', label: 'Full Name' },
+  { key: 'batch_identifier', label: 'Batch Identifier' },
+];
+
 export function UnifiedUploadDialog({
   list,
   open,
@@ -28,6 +38,9 @@ export function UnifiedUploadDialog({
   onSuccess,
 }: UnifiedUploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
+  const [hasHeader, setHasHeader] = useState(true);
+  const [preview, setPreview] = useState<{ headers: string[]; rows: Record<string, string>[]; total_rows: number } | null>(null);
+  const [mapping, setMapping] = useState<CsvMappingConfig>({ phone: '', name: '', batch_identifier: '', metadata: [] });
   const [jobId, setJobId] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{
     action?: 'upload' | 'update';
@@ -38,39 +51,78 @@ export function UnifiedUploadDialog({
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const uploadMutation = useUploadList();
+  const previewMutation = usePreviewCsv();
   const { data: progressData } = useUploadProgress(jobId);
 
-  // Determine if this will create a new version
   const willCreateVersion = !list.status?.match(/^(draft|pending|failed)$/);
   const newVersionNumber = list.version_number + 1;
 
+  const availableColumns = useMemo(() => preview?.headers ?? [], [preview]);
+
+  const resetDialog = () => {
+    setFile(null);
+    setHasHeader(true);
+    setPreview(null);
+    setMapping({ phone: '', name: '', batch_identifier: '', metadata: [] });
+    setJobId(null);
+    setUploadResult(null);
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      if (selectedFile.name.endsWith('.csv')) {
-        setFile(selectedFile);
-      } else {
-        toast.error('Please upload a CSV file');
-      }
+    if (!selectedFile) return;
+    if (!selectedFile.name.endsWith('.csv')) {
+      toast.error('Please upload a CSV file');
+      return;
+    }
+    setFile(selectedFile);
+    setPreview(null);
+    setMapping({ phone: '', name: '', batch_identifier: '', metadata: [] });
+  };
+
+  const handlePreview = async () => {
+    if (!file) return;
+    try {
+      const result = await previewMutation.mutateAsync({ listId: list.id, file, hasHeader });
+      setPreview(result.data);
+      const headers = result.data.headers;
+      const phoneGuess = headers.find((h) => h.toLowerCase().includes('phone') || h.toLowerCase() === 'phone_number') ?? '';
+      const nameGuess = headers.find((h) => h.toLowerCase().includes('name') && h.toLowerCase() !== 'phone_number') ?? '';
+      const batchGuess = headers.find((h) => h.toLowerCase().includes('batch')) ?? '';
+      setMapping({ phone: phoneGuess, name: nameGuess, batch_identifier: batchGuess, metadata: [] });
+    } catch {
+      toast.error('Failed to parse CSV preview');
     }
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !mapping.phone) return;
+
+    const cleanedMapping: CsvMappingConfig = {
+      phone: mapping.phone,
+      ...(mapping.name ? { name: mapping.name } : {}),
+      ...(mapping.batch_identifier ? { batch_identifier: mapping.batch_identifier } : {}),
+      ...(mapping.metadata?.length ? { metadata: mapping.metadata } : {}),
+    };
 
     try {
       const result = await uploadMutation.mutateAsync({
         listId: list.id,
         file,
+        mapping: cleanedMapping,
       });
-      
+
       setJobId(result.data.job_id);
       setUploadResult({
         action: result.data.action,
         listId: result.data.list_id,
         newVersionNumber: result.data.new_version_number,
       });
-      
+
       toast.success(
         result.data.action === 'update'
           ? `Version ${result.data.new_version_number} created. Old data backed up. Processing...`
@@ -81,18 +133,15 @@ export function UnifiedUploadDialog({
     }
   };
 
-  // Auto-close on completion and trigger success callback
   useEffect(() => {
     const status = progressData?.data?.status;
 
     if (status === 'completed' && uploadResult && !autoCloseTimerRef.current) {
-      // Immediately trigger success callback so parent refreshes the list
       if (onSuccess) {
         onSuccess(uploadResult.listId || list.id);
       }
-      // Set a timer to auto-close after 2 seconds
       autoCloseTimerRef.current = setTimeout(() => {
-        handleClose(false); // Don't call onSuccess again, already done above
+        handleClose(false);
       }, 2000);
     }
 
@@ -104,50 +153,50 @@ export function UnifiedUploadDialog({
   }, [progressData?.data?.status, uploadResult]);
 
   const handleClose = (triggerSuccess = false) => {
-    // Call onSuccess callback if explicitly requested (e.g. manual close after completion)
     if (triggerSuccess && onSuccess) {
       onSuccess(uploadResult?.listId || list.id);
     }
-
-    // Reset state
-    setFile(null);
-    setJobId(null);
-    setUploadResult(null);
-    if (autoCloseTimerRef.current) {
-      clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    }
+    resetDialog();
     onOpenChange(false);
   };
 
   const isComplete = progressData?.data?.status === 'completed';
-  const isFailed = progressData?.data?.status === 'failed' || 
-                   progressData?.data?.status === 'error' || 
-                   progressData?.data?.status === 'validation_failed';
+  const isFailed =
+    progressData?.data?.status === 'failed' ||
+    progressData?.data?.status === 'error' ||
+    progressData?.data?.status === 'validation_failed';
   const progress = progressData?.data?.percentage || 0;
+
+  const mappedPreview = useMemo(() => {
+    if (!preview) return [];
+    return preview.rows.map((row) => ({
+      phone: mapping.phone ? row[mapping.phone] ?? '' : '',
+      name: mapping.name ? row[mapping.name] ?? '' : '',
+      batch: mapping.batch_identifier ? row[mapping.batch_identifier] ?? '' : '',
+      metadata: mapping.metadata?.map((col) => `${col}: ${row[col] ?? ''}`).join(', ') ?? '',
+    }));
+  }, [preview, mapping]);
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && handleClose(false)}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Upload Destinations</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with phone numbers to &quot;{list.name}&quot;
+            Upload a CSV file to &quot;{list.name}&quot; and map columns.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Version Creation Warning */}
         {willCreateVersion && !jobId && (
           <Alert className="bg-amber-50 border-amber-200">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-800">
-              Current version (v{list.version_number}) will be archived and version {newVersionNumber} will be created. 
-              This action cannot be undone.
+              Current version (v{list.version_number}) will be archived and version {newVersionNumber} will be created.
             </AlertDescription>
           </Alert>
         )}
 
-        {!jobId && (
+        {!jobId && !preview && (
           <>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
               <input
@@ -166,35 +215,119 @@ export function UnifiedUploadDialog({
                       {(file.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setFile(null)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setFile(null)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full"
-                >
+                <button onClick={() => fileInputRef.current?.click()} className="w-full">
                   <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-lg font-medium">Click to select a CSV file</p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    CSV must have a &quot;phone_number&quot; column
+                    CSV must include a phone column
                   </p>
                 </button>
               )}
             </div>
 
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Maximum 100,000 rows per upload. Optional &quot;description&quot; column supported.
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="has-header"
+                checked={hasHeader}
+                onCheckedChange={(checked) => setHasHeader(checked === true)}
+              />
+              <Label htmlFor="has-header">File has a header row</Label>
+            </div>
+
+            <Button onClick={handlePreview} disabled={!file || previewMutation.isPending}>
+              {previewMutation.isPending ? 'Parsing...' : 'Continue to Mapping'}
+            </Button>
           </>
+        )}
+
+        {!jobId && preview && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">{preview.total_rows.toLocaleString()} rows detected</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {REQUIRED_FIELDS.map((field) => (
+                <div key={field.key} className="space-y-2">
+                  <Label>{field.label}</Label>
+                  <Select
+                    value={mapping[field.key as keyof CsvMappingConfig] as string}
+                    onValueChange={(value) =>
+                      setMapping((prev) => ({ ...prev, [field.key]: value === 'NONE' ? '' : value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">None</SelectItem>
+                      {availableColumns.map((col) => (
+                        <SelectItem key={col} value={col}>
+                          {col}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Metadata columns</Label>
+              <div className="grid grid-cols-2 gap-2 border rounded p-3">
+                {availableColumns.map((col) => (
+                  <div key={col} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`meta-${col}`}
+                      checked={mapping.metadata?.includes(col) ?? false}
+                      onCheckedChange={(checked) => {
+                        setMapping((prev) => {
+                          const current = prev.metadata ?? [];
+                          const updated = checked
+                            ? [...current, col]
+                            : current.filter((c) => c !== col);
+                          return { ...prev, metadata: updated };
+                        });
+                      }}
+                    />
+                    <Label htmlFor={`meta-${col}`} className="text-sm font-normal">{col}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {mappedPreview.length > 0 && (
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Batch</TableHead>
+                      <TableHead>Metadata</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mappedPreview.slice(0, 3).map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{row.phone}</TableCell>
+                        <TableCell>{row.name || '-'}</TableCell>
+                        <TableCell>{row.batch || '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{row.metadata || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <Button variant="outline" onClick={() => setPreview(null)}>
+              Back
+            </Button>
+          </div>
         )}
 
         {jobId && (
@@ -205,31 +338,26 @@ export function UnifiedUploadDialog({
                 <span>{progress}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{ width: `${progress}%` }}
-                />
+                <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
               </div>
             </div>
-
             {isComplete && (
               <Alert className="bg-green-50 border-green-200">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
                   {uploadResult?.action === 'update'
-                    ? `Version ${uploadResult.newVersionNumber} created and uploaded successfully! Old data backed up.`
-                    : 'Upload completed successfully! Refreshing...'}
+                    ? `Version ${uploadResult.newVersionNumber} created and uploaded successfully!`
+                    : 'Upload completed successfully!'}
                 </AlertDescription>
               </Alert>
             )}
-
             {isFailed && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   {progressData?.data?.status === 'validation_failed'
-                    ? 'CSV validation failed. Please check the file format and try again.'
-                    : 'Upload failed. Please check the validation errors.'}
+                    ? 'CSV validation failed. Check the file format and mapping.'
+                    : 'Upload failed. Check validation errors.'}
                 </AlertDescription>
               </Alert>
             )}
@@ -237,15 +365,15 @@ export function UnifiedUploadDialog({
         )}
 
         <DialogFooter>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => handleClose(false)}
             disabled={uploadMutation.isPending || (!isComplete && !isFailed && jobId !== null)}
           >
             {isComplete || isFailed ? 'Close' : 'Cancel'}
           </Button>
-          {!jobId && (
-            <Button onClick={handleUpload} disabled={!file || uploadMutation.isPending}>
+          {!jobId && preview && (
+            <Button onClick={handleUpload} disabled={!mapping.phone || uploadMutation.isPending}>
               {uploadMutation.isPending ? 'Starting...' : willCreateVersion ? 'Create Version & Upload' : 'Start Upload'}
             </Button>
           )}

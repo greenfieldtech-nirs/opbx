@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { distributionListsApi } from '@/services/distributionListsApi';
-import type { CreateListRequest, DistributionListParams } from '@/types';
+import type { CreateListRequest, CsvMappingConfig, CsvPreview, DistributionListParams } from '@/types';
 
 // Query keys
 export const distributionListKeys = {
@@ -52,6 +52,20 @@ export function useCreateList() {
   });
 }
 
+export function usePreviewCsv() {
+  return useMutation({
+    mutationFn: ({
+      listId,
+      file,
+      hasHeader,
+    }: {
+      listId: string | number;
+      file: File;
+      hasHeader?: boolean;
+    }) => distributionListsApi.previewCsv(listId, file, hasHeader),
+  });
+}
+
 /**
  * Hook to upload CSV to a list
  */
@@ -59,8 +73,15 @@ export function useUploadList() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ listId, file }: { listId: string | number; file: File }) =>
-      distributionListsApi.uploadCsv(listId, file),
+    mutationFn: ({
+      listId,
+      file,
+      mapping,
+    }: {
+      listId: string | number;
+      file: File;
+      mapping: CsvMappingConfig;
+    }) => distributionListsApi.uploadCsv(listId, file, mapping),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: distributionListKeys.detail(variables.listId),

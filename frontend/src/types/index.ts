@@ -1272,7 +1272,9 @@ export interface AutoDialerList {
 export interface ListDestination {
   id: number;
   phone_number: string;
-  description: string | null;
+  name: string | null;
+  batch_identifier: string | null;
+  metadata: Record<string, string> | null;
   status: string;
   status_label: string;
   dial_attempts: number;
@@ -1285,6 +1287,20 @@ export interface ListDestination {
   is_invalid: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface CsvMappingConfig {
+  phone: string;
+  name?: string;
+  batch_identifier?: string;
+  metadata?: string[];
+}
+
+export interface CsvPreview {
+  headers: string[];
+  rows: Record<string, string>[];
+  total_rows: number;
+  has_header: boolean;
 }
 
 export interface CreateListRequest {
