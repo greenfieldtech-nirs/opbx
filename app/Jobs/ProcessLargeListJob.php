@@ -36,6 +36,7 @@ class ProcessLargeListJob implements ShouldQueue
         public string $filePath,
         public string $jobId,
         public int $totalRows,
+        public array $mapping = [],
     ) {}
 
     /**
@@ -113,7 +114,7 @@ class ProcessLargeListJob implements ShouldQueue
 
             // Dispatch job for this chunk
             $chunkJobId = "{$this->jobId}_chunk_{$chunkNumber}";
-            ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId)
+            ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId, false, $this->mapping)
                 ->onQueue('auto-dialer');
 
             Log::info('ProcessLargeListJob: Dispatched chunk', [

@@ -45,6 +45,7 @@ class ProcessListUploadJob implements ShouldQueue
         public string $filePath,
         public string $jobId,
         public bool $isNewVersion = false,
+        public array $mapping = [],
     ) {}
 
     /**
@@ -73,6 +74,7 @@ class ProcessListUploadJob implements ShouldQueue
             $result = $validator->validateCsvFile(
                 $this->filePath,
                 $list->organization_id,
+                $this->mapping,
             );
 
             if (! $result->success) {
@@ -178,7 +180,7 @@ class ProcessListUploadJob implements ShouldQueue
     /**
      * Create destinations in batches.
      *
-     * @param  array<int, array{phone_number: string, description: ?string}>  $validRows
+     * @param  array<int, array{phone_number: string, name: ?string, batch_identifier: ?string, metadata: ?array<string, string>}>  $validRows
      */
     private function createDestinations(AutoDialerList $list, array $validRows): void
     {
@@ -195,7 +197,9 @@ class ProcessListUploadJob implements ShouldQueue
                     'organization_id' => $list->organization_id,
                     'list_id' => $list->id,
                     'phone_number' => $row['phone_number'],
-                    'description' => $row['description'] ?? null,
+                    'name' => $row['name'] ?? null,
+                    'batch_identifier' => $row['batch_identifier'] ?? null,
+                    'metadata' => isset($row['metadata']) ? json_encode($row['metadata']) : null,
                     'status' => DestinationStatus::PENDING,
                     'dial_attempts' => 0,
                     'duration' => 0,
