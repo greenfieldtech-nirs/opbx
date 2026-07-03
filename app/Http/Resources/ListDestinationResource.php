@@ -14,7 +14,9 @@ class ListDestinationResource extends JsonResource
         return [
             'id' => $this->id,
             'phone_number' => $this->phone_number,
-            'description' => $this->description,
+            'name' => $this->name,
+            'batch_identifier' => $this->batch_identifier,
+            'metadata' => $this->metadata,
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
 

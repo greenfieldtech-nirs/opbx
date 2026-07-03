@@ -26,7 +26,7 @@ class AutoDialerDestinationFactory extends Factory
             'organization_id' => Organization::factory(),
             'list_id' => AutoDialerList::factory(),
             'phone_number' => '+1'.$this->faker->numberBetween(2000000000, 9999999999),
-            'description' => $this->faker->optional()->sentence,
+            'name' => $this->faker->optional()->name,
             'status' => DestinationStatus::PENDING,
             'dial_attempts' => 0,
             'last_session_token' => null,
