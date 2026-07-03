@@ -107,7 +107,7 @@ export interface PlatformUsersParams {
   role?: string;
   status?: string;
   is_platform_manager?: boolean;
-  sort_by?: 'name' | 'email' | 'created_at';
+  sort_by?: 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
   sort_direction?: 'asc' | 'desc';
 }
 
