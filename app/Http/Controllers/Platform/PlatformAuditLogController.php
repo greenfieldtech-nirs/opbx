@@ -54,8 +54,19 @@ class PlatformAuditLogController extends Controller
         $query->orderBy('created_at', 'desc');
 
         $perPage = $request->input('per_page', 25);
-        $logs = $query->paginate(min($perPage, 100));
+        $paginator = $query->paginate(min($perPage, 100));
 
-        return response()->json($logs);
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ]);
     }
 }

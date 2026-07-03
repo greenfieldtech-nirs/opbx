@@ -60,20 +60,26 @@ export default function PlatformAuditLog() {
 
   const [platformManagerUserId, setPlatformManagerUserId] = useState('');
   const [action, setAction] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
 
   const { data, isLoading, isRefetching, refetch } = usePlatformAuditLogs({
+    page: currentPage,
+    per_page: perPage,
     platform_manager_user_id: platformManagerUserId || undefined,
     action: action === 'all' ? undefined : action,
   });
 
   const entries = data?.data || [];
   const totalEntries = data?.meta?.total || 0;
+  const totalPages = Math.ceil(totalEntries / perPage);
 
   const hasActiveFilters = platformManagerUserId || action !== 'all';
 
   const clearFilters = () => {
     setPlatformManagerUserId('');
     setAction('all');
+    setCurrentPage(1);
   };
 
   return (
@@ -102,7 +108,10 @@ export default function PlatformAuditLog() {
                 <Input
                   placeholder="Search by platform manager user ID..."
                   value={platformManagerUserId}
-                  onChange={(e) => setPlatformManagerUserId(e.target.value)}
+                  onChange={(e) => {
+                    setPlatformManagerUserId(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="pl-9"
                   autoComplete="off"
                 />
@@ -122,7 +131,10 @@ export default function PlatformAuditLog() {
               {/* Action Filter */}
               <Select
                 value={action}
-                onValueChange={setAction}
+                onValueChange={(value) => {
+                  setAction(value);
+                  setCurrentPage(1);
+                }}
               >
                 <SelectTrigger className="w-[220px]">
                   <SelectValue />
@@ -167,6 +179,54 @@ export default function PlatformAuditLog() {
                 {entries.map((entry) => (
                   <AuditLogEntry key={entry.id} entry={entry} />
                 ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Rows per page:</p>
+                  <Select
+                    value={perPage.toString()}
+                    onValueChange={(value) => {
+                      setPerPage(parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

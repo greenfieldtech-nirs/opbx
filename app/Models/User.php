@@ -23,6 +23,21 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
+     * Resolve route bindings for platform management routes without the tenant
+     * scope, so platform managers can act on users across all organizations.
+     */
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        if (request()->is('api/v1/platform/*')) {
+            return $this->withoutGlobalScope(OrganizationScope::class)
+                ->where($field ?? $this->getRouteKeyName(), $value)
+                ->first();
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
+
+    /**
      * Default field list for eager/lazy loading extension relationship.
      */
     public const DEFAULT_EXTENSION_FIELDS = 'extension:id,user_id,extension_number';
