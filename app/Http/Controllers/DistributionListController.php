@@ -338,10 +338,10 @@ class DistributionListController extends Controller
      */
     public function downloadExample(): BinaryFileResponse
     {
-        $content = "phone_number,description\n".
-            "+14155551212,John Doe - Sales Lead\n".
-            "+14155551213,Jane Smith - Support Case\n".
-            "+14155551214,Bob Johnson - Follow-up Call\n";
+        $content = "phone_number,name,batch_identifier\n".
+            "+14155551212,John Doe,batch-a\n".
+            "+14155551213,Jane Smith,batch-b\n".
+            "+14155551214,Bob Johnson,batch-a\n";
 
         $filePath = tempnam(sys_get_temp_dir(), 'list_example_').'.csv';
         file_put_contents($filePath, $content);
