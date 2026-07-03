@@ -14,7 +14,7 @@ class ListValidationServiceMappingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new ListValidationService();
+        $this->service = new ListValidationService;
     }
 
     /** @test */

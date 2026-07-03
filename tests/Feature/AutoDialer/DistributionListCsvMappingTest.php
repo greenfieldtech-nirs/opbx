@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\AutoDialer;
 
+use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
@@ -17,7 +18,9 @@ class DistributionListCsvMappingTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Organization $organization;
+
     private AutoDialerList $list;
 
     protected function setUp(): void
@@ -73,7 +76,7 @@ class DistributionListCsvMappingTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.action', 'upload');
 
-        $destination = \App\Models\AutoDialerDestination::where('list_id', $this->list->id)
+        $destination = AutoDialerDestination::where('list_id', $this->list->id)
             ->where('phone_number', '+14155551212')
             ->first();
 

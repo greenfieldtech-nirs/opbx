@@ -16,6 +16,7 @@ use App\Models\AutoDialerList;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -293,7 +294,7 @@ class ListManagementService
             $filteredCount = count($validEntries) - count($finalEntries);
 
             if (! empty($finalEntries)) {
-                \Illuminate\Support\Facades\DB::table('auto_dialer_destinations')->insert($finalEntries);
+                DB::table('auto_dialer_destinations')->insert($finalEntries);
                 $added = count($finalEntries);
             }
 

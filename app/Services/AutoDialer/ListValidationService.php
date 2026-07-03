@@ -115,6 +115,7 @@ class ListValidationService
 
             if ($rowNumber === 1 && $hasHeader) {
                 $headers = array_map(fn ($h) => trim((string) $h), $rowData);
+
                 continue;
             }
 
