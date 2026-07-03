@@ -15,6 +15,7 @@ use App\Services\AutoDialer\ListManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DistributionListController extends Controller
@@ -199,7 +200,7 @@ class DistributionListController extends Controller
         $hasHeader = $validated['has_header'] ?? true;
 
         $tempPath = $file->store('temp/list_previews');
-        $fullPath = storage_path('app/private/'.$tempPath);
+        $fullPath = Storage::disk('local')->path($tempPath);
 
         try {
             $preview = $this->listService->previewCsv($fullPath, $hasHeader);

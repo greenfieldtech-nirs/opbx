@@ -17,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -77,7 +78,7 @@ class ListManagementService
 
         // Store file temporarily (default disk is 'local' which uses storage/app/private)
         $tempPath = $file->store('temp/list_uploads');
-        $fullPath = storage_path('app/private/'.$tempPath);
+        $fullPath = Storage::disk('local')->path($tempPath);
 
         // Generate job ID
         $jobId = Str::uuid()->toString();
