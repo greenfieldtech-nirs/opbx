@@ -95,7 +95,7 @@ export interface PlatformOrganizationsParams {
   per_page?: number;
   search?: string;
   status?: OrganizationStatus;
-  sort_by?: 'name' | 'created_at' | 'users_count';
+  sort_by?: 'id' | 'name' | 'status' | 'created_at' | 'users_count' | 'extensions_count' | 'dids_count';
   sort_direction?: 'asc' | 'desc';
 }
 

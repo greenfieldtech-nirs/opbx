@@ -68,7 +68,7 @@ import {
 } from '@/hooks/platform';
 import type { PlatformOrganization, OrganizationStatus } from '@/types/platform';
 
-type SortField = 'name' | 'created_at' | 'users_count';
+type SortField = 'id' | 'name' | 'status' | 'created_at' | 'users_count' | 'extensions_count' | 'dids_count';
 type SortDirection = 'asc' | 'desc' | null;
 
 export default function PlatformOrganizations() {
@@ -117,6 +117,7 @@ export default function PlatformOrganizations() {
 
   const organizations = data?.data || [];
   const totalOrganizations = data?.meta?.total || 0;
+  const totalPages = Math.ceil(totalOrganizations / perPage);
 
   const updateStatusMutation = useUpdateOrganizationStatus();
   const updateSettingsMutation = useUpdateOrganizationSettings();
@@ -194,7 +195,23 @@ export default function PlatformOrganizations() {
   const columns: Column<PlatformOrganization>[] = [
     {
       header: 'ID',
+      sortKey: 'id',
       cell: (org) => <span>{org.id}</span>,
+    },
+    {
+      header: 'Name/Identity',
+      sortKey: 'name',
+      cell: (org) => (
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 bg-blue-100">
+            <Building2 className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <div className="font-medium text-primary">{org.name}</div>
+            <div className="text-xs text-muted-foreground capitalize">{org.slug}</div>
+          </div>
+        </div>
+      ),
     },
     {
       header: 'Users',
@@ -208,6 +225,7 @@ export default function PlatformOrganizations() {
     },
     {
       header: 'Extensions',
+      sortKey: 'extensions_count',
       cell: (org) => (
         <div className="flex items-center gap-1.5">
           <Phone className="h-4 w-4 text-muted-foreground" />
@@ -217,6 +235,7 @@ export default function PlatformOrganizations() {
     },
     {
       header: 'DIDs',
+      sortKey: 'dids_count',
       cell: (org) => (
         <div className="flex items-center gap-1.5">
           <Globe className="h-4 w-4 text-muted-foreground" />
@@ -226,6 +245,7 @@ export default function PlatformOrganizations() {
     },
     {
       header: 'Status',
+      sortKey: 'status',
       cell: (org) => getStatusBadge(org.status),
     },
     {
@@ -320,6 +340,7 @@ export default function PlatformOrganizations() {
               getIdentityPrimary={(org) => org.name}
               getIdentitySecondary={(org) => org.slug}
               onIdentityClick={openEditDialog}
+              showIdentityColumn={false}
               sortField={sortField}
               sortDirection={sortDirection}
               onSort={handleSort}
@@ -343,6 +364,54 @@ export default function PlatformOrganizations() {
                 />
               }
             />
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Rows per page:</p>
+                  <Select
+                    value={perPage.toString()}
+                    onValueChange={(value) => {
+                      setPerPage(parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

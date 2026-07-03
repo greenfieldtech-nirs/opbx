@@ -50,7 +50,7 @@ class PlatformOrganizationController extends Controller
             // Sort
             $sortBy = $request->input('sort_by', 'created_at');
             $sortDirection = $request->input('sort_direction', 'desc');
-            $allowedSorts = ['name', 'created_at', 'users_count'];
+            $allowedSorts = ['id', 'name', 'status', 'created_at', 'users_count', 'extensions_count', 'dids_count'];
 
             if (in_array($sortBy, $allowedSorts, true)) {
                 $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');

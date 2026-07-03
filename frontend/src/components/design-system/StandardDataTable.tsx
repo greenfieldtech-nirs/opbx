@@ -45,6 +45,7 @@ export interface StandardDataTableProps<T> {
     getIdentityPrimary: (item: T) => string;
     getIdentitySecondary: (item: T) => string;
     onIdentityClick?: (item: T, e: React.MouseEvent) => void;
+    showIdentityColumn?: boolean;
     // Sorting props
     sortField?: string;
     sortDirection?: 'asc' | 'desc';
@@ -71,6 +72,7 @@ export function StandardDataTable<T extends { id: string | number }>({
     getIdentityPrimary,
     getIdentitySecondary,
     onIdentityClick,
+    showIdentityColumn = true,
     sortField,
     sortDirection,
     onSort,
@@ -114,15 +116,17 @@ export function StandardDataTable<T extends { id: string | number }>({
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead
-                            className={cn("w-[250px]", onSort && "cursor-pointer")}
-                            onClick={() => onSort?.('identity')}
-                        >
-                            <div className="flex items-center">
-                                Name/Identity
-                                {onSort && renderSortIcon('identity')}
-                            </div>
-                        </TableHead>
+                        {showIdentityColumn && (
+                            <TableHead
+                                className={cn("w-[250px]", onSort && "cursor-pointer")}
+                                onClick={() => onSort?.('identity')}
+                            >
+                                <div className="flex items-center">
+                                    Name/Identity
+                                    {onSort && renderSortIcon('identity')}
+                                </div>
+                            </TableHead>
+                        )}
                         {columns.map((column, idx) => (
                             <TableHead key={idx} className={column.className}>
                                 <button
@@ -150,32 +154,34 @@ export function StandardDataTable<T extends { id: string | number }>({
                             onClick={() => onRowClick?.(item)}
                         >
                             {/* Identity Cell */}
-                            <TableCell>
-                                <button
-                                    onClick={(e) => {
-                                        if (onIdentityClick) {
-                                            e.stopPropagation();
-                                            onIdentityClick(item, e);
-                                        } else if (onRowClick) {
-                                            // Fallback to row click if identity specifically doesn't have its own
-                                        }
-                                    }}
-                                    className={cn(
-                                        "flex items-center gap-3 text-left translate-y-[-2px]",
-                                        onIdentityClick && "hover:underline"
-                                    )}
-                                >
-                                    <div className={cn("h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0", identityIconBg)}>
-                                        <IdentityIcon className={cn("h-5 w-5", identityIconColor)} />
-                                    </div>
-                                    <div>
-                                        <div className="font-medium text-primary">{getIdentityPrimary(item)}</div>
-                                        <div className="text-xs text-muted-foreground capitalize">
-                                            {getIdentitySecondary(item)}
+                            {showIdentityColumn && (
+                                <TableCell>
+                                    <button
+                                        onClick={(e) => {
+                                            if (onIdentityClick) {
+                                                e.stopPropagation();
+                                                onIdentityClick(item, e);
+                                            } else if (onRowClick) {
+                                                // Fallback to row click if identity specifically doesn't have its own
+                                            }
+                                        }}
+                                        className={cn(
+                                            "flex items-center gap-3 text-left translate-y-[-2px]",
+                                            onIdentityClick && "hover:underline"
+                                        )}
+                                    >
+                                        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0", identityIconBg)}>
+                                            <IdentityIcon className={cn("h-5 w-5", identityIconColor)} />
                                         </div>
-                                    </div>
-                                </button>
-                            </TableCell>
+                                        <div>
+                                            <div className="font-medium text-primary">{getIdentityPrimary(item)}</div>
+                                            <div className="text-xs text-muted-foreground capitalize">
+                                                {getIdentitySecondary(item)}
+                                            </div>
+                                        </div>
+                                    </button>
+                                </TableCell>
+                            )}
 
                             {/* Dynamic Columns */}
                             {columns.map((column, idx) => (
