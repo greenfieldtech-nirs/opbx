@@ -165,6 +165,8 @@ export default function PlatformUsers() {
         data: { is_platform_manager: isManager },
       });
       toast.success(isManager ? 'Platform manager rights granted' : 'Platform manager rights revoked');
+      // Update the selected user so the dialog toggle reflects the new state immediately
+      setSelectedUser((prev) => (prev ? { ...prev, is_platform_manager: isManager } : null));
     } catch {
       toast.error('Failed to update platform manager status');
     }
