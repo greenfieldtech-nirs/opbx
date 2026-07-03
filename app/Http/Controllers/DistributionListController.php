@@ -101,9 +101,16 @@ class DistributionListController extends Controller
     {
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
+            'mapping' => ['required', 'array'],
+            'mapping.phone' => ['required', 'string'],
+            'mapping.name' => ['nullable', 'string'],
+            'mapping.batch_identifier' => ['nullable', 'string'],
+            'mapping.metadata' => ['nullable', 'array'],
+            'mapping.metadata.*' => ['string'],
         ]);
 
         $file = $validated['file'];
+        $mapping = $validated['mapping'];
 
         // Determine action based on list status
         $canUploadToCurrent = $list->status->canUpload();
@@ -120,7 +127,7 @@ class DistributionListController extends Controller
                 // Upload to current list
                 $this->authorize('upload', $list);
 
-                $result = $this->listService->uploadCsv($list->id, $file);
+                $result = $this->listService->uploadCsv($list->id, $file, $mapping);
 
                 return response()->json([
                     'message' => 'File uploaded successfully. Processing started.',
@@ -135,7 +142,7 @@ class DistributionListController extends Controller
                 $this->authorize('createVersion', $list);
 
                 // Backup old destinations and update same list
-                $result = $this->listService->updateListWithBackup($list->id, $file);
+                $result = $this->listService->updateListWithBackup($list->id, $file, $mapping);
 
                 return response()->json([
                     'message' => 'List updated with new data. Old destinations backed up. Processing started.',
@@ -177,6 +184,37 @@ class DistributionListController extends Controller
     }
 
     /**
+     * Preview a CSV file before upload.
+     */
+    public function previewCsv(Request $request, AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('view', $list);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
+            'has_header' => ['boolean'],
+        ]);
+
+        $file = $validated['file'];
+        $hasHeader = $validated['has_header'] ?? true;
+
+        $tempPath = $file->store('temp/list_previews');
+        $fullPath = storage_path('app/private/'.$tempPath);
+
+        try {
+            $preview = $this->listService->previewCsv($fullPath, $hasHeader);
+
+            return response()->json([
+                'data' => $preview,
+            ]);
+        } finally {
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+        }
+    }
+
+    /**
      * Add single destination.
      */
     public function addDestination(Request $request, AutoDialerList $list): JsonResponse
@@ -185,14 +223,14 @@ class DistributionListController extends Controller
 
         $validated = $request->validate([
             'phone_number' => ['required', 'string'],
-            'description' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
             $destination = $this->listService->addDestination(
                 $list->id,
                 $validated['phone_number'],
-                $validated['description'] ?? null,
+                $validated['name'] ?? null,
             );
 
             return response()->json([
@@ -216,7 +254,7 @@ class DistributionListController extends Controller
         $validated = $request->validate([
             'destinations' => ['required', 'array', 'max:1000'],
             'destinations.*.phone_number' => ['required', 'string'],
-            'destinations.*.description' => ['nullable', 'string', 'max:255'],
+            'destinations.*.name' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
