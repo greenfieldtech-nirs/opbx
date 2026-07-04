@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\AutoDialer;
 
+use App\Jobs\ProcessListUploadJob;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\AutoDialer\ListValidationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -115,5 +117,40 @@ class DistributionListCsvMappingTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['mapping.phone']);
+    }
+
+    /** @test */
+    public function it_processes_upload_job_without_authenticated_user(): void
+    {
+        $csv = "phone,full_name\n+14155551212,John Doe\n";
+        $fullPath = tempnam(sys_get_temp_dir(), 'upload_test_').'.csv';
+        file_put_contents($fullPath, $csv);
+
+        try {
+            // Simulate queue worker context: no authenticated user
+            auth()->forgetGuards();
+
+            $job = new ProcessListUploadJob(
+                $this->list->id,
+                $fullPath,
+                'test-job-id',
+                false,
+                ['phone' => 'phone', 'name' => 'full_name']
+            );
+            $job->handle(app(ListValidationService::class));
+
+            $this->assertDatabaseHas('auto_dialer_destinations', [
+                'list_id' => $this->list->id,
+                'phone_number' => '+14155551212',
+                'name' => 'John Doe',
+            ]);
+
+            $this->list->refresh();
+            $this->assertSame('ready', $this->list->status->value);
+        } finally {
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+        }
     }
 }
