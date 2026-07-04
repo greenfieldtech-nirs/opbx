@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Upload, FileSpreadsheet, X, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useUploadList, useUploadProgress, usePreviewCsv } from '@/hooks/useDistributionLists';
 import { toast } from 'sonner';
+import axios from 'axios';
 import type { AutoDialerList, CsvMappingConfig } from '@/types';
 
 interface UnifiedUploadDialogProps {
@@ -31,6 +32,21 @@ const REQUIRED_FIELDS = [
   { key: 'batch_identifier', label: 'Batch Identifier' },
 ];
 
+function getUploadError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { message?: string; error?: string } | undefined;
+    if (data?.message) {
+      return data.message;
+    }
+    if (data?.error) {
+      return data.error;
+    }
+    return error.message || 'An unexpected error occurred';
+  }
+
+  return 'An unexpected error occurred';
+}
+
 export function UnifiedUploadDialog({
   list,
   open,
@@ -42,6 +58,7 @@ export function UnifiedUploadDialog({
   const [preview, setPreview] = useState<{ headers: string[]; rows: Record<string, string>[]; total_rows: number } | null>(null);
   const [mapping, setMapping] = useState<CsvMappingConfig>({ phone: '', name: '', batch_identifier: '', metadata: [] });
   const [jobId, setJobId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{
     action?: 'upload' | 'update';
     listId?: number;
@@ -66,6 +83,7 @@ export function UnifiedUploadDialog({
     setMapping({ phone: '', name: '', batch_identifier: '', metadata: [] });
     setJobId(null);
     setUploadResult(null);
+    setError(null);
     if (autoCloseTimerRef.current) {
       clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = null;
@@ -76,16 +94,18 @@ export function UnifiedUploadDialog({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     if (!selectedFile.name.endsWith('.csv')) {
-      toast.error('Please upload a CSV file');
+      setError('Please upload a CSV file');
       return;
     }
     setFile(selectedFile);
+    setError(null);
     setPreview(null);
     setMapping({ phone: '', name: '', batch_identifier: '', metadata: [] });
   };
 
   const handlePreview = async () => {
     if (!file) return;
+    setError(null);
     try {
       const result = await previewMutation.mutateAsync({ listId: list.id, file, hasHeader });
       setPreview(result.data);
@@ -94,13 +114,15 @@ export function UnifiedUploadDialog({
       const nameGuess = headers.find((h) => h.toLowerCase().includes('name') && h.toLowerCase() !== 'phone_number') ?? '';
       const batchGuess = headers.find((h) => h.toLowerCase().includes('batch')) ?? '';
       setMapping({ phone: phoneGuess, name: nameGuess, batch_identifier: batchGuess, metadata: [] });
-    } catch {
-      toast.error('Failed to parse CSV preview');
+    } catch (err) {
+      setError(getUploadError(err));
     }
   };
 
   const handleUpload = async () => {
     if (!file || !mapping.phone) return;
+
+    setError(null);
 
     const cleanedMapping: CsvMappingConfig = {
       phone: mapping.phone,
@@ -128,8 +150,8 @@ export function UnifiedUploadDialog({
           ? `Version ${result.data.new_version_number} created. Old data backed up. Processing...`
           : 'Upload started. Processing...'
       );
-    } catch {
-      toast.error('Failed to start upload');
+    } catch (err) {
+      setError(getUploadError(err));
     }
   };
 
@@ -193,6 +215,13 @@ export function UnifiedUploadDialog({
             <AlertDescription className="text-amber-800">
               Current version (v{list.version_number}) will be archived and version {newVersionNumber} will be created.
             </AlertDescription>
+          </Alert>
+        )}
+
+        {error && !jobId && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
@@ -324,7 +353,7 @@ export function UnifiedUploadDialog({
               </div>
             )}
 
-            <Button variant="outline" onClick={() => setPreview(null)}>
+            <Button variant="outline" onClick={() => { setPreview(null); setError(null); }}>
               Back
             </Button>
           </div>

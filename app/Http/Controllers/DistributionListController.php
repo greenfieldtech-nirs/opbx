@@ -197,7 +197,7 @@ class DistributionListController extends Controller
         ]);
 
         $file = $validated['file'];
-        $hasHeader = $validated['has_header'] ?? true;
+        $hasHeader = filter_var($validated['has_header'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
         $tempPath = $file->store('temp/list_previews');
         $fullPath = Storage::disk('local')->path($tempPath);

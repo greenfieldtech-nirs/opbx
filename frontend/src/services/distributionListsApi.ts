@@ -117,7 +117,16 @@ export const distributionListsApi = {
   }> => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('mapping', JSON.stringify(mapping));
+    formData.append('mapping[phone]', mapping.phone);
+    if (mapping.name) {
+      formData.append('mapping[name]', mapping.name);
+    }
+    if (mapping.batch_identifier) {
+      formData.append('mapping[batch_identifier]', mapping.batch_identifier);
+    }
+    mapping.metadata?.forEach((column) => {
+      formData.append('mapping[metadata][]', column);
+    });
 
     const response = await api.post(`/auto-dialer-campaigns/lists/${listId}/upload`, formData, {
       headers: {

@@ -57,6 +57,22 @@ class DistributionListCsvMappingTest extends TestCase
     }
 
     /** @test */
+    public function it_accepts_has_header_as_string_from_form_data(): void
+    {
+        $csv = "phone,full_name\n+14155551212,John Doe\n";
+        $file = UploadedFile::fake()->createWithContent('contacts.csv', $csv);
+
+        $this->actingAs($this->user)
+            ->postJson("/api/v1/auto-dialer-campaigns/lists/{$this->list->id}/preview-csv", [
+                'file' => $file,
+                'has_header' => '1',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.headers', ['phone', 'full_name'])
+            ->assertJsonPath('data.total_rows', 1);
+    }
+
+    /** @test */
     public function it_uploads_csv_with_mapping_and_creates_destinations(): void
     {
         $csv = "phone,full_name,batch_id,account\n+14155551212,John Doe,batch-1,ACC-123\n+14155551213,Jane Smith,batch-2,ACC-456\n";
