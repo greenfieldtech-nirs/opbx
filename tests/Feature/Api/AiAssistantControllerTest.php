@@ -188,6 +188,38 @@ class AiAssistantControllerTest extends TestCase
     }
 
     /**
+     * Test creating a dummy AI assistant with no configuration.
+     */
+    public function test_create_dummy_ai_assistant_with_empty_configuration(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $data = [
+            'name' => 'Dummy Assistant',
+            'status' => 'active',
+            'provider' => 'dummy_ai',
+            'configuration' => [],
+        ];
+
+        $response = $this->postJson('/api/v1/ai-assistants', $data);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'name' => 'Dummy Assistant',
+                'provider' => 'dummy_ai',
+                'protocol' => 'dummy',
+                'configuration' => [],
+            ]);
+
+        $this->assertDatabaseHas('ai_assistants', [
+            'name' => 'Dummy Assistant',
+            'provider' => 'dummy_ai',
+            'protocol' => 'dummy',
+            'organization_id' => $this->organization->id,
+        ]);
+    }
+
+    /**
      * Test validation requires provider.
      */
     public function test_create_requires_provider(): void

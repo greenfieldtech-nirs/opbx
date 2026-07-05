@@ -57,7 +57,6 @@ class UpdateAiAssistantRequest extends FormRequest
             ],
             'configuration' => [
                 'sometimes',
-                'required',
                 'array',
             ],
         ];
