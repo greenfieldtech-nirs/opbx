@@ -113,13 +113,13 @@ class UpdateAiAssistantRequest extends FormRequest
                 return;
             }
 
-            foreach ($providerDef->config_fields as $field) {
-                $value = $configuration[$field->key] ?? null;
+            foreach ($providerDef->configFields as $field) {
+                $value = $configuration[$field->name] ?? null;
 
                 // Check required fields
                 if ($field->required && empty($value)) {
                     $validator->errors()->add(
-                        "configuration.{$field->key}",
+                        "configuration.{$field->name}",
                         "{$field->label} is required"
                     );
 
@@ -168,7 +168,7 @@ class UpdateAiAssistantRequest extends FormRequest
         }
 
         if ($errorMessage) {
-            $validator->errors()->add("configuration.{$field->key}", $errorMessage);
+            $validator->errors()->add("configuration.{$field->name}", $errorMessage);
         }
     }
 }

@@ -256,6 +256,44 @@ class AiAssistantControllerTest extends TestCase
     }
 
     /**
+     * Test updating an AI assistant with a new provider and configuration.
+     *
+     * Regression test: the update request must read ProviderDefinition->configFields
+     * and ProviderConfigField->name, not the non-existent snake_case properties.
+     */
+    public function test_update_ai_assistant_with_provider_configuration(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $assistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'provider' => 'vapi',
+            'configuration' => ['phone_number' => '+12125551234'],
+        ]);
+
+        $data = [
+            'name' => 'Retell Agent',
+            'provider' => 'retell',
+            'configuration' => ['phone_number' => '+12133287400'],
+        ];
+
+        $response = $this->putJson("/api/v1/ai-assistants/{$assistant->id}", $data);
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'name' => 'Retell Agent',
+                'provider' => 'retell',
+                'configuration' => ['phone_number' => '+12133287400'],
+            ]);
+
+        $this->assertDatabaseHas('ai_assistants', [
+            'id' => $assistant->id,
+            'name' => 'Retell Agent',
+            'provider' => 'retell',
+        ]);
+    }
+
+    /**
      * Test deleting an AI assistant that is not in use.
      */
     public function test_delete_ai_assistant_not_in_use(): void
