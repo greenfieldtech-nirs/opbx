@@ -39,6 +39,9 @@ class DialingSchedulerTest extends TestCase
             'start_time' => 9,
             'end_time' => 17,
             'timezone' => 'UTC',
+            'start_date' => '2020-01-01',
+            'end_date' => '2030-12-31',
+            'days_active' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
         ], $overrides));
     }
 

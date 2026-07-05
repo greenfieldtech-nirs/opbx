@@ -42,6 +42,9 @@ class CampaignProcessorTest extends TestCase
     {
         return AutoDialerCampaign::factory()->create(array_merge([
             'organization_id' => $this->organization->id,
+            'start_date' => '2020-01-01',
+            'end_date' => '2030-12-31',
+            'days_active' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
         ], $overrides));
     }
 
