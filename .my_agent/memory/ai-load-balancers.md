@@ -120,3 +120,5 @@ Standard apiResource at `/v1/ai-assistant-load-balancers`
 ## Follow-Through Metadata (2026-07-05)
 
 When `AlbsFollowThroughController` routes a failed call to the next member, it loads the original `AutoDialerCallSession` by `call_id`/`session_token` and includes the destination's flattened metadata in the next assistant's CXML using the same Dummy/SIP/WebSocket rules as the initial dialer CXML.
+
+Security note: the lookup is scoped to the organization ID established by `voice.webhook.auth` middleware (`_organization_id`), so a session from a different tenant cannot be loaded.
