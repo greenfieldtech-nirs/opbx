@@ -11,8 +11,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
+use App\Models\AutoDialerCallSession;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\AutoDialer\MetadataHelper;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -72,6 +74,14 @@ class AlbsFollowThroughController extends Controller
             ?? $request->input('SessionData.callSid')
             ?? $request->input('Session')
             ?? $request->input('session');
+
+        $metadata = $this->getMetadataFromCallSid($callSid);
+
+        Log::info('ALBS Follow Through: Loaded destination metadata', [
+            'request_id' => $requestId,
+            'call_sid' => $callSid,
+            'metadata' => $metadata,
+        ]);
 
         // Get albs_id from query string or body
         $albsId = $request->query('albs_id') ?? $request->input('albs_id');
@@ -174,7 +184,7 @@ class AlbsFollowThroughController extends Controller
             ]);
 
             // Follow-through is disabled, execute fallback action immediately
-            return $this->executeFallback($albs, $request);
+            return $this->executeFallback($albs, $request, $metadata);
         }
 
         // Follow-through is enabled - try next member
@@ -210,7 +220,7 @@ class AlbsFollowThroughController extends Controller
             ]);
 
             // All assistants tried, execute original fallback
-            return $this->executeFallback($albs, $request);
+            return $this->executeFallback($albs, $request, $metadata);
         }
 
         // Store updated tried list
@@ -226,7 +236,7 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         // Generate CXML to route to next assistant
-        return $this->routeToAssistant($nextAssistant, $albs, $request);
+        return $this->routeToAssistant($nextAssistant, $albs, $request, $metadata);
     }
 
     /**
@@ -251,6 +261,28 @@ class AlbsFollowThroughController extends Controller
     {
         $key = self::TENTATIVE_ASSISTANTS_KEY.$callSid;
         Cache::put($key, json_encode($assistantIds), self::CACHE_TTL_SECONDS);
+    }
+
+    /**
+     * Load flattened metadata from the original auto-dialer destination.
+     */
+    private function getMetadataFromCallSid(?string $callSid): array
+    {
+        if (! $callSid) {
+            return [];
+        }
+
+        $session = \App\Scopes\OrganizationScope::bypass(fn () => AutoDialerCallSession::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('call_id', $callSid)
+            ->orWhere('session_token', $callSid)
+            ->with('destination')
+            ->first());
+
+        if (! $session || ! $session->destination) {
+            return [];
+        }
+
+        return MetadataHelper::flatten($session->destination->metadata ?? []);
     }
 
     /**
@@ -336,7 +368,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Generate CXML to route to an AI Assistant.
      */
-    private function routeToAssistant(AiAssistant $aiAssistant, AiAssistantLoadBalancer $albs, Request $request): Response
+    private function routeToAssistant(AiAssistant $aiAssistant, AiAssistantLoadBalancer $albs, Request $request, array $metadata = []): Response
     {
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;
@@ -347,14 +379,14 @@ class AlbsFollowThroughController extends Controller
         $callbackUrl = $this->buildCallbackUrl($albs->id, $aiAssistant->id, $request);
 
         if ($protocol === 'websocket') {
-            return $this->routeWebSocket($aiAssistant, $config, $provider, $callbackUrl, $request);
+            return $this->routeWebSocket($aiAssistant, $config, $provider, $callbackUrl, $request, $metadata);
         }
 
         if ($protocol === 'dummy') {
-            return $this->routeDummy($aiAssistant);
+            return $this->routeDummy($aiAssistant, $metadata);
         }
 
-        return $this->routeSip($aiAssistant, $config, $provider, $callbackUrl, $request);
+        return $this->routeSip($aiAssistant, $config, $provider, $callbackUrl, $request, $metadata);
     }
 
     /**
@@ -391,7 +423,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Route to WebSocket-based AI Assistant.
      */
-    private function routeWebSocket(AiAssistant $aiAssistant, array $config, ?string $provider, string $callbackUrl, Request $request): Response
+    private function routeWebSocket(AiAssistant $aiAssistant, array $config, ?string $provider, string $callbackUrl, Request $request, array $metadata = []): Response
     {
         if (! $provider) {
             Log::error('ALBS Follow Through: WebSocket assistant missing provider', [
@@ -432,7 +464,7 @@ class AlbsFollowThroughController extends Controller
             ]);
 
             // Using action parameter on Connect verb for callback
-            $builder = CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl);
+            $builder = CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl, $metadata);
 
             return response($builder, 200, ['Content-Type' => 'application/xml']);
         } catch (\InvalidArgumentException $e) {
@@ -449,7 +481,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Route to SIP-based AI Assistant.
      */
-    private function routeSip(AiAssistant $aiAssistant, array $config, ?string $provider, string $callbackUrl, Request $request): Response
+    private function routeSip(AiAssistant $aiAssistant, array $config, ?string $provider, string $callbackUrl, Request $request, array $metadata = []): Response
     {
         $phoneNumber = $config['phone_number'] ?? null;
 
@@ -467,7 +499,8 @@ class AlbsFollowThroughController extends Controller
             'phone_number' => $phoneNumber,
         ]);
 
-        $builder = CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl);
+        $headers = $this->buildSipHeaders($metadata);
+        $builder = CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl, $headers);
 
         return response($builder, 200, ['Content-Type' => 'application/xml']);
     }
@@ -475,7 +508,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Execute the original fallback action when all assistants fail.
      */
-    private function executeFallback(AiAssistantLoadBalancer $albs, Request $request): Response
+    private function executeFallback(AiAssistantLoadBalancer $albs, Request $request, array $metadata = []): Response
     {
         $fallbackAction = $albs->fallback_action;
 
@@ -489,7 +522,7 @@ class AlbsFollowThroughController extends Controller
             RingGroupFallbackAction::EXTENSION => $this->routeToExtension($albs, $request),
             RingGroupFallbackAction::RING_GROUP => $this->routeToRingGroup($albs, $request),
             RingGroupFallbackAction::IVR_MENU => $this->routeToIvrMenu($albs, $request),
-            RingGroupFallbackAction::AI_ASSISTANT => $this->routeToAiAssistant($albs, $request),
+            RingGroupFallbackAction::AI_ASSISTANT => $this->routeToAiAssistant($albs, $request, $metadata),
             default => $this->hangupResponse(),
         };
     }
@@ -664,7 +697,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Route to dummy AI Assistant.
      */
-    private function routeDummy(AiAssistant $aiAssistant): Response
+    private function routeDummy(AiAssistant $aiAssistant, array $metadata = []): Response
     {
         Log::info('ALBS Follow Through: Routing to Dummy AI provider', [
             'ai_assistant_id' => $aiAssistant->id,
@@ -672,7 +705,7 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         return response(
-            CxmlBuilder::dummyAiMessage(),
+            CxmlBuilder::dummyAiMessage($metadata),
             200,
             ['Content-Type' => 'application/xml']
         );
@@ -684,7 +717,7 @@ class AlbsFollowThroughController extends Controller
      * Reuses the existing routeToAssistant() method which handles
      * both WebSocket and SIP-based AI assistant routing with CXML generation.
      */
-    private function routeToAiAssistant(AiAssistantLoadBalancer $albs, Request $request): Response
+    private function routeToAiAssistant(AiAssistantLoadBalancer $albs, Request $request, array $metadata = []): Response
     {
         $aiAssistantId = $albs->fallback_ai_assistant_id;
 
@@ -718,14 +751,14 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         // Reuse existing routing logic (no follow-through callback for the fallback itself)
-        return $this->routeToAssistantDirect($aiAssistant, $request);
+        return $this->routeToAssistantDirect($aiAssistant, $request, $metadata);
     }
 
     /**
      * Route directly to an AI Assistant without follow-through callback.
      * Used for fallback routing where we don't want another ALB callback loop.
      */
-    private function routeToAssistantDirect(AiAssistant $aiAssistant, Request $request): Response
+    private function routeToAssistantDirect(AiAssistant $aiAssistant, Request $request, array $metadata = []): Response
     {
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;
@@ -756,7 +789,7 @@ class AlbsFollowThroughController extends Controller
                 );
 
                 return response(
-                    CxmlBuilder::streamToWebSocket($websocketUrl),
+                    CxmlBuilder::streamToWebSocket($websocketUrl, $metadata),
                     200,
                     ['Content-Type' => 'application/xml']
                 );
@@ -771,7 +804,7 @@ class AlbsFollowThroughController extends Controller
         }
 
         if ($protocol === 'dummy') {
-            return $this->routeDummy($aiAssistant);
+            return $this->routeDummy($aiAssistant, $metadata);
         }
 
         // SIP-based routing
@@ -781,11 +814,31 @@ class AlbsFollowThroughController extends Controller
             return $this->errorResponse('Fallback AI Assistant configuration incomplete');
         }
 
+        $headers = $this->buildSipHeaders($metadata);
+
         return response(
-            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
+            CxmlBuilder::dialServiceProvider($provider, $phoneNumber, $headers),
             200,
             ['Content-Type' => 'application/xml']
         );
+    }
+
+    /**
+     * Build SIP headers from flattened metadata, prefixing with X- when needed.
+     *
+     * @param  array<string, string>  $metadata
+     * @return array<string, string>
+     */
+    private function buildSipHeaders(array $metadata): array
+    {
+        $headers = [];
+
+        foreach ($metadata as $key => $value) {
+            $headerName = str_starts_with($key, 'X-') ? $key : 'X-'.$key;
+            $headers[$headerName] = $value;
+        }
+
+        return $headers;
     }
 
     /**
