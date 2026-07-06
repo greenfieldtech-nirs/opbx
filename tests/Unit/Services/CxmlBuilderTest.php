@@ -16,7 +16,7 @@ class CxmlBuilderTest extends TestCase
 
         $this->assertStringContainsString('<Response>', $cxml);
         $this->assertStringContainsString('<Dial', $cxml);
-        $this->assertStringContainsString('<Sip>' . $sipUri . '</Sip>', $cxml);
+        $this->assertStringContainsString('<Sip>'.$sipUri.'</Sip>', $cxml);
         $this->assertStringContainsString('timeout="30"', $cxml);
     }
 
@@ -35,7 +35,7 @@ class CxmlBuilderTest extends TestCase
         $this->assertStringContainsString('timeout="45"', $cxml);
 
         foreach ($sipUris as $uri) {
-            $this->assertStringContainsString('<Sip>' . $uri . '</Sip>', $cxml);
+            $this->assertStringContainsString('<Sip>'.$uri.'</Sip>', $cxml);
         }
     }
 
@@ -45,7 +45,7 @@ class CxmlBuilderTest extends TestCase
         $cxml = CxmlBuilder::busy($message);
 
         $this->assertStringContainsString('<Response>', $cxml);
-        $this->assertStringContainsString('<Say>' . $message . '</Say>', $cxml);
+        $this->assertStringContainsString('<Say>'.$message.'</Say>', $cxml);
         $this->assertStringContainsString('<Hangup/>', $cxml);
     }
 
@@ -59,7 +59,7 @@ class CxmlBuilderTest extends TestCase
 
     public function test_builder_chains_multiple_verbs(): void
     {
-        $builder = new CxmlBuilder();
+        $builder = new CxmlBuilder;
         $cxml = $builder
             ->say('Welcome to our PBX')
             ->dial('sip:1001@example.com', 30)
@@ -71,7 +71,7 @@ class CxmlBuilderTest extends TestCase
 
     public function test_phone_number_generates_number_element(): void
     {
-        $builder = new CxmlBuilder();
+        $builder = new CxmlBuilder;
         $cxml = $builder
             ->dial('+1234567890')
             ->build();
@@ -100,7 +100,7 @@ class CxmlBuilderTest extends TestCase
 
     public function test_dial_with_trunks_attribute(): void
     {
-        $builder = new CxmlBuilder();
+        $builder = new CxmlBuilder;
         $cxml = $builder
             ->dial('sip:1001@example.com', 30, null, 'trunk1,trunk2')
             ->build();

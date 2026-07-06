@@ -6,6 +6,8 @@ namespace Tests\Feature\AutoDialer;
 
 use App\Enums\RoutingDestinationType;
 use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
+use App\Models\AiAssistantLoadBalancerMember;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\Organization;
@@ -138,12 +140,12 @@ class AutoDialerCxmlMetadataTest extends TestCase
             'protocol' => 'sip',
             'configuration' => ['phone_number' => '+12127773456'],
         ]);
-        $loadBalancer = \App\Models\AiAssistantLoadBalancer::factory()->create([
+        $loadBalancer = AiAssistantLoadBalancer::factory()->create([
             'organization_id' => $organization->id,
             'strategy' => 'priority',
             'follow_through' => false,
         ]);
-        \App\Models\AiAssistantLoadBalancerMember::factory()->create([
+        AiAssistantLoadBalancerMember::factory()->create([
             'load_balancer_id' => $loadBalancer->id,
             'ai_assistant_id' => $aiAssistant->id,
             'priority' => 1,

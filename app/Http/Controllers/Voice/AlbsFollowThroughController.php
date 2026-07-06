@@ -12,10 +12,17 @@ use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
 use App\Models\AutoDialerCallSession;
+use App\Models\CloudonixSettings;
+use App\Models\DidNumber;
+use App\Models\Extension;
+use App\Models\IvrMenu;
+use App\Models\RingGroup;
+use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\AutoDialer\MetadataHelper;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
@@ -142,15 +149,15 @@ class AlbsFollowThroughController extends Controller
         }
 
         // Load the AI Load Balancer
-        $albs = AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $albs = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
             ->with(['members' => function ($query) {
                 $query->where('status', 'active')
                     ->whereHas('aiAssistant', function ($q) {
-                        $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                        $q->withoutGlobalScope(OrganizationScope::class)
                             ->where('status', AiAssistantStatus::ACTIVE->value);
                     })
                     ->with(['aiAssistant' => function ($q) {
-                        $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
+                        $q->withoutGlobalScope(OrganizationScope::class);
                     }]);
             }])
             ->where('id', $albsId)
@@ -272,7 +279,7 @@ class AlbsFollowThroughController extends Controller
             return [];
         }
 
-        $session = \App\Scopes\OrganizationScope::bypass(fn () => AutoDialerCallSession::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $session = OrganizationScope::bypass(fn () => AutoDialerCallSession::withoutGlobalScope(OrganizationScope::class)
             ->where('call_id', $callSid)
             ->orWhere('session_token', $callSid)
             ->with('destination')
@@ -404,7 +411,7 @@ class AlbsFollowThroughController extends Controller
         $organizationId = $request->input('_organization_id');
 
         // Look up organization's Cloudonix settings
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $organizationId)->first();
+        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
 
         // Use configured webhook base URL, or fall back to app URL
         $baseUrl = $cloudonixSettings
@@ -554,7 +561,7 @@ class AlbsFollowThroughController extends Controller
             return $this->hangupResponse();
         }
 
-        $extension = \App\Models\Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $extensionId)
             ->where('organization_id', $albs->organization_id)
             ->where('status', 'active')
@@ -608,7 +615,7 @@ class AlbsFollowThroughController extends Controller
             return $this->hangupResponse();
         }
 
-        $ringGroup = \App\Models\RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $ringGroupId)
             ->where('organization_id', $albs->organization_id)
             ->where('status', 'active')
@@ -623,8 +630,8 @@ class AlbsFollowThroughController extends Controller
             return $this->hangupResponse();
         }
 
-        $members = $ringGroup->getMembers()->filter(fn (\App\Models\Extension $ext) => $ext->isActive());
-        $sipUris = $members->map(fn (\App\Models\Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
+        $members = $ringGroup->getMembers()->filter(fn (Extension $ext) => $ext->isActive());
+        $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
 
         if (empty($sipUris)) {
             Log::warning('ALBS Follow Through: Fallback ring group has no active members', [
@@ -666,7 +673,7 @@ class AlbsFollowThroughController extends Controller
             return $this->hangupResponse();
         }
 
-        $ivrMenu = \App\Models\IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $ivrMenu = IvrMenu::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $ivrMenuId)
             ->where('organization_id', $albs->organization_id)
             ->where('status', 'active')
@@ -688,8 +695,8 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         // Delegate to IvrRoutingStrategy via app container
-        $ivrStrategy = app(\App\Services\VoiceRouting\Strategies\IvrRoutingStrategy::class);
-        $dummyDid = new \App\Models\DidNumber;
+        $ivrStrategy = app(IvrRoutingStrategy::class);
+        $dummyDid = new DidNumber;
 
         return $ivrStrategy->route($request, $dummyDid, ['ivr_menu' => $ivrMenu]);
     }
@@ -729,7 +736,7 @@ class AlbsFollowThroughController extends Controller
             return $this->hangupResponse();
         }
 
-        $aiAssistant = AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $aiAssistantId)
             ->where('organization_id', $albs->organization_id)
             ->where('status', AiAssistantStatus::ACTIVE->value)

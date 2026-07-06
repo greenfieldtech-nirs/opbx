@@ -19,6 +19,7 @@ use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\PhoneNumberService;
+use App\Services\VoiceRouting\AlbsDistributionService;
 use App\Services\VoiceRouting\OutboundRoutingService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -506,7 +507,7 @@ class AutoDialerCloudonixService
         }
 
         // Select AI assistant using the distribution service (respects strategy)
-        $distributionService = app(\App\Services\VoiceRouting\AlbsDistributionService::class);
+        $distributionService = app(AlbsDistributionService::class);
         $aiAssistant = $distributionService->selectAssistant($loadBalancer);
 
         if (! $aiAssistant) {
@@ -555,7 +556,7 @@ class AutoDialerCloudonixService
         AiAssistant $currentAssistant,
         AutoDialerCampaign $campaign
     ): string {
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        $cloudonixSettings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
 
         $baseUrl = $cloudonixSettings
             ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')

@@ -6,6 +6,7 @@ namespace App\Services\CxmlBuilder;
 
 use DOMDocument;
 use DOMElement;
+use Illuminate\Http\Response;
 
 /**
  * CXML response builder for Cloudonix voice applications.
@@ -779,7 +780,7 @@ class CxmlBuilder
      *
      * @param  int  $status  HTTP status code (default: 200)
      */
-    public function toResponse(int $status = 200): \Illuminate\Http\Response
+    public function toResponse(int $status = 200): Response
     {
         return response($this->build(), $status)
             ->header('Content-Type', 'application/xml');

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Voice;
 
 use App\Enums\AiAssistantStatus;
-use App\Enums\AlbsStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
