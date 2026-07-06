@@ -645,21 +645,26 @@ class CxmlBuilder
      * This enables bi-directional audio streaming to WebSocket-based services.
      *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      *
      * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect/stream
      */
-    public function connectStream(string $websocketUrl): self
+    public function connectStream(string $websocketUrl, array $parameters = []): self
     {
-        // Validate WebSocket URL format
         if (! str_starts_with($websocketUrl, 'wss://')) {
             throw new \InvalidArgumentException('WebSocket URL must start with wss://');
         }
 
         $connect = $this->document->createElement('Connect');
         $stream = $this->document->createElement('Stream');
-        // DOMDocument::setAttribute handles XML escaping automatically —
-        // do NOT pre-encode with htmlspecialchars (causes double-encoding of &)
         $stream->setAttribute('url', $websocketUrl);
+
+        foreach ($parameters as $paramName => $paramValue) {
+            $param = $this->document->createElement('Parameter');
+            $param->setAttribute('name', (string) $paramName);
+            $param->setAttribute('value', (string) $paramValue);
+            $stream->appendChild($param);
+        }
 
         $connect->appendChild($stream);
         $this->response->appendChild($connect);
@@ -670,31 +675,33 @@ class CxmlBuilder
     /**
      * Add Connect verb with Stream noun for WebSocket audio streaming with action callback.
      *
-     * This enables bi-directional audio streaming and notifies us when the connect
-     * completes (busy, no-answer, failed, etc.) via the action parameter.
-     *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
      * @param  string|null  $actionUrl  Callback URL when connect completes
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      *
      * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect
      */
-    public function connectStreamWithAction(string $websocketUrl, ?string $actionUrl = null): self
+    public function connectStreamWithAction(string $websocketUrl, ?string $actionUrl = null, array $parameters = []): self
     {
-        // Validate WebSocket URL format
         if (! str_starts_with($websocketUrl, 'wss://')) {
             throw new \InvalidArgumentException('WebSocket URL must start with wss://');
         }
 
         $connect = $this->document->createElement('Connect');
 
-        // Add action attribute on Connect verb for callback when connect completes
-        // DOMDocument handles XML encoding automatically - & becomes &amp;
         if ($actionUrl !== null) {
             $connect->setAttribute('action', $actionUrl);
         }
 
         $stream = $this->document->createElement('Stream');
         $stream->setAttribute('url', $websocketUrl);
+
+        foreach ($parameters as $paramName => $paramValue) {
+            $param = $this->document->createElement('Parameter');
+            $param->setAttribute('name', (string) $paramName);
+            $param->setAttribute('value', (string) $paramValue);
+            $stream->appendChild($param);
+        }
 
         $connect->appendChild($stream);
         $this->response->appendChild($connect);
@@ -709,12 +716,13 @@ class CxmlBuilder
      *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
      * @param  string|null  $actionUrl  Callback URL when connect completes
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      * @return string CXML response
      */
-    public static function streamToWebSocketWithAction(string $websocketUrl, ?string $actionUrl = null): string
+    public static function streamToWebSocketWithAction(string $websocketUrl, ?string $actionUrl = null, array $parameters = []): string
     {
         $builder = new self;
-        $builder->connectStreamWithAction($websocketUrl, $actionUrl);
+        $builder->connectStreamWithAction($websocketUrl, $actionUrl, $parameters);
 
         return $builder->build();
     }
@@ -741,12 +749,13 @@ class CxmlBuilder
      * Static factory method for creating WebSocket streaming responses.
      *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      * @return string CXML response
      */
-    public static function streamToWebSocket(string $websocketUrl): string
+    public static function streamToWebSocket(string $websocketUrl, array $parameters = []): string
     {
         $builder = new self;
-        $builder->connectStream($websocketUrl);
+        $builder->connectStream($websocketUrl, $parameters);
 
         return $builder->build();
     }
