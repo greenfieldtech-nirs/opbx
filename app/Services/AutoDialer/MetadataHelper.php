@@ -39,4 +39,22 @@ final class MetadataHelper
 
         return (string) $value;
     }
+
+    /**
+     * Build SIP headers from flattened metadata, prefixing with X- when needed.
+     *
+     * @param  array<string, string>  $metadata
+     * @return array<string, string>
+     */
+    public static function toSipHeaders(array $metadata): array
+    {
+        $headers = [];
+
+        foreach ($metadata as $key => $value) {
+            $headerName = str_starts_with($key, 'X-') ? $key : 'X-'.$key;
+            $headers[$headerName] = $value;
+        }
+
+        return $headers;
+    }
 }

@@ -144,4 +144,64 @@ class AlbsFollowThroughMetadataTest extends TestCase
         $cxml = $response->getContent();
         $this->assertStringNotContainsString('<Header name="X-', $cxml);
     }
+
+    public function test_follow_through_does_not_leak_metadata_across_organizations(): void
+    {
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'provider' => 'retell',
+            'protocol' => 'sip',
+            'configuration' => ['phone_number' => '+12127773456'],
+            'status' => AiAssistantStatus::ACTIVE,
+        ]);
+        $loadBalancer = AiAssistantLoadBalancer::factory()->create([
+            'organization_id' => $this->organization->id,
+            'strategy' => 'priority',
+            'follow_through' => true,
+        ]);
+        AiAssistantLoadBalancerMember::factory()->create([
+            'load_balancer_id' => $loadBalancer->id,
+            'ai_assistant_id' => $aiAssistant->id,
+            'priority' => 1,
+            'status' => 'active',
+        ]);
+
+        // Create a session belonging to a different organization with the same CallSid.
+        $otherOrganization = Organization::factory()->create();
+        $otherSettings = CloudonixSettings::factory()->create([
+            'organization_id' => $otherOrganization->id,
+        ]);
+        $otherDestination = AutoDialerDestination::factory()->create([
+            'organization_id' => $otherOrganization->id,
+            'metadata' => ['stolen' => 'value'],
+        ]);
+        $otherCampaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $otherOrganization->id,
+        ]);
+        AutoDialerCallSession::factory()->create([
+            'organization_id' => $otherOrganization->id,
+            'campaign_id' => $otherCampaign->id,
+            'destination_id' => $otherDestination->id,
+            'call_id' => 'CA123',
+        ]);
+
+        // Send a request authenticated for our organization, but with the other org's CallSid.
+        $response = $this->postJson(route('voice.albs-follow-through', [
+            'albs_id' => $loadBalancer->id,
+            'current_assistant_id' => $aiAssistant->id,
+        ]), [
+            'CallSid' => 'CA123',
+            'DialCallStatus' => 'busy',
+            'Domain' => $this->settings->domain_uuid,
+            'To' => '+15551234567',
+            'From' => '+15559876543',
+        ], [
+            'X-Cx-Session' => 'CA123',
+            'Authorization' => 'Bearer '.$this->settings->domain_requests_api_key,
+        ]);
+
+        $response->assertStatus(200);
+        $cxml = $response->getContent();
+        $this->assertStringNotContainsString('<Header name="X-stolen"', $cxml);
+    }
 }

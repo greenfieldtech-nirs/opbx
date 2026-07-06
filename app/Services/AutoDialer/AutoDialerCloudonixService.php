@@ -409,7 +409,7 @@ class AutoDialerCloudonixService
      */
     private function generateSipCxml(AiAssistant $aiAssistant, array $config, ?string $provider, array $metadata = []): string
     {
-        $headers = $this->buildSipHeaders($metadata);
+        $headers = MetadataHelper::toSipHeaders($metadata);
 
         // Check if AI Assistant has service URL (preferred for generic service URLs)
         $extension = Extension::withoutGlobalScope(OrganizationScope::class)
@@ -452,24 +452,6 @@ class AutoDialerCloudonixService
         ]);
 
         return CxmlBuilder::dialServiceProvider($provider, $phoneNumber, $headers);
-    }
-
-    /**
-     * Build SIP headers from flattened metadata, prefixing with X- when needed.
-     *
-     * @param  array<string, string>  $metadata
-     * @return array<string, string>
-     */
-    private function buildSipHeaders(array $metadata): array
-    {
-        $headers = [];
-
-        foreach ($metadata as $key => $value) {
-            $headerName = str_starts_with($key, 'X-') ? $key : 'X-'.$key;
-            $headers[$headerName] = $value;
-        }
-
-        return $headers;
     }
 
     /**
@@ -623,7 +605,7 @@ class AutoDialerCloudonixService
             return $this->buildHangupCxml();
         }
 
-        $headers = $this->buildSipHeaders($metadata);
+        $headers = MetadataHelper::toSipHeaders($metadata);
 
         return CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl, $headers);
     }

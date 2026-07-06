@@ -82,7 +82,7 @@ class AlbsFollowThroughController extends Controller
             ?? $request->input('Session')
             ?? $request->input('session');
 
-        $metadata = $this->getMetadataFromCallSid($callSid);
+        $metadata = $this->getMetadataFromCallSid($callSid, (int) $request->input('_organization_id'));
 
         Log::info('ALBS Follow Through: Loaded destination metadata', [
             'request_id' => $requestId,
@@ -273,15 +273,18 @@ class AlbsFollowThroughController extends Controller
     /**
      * Load flattened metadata from the original auto-dialer destination.
      */
-    private function getMetadataFromCallSid(?string $callSid): array
+    private function getMetadataFromCallSid(?string $callSid, ?int $organizationId): array
     {
-        if (! $callSid) {
+        if (! $callSid || ! $organizationId) {
             return [];
         }
 
         $session = OrganizationScope::bypass(fn () => AutoDialerCallSession::withoutGlobalScope(OrganizationScope::class)
-            ->where('call_id', $callSid)
-            ->orWhere('session_token', $callSid)
+            ->where('organization_id', $organizationId)
+            ->where(fn ($query) => $query
+                ->where('call_id', $callSid)
+                ->orWhere('session_token', $callSid)
+            )
             ->with('destination')
             ->first());
 
@@ -506,7 +509,7 @@ class AlbsFollowThroughController extends Controller
             'phone_number' => $phoneNumber,
         ]);
 
-        $headers = $this->buildSipHeaders($metadata);
+        $headers = MetadataHelper::toSipHeaders($metadata);
         $builder = CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl, $headers);
 
         return response($builder, 200, ['Content-Type' => 'application/xml']);
@@ -821,31 +824,13 @@ class AlbsFollowThroughController extends Controller
             return $this->errorResponse('Fallback AI Assistant configuration incomplete');
         }
 
-        $headers = $this->buildSipHeaders($metadata);
+        $headers = MetadataHelper::toSipHeaders($metadata);
 
         return response(
             CxmlBuilder::dialServiceProvider($provider, $phoneNumber, $headers),
             200,
             ['Content-Type' => 'application/xml']
         );
-    }
-
-    /**
-     * Build SIP headers from flattened metadata, prefixing with X- when needed.
-     *
-     * @param  array<string, string>  $metadata
-     * @return array<string, string>
-     */
-    private function buildSipHeaders(array $metadata): array
-    {
-        $headers = [];
-
-        foreach ($metadata as $key => $value) {
-            $headerName = str_starts_with($key, 'X-') ? $key : 'X-'.$key;
-            $headers[$headerName] = $value;
-        }
-
-        return $headers;
     }
 
     /**

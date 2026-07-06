@@ -48,4 +48,17 @@ class MetadataHelperTest extends TestCase
         $this->assertSame([], MetadataHelper::flatten([]));
         $this->assertSame([], MetadataHelper::flatten(null ?? []));
     }
+
+    public function test_builds_sip_headers_with_x_prefix(): void
+    {
+        $headers = MetadataHelper::toSipHeaders([
+            'key' => 'value',
+            'X-Already' => 'prefixed',
+        ]);
+
+        $this->assertSame([
+            'X-key' => 'value',
+            'X-Already' => 'prefixed',
+        ], $headers);
+    }
 }
