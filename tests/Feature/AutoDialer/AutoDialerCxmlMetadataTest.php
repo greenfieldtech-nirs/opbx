@@ -197,4 +197,36 @@ class AutoDialerCxmlMetadataTest extends TestCase
 
         $this->assertStringNotContainsString('<Header', $cxml);
     }
+
+    public function test_dograh_oss_cxml_includes_url_and_metadata_parameters(): void
+    {
+        $organization = Organization::factory()->create();
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $organization->id,
+            'provider' => 'dograh-oss',
+            'protocol' => 'websocket',
+            'configuration' => [
+                'websocket_endpoint' => 'wss://oss.example.com/dograh/stream',
+                'agent_uuid' => 'agent-uuid-789',
+            ],
+        ]);
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $organization->id,
+            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT,
+            'routing_destination_id' => $aiAssistant->id,
+        ]);
+        $destination = AutoDialerDestination::factory()->create([
+            'organization_id' => $organization->id,
+            'metadata' => ['key' => 'value'],
+        ]);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('generateCxmlForCampaign');
+        $method->setAccessible(true);
+
+        $cxml = $method->invoke($this->service, $campaign, $destination);
+
+        $this->assertStringContainsString('wss://oss.example.com/dograh/stream/agent-uuid-789', $cxml);
+        $this->assertStringContainsString('<Parameter name="key" value="value"/>', $cxml);
+    }
 }

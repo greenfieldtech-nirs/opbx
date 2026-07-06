@@ -413,6 +413,63 @@ class ProviderRegistry
             description: 'DeepDub WebSocket-based AI assistant',
         ));
 
+        $this->register(new ProviderDefinition(
+            key: 'dograh-cloud',
+            name: 'Dograh Cloud',
+            protocol: 'websocket',
+            urlTemplate: '{websocket_endpoint}/{agent_uuid}',
+            configFields: [
+                new ProviderConfigField(
+                    name: 'websocket_endpoint',
+                    label: 'WebSocket Endpoint',
+                    type: 'url',
+                    required: true,
+                    placeholder: 'wss://app.dograh.com/api/v1/agent-stream',
+                    description: 'Fixed Dograh Cloud WebSocket endpoint',
+                    readOnly: true,
+                    defaultValue: 'wss://app.dograh.com/api/v1/agent-stream',
+                ),
+                new ProviderConfigField(
+                    name: 'agent_uuid',
+                    label: 'Agent UUID',
+                    type: 'text',
+                    required: true,
+                    placeholder: '123e4567-e89b-12d3-a456-426614174000',
+                    description: 'The Dograh voice agent UUID from the Dograh UI',
+                    validationRules: ['string', 'max:255'],
+                ),
+            ],
+            description: 'Dograh Cloud WebSocket-based AI assistant',
+        ));
+
+        $this->register(new ProviderDefinition(
+            key: 'dograh-oss',
+            name: 'Dograh OSS',
+            protocol: 'websocket',
+            urlTemplate: '{websocket_endpoint}/{agent_uuid}',
+            configFields: [
+                new ProviderConfigField(
+                    name: 'websocket_endpoint',
+                    label: 'WebSocket Endpoint',
+                    type: 'url',
+                    required: true,
+                    placeholder: 'wss://your-dograh-server.example.com/agent-stream',
+                    description: 'Your remote Dograh OSS WebSocket endpoint',
+                    validationRules: ['url'],
+                ),
+                new ProviderConfigField(
+                    name: 'agent_uuid',
+                    label: 'Agent UUID',
+                    type: 'text',
+                    required: true,
+                    placeholder: '123e4567-e89b-12d3-a456-426614174000',
+                    description: 'The Dograh voice agent UUID from the Dograh UI',
+                    validationRules: ['string', 'max:255'],
+                ),
+            ],
+            description: 'Dograh OSS self-hosted WebSocket-based AI assistant',
+        ));
+
         // Dummy test provider (no external connection)
         $this->register(new ProviderDefinition(
             key: 'dummy_ai',

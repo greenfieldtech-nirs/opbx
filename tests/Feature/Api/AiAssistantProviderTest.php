@@ -230,4 +230,48 @@ class AiAssistantProviderTest extends TestCase
         $this->assertContains('bot_id', $fieldNames);
         $this->assertContains('auth_token', $fieldNames);
     }
+
+    public function test_dograh_cloud_provider_configuration(): void
+    {
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/dograh-cloud');
+
+        $response->assertStatus(200);
+
+        $provider = $response->json('data');
+
+        $this->assertEquals('dograh-cloud', $provider['key']);
+        $this->assertEquals('Dograh Cloud', $provider['name']);
+        $this->assertEquals('websocket', $provider['protocol']);
+        $this->assertEquals('{websocket_endpoint}/{agent_uuid}', $provider['url_template']);
+
+        $fieldNames = array_column($provider['config_fields'], 'name');
+        $this->assertContains('websocket_endpoint', $fieldNames);
+        $this->assertContains('agent_uuid', $fieldNames);
+
+        $endpointField = collect($provider['config_fields'])->firstWhere('name', 'websocket_endpoint');
+        $this->assertTrue($endpointField['read_only']);
+        $this->assertEquals('wss://app.dograh.com/api/v1/agent-stream', $endpointField['default_value']);
+    }
+
+    public function test_dograh_oss_provider_configuration(): void
+    {
+        $response = $this->actingAs($this->user)->getJson('/api/v1/ai-assistant/providers/dograh-oss');
+
+        $response->assertStatus(200);
+
+        $provider = $response->json('data');
+
+        $this->assertEquals('dograh-oss', $provider['key']);
+        $this->assertEquals('Dograh OSS', $provider['name']);
+        $this->assertEquals('websocket', $provider['protocol']);
+        $this->assertEquals('{websocket_endpoint}/{agent_uuid}', $provider['url_template']);
+
+        $fieldNames = array_column($provider['config_fields'], 'name');
+        $this->assertContains('websocket_endpoint', $fieldNames);
+        $this->assertContains('agent_uuid', $fieldNames);
+
+        $endpointField = collect($provider['config_fields'])->firstWhere('name', 'websocket_endpoint');
+        $this->assertTrue($endpointField['required']);
+        $this->assertFalse($endpointField['read_only'] ?? false);
+    }
 }

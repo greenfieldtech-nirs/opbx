@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Phone, Wifi } from 'lucide-react';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
-import type { ProviderDefinition } from '@/types/aiAssistant';
+import type { ProviderConfigField, ProviderDefinition } from '@/types/aiAssistant';
 
 interface AiAssistantConfigFormProps {
   formData: {
@@ -42,11 +42,11 @@ export const AiAssistantConfigForm: React.FC<AiAssistantConfigFormProps> = ({
     return providers.find((p: ProviderDefinition) => p.key === formData.ai_provider);
   }, [formData.ai_provider, providers]);
 
-  // Clear non-applicable fields when provider changes
+  // Clear non-applicable fields and set read-only defaults when provider changes
   useEffect(() => {
     if (selectedProvider) {
       const updates: any = {};
-      
+
       // Clear fields not applicable to current protocol
       if (selectedProvider.protocol === 'websocket') {
         updates.ai_phone_number = '';
@@ -58,12 +58,21 @@ export const AiAssistantConfigForm: React.FC<AiAssistantConfigFormProps> = ({
         updates.ai_session_id = '';
       }
 
+      // Set read-only fields to their default values
+      selectedProvider.config_fields?.forEach((field: ProviderConfigField) => {
+        if (field.read_only && field.default_value) {
+          const fieldKey = `ai_${field.name}`;
+          updates[fieldKey] = field.default_value;
+        }
+      });
+
       // Only update if there are changes
       if (Object.keys(updates).length > 0) {
         setFormData({ ...formData, ...updates });
       }
     }
-  }, [selectedProvider?.protocol]);
+  }, [selectedProvider?.key]);
+
 
   // Render loading state
   if (isLoading) {
@@ -89,7 +98,7 @@ export const AiAssistantConfigForm: React.FC<AiAssistantConfigFormProps> = ({
   // Render dynamic field based on provider configuration
   const renderField = (field: any) => {
     const fieldKey = `ai_${field.key}`;
-    const fieldValue = formData[fieldKey] || '';
+    const fieldValue = formData[fieldKey] || (field.read_only ? field.default_value : '');
     const fieldError = formErrors[fieldKey];
 
     return (
@@ -101,9 +110,14 @@ export const AiAssistantConfigForm: React.FC<AiAssistantConfigFormProps> = ({
           id={fieldKey}
           type={field.type === 'password' ? 'password' : 'text'}
           value={fieldValue}
-          onChange={(e) => setFormData({ ...formData, [fieldKey]: e.target.value })}
+          onChange={(e) => {
+            if (!field.read_only) {
+              setFormData({ ...formData, [fieldKey]: e.target.value });
+            }
+          }}
           placeholder={field.placeholder || ''}
           autoComplete="off"
+          readOnly={!!field.read_only}
         />
         {field.description && (
           <p className="text-xs text-muted-foreground">{field.description}</p>

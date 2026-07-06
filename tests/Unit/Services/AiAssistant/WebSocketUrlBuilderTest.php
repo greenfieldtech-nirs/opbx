@@ -84,7 +84,7 @@ class WebSocketUrlBuilderTest extends TestCase
     public function test_rejects_non_wss_template(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('WebSocket URL template must start with wss://');
+        $this->expectExceptionMessage('WebSocket URL must start with wss://');
 
         $template = 'ws://example.com/stream';
         $this->builder->buildUrl($template, [], []);
@@ -93,7 +93,7 @@ class WebSocketUrlBuilderTest extends TestCase
     public function test_rejects_http_template(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('WebSocket URL template must start with wss://');
+        $this->expectExceptionMessage('WebSocket URL must start with wss://');
 
         $template = 'https://example.com/stream';
         $this->builder->buildUrl($template, [], []);
@@ -285,5 +285,48 @@ class WebSocketUrlBuilderTest extends TestCase
         $url = $this->builder->buildUrl($template, $config, $cloudonixParams);
 
         $this->assertEquals('wss://example.com/stream', $url);
+    }
+
+    public function test_builds_dograh_cloud_url_with_fixed_endpoint(): void
+    {
+        $template = '{websocket_endpoint}/{agent_uuid}';
+        $config = [
+            'websocket_endpoint' => 'wss://app.dograh.com/api/v1/agent-stream',
+            'agent_uuid' => 'agent-uuid-123',
+        ];
+        $cloudonixParams = [];
+
+        $url = $this->builder->buildUrl($template, $config, $cloudonixParams);
+
+        $this->assertEquals('wss://app.dograh.com/api/v1/agent-stream/agent-uuid-123', $url);
+    }
+
+    public function test_builds_dograh_oss_url_with_custom_endpoint(): void
+    {
+        $template = '{websocket_endpoint}/{agent_uuid}';
+        $config = [
+            'websocket_endpoint' => 'wss://oss.example.com/dograh/stream',
+            'agent_uuid' => 'agent-uuid-456',
+        ];
+        $cloudonixParams = [];
+
+        $url = $this->builder->buildUrl($template, $config, $cloudonixParams);
+
+        $this->assertEquals('wss://oss.example.com/dograh/stream/agent-uuid-456', $url);
+    }
+
+    public function test_dograh_url_encodes_agent_uuid(): void
+    {
+        $template = '{websocket_endpoint}/{agent_uuid}';
+        $config = [
+            'websocket_endpoint' => 'wss://app.dograh.com/api/v1/agent-stream',
+            'agent_uuid' => 'agent uuid with spaces',
+        ];
+        $cloudonixParams = [];
+
+        $url = $this->builder->buildUrl($template, $config, $cloudonixParams);
+
+        $this->assertStringContainsString('wss://app.dograh.com/api/v1/agent-stream/', $url);
+        $this->assertStringContainsString('agent%20uuid%20with%20spaces', $url);
     }
 }
