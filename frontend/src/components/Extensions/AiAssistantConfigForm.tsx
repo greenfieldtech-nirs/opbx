@@ -117,7 +117,7 @@ export const AiAssistantConfigForm: React.FC<AiAssistantConfigFormProps> = ({
           }}
           placeholder={field.placeholder || ''}
           autoComplete="off"
-          readOnly={!!field.read_only}
+          disabled={!!field.read_only}
         />
         {field.description && (
           <p className="text-xs text-muted-foreground">{field.description}</p>
