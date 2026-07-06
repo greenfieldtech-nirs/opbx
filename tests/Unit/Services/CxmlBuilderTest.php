@@ -118,4 +118,41 @@ class CxmlBuilderTest extends TestCase
         $this->assertStringContainsString('trunks="trunk1"', $cxml);
         $this->assertStringContainsString('<Number>+1234567890</Number>', $cxml);
     }
+
+    public function test_dial_service_provider_includes_sip_headers(): void
+    {
+        $cxml = CxmlBuilder::dialServiceProvider('retell', '+12127773456', [
+            'X-key' => 'value',
+            'X-key2' => 'value2',
+        ]);
+
+        $this->assertStringContainsString('<Header name="X-key" value="value"/>', $cxml);
+        $this->assertStringContainsString('<Header name="X-key2" value="value2"/>', $cxml);
+        $this->assertStringContainsString('<Service provider="retell">+12127773456</Service>', $cxml);
+    }
+
+    public function test_dial_service_provider_with_action_includes_sip_headers(): void
+    {
+        $cxml = CxmlBuilder::dialServiceProviderWithAction('retell', '+12127773456', 'https://example.com/callback', [
+            'X-key' => 'value',
+        ]);
+
+        $this->assertStringContainsString('action="https://example.com/callback"', $cxml);
+        $this->assertStringContainsString('<Header name="X-key" value="value"/>', $cxml);
+    }
+
+    public function test_dial_service_includes_sip_headers(): void
+    {
+        $cxml = CxmlBuilder::dialService('https://example.com/ai', 'token', [], ['X-key' => 'value']);
+
+        $this->assertStringContainsString('<Header name="X-key" value="value"/>', $cxml);
+        $this->assertStringContainsString('<Service token="token">https://example.com/ai</Service>', $cxml);
+    }
+
+    public function test_sip_headers_omitted_when_empty(): void
+    {
+        $cxml = CxmlBuilder::dialServiceProvider('retell', '+12127773456', []);
+
+        $this->assertStringNotContainsString('<Header', $cxml);
+    }
 }

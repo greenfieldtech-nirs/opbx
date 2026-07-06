@@ -164,10 +164,19 @@ class CxmlBuilder
      * @param  string  $serviceUrl  The service provider URL
      * @param  string|null  $serviceToken  Optional service authentication token
      * @param  array<string, mixed>  $params  Additional service parameters
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public function addDialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): self
+    public function addDialService(string $serviceUrl, ?string $serviceToken = null, array $params = [], array $headers = []): self
     {
         $dial = $this->document->createElement('Dial');
+
+        foreach ($headers as $headerName => $headerValue) {
+            $header = $this->document->createElement('Header');
+            $header->setAttribute('name', (string) $headerName);
+            $header->setAttribute('value', (string) $headerValue);
+            $dial->appendChild($header);
+        }
+
         $service = $this->document->createElement('Service', htmlspecialchars($serviceUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
 
         if ($serviceToken !== null) {
@@ -435,11 +444,12 @@ class CxmlBuilder
      * @param  string  $serviceUrl  The service provider URL
      * @param  string|null  $serviceToken  Optional service authentication token
      * @param  array<string, mixed>  $params  Additional service parameters
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): string
+    public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = [], array $headers = []): string
     {
         $builder = new self;
-        $builder->addDialService($serviceUrl, $serviceToken, $params);
+        $builder->addDialService($serviceUrl, $serviceToken, $params, $headers);
 
         return $builder->build();
     }
@@ -451,11 +461,20 @@ class CxmlBuilder
      *
      * @param  string  $provider  The service provider name (e.g., 'retell', 'vapi')
      * @param  string  $phoneNumber  The service provider phone number
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public static function dialServiceProvider(string $provider, string $phoneNumber): string
+    public static function dialServiceProvider(string $provider, string $phoneNumber, array $headers = []): string
     {
         $builder = new self;
         $dial = $builder->document->createElement('Dial');
+
+        foreach ($headers as $headerName => $headerValue) {
+            $header = $builder->document->createElement('Header');
+            $header->setAttribute('name', (string) $headerName);
+            $header->setAttribute('value', (string) $headerValue);
+            $dial->appendChild($header);
+        }
+
         $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, self::XML_ENCODING, 'UTF-8'));
         $service->setAttribute('provider', $provider);
         $dial->appendChild($service);
@@ -473,8 +492,9 @@ class CxmlBuilder
      * @param  string  $provider  The service provider name (e.g., 'retell', 'vapi')
      * @param  string  $phoneNumber  The service provider phone number
      * @param  string  $actionUrl  Callback URL when dial completes
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public static function dialServiceProviderWithAction(string $provider, string $phoneNumber, string $actionUrl): string
+    public static function dialServiceProviderWithAction(string $provider, string $phoneNumber, string $actionUrl, array $headers = []): string
     {
         $builder = new self;
         $dial = $builder->document->createElement('Dial');
@@ -482,6 +502,13 @@ class CxmlBuilder
         // Add action attribute for callback
         // DOMDocument handles XML encoding automatically - & becomes &amp;
         $dial->setAttribute('action', $actionUrl);
+
+        foreach ($headers as $headerName => $headerValue) {
+            $header = $builder->document->createElement('Header');
+            $header->setAttribute('name', (string) $headerName);
+            $header->setAttribute('value', (string) $headerValue);
+            $dial->appendChild($header);
+        }
 
         $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, self::XML_ENCODING, 'UTF-8'));
         $service->setAttribute('provider', $provider);
