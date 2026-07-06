@@ -387,15 +387,46 @@ class CxmlBuilder
     }
 
     /**
-     * Build a dummy AI assistant response with a fixed message and hangup.
+     * Build a dummy AI assistant response with a fixed message and optional metadata comments.
+     *
+     * @param  array<string, string>  $metadata  Flattened key-value metadata
      */
-    public static function dummyAiMessage(): string
+    public static function dummyAiMessage(array $metadata = []): string
     {
         $builder = new self;
+
+        foreach ($metadata as $key => $value) {
+            $builder->addMetadataComment($key, $value);
+        }
+
         $builder->say('Hi There, this is not an AI assistant, this is just a small dummy audio message, that will ensure that your routing setup is functional and working. I know you expected more at this point, but it really doesn\'t get any better than this right now. Thank you for using Cloudonix and O.P.B.X - don\'t forget to visit cloudonix-dot-com for the most up to date information about cloudonix services.')
             ->hangup();
 
         return $builder->build();
+    }
+
+    /**
+     * Add a metadata comment to the response.
+     */
+    private function addMetadataComment(string $key, string $value): void
+    {
+        $safeKey = $this->escapeComment($key);
+        $safeValue = $this->escapeComment($value);
+
+        $comment = $this->document->createComment(
+            sprintf(' metadata key="%s" value="%s" ', $safeKey, $safeValue)
+        );
+
+        $this->response->appendChild($comment);
+    }
+
+    /**
+     * Sanitize a string so it can safely live inside an XML comment.
+     */
+    private function escapeComment(string $value): string
+    {
+        // XML comments may not contain the sequence "--".
+        return str_replace(['--', '>'], ['- -', ' '], $value);
     }
 
     /**

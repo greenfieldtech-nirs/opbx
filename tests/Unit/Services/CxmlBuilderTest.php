@@ -80,6 +80,24 @@ class CxmlBuilderTest extends TestCase
         $this->assertStringNotContainsString('<Sip>', $cxml);
     }
 
+    public function test_dummy_ai_message_includes_metadata_comments(): void
+    {
+        $cxml = CxmlBuilder::dummyAiMessage([
+            'key' => 'value',
+            'key2' => 'value2',
+        ]);
+
+        $this->assertStringContainsString('<!-- metadata key="key" value="value" -->', $cxml);
+        $this->assertStringContainsString('<!-- metadata key="key2" value="value2" -->', $cxml);
+    }
+
+    public function test_dummy_ai_message_omits_comments_when_metadata_empty(): void
+    {
+        $cxml = CxmlBuilder::dummyAiMessage([]);
+
+        $this->assertStringNotContainsString('<!-- metadata', $cxml);
+    }
+
     public function test_dial_with_trunks_attribute(): void
     {
         $builder = new CxmlBuilder();
