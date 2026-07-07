@@ -25,7 +25,9 @@ class AutoDialerDestination extends Model
         'organization_id',
         'list_id',
         'phone_number',
-        'description',
+        'name',
+        'batch_identifier',
+        'metadata',
         'status',
         'dial_attempts',
         'last_session_token',
@@ -48,6 +50,7 @@ class AutoDialerDestination extends Model
      */
     protected $casts = [
         'status' => DestinationStatus::class,
+        'metadata' => 'array',
         'last_dialed_at' => 'datetime',
         'next_retry_at' => 'datetime',
     ];

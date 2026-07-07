@@ -55,6 +55,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
 import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
@@ -469,7 +470,9 @@ export default function DistributionListDetail() {
                       />
                     </TableHead>
                     <TableHead>Phone Number</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Batch</TableHead>
+                    <TableHead>Metadata</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Dial Attempts</TableHead>
                     <TableHead>Last Call</TableHead>
@@ -480,13 +483,13 @@ export default function DistributionListDetail() {
                 <TableBody>
                   {isDestinationsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={10} className="text-center py-8">
                         Loading destinations...
                       </TableCell>
                     </TableRow>
                   ) : destinations.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No destinations found
                       </TableCell>
                     </TableRow>
@@ -508,7 +511,36 @@ export default function DistributionListDetail() {
                             <ExternalLink className="h-3 w-3" />
                           </button>
                         </TableCell>
-                        <TableCell>{destination.description || '-'}</TableCell>
+                        <TableCell className="max-w-[200px]">
+                          {destination.name || '-'}
+                        </TableCell>
+                        <TableCell>{destination.batch_identifier || '-'}</TableCell>
+                        <TableCell>
+                          {destination.metadata && Object.keys(destination.metadata).length > 0 ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  {Object.keys(destination.metadata).length} fields
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80">
+                                <div className="space-y-2">
+                                  <h4 className="font-medium">Metadata</h4>
+                                  <div className="rounded-md border divide-y max-h-[250px] overflow-auto">
+                                    {Object.entries(destination.metadata).map(([key, value]) => (
+                                      <div key={key} className="flex justify-between gap-2 px-3 py-2 text-sm">
+                                        <span className="font-medium text-muted-foreground shrink-0">{key}</span>
+                                        <span className="truncate">{value}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge className={statusColors[destination.status] || 'bg-gray-100'}>
                             {destination.status_label}

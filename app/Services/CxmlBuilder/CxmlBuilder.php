@@ -6,6 +6,7 @@ namespace App\Services\CxmlBuilder;
 
 use DOMDocument;
 use DOMElement;
+use Illuminate\Http\Response;
 
 /**
  * CXML response builder for Cloudonix voice applications.
@@ -164,10 +165,19 @@ class CxmlBuilder
      * @param  string  $serviceUrl  The service provider URL
      * @param  string|null  $serviceToken  Optional service authentication token
      * @param  array<string, mixed>  $params  Additional service parameters
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public function addDialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): self
+    public function addDialService(string $serviceUrl, ?string $serviceToken = null, array $params = [], array $headers = []): self
     {
         $dial = $this->document->createElement('Dial');
+
+        foreach ($headers as $headerName => $headerValue) {
+            $header = $this->document->createElement('Header');
+            $header->setAttribute('name', (string) $headerName);
+            $header->setAttribute('value', (string) $headerValue);
+            $dial->appendChild($header);
+        }
+
         $service = $this->document->createElement('Service', htmlspecialchars($serviceUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
 
         if ($serviceToken !== null) {
@@ -387,15 +397,46 @@ class CxmlBuilder
     }
 
     /**
-     * Build a dummy AI assistant response with a fixed message and hangup.
+     * Build a dummy AI assistant response with a fixed message and optional metadata comments.
+     *
+     * @param  array<string, string>  $metadata  Flattened key-value metadata
      */
-    public static function dummyAiMessage(): string
+    public static function dummyAiMessage(array $metadata = []): string
     {
         $builder = new self;
+
+        foreach ($metadata as $key => $value) {
+            $builder->addMetadataComment($key, $value);
+        }
+
         $builder->say('Hi There, this is not an AI assistant, this is just a small dummy audio message, that will ensure that your routing setup is functional and working. I know you expected more at this point, but it really doesn\'t get any better than this right now. Thank you for using Cloudonix and O.P.B.X - don\'t forget to visit cloudonix-dot-com for the most up to date information about cloudonix services.')
             ->hangup();
 
         return $builder->build();
+    }
+
+    /**
+     * Add a metadata comment to the response.
+     */
+    private function addMetadataComment(string $key, string $value): void
+    {
+        $safeKey = $this->escapeComment($key);
+        $safeValue = $this->escapeComment($value);
+
+        $comment = $this->document->createComment(
+            sprintf(' metadata key="%s" value="%s" ', $safeKey, $safeValue)
+        );
+
+        $this->response->appendChild($comment);
+    }
+
+    /**
+     * Sanitize a string so it can safely live inside an XML comment.
+     */
+    private function escapeComment(string $value): string
+    {
+        // XML comments may not contain the sequence "--".
+        return str_replace(['--', '>'], ['- -', ' '], $value);
     }
 
     /**
@@ -404,11 +445,12 @@ class CxmlBuilder
      * @param  string  $serviceUrl  The service provider URL
      * @param  string|null  $serviceToken  Optional service authentication token
      * @param  array<string, mixed>  $params  Additional service parameters
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = []): string
+    public static function dialService(string $serviceUrl, ?string $serviceToken = null, array $params = [], array $headers = []): string
     {
         $builder = new self;
-        $builder->addDialService($serviceUrl, $serviceToken, $params);
+        $builder->addDialService($serviceUrl, $serviceToken, $params, $headers);
 
         return $builder->build();
     }
@@ -420,11 +462,20 @@ class CxmlBuilder
      *
      * @param  string  $provider  The service provider name (e.g., 'retell', 'vapi')
      * @param  string  $phoneNumber  The service provider phone number
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public static function dialServiceProvider(string $provider, string $phoneNumber): string
+    public static function dialServiceProvider(string $provider, string $phoneNumber, array $headers = []): string
     {
         $builder = new self;
         $dial = $builder->document->createElement('Dial');
+
+        foreach ($headers as $headerName => $headerValue) {
+            $header = $builder->document->createElement('Header');
+            $header->setAttribute('name', (string) $headerName);
+            $header->setAttribute('value', (string) $headerValue);
+            $dial->appendChild($header);
+        }
+
         $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, self::XML_ENCODING, 'UTF-8'));
         $service->setAttribute('provider', $provider);
         $dial->appendChild($service);
@@ -442,8 +493,9 @@ class CxmlBuilder
      * @param  string  $provider  The service provider name (e.g., 'retell', 'vapi')
      * @param  string  $phoneNumber  The service provider phone number
      * @param  string  $actionUrl  Callback URL when dial completes
+     * @param  array<string, string>  $headers  SIP headers to include in the Dial verb
      */
-    public static function dialServiceProviderWithAction(string $provider, string $phoneNumber, string $actionUrl): string
+    public static function dialServiceProviderWithAction(string $provider, string $phoneNumber, string $actionUrl, array $headers = []): string
     {
         $builder = new self;
         $dial = $builder->document->createElement('Dial');
@@ -451,6 +503,13 @@ class CxmlBuilder
         // Add action attribute for callback
         // DOMDocument handles XML encoding automatically - & becomes &amp;
         $dial->setAttribute('action', $actionUrl);
+
+        foreach ($headers as $headerName => $headerValue) {
+            $header = $builder->document->createElement('Header');
+            $header->setAttribute('name', (string) $headerName);
+            $header->setAttribute('value', (string) $headerValue);
+            $dial->appendChild($header);
+        }
 
         $service = $builder->document->createElement('Service', htmlspecialchars($phoneNumber, self::XML_ENCODING, 'UTF-8'));
         $service->setAttribute('provider', $provider);
@@ -587,21 +646,26 @@ class CxmlBuilder
      * This enables bi-directional audio streaming to WebSocket-based services.
      *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      *
      * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect/stream
      */
-    public function connectStream(string $websocketUrl): self
+    public function connectStream(string $websocketUrl, array $parameters = []): self
     {
-        // Validate WebSocket URL format
         if (! str_starts_with($websocketUrl, 'wss://')) {
             throw new \InvalidArgumentException('WebSocket URL must start with wss://');
         }
 
         $connect = $this->document->createElement('Connect');
         $stream = $this->document->createElement('Stream');
-        // DOMDocument::setAttribute handles XML escaping automatically —
-        // do NOT pre-encode with htmlspecialchars (causes double-encoding of &)
         $stream->setAttribute('url', $websocketUrl);
+
+        foreach ($parameters as $paramName => $paramValue) {
+            $param = $this->document->createElement('Parameter');
+            $param->setAttribute('name', (string) $paramName);
+            $param->setAttribute('value', (string) $paramValue);
+            $stream->appendChild($param);
+        }
 
         $connect->appendChild($stream);
         $this->response->appendChild($connect);
@@ -612,31 +676,33 @@ class CxmlBuilder
     /**
      * Add Connect verb with Stream noun for WebSocket audio streaming with action callback.
      *
-     * This enables bi-directional audio streaming and notifies us when the connect
-     * completes (busy, no-answer, failed, etc.) via the action parameter.
-     *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
      * @param  string|null  $actionUrl  Callback URL when connect completes
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      *
      * @see https://developers.cloudonix.com/Documentation/voiceApplication/Verb/connect
      */
-    public function connectStreamWithAction(string $websocketUrl, ?string $actionUrl = null): self
+    public function connectStreamWithAction(string $websocketUrl, ?string $actionUrl = null, array $parameters = []): self
     {
-        // Validate WebSocket URL format
         if (! str_starts_with($websocketUrl, 'wss://')) {
             throw new \InvalidArgumentException('WebSocket URL must start with wss://');
         }
 
         $connect = $this->document->createElement('Connect');
 
-        // Add action attribute on Connect verb for callback when connect completes
-        // DOMDocument handles XML encoding automatically - & becomes &amp;
         if ($actionUrl !== null) {
             $connect->setAttribute('action', $actionUrl);
         }
 
         $stream = $this->document->createElement('Stream');
         $stream->setAttribute('url', $websocketUrl);
+
+        foreach ($parameters as $paramName => $paramValue) {
+            $param = $this->document->createElement('Parameter');
+            $param->setAttribute('name', (string) $paramName);
+            $param->setAttribute('value', (string) $paramValue);
+            $stream->appendChild($param);
+        }
 
         $connect->appendChild($stream);
         $this->response->appendChild($connect);
@@ -651,12 +717,13 @@ class CxmlBuilder
      *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
      * @param  string|null  $actionUrl  Callback URL when connect completes
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      * @return string CXML response
      */
-    public static function streamToWebSocketWithAction(string $websocketUrl, ?string $actionUrl = null): string
+    public static function streamToWebSocketWithAction(string $websocketUrl, ?string $actionUrl = null, array $parameters = []): string
     {
         $builder = new self;
-        $builder->connectStreamWithAction($websocketUrl, $actionUrl);
+        $builder->connectStreamWithAction($websocketUrl, $actionUrl, $parameters);
 
         return $builder->build();
     }
@@ -683,12 +750,13 @@ class CxmlBuilder
      * Static factory method for creating WebSocket streaming responses.
      *
      * @param  string  $websocketUrl  WebSocket URL (must start with wss://)
+     * @param  array<string, string>  $parameters  Parameters to send on the Stream
      * @return string CXML response
      */
-    public static function streamToWebSocket(string $websocketUrl): string
+    public static function streamToWebSocket(string $websocketUrl, array $parameters = []): string
     {
         $builder = new self;
-        $builder->connectStream($websocketUrl);
+        $builder->connectStream($websocketUrl, $parameters);
 
         return $builder->build();
     }
@@ -712,7 +780,7 @@ class CxmlBuilder
      *
      * @param  int  $status  HTTP status code (default: 200)
      */
-    public function toResponse(int $status = 200): \Illuminate\Http\Response
+    public function toResponse(int $status = 200): Response
     {
         return response($this->build(), $status)
             ->header('Content-Type', 'application/xml');

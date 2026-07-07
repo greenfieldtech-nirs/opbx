@@ -50,7 +50,7 @@ class StoreAiAssistantRequest extends FormRequest
                 'max:100',
             ],
             'configuration' => [
-                'required',
+                'present',
                 'array',
             ],
         ];
@@ -69,6 +69,7 @@ class StoreAiAssistantRequest extends FormRequest
             'status.required' => 'Status is required.',
             'provider.required' => 'AI provider is required.',
             'configuration.required' => 'Provider configuration is required.',
+            'configuration.present' => 'Provider configuration is required.',
             'configuration.array' => 'Provider configuration must be an object.',
         ];
     }

@@ -107,7 +107,6 @@ class CampaignListService
             }
 
             $phoneNumber = trim($row[0]);
-            $description = trim($row[1] ?? '');
 
             if (! $this->isValidPhoneNumber($phoneNumber)) {
                 $stats['invalid_rows']++;
@@ -119,7 +118,9 @@ class CampaignListService
                 'organization_id' => $campaign->organization_id,
                 'list_id' => $list->id,
                 'phone_number' => $phoneNumber,
-                'description' => $description,
+                'name' => null,
+                'batch_identifier' => null,
+                'metadata' => null,
                 'status' => 'pending',
                 'created_at' => now(),
                 'updated_at' => now(),

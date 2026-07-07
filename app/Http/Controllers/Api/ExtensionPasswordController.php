@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ExtensionType;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Models\Extension;
@@ -52,7 +53,7 @@ class ExtensionPasswordController extends Controller
         }
 
         // Only USER type extensions have passwords - return 204 No Content for others
-        if ($extension->type !== \App\Enums\ExtensionType::USER) {
+        if ($extension->type !== ExtensionType::USER) {
             return response()->json(null, 204);
         }
 
@@ -109,7 +110,7 @@ class ExtensionPasswordController extends Controller
         }
 
         // Only USER extensions can have passwords
-        if ($extension->type !== \App\Enums\ExtensionType::USER) {
+        if ($extension->type !== ExtensionType::USER) {
             return response()->json([
                 'error' => 'Cannot reset password',
                 'message' => 'Only PBX User extensions have SIP passwords. '.

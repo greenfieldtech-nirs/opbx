@@ -188,6 +188,128 @@ class AiAssistantControllerTest extends TestCase
     }
 
     /**
+     * Test creating a dummy AI assistant with no configuration.
+     */
+    /**
+     * Test creating a dummy AI assistant with no configuration.
+     */
+    public function test_create_dummy_ai_assistant_with_empty_configuration(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $data = [
+            'name' => 'Dummy Assistant',
+            'status' => 'active',
+            'provider' => 'dummy_ai',
+            'configuration' => [],
+        ];
+
+        $response = $this->postJson('/api/v1/ai-assistants', $data);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'name' => 'Dummy Assistant',
+                'provider' => 'dummy_ai',
+                'protocol' => 'dummy',
+                'configuration' => [],
+            ]);
+
+        $this->assertDatabaseHas('ai_assistants', [
+            'name' => 'Dummy Assistant',
+            'provider' => 'dummy_ai',
+            'protocol' => 'dummy',
+            'organization_id' => $this->organization->id,
+        ]);
+    }
+
+    public function test_create_dograh_cloud_ai_assistant(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $data = [
+            'name' => 'Test Dograh Cloud Assistant',
+            'description' => 'Test description',
+            'status' => 'active',
+            'provider' => 'dograh-cloud',
+            'configuration' => [
+                'websocket_endpoint' => 'wss://api.dograh.com/api/v1/agent-stream/cloudonix',
+                'agent_uuid' => 'agent-uuid-123',
+            ],
+        ];
+
+        $response = $this->postJson('/api/v1/ai-assistants', $data);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'name' => 'Test Dograh Cloud Assistant',
+                'provider' => 'dograh-cloud',
+                'protocol' => 'websocket',
+            ]);
+
+        $this->assertDatabaseHas('ai_assistants', [
+            'name' => 'Test Dograh Cloud Assistant',
+            'provider' => 'dograh-cloud',
+            'protocol' => 'websocket',
+            'organization_id' => $this->organization->id,
+        ]);
+    }
+
+    public function test_create_dograh_oss_ai_assistant(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $data = [
+            'name' => 'Test Dograh OSS Assistant',
+            'description' => 'Test description',
+            'status' => 'active',
+            'provider' => 'dograh-oss',
+            'configuration' => [
+                'websocket_endpoint' => 'wss://oss.example.com/dograh/stream',
+                'agent_uuid' => 'agent-uuid-456',
+            ],
+        ];
+
+        $response = $this->postJson('/api/v1/ai-assistants', $data);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment([
+                'name' => 'Test Dograh OSS Assistant',
+                'provider' => 'dograh-oss',
+                'protocol' => 'websocket',
+            ]);
+
+        $this->assertDatabaseHas('ai_assistants', [
+            'name' => 'Test Dograh OSS Assistant',
+            'provider' => 'dograh-oss',
+            'protocol' => 'websocket',
+            'organization_id' => $this->organization->id,
+        ]);
+    }
+
+    public function test_create_dograh_cloud_enforces_fixed_endpoint(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $data = [
+            'name' => 'Dograh Cloud Fixed Endpoint',
+            'status' => 'active',
+            'provider' => 'dograh-cloud',
+            'configuration' => [
+                'websocket_endpoint' => 'wss://attacker.com/hijack',
+                'agent_uuid' => 'agent-uuid-789',
+            ],
+        ];
+
+        $response = $this->postJson('/api/v1/ai-assistants', $data);
+
+        $response->assertStatus(201);
+
+        $assistant = AiAssistant::where('name', 'Dograh Cloud Fixed Endpoint')->first();
+        $this->assertNotNull($assistant);
+        $this->assertEquals('wss://api.dograh.com/api/v1/agent-stream/cloudonix', $assistant->configuration['websocket_endpoint']);
+    }
+
+    /**
      * Test validation requires provider.
      */
     public function test_create_requires_provider(): void
@@ -252,6 +374,44 @@ class AiAssistantControllerTest extends TestCase
         $this->assertDatabaseHas('ai_assistants', [
             'id' => $assistant->id,
             'name' => 'Updated Name',
+        ]);
+    }
+
+    /**
+     * Test updating an AI assistant with a new provider and configuration.
+     *
+     * Regression test: the update request must read ProviderDefinition->configFields
+     * and ProviderConfigField->name, not the non-existent snake_case properties.
+     */
+    public function test_update_ai_assistant_with_provider_configuration(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $assistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'provider' => 'vapi',
+            'configuration' => ['phone_number' => '+12125551234'],
+        ]);
+
+        $data = [
+            'name' => 'Retell Agent',
+            'provider' => 'retell',
+            'configuration' => ['phone_number' => '+12133287400'],
+        ];
+
+        $response = $this->putJson("/api/v1/ai-assistants/{$assistant->id}", $data);
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'name' => 'Retell Agent',
+                'provider' => 'retell',
+                'configuration' => ['phone_number' => '+12133287400'],
+            ]);
+
+        $this->assertDatabaseHas('ai_assistants', [
+            'id' => $assistant->id,
+            'name' => 'Retell Agent',
+            'provider' => 'retell',
         ]);
     }
 

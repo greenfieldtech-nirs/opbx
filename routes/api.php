@@ -458,6 +458,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('distribution-lists.show');
     Route::post('auto-dialer-campaigns/lists/{list}/upload', [DistributionListController::class, 'upload'])
         ->name('distribution-lists.upload');
+    Route::post('auto-dialer-campaigns/lists/{list}/preview-csv', [DistributionListController::class, 'previewCsv'])
+        ->name('distribution-lists.preview-csv');
     Route::get('auto-dialer-campaigns/lists/upload-progress/{jobId}', [DistributionListController::class, 'uploadProgress'])
         ->name('distribution-lists.progress');
     Route::post('auto-dialer-campaigns/lists/{list}/destinations', [DistributionListController::class, 'addDestination'])

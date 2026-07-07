@@ -214,4 +214,34 @@ class CxmlBuilderWebSocketTest extends TestCase
         // Verify & is properly encoded in raw XML
         $this->assertStringContainsString('&amp;', $cxml);
     }
+
+    public function test_stream_to_websocket_includes_parameters(): void
+    {
+        $cxml = CxmlBuilder::streamToWebSocket('wss://example.com/stream', [
+            'key' => 'value',
+            'key2' => 'value2',
+        ]);
+
+        $this->assertStringContainsString('<Parameter name="key" value="value"/>', $cxml);
+        $this->assertStringContainsString('<Parameter name="key2" value="value2"/>', $cxml);
+    }
+
+    public function test_stream_to_websocket_with_action_includes_parameters(): void
+    {
+        $cxml = CxmlBuilder::streamToWebSocketWithAction(
+            'wss://example.com/stream',
+            'https://example.com/callback',
+            ['key' => 'value']
+        );
+
+        $this->assertStringContainsString('action="https://example.com/callback"', $cxml);
+        $this->assertStringContainsString('<Parameter name="key" value="value"/>', $cxml);
+    }
+
+    public function test_stream_parameters_omitted_when_empty(): void
+    {
+        $cxml = CxmlBuilder::streamToWebSocket('wss://example.com/stream', []);
+
+        $this->assertStringNotContainsString('<Parameter', $cxml);
+    }
 }

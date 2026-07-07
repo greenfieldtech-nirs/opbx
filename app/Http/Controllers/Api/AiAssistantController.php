@@ -234,6 +234,8 @@ class AiAssistantController extends AbstractApiCrudController
             }
         }
 
+        $data = $this->normalizeProviderConfiguration($data);
+
         return $data;
     }
 
@@ -252,6 +254,26 @@ class AiAssistantController extends AbstractApiCrudController
             if ($provider) {
                 $data['protocol'] = $provider->protocol;
             }
+        }
+
+        $data = $this->normalizeProviderConfiguration($data, $model->provider);
+
+        return $data;
+    }
+
+    /**
+     * Normalize provider-specific configuration before persistence.
+     *
+     * For providers with fixed read-only values, ensure the configuration
+     * contains the correct value regardless of what the client sent.
+     */
+    private function normalizeProviderConfiguration(array $data, ?string $existingProvider = null): array
+    {
+        $provider = $data['provider'] ?? $existingProvider;
+
+        if ($provider === 'dograh-cloud') {
+            $data['configuration'] = $data['configuration'] ?? [];
+            $data['configuration']['websocket_endpoint'] = 'wss://api.dograh.com/api/v1/agent-stream/cloudonix';
         }
 
         return $data;

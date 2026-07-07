@@ -17,6 +17,8 @@ class ProviderConfigField
         public readonly ?string $placeholder = null,
         public readonly ?string $description = null,
         public readonly array $validationRules = [],
+        public readonly bool $readOnly = false,
+        public readonly ?string $defaultValue = null,
     ) {}
 
     /**
@@ -34,6 +36,8 @@ class ProviderConfigField
             'placeholder' => $this->placeholder,
             'description' => $this->description,
             'validation_rules' => $this->validationRules,
+            'read_only' => $this->readOnly,
+            'default_value' => $this->defaultValue,
         ];
     }
 }

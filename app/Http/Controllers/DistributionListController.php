@@ -15,6 +15,7 @@ use App\Services\AutoDialer\ListManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DistributionListController extends Controller
@@ -101,9 +102,16 @@ class DistributionListController extends Controller
     {
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
+            'mapping' => ['required', 'array'],
+            'mapping.phone' => ['required', 'string'],
+            'mapping.name' => ['nullable', 'string'],
+            'mapping.batch_identifier' => ['nullable', 'string'],
+            'mapping.metadata' => ['nullable', 'array'],
+            'mapping.metadata.*' => ['string'],
         ]);
 
         $file = $validated['file'];
+        $mapping = $validated['mapping'];
 
         // Determine action based on list status
         $canUploadToCurrent = $list->status->canUpload();
@@ -120,7 +128,7 @@ class DistributionListController extends Controller
                 // Upload to current list
                 $this->authorize('upload', $list);
 
-                $result = $this->listService->uploadCsv($list->id, $file);
+                $result = $this->listService->uploadCsv($list->id, $file, $mapping);
 
                 return response()->json([
                     'message' => 'File uploaded successfully. Processing started.',
@@ -135,7 +143,7 @@ class DistributionListController extends Controller
                 $this->authorize('createVersion', $list);
 
                 // Backup old destinations and update same list
-                $result = $this->listService->updateListWithBackup($list->id, $file);
+                $result = $this->listService->updateListWithBackup($list->id, $file, $mapping);
 
                 return response()->json([
                     'message' => 'List updated with new data. Old destinations backed up. Processing started.',
@@ -177,6 +185,37 @@ class DistributionListController extends Controller
     }
 
     /**
+     * Preview a CSV file before upload.
+     */
+    public function previewCsv(Request $request, AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('view', $list);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
+            'has_header' => ['boolean'],
+        ]);
+
+        $file = $validated['file'];
+        $hasHeader = filter_var($validated['has_header'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+        $tempPath = $file->store('temp/list_previews');
+        $fullPath = Storage::disk('local')->path($tempPath);
+
+        try {
+            $preview = $this->listService->previewCsv($fullPath, $hasHeader);
+
+            return response()->json([
+                'data' => $preview,
+            ]);
+        } finally {
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+        }
+    }
+
+    /**
      * Add single destination.
      */
     public function addDestination(Request $request, AutoDialerList $list): JsonResponse
@@ -185,14 +224,14 @@ class DistributionListController extends Controller
 
         $validated = $request->validate([
             'phone_number' => ['required', 'string'],
-            'description' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
             $destination = $this->listService->addDestination(
                 $list->id,
                 $validated['phone_number'],
-                $validated['description'] ?? null,
+                $validated['name'] ?? null,
             );
 
             return response()->json([
@@ -216,7 +255,7 @@ class DistributionListController extends Controller
         $validated = $request->validate([
             'destinations' => ['required', 'array', 'max:1000'],
             'destinations.*.phone_number' => ['required', 'string'],
-            'destinations.*.description' => ['nullable', 'string', 'max:255'],
+            'destinations.*.name' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
@@ -338,10 +377,10 @@ class DistributionListController extends Controller
      */
     public function downloadExample(): BinaryFileResponse
     {
-        $content = "phone_number,description\n".
-            "+14155551212,John Doe - Sales Lead\n".
-            "+14155551213,Jane Smith - Support Case\n".
-            "+14155551214,Bob Johnson - Follow-up Call\n";
+        $content = "phone_number,name,batch_identifier\n".
+            "+14155551212,John Doe,batch-a\n".
+            "+14155551213,Jane Smith,batch-b\n".
+            "+14155551214,Bob Johnson,batch-a\n";
 
         $filePath = tempnam(sys_get_temp_dir(), 'list_example_').'.csv';
         file_put_contents($filePath, $content);

@@ -232,6 +232,8 @@ export default function ExtensionsComplete() {
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
+  const [fetchedPasswords, setFetchedPasswords] = useState<Map<string, string | null>>(new Map());
+  const [isFetchingPassword, setIsFetchingPassword] = useState<Set<string>>(new Set());
 
   // Form state
   const [formData, setFormData] = useState<ExtensionFormData>({
@@ -968,16 +970,53 @@ export default function ExtensionsComplete() {
   };
 
   // Toggle password visibility
-  const togglePasswordVisibility = (extensionId: string) => {
-    setVisiblePasswords(prev => {
-      const next = new Set(prev);
-      if (next.has(extensionId)) {
+  const togglePasswordVisibility = async (extensionId: string) => {
+    const isVisible = visiblePasswords.has(extensionId);
+
+    if (isVisible) {
+      setVisiblePasswords(prev => {
+        const next = new Set(prev);
         next.delete(extensionId);
-      } else {
-        next.add(extensionId);
-      }
-      return next;
-    });
+        return next;
+      });
+
+      return;
+    }
+
+    // Only USER extensions have passwords; everything else is a no-op
+    const extension = extensions.find(ext => ext.id === extensionId);
+    if (extension?.type !== 'user') {
+      setVisiblePasswords(prev => new Set(prev).add(extensionId));
+
+      return;
+    }
+
+    // If we already have a fresh temp or fetched password, just show it
+    if (tempPasswords.has(extensionId) || fetchedPasswords.has(extensionId)) {
+      setVisiblePasswords(prev => new Set(prev).add(extensionId));
+
+      return;
+    }
+
+    setIsFetchingPassword(prev => new Set(prev).add(extensionId));
+
+    try {
+      const response = await extensionsService.getPassword(extensionId);
+      const password = response?.data?.password ?? null;
+
+      setFetchedPasswords(prev => new Map(prev).set(extensionId, password));
+      setVisiblePasswords(prev => new Set(prev).add(extensionId));
+    } catch (err) {
+      // No password set or other error - treat as not set
+      setFetchedPasswords(prev => new Map(prev).set(extensionId, null));
+      setVisiblePasswords(prev => new Set(prev).add(extensionId));
+    } finally {
+      setIsFetchingPassword(prev => {
+        const next = new Set(prev);
+        next.delete(extensionId);
+        return next;
+      });
+    }
   };
 
   // Copy password to clipboard
@@ -988,6 +1027,10 @@ export default function ExtensionsComplete() {
     } catch (error) {
       toast.error('Failed to copy password');
     }
+  };
+
+  const getExtensionPassword = (extensionId: string): string | null => {
+    return tempPasswords.get(extensionId) ?? fetchedPasswords.get(extensionId) ?? null;
   };
 
   // Open create dialog
@@ -1257,20 +1300,25 @@ export default function ExtensionsComplete() {
                   extension.type === 'user' ? (
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm">
-                        {visiblePasswords.has(extension.id) ? (tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set') : '••••••••••••••••'}
+                        {visiblePasswords.has(extension.id)
+                          ? (getExtensionPassword(extension.id) ?? 'Not set')
+                          : '••••••••••••••••'}
                       </span>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
+                          disabled={isFetchingPassword.has(extension.id)}
                           onClick={(e) => {
                             e.stopPropagation();
                             togglePasswordVisibility(extension.id);
                           }}
                           title={visiblePasswords.has(extension.id) ? 'Hide password' : 'Show password'}
                         >
-                          {visiblePasswords.has(extension.id) ? (
+                          {isFetchingPassword.has(extension.id) ? (
+                            <span className="h-4 w-4 animate-pulse">…</span>
+                          ) : visiblePasswords.has(extension.id) ? (
                             <EyeOff className="h-4 w-4" />
                           ) : (
                             <Eye className="h-4 w-4" />
@@ -1280,9 +1328,13 @@ export default function ExtensionsComplete() {
                           variant="ghost"
                           size="sm"
                           className="h-7 w-7 p-0"
+                          disabled={!getExtensionPassword(extension.id)}
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyPassword(tempPasswords.get(extension.id) || extension.sip_config?.password || 'Not set', extension.extension_number);
+                            const password = getExtensionPassword(extension.id);
+                            if (password) {
+                              copyPassword(password, extension.extension_number);
+                            }
                           }}
                           title="Copy password"
                         >

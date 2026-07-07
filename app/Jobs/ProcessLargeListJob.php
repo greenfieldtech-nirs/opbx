@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Enums\ListStatus;
 use App\Models\AutoDialerList;
+use App\Scopes\OrganizationScope;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,6 +37,7 @@ class ProcessLargeListJob implements ShouldQueue
         public string $filePath,
         public string $jobId,
         public int $totalRows,
+        public array $mapping = [],
     ) {}
 
     /**
@@ -43,112 +45,114 @@ class ProcessLargeListJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $sourceList = AutoDialerList::find($this->sourceListId);
+        OrganizationScope::bypass(function (): void {
+            $sourceList = AutoDialerList::find($this->sourceListId);
 
-        if (! $sourceList) {
-            Log::error('ProcessLargeListJob: Source list not found', [
-                'list_id' => $this->sourceListId,
-            ]);
-
-            return;
-        }
-
-        Log::info('ProcessLargeListJob: Starting large file processing', [
-            'source_list_id' => $this->sourceListId,
-            'total_rows' => $this->totalRows,
-            'max_per_list' => self::MAX_ENTRIES_PER_LIST,
-        ]);
-
-        // Calculate number of lists needed
-        $numLists = ceil($this->totalRows / self::MAX_ENTRIES_PER_LIST);
-
-        $this->updateProgress(0, 'splitting', 0, $numLists);
-
-        // Split the file
-        $splitFiles = $this->splitCsvFile($this->filePath, self::MAX_ENTRIES_PER_LIST);
-
-        if (empty($splitFiles)) {
-            Log::error('ProcessLargeListJob: Failed to split file', [
-                'source_list_id' => $this->sourceListId,
-            ]);
-
-            $sourceList->update([
-                'status' => ListStatus::FAILED,
-                'validation_errors' => [['error' => 'Failed to split large file']],
-            ]);
-
-            return;
-        }
-
-        $createdLists = [];
-        $totalValid = 0;
-        $totalInvalid = 0;
-
-        // Process each chunk sequentially
-        foreach ($splitFiles as $index => $chunkFile) {
-            $chunkNumber = $index + 1;
-            $progress = (int) (($chunkNumber / count($splitFiles)) * 100);
-
-            $this->updateProgress($progress, 'processing_chunk', $chunkNumber, count($splitFiles));
-
-            // Create or get list for this chunk
-            if ($index === 0) {
-                // First chunk uses the original list
-                $list = $sourceList;
-                $list->update(['status' => ListStatus::PROCESSING]);
-            } else {
-                // Create new list for this chunk
-                $list = AutoDialerList::create([
-                    'organization_id' => $sourceList->organization_id,
-                    'name' => "{$sourceList->name} (Part {$chunkNumber})",
-                    'description' => "Auto-generated part {$chunkNumber} of {$sourceList->name}",
-                    'version_number' => $sourceList->version_number,
-                    'parent_list_id' => $sourceList->parent_list_id ?? $sourceList->id,
-                    'is_latest_version' => false,
-                    'status' => ListStatus::PROCESSING,
+            if (! $sourceList) {
+                Log::error('ProcessLargeListJob: Source list not found', [
+                    'list_id' => $this->sourceListId,
                 ]);
+
+                return;
             }
 
-            $createdLists[] = $list->id;
-
-            // Dispatch job for this chunk
-            $chunkJobId = "{$this->jobId}_chunk_{$chunkNumber}";
-            ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId)
-                ->onQueue('auto-dialer');
-
-            Log::info('ProcessLargeListJob: Dispatched chunk', [
+            Log::info('ProcessLargeListJob: Starting large file processing', [
                 'source_list_id' => $this->sourceListId,
-                'chunk_list_id' => $list->id,
-                'chunk_number' => $chunkNumber,
-                'total_chunks' => count($splitFiles),
+                'total_rows' => $this->totalRows,
+                'max_per_list' => self::MAX_ENTRIES_PER_LIST,
             ]);
 
-            // Wait for this chunk to complete before processing next
-            // This ensures sequential processing
-            $this->waitForChunkCompletion($chunkJobId);
-        }
+            // Calculate number of lists needed
+            $numLists = ceil($this->totalRows / self::MAX_ENTRIES_PER_LIST);
 
-        // Update source list with summary
-        $sourceList->refresh();
-        $sourceList->update([
-            'status' => ListStatus::READY,
-            'processed_at' => now(),
-            'description' => ($sourceList->description ?? '').
-                " [Split into {$numLists} lists: ".implode(', ', $createdLists).']',
-        ]);
+            $this->updateProgress(0, 'splitting', 0, $numLists);
 
-        $this->updateProgress(100, 'completed', count($splitFiles), count($splitFiles));
+            // Split the file
+            $splitFiles = $this->splitCsvFile($this->filePath, self::MAX_ENTRIES_PER_LIST);
 
-        // Clean up original file
-        if (file_exists($this->filePath)) {
-            unlink($this->filePath);
-        }
+            if (empty($splitFiles)) {
+                Log::error('ProcessLargeListJob: Failed to split file', [
+                    'source_list_id' => $this->sourceListId,
+                ]);
 
-        Log::info('ProcessLargeListJob: Completed large file processing', [
-            'source_list_id' => $this->sourceListId,
-            'num_lists_created' => count($createdLists),
-            'list_ids' => $createdLists,
-        ]);
+                $sourceList->update([
+                    'status' => ListStatus::FAILED,
+                    'validation_errors' => [['error' => 'Failed to split large file']],
+                ]);
+
+                return;
+            }
+
+            $createdLists = [];
+            $totalValid = 0;
+            $totalInvalid = 0;
+
+            // Process each chunk sequentially
+            foreach ($splitFiles as $index => $chunkFile) {
+                $chunkNumber = $index + 1;
+                $progress = (int) (($chunkNumber / count($splitFiles)) * 100);
+
+                $this->updateProgress($progress, 'processing_chunk', $chunkNumber, count($splitFiles));
+
+                // Create or get list for this chunk
+                if ($index === 0) {
+                    // First chunk uses the original list
+                    $list = $sourceList;
+                    $list->update(['status' => ListStatus::PROCESSING]);
+                } else {
+                    // Create new list for this chunk
+                    $list = AutoDialerList::create([
+                        'organization_id' => $sourceList->organization_id,
+                        'name' => "{$sourceList->name} (Part {$chunkNumber})",
+                        'description' => "Auto-generated part {$chunkNumber} of {$sourceList->name}",
+                        'version_number' => $sourceList->version_number,
+                        'parent_list_id' => $sourceList->parent_list_id ?? $sourceList->id,
+                        'is_latest_version' => false,
+                        'status' => ListStatus::PROCESSING,
+                    ]);
+                }
+
+                $createdLists[] = $list->id;
+
+                // Dispatch job for this chunk
+                $chunkJobId = "{$this->jobId}_chunk_{$chunkNumber}";
+                ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId, false, $this->mapping)
+                    ->onQueue('auto-dialer');
+
+                Log::info('ProcessLargeListJob: Dispatched chunk', [
+                    'source_list_id' => $this->sourceListId,
+                    'chunk_list_id' => $list->id,
+                    'chunk_number' => $chunkNumber,
+                    'total_chunks' => count($splitFiles),
+                ]);
+
+                // Wait for this chunk to complete before processing next
+                // This ensures sequential processing
+                $this->waitForChunkCompletion($chunkJobId);
+            }
+
+            // Update source list with summary
+            $sourceList->refresh();
+            $sourceList->update([
+                'status' => ListStatus::READY,
+                'processed_at' => now(),
+                'description' => ($sourceList->description ?? '').
+                    " [Split into {$numLists} lists: ".implode(', ', $createdLists).']',
+            ]);
+
+            $this->updateProgress(100, 'completed', count($splitFiles), count($splitFiles));
+
+            // Clean up original file
+            if (file_exists($this->filePath)) {
+                unlink($this->filePath);
+            }
+
+            Log::info('ProcessLargeListJob: Completed large file processing', [
+                'source_list_id' => $this->sourceListId,
+                'num_lists_created' => count($createdLists),
+                'list_ids' => $createdLists,
+            ]);
+        });
     }
 
     /**
@@ -161,10 +165,10 @@ class ProcessLargeListJob implements ShouldQueue
             'error' => $exception->getMessage(),
         ]);
 
-        AutoDialerList::where('id', $this->sourceListId)->update([
+        OrganizationScope::bypass(fn () => AutoDialerList::where('id', $this->sourceListId)->update([
             'status' => ListStatus::FAILED,
             'validation_errors' => [['error' => 'Large file processing failed']],
-        ]);
+        ]));
 
         $this->updateProgress(100, 'failed');
 
