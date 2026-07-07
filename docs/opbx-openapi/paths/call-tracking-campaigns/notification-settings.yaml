@@ -1,0 +1,195 @@
+paths:
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings:
+    parameters:
+    - name: call_tracking_campaign
+      in: path
+      required: true
+      description: Call tracking campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Call Tracking Campaigns
+      summary: Get notification settings
+      description: |
+        Get webhook notification settings for a call tracking campaign.
+      operationId: getCallTrackingNotificationSettings
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Notification settings retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: ../../components/schemas/CallTrackingNotificationSettings.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+    put:
+      tags:
+      - Call Tracking Campaigns
+      summary: Update notification settings
+      description: |
+        Create or update webhook notification settings for a call tracking
+        campaign. When `auth_method` is `bearer_token` or `basic_auth`,
+        `auth_secret` is required. When `auth_method` is `basic_auth`,
+        `auth_username` is also required.
+      operationId: updateCallTrackingNotificationSettings
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                webhook_url:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                  description: URL where webhook events are delivered
+                  example: https://example.com/webhooks/call-tracking
+                auth_method:
+                  type: string
+                  enum:
+                  - none
+                  - bearer_token
+                  - basic_auth
+                  description: Authentication method for webhook requests
+                  example: bearer_token
+                auth_secret:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 2048
+                  description: Auth secret/token (required when auth_method is not none)
+                  example: sk_live_abc123
+                auth_username:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Basic auth username (required when auth_method is basic_auth)
+                  example: webhook_user
+                enabled_events:
+                  type: array
+                  description: Event types that trigger webhook notifications
+                  items:
+                    type: string
+                    enum:
+                    - call.received
+                    - call.answered
+                    - call.missed
+                    - call.converted
+                    - call.failed
+                  example:
+                  - call.received
+                  - call.converted
+                is_active:
+                  type: boolean
+                  description: Whether webhook notifications are active
+                  example: true
+              required:
+              - webhook_url
+              - auth_method
+              - enabled_events
+              - is_active
+      responses:
+        '200':
+          description: Notification settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Notification settings updated successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingNotificationSettings.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings/test:
+    parameters:
+    - name: call_tracking_campaign
+      in: path
+      required: true
+      description: Call tracking campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    post:
+      tags:
+      - Call Tracking Campaigns
+      summary: Test notification settings
+      description: |
+        Send a test webhook event to the configured notification URL for a
+        campaign. If no event_type is provided, a default test event is used.
+      operationId: testCallTrackingNotificationSettings
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_type:
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - call.received
+                  - call.answered
+                  - call.missed
+                  - call.converted
+                  - call.failed
+                  description: Event type to test
+                  example: call.received
+      responses:
+        '200':
+          description: Test notification sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Test notification sent successfully
+                  success:
+                    type: boolean
+                    example: true
+                  response_status_code:
+                    type:
+                    - integer
+                    - 'null'
+                    example: 200
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml

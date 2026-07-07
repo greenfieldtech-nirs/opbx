@@ -23,9 +23,20 @@ class WebSocketUrlBuilder
         'api_key',
         'assistant_id',
         'agent_id',
+        'agent_uuid',
         'app_id',
         'workspace_id',
         'project_id',
+        'websocket_endpoint',
+    ];
+
+    /**
+     * Placeholders that are inserted as-is without URL encoding.
+     *
+     * These are typically complete WebSocket URLs provided by the user.
+     */
+    private const RAW_CONFIG_PLACEHOLDERS = [
+        'websocket_endpoint',
     ];
 
     /**
@@ -49,11 +60,6 @@ class WebSocketUrlBuilder
      */
     public function buildUrl(string $template, array $configValues, array $cloudonixParams): string
     {
-        // Validate template format
-        if (! str_starts_with($template, 'wss://')) {
-            throw new InvalidArgumentException('WebSocket URL template must start with wss://');
-        }
-
         // Extract all placeholders from template
         preg_match_all('/\{([a-z_]+)\}/', $template, $matches);
         $placeholders = $matches[1] ?? [];
@@ -72,7 +78,7 @@ class WebSocketUrlBuilder
         foreach (self::ALLOWED_CONFIG_PLACEHOLDERS as $placeholder) {
             if (isset($configValues[$placeholder])) {
                 $value = $configValues[$placeholder];
-                $encodedValue = $this->encodeUrlComponent($value);
+                $encodedValue = $this->encodeUrlComponent($value, $placeholder);
                 $url = str_replace('{'.$placeholder.'}', $encodedValue, $url);
             }
         }
@@ -81,7 +87,7 @@ class WebSocketUrlBuilder
         foreach (self::CLOUDONIX_PLACEHOLDERS as $placeholder) {
             if (isset($cloudonixParams[$placeholder])) {
                 $value = $cloudonixParams[$placeholder];
-                $encodedValue = $this->encodeUrlComponent($value);
+                $encodedValue = $this->encodeUrlComponent($value, $placeholder);
                 $url = str_replace('{'.$placeholder.'}', $encodedValue, $url);
             }
         }
@@ -91,7 +97,11 @@ class WebSocketUrlBuilder
             throw new InvalidArgumentException("Template contains unsubstituted placeholder: {{$match[1]}}");
         }
 
-        // Final validation
+        // Final validation: the resolved URL must be a secure WebSocket URL
+        if (! str_starts_with($url, 'wss://')) {
+            throw new InvalidArgumentException('WebSocket URL must start with wss://');
+        }
+
         if (! filter_var($url, FILTER_VALIDATE_URL)) {
             throw new InvalidArgumentException('Built URL is invalid');
         }
@@ -112,11 +122,16 @@ class WebSocketUrlBuilder
      * Encode a value for use in URL (path or query string).
      *
      * This ensures special characters are properly encoded but doesn't
-     * double-encode already encoded characters.
+     * double-encode already encoded characters. Raw placeholders are inserted
+     * as-is because they are complete URLs that must not be encoded.
      */
-    private function encodeUrlComponent(mixed $value): string
+    private function encodeUrlComponent(mixed $value, string $placeholder): string
     {
         $stringValue = (string) $value;
+
+        if (in_array($placeholder, self::RAW_CONFIG_PLACEHOLDERS, true)) {
+            return $stringValue;
+        }
 
         // URL-encode the value
         // Use rawurlencode to encode spaces as %20 instead of +
@@ -135,7 +150,7 @@ class WebSocketUrlBuilder
     {
         try {
             // Check basic format
-            if (! str_starts_with($template, 'wss://')) {
+            if (! str_starts_with($template, 'wss://') && ! $this->startsWithRawPlaceholder($template)) {
                 return false;
             }
 
@@ -153,6 +168,20 @@ class WebSocketUrlBuilder
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Check if the template starts with a raw placeholder that will be a full URL.
+     */
+    private function startsWithRawPlaceholder(string $template): bool
+    {
+        foreach (self::RAW_CONFIG_PLACEHOLDERS as $placeholder) {
+            if (str_starts_with($template, '{'.$placeholder.'}')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -73,7 +73,7 @@ import {
 } from '@/hooks/platform';
 import type { PlatformUser } from '@/types/platform';
 
-type SortField = 'name' | 'email' | 'created_at';
+type SortField = 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
 type SortDirection = 'asc' | 'desc' | null;
 
 export default function PlatformUsers() {
@@ -125,6 +125,7 @@ export default function PlatformUsers() {
 
   const users = data?.data || [];
   const totalUsers = data?.meta?.total || 0;
+  const totalPages = Math.ceil(totalUsers / perPage);
 
   const setManagerMutation = useSetPlatformManager();
   const deleteMutation = useDeletePlatformUser();
@@ -164,6 +165,8 @@ export default function PlatformUsers() {
         data: { is_platform_manager: isManager },
       });
       toast.success(isManager ? 'Platform manager rights granted' : 'Platform manager rights revoked');
+      // Update the selected user so the dialog toggle reflects the new state immediately
+      setSelectedUser((prev) => (prev ? { ...prev, is_platform_manager: isManager } : null));
     } catch {
       toast.error('Failed to update platform manager status');
     }
@@ -252,7 +255,23 @@ export default function PlatformUsers() {
 
   const columns: Column<PlatformUser>[] = [
     {
+      header: 'ID',
+      sortKey: 'id',
+      cell: (user) => <span>{user.id}</span>,
+    },
+    {
+      header: 'Name',
+      sortKey: 'name',
+      cell: (user) => (
+        <div className="flex items-center gap-1.5">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">{user.name}</span>
+        </div>
+      ),
+    },
+    {
       header: 'Email',
+      sortKey: 'email',
       cell: (user) => (
         <div className="flex items-center gap-1.5">
           <Mail className="h-4 w-4 text-muted-foreground" />
@@ -279,6 +298,7 @@ export default function PlatformUsers() {
     },
     {
       header: 'Platform Manager',
+      sortKey: 'is_platform_manager',
       cell: (user) => (
         <div className="flex items-center justify-center">
           {user.is_platform_manager ? (
@@ -405,6 +425,7 @@ export default function PlatformUsers() {
               getIdentityPrimary={(user) => user.name}
               getIdentitySecondary={(user) => user.email}
               onIdentityClick={openEditDialog}
+              showIdentityColumn={false}
               sortField={sortField}
               sortDirection={sortDirection}
               onSort={handleSort}
@@ -428,6 +449,54 @@ export default function PlatformUsers() {
                 />
               }
             />
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Rows per page:</p>
+                  <Select
+                    value={perPage.toString()}
+                    onValueChange={(value) => {
+                      setPerPage(parseInt(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

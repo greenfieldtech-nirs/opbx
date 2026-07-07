@@ -1,0 +1,340 @@
+paths:
+  /v1/auth/auth0/redirect:
+    post:
+      tags:
+        - Authentication
+      summary: Initiate Auth0 OAuth redirect
+      description: |
+        Start the Auth0 Universal Login / social-provider OAuth flow.
+        Returns the Auth0 authorize URL and a state token the client should
+        use when handling the callback.
+      operationId: auth0Redirect
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/Auth0RedirectRequest.yaml'
+      responses:
+        '200':
+          description: Redirect URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_url:
+                    type: string
+                    format: uri
+                    description: Auth0 authorize URL to redirect the user to
+                    example: https://example.auth0.com/authorize?client_id=...
+                  state:
+                    type: string
+                    description: State token to validate on callback
+                    example: abc123def456
+                required:
+                  - redirect_url
+                  - state
+        '400':
+          description: Invalid provider
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_INVALID_PROVIDER
+                  message: Invalid provider selected.
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+        '503':
+          description: Auth0 is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_NOT_CONFIGURED
+                  message: Auth0 is not enabled.
+  /v1/auth/auth0/callback:
+    get:
+      tags:
+        - Authentication
+      summary: Auth0 OAuth callback
+      description: |
+        Callback endpoint invoked by the browser after Auth0 authentication.
+        Exchanges the authorization `code` and `state` for a user profile and
+        completes login, registration, account linking, or invitation acceptance.
+      operationId: auth0Callback
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Auth0 authorization code
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: State token returned by the redirect endpoint
+      responses:
+        '200':
+          description: Authentication completed successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - title: Login Response
+                    $ref: '../../components/schemas/Auth0CallbackResponse.yaml'
+                  - title: Link Response
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Identity linked successfully.
+                    required:
+                      - message
+        '400':
+          description: Invalid callback parameters or state
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              examples:
+                missingParameters:
+                  summary: Missing code or state
+                  value:
+                    error:
+                      code: AUTH0_INVALID_CALLBACK
+                      message: Missing code or state.
+                invalidState:
+                  summary: Invalid or expired state
+                  value:
+                    error:
+                      code: AUTH0_INVALID_STATE
+                      message: State validation failed.
+        '409':
+          description: Account conflict or registration required
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - title: Account Exists
+                    type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            example: AUTH0_ACCOUNT_EXISTS
+                          message:
+                            type: string
+                            example: An account with this email already exists. Please log in with your password and link this account in Profile settings.
+                        required:
+                          - code
+                          - message
+                  - title: Registration Required
+                    type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            example: AUTH0_REGISTRATION_REQUIRED
+                          message:
+                            type: string
+                            example: Please complete onboarding.
+                        required:
+                          - code
+                          - message
+                      profile:
+                        type: object
+                        properties:
+                          email:
+                            type: string
+                            format: email
+                            example: john.doe@example.com
+                          name:
+                            type: string
+                            example: John Doe
+                          provider:
+                            type: string
+                            example: google
+                          subject:
+                            type: string
+                            example: '112233445566778899001'
+                        required:
+                          - email
+                          - name
+                          - provider
+                          - subject
+        '410':
+          description: Invitation user is invalid or already activated
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: INVITE_INVALID_USER
+                  message: Invitation user is invalid or has already been activated.
+        '422':
+          description: Validation or email verification failure
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              examples:
+                emailUnverified:
+                  summary: Email not verified with provider
+                  value:
+                    error:
+                      code: AUTH0_EMAIL_UNVERIFIED
+                      message: Please verify your email with the provider before continuing.
+                inviteEmailMismatch:
+                  summary: Invitation email mismatch
+                  value:
+                    error:
+                      code: INVITE_EMAIL_MISMATCH
+                      message: Auth0 email does not match the invitation email.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+        '500':
+          description: Unable to process Auth0 login
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_RESOLUTION_FAILED
+                  message: Unable to process Auth0 login.
+        '503':
+          description: Auth0 is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_NOT_CONFIGURED
+                  message: Auth0 is not enabled.
+  /v1/auth/auth0/link:
+    post:
+      tags:
+        - Authentication
+      summary: Initiate Auth0 account linking
+      description: |
+        Starts the Auth0 flow to link a social identity to the currently
+        authenticated user's account. The callback with `intent=link` will
+        complete the linking.
+      operationId: auth0Link
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  enum:
+                    - google
+                    - facebook
+                    - microsoft
+                    - github
+                    - x
+                  description: Social identity provider to link
+                  example: google
+              required:
+                - provider
+      responses:
+        '200':
+          description: Redirect URL generated for linking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_url:
+                    type: string
+                    format: uri
+                    description: Auth0 authorize URL to redirect the user to
+                    example: https://example.auth0.com/authorize?client_id=...
+                  state:
+                    type: string
+                    description: State token to validate on callback
+                    example: abc123def456
+                required:
+                  - redirect_url
+                  - state
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+        '503':
+          description: Auth0 is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: AUTH0_NOT_CONFIGURED
+                  message: Auth0 is not enabled.
+  /v1/auth/auth0/unlink:
+    post:
+      tags:
+        - Authentication
+      summary: Unlink Auth0 social identity
+      description: Remove the linked social identity for the specified provider from the authenticated user's account.
+      operationId: auth0Unlink
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  enum:
+                    - google
+                    - facebook
+                    - microsoft
+                    - github
+                    - x
+                  description: Social identity provider to unlink
+                  example: google
+              required:
+                - provider
+      responses:
+        '200':
+          description: Identity unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/SuccessMessage.yaml'
+              example:
+                message: Identity unlinked.
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

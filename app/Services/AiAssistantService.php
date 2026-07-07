@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AiAssistant;
 use App\Services\AiAssistant\ProviderRegistry;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -106,7 +107,7 @@ class AiAssistantService
      * Get usage statistics for an AI assistant.
      *
      * @param  AiAssistant  $assistant  The assistant
-     * @return array{usage_count: int, extensions: \Illuminate\Support\Collection}
+     * @return array{usage_count: int, extensions: Collection}
      */
     public function getUsageStats(AiAssistant $assistant): array
     {
@@ -141,12 +142,12 @@ class AiAssistantService
 
         $errors = [];
 
-        foreach ($providerDef->config_fields as $field) {
-            $value = $configuration[$field->key] ?? null;
+        foreach ($providerDef->configFields as $field) {
+            $value = $configuration[$field->name] ?? null;
 
             // Check required fields
             if ($field->required && empty($value)) {
-                $errors[$field->key] = "{$field->label} is required";
+                $errors[$field->name] = "{$field->label} is required";
 
                 continue;
             }
@@ -159,7 +160,7 @@ class AiAssistantService
             // Type-specific validation
             $typeError = $this->validateFieldType($field->type, $value, $field->label);
             if ($typeError) {
-                $errors[$field->key] = $typeError;
+                $errors[$field->name] = $typeError;
             }
         }
 

@@ -109,7 +109,7 @@ class PlatformManagerSecurityTest extends TestCase
 
         $response->assertForbidden()
             ->assertJson([
-                'message' => 'Platform manager access required.',
+                'message' => 'Forbidden. Platform manager access required.',
             ]);
     }
 

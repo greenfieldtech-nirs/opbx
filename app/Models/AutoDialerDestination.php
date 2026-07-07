@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\DestinationStatus;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,7 +25,9 @@ class AutoDialerDestination extends Model
         'organization_id',
         'list_id',
         'phone_number',
-        'description',
+        'name',
+        'batch_identifier',
+        'metadata',
         'status',
         'dial_attempts',
         'last_session_token',
@@ -47,6 +50,7 @@ class AutoDialerDestination extends Model
      */
     protected $casts = [
         'status' => DestinationStatus::class,
+        'metadata' => 'array',
         'last_dialed_at' => 'datetime',
         'next_retry_at' => 'datetime',
     ];

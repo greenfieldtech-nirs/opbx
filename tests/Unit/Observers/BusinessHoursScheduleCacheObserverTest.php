@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Observers;
 
+use App\Enums\BusinessHoursStatus;
 use App\Models\BusinessHoursSchedule;
 use App\Models\Organization;
-use App\Observers\BusinessHoursScheduleCacheObserver;
+use App\Observers\BusinessHoursCacheObserver;
 use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -23,6 +24,7 @@ class BusinessHoursScheduleCacheObserverTest extends TestCase
     use RefreshDatabase;
 
     private VoiceRoutingCacheService $cacheService;
+
     private Organization $organization;
 
     protected function setUp(): void
@@ -211,7 +213,7 @@ class BusinessHoursScheduleCacheObserverTest extends TestCase
         $this->assertTrue(Cache::has($cacheKey));
 
         // Act - change status from active to inactive
-        $schedule->status = \App\Enums\BusinessHoursStatus::INACTIVE;
+        $schedule->status = BusinessHoursStatus::INACTIVE;
         $schedule->save();
 
         // Assert - cache should be invalidated
@@ -275,10 +277,10 @@ class BusinessHoursScheduleCacheObserverTest extends TestCase
     public function test_observer_is_injected_with_cache_service(): void
     {
         // Arrange & Act
-        $observer = app(BusinessHoursScheduleCacheObserver::class);
+        $observer = app(BusinessHoursCacheObserver::class);
 
         // Assert - observer should be properly instantiated
-        $this->assertInstanceOf(BusinessHoursScheduleCacheObserver::class, $observer);
+        $this->assertInstanceOf(BusinessHoursCacheObserver::class, $observer);
 
         // Verify the observer has the cache service injected
         // (This is implicit through successful construction via DI)

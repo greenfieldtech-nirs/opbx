@@ -10,11 +10,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Authentication API controller using Laravel Sanctum.
@@ -128,7 +130,7 @@ class AuthController extends Controller
             'ip_address' => $ipAddress,
         ]);
 
-        $user = User::where('email', $request->input('email'))->first();
+        $user = OrganizationScope::bypass(fn () => User::where('email', $request->input('email'))->first());
 
         // Use generic error message to prevent user enumeration
         if (! $user || ! Hash::check($request->input('password'), $user->password)) {
@@ -217,7 +219,7 @@ class AuthController extends Controller
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
-        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager);
+        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager ?? false);
         $token = $user->createToken(
             'api-token',
             $abilities,
@@ -322,8 +324,8 @@ class AuthController extends Controller
         $user = $this->getAuthenticatedUser($request);
         $requestId = $this->getRequestId();
 
-        // Detect if using cookie auth (has session but no bearer token)
-        $useCookieAuth = $request->hasSession() && ! $request->bearerToken();
+        // Detect if using cookie auth (web guard is authenticated and no bearer token is present)
+        $useCookieAuth = Auth::guard('web')->check() && ! $request->bearerToken();
 
         Log::info('Logout initiated', [
             'request_id' => $requestId,
@@ -337,14 +339,17 @@ class AuthController extends Controller
             // Cookie-based logout
             Auth::guard('web')->logout();
 
-            // Invalidate session
-            $request->session()->invalidate();
+            // Invalidate session using the helper (avoids "Session store not set on request" in tests)
+            session()->invalidate();
 
             // Regenerate CSRF token
-            $request->session()->regenerateToken();
+            session()->regenerateToken();
         } else {
-            // Token-based logout
-            $request->user()?->currentAccessToken()?->delete();
+            // Token-based logout: only delete real persisted tokens
+            $token = $request->user()?->currentAccessToken();
+            if ($token instanceof PersonalAccessToken) {
+                $token->delete();
+            }
         }
 
         Log::info('Logout successful', [
@@ -415,8 +420,8 @@ class AuthController extends Controller
         $user = $this->getAuthenticatedUser($request);
         $requestId = $this->getRequestId();
 
-        // Detect if using cookie auth
-        $useCookieAuth = $request->hasSession() && ! $request->bearerToken();
+        // Detect if using cookie auth (web guard is authenticated and no bearer token is present)
+        $useCookieAuth = Auth::guard('web')->check() && ! $request->bearerToken();
 
         Log::info('Authentication refresh initiated', [
             'request_id' => $requestId,
@@ -427,8 +432,8 @@ class AuthController extends Controller
         ]);
 
         if ($useCookieAuth) {
-            // Cookie-based refresh - regenerate session
-            $request->session()->regenerate();
+            // Cookie-based refresh - regenerate session using the helper
+            session()->regenerate();
 
             Log::info('Session refresh successful', [
                 'request_id' => $requestId,
@@ -442,12 +447,15 @@ class AuthController extends Controller
         }
 
         // Token-based refresh
-        // Revoke current token
-        $request->user()->currentAccessToken()->delete();
+        // Revoke current real token (if any), then issue a new one
+        $token = $request->user()->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        }
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
-        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager);
+        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager ?? false);
         $token = $user->createToken(
             'api-token',
             $abilities,

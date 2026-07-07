@@ -10,7 +10,6 @@ use App\Models\Organization;
 use App\Models\OutboundWhitelist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -25,12 +24,17 @@ class OutboundWhitelistControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
 
     private User $owner;
+
     private User $pbxAdmin;
+
     private User $pbxUser;
+
     private User $reporter;
+
     private User $otherOrgUser;
 
     private OutboundWhitelist $outboundWhitelist;
@@ -38,17 +42,6 @@ class OutboundWhitelistControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Create outbound_whitelists table for testing
-        Schema::create('outbound_whitelists', function ($table) {
-            $table->id();
-            $table->foreignId('organization_id');
-            $table->string('name');
-            $table->string('destination_country');
-            $table->string('destination_prefix', 12);
-            $table->string('outbound_trunk_name');
-            $table->timestamps();
-        });
 
         // Create organizations
         $this->organization = Organization::factory()->create();
@@ -288,8 +281,8 @@ class OutboundWhitelistControllerTest extends TestCase
 
         $response->assertStatus(404)
             ->assertJson([
-                'error' => 'Not Found',
-                'message' => 'Outbound whitelist entry not found.',
+                'error' => 'NotFoundHttpException',
+                'message' => 'No query results for model [App\Models\OutboundWhitelist] '.$otherOrgOutboundWhitelist->id,
             ]);
     }
 
@@ -303,6 +296,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -338,6 +332,7 @@ class OutboundWhitelistControllerTest extends TestCase
     public function test_store_requires_authentication(): void
     {
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -356,6 +351,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->pbxUser);
 
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -374,6 +370,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->reporter);
 
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -395,8 +392,8 @@ class OutboundWhitelistControllerTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors([
+                'name',
                 'destination_country',
-                'destination_prefix',
                 'outbound_trunk_name',
             ]);
     }
@@ -415,6 +412,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
+            'name' => 'United States Entry',
             'destination_country' => 'United States', // Same country, same organization
             'destination_prefix' => '+19998887777',
             'outbound_trunk_name' => 'another_trunk',
@@ -440,6 +438,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->otherOrgUser);
 
         $data = [
+            'name' => 'United States Entry',
             'destination_country' => 'United States', // Same country, different organization
             'destination_prefix' => '+19998887777',
             'outbound_trunk_name' => 'another_trunk',
@@ -458,6 +457,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
+            'name' => 'United States Entry',
             'destination_country' => 'United States',
             'destination_prefix' => 'invalid-prefix',
             'outbound_trunk_name' => 'test_trunk',
@@ -479,6 +479,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -488,7 +489,7 @@ class OutboundWhitelistControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Outbound whitelist entry updated successfully.',
+                'message' => 'Outboundwhitelist updated successfully.',
                 'data' => [
                     'id' => $this->outboundWhitelist->id,
                     'organization_id' => $this->organization->id,
@@ -510,6 +511,7 @@ class OutboundWhitelistControllerTest extends TestCase
     public function test_update_requires_authentication(): void
     {
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -528,6 +530,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->pbxUser);
 
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -550,6 +553,7 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
+            'name' => 'Canadian Entry',
             'destination_country' => 'Canada',
             'destination_prefix' => '+12223334444',
             'outbound_trunk_name' => 'canadian_trunk',
@@ -571,8 +575,8 @@ class OutboundWhitelistControllerTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors([
+                'name',
                 'destination_country',
-                'destination_prefix',
                 'outbound_trunk_name',
             ]);
     }
@@ -643,8 +647,9 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
-            'destination_country' => 'United States',
-            'destination_prefix' => '  +1 555 123 4567  ', // Extra spaces
+            'name' => 'Canadian Prefix Entry',
+            'destination_country' => 'Canada',
+            'destination_prefix' => '  +123456789  ', // Extra spaces
             'outbound_trunk_name' => 'test_trunk',
         ];
 
@@ -653,7 +658,7 @@ class OutboundWhitelistControllerTest extends TestCase
         $response->assertStatus(201);
 
         $this->assertDatabaseHas('outbound_whitelists', [
-            'destination_prefix' => '+1 555 123 4567', // Normalized
+            'destination_prefix' => '+123456789', // Normalized
         ]);
     }
 
@@ -665,8 +670,9 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
-            'destination_country' => 'United States',
-            'destination_prefix' => '+15551234567',
+            'name' => 'Canadian Trunk Entry',
+            'destination_country' => 'Canada',
+            'destination_prefix' => '+123456789',
             'outbound_trunk_name' => '  test trunk  ', // Extra spaces
         ];
 
@@ -687,8 +693,9 @@ class OutboundWhitelistControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $data = [
-            'destination_country' => '  united states  ', // Extra spaces
-            'destination_prefix' => '+15551234567',
+            'name' => 'Canadian Country Entry',
+            'destination_country' => '  canada  ', // Extra spaces
+            'destination_prefix' => '+123456789',
             'outbound_trunk_name' => 'test_trunk',
         ];
 
@@ -697,7 +704,7 @@ class OutboundWhitelistControllerTest extends TestCase
         $response->assertStatus(201);
 
         $this->assertDatabaseHas('outbound_whitelists', [
-            'destination_country' => 'united states', // Normalized
+            'destination_country' => 'canada', // Normalized
         ]);
     }
 }

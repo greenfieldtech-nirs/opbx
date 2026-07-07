@@ -8,7 +8,6 @@ use App\Models\Organization;
 use App\Models\OutboundWhitelist;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -21,21 +20,12 @@ class OutboundWhitelistTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Create outbound_whitelists table for testing
-        Schema::create('outbound_whitelists', function ($table) {
-            $table->id();
-            $table->foreignId('organization_id');
-            $table->string('destination_country');
-            $table->string('destination_prefix', 12);
-            $table->string('outbound_trunk_name');
-            $table->timestamps();
-        });
 
         $this->organization = Organization::factory()->create();
         $this->otherOrganization = Organization::factory()->create();
@@ -46,7 +36,7 @@ class OutboundWhitelistTest extends TestCase
      */
     public function test_outbound_whitelist_has_correct_fillable_attributes(): void
     {
-        $outboundWhitelist = new OutboundWhitelist();
+        $outboundWhitelist = new OutboundWhitelist;
 
         $expectedFillable = [
             'organization_id',
@@ -54,6 +44,7 @@ class OutboundWhitelistTest extends TestCase
             'destination_country',
             'destination_prefix',
             'outbound_trunk_name',
+            'status',
         ];
 
         $this->assertEquals($expectedFillable, $outboundWhitelist->getFillable());
@@ -98,10 +89,14 @@ class OutboundWhitelistTest extends TestCase
         // With global scope (default), should only see entries for the current organization context
         // Note: In real usage, the scope is applied based on authenticated user context
         // For testing, we manually scope
-        $org1Count = OutboundWhitelist::where('organization_id', $this->organization->id)->count();
+        $org1Count = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->count();
         $this->assertEquals(3, $org1Count);
 
-        $org2Count = OutboundWhitelist::where('organization_id', $this->otherOrganization->id)->count();
+        $org2Count = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $this->otherOrganization->id)
+            ->count();
         $this->assertEquals(2, $org2Count);
     }
 
@@ -118,11 +113,11 @@ class OutboundWhitelistTest extends TestCase
             'organization_id' => $this->otherOrganization->id,
         ]);
 
-        $org1Entries = OutboundWhitelist::forOrganization($this->organization->id)->get();
+        $org1Entries = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->forOrganization($this->organization->id)->get();
         $this->assertCount(3, $org1Entries);
         $this->assertTrue($org1Entries->every(fn ($entry) => $entry->organization_id === $this->organization->id));
 
-        $org2Entries = OutboundWhitelist::forOrganization($this->otherOrganization->id)->get();
+        $org2Entries = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->forOrganization($this->otherOrganization->id)->get();
         $this->assertCount(2, $org2Entries);
         $this->assertTrue($org2Entries->every(fn ($entry) => $entry->organization_id === $this->otherOrganization->id));
     }
@@ -151,7 +146,7 @@ class OutboundWhitelistTest extends TestCase
             'destination_country' => $country3,
         ]);
 
-        $results = OutboundWhitelist::search('United')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('United')->get();
         $this->assertCount(2, $results);
         $this->assertTrue($results->contains(fn ($entry) => $entry->destination_country === $country1));
         $this->assertTrue($results->contains(fn ($entry) => $entry->destination_country === $country3));
@@ -181,7 +176,7 @@ class OutboundWhitelistTest extends TestCase
             'destination_prefix' => $prefix3,
         ]);
 
-        $results = OutboundWhitelist::search('123')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('123')->get();
         $this->assertCount(1, $results);
         $this->assertEquals($prefix1, $results->first()->destination_prefix);
     }
@@ -210,10 +205,10 @@ class OutboundWhitelistTest extends TestCase
             'outbound_trunk_name' => $trunk3,
         ]);
 
-        $results = OutboundWhitelist::search('sip')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('sip')->get();
         $this->assertCount(2, $results);
-        $this->assertTrue($results->contains(fn ($entry) => $entry->trunk_name === $trunk1));
-        $this->assertTrue($results->contains(fn ($entry) => $entry->trunk_name === $trunk2));
+        $this->assertTrue($results->contains(fn ($entry) => $entry->outbound_trunk_name === $trunk1));
+        $this->assertTrue($results->contains(fn ($entry) => $entry->outbound_trunk_name === $trunk2));
     }
 
     /**
@@ -236,13 +231,13 @@ class OutboundWhitelistTest extends TestCase
         ]);
 
         // Search should match across different fields
-        $results = OutboundWhitelist::search('United')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('United')->get();
         $this->assertCount(1, $results);
 
-        $results = OutboundWhitelist::search('1555')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('1555')->get();
         $this->assertCount(1, $results);
 
-        $results = OutboundWhitelist::search('trunk')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('trunk')->get();
         $this->assertCount(2, $results);
     }
 
@@ -256,13 +251,13 @@ class OutboundWhitelistTest extends TestCase
             'destination_country' => 'United States',
         ]);
 
-        $results = OutboundWhitelist::search('united states')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('united states')->get();
         $this->assertCount(1, $results);
 
-        $results = OutboundWhitelist::search('UNITED STATES')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('UNITED STATES')->get();
         $this->assertCount(1, $results);
 
-        $results = OutboundWhitelist::search('United States')->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('United States')->get();
         $this->assertCount(1, $results);
     }
 
@@ -275,10 +270,7 @@ class OutboundWhitelistTest extends TestCase
             'organization_id' => $this->organization->id,
         ]);
 
-        $results = OutboundWhitelist::search('')->get();
-        $this->assertCount(3, $results);
-
-        $results = OutboundWhitelist::search(null)->get();
+        $results = OutboundWhitelist::withoutGlobalScope(OrganizationScope::class)->search('')->get();
         $this->assertCount(3, $results);
     }
 

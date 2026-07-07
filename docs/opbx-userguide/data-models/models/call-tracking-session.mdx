@@ -1,0 +1,68 @@
+---
+sidebar_position: 62
+slug: /data-models/models/call-tracking-session
+sidebar_class_name: cxGuidesSidebar
+title: CallTrackingSession Model
+---
+
+# CallTrackingSession Model
+
+The `CallTrackingSession` model represents a single attributed call to a tracking number. Sessions are created from Cloudonix CDRs by `ProcessCDRJob` and are used for analytics, conversion tracking, and ad-platform uploads.
+
+**Table:** `call_tracking_sessions`  
+**Model:** `App\Models\CallTrackingSession`  
+**Resource:** `App\Http\Resources\CallTrackingSessionResource`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
+| `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
+| `call_tracking_number_id` | bigint unsigned | No | - | Tracking number that received the call |
+| `did_number_id` | bigint unsigned | No | - | DID that received the call |
+| `call_id` | varchar(255) | Yes | null | Cloudonix call ID |
+| `session_id` | varchar(255) | Yes | null | Cloudonix session ID |
+| `caller_number` | varchar(50) | Yes | null | Caller E.164 number |
+| `caller_country` | varchar(10) | Yes | null | Caller country code |
+| `called_number` | varchar(50) | Yes | null | Dialed tracking number |
+| `source` | varchar(100) | Yes | null | Attributed source |
+| `medium` | varchar(100) | Yes | null | Attributed medium |
+| `campaign_name` | varchar(255) | Yes | null | Campaign name at time of call |
+| `disposition` | varchar(50) | Yes | null | Call disposition |
+| `duration` | int | Yes | null | Total call duration in seconds |
+| `billsec` | int | Yes | null | Billed seconds |
+| `is_answered` | boolean | No | false | Whether the call was answered |
+| `is_converted` | boolean | No | false | Whether the call met conversion rules |
+| `conversion_value` | decimal | Yes | null | Conversion value |
+| `started_at` | timestamp | Yes | null | Call start time |
+| `answered_at` | timestamp | Yes | null | Call answer time |
+| `ended_at` | timestamp | Yes | null | Call end time |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Relationships
+
+### Belongs To
+
+```php
+$session->organization() → Organization
+$session->campaign() → CallTrackingCampaign
+$session->number() → CallTrackingNumber
+$session->did() → DidNumber
+```
+
+## Conversion
+
+Conversion is evaluated by `ConversionRuleEvaluator` using the campaign's `conversion_rule`:
+
+- `min_answered_duration_seconds` must be met if configured.
+- `requires_answered_disposition` must be met if enabled.
+- `conversion_value` is copied from the rule if set.
+
+## Related Documentation
+
+- [Call Tracking Analytics Module](../../modules/call-tracking-analytics)
+- [CallTrackingCampaign](./call-tracking-campaign)
+- [CallTrackingNumber](./call-tracking-number)

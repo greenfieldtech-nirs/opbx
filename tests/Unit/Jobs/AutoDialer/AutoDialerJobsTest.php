@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Jobs\AutoDialer;
 
-use App\Enums\AutoDialer\CampaignStatus;
-use App\Enums\AutoDialer\DestinationStatus;
-use App\Enums\AutoDialer\RoutingDestinationType;
+use App\Enums\CampaignStatus;
+use App\Enums\DestinationStatus;
+use App\Enums\RoutingDestinationType;
 use App\Jobs\DialDestinationJob;
 use App\Jobs\ProcessAutoDialerCampaignJob;
-use App\Jobs\UpdateDestinationStatusJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
+use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\AutoDialer\CampaignProcessor;
+use App\Services\AutoDialer\DestinationValidator;
+use App\Services\AutoDialer\DialingScheduler;
 use App\Services\CloudonixClient\CloudonixClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class AutoDialerJobsTest extends TestCase
@@ -34,377 +37,169 @@ class AutoDialerJobsTest extends TestCase
         $this->user = User::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
+        $this->actingAs($this->user);
+    }
+
+    private function createCampaign(array $overrides = []): AutoDialerCampaign
+    {
+        return AutoDialerCampaign::factory()->create(array_merge([
+            'organization_id' => $this->organization->id,
+        ], $overrides));
+    }
+
+    private function createDestination(AutoDialerCampaign $campaign, array $overrides = []): AutoDialerDestination
+    {
+        $list = AutoDialerList::factory()->assignedToCampaign($campaign)->create();
+
+        return AutoDialerDestination::factory()->create(array_merge([
+            'list_id' => $list->id,
+            'organization_id' => $this->organization->id,
+        ], $overrides));
     }
 
     // ==================== ProcessAutoDialerCampaignJob ====================
 
-    public function test_process_campaign_job_processes_running_campaign(): void
+    public function test_process_campaign_job_processes_active_campaign(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
+        Queue::fake();
+
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
             'started_at' => now(),
         ]);
+        $this->createDestination($campaign, ['status' => DestinationStatus::PENDING]);
 
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
+        $this->travelTo(now()->setTime(14, 0));
+        $campaign->refresh();
 
+        $processor = app(CampaignProcessor::class);
         $job = new ProcessAutoDialerCampaignJob($campaign->id);
+        $job->handle($processor, app(DialingScheduler::class));
 
-        // Mock the processor to verify it's called
-        $mockProcessor = $this->createMock(CampaignProcessor::class);
-        $mockProcessor->expects($this->onc())
-            ->method('process')
-            ->with($this->callback(fn ($c) => $c->id === $campaign->id));
-
-        $this->instance(CampaignProcessor::class, $mockProcessor);
-
-        $job->handle();
-
-        $this->assertTrue(true); // Job executed without exception
+        // Campaign should still be active and scheduled next batch
+        Queue::assertPushed(ProcessAutoDialerCampaignJob::class, 1);
     }
 
-    public function test_process_campaign_job_skips_non_running_campaigns(): void
+    public function test_process_campaign_job_reschedules_when_outside_schedule(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::PAUSED->value,
+        Queue::fake();
+
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
+            'started_at' => now(),
+        ]);
+        $this->createDestination($campaign, ['status' => DestinationStatus::PENDING]);
+
+        $this->travelTo(now()->setTime(23, 0));
+        $campaign->refresh();
+
+        $processor = app(CampaignProcessor::class);
+        $job = new ProcessAutoDialerCampaignJob($campaign->id);
+        $job->handle($processor, app(DialingScheduler::class));
+
+        Queue::assertPushed(ProcessAutoDialerCampaignJob::class, 1);
+    }
+
+    public function test_process_campaign_job_skips_non_active_campaigns(): void
+    {
+        Queue::fake();
+
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::PAUSED,
         ]);
 
+        $processor = app(CampaignProcessor::class);
         $job = new ProcessAutoDialerCampaignJob($campaign->id);
+        $job->handle($processor, app(DialingScheduler::class));
 
-        // Should not throw exception, just return early
-        $job->handle();
-
-        $this->assertTrue(true); // No exception thrown
+        Queue::assertNothingPushed();
     }
 
     public function test_process_campaign_job_handles_missing_campaign(): void
     {
+        Queue::fake();
+
+        $processor = app(CampaignProcessor::class);
         $job = new ProcessAutoDialerCampaignJob(99999);
+        $job->handle($processor, app(DialingScheduler::class));
 
-        // Should not throw exception, just return early
-        $job->handle();
-
-        $this->assertTrue(true); // No exception thrown
+        Queue::assertNothingPushed();
     }
 
     // ==================== DialDestinationJob ====================
 
     public function test_dial_destination_job_dials_valid_destination(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT->value,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT,
             'routing_destination_id' => 1,
             'caller_id' => '+1234567890',
+            'max_dial_attempts' => 3,
         ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $destination = $this->createDestination($campaign, [
+            'status' => DestinationStatus::PENDING,
             'phone_number' => '+14155551234',
-            'valid' => true,
-            'whitelist_status' => 'allowed',
         ]);
 
-        // Mock CloudonixClient
-        $mockClient = $this->createMock(CloudonixClient::class);
-        $mockClient->expects($this->onc())
-            ->method('initiateCall')
-            ->willReturn([
-                'call_id' => 'test-call-123',
-                'status' => 'initiated',
-            ]);
+        $mockValidator = $this->createMock(DestinationValidator::class);
+        $mockValidator->method('validate')->willReturn([
+            'valid' => true,
+            'error' => null,
+            'trunk' => 'test-trunk',
+        ]);
+        $this->instance(DestinationValidator::class, $mockValidator);
 
+        $mockClient = $this->createMock(CloudonixClient::class);
+        $mockClient->method('initiateCall')->willReturn([
+            'sessionToken' => 'test-session-123',
+            'callId' => 'test-call-123',
+        ]);
         $this->instance(CloudonixClient::class, $mockClient);
 
-        $job = new DialDestinationJob($destination->id);
-        $job->handle();
+        $validator = app(DestinationValidator::class);
+        $job = new DialDestinationJob($destination->id, $campaign->id);
+        $job->handle($validator, $mockClient);
 
         $destination->refresh();
-        $this->assertEquals(DestinationStatus::IN_PROGRESS->value, $destination->status);
+        $this->assertEquals(DestinationStatus::DIALING, $destination->status);
         $this->assertNotNull($destination->last_dialed_at);
+        $this->assertEquals('test-call-123', $destination->last_call_id);
     }
 
-    public function test_dial_destination_job_skips_invalid_destination(): void
+    public function test_dial_destination_job_marks_invalid_as_invalid(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-            'valid' => false,
-        ]);
-
-        $job = new DialDestinationJob($destination->id);
-        $job->handle();
-
-        $destination->refresh();
-        // Destination should be marked as skipped
-        $this->assertEquals(DestinationStatus::SKIPPED->value, $destination->status);
-    }
-
-    public function test_dial_destination_job_handles_api_failure(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT->value,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT,
             'routing_destination_id' => 1,
             'caller_id' => '+1234567890',
-            'max_retry_attempts' => 3,
+        ]);
+        $destination = $this->createDestination($campaign, [
+            'status' => DestinationStatus::PENDING,
+            'phone_number' => 'not-a-number',
         ]);
 
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-            'phone_number' => '+14155551234',
-            'valid' => true,
-            'whitelist_status' => 'allowed',
-            'retry_count' => 0,
-        ]);
-
-        // Mock CloudonixClient to return failure
         $mockClient = $this->createMock(CloudonixClient::class);
-        $mockClient->expects($this->onc())
-            ->method('initiateCall')
-            ->willReturn(null);
-
         $this->instance(CloudonixClient::class, $mockClient);
 
-        $job = new DialDestinationJob($destination->id);
-        $job->handle();
+        $validator = app(DestinationValidator::class);
+        $job = new DialDestinationJob($destination->id, $campaign->id);
+        $job->handle($validator, $mockClient);
 
         $destination->refresh();
-        $this->assertEquals(DestinationStatus::PENDING->value, $destination->status);
-        $this->assertEquals(1, $destination->retry_count);
-    }
-
-    public function test_dial_destination_job_increments_retry_count(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT->value,
-            'routing_destination_id' => 1,
-            'caller_id' => '+1234567890',
-            'max_retry_attempts' => 3,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-            'phone_number' => '+14155551234',
-            'valid' => true,
-            'whitelist_status' => 'allowed',
-            'retry_count' => 1,
-        ]);
-
-        // Mock CloudonixClient to return failure
-        $mockClient = $this->createMock(CloudonixClient::class);
-        $mockClient->expects($this->onc())
-            ->method('initiateCall')
-            ->willReturn(null);
-
-        $this->instance(CloudonixClient::class, $mockClient);
-
-        $job = new DialDestinationJob($destination->id);
-        $job->handle();
-
-        $destination->refresh();
-        $this->assertEquals(2, $destination->retry_count);
-    }
-
-    public function test_dial_destination_job_marks_failed_after_max_retries(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT->value,
-            'routing_destination_id' => 1,
-            'caller_id' => '+1234567890',
-            'max_retry_attempts' => 3,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-            'phone_number' => '+14155551234',
-            'valid' => true,
-            'whitelist_status' => 'allowed',
-            'retry_count' => 3, // At max retries
-        ]);
-
-        // Mock CloudonixClient to return failure
-        $mockClient = $this->createMock(CloudonixClient::class);
-        $mockClient->expects($this->onc())
-            ->method('initiateCall')
-            ->willReturn(null);
-
-        $this->instance(CloudonixClient::class, $mockClient);
-
-        $job = new DialDestinationJob($destination->id);
-        $job->handle();
-
-        $destination->refresh();
-        $this->assertEquals(DestinationStatus::FAILED->value, $destination->status);
+        $this->assertEquals(DestinationStatus::INVALID, $destination->status);
     }
 
     public function test_dial_destination_job_handles_missing_destination(): void
     {
-        $job = new DialDestinationJob(99999);
-
-        // Should not throw exception
-        $job->handle();
-
-        $this->assertTrue(true);
-    }
-
-    // ==================== UpdateDestinationStatusJob ====================
-
-    public function test_update_status_job_updates_destination_status(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        $job = new UpdateDestinationStatusJob(
-            $destination->id,
-            DestinationStatus::COMPLETED->value,
-            [
-                'call_duration' => 60,
-                'call_id' => 'test-call-123',
-            ]
-        );
-        $job->handle();
-
-        $destination->refresh();
-        $this->assertEquals(DestinationStatus::COMPLETED->value, $destination->status);
-        $this->assertEquals(60, $destination->call_duration);
-        $this->assertNotNull($destination->completed_at);
-    }
-
-    public function test_update_status_job_handles_amd_machine_detected(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'max_retry_attempts' => 3,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-            'retry_count' => 0,
-        ]);
-
-        $job = new UpdateDestinationStatusJob(
-            $destination->id,
-            DestinationStatus::AMD_MACHINE->value,
-            ['amd_detected' => true]
-        );
-        $job->handle();
-
-        $destination->refresh();
-        // AMD machine detected should result in retry, so stays pending
-        $this->assertEquals(DestinationStatus::PENDING->value, $destination->status);
-        $this->assertEquals(1, $destination->retry_count);
-    }
-
-    public function test_update_status_job_handles_amd_human_detected(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        $job = new UpdateDestinationStatusJob(
-            $destination->id,
-            DestinationStatus::AMD_HUMAN->value,
-            ['amd_detected' => false]
-        );
-        $job->handle();
-
-        $destination->refresh();
-        // AMD human detected, continues to routing
-        $this->assertEquals(DestinationStatus::IN_PROGRESS->value, $destination->status);
-    }
-
-    public function test_update_status_job_handles_missing_destination(): void
-    {
-        $job = new UpdateDestinationStatusJob(
-            99999,
-            DestinationStatus::COMPLETED->value,
-            []
-        );
-
-        // Should not throw exception
-        $job->handle();
+        $mockClient = $this->createMock(CloudonixClient::class);
+        $validator = app(DestinationValidator::class);
+        $job = new DialDestinationJob(99999, 99999);
+        $job->handle($validator, $mockClient);
 
         $this->assertTrue(true);
-    }
-
-    public function test_update_status_job_records_call_metadata(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        $destination = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        $metadata = [
-            'call_duration' => 120,
-            'call_id' => 'call-12345',
-            'hangup_cause' => 'NORMAL_CLEARING',
-        ];
-
-        $job = new UpdateDestinationStatusJob(
-            $destination->id,
-            DestinationStatus::COMPLETED->value,
-            $metadata
-        );
-        $job->handle();
-
-        $destination->refresh();
-        $this->assertEquals(120, $destination->call_duration);
     }
 }

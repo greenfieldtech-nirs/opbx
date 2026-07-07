@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Controllers\Traits\HandlesApiErrors;
 use App\Http\Controllers\Traits\LogsOperations;
+use App\Services\ResourceReferenceChecker;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -169,18 +173,18 @@ abstract class AbstractApiCrudController extends Controller
      * @param  int  $resourceId  The ID of the resource
      * @param  int  $organizationId  The organization ID for tenant scoping
      *
-     * @throws \App\Exceptions\ResourceInUseException
+     * @throws ResourceInUseException
      */
     protected function checkResourceReferencesBeforeDelete(
         string $resourceType,
         int $resourceId,
         int $organizationId
     ): void {
-        $referenceChecker = app(\App\Services\ResourceReferenceChecker::class);
+        $referenceChecker = app(ResourceReferenceChecker::class);
         $result = $referenceChecker->checkReferences($resourceType, $resourceId, $organizationId);
 
         if ($result['has_references']) {
-            throw new \App\Exceptions\ResourceInUseException($resourceType, $result['references']);
+            throw new ResourceInUseException($resourceType, $result['references']);
         }
     }
 
@@ -188,7 +192,7 @@ abstract class AbstractApiCrudController extends Controller
      * Hook method to acquire a distributed lock before updating a model.
      * Return null for no locking (default behavior).
      */
-    protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
+    protected function acquireUpdateLock(Model $model, Request $request): ?Lock
     {
         // Default implementation - no locking
         return null;
@@ -197,7 +201,7 @@ abstract class AbstractApiCrudController extends Controller
     /**
      * Hook method to release a distributed lock after updating a model.
      */
-    protected function releaseUpdateLock(?\Illuminate\Contracts\Cache\Lock $lock, Model $model, Request $request): void
+    protected function releaseUpdateLock(?Lock $lock, Model $model, Request $request): void
     {
         // Default implementation - no action
     }
@@ -475,6 +479,30 @@ abstract class AbstractApiCrudController extends Controller
     }
 
     /**
+     * Get the form request class for store operations.
+     *
+     * Override to enforce a specific FormRequest class for validation.
+     *
+     * @return class-string<FormRequest>|null
+     */
+    protected function getStoreRequestClass(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Get the form request class for update operations.
+     *
+     * Override to enforce a specific FormRequest class for validation.
+     *
+     * @return class-string<FormRequest>|null
+     */
+    protected function getUpdateRequestClass(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Get operation message using parameterized approach.
      *
      * @param  string  $operation  The operation (create, update, delete)
@@ -614,6 +642,12 @@ abstract class AbstractApiCrudController extends Controller
 
         $this->authorize($this->getCreateAbility(), $this->getModelClass());
 
+        // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
+        $formRequestClass = $this->getStoreRequestClass();
+        if ($formRequestClass !== null) {
+            $request = app($formRequestClass);
+        }
+
         // Get validated data - works with FormRequest objects
         $validated = method_exists($request, 'validated')
             ? $request->validated()
@@ -741,6 +775,7 @@ abstract class AbstractApiCrudController extends Controller
         $currentUser = $this->getAuthenticatedUser();
 
         $model = $this->resolveModel($request);
+        $this->authorize($this->getUpdateAbility(), $model);
 
         // Tenant scope check
         if ($model->organization_id !== $currentUser->organization_id) {
@@ -756,6 +791,15 @@ abstract class AbstractApiCrudController extends Controller
                 'error' => 'Not Found',
                 'message' => ucfirst($this->getResourceKey()).' not found.',
             ], 404);
+        }
+
+        // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
+        $formRequestClass = $this->getUpdateRequestClass();
+        if ($formRequestClass !== null) {
+            // Bind the resolved model to the route parameter so the FormRequest can
+            // access it via route model binding in authorize()/rules().
+            $request->route()->setParameter($this->getRouteParameterName(), $model);
+            $request = app($formRequestClass);
         }
 
         // Get validated data - works with FormRequest objects

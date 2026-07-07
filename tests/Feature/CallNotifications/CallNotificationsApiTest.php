@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CallNotifications;
 
+use App\Enums\UserRole;
 use App\Models\CallNotificationLog;
 use App\Models\CallNotificationsSettings;
 use App\Models\Organization;
@@ -28,7 +29,7 @@ class CallNotificationsApiTest extends TestCase
         $this->organization = Organization::factory()->create();
         $this->user = User::factory()->create([
             'organization_id' => $this->organization->id,
-            'role' => 'admin',
+            'role' => UserRole::PBX_ADMIN,
         ]);
     }
 
@@ -63,12 +64,12 @@ class CallNotificationsApiTest extends TestCase
     {
         $payload = [
             'webhook_url' => 'https://example.com/webhook',
-            'auth_method' => 'hmac',
-            'hmac_secret' => 'secret-key',
+            'auth_method' => 'bearer_token',
+            'auth_secret' => 'secret-key-12345678901234567890',
             'retry_attempts' => 3,
             'retry_backoff_seconds' => 60,
             'rate_limit_per_minute' => 500,
-            'enabled_events' => ['new', 'ringing', 'connected', 'completed'],
+            'enabled_events' => ['new', 'ringing', 'connected', 'answered'],
         ];
 
         $response = $this->actingAs($this->user)
@@ -76,8 +77,8 @@ class CallNotificationsApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.webhook_url', 'https://example.com/webhook')
-            ->assertJsonPath('data.auth_method', 'hmac')
-            ->assertJsonPath('data.enabled_events', ['new', 'ringing', 'connected', 'completed']);
+            ->assertJsonPath('data.auth_method', 'bearer_token')
+            ->assertJsonPath('data.enabled_events', ['new', 'ringing', 'connected', 'answered']);
 
         $this->assertDatabaseHas('call_notifications_settings', [
             'organization_id' => $this->organization->id,
@@ -94,6 +95,8 @@ class CallNotificationsApiTest extends TestCase
         $response = $this->actingAs($this->user)
             ->postJson('/api/v1/call-notifications/settings', [
                 'webhook_url' => 'https://example.com/webhook',
+                'auth_method' => 'none',
+                'enabled_events' => ['new'],
             ]);
 
         $response->assertStatus(409)
@@ -174,7 +177,7 @@ class CallNotificationsApiTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->postJson('/api/v1/call-notifications/test');
+            ->postJson('/api/v1/call-notifications/settings/test');
 
         $response->assertOk()
             ->assertJsonPath('message', 'Test webhook delivered successfully')
@@ -190,7 +193,7 @@ class CallNotificationsApiTest extends TestCase
     public function test_test_webhook_returns_error_when_not_configured(): void
     {
         $response = $this->actingAs($this->user)
-            ->postJson('/api/v1/call-notifications/test');
+            ->postJson('/api/v1/call-notifications/settings/test');
 
         $response->assertStatus(400)
             ->assertJsonPath('error', 'Notification settings not configured');

@@ -15,13 +15,12 @@ use Tests\TestCase;
  */
 class WebhookValidationTest extends TestCase
 {
-
     /**
      * Test CallInitiatedRequest validation with valid payload.
      */
     public function test_call_initiated_valid_payload(): void
     {
-        $request = new CallInitiatedRequest();
+        $request = new CallInitiatedRequest;
         $rules = $request->rules();
 
         $data = [
@@ -45,7 +44,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_initiated_missing_required_fields(): void
     {
-        $request = new CallInitiatedRequest();
+        $request = new CallInitiatedRequest;
         $rules = $request->rules();
 
         $data = [
@@ -66,7 +65,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_initiated_invalid_phone_numbers(): void
     {
-        $request = new CallInitiatedRequest();
+        $request = new CallInitiatedRequest;
         $rules = $request->rules();
 
         $data = [
@@ -89,7 +88,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_initiated_invalid_direction(): void
     {
-        $request = new CallInitiatedRequest();
+        $request = new CallInitiatedRequest;
         $rules = $request->rules();
 
         $data = [
@@ -111,7 +110,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_status_valid_payload(): void
     {
-        $request = new CallStatusRequest();
+        $request = new CallStatusRequest;
         $rules = $request->rules();
 
         $data = [
@@ -133,7 +132,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_status_missing_required_fields(): void
     {
-        $request = new CallStatusRequest();
+        $request = new CallStatusRequest;
         $rules = $request->rules();
 
         $data = [
@@ -152,7 +151,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_status_invalid_status(): void
     {
-        $request = new CallStatusRequest();
+        $request = new CallStatusRequest;
         $rules = $request->rules();
 
         $data = [
@@ -171,7 +170,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_call_status_invalid_duration(): void
     {
-        $request = new CallStatusRequest();
+        $request = new CallStatusRequest;
         $rules = $request->rules();
 
         $data = [
@@ -191,23 +190,24 @@ class WebhookValidationTest extends TestCase
      */
     public function test_cdr_valid_payload(): void
     {
-        $request = new CdrRequest();
+        $request = new CdrRequest;
         $rules = $request->rules();
 
         $data = [
             'call_id' => 'test-call-123',
+            'timestamp' => 1700000120,
             'from' => '+12025551234',
             'to' => '+13105559999',
-            'did' => '+13105559999',
-            'duration' => 120,
-            'start_time' => 1700000000,
-            'end_time' => 1700000120,
-            'answer_time' => 1700000010,
             'disposition' => 'answered',
-            'disconnect_reason' => 'normal',
-            'direction' => 'inbound',
+            'duration' => 120,
+            'billsec' => 110,
+            'session' => [
+                'callStartTime' => 1700000000000,
+                'callEndTime' => 1700000120000,
+                'callAnswerTime' => 1700000010000,
+            ],
             'recording_url' => 'https://example.com/recordings/test.mp3',
-            'cost' => 0.05,
+            'rated_cost' => 0.05,
         ];
 
         $validator = Validator::make($data, $rules);
@@ -220,7 +220,7 @@ class WebhookValidationTest extends TestCase
      */
     public function test_cdr_missing_required_fields(): void
     {
-        $request = new CdrRequest();
+        $request = new CdrRequest;
         $rules = $request->rules();
 
         $data = [
@@ -233,31 +233,32 @@ class WebhookValidationTest extends TestCase
         $this->assertArrayHasKey('call_id', $validator->errors()->toArray());
         $this->assertArrayHasKey('from', $validator->errors()->toArray());
         $this->assertArrayHasKey('to', $validator->errors()->toArray());
-        $this->assertArrayHasKey('did', $validator->errors()->toArray());
-        $this->assertArrayHasKey('start_time', $validator->errors()->toArray());
-        $this->assertArrayHasKey('end_time', $validator->errors()->toArray());
+        $this->assertArrayHasKey('timestamp', $validator->errors()->toArray());
         $this->assertArrayHasKey('disposition', $validator->errors()->toArray());
-        $this->assertArrayHasKey('direction', $validator->errors()->toArray());
+        $this->assertArrayHasKey('billsec', $validator->errors()->toArray());
     }
 
     /**
      * Test CdrRequest validation with invalid disposition.
+     *
+     * The Cloudonix CDR contract treats disposition as a free-form string
+     * (answered, busy, no-answer, failed, congestion, ...), so there is no
+     * fixed enum. The enforced constraint is required + max:50; an
+     * over-length disposition must be rejected.
      */
     public function test_cdr_invalid_disposition(): void
     {
-        $request = new CdrRequest();
+        $request = new CdrRequest;
         $rules = $request->rules();
 
         $data = [
             'call_id' => 'test-call-123',
+            'timestamp' => 1700000120,
             'from' => '+12025551234',
             'to' => '+13105559999',
-            'did' => '+13105559999',
             'duration' => 120,
-            'start_time' => 1700000000,
-            'end_time' => 1700000120,
-            'disposition' => 'invalid-disposition',
-            'direction' => 'inbound',
+            'billsec' => 110,
+            'disposition' => str_repeat('x', 51), // Exceeds max:50
         ];
 
         $validator = Validator::make($data, $rules);
@@ -271,19 +272,17 @@ class WebhookValidationTest extends TestCase
      */
     public function test_cdr_invalid_recording_url(): void
     {
-        $request = new CdrRequest();
+        $request = new CdrRequest;
         $rules = $request->rules();
 
         $data = [
             'call_id' => 'test-call-123',
+            'timestamp' => 1700000120,
             'from' => '+12025551234',
             'to' => '+13105559999',
-            'did' => '+13105559999',
             'duration' => 120,
-            'start_time' => 1700000000,
-            'end_time' => 1700000120,
+            'billsec' => 110,
             'disposition' => 'answered',
-            'direction' => 'inbound',
             'recording_url' => 'not-a-url',
         ];
 
@@ -295,29 +294,30 @@ class WebhookValidationTest extends TestCase
 
     /**
      * Test CdrRequest validation with negative cost.
+     *
+     * The Cloudonix CDR contract carries cost under rated_cost / approx_cost /
+     * sell_cost (there is no bare "cost" field). Each must reject negatives.
      */
     public function test_cdr_negative_cost(): void
     {
-        $request = new CdrRequest();
+        $request = new CdrRequest;
         $rules = $request->rules();
 
         $data = [
             'call_id' => 'test-call-123',
+            'timestamp' => 1700000120,
             'from' => '+12025551234',
             'to' => '+13105559999',
-            'did' => '+13105559999',
             'duration' => 120,
-            'start_time' => 1700000000,
-            'end_time' => 1700000120,
+            'billsec' => 110,
             'disposition' => 'answered',
-            'direction' => 'inbound',
-            'cost' => -0.05,
+            'rated_cost' => -0.05,
         ];
 
         $validator = Validator::make($data, $rules);
 
         $this->assertTrue($validator->fails());
-        $this->assertArrayHasKey('cost', $validator->errors()->toArray());
+        $this->assertArrayHasKey('rated_cost', $validator->errors()->toArray());
     }
 
     /**
@@ -325,9 +325,9 @@ class WebhookValidationTest extends TestCase
      */
     public function test_webhook_requests_authorize(): void
     {
-        $callInitiated = new CallInitiatedRequest();
-        $callStatus = new CallStatusRequest();
-        $cdr = new CdrRequest();
+        $callInitiated = new CallInitiatedRequest;
+        $callStatus = new CallStatusRequest;
+        $cdr = new CdrRequest;
 
         $this->assertTrue($callInitiated->authorize());
         $this->assertTrue($callStatus->authorize());

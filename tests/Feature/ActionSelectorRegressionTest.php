@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Enums\BusinessHoursActionType;
 use App\Enums\UserRole;
-use App\Http\Requests\BusinessHours\StoreBusinessHoursScheduleRequest;
-use App\Models\BusinessHoursSchedule;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Validator;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -26,6 +22,7 @@ class ActionSelectorRegressionTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private User $owner;
 
     protected function setUp(): void
@@ -116,6 +113,7 @@ class ActionSelectorRegressionTest extends TestCase
         $validScheduleData = [
             'name' => 'Test Schedule',
             'status' => 'active',
+            'timezone' => 'UTC',
             'open_hours_action' => [
                 'type' => 'extension',
                 'target_id' => 'ext-101', // Properly formatted
@@ -177,7 +175,7 @@ class ActionSelectorRegressionTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonValidationErrors([
                 'open_hours_action.target_id',
-                'closed_hours_action.target_id'
+                'closed_hours_action.target_id',
             ]);
     }
 
@@ -213,6 +211,7 @@ class ActionSelectorRegressionTest extends TestCase
         $scheduleData = [
             'name' => 'Complete Flow Test',
             'status' => 'active',
+            'timezone' => 'UTC',
             'open_hours_action' => $openHoursAction,
             'closed_hours_action' => $closedHoursAction,
             'schedule' => [
@@ -238,15 +237,16 @@ class ActionSelectorRegressionTest extends TestCase
         $formattedTargetId = $targetId;
         switch ($actionType) {
             case 'extension':
-                $formattedTargetId = 'ext-' . $targetId;
+                $formattedTargetId = 'ext-'.$targetId;
                 break;
             case 'ring_group':
-                $formattedTargetId = 'rg-' . $targetId;
+                $formattedTargetId = 'rg-'.$targetId;
                 break;
             case 'ivr_menu':
-                $formattedTargetId = 'ivr-' . $targetId;
+                $formattedTargetId = 'ivr-'.$targetId;
                 break;
         }
+
         return $formattedTargetId;
     }
 
@@ -257,7 +257,7 @@ class ActionSelectorRegressionTest extends TestCase
     {
         return [
             'type' => $type,
-            'target_id' => $this->simulateActionSelectorFormatting($type, $targetId)
+            'target_id' => $this->simulateActionSelectorFormatting($type, $targetId),
         ];
     }
 

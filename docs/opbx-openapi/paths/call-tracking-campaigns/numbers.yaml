@@ -1,0 +1,194 @@
+paths:
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers:
+    parameters:
+    - name: call_tracking_campaign
+      in: path
+      required: true
+      description: Call tracking campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Call Tracking Campaigns
+      summary: List campaign tracking numbers
+      description: |
+        Get a paginated list of tracking numbers assigned to a campaign.
+      operationId: listCallTrackingNumbers
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      responses:
+        '200':
+          description: List of tracking numbers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/CallTrackingNumber.yaml
+                  meta:
+                    $ref: ../../components/schemas/PaginationMeta.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+    post:
+      tags:
+      - Call Tracking Campaigns
+      summary: Assign tracking number
+      description: |
+        Assign an active DID number to a call tracking campaign. The DID must
+        belong to the same organization and cannot already be assigned to
+        another tracking campaign.
+      operationId: createCallTrackingNumber
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                did_number_id:
+                  type: integer
+                  description: ID of the active DID number to assign
+                  example: 12
+                friendly_name:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Friendly name for the tracking number
+                  example: Sales Line 1
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  default: active
+                  description: Tracking number status
+                  example: active
+              required:
+              - did_number_id
+      responses:
+        '201':
+          description: Tracking number assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Tracking number assigned successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingNumber.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}:
+    parameters:
+    - name: call_tracking_campaign
+      in: path
+      required: true
+      description: Call tracking campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    - name: call_tracking_number
+      in: path
+      required: true
+      description: Call tracking number ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 8
+    put:
+      tags:
+      - Call Tracking Campaigns
+      summary: Update tracking number
+      description: |
+        Update an assigned tracking number (friendly name or status).
+      operationId: updateCallTrackingNumber
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                friendly_name:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Friendly name for the tracking number
+                  example: Updated Sales Line
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  description: Tracking number status
+                  example: active
+      responses:
+        '200':
+          description: Tracking number updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Tracking number updated successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingNumber.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+    delete:
+      tags:
+      - Call Tracking Campaigns
+      summary: Remove tracking number
+      description: |
+        Remove a tracking number assignment from a campaign.
+      operationId: deleteCallTrackingNumber
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Tracking number removed successfully
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml

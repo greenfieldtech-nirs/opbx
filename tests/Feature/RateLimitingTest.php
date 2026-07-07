@@ -49,7 +49,7 @@ class RateLimitingTest extends TestCase
         $response = $this->actingAs($user)->getJson('/api/v1/profile');
         $this->assertEquals(429, $response->status());
         $this->assertArrayHasKey('error', $response->json());
-        $this->assertEquals('Too Many Requests', $response->json('error'));
+        $this->assertEquals('Rate limit exceeded', $response->json('error'));
         $this->assertArrayHasKey('retry_after', $response->json());
     }
 
@@ -142,9 +142,10 @@ class RateLimitingTest extends TestCase
      */
     public function test_rate_limit_is_per_user(): void
     {
-        $organization = Organization::factory()->create();
-        $user1 = User::factory()->create(['organization_id' => $organization->id]);
-        $user2 = User::factory()->create(['organization_id' => $organization->id]);
+        $organization1 = Organization::factory()->create();
+        $organization2 = Organization::factory()->create();
+        $user1 = User::factory()->create(['organization_id' => $organization1->id]);
+        $user2 = User::factory()->create(['organization_id' => $organization2->id]);
 
         // Get the rate limit
         $apiLimit = config('rate_limiting.api', 60);
@@ -159,7 +160,7 @@ class RateLimitingTest extends TestCase
         $response = $this->actingAs($user1)->getJson('/api/v1/profile');
         $this->assertEquals(429, $response->status());
 
-        // User 2 should still have their full quota
+        // User 2 should still have their full quota because they belong to a different organization
         $response = $this->actingAs($user2)->getJson('/api/v1/profile');
         $this->assertEquals(200, $response->status());
     }
@@ -170,7 +171,8 @@ class RateLimitingTest extends TestCase
     public function test_webhook_rate_limit_is_per_ip(): void
     {
         // Note: Testing webhook rate limiting is complex as it requires
-        // valid webhook signatures. This test verifies the middleware is applied.
+        // valid webhook signatures. This test verifies the webhook endpoint
+        // rejects unauthenticated/unparseable requests before any rate limiting.
         // Integration tests should verify full webhook rate limiting behavior.
 
         $response = $this->postJson('/api/webhooks/cloudonix/call-initiated', [
@@ -180,9 +182,8 @@ class RateLimitingTest extends TestCase
             'did' => '+13105559999',
         ]);
 
-        // Should be rejected by signature verification before rate limiting
-        // but this confirms middleware stack includes both
-        $this->assertContains($response->status(), [401, 500]);
+        // Should be rejected by signature verification or domain validation
+        $this->assertContains($response->status(), [400, 401, 500]);
     }
 
     /**

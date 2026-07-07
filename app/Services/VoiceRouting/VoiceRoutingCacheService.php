@@ -85,7 +85,9 @@ class VoiceRoutingCacheService
 
                     return Extension::withoutGlobalScope(OrganizationScope::class)
                         ->with([
-                            'user',
+                            'user' => function ($query) {
+                                $query->withoutGlobalScope(OrganizationScope::class);
+                            },
                             'aiAssistant' => function ($query) use ($organizationId) {
                                 $query->withoutGlobalScope(OrganizationScope::class)
                                     ->where('organization_id', $organizationId);
@@ -106,7 +108,12 @@ class VoiceRoutingCacheService
                 'error' => $e->getMessage(),
             ]);
 
-            return Extension::with('user')
+            return Extension::withoutGlobalScope(OrganizationScope::class)
+                ->with([
+                    'user' => function ($query) {
+                        $query->withoutGlobalScope(OrganizationScope::class);
+                    },
+                ])
                 ->where('organization_id', $organizationId)
                 ->where('extension_number', $extensionNumber)
                 ->first();
@@ -132,7 +139,8 @@ class VoiceRoutingCacheService
                         'organization_id' => $organizationId,
                     ]);
 
-                    return BusinessHoursSchedule::where('organization_id', $organizationId)
+                    return BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
+                        ->where('organization_id', $organizationId)
                         ->active()
                         ->with(['scheduleDays.timeRanges', 'exceptions.timeRanges'])
                         ->first();
@@ -155,7 +163,8 @@ class VoiceRoutingCacheService
                 'error' => $e->getMessage(),
             ]);
 
-            return BusinessHoursSchedule::where('organization_id', $organizationId)
+            return BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $organizationId)
                 ->active()
                 ->with(['scheduleDays.timeRanges', 'exceptions.timeRanges'])
                 ->first();

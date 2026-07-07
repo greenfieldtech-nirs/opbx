@@ -9,6 +9,7 @@ use App\Enums\DestinationStatus;
 use App\Jobs\DialDestinationJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -111,7 +112,7 @@ class CampaignProcessor
     {
         // Count destinations not in final states (pending, dialing, connected)
         $incompleteCount = $campaign->destinations()
-            ->whereNotIn('status', [
+            ->whereNotIn('auto_dialer_destinations.status', [
                 DestinationStatus::COMPLETED,
                 DestinationStatus::FAILED,
                 DestinationStatus::INVALID,
@@ -124,14 +125,14 @@ class CampaignProcessor
     /**
      * Get pending destinations for dialing.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, AutoDialerDestination>
+     * @return Collection<int, AutoDialerDestination>
      */
-    private function getPendingDestinations(AutoDialerCampaign $campaign): \Illuminate\Database\Eloquent\Collection
+    private function getPendingDestinations(AutoDialerCampaign $campaign): Collection
     {
         return $campaign->destinations()
-            ->whereIn('status', [DestinationStatus::PENDING, DestinationStatus::FAILED])
-            ->where('dial_attempts', '<', $campaign->max_dial_attempts)
-            ->orderBy('id')
+            ->whereIn('auto_dialer_destinations.status', [DestinationStatus::PENDING, DestinationStatus::FAILED])
+            ->where('auto_dialer_destinations.dial_attempts', '<', $campaign->max_dial_attempts)
+            ->orderBy('auto_dialer_destinations.id')
             ->limit($campaign->calls_per_second * 10) // Get batch of destinations
             ->get();
     }

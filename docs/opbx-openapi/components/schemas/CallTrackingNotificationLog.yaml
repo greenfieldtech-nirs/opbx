@@ -1,0 +1,64 @@
+type: object
+description: Delivery log for a call tracking webhook notification
+properties:
+  id:
+    type: integer
+    description: Unique log identifier
+    readOnly: true
+    example: 1
+  call_id:
+    type: string
+    description: Cloudonix call identifier
+    example: call-abc123
+  event_id:
+    type: string
+    description: Unique event identifier
+    example: evt-abc123
+  event_type:
+    type: string
+    description: Type of event that triggered the notification
+    example: call.converted
+  webhook_url:
+    type: string
+    format: uri
+    description: URL the webhook was delivered to
+    example: https://example.com/webhooks/call-tracking
+  response_status_code:
+    type:
+    - integer
+    - 'null'
+    description: HTTP status code returned by the receiving endpoint
+    example: 200
+  response_time_ms:
+    type:
+    - integer
+    - 'null'
+    description: Webhook response time in milliseconds
+    example: 120
+  is_success:
+    type: boolean
+    description: Whether the delivery was successful
+    example: true
+  attempt_number:
+    type: integer
+    description: Delivery attempt number
+    example: 1
+  error_message:
+    type:
+    - string
+    - 'null'
+    description: Error message if delivery failed
+    example: Connection timeout
+  created_at:
+    type: string
+    format: date-time
+    description: When the delivery attempt was made
+    example: '2024-01-15T14:30:00Z'
+required:
+- id
+- call_id
+- event_id
+- event_type
+- webhook_url
+- is_success
+- attempt_number

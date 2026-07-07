@@ -10,7 +10,7 @@ namespace App\Services\AutoDialer;
 readonly class CsvValidationResult
 {
     /**
-     * @param  array<int, array{phone_number: string, description: string}>  $validRows
+     * @param  array<int, array{phone_number: string, name: ?string, batch_identifier: ?string, metadata: ?array<string, string>}>  $validRows
      * @param  array<int, array{row: int, phone_number: string, error: string}>  $invalidRows
      * @param  array<int, array{phone_number: string, row: int, kept_row: int}>  $duplicates
      */

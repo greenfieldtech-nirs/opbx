@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,21 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * Resolve route bindings for platform management routes without the tenant
+     * scope, so platform managers can act on users across all organizations.
+     */
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        if (request()->is('api/v1/platform/*')) {
+            return $this->withoutGlobalScope(OrganizationScope::class)
+                ->where($field ?? $this->getRouteKeyName(), $value)
+                ->first();
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
 
     /**
      * Default field list for eager/lazy loading extension relationship.
@@ -38,12 +54,20 @@ class User extends Authenticatable
         'password',
         'role',
         'status',
+        'is_platform_manager',
         'phone',
         'street_address',
         'city',
         'state_province',
         'postal_code',
         'country',
+    ];
+
+    /**
+     * Default attribute values.
+     */
+    protected $attributes = [
+        'is_platform_manager' => false,
     ];
 
     /**

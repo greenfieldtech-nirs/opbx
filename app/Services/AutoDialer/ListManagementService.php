@@ -16,7 +16,9 @@ use App\Models\AutoDialerList;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -60,11 +62,13 @@ class ListManagementService
     /**
      * Upload CSV file to a list.
      *
-     * @return array{job_id: string, list_id: int, is_large_file: bool}
+     * @param  array<string, mixed>  $mapping
+     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int}
      */
     public function uploadCsv(
         int $listId,
         UploadedFile $file,
+        array $mapping = [],
     ): array {
         $list = AutoDialerList::findOrFail($listId);
 
@@ -75,7 +79,7 @@ class ListManagementService
 
         // Store file temporarily (default disk is 'local' which uses storage/app/private)
         $tempPath = $file->store('temp/list_uploads');
-        $fullPath = storage_path('app/private/'.$tempPath);
+        $fullPath = Storage::disk('local')->path($tempPath);
 
         // Generate job ID
         $jobId = Str::uuid()->toString();
@@ -97,7 +101,7 @@ class ListManagementService
 
         if ($isLargeFile) {
             // Dispatch large file job
-            ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount)
+            ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount, $mapping)
                 ->onQueue('auto-dialer');
 
             Log::info('ListManagementService: Dispatched large file processing', [
@@ -107,7 +111,7 @@ class ListManagementService
             ]);
         } else {
             // Dispatch regular upload job
-            ProcessListUploadJob::dispatch($list->id, $fullPath, $jobId)
+            ProcessListUploadJob::dispatch($list->id, $fullPath, $jobId, false, $mapping)
                 ->onQueue('auto-dialer');
 
             Log::info('ListManagementService: Dispatched upload processing', [
@@ -132,6 +136,16 @@ class ListManagementService
     }
 
     /**
+     * Preview a CSV file for column mapping.
+     *
+     * @return array{headers: array<int, string>, rows: array<int, array<string, string>>, total_rows: int, has_header: bool}
+     */
+    public function previewCsv(string $filePath, bool $hasHeader = true): array
+    {
+        return $this->validator->parseCsvPreview($filePath, $hasHeader, 5);
+    }
+
+    /**
      * Get upload progress.
      *
      * @return array{percentage: int, status: string, updated_at: string}|null
@@ -147,7 +161,7 @@ class ListManagementService
     public function addDestination(
         int $listId,
         string $phoneNumber,
-        ?string $description = null,
+        ?string $name = null,
     ): AutoDialerDestination {
         $list = AutoDialerList::findOrFail($listId);
 
@@ -177,7 +191,7 @@ class ListManagementService
             'organization_id' => $list->organization_id,
             'list_id' => $list->id,
             'phone_number' => $validation->normalizedNumber,
-            'description' => $description,
+            'name' => $name,
             'status' => DestinationStatus::PENDING,
             'dial_attempts' => 0,
             'duration' => 0,
@@ -202,7 +216,7 @@ class ListManagementService
     /**
      * Add multiple destinations to a list (batch).
      *
-     * @param  array<int, array{phone_number: string, description: ?string}>  $destinations
+     * @param  array<int, array{phone_number: string, name: ?string}>  $destinations
      * @return array{added: int, errors: array<int, string>}
      */
     public function addDestinationsBatch(
@@ -251,7 +265,7 @@ class ListManagementService
                     'organization_id' => $list->organization_id,
                     'list_id' => $list->id,
                     'phone_number' => $result->normalizedNumber,
-                    'description' => $destinations[$index]['description'] ?? null,
+                    'name' => $destinations[$index]['name'] ?? null,
                     'status' => DestinationStatus::PENDING,
                     'dial_attempts' => 0,
                     'duration' => 0,
@@ -280,7 +294,7 @@ class ListManagementService
             $filteredCount = count($validEntries) - count($finalEntries);
 
             if (! empty($finalEntries)) {
-                \Illuminate\Support\Facades\DB::table('auto_dialer_destinations')->insert($finalEntries);
+                DB::table('auto_dialer_destinations')->insert($finalEntries);
                 $added = count($finalEntries);
             }
 
@@ -354,9 +368,10 @@ class ListManagementService
     /**
      * Update list with new CSV - backup old destinations first.
      *
-     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int}
+     * @param  array<string, mixed>  $mapping
+     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int, backup_path: string}
      */
-    public function updateListWithBackup(int $listId, UploadedFile $file): array
+    public function updateListWithBackup(int $listId, UploadedFile $file, array $mapping = []): array
     {
         $list = AutoDialerList::findOrFail($listId);
 
@@ -388,7 +403,7 @@ class ListManagementService
         ]);
 
         // Upload new CSV
-        $result = $this->uploadCsv($listId, $file);
+        $result = $this->uploadCsv($listId, $file, $mapping);
 
         return [
             ...$result,
@@ -413,7 +428,9 @@ class ListManagementService
         $destinations = $list->destinations()->get()->map(function ($dest) {
             return [
                 'phone_number' => $dest->phone_number,
-                'description' => $dest->description,
+                'name' => $dest->name,
+                'batch_identifier' => $dest->batch_identifier,
+                'metadata' => $dest->metadata,
                 'status' => $dest->status->value,
                 'dial_attempts' => $dest->dial_attempts,
                 'duration' => $dest->duration,
@@ -469,14 +486,16 @@ class ListManagementService
         }
 
         // Write header
-        fputcsv($handle, ['phone_number', 'description', 'status', 'dial_attempts']);
+        fputcsv($handle, ['phone_number', 'name', 'batch_identifier', 'metadata', 'status', 'dial_attempts']);
 
         // Stream destinations to avoid memory issues with large lists
         $list->destinations()->chunk(1000, function ($destinations) use ($handle) {
             foreach ($destinations as $destination) {
                 fputcsv($handle, [
                     $destination->phone_number,
-                    $destination->description,
+                    $destination->name,
+                    $destination->batch_identifier,
+                    $destination->metadata ? json_encode($destination->metadata) : null,
                     $destination->status->value,
                     $destination->dial_attempts,
                 ]);

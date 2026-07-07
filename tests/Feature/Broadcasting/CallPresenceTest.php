@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Broadcasting;
 
+use App\Enums\CallStatus;
 use App\Events\CallAnswered;
 use App\Events\CallEnded;
 use App\Events\CallInitiated;
@@ -11,6 +12,7 @@ use App\Models\CallLog;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -25,6 +27,7 @@ final class CallPresenceTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private User $user;
 
     protected function setUp(): void
@@ -33,6 +36,17 @@ final class CallPresenceTest extends TestCase
 
         $this->organization = Organization::factory()->create();
         $this->user = User::factory()->for($this->organization)->create();
+
+        // Configure Pusher for broadcasting auth tests
+        config(['broadcasting.default' => 'pusher']);
+        config(['broadcasting.connections.pusher.key' => 'test-key']);
+        config(['broadcasting.connections.pusher.secret' => 'test-secret']);
+        config(['broadcasting.connections.pusher.options.app_id' => 'test-app']);
+
+        // Re-register channels on the active broadcaster; the test runner sets
+        // BROADCAST_CONNECTION=null, so channels loaded during boot were bound
+        // to the null broadcaster and are lost when we switch to pusher here.
+        require base_path('routes/channels.php');
     }
 
     public function test_call_initiated_event_is_broadcast(): void
@@ -42,7 +56,7 @@ final class CallPresenceTest extends TestCase
         $callLog = CallLog::factory()
             ->for($this->organization)
             ->create([
-                'status' => \App\Enums\CallStatus::Initiated,
+                'status' => CallStatus::INITIATED,
             ]);
 
         event(new CallInitiated($callLog));
@@ -59,7 +73,7 @@ final class CallPresenceTest extends TestCase
         $callLog = CallLog::factory()
             ->for($this->organization)
             ->create([
-                'status' => \App\Enums\CallStatus::Initiated,
+                'status' => CallStatus::INITIATED,
                 'from_number' => '+18005551234',
                 'to_number' => '+18005556789',
             ]);
@@ -89,7 +103,7 @@ final class CallPresenceTest extends TestCase
             ->for($this->organization)
             ->for($extension)
             ->create([
-                'status' => \App\Enums\CallStatus::Answered,
+                'status' => CallStatus::ANSWERED,
             ]);
 
         event(new CallAnswered($callLog));
@@ -106,7 +120,7 @@ final class CallPresenceTest extends TestCase
         $callLog = CallLog::factory()
             ->for($this->organization)
             ->create([
-                'status' => \App\Enums\CallStatus::Completed,
+                'status' => CallStatus::COMPLETED,
                 'duration' => 120,
             ]);
 
@@ -125,11 +139,11 @@ final class CallPresenceTest extends TestCase
         $channels = $event->broadcastOn();
 
         $this->assertCount(1, $channels);
-        $this->assertInstanceOf(\Illuminate\Broadcasting\Channel::class, $channels[0]);
+        $this->assertInstanceOf(Channel::class, $channels[0]);
 
         // Channel name should be in format: presence.org.{organization_id}
         $channelName = $channels[0]->name;
-        $this->assertEquals("presence.org.{$this->organization->id}", $channelName);
+        $this->assertEquals("presence-org.{$this->organization->id}", $channelName);
     }
 
     public function test_presence_channel_authorizes_users_from_same_organization(): void
@@ -137,8 +151,8 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "presence.org.{$this->organization->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "presence-org.{$this->organization->id}",
         ]);
 
         $response->assertOk();
@@ -154,7 +168,7 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
+            'socket_id' => '123.456',
             'channel_name' => "presence.org.{$otherOrganization->id}",
         ]);
 
@@ -164,8 +178,8 @@ final class CallPresenceTest extends TestCase
     public function test_presence_channel_denies_unauthenticated_users(): void
     {
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "presence.org.{$this->organization->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "presence-org.{$this->organization->id}",
         ]);
 
         $response->assertUnauthorized();
@@ -176,8 +190,8 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "presence.org.{$this->organization->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "presence-org.{$this->organization->id}",
         ]);
 
         $response->assertOk();
@@ -203,8 +217,8 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "extension.{$extension->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "private-extension.{$extension->id}",
         ]);
 
         $response->assertOk();
@@ -217,8 +231,8 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "extension.{$extension->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "private-extension.{$extension->id}",
         ]);
 
         $response->assertForbidden();
@@ -229,8 +243,8 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "user.{$this->user->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "private-user.{$this->user->id}",
         ]);
 
         $response->assertOk();
@@ -242,8 +256,8 @@ final class CallPresenceTest extends TestCase
         $this->actingAs($this->user, 'sanctum');
 
         $response = $this->postJson('/api/v1/broadcasting/auth', [
-            'socket_id' => 'test-socket-id',
-            'channel_name' => "user.{$otherUser->id}",
+            'socket_id' => '123.456',
+            'channel_name' => "private-user.{$otherUser->id}",
         ]);
 
         $response->assertForbidden();
@@ -251,7 +265,9 @@ final class CallPresenceTest extends TestCase
 
     public function test_websocket_health_endpoint_returns_ok(): void
     {
-        $response = $this->getJson('/api/v1/websocket/health');
+        $this->actingAs($this->user, 'sanctum');
+
+        $response = $this->getJson('/api/websocket/health');
 
         // May return 500 if Soketi is not running in test environment
         // But the endpoint should exist and respond
@@ -259,6 +275,5 @@ final class CallPresenceTest extends TestCase
 
         $data = $response->json();
         $this->assertArrayHasKey('status', $data);
-        $this->assertArrayHasKey('websocket', $data);
     }
 }

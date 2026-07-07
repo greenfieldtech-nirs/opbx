@@ -1,0 +1,151 @@
+---
+sidebar_position: 22
+slug: /modules/call-tracking-analytics
+sidebar_class_name: cxGuidesSidebar
+title: "Call Tracking Analytics"
+description: "Dashboard, KPIs, attribution tables, and CSV export for call tracking"
+---
+
+# Call Tracking Analytics
+
+The Call Tracking Analytics dashboard shows how your campaigns are performing, which sources are driving calls, and which calls meet your conversion rules.
+
+## Purpose
+
+Use this module to:
+
+- Monitor call volume and conversion trends over time
+- Identify top campaigns and traffic sources
+- Filter sessions by date range and conversion status
+- Export attributed call data for external reporting
+
+## Dashboard KPIs
+
+The dashboard displays summary cards at the top of the page:
+
+| KPI | Description |
+|-----|-------------|
+| Total Calls | Number of tracked calls in the selected period |
+| Unique Callers | Number of distinct caller numbers |
+| Answered Calls | Calls with an answered disposition |
+| Missed Calls | Calls that were not answered |
+| Average Duration | Average call duration in seconds |
+| Conversions | Calls that met the campaign conversion rule |
+| Conversion Rate | Conversions divided by total calls, as a percentage |
+
+## Time-Series Chart
+
+The **Calls vs Conversions** line chart shows call volume and conversions over the selected date range. You can group the data by day, week, or month.
+
+| Group By | Format | Use Case |
+|----------|--------|----------|
+| Day | `YYYY-MM-DD` | Short-term trends and daily spikes |
+| Week | ISO year-week (`YYYY-WW`) | Weekly performance reviews |
+| Month | `YYYY-MM` | Monthly reporting and planning |
+
+The chart uses the call start time to place each call in the correct bucket.
+
+## Top Campaigns and Sources
+
+Below the chart, the dashboard shows two tables:
+
+### Top Campaigns
+
+Lists the campaigns with the most tracked calls, ranked by call volume. Each row shows:
+
+- Campaign name
+- Number of calls
+- Number of conversions
+
+### Top Sources
+
+Lists the traffic sources driving the most calls, ranked by call volume. Each row shows:
+
+- Source name (for example, `google`, `facebook`, or `direct`)
+- Number of calls
+- Number of conversions
+
+Use these tables to quickly see which marketing investments are generating calls and conversions.
+
+## Conversion Rules
+
+A call is counted as a conversion when it satisfies the campaign-level conversion rule:
+
+| Condition | Default | Effect |
+|-----------|---------|--------|
+| Require answered disposition | `true` | Only `CONNECTED` or `ANSWERED` calls can convert |
+| Min answered duration (seconds) | `30` | The billable duration must be at least this value |
+| Conversion value | none | Optional monetary value stored on the session |
+
+If a call does not meet the rule, it is still tracked and visible in the dashboard and sessions list, but it is not counted as a conversion.
+
+## Sessions List
+
+The **Call Tracking Sessions** page lists every attributed call. Each row shows the called number, campaign, source/medium, duration, disposition, and conversion status.
+
+You can filter the list by:
+
+- Caller or called number search
+- Start and end date
+- Converted calls only
+
+## Export CSV
+
+You can export analytics data to a CSV file for spreadsheet or BI tools.
+
+### How to Export
+
+1. Go to **Call Tracking → Dashboard**
+2. Select the desired date range and group by option
+3. Click **Export CSV**
+
+The export groups rows by date, campaign, source, and medium and includes the following columns:
+
+| Column | Description |
+|--------|-------------|
+| `date` | Date or grouping bucket |
+| `campaign_name` | Campaign that received the call |
+| `source` | Attribution source |
+| `medium` | Attribution medium |
+| `calls` | Total calls in the bucket |
+| `answered` | Answered calls |
+| `missed` | Missed calls |
+| `conversions` | Calls that converted |
+| `avg_duration` | Average duration in seconds |
+
+:::tip
+Use the export to build custom reports or to import call data into your CRM or ad platform.
+:::
+
+## Date Range and Filtering
+
+The dashboard defaults to the last 30 days. Use the date pickers to change the range. The data updates automatically when you change a filter.
+
+| Filter | Behavior |
+|--------|----------|
+| Start date | First day to include in the report |
+| End date | Last day to include in the report |
+| Group by | Day, week, or month granularity |
+
+The start date must be on or before the end date.
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View dashboard | Yes | Yes | Yes | Yes |
+| View sessions | Yes | Yes | Yes | Yes |
+| Export CSV | Yes | Yes | Yes | Yes |
+
+## Best Practices
+
+- Review the dashboard weekly to spot trends in call volume and conversion rate
+- Compare top campaigns and sources to your ad spend to calculate return on investment
+- Set conversion rules that reflect a truly qualified call for your business
+- Export data before making large changes to campaigns or conversion rules
+
+## Related Modules
+
+- [Call Tracking Campaigns](/modules/call-tracking-campaigns) — Configure campaigns, conversion rules, and tracking numbers
+- [Call Tracking DNI](/modules/call-tracking-dni) — Dynamic Number Insertion for website attribution
+- [Call Logs](/modules/call-logs) — View raw call detail records

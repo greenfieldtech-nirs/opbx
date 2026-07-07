@@ -59,6 +59,11 @@ class UserPolicy
      */
     public function view(User $authUser, User $targetUser): bool
     {
+        // Cross-tenant access is never allowed
+        if ($authUser->organization_id !== $targetUser->organization_id) {
+            return false;
+        }
+
         // Owner and PBX Admin can view any user
         if ($authUser->role->canManageUsers()) {
             return true;
@@ -86,6 +91,11 @@ class UserPolicy
      */
     public function update(User $authUser, User $targetUser): bool
     {
+        // Cross-tenant access is never allowed
+        if ($authUser->organization_id !== $targetUser->organization_id) {
+            return false;
+        }
+
         // Owner and PBX Admin can update any user
         if ($authUser->role->canManageUsers()) {
             return true;
@@ -113,6 +123,11 @@ class UserPolicy
      */
     public function updateRole(User $authUser, User $targetUser): bool
     {
+        // Cross-tenant access is never allowed
+        if ($authUser->organization_id !== $targetUser->organization_id) {
+            return false;
+        }
+
         // Only Owner can change roles
         if (! $authUser->role->isOwner()) {
             return false;
@@ -139,6 +154,11 @@ class UserPolicy
      */
     public function delete(User $authUser, User $targetUser): bool
     {
+        // Cross-tenant access is never allowed
+        if ($authUser->organization_id !== $targetUser->organization_id) {
+            return false;
+        }
+
         // Owner and PBX Admin can delete users
         if (! $authUser->role->canManageUsers()) {
             return false;
@@ -165,6 +185,11 @@ class UserPolicy
      */
     public function updatePassword(User $authUser, User $targetUser): bool
     {
+        // Cross-tenant access is never allowed
+        if ($authUser->organization_id !== $targetUser->organization_id) {
+            return false;
+        }
+
         // Users cannot change their own password through this UI
         if ($authUser->id === $targetUser->id) {
             return false;

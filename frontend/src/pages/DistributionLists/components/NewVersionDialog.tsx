@@ -44,6 +44,7 @@ export function NewVersionDialog({ list, open, onOpenChange }: NewVersionDialogP
       await uploadMutation.mutateAsync({
         listId: list.id,
         file,
+        mapping: { phone: 'phone_number' },
       });
       toast.success('New version upload started. Current version will be archived.');
       handleClose();

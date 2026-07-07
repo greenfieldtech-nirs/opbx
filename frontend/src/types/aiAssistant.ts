@@ -12,6 +12,8 @@ export interface ProviderConfigField {
   placeholder?: string;
   description?: string;
   validation_rules: string[];
+  read_only?: boolean;
+  default_value?: string;
 }
 
 export interface ProviderDefinition {
@@ -49,8 +51,10 @@ export interface AiAssistantConfiguration {
   api_key?: string;
   assistant_id?: string;
   agent_id?: string;
+  agent_uuid?: string;
   app_id?: string;
   workspace_id?: string;
   project_id?: string;
+  websocket_endpoint?: string;
   [key: string]: string | undefined;
 }

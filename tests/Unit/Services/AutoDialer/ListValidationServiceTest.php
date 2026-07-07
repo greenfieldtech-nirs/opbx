@@ -32,10 +32,10 @@ class ListValidationServiceTest extends TestCase
     /** @test */
     public function it_validates_valid_uk_phone_number(): void
     {
-        $result = $this->service->validatePhoneNumber('+447700900123');
+        $result = $this->service->validatePhoneNumber('+447770123456');
 
         $this->assertTrue($result->valid);
-        $this->assertEquals('+447700900123', $result->normalizedNumber);
+        $this->assertEquals('+447770123456', $result->normalizedNumber);
     }
 
     /** @test */
@@ -78,9 +78,9 @@ class ListValidationServiceTest extends TestCase
     public function it_validates_batch_of_phone_numbers(): void
     {
         $entries = [
-            ['phone_number' => '+14155551212', 'description' => 'Valid 1'],
-            ['phone_number' => '+14155551213', 'description' => 'Valid 2'],
-            ['phone_number' => 'invalid', 'description' => 'Invalid'],
+            ['phone_number' => '+14155551212', 'name' => 'Valid 1'],
+            ['phone_number' => '+14155551213', 'name' => 'Valid 2'],
+            ['phone_number' => 'invalid', 'name' => 'Invalid'],
         ];
 
         $result = $this->service->batchValidate($entries);

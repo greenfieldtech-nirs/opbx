@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\OutboundWhitelist\StoreOutboundWhitelistRequest;
+use App\Http\Requests\OutboundWhitelist\UpdateOutboundWhitelistRequest;
 use App\Http\Resources\OutboundWhitelistResource;
 use App\Models\OutboundWhitelist;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Outbound Whitelist management API controller.
@@ -83,6 +86,22 @@ class OutboundWhitelistController extends AbstractApiCrudController
     }
 
     /**
+     * Get the form request class for store operations.
+     */
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreOutboundWhitelistRequest::class;
+    }
+
+    /**
+     * Get the form request class for update operations.
+     */
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateOutboundWhitelistRequest::class;
+    }
+
+    /**
      * Display a paginated list of outbound whitelist entries.
      *
      * Overrides parent to maintain custom response format with meta pagination info.
@@ -136,7 +155,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
             }
         }
 
-        \Illuminate\Support\Facades\Log::info($this->getPluralResourceKey().' list retrieved', [
+        Log::info($this->getPluralResourceKey().' list retrieved', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
@@ -199,7 +218,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
 
         // Tenant scope check
         if ($outboundWhitelist->organization_id !== $user->organization_id) {
-            \Illuminate\Support\Facades\Log::warning('Cross-tenant outbound whitelist toggle attempt', [
+            Log::warning('Cross-tenant outbound whitelist toggle attempt', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
                 'organization_id' => $user->organization_id,
@@ -215,7 +234,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
         try {
             $outboundWhitelist->toggleStatus();
 
-            \Illuminate\Support\Facades\Log::info('Toggled outbound whitelist entry status', [
+            Log::info('Toggled outbound whitelist entry status', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
                 'organization_id' => $user->organization_id,
@@ -230,7 +249,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
                 'message' => 'Status updated successfully',
             ]);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to toggle outbound whitelist status', [
+            Log::error('Failed to toggle outbound whitelist status', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
                 'organization_id' => $user->organization_id,

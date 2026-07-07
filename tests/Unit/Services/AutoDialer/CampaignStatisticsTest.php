@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\AutoDialer;
 
-use App\Enums\AutoDialer\DestinationStatus;
+use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
+use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\AutoDialer\CampaignStatistics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class CampaignStatisticsTest extends TestCase
@@ -31,351 +33,121 @@ class CampaignStatisticsTest extends TestCase
         $this->user = User::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
+        $this->actingAs($this->user);
     }
 
-    public function test_get_summary_returns_correct_totals(): void
+    private function createCampaign(array $overrides = []): AutoDialerCampaign
     {
-        $campaign = AutoDialerCampaign::factory()->create([
+        return AutoDialerCampaign::factory()->create(array_merge([
             'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        // Create destinations with different statuses
-        AutoDialerDestination::factory()->count(5)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(2)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
-        ]);
-
-        $summary = $this->statistics->getSummary($campaign);
-
-        $this->assertEquals(11, $summary['total_destinations']);
-        $this->assertEquals(5, $summary['completed']);
-        $this->assertEquals(3, $summary['pending']);
-        $this->assertEquals(2, $summary['in_progress']);
-        $this->assertEquals(1, $summary['failed']);
+        ], $overrides));
     }
 
-    public function test_get_summary_calculates_success_rate_correctly(): void
+    private function createListWithDestinations(AutoDialerCampaign $campaign, int $count, array $overrides = []): AutoDialerList
     {
-        $campaign = AutoDialerCampaign::factory()->create([
+        $list = AutoDialerList::factory()->assignedToCampaign($campaign)->create();
+
+        AutoDialerDestination::factory()->count($count)->create(array_merge([
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
+        ], $overrides));
 
-        // 8 completed, 2 failed = 80% success rate
-        AutoDialerDestination::factory()->count(8)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(2)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
-        ]);
-
-        $summary = $this->statistics->getSummary($campaign);
-
-        $this->assertEquals(80.0, $summary['success_rate']);
+        return $list;
     }
 
-    public function test_get_summary_handles_zero_destinations(): void
+    public function test_get_stats_returns_correct_counts(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
+        $campaign = $this->createCampaign();
+        $this->createListWithDestinations($campaign, 5, ['status' => DestinationStatus::COMPLETED]);
+        $this->createListWithDestinations($campaign, 3, ['status' => DestinationStatus::PENDING]);
+        $this->createListWithDestinations($campaign, 2, ['status' => DestinationStatus::FAILED]);
+        $this->createListWithDestinations($campaign, 1, ['status' => DestinationStatus::INVALID]);
 
-        $summary = $this->statistics->getSummary($campaign);
+        $stats = $this->statistics->getStats($campaign);
 
-        $this->assertEquals(0, $summary['total_destinations']);
-        $this->assertEquals(0, $summary['success_rate']);
+        $this->assertEquals(11, $stats['total']);
+        $this->assertEquals(5, $stats['completed']);
+        $this->assertEquals(3, $stats['pending']);
+        $this->assertEquals(2, $stats['failed']);
+        $this->assertEquals(1, $stats['invalid']);
+        $this->assertEquals(73, $stats['progress_percentage']);
     }
 
-    public function test_get_summary_returns_zero_success_rate_when_no_completed_or_failed(): void
+    public function test_get_stats_calculates_progress_percentage(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
+        $campaign = $this->createCampaign();
+        $this->createListWithDestinations($campaign, 8, ['status' => DestinationStatus::COMPLETED]);
+        $this->createListWithDestinations($campaign, 2, ['status' => DestinationStatus::FAILED]);
 
-        // Only pending destinations
-        AutoDialerDestination::factory()->count(5)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
+        $stats = $this->statistics->getStats($campaign);
 
-        $summary = $this->statistics->getSummary($campaign);
-
-        $this->assertEquals(0, $summary['success_rate']);
+        $this->assertEquals(10, $stats['total']);
+        $this->assertEquals(100, $stats['progress_percentage']);
     }
 
-    public function test_get_detailed_stats_returns_correct_breakdown(): void
+    public function test_get_stats_returns_zero_for_empty_campaign(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
+        $campaign = $this->createCampaign();
 
-        // Create destinations with different statuses
-        AutoDialerDestination::factory()->count(10)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
+        $stats = $this->statistics->getStats($campaign);
 
-        AutoDialerDestination::factory()->count(5)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(2)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::SKIPPED->value,
-        ]);
-
-        $stats = $this->statistics->getDetailedStats($campaign);
-
-        $this->assertEquals(10, $stats['by_status']['completed']);
-        $this->assertEquals(5, $stats['by_status']['pending']);
-        $this->assertEquals(3, $stats['by_status']['in_progress']);
-        $this->assertEquals(2, $stats['by_status']['failed']);
-        $this->assertEquals(1, $stats['by_status']['skipped']);
-        $this->assertEquals(21, $stats['total']);
-        $this->assertEqualsWithDelta(66.67, $stats['completion_percentage'], 0.01);
+        $this->assertEquals(0, $stats['total']);
+        $this->assertEquals(0, $stats['completed']);
+        $this->assertEquals(0, $stats['failed']);
+        $this->assertEquals(0, $stats['progress_percentage']);
     }
 
-    public function test_update_campaign_stats_updates_campaign_fields(): void
+    public function test_get_stats_uses_cache_when_available(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
+        $campaign = $this->createCampaign();
+        $cacheKey = "auto_dialer:campaign_stats:{$campaign->id}";
+        Cache::put($cacheKey, ['total' => 99, 'completed' => 99, 'failed' => 0, 'invalid' => 0, 'pending' => 0, 'progress_percentage' => 100], 300);
+
+        $stats = $this->statistics->getStats($campaign);
+
+        $this->assertEquals(99, $stats['total']);
+    }
+
+    public function test_update_counts_updates_campaign_fields(): void
+    {
+        $campaign = $this->createCampaign([
             'total_destinations' => 0,
             'completed_calls' => 0,
             'failed_calls' => 0,
+            'pending_calls' => 0,
         ]);
+        $this->createListWithDestinations($campaign, 5, ['status' => DestinationStatus::COMPLETED]);
+        $this->createListWithDestinations($campaign, 3, ['status' => DestinationStatus::FAILED]);
+        $this->createListWithDestinations($campaign, 2, ['status' => DestinationStatus::PENDING]);
 
-        // Create destinations
-        AutoDialerDestination::factory()->count(5)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
-        ]);
-
-        $this->statistics->updateCampaignStats($campaign);
+        $this->statistics->updateCounts($campaign);
 
         $campaign->refresh();
-
-        $this->assertEquals(8, $campaign->total_destinations);
+        $this->assertEquals(10, $campaign->total_destinations);
         $this->assertEquals(5, $campaign->completed_calls);
         $this->assertEquals(3, $campaign->failed_calls);
+        $this->assertEquals(2, $campaign->pending_calls);
     }
 
-    public function test_get_progress_percentage_calculates_correctly(): void
+    public function test_update_counts_caches_stats(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
+        $campaign = $this->createCampaign();
+        $this->createListWithDestinations($campaign, 3, ['status' => DestinationStatus::PENDING]);
 
-        // 75% complete (6 completed, 2 failed, 2 pending)
-        AutoDialerDestination::factory()->count(6)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
+        $this->statistics->updateCounts($campaign);
 
-        AutoDialerDestination::factory()->count(2)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(2)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
-
-        $progress = $this->statistics->getProgressPercentage($campaign);
-
-        $this->assertEquals(80.0, $progress); // (6 + 2) / 10 = 80%
+        $cacheKey = "auto_dialer:campaign_stats:{$campaign->id}";
+        $this->assertTrue(Cache::has($cacheKey));
     }
 
-    public function test_get_progress_percentage_returns_zero_for_no_destinations(): void
+    public function test_clear_cache_removes_cached_stats(): void
     {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
+        $campaign = $this->createCampaign();
+        $cacheKey = "auto_dialer:campaign_stats:{$campaign->id}";
+        Cache::put($cacheKey, ['total' => 1], 300);
 
-        $progress = $this->statistics->getProgressPercentage($campaign);
+        $this->statistics->clearCache($campaign);
 
-        $this->assertEquals(0.0, $progress);
-    }
-
-    public function test_is_complete_returns_true_when_all_finished(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        // All destinations completed or failed
-        AutoDialerDestination::factory()->count(5)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
-
-        AutoDialerDestination::factory()->count(2)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::SKIPPED->value,
-        ]);
-
-        $this->assertTrue($this->statistics->isComplete($campaign));
-    }
-
-    public function test_is_complete_returns_false_when_pending_remain(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
-
-        $this->assertFalse($this->statistics->isComplete($campaign));
-    }
-
-    public function test_is_complete_returns_false_when_in_progress(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        $this->assertFalse($this->statistics->isComplete($campaign));
-    }
-
-    public function test_get_call_duration_stats_calculates_average(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-            'call_duration' => 60,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-            'call_duration' => 120,
-        ]);
-
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
-            'call_duration' => 180,
-        ]);
-
-        $stats = $this->statistics->getCallDurationStats($campaign);
-
-        $this->assertEquals(120, $stats['average_seconds']);
-        $this->assertEquals(60, $stats['min_seconds']);
-        $this->assertEquals(180, $stats['max_seconds']);
-        $this->assertEquals(360, $stats['total_seconds']);
-    }
-
-    public function test_get_call_duration_stats_handles_no_completed_calls(): void
-    {
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-        ]);
-
-        $stats = $this->statistics->getCallDurationStats($campaign);
-
-        $this->assertEquals(0, $stats['average_seconds']);
-        $this->assertEquals(0, $stats['min_seconds']);
-        $this->assertEquals(0, $stats['max_seconds']);
-        $this->assertEquals(0, $stats['total_seconds']);
+        $this->assertFalse(Cache::has($cacheKey));
     }
 }

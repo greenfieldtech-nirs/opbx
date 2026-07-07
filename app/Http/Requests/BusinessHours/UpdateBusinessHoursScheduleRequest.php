@@ -10,6 +10,7 @@ use App\Enums\BusinessHoursStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating a business hours schedule.
@@ -251,7 +252,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -304,10 +305,14 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
     /**
      * Validate that the action structure is consistent.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
-    private function validateActionStructure($validator, string $field, array $action): void
+    private function validateActionStructure($validator, string $field, ?array $action): void
     {
+        if ($action === null) {
+            return;
+        }
+
         $type = $action['type'] ?? null;
         $targetId = $action['target_id'] ?? null;
 

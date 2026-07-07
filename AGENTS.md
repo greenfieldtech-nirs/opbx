@@ -126,7 +126,7 @@ docker compose exec app php artisan migrate # Run migrations
 
 - Tests in `tests/Unit/` and `tests/Feature/`; extend `Tests\TestCase`
 - Method names: `test_descriptive_snake_case()` with `: void` return type
-- SQLite in-memory for all tests (configured in phpunit.xml)
+- **MySQL only**: All tests run against the MySQL `opbx_test` database (configured in `phpunit.xml`). SQLite is not used because its semantics can mask MySQL-specific failures.
 - Use `RefreshDatabase` trait for feature tests
 - Use `Database\Factories\` for model factories
 

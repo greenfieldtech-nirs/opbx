@@ -1,0 +1,81 @@
+type: object
+description: Request from a user to join an organization via a social identity
+properties:
+  id:
+    type: integer
+    description: Unique join request identifier
+    readOnly: true
+    example: 1
+  organization_id:
+    type: integer
+    description: ID of the organization being requested to join
+    example: 1
+  email:
+    type: string
+    format: email
+    description: Email address of the requester
+    example: jane.smith@example.com
+  name:
+    type: string
+    description: Display name of the requester
+    example: Jane Smith
+  provider:
+    type: string
+    enum:
+      - google
+      - facebook
+      - microsoft
+      - github
+      - x
+    description: Social identity provider used for the request
+    example: google
+  provider_subject:
+    type: string
+    description: Provider-specific subject identifier
+    example: '112233445566778899001'
+  status:
+    type: string
+    enum:
+      - pending
+      - approved
+      - rejected
+    description: Current status of the join request
+    example: pending
+  role:
+    type: string
+    enum:
+      - owner
+      - pbx_admin
+      - pbx_user
+      - reporter
+    description: Role that will be assigned if the request is approved
+    example: pbx_user
+  created_at:
+    type: string
+    format: date-time
+    description: Timestamp when the request was created
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: Timestamp when the request was last updated
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+  deleted_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+    description: Timestamp when the request was soft-deleted
+    readOnly: true
+    example: '2024-01-15T10:30:00Z'
+required:
+  - id
+  - organization_id
+  - email
+  - name
+  - provider
+  - provider_subject
+  - status
+  - role

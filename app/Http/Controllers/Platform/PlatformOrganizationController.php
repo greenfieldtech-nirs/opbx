@@ -50,7 +50,7 @@ class PlatformOrganizationController extends Controller
             // Sort
             $sortBy = $request->input('sort_by', 'created_at');
             $sortDirection = $request->input('sort_direction', 'desc');
-            $allowedSorts = ['name', 'created_at', 'users_count'];
+            $allowedSorts = ['id', 'name', 'status', 'created_at', 'users_count', 'extensions_count', 'dids_count'];
 
             if (in_array($sortBy, $allowedSorts, true)) {
                 $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
@@ -58,7 +58,20 @@ class PlatformOrganizationController extends Controller
 
             $perPage = $request->input('per_page', 25);
 
-            return $query->paginate(min($perPage, 100));
+            $paginator = $query->paginate(min($perPage, 100));
+
+            return [
+                'data' => $paginator->items(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                    'last_page' => $paginator->lastPage(),
+                    'from' => $paginator->firstItem(),
+                    'to' => $paginator->lastItem(),
+                    'has_more' => $paginator->hasMorePages(),
+                ],
+            ];
         });
 
         return response()->json($organizations);

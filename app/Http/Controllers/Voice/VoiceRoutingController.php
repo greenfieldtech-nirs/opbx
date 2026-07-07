@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Voice\IvrInputRequest;
 use App\Http\Requests\Voice\RingGroupCallbackRequest;
 use App\Http\Requests\Voice\VoiceRoutingRequest;
+use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -44,7 +45,7 @@ class VoiceRoutingController extends Controller
             'has_org_id' => $orgId !== null,
         ]);
 
-        return $this->manager->handleInbound($request);
+        return OrganizationScope::bypass(fn () => $this->manager->handleInbound($request));
     }
 
     /**
@@ -63,7 +64,7 @@ class VoiceRoutingController extends Controller
             'organization_id' => $request->input('_organization_id'),
         ]);
 
-        $response = $this->manager->routeRingGroupCallback($request);
+        $response = OrganizationScope::bypass(fn () => $this->manager->routeRingGroupCallback($request));
 
         Log::info('VoiceRoutingController: Ring group callback response generated', [
             'request_id' => $requestId,
@@ -79,7 +80,7 @@ class VoiceRoutingController extends Controller
      */
     public function handleIvrInput(IvrInputRequest $request): Response
     {
-        return $this->manager->handleIvrInput($request);
+        return OrganizationScope::bypass(fn () => $this->manager->handleIvrInput($request));
     }
 
     /**

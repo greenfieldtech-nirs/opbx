@@ -44,7 +44,7 @@ class UserInvitationService
 
         $this->ensureRateLimit($organizationId);
 
-        $existingUser = User::where('organization_id', $organizationId)->where('email', $email)->first();
+        $existingUser = OrganizationScope::bypass(fn () => User::where('organization_id', $organizationId)->where('email', $email)->first());
 
         if ($existingUser !== null) {
             if ($existingUser->isPending()) {

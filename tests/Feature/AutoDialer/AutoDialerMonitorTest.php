@@ -506,7 +506,7 @@ class AutoDialerMonitorTest extends TestCase
         }
     }
 
-    public function test_monitor_detail_returns_403_for_different_organization(): void
+    public function test_monitor_detail_returns_404_for_different_organization(): void
     {
         $otherOrganization = Organization::factory()->create();
 
@@ -518,7 +518,7 @@ class AutoDialerMonitorTest extends TestCase
         $response = $this->actingAs($this->adminUser)
             ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail");
 
-        $response->assertForbidden();
+        $response->assertNotFound();
     }
 
     public function test_monitor_detail_returns_404_for_non_existent_campaign(): void

@@ -1,0 +1,87 @@
+paths:
+  /v1/call-tracking-sessions:
+    get:
+      tags:
+      - Call Tracking Sessions
+      summary: List sessions
+      description: |
+        Get a paginated list of call tracking sessions. Supports filtering by
+        campaign, source, medium, date range, conversion status and search.
+      operationId: listCallTrackingSessions
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: campaign_ids
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Filter by campaign IDs
+      - name: sources
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: Filter by marketing sources
+      - name: mediums
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: Filter by marketing mediums
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Filter from date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Filter to date
+      - name: is_converted
+        in: query
+        required: false
+        schema:
+          type: boolean
+        description: Filter by conversion status
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 3
+        description: Search term (minimum 3 characters)
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/CallTrackingSession.yaml
+                  meta:
+                    $ref: ../../components/schemas/PaginationMeta.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml

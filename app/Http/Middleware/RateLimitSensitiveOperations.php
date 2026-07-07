@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use Closure;
-use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -25,7 +25,9 @@ class RateLimitSensitiveOperations
         $key = "sensitive-operation:{$userId}:{$request->ip()}";
 
         // Admins get elevated limits instead of bypass
-        $maxAttempts = $request->user()?->isAdmin()
+        $user = $request->user();
+        $isAdmin = $user && ($user->isOwner() || $user->isPBXAdmin());
+        $maxAttempts = $isAdmin
             ? (int) config('rate_limiting.sensitive_admin', 60)
             : (int) config('rate_limiting.sensitive', 10);
 

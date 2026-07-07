@@ -53,6 +53,7 @@ export function UploadDestinationsDialog({
       const result = await uploadMutation.mutateAsync({
         listId: list.id,
         file,
+        mapping: { phone: 'phone_number' },
       });
       setJobId(result.data.job_id);
       toast.success('Upload started. Processing...');
@@ -129,8 +130,7 @@ export function UploadDestinationsDialog({
             <Alert className="mt-4">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                CSV must have a &quot;phone_number&quot; column. Optional &quot;description&quot; column supported.
-                Maximum 100,000 rows per upload.
+                CSV must have a &quot;phone_number&quot; column. Maximum 100,000 rows per upload.
               </AlertDescription>
             </Alert>
           </>

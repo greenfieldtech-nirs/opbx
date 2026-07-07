@@ -24,9 +24,13 @@ class RoleManagementTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private User $owner;
+
     private User $pbxAdmin;
+
     private User $pbxUser;
+
     private User $reporter;
 
     protected function setUp(): void
@@ -63,18 +67,19 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'reporter',
         ]);
 
         // Owner trying to change another user's role
         $targetUser = $this->pbxUser;
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'pbx_admin',
         ]);
 
-        $response->assertOk();
+        // Owner cannot change their own role through the profile endpoint (prevents lockout)
+        $response->assertForbidden();
 
         // Verify role was changed in database
         $this->owner->refresh();
@@ -87,7 +92,7 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->pbxAdmin);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'owner',
         ]);
 
@@ -99,7 +104,7 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->pbxUser);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'pbx_admin',
         ]);
 
@@ -111,7 +116,7 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->reporter);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'pbx_admin',
         ]);
 
@@ -123,7 +128,7 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'pbx_admin',
         ]);
 
@@ -136,12 +141,12 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'role' => 'invalid_role',
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['role']);
+        // Owner cannot change their own role; the request is rejected before role validation
+        $response->assertStatus(403);
     }
 
     /** @test */
@@ -246,28 +251,28 @@ class RoleManagementTest extends TestCase
     {
         // Owner can update
         $this->actingAs($this->owner);
-        $response = $this->patchJson('/api/profile/organization', [
+        $response = $this->putJson('/api/v1/profile/organization', [
             'name' => 'Updated Organization Name',
         ]);
         $response->assertOk();
 
         // PBX Admin cannot update
         $this->actingAs($this->pbxAdmin);
-        $response = $this->patchJson('/api/profile/organization', [
+        $response = $this->putJson('/api/v1/profile/organization', [
             'name' => 'Another Update',
         ]);
         $response->assertForbidden();
 
         // PBX User cannot update
         $this->actingAs($this->pbxUser);
-        $response = $this->patchJson('/api/profile/organization', [
+        $response = $this->putJson('/api/v1/profile/organization', [
             'name' => 'Yet Another Update',
         ]);
         $response->assertForbidden();
 
         // Reporter cannot update
         $this->actingAs($this->reporter);
-        $response = $this->patchJson('/api/profile/organization', [
+        $response = $this->putJson('/api/v1/profile/organization', [
             'name' => 'Final Update',
         ]);
         $response->assertForbidden();
@@ -295,7 +300,7 @@ class RoleManagementTest extends TestCase
         $this->actingAs($this->owner);
 
         // This should log the role change attempt
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'name' => 'Updated Name',
             'role' => 'pbx_admin',
         ]);
@@ -311,7 +316,7 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAs($this->pbxUser);
 
-        $response = $this->patchJson('/api/profile', [
+        $response = $this->putJson('/api/v1/profile', [
             'name' => 'Updated Name',
             'email' => 'newemail@example.com',
         ]);
@@ -331,22 +336,22 @@ class RoleManagementTest extends TestCase
     {
         // Owner
         $this->actingAs($this->owner);
-        $response = $this->patchJson('/api/profile', ['name' => 'Owner Updated']);
+        $response = $this->putJson('/api/v1/profile', ['name' => 'Owner Updated']);
         $response->assertOk();
 
         // PBX Admin
         $this->actingAs($this->pbxAdmin);
-        $response = $this->patchJson('/api/profile', ['name' => 'Admin Updated']);
+        $response = $this->putJson('/api/v1/profile', ['name' => 'Admin Updated']);
         $response->assertOk();
 
         // PBX User
         $this->actingAs($this->pbxUser);
-        $response = $this->patchJson('/api/profile', ['name' => 'User Updated']);
+        $response = $this->putJson('/api/v1/profile', ['name' => 'User Updated']);
         $response->assertOk();
 
         // Reporter
         $this->actingAs($this->reporter);
-        $response = $this->patchJson('/api/profile', ['name' => 'Reporter Updated']);
+        $response = $this->putJson('/api/v1/profile', ['name' => 'Reporter Updated']);
         $response->assertOk();
     }
 }

@@ -77,7 +77,7 @@ class PlatformUserController extends Controller
             // Sort
             $sortBy = $request->input('sort_by', 'created_at');
             $sortDirection = $request->input('sort_direction', 'desc');
-            $allowedSorts = ['name', 'email', 'created_at'];
+            $allowedSorts = ['id', 'name', 'email', 'status', 'is_platform_manager', 'created_at'];
 
             if (in_array($sortBy, $allowedSorts, true)) {
                 $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
@@ -85,7 +85,20 @@ class PlatformUserController extends Controller
 
             $perPage = $request->input('per_page', 25);
 
-            return $query->paginate(min($perPage, 100));
+            $paginator = $query->paginate(min($perPage, 100));
+
+            return [
+                'data' => $paginator->items(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                    'last_page' => $paginator->lastPage(),
+                    'from' => $paginator->firstItem(),
+                    'to' => $paginator->lastItem(),
+                    'has_more' => $paginator->hasMorePages(),
+                ],
+            ];
         });
 
         return response()->json($users);
@@ -128,10 +141,30 @@ class PlatformUserController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $perPage = $request->input('per_page', 25);
-        $users = $query->paginate(min($perPage, 100));
+        // Sort
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortDirection = $request->input('sort_direction', 'desc');
+        $allowedSorts = ['id', 'name', 'email', 'status', 'is_platform_manager', 'created_at'];
 
-        return response()->json($users);
+        if (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
+
+        $perPage = $request->input('per_page', 25);
+        $paginator = $query->paginate(min($perPage, 100));
+
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ]);
     }
 
     /**

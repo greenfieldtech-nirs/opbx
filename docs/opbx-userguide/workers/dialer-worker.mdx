@@ -106,8 +106,11 @@ make run
 | `REDIS_DB` | `0` | No | Redis database |
 | `WORKER_ID` | `worker-1` | Yes | Unique worker identifier |
 | `POLL_INTERVAL` | `10s` | No | Campaign polling interval |
-| `HEALTH_CHECK_PORT` | `8080` | Yes | Health check HTTP port |
-| `WEBHOOK_PORT` | `8081` | Yes | CDR webhook HTTP port |
+| `WEBHOOK_PORT` | `8081` | Yes | HTTP server port for CDR webhooks and health checks |
+
+:::note
+The worker exposes a single HTTP server on `WEBHOOK_PORT`. Health checks are available at `GET /webhooks/health` on this port.
+:::
 | `WEBHOOK_SECRET` | — | No | HMAC-SHA256 secret for CDR webhooks |
 
 :::note
@@ -150,6 +153,7 @@ Each instance polls independently and uses Redis for distributed locking and sha
 | Issue | Solution |
 |-------|----------|
 | Worker not dialing | Check `LARAVEL_API_URL` and `LARAVEL_API_TOKEN`; verify campaign status is `ACTIVE` |
+| Health check unreachable | Check `WEBHOOK_PORT` and query `GET /webhooks/health` on that port |
 | CAC counter drift | The worker reconciles the counter against live call state on each poll cycle |
 | Webhook auth failures | Ensure `WEBHOOK_SECRET` matches the value used by Laravel |
 | High memory usage | Reduce `POLL_INTERVAL` or scale horizontally |

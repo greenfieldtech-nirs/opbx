@@ -10,6 +10,7 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\RingGroup;
+use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -217,12 +218,14 @@ class DidNumberTest extends TestCase
         ]);
 
         // Total without scope
-        $totalCount = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)->count();
+        $totalCount = DidNumber::withoutGlobalScope(OrganizationScope::class)->count();
         $this->assertEquals(5, $totalCount);
 
         // OrganizationScope should be automatically applied in real usage
         // but for testing we need to manually scope
-        $org1Count = DidNumber::where('organization_id', $organization1->id)->count();
+        $org1Count = DidNumber::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organization1->id)
+            ->count();
         $this->assertEquals(3, $org1Count);
     }
 

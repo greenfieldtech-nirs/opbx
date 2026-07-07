@@ -95,7 +95,7 @@ export interface PlatformOrganizationsParams {
   per_page?: number;
   search?: string;
   status?: OrganizationStatus;
-  sort_by?: 'name' | 'created_at' | 'users_count';
+  sort_by?: 'id' | 'name' | 'status' | 'created_at' | 'users_count' | 'extensions_count' | 'dids_count';
   sort_direction?: 'asc' | 'desc';
 }
 
@@ -107,7 +107,7 @@ export interface PlatformUsersParams {
   role?: string;
   status?: string;
   is_platform_manager?: boolean;
-  sort_by?: 'name' | 'email' | 'created_at';
+  sort_by?: 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
   sort_direction?: 'asc' | 'desc';
 }
 

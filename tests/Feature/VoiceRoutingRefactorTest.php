@@ -3,14 +3,18 @@
 namespace Tests\Feature;
 
 use App\Enums\ExtensionType;
+use App\Models\AiAssistant;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\RingGroup;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\RoutingSentryService;
+use App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 class VoiceRoutingRefactorTest extends TestCase
@@ -71,6 +75,7 @@ class VoiceRoutingRefactorTest extends TestCase
         // Create Cloudonix Settings for Auth
         $this->settings = CloudonixSettings::factory()->create([
             'organization_id' => $this->organization->id,
+            'domain_name' => 'test.example.com',
             'domain_requests_api_key' => $this->apiKey,
         ]);
     }
@@ -83,19 +88,24 @@ class VoiceRoutingRefactorTest extends TestCase
         ];
     }
 
-    /** @test */
-    public function it_routes_inbound_call_to_user_extension()
+    private function getBasePayload(array $overrides = []): array
     {
-
-        $response = $this->postJson(route('voice.route'), [
+        return array_merge([
             'From' => '+1987654321',
             'To' => $this->did->phone_number,
             'Direction' => 'inbound',
             'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+            'Domain' => 'test.example.com',
+        ], $overrides);
+    }
+
+    /** @test */
+    public function it_routes_inbound_call_to_user_extension()
+    {
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/xml; charset=utf-8');
+        $response->assertHeader('Content-Type', 'application/xml');
 
         $content = $response->getContent();
         $this->assertStringContainsString('<Dial', $content);
@@ -127,16 +137,11 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
         $content = $response->getContent();
-        $this->assertStringContainsString('<Dial timeout="20">', $content);
+        $this->assertStringContainsString('<Dial timeout="20"', $content);
         $this->assertStringContainsString($this->extension->extension_number, $content);
     }
 
@@ -148,12 +153,11 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->never();
         });
 
-        $response = $this->postJson(route('voice.route'), [
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload([
             'To' => $this->extension->extension_number,
             'From' => '1002',
-            'Direction' => 'internal',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+            'Direction' => 'subscriber',
+        ]), $this->getAuthHeaders());
 
         $response->assertStatus(200);
         $content = $response->getContent();
@@ -164,8 +168,15 @@ class VoiceRoutingRefactorTest extends TestCase
     /** @test */
     public function it_routes_to_ai_assistant_extension()
     {
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => 'active',
+            'protocol' => 'sip',
+        ]);
+
         $aiExtension = Extension::factory()->create([
             'organization_id' => $this->organization->id,
+            'ai_assistant_id' => $aiAssistant->id,
             'extension_number' => '2030',
             'type' => ExtensionType::AI_ASSISTANT,
             'status' => 'active',
@@ -183,15 +194,10 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/xml; charset=utf-8');
+        $response->assertHeader('Content-Type', 'application/xml');
 
         $content = $response->getContent();
         $this->assertStringContainsString('<Dial>', $content);
@@ -205,8 +211,17 @@ class VoiceRoutingRefactorTest extends TestCase
     /** @test */
     public function it_returns_unavailable_for_ai_assistant_without_service_url()
     {
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => 'active',
+            'provider' => 'vapi',
+            'protocol' => 'sip',
+            'configuration' => [],
+        ]);
+
         $aiExtension = Extension::factory()->create([
             'organization_id' => $this->organization->id,
+            'ai_assistant_id' => $aiAssistant->id,
             'extension_number' => '2031',
             'type' => ExtensionType::AI_ASSISTANT,
             'status' => 'active',
@@ -222,12 +237,7 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
         $content = $response->getContent();
@@ -255,8 +265,15 @@ class VoiceRoutingRefactorTest extends TestCase
     /** @test */
     public function ai_agent_routing_strategy_generates_correct_cxml()
     {
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => 'active',
+            'protocol' => 'sip',
+        ]);
+
         $aiExtension = Extension::factory()->create([
             'organization_id' => $this->organization->id,
+            'ai_assistant_id' => $aiAssistant->id,
             'extension_number' => '2033',
             'type' => ExtensionType::AI_ASSISTANT,
             'status' => 'active',
@@ -265,12 +282,12 @@ class VoiceRoutingRefactorTest extends TestCase
             'service_params' => ['model' => 'gpt-4', 'language' => 'en'],
         ]);
 
-        $strategy = app(\App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class);
-        $request = new \Illuminate\Http\Request;
-        $did = new \App\Models\DidNumber;
+        $strategy = app(AiAgentRoutingStrategy::class);
+        $request = new Request;
+        $did = new DidNumber;
         $destination = ['extension' => $aiExtension];
 
-        $response = $strategy->route($request, $did, $destination);
+        $response = OrganizationScope::bypass(fn () => $strategy->route($request, $did, $destination));
 
         $this->assertEquals(200, $response->status());
         $content = $response->getContent();
@@ -285,26 +302,33 @@ class VoiceRoutingRefactorTest extends TestCase
     /** @test */
     public function ai_agent_routing_strategy_handles_legacy_configuration()
     {
+        $aiAssistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => 'active',
+            'provider' => 'retell',
+            'protocol' => 'sip',
+            'configuration' => [
+                'phone_number' => '+12127773456',
+            ],
+        ]);
+
         $aiExtension = Extension::factory()->create([
             'organization_id' => $this->organization->id,
+            'ai_assistant_id' => $aiAssistant->id,
             'extension_number' => '2034',
             'type' => ExtensionType::AI_ASSISTANT,
             'status' => 'active',
             'service_url' => null,
             'service_token' => null,
             'service_params' => null,
-            'configuration' => [
-                'provider' => 'retell',
-                'phone_number' => '+12127773456',
-            ],
         ]);
 
-        $strategy = app(\App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy::class);
-        $request = new \Illuminate\Http\Request;
-        $did = new \App\Models\DidNumber;
+        $strategy = app(AiAgentRoutingStrategy::class);
+        $request = new Request;
+        $did = new DidNumber;
         $destination = ['extension' => $aiExtension];
 
-        $response = $strategy->route($request, $did, $destination);
+        $response = OrganizationScope::bypass(fn () => $strategy->route($request, $did, $destination));
 
         $this->assertEquals(200, $response->status());
         $content = $response->getContent();
@@ -336,15 +360,10 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/xml; charset=utf-8');
+        $response->assertHeader('Content-Type', 'application/xml');
 
         $content = $response->getContent();
         $this->assertStringContainsString('<Dial', $content);
@@ -373,12 +392,7 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
         $content = $response->getContent();
@@ -414,12 +428,7 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
         $content = $response->getContent();
@@ -448,15 +457,10 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/xml; charset=utf-8');
+        $response->assertHeader('Content-Type', 'application/xml');
 
         $content = $response->getContent();
         $this->assertStringContainsString('<Dial', $content);
@@ -485,15 +489,10 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
-        $response = $this->postJson(route('voice.route'), [
-            'From' => '+1555555555',
-            'To' => $this->did->phone_number,
-            'Direction' => 'inbound',
-            'CallSid' => 'CA'.md5(uniqid()),
-        ], $this->getAuthHeaders());
+        $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/xml; charset=utf-8');
+        $response->assertHeader('Content-Type', 'application/xml');
 
         $content = $response->getContent();
         $this->assertStringContainsString('<Dial', $content);

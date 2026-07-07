@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Models\AutoDialerList;
+use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\ListValidationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,6 +46,7 @@ class ProcessListUploadJob implements ShouldQueue
         public string $filePath,
         public string $jobId,
         public bool $isNewVersion = false,
+        public array $mapping = [],
     ) {}
 
     /**
@@ -52,102 +54,105 @@ class ProcessListUploadJob implements ShouldQueue
      */
     public function handle(ListValidationService $validator): void
     {
-        $list = AutoDialerList::find($this->listId);
+        OrganizationScope::bypass(function () use ($validator): void {
+            $list = AutoDialerList::find($this->listId);
 
-        if (! $list) {
-            Log::error('ProcessListUploadJob: List not found', ['list_id' => $this->listId]);
-            $this->fail('List not found');
-
-            return;
-        }
-
-        // Update status to processing
-        $list->update(['status' => ListStatus::PROCESSING]);
-
-        // Initialize progress tracking
-        $this->updateProgress(0, 'started');
-
-        try {
-            // Validate CSV file
-            $this->updateProgress(10, 'validating');
-            $result = $validator->validateCsvFile(
-                $this->filePath,
-                $list->organization_id,
-            );
-
-            if (! $result->success) {
-                $this->handleValidationFailure($list, $result->error);
+            if (! $list) {
+                Log::error('ProcessListUploadJob: List not found', ['list_id' => $this->listId]);
+                $this->fail('List not found');
 
                 return;
             }
 
-            $this->updateProgress(30, 'processing');
+            // Update status to processing
+            $list->update(['status' => ListStatus::PROCESSING]);
 
-            // Update list statistics
-            $list->update([
-                'total_rows' => $result->totalRows,
-                'valid_rows' => count($result->validRows),
-                'invalid_rows' => count($result->invalidRows),
-            ]);
+            // Initialize progress tracking
+            $this->updateProgress(0, 'started');
 
-            // Store validation errors if any
-            if (count($result->invalidRows) > 0) {
+            try {
+                // Validate CSV file
+                $this->updateProgress(10, 'validating');
+                $result = $validator->validateCsvFile(
+                    $this->filePath,
+                    $list->organization_id,
+                    $this->mapping,
+                );
+
+                if (! $result->success) {
+                    $this->handleValidationFailure($list, $result->error);
+
+                    return;
+                }
+
+                $this->updateProgress(30, 'processing');
+
+                // Update list statistics
                 $list->update([
-                    'validation_errors' => $result->invalidRows,
+                    'total_rows' => $result->totalRows,
+                    'valid_rows' => count($result->validRows),
+                    'invalid_rows' => count($result->invalidRows),
                 ]);
-            }
 
-            // Create destinations in batches
-            $this->updateProgress(40, 'creating_destinations');
-            $this->createDestinations($list, $result->validRows);
+                // Store validation errors if any
+                if (count($result->invalidRows) > 0) {
+                    $list->update([
+                        'validation_errors' => $result->invalidRows,
+                    ]);
+                }
 
-            $this->updateProgress(90, 'finalizing');
+                // Create destinations in batches
+                $this->updateProgress(40, 'creating_destinations');
+                $this->createDestinations($list, $result->validRows);
 
-            // Update final status
-            if (count($result->validRows) === 0) {
-                // No valid rows - mark as failed
+                $this->updateProgress(90, 'finalizing');
+
+                // Update final status
+                if (count($result->validRows) === 0) {
+                    // No valid rows - mark as failed
+                    $list->update([
+                        'status' => ListStatus::FAILED,
+                        'processed_at' => now(),
+                    ]);
+                    $this->updateProgress(100, 'failed');
+                } else {
+                    // Success - mark as ready
+                    $list->update([
+                        'status' => ListStatus::READY,
+                        'processed_at' => now(),
+                    ]);
+                    $this->updateProgress(100, 'completed');
+                }
+
+                // Clean up file
+                if (file_exists($this->filePath)) {
+                    unlink($this->filePath);
+                }
+
+                Log::info('ProcessListUploadJob: Completed', [
+                    'list_id' => $this->listId,
+                    'valid_rows' => count($result->validRows),
+                    'invalid_rows' => count($result->invalidRows),
+                    'duplicates' => count($result->duplicates),
+                ]);
+            } catch (\Exception $e) {
+                Log::error('ProcessListUploadJob: Exception', [
+                    'list_id' => $this->listId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
                 $list->update([
                     'status' => ListStatus::FAILED,
+                    'validation_errors' => [['error' => 'Processing failed: '.$e->getMessage()]],
                     'processed_at' => now(),
                 ]);
-                $this->updateProgress(100, 'failed');
-            } else {
-                // Success - mark as ready
-                $list->update([
-                    'status' => ListStatus::READY,
-                    'processed_at' => now(),
-                ]);
-                $this->updateProgress(100, 'completed');
+
+                $this->updateProgress(100, 'error');
+
+                throw $e; // Re-throw to trigger retry
             }
-
-            // Clean up file
-            if (file_exists($this->filePath)) {
-                unlink($this->filePath);
-            }
-
-            Log::info('ProcessListUploadJob: Completed', [
-                'list_id' => $this->listId,
-                'valid_rows' => count($result->validRows),
-                'invalid_rows' => count($result->invalidRows),
-                'duplicates' => count($result->duplicates),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('ProcessListUploadJob: Exception', [
-                'list_id' => $this->listId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            $list->update([
-                'status' => ListStatus::FAILED,
-                'validation_errors' => [['error' => 'Processing failed: '.$e->getMessage()]],
-                'processed_at' => now(),
-            ]);
-
-            $this->updateProgress(100, 'error');
-
-            throw $e; // Re-throw to trigger retry
-        }
+        });
     }
 
     /**
@@ -161,11 +166,11 @@ class ProcessListUploadJob implements ShouldQueue
         ]);
 
         // Update list status to failed
-        AutoDialerList::where('id', $this->listId)->update([
+        OrganizationScope::bypass(fn () => AutoDialerList::where('id', $this->listId)->update([
             'status' => ListStatus::FAILED,
             'validation_errors' => [['error' => 'Processing failed after retries']],
             'processed_at' => now(),
-        ]);
+        ]));
 
         $this->updateProgress(100, 'failed');
 
@@ -178,7 +183,7 @@ class ProcessListUploadJob implements ShouldQueue
     /**
      * Create destinations in batches.
      *
-     * @param  array<int, array{phone_number: string, description: ?string}>  $validRows
+     * @param  array<int, array{phone_number: string, name: ?string, batch_identifier: ?string, metadata: ?array<string, string>}>  $validRows
      */
     private function createDestinations(AutoDialerList $list, array $validRows): void
     {
@@ -195,7 +200,9 @@ class ProcessListUploadJob implements ShouldQueue
                     'organization_id' => $list->organization_id,
                     'list_id' => $list->id,
                     'phone_number' => $row['phone_number'],
-                    'description' => $row['description'] ?? null,
+                    'name' => $row['name'] ?? null,
+                    'batch_identifier' => $row['batch_identifier'] ?? null,
+                    'metadata' => isset($row['metadata']) ? json_encode($row['metadata']) : null,
                     'status' => DestinationStatus::PENDING,
                     'dial_attempts' => 0,
                     'duration' => 0,

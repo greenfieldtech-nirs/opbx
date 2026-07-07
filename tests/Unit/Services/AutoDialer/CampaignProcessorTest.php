@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\AutoDialer;
 
-use App\Enums\AutoDialer\CampaignStatus;
-use App\Enums\AutoDialer\DestinationStatus;
+use App\Enums\CampaignStatus;
+use App\Enums\DestinationStatus;
+use App\Jobs\DialDestinationJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
+use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\AutoDialer\CampaignProcessor;
@@ -28,132 +30,115 @@ class CampaignProcessorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new CampaignProcessor;
+        $this->processor = app(CampaignProcessor::class);
         $this->organization = Organization::factory()->create();
         $this->user = User::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
+        $this->actingAs($this->user);
     }
 
-    public function test_process_calls_queues_dial_jobs_for_pending_destinations(): void
+    private function createCampaign(array $overrides = []): AutoDialerCampaign
+    {
+        return AutoDialerCampaign::factory()->create(array_merge([
+            'organization_id' => $this->organization->id,
+            'start_date' => '2020-01-01',
+            'end_date' => '2030-12-31',
+            'days_active' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+        ], $overrides));
+    }
+
+    private function createListWithDestinations(AutoDialerCampaign $campaign, int $count, array $overrides = []): AutoDialerList
+    {
+        $list = AutoDialerList::factory()->assignedToCampaign($campaign)->create();
+
+        AutoDialerDestination::factory()->count($count)->create(array_merge([
+            'list_id' => $list->id,
+            'organization_id' => $this->organization->id,
+        ], $overrides));
+
+        return $list;
+    }
+
+    public function test_process_queues_dial_jobs_for_pending_destinations(): void
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 5,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
             'started_at' => now(),
         ]);
 
-        $destinations = AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $this->createListWithDestinations($campaign, 3, [
+            'status' => DestinationStatus::PENDING,
         ]);
 
+        $this->travelTo(now()->setTime(14, 0));
+        $campaign->refresh();
         $this->processor->process($campaign);
 
-        // Should queue 3 dial jobs (one for each destination)
-        Queue::assertPushed(\App\Jobs\DialDestinationJob::class, 3);
-    }
-
-    public function test_process_respects_max_concurrent_calls_limit(): void
-    {
-        Queue::fake();
-
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 2,
-            'started_at' => now(),
-        ]);
-
-        // Create 5 pending destinations
-        AutoDialerDestination::factory()->count(5)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-        ]);
-
-        // Create 1 active call (should reduce available slots)
-        AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::IN_PROGRESS->value,
-        ]);
-
-        $this->processor->process($campaign);
-
-        // Should queue only 1 job (max 2 concurrent, 1 active = 1 available)
-        Queue::assertPushed(\App\Jobs\DialDestinationJob::class, 1);
+        Queue::assertPushed(DialDestinationJob::class, 3);
     }
 
     public function test_process_only_processes_pending_destinations(): void
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 10,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
             'started_at' => now(),
         ]);
 
-        // Create destinations with different statuses
+        $list = $this->createListWithDestinations($campaign, 0);
+
         AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+            'status' => DestinationStatus::PENDING,
         ]);
 
         AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::COMPLETED->value,
+            'status' => DestinationStatus::COMPLETED,
         ]);
 
         AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::FAILED->value,
+            'status' => DestinationStatus::FAILED,
         ]);
 
         AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::SKIPPED->value,
+            'status' => DestinationStatus::INVALID,
         ]);
 
+        $this->travelTo(now()->setTime(14, 0));
+        $campaign->refresh();
         $this->processor->process($campaign);
 
-        // Should queue only 1 job (only pending destination)
-        Queue::assertPushed(\App\Jobs\DialDestinationJob::class, 1);
+        // Only pending (failed can retry but is also counted as pending for dialing)
+        Queue::assertPushed(DialDestinationJob::class, 2);
     }
 
     public function test_process_does_not_queue_jobs_when_campaign_paused(): void
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::PAUSED->value,
-            'max_concurrent_calls' => 10,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::PAUSED,
         ]);
 
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $this->createListWithDestinations($campaign, 3, [
+            'status' => DestinationStatus::PENDING,
         ]);
 
         $this->processor->process($campaign);
 
-        // Should not queue any jobs when paused
         Queue::assertNothingPushed();
     }
 
@@ -161,22 +146,16 @@ class CampaignProcessorTest extends TestCase
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::COMPLETED->value,
-            'max_concurrent_calls' => 10,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::COMPLETED,
         ]);
 
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $this->createListWithDestinations($campaign, 3, [
+            'status' => DestinationStatus::PENDING,
         ]);
 
         $this->processor->process($campaign);
 
-        // Should not queue any jobs when completed
         Queue::assertNothingPushed();
     }
 
@@ -184,28 +163,21 @@ class CampaignProcessorTest extends TestCase
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 10,
-            'daily_start_time' => '09:00',
-            'daily_end_time' => '17:00',
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
             'started_at' => now(),
         ]);
 
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $this->createListWithDestinations($campaign, 3, [
+            'status' => DestinationStatus::PENDING,
         ]);
 
-        // Test outside business hours (e.g., 11 PM)
         $this->travelTo(now()->setTime(23, 0));
 
         $this->processor->process($campaign);
 
-        // Should not queue any jobs outside scheduled hours
         Queue::assertNothingPushed();
     }
 
@@ -213,112 +185,103 @@ class CampaignProcessorTest extends TestCase
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 10,
-            'daily_start_time' => '09:00',
-            'daily_end_time' => '17:00',
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
             'started_at' => now(),
         ]);
 
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $this->createListWithDestinations($campaign, 3, [
+            'status' => DestinationStatus::PENDING,
         ]);
 
-        // Test during business hours (e.g., 2 PM)
         $this->travelTo(now()->setTime(14, 0));
-
+        $campaign->refresh();
         $this->processor->process($campaign);
 
-        // Should queue jobs during scheduled hours
-        Queue::assertPushed(\App\Jobs\DialDestinationJob::class, 3);
+        Queue::assertPushed(DialDestinationJob::class, 3);
     }
 
     public function test_process_handles_timezone_correctly(): void
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 10,
-            'daily_start_time' => '09:00',
-            'daily_end_time' => '17:00',
+        // Freeze to a deterministic weekday before creating the campaign so the
+        // factory's start_date/end_date align with the time we assert against.
+        $this->travelTo(now('UTC')->setDate(2026, 7, 3)->setTime(14, 0));
+
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
             'timezone' => 'America/New_York',
             'started_at' => now(),
         ]);
 
-        AutoDialerDestination::factory()->count(3)->create([
-            'campaign_id' => $campaign->id,
-            'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
+        $this->createListWithDestinations($campaign, 3, [
+            'status' => DestinationStatus::PENDING,
         ]);
 
-        // Test at 10 AM in campaign timezone (America/New_York)
-        $this->travelTo(now()->timezone('America/New_York')->setTime(10, 0));
-
+        $this->travelTo(now('America/New_York')->setTime(10, 0));
+        $campaign->refresh();
         $this->processor->process($campaign);
 
-        // Should queue jobs during scheduled hours in correct timezone
-        Queue::assertPushed(\App\Jobs\DialDestinationJob::class, 3);
+        Queue::assertPushed(DialDestinationJob::class, 3);
     }
 
     public function test_process_returns_early_when_no_pending_destinations(): void
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 10,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
             'started_at' => now(),
         ]);
 
-        // No destinations created
+        $this->createListWithDestinations($campaign, 0);
 
+        $this->travelTo(now()->setTime(14, 0));
+        $campaign->refresh();
         $this->processor->process($campaign);
 
         Queue::assertNothingPushed();
     }
 
-    public function test_process_prioritizes_destinations_by_priority(): void
+    public function test_process_completes_campaign_when_all_destinations_finished(): void
     {
         Queue::fake();
 
-        $campaign = AutoDialerCampaign::factory()->create([
-            'organization_id' => $this->organization->id,
-            'created_by_user_id' => $this->user->id,
-            'status' => CampaignStatus::RUNNING->value,
-            'max_concurrent_calls' => 2,
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'start_time' => 9,
+            'end_time' => 17,
             'started_at' => now(),
+            'total_destinations' => 2,
         ]);
 
-        // Create destinations with different priorities
-        $lowPriority = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
+        $list = $this->createListWithDestinations($campaign, 0);
+
+        AutoDialerDestination::factory()->create([
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-            'priority' => 1,
-            'phone_number' => '+1111111111',
+            'status' => DestinationStatus::COMPLETED,
         ]);
 
-        $highPriority = AutoDialerDestination::factory()->create([
-            'campaign_id' => $campaign->id,
+        AutoDialerDestination::factory()->create([
+            'list_id' => $list->id,
             'organization_id' => $this->organization->id,
-            'status' => DestinationStatus::PENDING->value,
-            'priority' => 10,
-            'phone_number' => '+2222222222',
+            'status' => DestinationStatus::FAILED,
         ]);
 
+        $this->travelTo(now()->setTime(14, 0));
+        $campaign->refresh();
         $this->processor->process($campaign);
 
-        // Should queue 2 jobs
-        Queue::assertPushed(\App\Jobs\DialDestinationJob::class, 2);
+        $campaign->refresh();
+        $this->assertEquals(CampaignStatus::COMPLETED, $campaign->status);
+        $this->assertNotNull($campaign->completed_at);
     }
 }

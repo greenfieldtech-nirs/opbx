@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Auth\BypassScopeEloquentUserProvider;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AutoDialerCampaign;
@@ -24,6 +25,7 @@ use App\Models\Extension;
 use App\Models\InboundBlacklist;
 use App\Models\Organization;
 use App\Models\OrganizationJoinRequest;
+use App\Models\PersonalAccessToken;
 use App\Models\Recording;
 use App\Models\User;
 use App\Observers\BusinessHoursCacheObserver;
@@ -80,11 +82,13 @@ use App\Services\VoiceRouting\VoiceRoutingManager;
 use App\Services\VoiceRouting\VoiceRoutingStrategyExecutor;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -280,6 +284,16 @@ class AppServiceProvider extends ServiceProvider
 
         // Configure rate limiting
         $this->configureRateLimiting();
+
+        // Register custom auth provider that bypasses OrganizationScope when resolving users
+        // (required because User is scoped, but auth lookups happen before auth context exists)
+        Auth::provider('bypass_scope_eloquent', function ($app, array $config) {
+            return new BypassScopeEloquentUserProvider($app->make('hash'), $config['model']);
+        });
+
+        // Tell Sanctum to use our PersonalAccessToken model so the tokenable owner lookup
+        // bypasses the tenant scope; otherwise bearer tokens resolve to no user.
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         // Register model observers for cache invalidation (Phase 1 Step 8)
         Extension::observe(ExtensionCacheObserver::class);

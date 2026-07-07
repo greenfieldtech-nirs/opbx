@@ -1,0 +1,166 @@
+paths:
+  /v1/call-tracking-analytics:
+    get:
+      tags:
+      - Call Tracking Analytics
+      summary: Get analytics
+      description: |
+        Get aggregated call tracking analytics for a date range. Supports
+        filtering by campaign, source, medium and grouping by day, week or
+        month.
+      operationId: getCallTrackingAnalytics
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - name: start_date
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Start date of the analytics range
+        example: '2024-01-01'
+      - name: end_date
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: End date of the analytics range
+        example: '2024-01-31'
+      - name: campaign_ids
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Filter by campaign IDs
+      - name: sources
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: Filter by marketing sources
+      - name: mediums
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: Filter by marketing mediums
+      - name: group_by
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - day
+          - week
+          - month
+        description: Time grouping for the time series
+        example: day
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: ../../components/schemas/CallTrackingAnalytics.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
+  /v1/call-tracking-analytics/export:
+    get:
+      tags:
+      - Call Tracking Analytics
+      summary: Export analytics
+      description: |
+        Export call tracking analytics as a downloadable file. Accepts the same
+        filters as the analytics endpoint.
+      operationId: exportCallTrackingAnalytics
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - name: start_date
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Start date of the analytics range
+        example: '2024-01-01'
+      - name: end_date
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: End date of the analytics range
+        example: '2024-01-31'
+      - name: campaign_ids
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: integer
+        description: Filter by campaign IDs
+      - name: sources
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: Filter by marketing sources
+      - name: mediums
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+        description: Filter by marketing mediums
+      - name: group_by
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - day
+          - week
+          - month
+        description: Time grouping for the export
+        example: day
+      responses:
+        '200':
+          description: Analytics export file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename for the exported file
+              example: attachment; filename="call-tracking-analytics.csv"
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml

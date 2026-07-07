@@ -25,11 +25,17 @@ class ExtensionControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private User $owner;
+
     private User $pbxAdmin;
+
     private User $pbxUser;
+
     private User $reporter;
+
     private User $otherOrgUser;
 
     /**
@@ -149,7 +155,6 @@ class ExtensionControllerTest extends TestCase
                         'updated_at',
                     ],
                 ],
-                'links',
                 'meta',
             ]);
 
@@ -302,7 +307,7 @@ class ExtensionControllerTest extends TestCase
         $response->assertStatus(201)
             ->assertJsonStructure([
                 'message',
-                'extension' => [
+                'data' => [
                     'id',
                     'organization_id',
                     'user_id',
@@ -428,7 +433,7 @@ class ExtensionControllerTest extends TestCase
         $response->assertStatus(201);
     }
 
-    public function test_user_type_extension_requires_user_id(): void
+    public function test_user_type_extension_can_be_unassigned(): void
     {
         Sanctum::actingAs($this->owner);
 
@@ -441,8 +446,13 @@ class ExtensionControllerTest extends TestCase
             'configuration' => [],
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['user_id']);
+        $response->assertStatus(201);
+
+        $this->assertDatabaseHas('extensions', [
+            'extension_number' => '1001',
+            'type' => 'user',
+            'user_id' => null,
+        ]);
     }
 
     public function test_conference_type_extension_requires_conference_room_id(): void
@@ -549,7 +559,7 @@ class ExtensionControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'extension' => [
+                'data' => [
                     'id',
                     'organization_id',
                     'user_id',
@@ -844,6 +854,109 @@ class ExtensionControllerTest extends TestCase
     }
 
     /**
+     * Test that extension password can be retrieved via the dedicated endpoint.
+     *
+     * The CRUD resource intentionally hides the password; the UI must fetch it
+     * explicitly through GET /extensions/{id}/password.
+     */
+    public function test_owner_can_retrieve_extension_password_via_dedicated_endpoint(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $secretPassword = 'secret123456';
+        $extension = Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->pbxUser->id,
+            'extension_number' => '1001',
+            'password' => $secretPassword,
+            'type' => ExtensionType::USER,
+            'status' => UserStatus::ACTIVE,
+            'voicemail_enabled' => false,
+            'configuration' => [],
+        ]);
+
+        $response = $this->getJson("/api/v1/extensions/{$extension->id}/password");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.password', $secretPassword);
+        $response->assertJsonPath('data.extension_number', '1001');
+        $response->assertHeader('Cache-Control');
+        $cacheControl = $response->headers->get('Cache-Control');
+        $this->assertMatchesRegularExpression('/no-store/', $cacheControl);
+        $this->assertMatchesRegularExpression('/no-cache/', $cacheControl);
+        $this->assertMatchesRegularExpression('/must-revalidate/', $cacheControl);
+    }
+
+    /**
+     * Test that non-USER extension types do not have a password to retrieve.
+     */
+    public function test_non_user_extension_password_endpoint_returns_no_content(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $extension = Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => null,
+            'extension_number' => '2001',
+            'type' => ExtensionType::CONFERENCE,
+            'status' => UserStatus::ACTIVE,
+            'voicemail_enabled' => false,
+            'configuration' => ['conference_room_id' => 1],
+        ]);
+
+        $response = $this->getJson("/api/v1/extensions/{$extension->id}/password");
+
+        $response->assertStatus(204);
+    }
+
+    /**
+     * Test that a user extension without a password returns a 400 error.
+     */
+    public function test_user_extension_without_password_returns_error(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $extension = Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->pbxUser->id,
+            'extension_number' => '1001',
+            'password' => null,
+            'type' => ExtensionType::USER,
+            'status' => UserStatus::ACTIVE,
+            'voicemail_enabled' => false,
+            'configuration' => [],
+        ]);
+
+        $response = $this->getJson("/api/v1/extensions/{$extension->id}/password");
+
+        $response->assertStatus(400);
+        $response->assertJsonPath('message', 'This extension does not have a password set.');
+    }
+
+    /**
+     * Test that extension password endpoint enforces tenant isolation.
+     */
+    public function test_user_cannot_retrieve_password_from_other_organization(): void
+    {
+        Sanctum::actingAs($this->otherOrgUser);
+
+        $extension = Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->pbxUser->id,
+            'extension_number' => '1001',
+            'password' => 'secret123456',
+            'type' => ExtensionType::USER,
+            'status' => UserStatus::ACTIVE,
+            'voicemail_enabled' => false,
+            'configuration' => [],
+        ]);
+
+        $response = $this->getJson("/api/v1/extensions/{$extension->id}/password");
+
+        $response->assertStatus(404);
+    }
+
+    /**
      * Test that SIP passwords are never exposed in API responses.
      *
      * This is a critical security test to prevent toll fraud.
@@ -870,7 +983,7 @@ class ExtensionControllerTest extends TestCase
         $response = $this->getJson("/api/v1/extensions/{$extension->id}");
 
         $response->assertStatus(200);
-        $this->assertArrayNotHasKey('password', $response->json('extension'));
+        $this->assertArrayNotHasKey('password', $response->json('data'));
         $response->assertJsonMissing(['password' => $secretPassword]);
 
         // Test GET /extensions - list all extensions

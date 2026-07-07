@@ -6,6 +6,8 @@ namespace App\Models;
 
 use App\Enums\UserStatus;
 use App\Scopes\OrganizationScope;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,8 +33,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $music_on_hold
  * @property bool $talk_detection_enabled
  * @property string|null $talk_detection_webhook_url
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  * @property-read Organization $organization
  */
 #[ScopedBy([OrganizationScope::class])]

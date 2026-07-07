@@ -2,9 +2,24 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\BypassOrganizationScope;
+use App\Http\Middleware\DialerWorkerAuth;
+use App\Http\Middleware\EnsurePlatformManager;
+use App\Http\Middleware\EnsureTenantScope;
+use App\Http\Middleware\EnsureWebhookIdempotency;
+use App\Http\Middleware\RateLimitPerOrganization;
+use App\Http\Middleware\RateLimitSensitiveOperations;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\VerifyCloudonixSignature;
+use App\Http\Middleware\VerifyVoiceWebhookAuth;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,23 +36,24 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Global middleware for security headers
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
 
         // Handle CORS for API routes
         $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
+            HandleCors::class,
         ]);
 
         // Middleware aliases
         $middleware->alias([
-            'tenant.scope' => \App\Http\Middleware\EnsureTenantScope::class,
-            'webhook.signature' => \App\Http\Middleware\VerifyCloudonixSignature::class,
-            'webhook.idempotency' => \App\Http\Middleware\EnsureWebhookIdempotency::class,
-            'voice.webhook.auth' => \App\Http\Middleware\VerifyVoiceWebhookAuth::class,
-            'rate_limit_org' => \App\Http\Middleware\RateLimitPerOrganization::class,
-            'sensitive-operations' => \App\Http\Middleware\RateLimitSensitiveOperations::class,
-            'platform.manager' => \App\Http\Middleware\EnsurePlatformManager::class,
-            'dialer.worker.auth' => \App\Http\Middleware\DialerWorkerAuth::class,
+            'tenant.scope' => EnsureTenantScope::class,
+            'webhook.signature' => VerifyCloudonixSignature::class,
+            'webhook.idempotency' => EnsureWebhookIdempotency::class,
+            'voice.webhook.auth' => VerifyVoiceWebhookAuth::class,
+            'rate_limit_org' => RateLimitPerOrganization::class,
+            'sensitive-operations' => RateLimitSensitiveOperations::class,
+            'platform.manager' => EnsurePlatformManager::class,
+            'bypass.organization.scope' => BypassOrganizationScope::class,
+            'dialer.worker.auth' => DialerWorkerAuth::class,
         ]);
 
         // Configure authentication to return JSON for API routes instead of redirecting
@@ -69,7 +85,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $context = [];
 
             // Add safe request data to context
-            if ($data instanceof \Illuminate\Http\Request) {
+            if ($data instanceof Request) {
                 $context['url'] = $data->fullUrl();
                 $context['method'] = $data->method();
                 $context['ip'] = $data->ip();
@@ -102,7 +118,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         // Handle authorization exceptions for API routes
-        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+        $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'error' => 'Unauthenticated',
@@ -111,7 +127,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
+        $exceptions->render(function (AuthorizationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'error' => 'Forbidden',
@@ -121,7 +137,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         // Handle HTTP exceptions with custom error page
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, $request) {
+        $exceptions->render(function (HttpExceptionInterface $e, $request) {
             $statusCode = $e->getStatusCode();
 
             // Only handle specific error codes with the custom view

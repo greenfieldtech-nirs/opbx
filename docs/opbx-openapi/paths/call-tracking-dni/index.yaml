@@ -1,0 +1,82 @@
+paths:
+  /v1/call-tracking-dni/swap:
+    get:
+      tags:
+      - Call Tracking DNI
+      summary: Dynamic number insertion swap
+      description: |
+        Public endpoint used by client websites for dynamic number insertion
+        (DNI). Returns the best matching tracking number for the given
+        organization and UTM parameters. If no matching tracking number is
+        found, the provided default number is returned.
+
+        This endpoint is rate-limited.
+      operationId: callTrackingDniSwap
+      security: []
+      parameters:
+      - name: organization_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Organization ID
+        example: 1
+      - name: utm_source
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+        description: Marketing source
+        example: google
+      - name: utm_medium
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+        description: Marketing medium
+        example: cpc
+      - name: utm_campaign
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 255
+        description: Marketing campaign name
+        example: spring-sale
+      - name: default_number
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^\+[1-9]\d{1,14}$
+        description: Default number to return if no match is found (E.164 format)
+        example: '+14155551212'
+      responses:
+        '200':
+          description: Swap result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  phone_number:
+                    type: string
+                    description: Phone number to display (tracking number or default)
+                    example: '+12127773456'
+                  call_tracking_number_id:
+                    type:
+                    - integer
+                    - 'null'
+                    description: ID of the matched tracking number, or null if default was returned
+                    example: 8
+        '400':
+          $ref: ../../components/responses/BadRequest.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '429':
+          $ref: ../../components/responses/TooManyRequests.yaml
+        '500':
+          $ref: ../../components/responses/ServerError.yaml

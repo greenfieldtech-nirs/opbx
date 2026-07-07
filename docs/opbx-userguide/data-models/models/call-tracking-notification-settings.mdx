@@ -1,0 +1,65 @@
+---
+sidebar_position: 63
+slug: /data-models/models/call-tracking-notification-settings
+sidebar_class_name: cxGuidesSidebar
+title: CallTrackingNotificationSettings Model
+---
+
+# CallTrackingNotificationSettings Model
+
+The `CallTrackingNotificationSettings` model stores per-campaign webhook notification configuration. When a call tracking event occurs, OPBX can dispatch a JSON payload to the configured URL.
+
+**Table:** `call_tracking_notification_settings`  
+**Model:** `App\Models\CallTrackingNotificationSettings`  
+**Resource:** `App\Http\Resources\CallTrackingNotificationSettingsResource`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
+| `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
+| `webhook_url` | varchar(2048) | No | - | Destination URL |
+| `auth_method` | varchar(50) | No | none | none, bearer_token, basic_auth |
+| `auth_secret` | text | Yes | null | Encrypted token/password |
+| `auth_username` | varchar(255) | Yes | null | Basic auth username |
+| `enabled_events` | json | No | - | Array of event types |
+| `is_active` | boolean | No | true | Whether notifications are enabled |
+| `created_at` | timestamp | Yes | null | Creation timestamp |
+| `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Events
+
+| Event | Value |
+|-------|-------|
+| Call Received | `call.received` |
+| Call Answered | `call.answered` |
+| Call Missed | `call.missed` |
+| Call Converted | `call.converted` |
+| Call Failed | `call.failed` |
+
+## Security
+
+- Outbound URLs are validated with `SsrfUrlValidator` to prevent SSRF.
+- `Authorization` headers are redacted before being persisted in delivery logs.
+
+## Relationships
+
+### Belongs To
+
+```php
+$settings->organization() → Organization
+$settings->campaign() → CallTrackingCampaign
+```
+
+### Has Many
+
+```php
+$settings->logs() → CallTrackingNotificationLog[]
+```
+
+## Related Documentation
+
+- [Call Tracking Campaigns Module](../../modules/call-tracking-campaigns)
+- [CallTrackingCampaign](./call-tracking-campaign)

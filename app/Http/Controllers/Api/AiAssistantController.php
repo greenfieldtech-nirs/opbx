@@ -6,11 +6,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\AiAssistantStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\AiAssistant\StoreAiAssistantRequest;
+use App\Http\Requests\AiAssistant\UpdateAiAssistantRequest;
 use App\Http\Resources\AiAssistantResource;
 use App\Models\AiAssistant;
 use App\Services\AiAssistant\ProviderRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -120,6 +123,78 @@ class AiAssistantController extends AbstractApiCrudController
     }
 
     /**
+     * Hook after showing an AI assistant.
+     *
+     * Loads extension details so the resource can include usage information.
+     */
+    protected function afterShow(Model $model, Request $request): void
+    {
+        /** @var AiAssistant $model */
+        $model->load([
+            'extensions' => function ($query) {
+                $query->select('id', 'extension_number', 'type', 'status', 'ai_assistant_id', 'organization_id')
+                    ->with('user:id,name,email')
+                    ->limit(10);
+            },
+        ]);
+    }
+
+    /**
+     * Remove the specified AI assistant.
+     *
+     * Returns 422 if the assistant is still referenced by extensions.
+     */
+    public function destroy(Request $request): JsonResponse
+    {
+        $model = $this->resolveModel($request);
+        $this->authorize($this->getDeleteAbility(), $model);
+
+        $currentUser = $this->getAuthenticatedUser();
+
+        if ($model->organization_id !== $currentUser->organization_id) {
+            \Log::warning('Cross-tenant ai assistant deletion attempt', [
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_ai_assistant_id' => $model->id,
+                'target_organization_id' => $model->organization_id,
+            ]);
+
+            return response()->json([
+                'error' => 'Not Found',
+                'message' => 'Ai assistant not found.',
+            ], 404);
+        }
+
+        /** @var AiAssistant $model */
+        if ($model->isInUse()) {
+            return $this->errorResponse(
+                'Cannot delete AI Assistant that is in use. Please reassign these extensions first.',
+                422,
+                'AI_ASSISTANT_IN_USE',
+                ['usage_count' => $model->usage_count]
+            );
+        }
+
+        return parent::destroy($request);
+    }
+
+    /**
+     * Get the form request class for store operations.
+     */
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreAiAssistantRequest::class;
+    }
+
+    /**
+     * Get the form request class for update operations.
+     */
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateAiAssistantRequest::class;
+    }
+
+    /**
      * Use transaction for store to ensure service layer operations are atomic.
      */
     protected function shouldUseTransactionForStore(): bool
@@ -159,6 +234,8 @@ class AiAssistantController extends AbstractApiCrudController
             }
         }
 
+        $data = $this->normalizeProviderConfiguration($data);
+
         return $data;
     }
 
@@ -177,6 +254,26 @@ class AiAssistantController extends AbstractApiCrudController
             if ($provider) {
                 $data['protocol'] = $provider->protocol;
             }
+        }
+
+        $data = $this->normalizeProviderConfiguration($data, $model->provider);
+
+        return $data;
+    }
+
+    /**
+     * Normalize provider-specific configuration before persistence.
+     *
+     * For providers with fixed read-only values, ensure the configuration
+     * contains the correct value regardless of what the client sent.
+     */
+    private function normalizeProviderConfiguration(array $data, ?string $existingProvider = null): array
+    {
+        $provider = $data['provider'] ?? $existingProvider;
+
+        if ($provider === 'dograh-cloud') {
+            $data['configuration'] = $data['configuration'] ?? [];
+            $data['configuration']['websocket_endpoint'] = 'wss://api.dograh.com/api/v1/agent-stream/cloudonix';
         }
 
         return $data;

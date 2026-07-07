@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Platform\PlatformAuditLogController;
+use App\Http\Controllers\Platform\PlatformDashboardController;
+use App\Http\Controllers\Platform\PlatformOrganizationController;
+use App\Http\Controllers\Platform\PlatformUserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,27 +20,27 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1/platform')
-    ->middleware(['auth:sanctum', 'platform.manager'])
+    ->middleware(['auth:sanctum', 'platform.manager', 'bypass.organization.scope'])
     ->group(function (): void {
         // Dashboard
-        Route::get('/dashboard', [\App\Http\Controllers\Platform\PlatformDashboardController::class, 'index']);
+        Route::get('/dashboard', [PlatformDashboardController::class, 'index']);
 
         // Organizations
-        Route::get('/organizations', [\App\Http\Controllers\Platform\PlatformOrganizationController::class, 'index']);
-        Route::get('/organizations/{organization}', [\App\Http\Controllers\Platform\PlatformOrganizationController::class, 'show']);
-        Route::put('/organizations/{organization}', [\App\Http\Controllers\Platform\PlatformOrganizationController::class, 'update']);
-        Route::patch('/organizations/{organization}/status', [\App\Http\Controllers\Platform\PlatformOrganizationController::class, 'updateStatus']);
+        Route::get('/organizations', [PlatformOrganizationController::class, 'index']);
+        Route::get('/organizations/{organization}', [PlatformOrganizationController::class, 'show']);
+        Route::put('/organizations/{organization}', [PlatformOrganizationController::class, 'update']);
+        Route::patch('/organizations/{organization}/status', [PlatformOrganizationController::class, 'updateStatus']);
 
         // Users (across organizations)
-        Route::get('/users', [\App\Http\Controllers\Platform\PlatformUserController::class, 'index']);
-        Route::get('/organizations/{organization}/users', [\App\Http\Controllers\Platform\PlatformUserController::class, 'indexByOrganization']);
-        Route::post('/organizations/{organization}/users', [\App\Http\Controllers\Platform\PlatformUserController::class, 'store']);
-        Route::get('/users/{user}', [\App\Http\Controllers\Platform\PlatformUserController::class, 'show']);
-        Route::put('/users/{user}', [\App\Http\Controllers\Platform\PlatformUserController::class, 'update']);
-        Route::delete('/users/{user}', [\App\Http\Controllers\Platform\PlatformUserController::class, 'destroy']);
-        Route::patch('/users/{user}/platform-manager', [\App\Http\Controllers\Platform\PlatformUserController::class, 'setPlatformManager']);
-        Route::patch('/users/{user}/password', [\App\Http\Controllers\Platform\PlatformUserController::class, 'updatePassword']);
+        Route::get('/users', [PlatformUserController::class, 'index']);
+        Route::get('/organizations/{organization}/users', [PlatformUserController::class, 'indexByOrganization']);
+        Route::post('/organizations/{organization}/users', [PlatformUserController::class, 'store']);
+        Route::get('/users/{user}', [PlatformUserController::class, 'show']);
+        Route::put('/users/{user}', [PlatformUserController::class, 'update']);
+        Route::delete('/users/{user}', [PlatformUserController::class, 'destroy']);
+        Route::patch('/users/{user}/platform-manager', [PlatformUserController::class, 'setPlatformManager']);
+        Route::patch('/users/{user}/password', [PlatformUserController::class, 'updatePassword']);
 
         // Audit Logs
-        Route::get('/audit-logs', [\App\Http\Controllers\Platform\PlatformAuditLogController::class, 'index']);
+        Route::get('/audit-logs', [PlatformAuditLogController::class, 'index']);
     });

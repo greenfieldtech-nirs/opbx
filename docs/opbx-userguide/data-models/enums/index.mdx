@@ -229,6 +229,7 @@ User account states.
 |------|-------|-------------|
 | `ACTIVE` | active | Can log in |
 | `INACTIVE` | inactive | Suspended |
+| `PENDING` | pending | Invitation pending activation |
 
 ### OrganizationStatus
 
@@ -257,7 +258,53 @@ Call session states.
 | `RINGING` | ringing | Destination ringing |
 | `ANSWERED` | answered | Call connected |
 | `COMPLETED` | completed | Call ended normally |
+| `BUSY` | busy | Busy signal |
+| `NO_ANSWER` | no_answer | No answer |
 | `FAILED` | failed | Call failed |
+
+## Call Tracking Enums
+
+### CallTrackingCampaignStatus
+
+Campaign states.
+
+**File:** `App\Enums\CallTrackingCampaignStatus`
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `ACTIVE` | active | Campaign is live |
+| `INACTIVE` | inactive | Campaign is paused |
+
+### CallTrackingDestinationType
+
+Destination types for tracked calls.
+
+**File:** `App\Enums\CallTrackingDestinationType`
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `FORWARD` | forward | Forward to external number |
+| `EXTENSION` | extension | Route to extension |
+| `RING_GROUP` | ring_group | Route to ring group |
+| `BUSINESS_HOURS` | business_hours | Route via business hours |
+| `CONFERENCE_ROOM` | conference_room | Route to conference room |
+| `IVR_MENU` | ivr_menu | Route to IVR menu |
+| `AI_ASSISTANT` | ai_assistant | Route to AI assistant |
+| `AI_LOAD_BALANCER` | ai_load_balancer | Route via AI load balancer |
+
+### CallTrackingEventType
+
+Webhook event types.
+
+**File:** `App\Enums\CallTrackingEventType`
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `CALL_RECEIVED` | call.received | Call received |
+| `CALL_ANSWERED` | call.answered | Call answered |
+| `CALL_MISSED` | call.missed | Call missed |
+| `CALL_CONVERTED` | call.converted | Call converted |
+| `CALL_FAILED` | call.failed | Call failed |
 
 ## Business Hours Enums
 

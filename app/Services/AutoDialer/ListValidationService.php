@@ -69,7 +69,7 @@ class ListValidationService
     /**
      * Validate multiple phone numbers in batch.
      *
-     * @param  array<int, array{phone_number: string, description: string}>  $entries
+     * @param  array<int, array{phone_number: string, name?: string}>  $entries
      */
     public function batchValidate(
         array $entries,
@@ -94,15 +94,61 @@ class ListValidationService
     }
 
     /**
-     * Validate a CSV file.
+     * Parse a CSV preview: headers and first N rows.
+     *
+     * @return array{headers: array<int, string>, rows: array<int, array<string, string>>, total_rows: int, has_header: bool}
+     */
+    public function parseCsvPreview(string $filePath, bool $hasHeader = true, int $limit = 5): array
+    {
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            return ['headers' => [], 'rows' => [], 'total_rows' => 0, 'has_header' => $hasHeader];
+        }
+
+        $headers = [];
+        $rows = [];
+        $totalRows = 0;
+        $rowNumber = 0;
+
+        while (($rowData = fgetcsv($handle, escape: '\\')) !== false) {
+            $rowNumber++;
+
+            if ($rowNumber === 1 && $hasHeader) {
+                $headers = array_map(fn ($h) => trim((string) $h), $rowData);
+
+                continue;
+            }
+
+            if ($totalRows < $limit) {
+                $rows[] = $hasHeader
+                    ? $this->combineWithHeaders($headers, $rowData)
+                    : $this->combineWithColumnIndexes($rowData);
+            }
+            $totalRows++;
+        }
+
+        fclose($handle);
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'total_rows' => $totalRows,
+            'has_header' => $hasHeader,
+        ];
+    }
+
+    /**
+     * Validate a CSV file using a column mapping.
      *
      * @param  string  $filePath  Path to the CSV file
      * @param  int  $organizationId  Organization ID for context
+     * @param  array<string, mixed>  $mapping  Mapping config: phone, name?, batch_identifier?, metadata?[]
      * @param  string|null  $defaultRegion  Default region for validation
      */
     public function validateCsvFile(
         string $filePath,
         int $organizationId,
+        array $mapping,
         ?string $defaultRegion = 'US',
     ): CsvValidationResult {
         try {
@@ -118,7 +164,6 @@ class ListValidationService
                 );
             }
 
-            // Read header
             $headers = fgetcsv($handle, escape: '\\');
             if ($headers === false) {
                 fclose($handle);
@@ -133,8 +178,10 @@ class ListValidationService
                 );
             }
 
-            // Validate required columns
-            if (! in_array('phone_number', $headers, true)) {
+            $headers = array_map(fn ($h) => trim((string) $h), $headers);
+            $phoneColumn = $mapping['phone'] ?? null;
+
+            if (empty($phoneColumn) || ! in_array($phoneColumn, $headers, true)) {
                 fclose($handle);
 
                 return new CsvValidationResult(
@@ -143,34 +190,46 @@ class ListValidationService
                     invalidRows: [],
                     duplicates: [],
                     success: false,
-                    error: 'CSV must contain a "phone_number" column',
+                    error: 'CSV must contain a column mapped to phone_number',
                 );
             }
 
+            $nameColumn = $mapping['name'] ?? null;
+            $batchColumn = $mapping['batch_identifier'] ?? null;
+            $metadataColumns = $mapping['metadata'] ?? [];
+
             $validRows = [];
             $invalidRows = [];
-            $seenNumbers = []; // Track duplicates
+            $seenNumbers = [];
             $duplicates = [];
             $rowNumber = 0;
 
             while (($rowData = fgetcsv($handle, escape: '\\')) !== false) {
                 $rowNumber++;
 
-                // Combine headers with row data
-                $record = array_combine($headers, $rowData);
-                if ($record === false) {
-                    continue; // Skip malformed rows
-                }
-
-                // Skip empty rows
-                if (empty($record['phone_number'])) {
+                $record = $this->combineWithHeaders($headers, $rowData);
+                if (empty($record[$phoneColumn])) {
                     continue;
                 }
 
-                $phoneNumber = trim($record['phone_number']);
-                $description = isset($record['description']) ? trim($record['description']) : null;
+                $phoneNumber = trim($record[$phoneColumn]);
+                $name = $nameColumn ? trim($record[$nameColumn] ?? '') : null;
+                $name = $name === '' ? null : $name;
+                $batchIdentifier = $batchColumn ? trim($record[$batchColumn] ?? '') : null;
+                $batchIdentifier = $batchIdentifier === '' ? null : $batchIdentifier;
 
-                // Check for duplicates within the file
+                $metadata = null;
+                if (! empty($metadataColumns)) {
+                    foreach ($metadataColumns as $column) {
+                        if (in_array($column, $headers, true)) {
+                            $value = trim($record[$column] ?? '');
+                            if ($value !== '') {
+                                $metadata[$column] = $value;
+                            }
+                        }
+                    }
+                }
+
                 $normalizedForDedup = $this->normalizeForDedup($phoneNumber);
 
                 if (isset($seenNumbers[$normalizedForDedup])) {
@@ -180,16 +239,17 @@ class ListValidationService
                         'kept_row' => $seenNumbers[$normalizedForDedup],
                     ];
 
-                    continue; // Skip duplicate
+                    continue;
                 }
 
-                // Validate phone number
                 $validationResult = $this->validatePhoneNumber($phoneNumber, $defaultRegion);
 
                 if ($validationResult->valid) {
                     $validRows[] = [
                         'phone_number' => $validationResult->normalizedNumber,
-                        'description' => $description,
+                        'name' => $name,
+                        'batch_identifier' => $batchIdentifier,
+                        'metadata' => $metadata,
                     ];
                     $seenNumbers[$normalizedForDedup] = $rowNumber;
                 } else {
@@ -310,5 +370,34 @@ class ListValidationService
             NumberParseException::TOO_LONG => 'Phone number is too long',
             default => 'Invalid phone number format',
         };
+    }
+
+    /**
+     * @param  array<int, string>  $headers
+     * @param  array<int, string>  $rowData
+     * @return array<string, string>
+     */
+    private function combineWithHeaders(array $headers, array $rowData): array
+    {
+        $combined = [];
+        foreach ($headers as $index => $header) {
+            $combined[$header] = $rowData[$index] ?? '';
+        }
+
+        return $combined;
+    }
+
+    /**
+     * @param  array<int, string>  $rowData
+     * @return array<string, string>
+     */
+    private function combineWithColumnIndexes(array $rowData): array
+    {
+        $combined = [];
+        foreach ($rowData as $index => $value) {
+            $combined['column_'.($index + 1)] = $value;
+        }
+
+        return $combined;
     }
 }

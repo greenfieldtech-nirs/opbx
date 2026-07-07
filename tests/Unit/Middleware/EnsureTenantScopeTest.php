@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Middleware;
 
+use App\Enums\OrganizationStatus;
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use App\Http\Middleware\EnsureTenantScope;
 use App\Models\Organization;
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,6 +25,7 @@ class EnsureTenantScopeTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Organization $organization;
 
     protected function setUp(): void
@@ -40,8 +42,8 @@ class EnsureTenantScopeTest extends TestCase
         $this->user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
-            'role' => \App\Enums\UserRole::OWNER,
-            'status' => \App\Enums\UserStatus::ACTIVE,
+            'role' => UserRole::OWNER,
+            'status' => UserStatus::ACTIVE,
             'organization_id' => $this->organization->id,
         ]);
     }
@@ -51,17 +53,21 @@ class EnsureTenantScopeTest extends TestCase
         $response = $this->get('/api/v1/users', []);
 
         $response->assertStatus(401);
+        // The route is protected by auth:sanctum first, which returns this message
         $response->assertJson([
-            'message' => 'Unauthenticated.',
+            'message' => 'Authentication required to access this resource.',
         ]);
     }
 
     public function test_authenticated_user_without_org_is_blocked(): void
     {
-        // Create a user without organization
+        // Create a user with a valid org (required by DB NOT NULL), then simulate
+        // a missing organization context by clearing the attribute on the model
+        // instance used by the request.
         $userWithoutOrg = User::factory()->create([
-            'organization_id' => null,
+            'organization_id' => $this->organization->id,
         ]);
+        $userWithoutOrg->organization_id = null;
 
         $response = $this->actingAs($userWithoutOrg)->get('/api/v1/users', []);
 
@@ -73,8 +79,8 @@ class EnsureTenantScopeTest extends TestCase
 
     public function test_inactive_organization_is_blocked(): void
     {
-        // Update test user's organization to inactive
-        $this->organization->update(['status' => 'inactive']);
+        // Update test user's organization to deleted (non-active) status
+        $this->organization->update(['status' => OrganizationStatus::DELETED]);
         $this->user->refresh(); // Refresh to get updated relationship
 
         $response = $this->actingAs($this->user)->get('/api/v1/users', []);
@@ -100,14 +106,14 @@ class EnsureTenantScopeTest extends TestCase
         $otherUser = User::factory()->create([
             'name' => 'Other User',
             'email' => 'other@example.com',
-            'role' => \App\Enums\UserRole::PBX_USER,
-            'status' => \App\Enums\UserStatus::ACTIVE,
+            'role' => UserRole::PBX_USER,
+            'status' => UserStatus::ACTIVE,
             'organization_id' => $this->organization->id,
         ]);
 
         // Test that middleware allows access to individual user endpoint
         // (assuming the controller handles authorization)
-        $response = $this->actingAs($this->user)->get('/api/v1/users/' . $otherUser->id);
+        $response = $this->actingAs($this->user)->get('/api/v1/users/'.$otherUser->id);
 
         // The middleware should pass (not return 403 for org issues)
         // Authorization errors would be 403 with different messages

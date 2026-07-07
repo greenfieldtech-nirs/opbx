@@ -1,0 +1,135 @@
+---
+sidebar_position: 21
+slug: /modules/call-tracking-dni
+sidebar_class_name: cxGuidesSidebar
+title: "Call Tracking DNI"
+description: "Dynamic Number Insertion for website call tracking"
+---
+
+# Call Tracking DNI
+
+Dynamic Number Insertion (DNI) swaps the phone number displayed on your website so visitors see a tracking number that matches their marketing source. When the visitor calls, OPBX attributes the call to the correct campaign.
+
+## Purpose
+
+Use DNI to:
+
+- Show different numbers to visitors from different campaigns
+- Attribute inbound website calls to sources, mediums, and campaigns
+- Keep your default number visible when no matching campaign is found
+- Avoid manually hard-coding tracking numbers on every page
+
+## How DNI Works
+
+When a page loads, the DNI script reads the visitor's URL query parameters (for example, `utm_source=google`) and calls the OPBX DNI swap endpoint. OPBX returns the best matching active tracking number. The script then replaces the contents of every marked element on the page with that number.
+
+If no campaign matches, OPBX returns the organization's first active tracking number or falls back to the default number you configured.
+
+## Query Parameters
+
+The DNI endpoint accepts the following query parameters:
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `organization_id` | Yes | Your OPBX organization ID |
+| `utm_source` | No | Marketing source, e.g. `google` |
+| `utm_medium` | No | Marketing medium, e.g. `cpc` |
+| `utm_campaign` | No | Campaign name or keyword; matched against campaign names |
+| `default_number` | No | Fallback E.164 number if no tracking number is found |
+
+OPBX matches campaigns using case-insensitive comparison on `source` and `medium`. If `utm_campaign` is provided, campaign names are matched with a partial, case-insensitive search.
+
+## Mark Elements for Swapping
+
+Mark the elements that should display the tracking number with the `data-ct-phone` attribute:
+
+```html
+<span data-ct-phone>+1 (415) 555-0000</span>
+<a href="tel:+14155550000" data-ct-phone>+1 (415) 555-0000</a>
+```
+
+The snippet updates both the visible text and, for `<a>` tags, the `href` with a `tel:` link.
+
+## Install the Snippet
+
+### Option 1: Hosted Script
+
+Upload or serve `public/js/call-tracking-dni.js` from your OPBX instance and include it on every page that should swap numbers:
+
+```html
+<script async
+  src="https://your-domain.com/js/call-tracking-dni.js"
+  data-organization-id="1"
+  data-default="+14155550000"
+  data-selector="[data-ct-phone]">
+</script>
+```
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `data-organization-id` | Yes | Your OPBX organization ID |
+| `data-default` | No | Fallback number in E.164 format |
+| `data-selector` | No | CSS selector for elements to swap; defaults to `.call-tracking-number` |
+
+The hosted script uses `sessionStorage` to cache the swapped number for the duration of the browsing session, so subsequent page loads do not repeat the API request.
+
+### Option 2: Inline Snippet
+
+You can also generate an inline snippet from **Call Tracking → DNI Snippet** in the OPBX UI. The inline snippet does not rely on an external script file and is useful when you cannot host the OPBX JavaScript file yourself.
+
+1. Open **Call Tracking → DNI Snippet**
+2. Enter your API URL (for example, `https://your-domain.com/api/v1/call-tracking-dni/swap`)
+3. Enter a default number
+4. Enter your organization ID
+5. Copy the generated snippet
+6. Paste it into the `<head>` or at the end of the `<body>` on every page
+
+The generated snippet uses the same `data-ct-phone` marker and UTM parameters as the hosted script.
+
+## Example Page
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>HVAC Services</title>
+  <script async
+    src="https://your-domain.com/js/call-tracking-dni.js"
+    data-organization-id="1"
+    data-default="+14155550000"
+    data-selector="[data-ct-phone]">
+  </script>
+</head>
+<body>
+  <h1>HVAC Services</h1>
+  <p>Call us now:
+    <a href="tel:+14155550000" data-ct-phone>+1 (415) 555-0000</a>
+  </p>
+</body>
+</html>
+```
+
+When a visitor arrives from `https://example.com/?utm_source=google&utm_medium=cpc`, the page displays the tracking number assigned to the matching campaign. Visitors with no matching campaign continue to see `+1 (415) 555-0000`.
+
+## Matching Behavior
+
+OPBX selects a tracking number in this order:
+
+1. Find an active campaign matching `utm_source` and `utm_medium` (and optionally `utm_campaign`)
+2. Return the first active tracking number assigned to that campaign
+3. If no campaign matches, return the organization's first active tracking number
+4. If no tracking number is found, return the `default_number` you provided
+
+## Best Practices
+
+- Place the DNI script in the `<head>` or at the end of the `<body>` so it runs after the elements exist
+- Mark every instance of the phone number on the page, including header, footer, and call-to-action buttons
+- Use the default number as the content of marked elements; the script will replace it when a match is found
+- Keep campaign source and medium values consistent with your UTM parameters
+- Test with UTM parameters in the URL and verify the swapped number in the page
+
+## Related Modules
+
+- [Call Tracking Campaigns](/modules/call-tracking-campaigns) — Create campaigns and assign tracking numbers
+- [Call Tracking Analytics](/modules/call-tracking-analytics) — Review attributed calls and conversions
+- [Phone Numbers (DIDs)](/modules/phone-numbers) — Manage the DIDs used as tracking numbers

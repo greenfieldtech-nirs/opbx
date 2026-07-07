@@ -77,6 +77,15 @@ Configuration files and environment variables:
 - [EmailLog](./models/email-logs) — Transactional email log
 - [PlatformAuditLog](./models/platform-audit-logs) — Cross-tenant audit trail
 
+### Call Tracking
+
+- [CallTrackingCampaign](./models/call-tracking-campaign) — Marketing campaign attribution
+- [CallTrackingNumber](./models/call-tracking-number) — DID-to-campaign assignment
+- [CallTrackingSession](./models/call-tracking-session) — Attributed call session
+- [CallTrackingNotificationSettings](./models/call-tracking-notification-settings) — Per-campaign webhook settings
+- CallTrackingNotificationLog (`App\Models\CallTrackingNotificationLog`) — Notification delivery log
+- CallTrackingAdPlatformIntegration (`App\Models\CallTrackingAdPlatformIntegration`) — Google Ads / Meta settings
+
 ### Security
 
 - InboundBlacklist (`App\Models\InboundBlacklist`) — Blocked caller patterns
