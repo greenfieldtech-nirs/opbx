@@ -3,37 +3,52 @@ sidebar_position: 2
 slug: /modules/extensions
 sidebar_class_name: cxGuidesSidebar
 title: "Extensions Management"
-description: Creating and managing PBX extensions
+description: "Creating and managing PBX extensions"
 ---
 
 # Extensions
 
 Extensions are the foundation of your PBX system. They represent numbered endpoints that callers can reach directly or through routing configurations.
 
-## What Is an Extension
+## Purpose
 
-An extension is a numbered endpoint (typically 3-5 digits) that represents a phone destination within your organization. Extensions can be assigned to users, forwarded to external numbers, or connected to automated services.
+Use this module to:
+
+- Create and manage extension endpoints
+- Assign extensions to users
+- Configure extension-specific routing
+- Sync user extensions to Cloudonix as SIP subscribers
+- Reset SIP passwords
 
 ## Extension Types
 
 OPBX supports multiple extension types for different use cases:
 
-| Type | Description | Configuration |
-|------|------------|--------------|
-| User | SIP phone extension for a person | Assigned to a user, auto-generated SIP password |
-| Conference | Routes to a conference room | Select conference room |
-| Ring Group | Routes to a ring group | Select ring group |
-| IVR | Routes to an IVR menu | Select IVR menu |
-| AI Assistant | Routes to an AI provider | Select AI assistant |
-| Forward | Forwards to external number | Enter phone number |
-| AI Load Balancer | Routes to AI load balancer | Select load balancer |
-| Custom Logic | Custom application routing | Container app/block name |
+| Type | Value | Description | Configuration |
+|------|-------|-------------|---------------|
+| User | `user` | SIP phone extension for a person | Assigned to a user, auto-generated SIP password |
+| Conference | `conference` | Routes to a conference room | Select conference room |
+| Ring Group | `ring_group` | Routes to a ring group | Select ring group |
+| IVR | `ivr` | Routes to an IVR menu | Select IVR menu |
+| AI Assistant | `ai_assistant` | Routes to an AI provider | Select AI assistant |
+| AI Load Balancer | `ai_load_balancer` | Routes to AI load balancer | Select load balancer |
+| Forward | `forward` | Forwards to external number | Enter phone number |
+| Custom Logic | `custom_logic` | Custom application routing | Container app/block name |
 
-## Creating an Extension
+## Permissions
 
-To create a new extension:
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View extensions | Yes | Yes | Yes | Yes |
+| Create extensions | Yes | Yes | No | No |
+| Update extensions | Yes | Yes | Own only | No |
+| Delete extensions | Yes | Yes | No | No |
 
-1. Navigate to the Extensions page
+## UI Workflow
+
+### Create an Extension
+
+1. Navigate to **Extensions** in the sidebar
 2. Click **Create Extension**
 3. Enter an extension number (3-5 digits, unique within your organization)
 4. Select the extension type
@@ -44,21 +59,7 @@ To create a new extension:
 Extension numbers cannot be changed after creation. If you need a different number, delete the extension and create a new one.
 :::
 
-## User Extensions
-
-User extensions are the most common type. They connect to SIP phones or softphones.
-
-### SIP Credentials
-
-When you create a User extension, OPBX auto-generates a SIP password. View the credentials on the extension detail page:
-
-- SIP Username: The extension number
-- SIP Password: Auto-generated secure password
-- SIP Server: Provided by your administrator
-
-### Resetting SIP Password
-
-If a user loses their SIP password or suspects compromise:
+### Reset a SIP Password
 
 1. Open the extension details
 2. Click **Reset Password**
@@ -69,69 +70,72 @@ If a user loses their SIP password or suspects compromise:
 Resetting the SIP password disconnects any active registrations. The SIP phone must re-register with the new credentials.
 :::
 
-### Voicemail
+### Sync to Cloudonix
 
-Enable voicemail on User extensions to capture messages when the user is unavailable:
-
-- Toggle voicemail on/off in extension settings
-- Voicemail notifications sent to the assigned user's email
-- Access voicemail through the SIP phone or web portal
+1. Go to **Extensions** in the sidebar
+2. Click **Sync to Cloudonix**
+3. The system creates SIP subscribers for all USER-type extensions
+4. Compare local and Cloudonix state before confirming if desired
 
 ## Cloudonix Synchronization
 
-User extensions sync to Cloudonix as SIP subscribers. This enables the Cloudonix platform to route calls to your SIP phones.
+User extensions sync to Cloudonix as SIP subscribers. The sync lifecycle is:
 
-### Manual Sync
+- **Create USER**: Auto-generate a 32-character hex password, insert into DB, then create the Cloudonix subscriber
+- **Type change TO USER**: Generate a password and sync to Cloudonix
+- **Type change FROM USER**: Remove the password and unsync from Cloudonix
+- **Delete USER**: Unsync from Cloudonix, then delete from DB
+- **Bidirectional sync**: Pushes local changes, imports Cloudonix subscribers, and aligns statuses
 
-Click the **Sync** button on the Extensions page to trigger synchronization. This is useful when:
+## Key Data Fields
 
-- A new extension is not registering
-- Credentials were reset
-- Changes appear not to be taking effect
+### `extensions` Table
 
-### Bidirectional Sync
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `user_id` | FK nullable | Only for USER type |
+| `extension_number` | string(5) | 3-5 digits, unique per org, immutable |
+| `password` | string(32) | SIP auth password (plain text for SIP client sharing) |
+| `type` | enum | user, conference, ring_group, ivr, ai_assistant, custom_logic, forward, ai_load_balancer |
+| `status` | enum | active, inactive |
+| `voicemail_enabled` | boolean | Only for USER type |
+| `configuration` | JSON | Type-specific config |
+| `ai_assistant_id` | FK nullable | Direct AI assistant link |
+| `cloudonix_subscriber_id` | string nullable | Cloudonix sync tracking |
 
-Synchronization works in both directions:
+## Related API Endpoints
 
-- **Local to Cloudonix**: New extensions and credential changes push to Cloudonix
-- **Cloudonix to Local**: Existing subscribers import as extensions
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/extensions[/{extension}]` | Standard CRUD |
+| GET | `/v1/extensions/sync/compare` | Compare local vs Cloudonix state |
+| POST | `/v1/extensions/sync` | Perform bidirectional sync |
+| GET | `/v1/extensions/{extension}/password` | View current SIP password |
+| PUT | `/v1/extensions/{extension}/reset-password` | Reset SIP password |
 
-:::tip
-Run a sync after bulk imports or when migrating from another system.
-:::
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Extension Status
-
-Extensions have one of two statuses:
-
-| Status | Behavior |
-|--------|----------|
-| Active | Receives calls normally |
-| Inactive | Calls rejected or routed to voicemail |
-
-Set an extension to Inactive when:
-- The user is on extended leave
-- The extension is being repurposed
-- You want to block calls without deleting the extension
-
-## Extension Best Practices
+## Best Practices
 
 ### Numbering Plan
 
 Develop a consistent numbering plan for your organization:
 
-- Reserve 3-digit extensions for departments (100-199 for sales, 200-299 for support)
+- Reserve 3-digit extensions for departments (for example, 100-199 for sales)
 - Use 4-digit extensions for individual users
 - Avoid numbers that conflict with feature codes
-
-### Assignment
-
-- Assign extensions to specific users when possible
-- Use descriptive labels for non-user extensions (conference rooms, ring groups)
-- Document forwarding rules for Forward-type extensions
 
 ### Security
 
 - Reset SIP passwords periodically
 - Disable extensions instead of leaving them active but unused
 - Monitor registration logs for unauthorized devices
+
+## Related Modules
+
+- [User Management](/modules/user-management) — Assign users to extensions
+- [Phone Numbers](/modules/phone-numbers) — DIDs route to extensions
+- [Ring Groups](/modules/ring-groups) — Extensions are ring group members
+- [AI Assistants](/modules/ai-assistants) — AI_ASSISTANT type extensions

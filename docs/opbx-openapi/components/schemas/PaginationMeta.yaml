@@ -19,17 +19,19 @@ properties:
     description: Last available page number
     example: 8
   from:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
     description: Index of first item on current page
     example: 1
   to:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
     description: Index of last item on current page
     example: 20
 required:
-  - current_page
-  - per_page
-  - total
-  - last_page
+- current_page
+- per_page
+- total
+- last_page

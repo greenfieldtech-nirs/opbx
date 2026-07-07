@@ -1,202 +1,98 @@
 ---
-sidebar_position: 9
+sidebar_position: 11
 slug: /modules/reporting
 sidebar_class_name: cxGuidesSidebar
-title: Reporting and Analytics
-description: Call logs, CDR records, and live monitoring
+title: "Reporting and Analytics"
+description: "Call logs, CDR records, and live monitoring"
 ---
 
 # Reporting and Analytics
 
-OPBX provides comprehensive reporting tools to monitor call activity, analyze usage patterns, and manage active calls in real-time.
+OPBX provides reporting tools to monitor call activity, analyze usage patterns, and manage active calls in real time.
 
-## Call Detail Records (CDR)
+## Purpose
 
-CDR is the primary call record system, capturing all call events from Cloudonix webhooks.
+Use the reporting modules to:
 
-### Accessing CDR
+- Review call detail records (CDR)
+- Export call data to CSV
+- Monitor active calls
+- View aggregate statistics
 
-1. Navigate to **CDR** in the sidebar
-2. Use filters to narrow results
-3. Click on any record for detailed information
+:::note
+Detailed documentation for CDR and live monitoring has moved to dedicated module pages:
 
-### Available Filters
-
-| Filter | Description |
-|--------|-------------|
-| From Number | Caller ID or origin number |
-| To Number | Destination number |
-| Disposition | Call outcome (answered, busy, failed, etc.) |
-| Date Range | Start and end dates for the search |
-
-### CDR Fields
-
-Each record contains:
-
-| Field | Description |
-|-------|-------------|
-| call_id | Unique identifier for the call |
-| from | Caller ID or origin number |
-| to | Destination number |
-| disposition | Final call status |
-| duration | Total call duration in seconds |
-| billsec | Billable seconds (time after answer) |
-| cost | Call cost (if applicable) |
-
-### Exporting Data
-
-Export CDR data to CSV for external analysis:
-
-1. Apply your desired filters
-2. Click **Export**
-3. Select CSV format
-4. The system streams the export to handle large datasets
-
-:::tip
-Large exports may take time to generate. The system processes them in the background and notifies you when ready.
+- [Call Logs](/modules/call-logs) — Call detail records, filters, and export
+- [Live Calls](/modules/live-calls) — Real-time call monitoring and disconnect
 :::
 
-### CDR Statistics
+## Available Reports
 
-View aggregated metrics for your filtered dataset:
+| Report | Location | Description |
+|--------|----------|-------------|
+| Call Detail Records | **Call Logs** in the sidebar | Complete call history from Cloudonix CDR webhooks |
+| Live Calls | **Live Calls** in the sidebar | Real-time view of active sessions |
+| Call Notifications Logs | **Call Notifications** settings | Webhook delivery audit log |
+| Blocked Call Logs | **Inbound Blacklist** | Log of blocked inbound calls |
+
+## Aggregate Statistics
+
+The CDR API provides aggregate metrics for the filtered dataset:
 
 | Metric | Description |
 |--------|-------------|
 | Total Calls | Number of calls in the selected period |
 | Total Duration | Sum of all call durations |
+| Total Billable Seconds | Sum of answered call durations |
 | Average Duration | Mean call length |
-| Cost Breakdown | Costs grouped by disposition |
+| Total Cost | Sum of sell costs |
+| By Disposition | Grouped counts by final disposition |
 
-## Live Calls
+## Exporting Data
 
-Monitor active calls in real-time.
+To export CDR data:
 
-### Accessing Live Calls
+1. Go to **Call Logs**
+2. Apply filters
+3. Click **Export**
+4. The system streams a CSV export
 
-Navigate to **Live Calls** in the sidebar to see all active sessions.
-
-### Displayed Information
-
-| Field | Description |
-|-------|-------------|
-| Caller ID | Originating phone number |
-| Destination | Number being called |
-| Status | Current call state |
-| Duration | How long the call has been active |
-
-### Call Statuses
-
-| Status | Description |
-|--------|-------------|
-| Initiated | Call setup in progress |
-| Ringing | Destination is ringing |
-| Answered | Call is connected |
-| Completed | Call has ended |
-| Failed | Call could not connect |
-
-### Available Actions
-
-| Action | Permission | Description |
-|--------|------------|-------------|
-| Disconnect | Admin/Owner only | End an active call immediately |
-| Refresh | Any user | Update the call list manually |
-
-:::warning
-Disconnecting calls is immediate and cannot be undone. Use this power responsibly.
+:::tip
+Large exports are processed in chunks of 1000 records to handle high-volume datasets.
 :::
 
-### Auto-Refresh
+## Permissions
 
-Configure the polling interval for automatic updates:
+| Resource | Owner | PBX Admin | PBX User | Reporter |
+|----------|-------|-----------|----------|----------|
+| Call Logs | Yes | Yes | Own only | Yes |
+| Live Calls | Yes | Yes | No | No |
+| Statistics | Yes | Yes | Yes | Yes |
+| Exports | Yes | Yes | Yes | Yes |
 
-| Interval | Best For |
-|----------|----------|
-| 1 second | High-volume call centers |
-| 5 seconds | Standard monitoring |
-| 30 seconds | Background monitoring |
-| 60 seconds | Occasional checking |
+## Related API Endpoints
 
-## Call Notifications
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/call-detail-records` | List CDR records |
+| GET | `/v1/call-detail-records/{call_detail_record}` | Show a CDR record |
+| GET | `/v1/call-detail-records/export` | Export CDR to CSV |
+| GET | `/v1/call-detail-records/statistics` | Aggregate statistics |
+| GET | `/v1/session-updates/active` | List active calls |
+| GET | `/v1/session-updates/active/stats` | Active call statistics |
+| DELETE | `/v1/session-updates/{sessionId}/disconnect` | Disconnect an active call |
 
-Receive webhook-based notifications for call events.
-
-### Configuration
-
-Call notifications are configured per organization in the settings:
-
-1. Go to **Settings** > **Notifications**
-2. Enable call notifications
-3. Enter your webhook URL
-4. Select which events to receive
-
-### Event Types
-
-| Event | Trigger |
-|-------|---------|
-| call.initiated | Call starts |
-| call.answered | Call is picked up |
-| call.completed | Call ends |
-| call.failed | Call fails to connect |
-
-### Webhook Payload
-
-Notifications include call details:
-
-```json
-{
-  "event": "call.completed",
-  "call_id": "abc-123-def",
-  "from": "+14155551234",
-  "to": "+14155555678",
-  "disposition": "answered",
-  "duration": 120,
-  "timestamp": "2024-01-15T10:30:00Z"
-}
-```
-
-:::note
-Ensure your webhook endpoint responds quickly (within 5 seconds) to avoid delivery retries.
-:::
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Best Practices
 
-### Regular Review
-
-Schedule time to review CDR data:
-
-- Weekly: Check for unusual patterns
-- Monthly: Analyze cost trends
-- Quarterly: Review capacity planning
-
-### Filter Effectively
-
-Use combinations of filters to find specific call patterns:
-
+- Review CDR data weekly for unusual patterns
 - Filter by disposition to find failed calls
-- Filter by date range for billing reconciliation
-- Filter by from/to for user activity review
+- Export data for billing reconciliation
+- Keep Live Calls open during peak hours
 
-### Export for Analysis
+## Related Modules
 
-For complex analysis:
-
-1. Export CDR data to CSV
-2. Import into your preferred analytics tool
-3. Create custom dashboards and reports
-
-### Monitor Live Calls
-
-During peak hours or important events:
-
-- Keep Live Calls open on a dashboard
-- Watch for unusual spikes in volume
-- Be ready to disconnect problematic calls
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Missing CDR records | Check webhook delivery status in Cloudonix dashboard |
-| Live calls not updating | Verify auto-refresh is enabled and check your connection |
-| Export fails | Reduce date range or contact support for large exports |
-| Notifications not received | Verify webhook URL is accessible and returns 200 OK |
+- [Call Logs](/modules/call-logs) — Detailed CDR documentation
+- [Live Calls](/modules/live-calls) — Real-time monitoring documentation
+- [Call Notifications](/modules/call-notifications) — Webhook event configuration

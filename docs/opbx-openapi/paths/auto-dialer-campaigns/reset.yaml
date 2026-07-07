@@ -1,0 +1,110 @@
+paths:
+  /v1/auto-dialer-campaigns/{campaign}/reset-cac:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    post:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Reset CAC counter
+      description: |
+        Reset the Concurrent Active Calls (CAC) counter for a campaign.
+
+        Useful when the CAC counter gets stuck due to missed CDR webhooks,
+        preventing new calls from being initiated.
+      operationId: resetCampaignCac
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CAC counter reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "CAC counter reset successfully"
+                  campaign_id:
+                    type: integer
+                    example: 1
+                  previous_value:
+                    type: integer
+                    example: 5
+                  new_value:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '500':
+          $ref: '../../components/responses/ServerError.yaml'
+
+  /v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    post:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Reset caller ID cycle
+      description: |
+        Reset the Caller ID cycle for Round-Robin strategies.
+
+        Only applicable when the campaign uses a Round-Robin caller ID
+        strategy. Resets the next index to the start of the pool.
+      operationId: resetCampaignCallerIdCycle
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Caller ID cycle reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Caller ID cycle reset successfully"
+                  campaign_id:
+                    type: integer
+                    example: 1
+                  strategy:
+                    type: string
+                    example: "round_robin"
+                  next_index:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          description: Cannot reset cycle
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'

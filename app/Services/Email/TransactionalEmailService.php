@@ -11,6 +11,7 @@ use App\Services\Email\DTOs\EmailSendResult;
 use App\Services\Email\Exceptions\EmailException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 /**
  * Transactional Email Service
@@ -35,15 +36,42 @@ class TransactionalEmailService implements TransactionalEmailInterface
      */
     public function send(EmailMessage $message): EmailSendResult
     {
+        $driverName = $this->driver->getDriverName();
+
+        Log::info('Sending transactional email', [
+            'correlation_id' => $message->correlationId,
+            'driver' => $driverName,
+            'to' => $message->to[0]->email ?? 'unknown',
+            'subject' => $message->subject,
+        ]);
+
         // Check rate limit
         $this->checkRateLimit();
 
         try {
             $result = $this->driver->send($message);
+
+            Log::info('Transactional email send completed', [
+                'correlation_id' => $message->correlationId,
+                'driver' => $driverName,
+                'success' => $result->success,
+                'provider' => $result->providerUsed,
+                'message_id' => $result->messageId,
+                'metadata' => $result->metadata,
+            ]);
+
             $this->logSuccess($result, $message);
 
             return $result;
         } catch (\Exception $e) {
+            Log::error('Transactional email send failed', [
+                'correlation_id' => $message->correlationId,
+                'driver' => $driverName,
+                'success' => false,
+                'error' => $e->getMessage(),
+                'error_class' => get_class($e),
+            ]);
+
             $this->logFailure($e, $message);
             throw $e;
         }
@@ -55,7 +83,7 @@ class TransactionalEmailService implements TransactionalEmailInterface
     public function sendAsync(EmailMessage $message): string
     {
         $job = new Jobs\SendTransactionalEmailJob($message, $this->config);
-        $jobId = $message->correlationId ?? (string) \Illuminate\Support\Str::uuid();
+        $jobId = $message->correlationId ?? (string) Str::uuid();
 
         dispatch($job)->onQueue($this->config['queue'] ?? 'default');
 
@@ -108,7 +136,7 @@ class TransactionalEmailService implements TransactionalEmailInterface
     /**
      * Check rate limit for the current driver.
      *
-     * @throws \App\Services\Email\Exceptions\EmailException
+     * @throws EmailException
      */
     private function checkRateLimit(): void
     {

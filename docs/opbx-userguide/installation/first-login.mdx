@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 slug: /installation/first-login
 sidebar_class_name: cxGuidesSidebar
 title: "First Login"
@@ -21,7 +21,7 @@ http://localhost/ui/register
 ```
 
 :::note Replace localhost
-If you configured a different `APP_PORT` or domain during installation, adjust the URL accordingly. For example: `http://your-server:8080/ui/register`
+If you configured a different `APP_PORT` or domain during installation, adjust the URL accordingly. For example: `http://your-server:8080/ui/register`.
 :::
 
 ### 2. Complete the Registration Form
@@ -31,7 +31,7 @@ Fill in the required fields:
 | Field | Requirements |
 |-------|--------------|
 | Organization Name | 2-100 characters, unique across the system |
-| Admin Email | Valid email address, will be used for login |
+| Admin Email | Valid email address, used for login |
 | Password | Minimum 8 characters, must include uppercase, lowercase, number, and special character |
 
 :::tip Password Security
@@ -40,16 +40,27 @@ Use a strong, unique password for the admin account. This account has full acces
 
 ### 3. Submit the Form
 
-Click the **Create Organization** button. The system performs these actions:
+Click **Create Organization**. The system performs these actions:
 
 1. Creates your organization with the specified name
 2. Creates an Owner user account with your email and password
-3. Generates an API token for system integrations
+3. Issues a Sanctum access token for API access
 4. Redirects you to the Dashboard
 
 :::note First Organization
-The first organization created on a fresh OPBX installation becomes the primary tenant. Additional organizations can be created later by platform administrators.
+The first organization created on a fresh OPBX installation becomes the primary tenant. Additional organizations can be created later by platform administrators through the platform management interface.
 :::
+
+## Authentication Modes
+
+OPBX supports dual-mode authentication via Laravel Sanctum:
+
+| Mode | Best For | Behavior |
+|------|----------|----------|
+| Bearer token | API clients, SPA default | Returns `access_token` in JSON; store in localStorage |
+| Cookie | Browser SPA sessions | Uses Sanctum cookie/session auth |
+
+The frontend (`AuthContext`) stores the token in `localStorage` as `opbx_token` and attaches it to every API request via an Axios interceptor.
 
 ## Dashboard Overview
 
@@ -75,20 +86,28 @@ See the [Cloudonix Integration](./cloudonix-setup) guide for detailed instructio
 Go to **Extensions** in the sidebar and create extensions for your team members. Each extension represents a phone endpoint in your system.
 
 Extensions can be:
+
 - **User extensions**: Assigned to people with SIP phones
 - **Conference rooms**: Multi-party audio bridges
 - **Ring groups**: Groups that ring together
 - **IVR menus**: Automated phone menus
+- **AI assistants**: Routes to AI providers
+- **AI load balancers**: Distributes calls across AI providers
+- **Forward**: Forwards calls to external numbers
+- **Custom logic**: Advanced routing via webhooks
 
 ### 3. Set Up Phone Numbers (DIDs)
 
-Navigate to **DID Numbers** to add your phone numbers. DIDs (Direct Inward Dialing numbers) are the phone numbers callers dial to reach your organization.
+Navigate to **Phone Numbers** to add your phone numbers. DIDs (Direct Inward Dialing numbers) are the phone numbers callers dial to reach your organization.
 
 Each DID routes to a destination such as:
+
 - A specific extension
 - A ring group
 - An IVR menu
 - Business hours routing
+- A conference room
+- An AI assistant or AI load balancer
 
 ### 4. Configure Call Routing
 
@@ -103,14 +122,27 @@ Set up how incoming calls flow through your system:
 Make test calls to verify your configuration works as expected before announcing new numbers to customers.
 :::
 
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/v1/auth/register` | Create organization and owner account |
+| GET | `/v1/auth/register/validate` | Validate registration prerequisites |
+| POST | `/v1/auth/login` | Authenticate and receive a token |
+| GET | `/v1/auth/me` | Retrieve current user |
+| POST | `/v1/auth/logout` | Revoke current token |
+| POST | `/v1/auth/refresh` | Refresh access token |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for request/response schemas.
+
 ## Next Steps
 
-With your initial setup complete, explore these guides:
+With your initial setup complete, you are ready to:
 
-- [Core Concepts](./concepts): Understand OPBX terminology and architecture
-- Cloudonix Integration: Connect to the telephony platform
-- Extension Management: Configure user endpoints
-- DID Routing: Set up inbound call handling
+1. [Configure Cloudonix integration](./cloudonix-setup)
+2. [Learn core PBX concepts](./concepts)
+3. [Create extensions](../modules/extensions)
+4. [Configure phone numbers](../modules/phone-numbers)
 
 :::info Need Help?
 If you encounter issues during setup, check the logs with `docker compose logs -f app` and verify all services are running with `docker compose ps`.

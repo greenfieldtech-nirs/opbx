@@ -101,6 +101,29 @@ paths:
           $ref: '../../components/responses/NotFound.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
+    patch:
+      tags:
+        - Business Hours
+      summary: Partially update Business Hours Schedule
+      operationId: patchBusinessHoursSchedule
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Business Hours Schedule updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
     delete:
       tags:

@@ -1,0 +1,64 @@
+---
+sidebar_position: 12
+slug: /data-models/models/call-notifications-settings
+sidebar_class_name: cxGuidesSidebar
+title: CallNotificationsSettings Model
+---
+
+# CallNotificationsSettings Model
+
+The `CallNotificationsSettings` model stores per-organization webhook notification configuration for call events.
+
+**Table:** `call_notifications_settings`  
+**Model:** `App\Models\CallNotificationsSettings`
+
+## Database Schema
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Singleton per org |
+| `webhook_url` | string | Yes | null | Target URL |
+| `auth_method` | string | No | none | none, bearer_token, basic_auth |
+| `auth_secret` | string | Yes | null | Encrypted secret |
+| `auth_username` | string | Yes | null | For basic auth |
+| `retry_attempts` | int | No | 3 | Max retries |
+| `retry_backoff_seconds` | int | No | 60 | Base backoff |
+| `request_timeout_seconds` | int | No | 30 | HTTP timeout |
+| `enabled_events` | JSON | No | `["new","ringing","connected","answered","busy","cancel","failed","congestion"]` | Event types |
+| `rate_limit_per_minute` | int | No | 500 | Redis-based rate limit |
+| `is_active` | boolean | No | true | Master switch |
+| `created_at` | datetime | Yes | - | |
+| `updated_at` | datetime | Yes | - | |
+
+## Relationships
+
+```php
+$settings->organization() → Organization
+```
+
+## Scopes
+
+```php
+CallNotificationsSettings::forOrganization($orgId)
+CallNotificationsSettings::active()
+```
+
+## Methods
+
+```php
+$settings->isEventEnabled(string $event): bool
+$settings->isConfigured(): bool
+$settings->getAuthHeaders(array $payload): array
+```
+
+## Usage Notes
+
+- Webhook URLs are validated against SSRF rules before storage.
+- The model is scoped by `OrganizationScope`; webhook handlers use `OrganizationScope::bypass()` to read it.
+- Authentication secrets are encrypted at rest.
+
+## Related Documentation
+
+- [Call Notifications Module](../../modules/call-notifications)
+- CallNotificationLog Model (`App\Models\CallNotificationLog`) — Notification delivery log

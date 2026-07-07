@@ -104,6 +104,23 @@ paths:
       responses:
         '200':
           description: Ring group updated
+    patch:
+      tags:
+        - Ring Groups
+      summary: Partially update ring group
+      operationId: patchRingGroup
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/RingGroup.yaml'
+      responses:
+        '200':
+          description: Ring group updated
 
     delete:
       tags:

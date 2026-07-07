@@ -1,28 +1,35 @@
 ---
-sidebar_position: 6
+sidebar_position: 3
 slug: /modules/phone-numbers
 sidebar_class_name: cxGuidesSidebar
-title: Phone Numbers (DIDs)
-description: Managing inbound phone numbers and routing
+title: "Phone Numbers (DIDs)"
+description: "Managing inbound phone numbers and routing"
 ---
 
 # Phone Numbers (DIDs)
 
 Direct Inward Dialing (DID) numbers are the phone numbers that external callers dial to reach your organization. This page explains how to manage phone numbers and configure their routing.
 
-## What Is a DID
+## Purpose
 
-A DID (Direct Inward Dialing) number is a phone number assigned to your organization. When someone calls this number, the call enters your PBX system and routes according to your configuration.
+Use this module to:
+
+- Add and label phone numbers
+- Configure inbound call routing
+- Enable or disable numbers
+- Choose from multiple destination types
 
 ## Phone Number Format
 
 OPBX stores phone numbers in E.164 international format:
 
-- Starts with a plus sign (+)
+- Starts with a plus sign (`+`)
 - Followed by country code
 - Followed by national number
 
 Example: `+14155551234` (US number, 415 area code)
+
+A non-E.164 mode is available for internal or special-use numbers.
 
 :::warning
 Phone numbers are immutable after creation. If you need to change a number, delete the old entry and add a new one.
@@ -30,7 +37,7 @@ Phone numbers are immutable after creation. If you need to change a number, dele
 
 ## Routing Types
 
-When a call arrives at a DID, OPBX routes it to a destination. The following routing types are available:
+When a call arrives at a DID, OPBX routes it to a destination:
 
 | Routing Type | Routes To | Best For |
 |-------------|-----------|----------|
@@ -42,24 +49,32 @@ When a call arrives at a DID, OPBX routes it to a destination. The following rou
 | AI Assistant | AI voice agent | Automated support |
 | AI Load Balancer | Distributed AI agents | High-volume AI routing |
 
-## Adding a Phone Number
+## Permissions
 
-To add a new phone number to your organization:
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View phone numbers | Yes | Yes | Yes | Yes |
+| Create phone numbers | Yes | Yes | No | No |
+| Update phone numbers | Yes | Yes | No | No |
+| Delete phone numbers | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Add a Phone Number
 
 1. Navigate to **Phone Numbers** in the sidebar
 2. Click **Add Phone Number**
-3. Enter the number in E.164 format (e.g., +14155551234)
-4. Select the routing type
-5. Choose the destination (the specific extension, ring group, etc.)
-6. Save the configuration
+3. Enter the number in E.164 format (for example, `+14155551234`)
+4. Enter an optional friendly name
+5. Select the routing type
+6. Choose the destination
+7. Save the configuration
 
 :::tip
 Use a consistent format for all numbers. Include the plus sign and country code to ensure proper routing.
 :::
 
-## Changing Routing
-
-To change where a phone number routes:
+### Change Routing
 
 1. Find the number in the Phone Numbers list
 2. Click to edit
@@ -71,66 +86,50 @@ Routing changes take effect immediately. Active calls are not affected, but new 
 
 ## Phone Number Status
 
-Each phone number has a status that controls whether it accepts calls:
-
 | Status | Behavior |
 |--------|----------|
 | Active | Routes calls to the configured destination |
-| Inactive | Calls are rejected with an error message |
+| Inactive | Calls are rejected |
 
 Set a number to Inactive when:
+
 - The number is being ported
 - You want to temporarily block calls
 - The number is reserved for future use
 
-## Routing Examples
+## Key Data Fields
 
-### Direct Line
+### `did_numbers` Table
 
-Route a DID directly to a user's extension:
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `phone_number` | string(20) | Globally unique, immutable |
+| `friendly_name` | string nullable | Display label |
+| `routing_type` | enum | extension, ring_group, business_hours, conference_room, ai_assistant, ivr_menu, ai_load_balancer |
+| `routing_config` | JSON | `{extension_id: N}` etc. |
+| `status` | enum | active, inactive |
+| `cloudonix_config` | JSON nullable | Cloudonix metadata |
 
-- **Number**: +14155551001
-- **Routing Type**: Extension
-- **Destination**: Extension 1001 (John Smith)
+## Related API Endpoints
 
-Result: When someone calls +14155551001, John Smith's phone rings.
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/phone-numbers[/{phoneNumber}]` | Standard CRUD |
 
-### Main Company Number
-
-Route a DID to an IVR menu:
-
-- **Number**: +14155551000
-- **Routing Type**: IVR Menu
-- **Destination**: Main Menu
-
-Result: Callers hear the main menu and press digits to reach departments.
-
-### After-Hours Support
-
-Route a DID through business hours:
-
-- **Number**: +14155551002
-- **Routing Type**: Business Hours
-- **Destination**: Open hours route to Support Ring Group, closed hours route to Emergency IVR
-
-Result: Calls reach the support team during business hours, and an emergency menu after hours.
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Best Practices
-
-### Number Organization
 
 - Label numbers with their purpose (Sales, Support, Main)
 - Use consistent routing patterns for similar numbers
 - Document which numbers are published externally
-
-### Routing Strategy
-
-- Use IVR menus for main numbers to reduce misdirected calls
-- Route department numbers to ring groups for coverage
-- Consider business hours routing for time-sensitive departments
-
-### Testing
-
 - Test each number after configuration
-- Verify routing changes with test calls
-- Check that inactive numbers properly reject calls
+
+## Related Modules
+
+- [Extensions](/modules/extensions) — Extension routing target
+- [Ring Groups](/modules/ring-groups) — Ring group routing target
+- [IVR Menus](/modules/ivr-menus) — IVR routing target
+- [Business Hours](/modules/business-hours) — Time-based routing target

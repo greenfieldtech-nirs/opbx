@@ -11,6 +11,8 @@ import { OwnerRoute } from '@/components/Auth/OwnerRoute';
 import { PlatformManagerRoute } from '@/components/platform/PlatformManagerRoute';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
+import Auth0Callback from '@/pages/Auth0Callback';
+import Auth0Onboarding from '@/pages/Auth0Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import Home from '@/pages/Home';
 
@@ -40,7 +42,15 @@ const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm
 const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
 const AutoDialerMonitor = lazy(() => import('@/pages/AutoDialerMonitor'));
 const DistributionLists = lazy(() => import('@/pages/DistributionLists'));
+const AcceptInvitation = lazy(() => import('@/pages/AcceptInvitation'));
 const DistributionListDetail = lazy(() => import('@/pages/DistributionListDetail'));
+const CallTrackingDashboard = lazy(() => import('@/pages/CallTrackingDashboard'));
+const CallTrackingCampaigns = lazy(() => import('@/pages/CallTrackingCampaigns'));
+const CallTrackingCampaignForm = lazy(() => import('@/pages/CallTrackingCampaignForm'));
+const CallTrackingCampaignDetail = lazy(() => import('@/pages/CallTrackingCampaignDetail'));
+const CallTrackingSessions = lazy(() => import('@/pages/CallTrackingSessions'));
+const CallTrackingDniSnippet = lazy(() => import('@/pages/CallTrackingDniSnippet'));
+const CallTrackingIntegrations = lazy(() => import('@/pages/CallTrackingIntegrations'));
 
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
@@ -65,6 +75,18 @@ export const router = createBrowserRouter([
   {
     path: '/ui/register',
     element: <Register />,
+  },
+  {
+    path: '/ui/auth/callback',
+    element: <Auth0Callback />,
+  },
+  {
+    path: '/ui/auth/onboarding',
+    element: <Auth0Onboarding />,
+  },
+  {
+    path: '/ui/invite',
+    element: <AcceptInvitation />,
   },
   // Protected app routes (under /ui)
   {
@@ -107,58 +129,58 @@ export const router = createBrowserRouter([
         path: 'phone-numbers',
         element: <PhoneNumbers />,
       },
-       {
-         path: 'ring-groups',
-         element: <RingGroups />,
-       },
-       {
-         path: 'ivr-menus',
-         element: <IVRMenus />,
-       },
-       {
-         path: 'business-hours',
-         element: <BusinessHours />,
-       },
+      {
+        path: 'ring-groups',
+        element: <RingGroups />,
+      },
+      {
+        path: 'ivr-menus',
+        element: <IVRMenus />,
+      },
+      {
+        path: 'business-hours',
+        element: <BusinessHours />,
+      },
       {
         path: 'call-logs',
         element: <CallLogs />,
       },
-       {
-         path: 'announcements',
-         element: <Announcements />,
-       },
-       {
-         path: 'recordings',
-         element: <Navigate to="/ui/announcements" replace />,
-       },
-       {
-         path: 'live-calls',
-         element: <LiveCalls />,
-       },
-       {
-         path: 'outbound-whitelist',
-         element: (
-           <OwnerRoute>
-             <OutboundWhitelistPage />
-           </OwnerRoute>
-         ),
-       },
-       {
-         path: 'inbound-blacklist',
-         element: <InboundBlacklistPage />,
-       },
-       {
-         path: 'profile',
-         element: <Profile />,
-       },
-        {
-          path: 'settings',
-          element: (
-            <OwnerRoute>
-              <Settings />
-            </OwnerRoute>
-          ),
-        },
+      {
+        path: 'announcements',
+        element: <Announcements />,
+      },
+      {
+        path: 'recordings',
+        element: <Navigate to="/ui/announcements" replace />,
+      },
+      {
+        path: 'live-calls',
+        element: <LiveCalls />,
+      },
+      {
+        path: 'outbound-whitelist',
+        element: (
+          <OwnerRoute>
+            <OutboundWhitelistPage />
+          </OwnerRoute>
+        ),
+      },
+      {
+        path: 'inbound-blacklist',
+        element: <InboundBlacklistPage />,
+      },
+      {
+        path: 'profile',
+        element: <Profile />,
+      },
+      {
+        path: 'settings',
+        element: (
+          <OwnerRoute>
+            <Settings />
+          </OwnerRoute>
+        ),
+      },
       {
         path: 'call-notifications',
         element: <CallNotificationsSettings />,
@@ -199,56 +221,95 @@ export const router = createBrowserRouter([
         path: 'auto-dialer/monitor',
         element: <AutoDialerMonitor />,
       },
+      {
+        path: 'call-tracking',
+        element: <Navigate to="/ui/call-tracking/dashboard" replace />,
+      },
+      {
+        path: 'call-tracking/dashboard',
+        element: <CallTrackingDashboard />,
+      },
+      {
+        path: 'call-tracking/campaigns',
+        element: <CallTrackingCampaigns />,
+      },
+      {
+        path: 'call-tracking/campaigns/new',
+        element: <CallTrackingCampaignForm />,
+      },
+      {
+        path: 'call-tracking/campaigns/:id',
+        element: <CallTrackingCampaignDetail />,
+      },
+      {
+        path: 'call-tracking/campaigns/:id/edit',
+        element: <CallTrackingCampaignForm />,
+      },
+      {
+        path: 'call-tracking/sessions',
+        element: <CallTrackingSessions />,
+      },
+      {
+        path: 'call-tracking/dni-snippet',
+        element: <CallTrackingDniSnippet />,
+      },
+      {
+        path: 'call-tracking/integrations',
+        element: (
+          <OwnerRoute>
+            <CallTrackingIntegrations />
+          </OwnerRoute>
+        ),
+      },
       // Platform Management routes (platform manager only)
-{
-  path: 'platform',
-  element: (
-    <PlatformManagerRoute>
-      <Navigate to="/ui/platform/dashboard" replace />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/dashboard',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformDashboard />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/organizations',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformOrganizations />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/organizations/:id',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformOrganizationDetail />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/users',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformUsers />
-    </PlatformManagerRoute>
-  ),
-},
-{
-  path: 'platform/audit-log',
-  element: (
-    <PlatformManagerRoute>
-      <PlatformAuditLog />
-    </PlatformManagerRoute>
-  ),
-},
-
-      ],
-   },
+      {
+        path: 'platform',
+        element: (
+          <PlatformManagerRoute>
+            <Navigate to="/ui/platform/dashboard" replace />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/dashboard',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformDashboard />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/organizations',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformOrganizations />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/organizations/:id',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformOrganizationDetail />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/users',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformUsers />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/audit-log',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformAuditLog />
+          </PlatformManagerRoute>
+        ),
+      },
+    ],
+  },
 ]);

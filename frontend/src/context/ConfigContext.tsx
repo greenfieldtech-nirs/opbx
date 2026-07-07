@@ -5,7 +5,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { configService, ApplicationConfig } from '@/services/config.service';
+import { configService, ApplicationConfig, Auth0Config } from '@/services/config.service';
 import { getApiErrorMessage } from '@/services/api';
 
 interface ConfigContextType {
@@ -17,6 +17,8 @@ interface ConfigContextType {
   hasWarnings: boolean;
   warnings: string[];
   isValidConfiguration: boolean;
+  saasEnabled: boolean;
+  auth0Config: Auth0Config;
   refetch: () => Promise<void>;
 }
 
@@ -46,6 +48,9 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
         is_valid_configuration: true,
         warnings: [],
         hide_webhook_fields: false,
+        recaptcha: { enabled: false },
+        saas_enabled: false,
+        auth0: { enabled: false },
       });
     } finally {
       setIsLoading(false);
@@ -65,6 +70,8 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     hasWarnings: (config?.warnings?.length ?? 0) > 0,
     warnings: config?.warnings ?? [],
     isValidConfiguration: config?.is_valid_configuration ?? true,
+    saasEnabled: config?.saas_enabled ?? false,
+    auth0Config: config?.auth0 ?? { enabled: false },
     refetch: fetchConfig,
   };
 

@@ -19,6 +19,7 @@ import {Label} from '@/components/ui/label';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Checkbox} from '@/components/ui/checkbox';
 import {AuroraBackgroundProvider} from '@nauverse/react-aurora-background';
+import {SocialAuthButtons} from '@/components/Auth/SocialAuthButtons';
 import opbxLogo from '@/assets/opbx_logo.png';
 
 // Form validation schema
@@ -202,6 +203,8 @@ export default function Login() {
                                         {isLoading ? 'Signing in...' : 'Log In'}
                                     </Button>
                                 </form>
+
+                                <SocialAuthButtons intent="login" />
 
                                 {/* Footer Info */}
                                 <div className="mt-8 text-center text-sm text-gray-600">

@@ -1,0 +1,121 @@
+---
+sidebar_position: 12
+slug: /modules/live-calls
+sidebar_class_name: cxGuidesSidebar
+title: "Live Calls"
+description: "Monitor and disconnect active calls in real time"
+---
+
+# Live Calls
+
+The Live Calls module provides real-time monitoring of active call sessions.
+
+## Purpose
+
+Use this module to:
+
+- View active calls across your organization
+- See call status, caller ID, destination, and duration
+- Disconnect individual calls or all active calls
+- Merge WebSocket updates with HTTP polling
+
+## Data Sources
+
+Live call data comes from Cloudonix session-update webhooks stored in the `session_updates` table. The frontend merges:
+
+- **HTTP polling**: Provides the initial state and full refresh
+- **WebSocket (Soketi)**: Provides incremental live updates
+
+## Displayed Information
+
+| Field | Description |
+|-------|-------------|
+| Caller ID | Originating phone number |
+| Destination | Number being called |
+| Direction | Inbound or outbound |
+| Status | Current call state |
+| Duration | How long the call has been active |
+| Session ID | Cloudonix session identifier |
+
+## Call Statuses
+
+| Status | Description |
+|--------|-------------|
+| Initiated | Call setup in progress |
+| Ringing | Destination is ringing |
+| Answered | Call is connected |
+| Completed | Call has ended |
+| Failed | Call could not connect |
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View live calls | Yes | Yes | No | No |
+| Disconnect calls | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Monitor Active Calls
+
+1. Navigate to **Live Calls** in the sidebar
+2. Use the polling interval selector to choose refresh frequency (manual, 1s, 5s, 15s, 30s, 60s)
+3. View the active call cards
+
+### Disconnect a Single Call
+
+1. Find the call card
+2. Click **Disconnect**
+3. Confirm the action
+
+The call is marked as `recentlyDisconnected` for 10 seconds so it does not reappear while Cloudonix processes the disconnect.
+
+### Disconnect All Calls
+
+1. Click **Disconnect All**
+2. Confirm the action in the danger dialog
+3. The system disconnects calls sequentially with a 200 ms delay
+
+:::warning
+Disconnecting calls is immediate and cannot be undone. Use this power responsibly.
+:::
+
+## Key Data Fields
+
+### `session_updates` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `session_id` | integer | Cloudonix session ID |
+| `session_token` | string | Used for Cloudonix API disconnect |
+| `event_id` | string | Idempotency key |
+| `domain_id` | integer | |
+| `domain` | string | |
+| `caller_id` | string | |
+| `destination` | string | |
+| `direction` | string | |
+| `status` | string | |
+| `session_created_at` | datetime | |
+| `session_modified_at` | datetime | |
+| `start_time` | datetime nullable | |
+| `answer_time` | datetime nullable | |
+| `call_ids` | array | |
+| `profile` | array | Includes QoS and AMD data |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/session-updates/active` | List active calls |
+| GET | `/v1/session-updates/active/stats` | Active call statistics |
+| GET | `/v1/session-updates/{sessionId}` | Session details |
+| DELETE | `/v1/session-updates/{sessionId}/disconnect` | Disconnect a call |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [Call Logs](/modules/call-logs) — Historical CDR view
+- [Call Notifications](/modules/call-notifications) — Webhook events for call status changes

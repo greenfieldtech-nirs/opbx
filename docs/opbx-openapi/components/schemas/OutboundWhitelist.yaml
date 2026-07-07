@@ -10,16 +10,19 @@ properties:
     example: Allowed Destinations
   pattern:
     type: string
-    example: '^\+1[0-9]{10}$'
+    example: ^\+1[0-9]{10}$
   description:
-    type: string
-    nullable: true
+    type:
+    - string
+    - 'null'
   priority:
     type: integer
     default: 0
   status:
     type: string
-    enum: [active, inactive]
+    enum:
+    - active
+    - inactive
   created_at:
     type: string
     format: date-time
@@ -27,8 +30,8 @@ properties:
     type: string
     format: date-time
 required:
-  - id
-  - organization_id
-  - name
-  - pattern
-  - status
+- id
+- organization_id
+- name
+- pattern
+- status

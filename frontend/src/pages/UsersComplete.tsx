@@ -95,8 +95,10 @@ import {
   Column,
   EmptyState
 } from '@/components/design-system';
-import type { User, UserRole, Status } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import type { User, UserRole, UserStatus } from '@/types';
 import { usersService } from '@/services/createResourceService';
+import InviteUserDialog from '@/components/Users/InviteUserDialog';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -108,7 +110,7 @@ interface UserFormData {
   email: string;
   password: string;
   role: UserRole;
-  status: Status;
+  status: UserStatus;
   phone: string;
   street_address: string;
   city: string;
@@ -121,11 +123,13 @@ interface UserFormData {
 
 export default function UsersComplete() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canCreateUsers = user?.role === 'owner' || user?.role === 'pbx_admin';
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
   const [extensionFilter, setExtensionFilter] = useState<'all' | 'has' | 'none'>('all');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -134,6 +138,7 @@ export default function UsersComplete() {
 
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -380,7 +385,7 @@ export default function UsersComplete() {
 
   // Handle toggle status
   const handleToggleStatus = (user: User) => {
-    const newStatus: Status = user.status === 'active' ? 'inactive' : 'active';
+    const newStatus: UserStatus = user.status === 'active' ? 'inactive' : 'active';
     updateUserMutation.mutate({
       id: user.id,
       data: { status: newStatus },
@@ -527,10 +532,20 @@ export default function UsersComplete() {
             <span className="text-foreground">Users</span>
           </div>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-2">
+          {canCreateUsers && (
+            <>
+              <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
+                <Mail className="h-4 w-4 mr-2" />
+                Invite User
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filters Section */}
@@ -577,7 +592,7 @@ export default function UsersComplete() {
             <Select
               value={statusFilter}
               onValueChange={(value) => {
-                setStatusFilter(value as Status | 'all');
+                setStatusFilter(value as UserStatus | 'all');
                 setCurrentPage(1);
               }}
             >
@@ -585,11 +600,12 @@ export default function UsersComplete() {
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
             </Select>
 
             <Select
@@ -875,7 +891,7 @@ export default function UsersComplete() {
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value as Status })}
+                  onValueChange={(value) => setFormData({ ...formData, status: value as UserStatus })}
                 >
                   <SelectTrigger id="status">
                     <SelectValue />
@@ -883,6 +899,7 @@ export default function UsersComplete() {
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1416,6 +1433,12 @@ export default function UsersComplete() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <InviteUserDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+      />
     </div >
   );
 }

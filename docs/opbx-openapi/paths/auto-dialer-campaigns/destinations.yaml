@@ -1,43 +1,48 @@
 paths:
   /v1/auto-dialer-campaigns/{campaign}/destinations:
     parameters:
-      - name: campaign
-        in: path
-        required: true
-        description: Campaign ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: List campaign destinations
-      description: |
-        Get a paginated list of destinations for a campaign.
-        
+      description: 'Get a paginated list of destinations for a campaign.
+
+
         Supports filtering by status and searching by phone number.
+
+        '
       operationId: listCampaignDestinations
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [pending, dialing, completed, failed]
-          description: Filter by destination status
-        - name: search
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Search by phone number
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - dialing
+          - completed
+          - failed
+        description: Filter by destination status
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Search by phone number
       responses:
         '200':
           description: List of destinations
@@ -56,60 +61,67 @@ paths:
                           example: 1
                         phone_number:
                           type: string
-                          example: "+14155551212"
+                          example: '+14155551212'
                         description:
-                          type: string
-                          nullable: true
-                          example: "John Doe - Sales Lead"
+                          type:
+                          - string
+                          - 'null'
+                          example: John Doe - Sales Lead
                         status:
                           type: string
-                          enum: [pending, dialing, completed, failed]
-                          example: "pending"
+                          enum:
+                          - pending
+                          - dialing
+                          - completed
+                          - failed
+                          example: pending
                         dial_attempts:
                           type: integer
                           example: 0
                         last_dialed_at:
-                          type: string
+                          type:
+                          - string
+                          - 'null'
                           format: date-time
-                          nullable: true
                           example: null
                         created_at:
                           type: string
                           format: date-time
-                          example: "2024-01-10 08:00:00"
+                          example: '2024-01-10 08:00:00'
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
   /v1/auto-dialer-campaigns/{campaign}/concurrency:
     parameters:
-      - name: campaign
-        in: path
-        required: true
-        description: Campaign ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Get concurrency information
-      description: |
-        Get real-time concurrency status for a campaign.
-        
+      description: 'Get real-time concurrency status for a campaign.
+
+
         Returns current CAC utilization, active sessions,
+
         and rate limit status for real-time monitoring.
+
+        '
       operationId: getCampaignConcurrency
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Concurrency information
@@ -154,17 +166,17 @@ paths:
                               example: 123
                             session_token:
                               type: string
-                              example: "sess-abc123"
+                              example: sess-abc123
                             destination_id:
                               type: integer
                               example: 456
                             phone_number:
                               type: string
-                              example: "+14155551212"
+                              example: '+14155551212'
                             started_at:
                               type: string
                               format: date-time
-                              example: "2024-01-15T14:30:00Z"
+                              example: '2024-01-15T14:30:00Z'
                             duration_seconds:
                               type: integer
                               example: 45
@@ -176,21 +188,23 @@ paths:
                             description: Whether campaign is rate limited
                             example: false
                           pause_reason:
-                            type: string
-                            nullable: true
+                            type:
+                            - string
+                            - 'null'
                             example: null
                           resumes_at:
-                            type: string
+                            type:
+                            - string
+                            - 'null'
                             format: date-time
-                            nullable: true
                             example: null
                           can_resume_now:
                             type: boolean
                             description: Whether campaign can be resumed
                             example: true
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml

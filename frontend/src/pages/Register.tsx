@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
 import { AuroraBackgroundProvider } from '@nauverse/react-aurora-background';
+import { SocialAuthButtons } from '@/components/Auth/SocialAuthButtons';
 import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -593,6 +594,8 @@ export default function Register() {
                     </>
                   )}
                 </form>
+
+                <SocialAuthButtons intent="register" />
 
                 <div className="mt-6 text-center">
                   <p className="text-sm text-gray-600">

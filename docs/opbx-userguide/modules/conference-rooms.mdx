@@ -1,136 +1,96 @@
 ---
-sidebar_position: 8
+sidebar_position: 7
 slug: /modules/conference-rooms
 sidebar_class_name: cxGuidesSidebar
-title: Conference Rooms
-description: Setting up multi-party conference bridges
+title: "Conference Rooms"
+description: "Set up multi-party conference bridges with PIN protection"
 ---
 
 # Conference Rooms
 
-Conference Rooms create audio bridges where multiple callers can join a shared conversation. Use them for team meetings, webinars, training sessions, or collaborative discussions.
+Conference rooms provide multi-party audio bridges for meetings.
 
-## Conference Settings
+## Purpose
 
-Configure your conference room with these options:
+Use this module to:
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Max Participants | Maximum number of concurrent participants (2-1000) | 25 |
-| PIN Required | Require a numeric PIN to join the conference | No |
-| PIN | Numeric access code (max 20 digits) | - |
-| Host PIN | Separate PIN for the host to join | - |
-| Wait for Host | Hold participants until the host joins | No |
-| Mute on Entry | Automatically mute participants when they join | No |
-| Announce Join/Leave | Play a tone when participants join or leave | No |
-| Recording Enabled | Allow call recording for this conference | No |
-| Auto-start Recording | Start recording automatically when the conference begins | No |
-| Music on Hold | Play music while participants wait | No |
+- Create conference bridges
+- Configure PIN and host PIN protection
+- Enable recording and host controls
+- Set participant limits and entry behavior
 
-:::tip
-Use a Host PIN with "Wait for Host" enabled for secure meetings where you control when the conference begins.
-:::
+## Features
 
-## Creating a Conference Room
+| Feature | Description |
+|---------|-------------|
+| PIN Protection | Optional numeric PIN required to join |
+| Host PIN | Special PIN for host controls |
+| Recording | Record conference sessions |
+| Auto-Start Recording | Start recording automatically when the conference begins |
+| Wait for Host | Keep participants on hold until the host joins |
+| Mute on Entry | Automatically mute new participants |
+| Announce Join/Leave | Play sounds when participants join or leave |
+| Talk Detection | Emit webhooks when participants speak |
+| Max Participants | Limit the number of simultaneous participants (2-1000) |
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View conference rooms | Yes | Yes | Yes | Yes |
+| Create conference rooms | Yes | Yes | No | No |
+| Update conference rooms | Yes | Yes | No | No |
+| Delete conference rooms | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Create a Conference Room
 
 1. Navigate to **Conference Rooms** in the sidebar
-2. Click **Create**
-3. Enter a descriptive name
+2. Click **Create Conference Room**
+3. Enter a name and optional description
 4. Set the maximum number of participants
-5. Configure PIN settings if needed
-6. Enable recording options if required
-7. Click **Save**
+5. Enable PIN protection and enter PINs if required
+6. Configure recording and host behavior
+7. Save
 
-## Accessing Conference Rooms
+The room can then be assigned to an extension or used as a DID routing destination.
 
-You can make conference rooms accessible to callers in two ways:
+## Key Data Fields
 
-### Via Extension
+### `conference_rooms` Table
 
-Create a Conference-type extension that points to the room:
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Unique per org |
+| `description` | string nullable | |
+| `max_participants` | integer | 2-1000 |
+| `status` | enum | active, inactive (uses UserStatus) |
+| `pin` | string nullable | Numeric, max 20 |
+| `pin_required` | boolean | |
+| `host_pin` | string nullable | |
+| `recording_enabled` | boolean | |
+| `recording_auto_start` | boolean | |
+| `recording_webhook_url` | URL nullable | |
+| `wait_for_host` | boolean | |
+| `mute_on_entry` | boolean | |
+| `announce_join_leave` | boolean | |
+| `music_on_hold` | boolean | |
+| `talk_detection_enabled` | boolean | |
+| `talk_detection_webhook_url` | URL nullable | Required when talk detection is enabled |
 
-1. Go to **Extensions** and click **Create**
-2. Select **Conference** as the extension type
-3. Choose the conference room from the dropdown
-4. Assign an extension number
-5. Click **Save**
+## Related API Endpoints
 
-Callers dial the extension number to join the conference.
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/conference-rooms[/{conferenceRoom}]` | Standard CRUD |
 
-### Via DID
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-Route incoming calls directly to a conference room:
+## Related Modules
 
-1. Go to **DIDs** and select a phone number
-2. Set the destination type to **Conference Room**
-3. Select the conference room
-4. Click **Save**
-
-Callers dial the DID number to join directly.
-
-## Use Cases
-
-### Scheduled Meetings
-
-Create a conference room with a PIN for recurring team meetings:
-
-- Set a memorable PIN
-- Share the extension number or DID with participants
-- Enable "Announce Join/Leave" for awareness
-
-### Webinar Dial-In Lines
-
-Set up a large-capacity conference for webinars:
-
-- Increase Max Participants to accommodate your audience
-- Enable "Wait for Host" to control start time
-- Enable recording for post-event distribution
-
-### Training Sessions
-
-Configure a conference for training purposes:
-
-- Enable "Mute on Entry" to reduce background noise
-- Use Host PIN for instructor access
-- Enable recording for later review
-
-## Security Considerations
-
-:::warning
-Conference rooms without PINs are accessible to anyone who knows the extension or DID number. Always enable PIN protection for sensitive meetings.
-:::
-
-### Recommended Security Settings
-
-| Scenario | PIN Required | Host PIN | Wait for Host |
-|----------|--------------|----------|---------------|
-| Public webinar | Yes | Yes | Yes |
-| Internal meeting | Yes | No | No |
-| Confidential discussion | Yes | Yes | Yes |
-| Open line | No | No | No |
-
-## Managing Active Conferences
-
-During an active conference:
-
-- Participants can join until the maximum is reached
-- The host can join with the Host PIN (if configured)
-- Recording starts automatically if "Auto-start Recording" is enabled
-- Participants hear music on hold if configured and waiting
-
-:::note
-Conference rooms do not have a moderator interface. For advanced moderation features, consider using external conference solutions integrated via SIP.
-:::
-
-## Recording
-
-When recording is enabled:
-
-- Recordings are stored securely and accessible from the Recordings section
-- Auto-start recording begins when the first participant joins
-- Manual recording requires host intervention (if supported by the provider)
-- Recording stops when the last participant leaves
-
-:::info
-Ensure you comply with local laws regarding call recording. Inform participants that the call is being recorded.
-:::
+- [Extensions](/modules/extensions) — CONFERENCE type extensions link to rooms
+- [Phone Numbers](/modules/phone-numbers) — DIDs can route to conference rooms
+- [IVR Menus](/modules/ivr-menus) — IVR options can route to conference rooms

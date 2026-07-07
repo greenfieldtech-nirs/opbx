@@ -1,0 +1,44 @@
+paths:
+  /v1/auto-dialer-campaigns/{campaign}/caller-id-stats:
+    parameters:
+      - name: campaign
+        in: path
+        required: true
+        description: Campaign ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    get:
+      tags:
+        - Auto Dialer Campaigns
+      summary: Get caller ID statistics
+      description: |
+        Get per-caller-ID statistics for a campaign.
+
+        Returns usage counters and performance metrics for each DID
+        configured in the campaign's caller ID pool.
+      operationId: getCampaignCallerIdStats
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Caller ID statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                example:
+                  caller_ids:
+                    - phone_number: "+14155551212"
+                      calls: 42
+                      answered: 35
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

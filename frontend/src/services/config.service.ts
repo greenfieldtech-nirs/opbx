@@ -6,6 +6,13 @@
 
 import api from './api';
 
+export interface Auth0Config {
+  enabled: boolean;
+  domain?: string;
+  client_id?: string;
+  providers?: string[];
+}
+
 export interface ApplicationConfig {
   mode: 'development' | 'production';
   is_production: boolean;
@@ -13,6 +20,12 @@ export interface ApplicationConfig {
   is_valid_configuration: boolean;
   warnings: string[];
   hide_webhook_fields: boolean;
+  recaptcha: {
+    enabled: boolean;
+    site_key?: string;
+  };
+  saas_enabled: boolean;
+  auth0: Auth0Config;
 }
 
 let cachedConfig: ApplicationConfig | null = null;

@@ -1,62 +1,92 @@
 ---
-sidebar_position: 1
+sidebar_position: 5
 slug: /data-models
 sidebar_class_name: cxGuidesSidebar
-title: Data Models Overview
-description: Complete reference of all database models, enums, and configurations
+title: "Data Models Overview"
+description: "Complete reference of all database models, enums, and configurations"
 ---
 
 # Data Models Overview
 
-This section provides comprehensive documentation of all data structures in OpBX.
+This section provides comprehensive documentation of the data structures in OPBX.
 
 ## Categories
 
 ### [Database Models](./models/index)
+
 Complete reference of all Eloquent models including:
+
 - Table structure and columns
 - Relationships
 - Scopes and mutators
 - Business logic methods
 
 ### [Enumerations](./enums/index)
+
 All PHP enums used throughout the application:
+
 - Status enums
 - Type enums
 - Strategy enums
 - Mode enums
 
 ### [Configuration](./configuration/index)
+
 Configuration files and environment variables:
+
 - Application config
 - Service configuration
 - Environment variables
 - Feature flags
 
-## Key Models
+## Key Models by Module
 
 ### Auto Dialer
-- [AutoDialerCampaign](./models/auto-dialer-campaign) - Campaign configuration
-- [AutoDialerCampaignCallerId](./models/auto-dialer-campaign-caller-id) - Caller ID pool entries
-- [AutoDialerCallerIdStat](./models/auto-dialer-caller-id-stat) - Per-Caller ID statistics
+
+- [AutoDialerCampaign](./models/auto-dialer-campaign) — Campaign configuration
+- [AutoDialerCampaignCallerId](./models/auto-dialer-campaign-caller-id) — Caller ID pool entries
+- [AutoDialerCallerIdStat](./models/auto-dialer-caller-id-stat) — Per-Caller ID statistics
+- AutoDialerList (`App\Models\AutoDialerList`) — Distribution lists
+- AutoDialerDestination (`App\Models\AutoDialerDestination`) — List destinations
 
 ### Core PBX
-- [Extension](./models/extension) - PBX extensions
-- [DidNumber](./models/did-number) - Phone numbers
-- [RingGroup](./models/ring-group) - Ring group configuration
-- [IvrMenu](./models/ivr-menu) - IVR menu structure
+
+- Extension (`App\Models\Extension`) — PBX extensions
+- DidNumber (`App\Models\DidNumber`) — Phone numbers
+- RingGroup (`App\Models\RingGroup`) — Ring group configuration
+- IvrMenu (`App\Models\IvrMenu`) — IVR menu structure
+- BusinessHoursSchedule (`App\Models\BusinessHoursSchedule`) — Business hours
 
 ### AI Integration
-- [AiAssistant](./models/ai-assistant) - AI assistant configuration
-- [AiAssistantLoadBalancer](./models/ai-assistant-load-balancer) - Load balancer setup
+
+- AiAssistant (`App\Models\AiAssistant`) — AI assistant configuration
+- AiAssistantLoadBalancer (`App\Models\AiAssistantLoadBalancer`) — Load balancer setup
 
 ### Users & Organizations
-- [User](./models/user) - User accounts
-- [Organization](./models/organization) - Multi-tenant organizations
+
+- User (`App\Models\User`) — User accounts
+- Organization (`App\Models\Organization`) — Multi-tenant organizations
+- [CloudonixSettings](./models/cloudonix-settings) — Cloudonix credentials per org
+
+### Call & Logging
+
+- CallDetailRecord (`App\Models\CallDetailRecord`) — CDR from Cloudonix
+- [SessionUpdate](./models/session-updates) — Real-time session events
+- [CallNotificationsSettings](./models/call-notifications-settings) — Webhook notification config
+- CallNotificationLog (`App\Models\CallNotificationLog`) — Notification delivery log
+- [EmailLog](./models/email-logs) — Transactional email log
+- [PlatformAuditLog](./models/platform-audit-logs) — Cross-tenant audit trail
+
+### Security
+
+- InboundBlacklist (`App\Models\InboundBlacklist`) — Blocked caller patterns
+- OutboundWhitelist (`App\Models\OutboundWhitelist`) — Outbound routing rules
+- BlockedCallLog (`App\Models\BlockedCallLog`) — Log of blocked calls
 
 ## Recently Added
 
 ### Caller ID Pooling (v2026.04)
+
 New models supporting multiple Caller IDs per campaign:
 
 | Model | Purpose |
@@ -64,4 +94,4 @@ New models supporting multiple Caller IDs per campaign:
 | `AutoDialerCampaignCallerId` | Pivot table linking campaigns to DIDs |
 | `AutoDialerCallerIdStat` | Tracks call statistics per Caller ID |
 
-See [Auto Dialer Caller ID Pooling](../applications/auto-dialer/campaigns#caller-id-pool-section) for usage documentation.
+See [Auto Dialer Campaigns](../modules/auto-dialer-campaigns) for usage documentation.

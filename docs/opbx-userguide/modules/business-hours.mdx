@@ -2,214 +2,128 @@
 sidebar_position: 5
 slug: /modules/business-hours
 sidebar_class_name: cxGuidesSidebar
-title: Business Hours
-description: Time-based call routing with schedules
+title: "Business Hours"
+description: "Route calls based on time of day with weekly schedules and holidays"
 ---
 
 # Business Hours
 
-Business Hours routes calls to different destinations based on the time of day and day of week. Use it to handle open/closed scenarios and holiday schedules.
+Business Hours enable time-based call routing. Calls route to different destinations depending on whether your business is open or closed.
 
-## What Is Business Hours Routing
+## Purpose
 
-Business Hours is a routing destination that evaluates the current time against a schedule. It routes calls to one destination during business hours and another destination outside business hours.
+Use this module to:
 
-## Components
+- Define weekly open and closed hours
+- Configure time zones
+- Add holiday and special-hours exceptions
+- Route calls to different destinations during open and closed periods
 
-A Business Hours configuration consists of:
+## Configuration Elements
 
-### Weekly Schedule
+| Element | Description |
+|---------|-------------|
+| Weekly Schedule | Open hours for each day of the week |
+| Time Zone | IANA timezone for accurate routing |
+| Exceptions | Closed dates or special hours (for example, holidays) |
+| Open Destination | Where calls go during business hours |
+| Closed Destination | Where calls go after hours |
 
-Per-day enable/disable with time ranges:
+## Destination Types
 
-| Day | Status | Hours |
-|-----|--------|-------|
-| Monday | Open | 09:00 - 17:00 |
-| Tuesday | Open | 09:00 - 17:00 |
-| Wednesday | Open | 09:00 - 17:00 |
-| Thursday | Open | 09:00 - 17:00 |
-| Friday | Open | 09:00 - 17:00 |
-| Saturday | Closed | - |
-| Sunday | Closed | - |
+Business hours support the following destination types using prefixed string IDs:
 
-### Timezone
+| Prefix | Destination |
+|--------|-------------|
+| `ext-{id}` | Extension |
+| `rg-{id}` | Ring Group |
+| `conf-{id}` | Conference Room |
+| `ivr-{id}` | IVR Menu |
+| `ai-{id}` | AI Assistant |
+| `alb-{id}` | AI Load Balancer |
 
-Select from 65+ timezones grouped by region:
+## Permissions
 
-- Americas
-- Europe
-- Asia Pacific
-- Africa
-- Middle East
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View schedules | Yes | Yes | Yes | Yes |
+| Create schedules | Yes | Yes | No | No |
+| Update schedules | Yes | Yes | No | No |
+| Delete schedules | Yes | Yes | No | No |
 
-:::warning
-Select the timezone where your business operates. Calls are evaluated against this timezone, not the caller's location.
-:::
+## UI Workflow
 
-### Actions
-
-| Action | Purpose |
-|--------|---------|
-| Open Hours | Where to route during business hours |
-| Closed Hours | Where to route outside business hours |
-
-### Exception Dates
-
-Special dates that override the weekly schedule:
-
-| Type | Description |
-|------|-------------|
-| Closed | All-day closure (holiday). Routes to closed hours destination. |
-| Special Hours | Modified hours (e.g., half day). Uses custom time ranges. |
-
-## Creating a Business Hours Schedule
-
-To create a new schedule:
+### Create a Schedule
 
 1. Navigate to **Business Hours** in the sidebar
 2. Click **Create Schedule**
-3. Enter a descriptive name
-4. Select the timezone
-5. Configure the weekly schedule
-6. Set open hours and closed hours destinations
-7. Add exception dates if needed
-8. Save the schedule
+3. Enter a name and select a timezone
+4. Define weekly hours for each day
+5. Add exceptions (holidays or special hours)
+6. Set the open-hours destination
+7. Set the closed-hours destination
+8. Save
 
-### Configuring Weekly Schedule
+### Duplicate a Schedule
 
-Use the calendar view to set hours:
+1. Open the schedule
+2. Click **Duplicate**
+3. The system creates a copy with "(Copy)" appended to the name
+4. Edit the copy as needed
 
-1. Click on a day to enable/disable it
-2. Drag time handles to set open/close times
-3. Copy settings from one day to others
+### Toggle Status
 
-## Action Types
-
-Both open and closed hours can route to:
-
-| Type | Use Case |
-|------|----------|
-| Extension | Specific person during/after hours |
-| Ring Group | Department coverage |
-| Conference Room | Scheduled conferences |
-| IVR Menu | After-hours menu or main menu |
-| AI Assistant | Automated handling |
-| AI Load Balancer | Distributed AI routing |
+Use the status toggle to enable or disable a schedule. Disabled schedules are not used for routing.
 
 ## Schedule Templates
 
-OPBX provides templates for common schedules:
+The frontend provides templates to speed up configuration:
 
-| Template | Description |
-|----------|-------------|
-| Mon-Fri Business | Monday-Friday, 9:00 AM - 5:00 PM |
-| Mon-Fri All Day | Monday-Friday, 24 hours |
-| Sun-Thu Business | Sunday-Thursday, 9:00 AM - 5:00 PM (Middle East) |
-| 24/7 | Always open |
-
-Select a template as a starting point, then customize as needed.
+- `mon-fri-business`
+- `mon-fri-all-day`
+- `sun-thu-business`
+- `sun-thu-all-day`
+- `24-7`
 
 ## Holiday Import
 
-Import public holidays by country and year:
+The UI can fetch public holidays from `date.nager.at` by country and year. Select the holidays you want to import as closed exceptions.
 
-1. Open the Business Hours schedule
-2. Click **Import Holidays**
-3. Select country
-4. Select year
-5. Review imported dates
-6. Save
+## Key Data Fields
 
-Imported holidays are added as Closed exception dates. You can modify or delete them after import.
+### `business_hours_schedules` Table
 
-:::note
-Holiday data comes from a public API. Verify imported dates against your actual business calendar.
-:::
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope, soft deletes |
+| `name` | string | Unique per org |
+| `status` | enum | active, inactive |
+| `timezone` | string | IANA timezone |
+| `open_hours_action` | JSON | `{target_id: "ext-13"}` |
+| `open_hours_action_type` | enum | BusinessHoursActionType |
+| `closed_hours_action` | JSON | `{target_id: "rg-5"}` |
+| `closed_hours_action_type` | enum | BusinessHoursActionType |
 
-## Duplicating Schedules
+### Related Tables
 
-Copy an existing schedule to create a variation:
+- `business_hours_schedule_days` — One row per day of the week per schedule
+- `business_hours_time_ranges` — Time intervals per day
+- `business_hours_exceptions` — Exception dates
+- `business_hours_exception_time_ranges` — Exception time intervals
 
-1. Find the schedule to copy
-2. Click **Duplicate**
-3. A new schedule appears with "(Copy)" in the name
-4. Modify the copy as needed
-5. Save
+## Related API Endpoints
 
-This is useful for:
-- Seasonal hour changes
-- Different departments with similar schedules
-- Testing schedule changes
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/business-hours[/{businessHour}]` | Standard CRUD |
+| POST | `/v1/business-hours/{businessHour}/duplicate` | Duplicate a schedule |
+| PATCH | `/v1/business-hours/{businessHour}/toggle-status` | Toggle active status |
 
-## Evaluation Order
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-When a call arrives, Business Hours evaluates in this order:
+## Related Modules
 
-1. **Check exception dates**: Is today a holiday or special hours date?
-2. **Check weekly schedule**: Is today enabled in the weekly schedule?
-3. **Check time ranges**: Is the current time within open hours?
-4. **Route**: Send to open hours or closed hours destination
-
-```mermaid
-graph TD
-    A[Call Arrives] --> B{Exception Date?}
-    B -->|Yes| C[Use exception rules]
-    B -->|No| D{Weekly Schedule?}
-    D -->|No| E[Closed Hours]
-    D -->|Yes| F{Time in Range?}
-    F -->|No| G[Closed Hours]
-    F -->|Yes| H[Open Hours]
-```
-
-## Business Hours Examples
-
-### Standard Office
-
-- **Name**: Main Office Hours
-- **Timezone**: America/New_York
-- **Schedule**: Mon-Fri, 9:00 AM - 5:00 PM
-- **Open Hours**: Main Ring Group
-- **Closed Hours**: After-Hours IVR
-- **Exceptions**: New Year's Day, Independence Day, Christmas
-
-### Support Hotline
-
-- **Name**: 24/7 Support
-- **Timezone**: UTC
-- **Schedule**: 24/7 (always open)
-- **Open Hours**: Support Ring Group
-- **Closed Hours**: Emergency Paging
-
-### Retail Location
-
-- **Name**: Downtown Store
-- **Timezone**: America/Los_Angeles
-- **Schedule**: Mon-Sat, 10:00 AM - 8:00 PM; Sun, 12:00 PM - 6:00 PM
-- **Open Hours**: Store Ring Group
-- **Closed Hours**: Store Info IVR
-
-## Best Practices
-
-### Timezone Selection
-
-- Use the timezone of your physical location
-- Consider daylight saving time changes
-- Use UTC for global 24/7 operations
-
-### Exception Planning
-
-- Import holidays at the start of each year
-- Add company-specific closures (training days, events)
-- Plan special hours for peak seasons
-
-### Fallback Design
-
-- Closed hours destination should provide value (information, voicemail, emergency contact)
-- Test closed hours routing after setup
-- Consider time zone differences for global callers
-
-### Testing
-
-- Test during both open and closed periods
-- Verify exception date handling
-- Check timezone transitions (DST changes)
+- [Phone Numbers](/modules/phone-numbers) — DIDs can route to business hours
+- [IVR Menus](/modules/ivr-menus) — IVR options can route to business hours
+- [Ring Groups](/modules/ring-groups) — Common closed-hours destination

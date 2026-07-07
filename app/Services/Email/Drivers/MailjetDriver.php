@@ -6,6 +6,7 @@ namespace App\Services\Email\Drivers;
 
 use App\Services\Email\DTOs\EmailMessage;
 use App\Services\Email\DTOs\EmailSendResult;
+use App\Services\Email\Exceptions\DriverException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -21,23 +22,35 @@ class MailjetDriver extends AbstractEmailDriver
     /**
      * Send an email via Mailjet.
      *
-     * @throws \App\Services\Email\Exceptions\DriverException
+     * @throws DriverException
      */
     public function send(EmailMessage $message): EmailSendResult
     {
         $this->validateConfig(['key', 'secret']);
 
+        $url = 'https://api.mailjet.com/v3.1/send';
+
+        $this->logApiCall('POST', $url, [
+            'correlation_id' => $message->correlationId,
+            'to' => array_map(fn ($r) => $r->email, $message->to),
+            'subject' => $message->subject,
+        ]);
+
         try {
             $response = Http::withBasicAuth($this->config['key'], $this->config['secret'])
                 ->timeout(30)
                 ->acceptJson()
-                ->post('https://api.mailjet.com/v3.1/send', $this->buildPayload($message));
+                ->post($url, $this->buildPayload($message));
 
             if ($response->failed()) {
+                $this->logApiResponse($response, $message->correlationId, true);
+
                 $error = $response->json();
                 $errorMessage = $error['ErrorMessage'] ?? $error['ErrorInfo'] ?? 'Mailjet API error';
                 throw new \Exception($errorMessage, $response->status());
             }
+
+            $this->logApiResponse($response, $message->correlationId);
 
             $data = $response->json();
             $messageData = $data['Messages'][0] ?? [];

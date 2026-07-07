@@ -17,7 +17,6 @@ class UserResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -30,6 +29,11 @@ class UserResource extends JsonResource
             'role' => $this->role->value,
             'status' => $this->status->value,
             'phone' => $this->phone,
+            'is_platform_manager' => $this->is_platform_manager,
+            'social_identities' => $this->socialIdentities->map(fn ($identity) => [
+                'provider' => $identity->provider->value,
+                'provider_email' => $identity->provider_email,
+            ])->all(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

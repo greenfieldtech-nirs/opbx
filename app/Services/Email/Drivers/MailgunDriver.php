@@ -6,6 +6,7 @@ namespace App\Services\Email\Drivers;
 
 use App\Services\Email\DTOs\EmailMessage;
 use App\Services\Email\DTOs\EmailSendResult;
+use App\Services\Email\Exceptions\DriverException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -21,24 +22,36 @@ class MailgunDriver extends AbstractEmailDriver
     /**
      * Send an email via Mailgun.
      *
-     * @throws \App\Services\Email\Exceptions\DriverException
+     * @throws DriverException
      */
     public function send(EmailMessage $message): EmailSendResult
     {
         $this->validateConfig(['domain', 'secret']);
 
+        $url = $this->getApiUrl('/messages');
+
+        $this->logApiCall('POST', $url, [
+            'correlation_id' => $message->correlationId,
+            'to' => array_map(fn ($r) => $r->email, $message->to),
+            'subject' => $message->subject,
+        ]);
+
         try {
             $response = Http::withBasicAuth('api', $this->config['secret'])
                 ->timeout(30)
                 ->asMultipart()
-                ->post($this->getApiUrl('/messages'), $this->buildPayload($message));
+                ->post($url, $this->buildPayload($message));
 
             if ($response->failed()) {
+                $this->logApiResponse($response, $message->correlationId, true);
+
                 throw new \Exception(
                     $response->json('message', 'Mailgun API error'),
                     $response->status()
                 );
             }
+
+            $this->logApiResponse($response, $message->correlationId);
 
             $data = $response->json();
 

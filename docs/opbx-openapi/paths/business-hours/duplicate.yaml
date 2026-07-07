@@ -1,5 +1,5 @@
 paths:
-  /v1/business-hours/{business_hour}/duplicate:
+  /v1/business-hours/{businessHour}/duplicate:
     post:
       tags:
         - Business Hours
@@ -9,7 +9,7 @@ paths:
         - bearerAuth: []
         - cookieAuth: []
       parameters:
-        - name: business_hour
+        - name: businessHour
           in: path
           required: true
           schema:

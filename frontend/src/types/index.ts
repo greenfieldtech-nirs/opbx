@@ -104,7 +104,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  status: Status;
+  status: UserStatus;
   is_platform_manager: boolean;
   phone?: string | null;
   street_address?: string | null;
@@ -113,6 +113,7 @@ export interface User {
   postal_code?: string | null;
   country?: string | null;
   extension?: Extension | null;
+  social_identities?: Array<{ provider: string; provider_email?: string }>;
   created_at: string;
   updated_at: string;
 }
@@ -471,7 +472,7 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   role: UserRole;
-  status?: Status;
+  status?: UserStatus;
   extension_number?: string; // Auto-create extension
 }
 
@@ -480,12 +481,12 @@ export interface UpdateUserRequest {
   email?: string;
   password?: string;
   role?: UserRole;
-  status?: Status;
+  status?: UserStatus;
 }
 
 export interface UsersFilterParams extends PaginationParams {
   role?: UserRole;
-  status?: Status;
+  status?: UserStatus;
   search?: string;
 }
 
@@ -867,6 +868,7 @@ export interface ProfileData {
   country?: string | null;
   organization: Organization;
   extension?: Extension | null;
+  social_identities?: Array<{ provider: string; provider_email?: string }>;
   created_at: string;
   updated_at: string;
 }
@@ -894,7 +896,7 @@ export interface ChangePasswordRequest {
   new_password_confirmation: string;
 }
 
-export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type UserStatus = 'active' | 'inactive' | 'pending' | 'suspended';
 export type ExtensionStatus = Status;
 
 // ============================================================================

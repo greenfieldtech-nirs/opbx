@@ -126,7 +126,30 @@ class ApplicationConfig
     }
 
     /**
-     * Get configuration summary for API response
+     * Get Auth0 configuration for frontend exposure.
+     *
+     * @return array<string, mixed>
+     */
+    private static function getAuth0Config(): array
+    {
+        $enabled = (bool) config('services.auth0.enabled', false);
+
+        if (! $enabled) {
+            return ['enabled' => false];
+        }
+
+        return [
+            'enabled' => true,
+            'domain' => config('services.auth0.domain'),
+            'client_id' => config('services.auth0.client_id'),
+            'providers' => config('services.auth0.providers', []),
+        ];
+    }
+
+    /**
+     * Get configuration summary for API response.
+     *
+     * @return array<string, mixed>
      */
     public static function getConfigurationSummary(): array
     {
@@ -141,6 +164,8 @@ class ApplicationConfig
                 'enabled' => config('services.recaptcha.enabled', false),
                 'site_key' => config('services.recaptcha.site_key'),
             ],
+            'saas_enabled' => (bool) config('services.auth0.enabled', false),
+            'auth0' => self::getAuth0Config(),
         ];
     }
 }

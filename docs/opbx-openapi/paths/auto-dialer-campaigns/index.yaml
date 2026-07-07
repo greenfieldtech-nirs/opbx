@@ -2,31 +2,38 @@ paths:
   /v1/auto-dialer-campaigns:
     get:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: List campaigns
-      description: |
-        Get a paginated list of auto-dialer campaigns.
+      description: 'Get a paginated list of auto-dialer campaigns.
+
         Supports filtering by status and search by name.
+
+        '
       operationId: listAutoDialerCampaigns
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [draft, active, paused, completed, archived]
-          description: Filter by campaign status
-        - name: search
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Search in campaign name
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - active
+          - paused
+          - completed
+          - archived
+        description: Filter by campaign status
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Search in campaign name
       responses:
         '200':
           description: List of campaigns
@@ -38,27 +45,29 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+                      $ref: ../../components/schemas/AutoDialerCampaign.yaml
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
-
+          $ref: ../../components/responses/Forbidden.yaml
     post:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Create campaign
-      description: |
-        Create a new auto-dialer campaign.
-        
-        The campaign is created in 'draft' status and must be started manually
+      description: 'Create a new auto-dialer campaign.
+
+
+        The campaign is created in ''draft'' status and must be started manually
+
         or via auto_start when ready.
+
+        '
       operationId: createAutoDialerCampaign
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -70,21 +79,26 @@ paths:
                   type: string
                   maxLength: 255
                   description: Campaign name
-                  example: "Q1 Sales Campaign"
+                  example: Q1 Sales Campaign
                 description:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 1000
                   description: Campaign description
-                  example: "Outbound campaign for Q1 sales leads"
+                  example: Outbound campaign for Q1 sales leads
                 routing_destination_type:
                   type: string
-                  enum: [ai_assistant, ai_load_balancer, hangup]
+                  enum:
+                  - ai_assistant
+                  - ai_load_balancer
+                  - hangup
                   description: Type of destination for connected calls
-                  example: "ai_assistant"
+                  example: ai_assistant
                 routing_destination_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                   description: ID of the routing destination (required unless type is 'hangup')
                   example: 5
                 dial_timeout:
@@ -95,14 +109,16 @@ paths:
                   example: 30
                 destination_connect:
                   type: string
-                  enum: [connected, immediately]
+                  enum:
+                  - connected
+                  - immediately
                   description: When to connect the destination
-                  example: "connected"
+                  example: connected
                 caller_id:
                   type: string
-                  pattern: "^\\+[1-9]\\d{1,14}$"
+                  pattern: ^\+[1-9]\d{1,14}$
                   description: Default Caller ID in E.164 format (legacy single Caller ID)
-                  example: "+14155551212"
+                  example: '+14155551212'
                 caller_id_pool:
                   type: array
                   description: Array of Caller IDs for the pool (1-100 items)
@@ -122,10 +138,13 @@ paths:
                         example: 1
                 caller_id_strategy:
                   type: string
-                  enum: [round_robin, random, least_recently_used]
+                  enum:
+                  - round_robin
+                  - random
+                  - least_recently_used
                   default: round_robin
                   description: Distribution strategy for Caller ID Pool
-                  example: "round_robin"
+                  example: round_robin
                 max_dial_attempts:
                   type: integer
                   minimum: 1
@@ -163,10 +182,10 @@ paths:
                                 type: string
                               start_time:
                                 type: string
-                                pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                                pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
                               end_time:
                                 type: string
-                                pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$"
+                                pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$
                     tuesday:
                       type: object
                       properties:
@@ -225,21 +244,22 @@ paths:
                   type: string
                   format: date
                   description: Campaign start date
-                  example: "2024-01-01"
+                  example: '2024-01-01'
                 end_date:
                   type: string
                   format: date
                   description: Campaign end date
-                  example: "2024-12-31"
+                  example: '2024-12-31'
                 timezone:
                   type: string
                   description: Timezone for scheduling
-                  example: "America/New_York"
+                  example: America/New_York
                 time_limit:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 30
                   maximum: 14400
-                  nullable: true
                   description: Maximum call duration in seconds
                   example: 300
                 auto_start:
@@ -256,48 +276,54 @@ paths:
                   example: true
                 amd_mode:
                   type: string
-                  enum: [Enabled, DetectMessageEnd]
+                  enum:
+                  - Enabled
+                  - DetectMessageEnd
                   description: AMD detection mode (required if amd_enabled is true)
-                  example: "DetectMessageEnd"
+                  example: DetectMessageEnd
                 amd_timeout:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 5
                   maximum: 120
-                  nullable: true
                   description: AMD timeout in seconds
                   example: 30
                 amd_speech_threshold:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 500
                   maximum: 5000
-                  nullable: true
                   description: AMD speech threshold in milliseconds
                   example: 2500
                 amd_speech_end_threshold:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 500
                   maximum: 5000
-                  nullable: true
                   description: AMD speech end threshold in milliseconds
                   example: 2500
                 amd_silence_timeout:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 500
                   maximum: 10000
-                  nullable: true
                   description: AMD silence timeout in milliseconds
                   example: 2500
               required:
-                - name
-                - routing_destination_type
-                - dial_timeout
-                - destination_connect
-                - caller_id
-                - concurrent_active_calls
-                - schedule
-                - start_date
-                - end_date
-                - timezone
+              - name
+              - routing_destination_type
+              - dial_timeout
+              - destination_connect
+              - caller_id
+              - concurrent_active_calls
+              - schedule
+              - start_date
+              - end_date
+              - timezone
       responses:
         '201':
           description: Campaign created successfully
@@ -308,36 +334,34 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Campaign created successfully"
+                    example: Campaign created successfully
                   data:
-                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+                    $ref: ../../components/schemas/AutoDialerCampaign.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/auto-dialer-campaigns/{campaign}:
     parameters:
-      - name: campaign
-        in: path
-        required: true
-        description: Campaign ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Get campaign
       description: Get a specific campaign by ID
       operationId: getAutoDialerCampaign
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Campaign details
@@ -347,27 +371,29 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+                    $ref: ../../components/schemas/AutoDialerCampaign.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
     put:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Update campaign
-      description: |
-        Update an existing campaign.
-        
-        Only campaigns in 'draft' status can be fully updated.
+      description: 'Update an existing campaign.
+
+
+        Only campaigns in ''draft'' status can be fully updated.
+
         Some fields may be restricted for active campaigns.
+
+        '
       operationId: updateAutoDialerCampaign
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -378,19 +404,24 @@ paths:
                 name:
                   type: string
                   maxLength: 255
-                  example: "Updated Campaign Name"
+                  example: Updated Campaign Name
                 description:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 1000
-                  example: "Updated description"
+                  example: Updated description
                 routing_destination_type:
                   type: string
-                  enum: [ai_assistant, ai_load_balancer, hangup]
-                  example: "ai_assistant"
+                  enum:
+                  - ai_assistant
+                  - ai_load_balancer
+                  - hangup
+                  example: ai_assistant
                 routing_destination_id:
-                  type: integer
-                  nullable: true
+                  type:
+                  - integer
+                  - 'null'
                   example: 5
                 dial_timeout:
                   type: integer
@@ -399,12 +430,14 @@ paths:
                   example: 30
                 destination_connect:
                   type: string
-                  enum: [connected, immediately]
-                  example: "connected"
+                  enum:
+                  - connected
+                  - immediately
+                  example: connected
                 caller_id:
                   type: string
-                  pattern: "^\\+[1-9]\\d{1,14}$"
-                  example: "+14155551212"
+                  pattern: ^\+[1-9]\d{1,14}$
+                  example: '+14155551212'
                 max_dial_attempts:
                   type: integer
                   minimum: 1
@@ -426,19 +459,20 @@ paths:
                 start_date:
                   type: string
                   format: date
-                  example: "2024-01-01"
+                  example: '2024-01-01'
                 end_date:
                   type: string
                   format: date
-                  example: "2024-12-31"
+                  example: '2024-12-31'
                 timezone:
                   type: string
-                  example: "America/New_York"
+                  example: America/New_York
                 time_limit:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 30
                   maximum: 14400
-                  nullable: true
                   example: 300
                 auto_start:
                   type: boolean
@@ -451,31 +485,37 @@ paths:
                   example: true
                 amd_mode:
                   type: string
-                  enum: [Enabled, DetectMessageEnd]
-                  example: "DetectMessageEnd"
+                  enum:
+                  - Enabled
+                  - DetectMessageEnd
+                  example: DetectMessageEnd
                 amd_timeout:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 5
                   maximum: 120
-                  nullable: true
                   example: 30
                 amd_speech_threshold:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 500
                   maximum: 5000
-                  nullable: true
                   example: 2500
                 amd_speech_end_threshold:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 500
                   maximum: 5000
-                  nullable: true
                   example: 2500
                 amd_silence_timeout:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 500
                   maximum: 10000
-                  nullable: true
                   example: 2500
       responses:
         '200':
@@ -487,70 +527,233 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Campaign updated successfully"
+                    example: Campaign updated successfully
                   data:
-                    $ref: '../../components/schemas/AutoDialerCampaign.yaml'
+                    $ref: ../../components/schemas/AutoDialerCampaign.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          $ref: ../../components/responses/ValidationError.yaml
+    patch:
+      tags:
+      - Auto Dialer Campaigns
+      summary: Partially update campaign
+      description: 'Update an existing campaign.
 
+
+        Only campaigns in ''draft'' status can be fully updated.
+
+        Some fields may be restricted for active campaigns.
+
+        '
+      operationId: patchAutoDialerCampaign
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  example: Updated Campaign Name
+                description:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 1000
+                  example: Updated description
+                routing_destination_type:
+                  type: string
+                  enum:
+                  - ai_assistant
+                  - ai_load_balancer
+                  - hangup
+                  example: ai_assistant
+                routing_destination_id:
+                  type:
+                  - integer
+                  - 'null'
+                  example: 5
+                dial_timeout:
+                  type: integer
+                  minimum: 1
+                  maximum: 300
+                  example: 30
+                destination_connect:
+                  type: string
+                  enum:
+                  - connected
+                  - immediately
+                  example: connected
+                caller_id:
+                  type: string
+                  pattern: ^\+[1-9]\d{1,14}$
+                  example: '+14155551212'
+                max_dial_attempts:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 3
+                concurrent_active_calls:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  example: 10
+                calls_per_second:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 1
+                schedule:
+                  type: object
+                  description: Weekly schedule configuration
+                start_date:
+                  type: string
+                  format: date
+                  example: '2024-01-01'
+                end_date:
+                  type: string
+                  format: date
+                  example: '2024-12-31'
+                timezone:
+                  type: string
+                  example: America/New_York
+                time_limit:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 30
+                  maximum: 14400
+                  example: 300
+                auto_start:
+                  type: boolean
+                  example: false
+                record_calls:
+                  type: boolean
+                  example: true
+                amd_enabled:
+                  type: boolean
+                  example: true
+                amd_mode:
+                  type: string
+                  enum:
+                  - Enabled
+                  - DetectMessageEnd
+                  example: DetectMessageEnd
+                amd_timeout:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 5
+                  maximum: 120
+                  example: 30
+                amd_speech_threshold:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 500
+                  maximum: 5000
+                  example: 2500
+                amd_speech_end_threshold:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 500
+                  maximum: 5000
+                  example: 2500
+                amd_silence_timeout:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 500
+                  maximum: 10000
+                  example: 2500
+      responses:
+        '200':
+          description: Campaign updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Campaign updated successfully
+                  data:
+                    $ref: ../../components/schemas/AutoDialerCampaign.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
     delete:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Delete campaign
-      description: |
-        Delete a campaign from the organization.
-        
-        Only campaigns in 'draft' or 'archived' status can be deleted.
+      description: 'Delete a campaign from the organization.
+
+
+        Only campaigns in ''draft'' or ''archived'' status can be deleted.
+
         Active campaigns must be paused and archived first.
+
+        '
       operationId: deleteAutoDialerCampaign
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: Campaign deleted successfully
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '409':
           description: Cannot delete campaign in current status
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
-                error: "DELETE_BLOCKED"
-                message: "Cannot delete active campaign. Pause and archive first."
-                code: "CAMPAIGN_ACTIVE"
-
+                error: DELETE_BLOCKED
+                message: Cannot delete active campaign. Pause and archive first.
+                code: CAMPAIGN_ACTIVE
   /v1/auto-dialer-campaigns/available-caller-ids:
     get:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Get available Caller IDs
-      description: |
-        Get a list of active DID numbers that can be used as Caller IDs
+      description: 'Get a list of active DID numbers that can be used as Caller IDs
+
         for auto-dialer campaigns.
+
+        '
       operationId: getAvailableCallerIds
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - name: exclude_campaign_id
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Campaign ID to exclude DIDs already in that campaign's pool
+      - name: exclude_campaign_id
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Campaign ID to exclude DIDs already in that campaign's pool
       responses:
         '200':
           description: List of available Caller IDs
@@ -571,43 +774,47 @@ paths:
                         phone_number:
                           type: string
                           description: Phone number in E.164 format
-                          example: "+12127773456"
+                          example: '+12127773456'
                         friendly_name:
-                          type: string
-                          nullable: true
+                          type:
+                          - string
+                          - 'null'
                           description: Friendly name for the number
-                          example: "Sales Line 1"
+                          example: Sales Line 1
                         status:
                           type: string
-                          enum: [active, inactive]
+                          enum:
+                          - active
+                          - inactive
                           description: DID status
-                          example: "active"
+                          example: active
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
-
+          $ref: ../../components/responses/Forbidden.yaml
   /v1/auto-dialer-campaigns/{campaign}/caller-id-stats:
     parameters:
-      - name: campaign
-        in: path
-        required: true
-        description: Campaign ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Get Caller ID statistics
-      description: |
-        Get usage statistics for each Caller ID in the campaign's pool.
+      description: 'Get usage statistics for each Caller ID in the campaign''s pool.
+
         Includes total calls, completed, failed, and success rates.
+
+        '
       operationId: getCallerIdStats
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Caller ID statistics
@@ -624,7 +831,7 @@ paths:
                     example: 150
                   strategy:
                     type: string
-                    example: "round_robin"
+                    example: round_robin
                   stats:
                     type: array
                     items:
@@ -635,11 +842,12 @@ paths:
                           example: 1
                         phone_number:
                           type: string
-                          example: "+12127773456"
+                          example: '+12127773456'
                         friendly_name:
-                          type: string
-                          nullable: true
-                          example: "Sales Line 1"
+                          type:
+                          - string
+                          - 'null'
+                          example: Sales Line 1
                         total_calls:
                           type: integer
                           example: 50
@@ -654,38 +862,40 @@ paths:
                           format: float
                           example: 90.0
                         last_used_at:
-                          type: string
+                          type:
+                          - string
+                          - 'null'
                           format: date-time
-                          nullable: true
-                          example: "2026-04-10T14:35:00Z"
+                          example: '2026-04-10T14:35:00Z'
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
   /v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle:
     parameters:
-      - name: campaign
-        in: path
-        required: true
-        description: Campaign ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     post:
       tags:
-        - Auto Dialer Campaigns
+      - Auto Dialer Campaigns
       summary: Reset Caller ID cycle
-      description: |
-        Reset the Caller ID cycle position for Round Robin strategy.
+      description: 'Reset the Caller ID cycle position for Round Robin strategy.
+
         Only available when campaign is in PAUSED status.
+
+        '
       operationId: resetCallerIdCycle
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Cycle reset successfully
@@ -696,29 +906,29 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Caller ID cycle reset successfully"
+                    example: Caller ID cycle reset successfully
                   campaign_id:
                     type: integer
                     example: 9
                   strategy:
                     type: string
-                    example: "round_robin"
+                    example: round_robin
                   next_index:
                     type: integer
                     example: 0
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml
         '409':
           description: Campaign not in valid status for reset
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: ../../components/schemas/Error.yaml
               example:
-                error: "INVALID_STATUS"
-                message: "Campaign must be PAUSED to reset cycle"
-                code: "CAMPAIGN_NOT_PAUSED"
+                error: INVALID_STATUS
+                message: Campaign must be PAUSED to reset cycle
+                code: CAMPAIGN_NOT_PAUSED

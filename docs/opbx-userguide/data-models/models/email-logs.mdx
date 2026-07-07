@@ -1,0 +1,62 @@
+---
+sidebar_position: 14
+slug: /data-models/models/email-logs
+sidebar_class_name: cxGuidesSidebar
+title: EmailLog Model
+---
+
+# EmailLog Model
+
+The `EmailLog` model tracks all transactional email sends for audit and debugging.
+
+**Table:** `email_logs`  
+**Model:** `App\Models\EmailLog`
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | bigint unsigned | No | Primary key |
+| `correlation_id` | string | Yes | Request correlation ID |
+| `provider` | string | Yes | Email provider (mailgun, mailjet, etc.) |
+| `driver` | string | Yes | Mail driver |
+| `from_email` | string | Yes | Sender address |
+| `to_email` | string | Yes | Recipient address |
+| `subject` | string | Yes | Email subject |
+| `status` | string | No | queued, sent, delivered, bounced, failed |
+| `provider_message_id` | string | Yes | Provider tracking ID |
+| `error_message` | text | Yes | Failure reason |
+| `metadata` | JSON | Yes | Provider response metadata |
+| `sent_at` | datetime | Yes | When sent |
+| `created_at` | datetime | No | |
+| `updated_at` | datetime | No | |
+
+## Constants
+
+```php
+EmailLog::STATUS_QUEUED
+EmailLog::STATUS_SENT
+EmailLog::STATUS_DELIVERED
+EmailLog::STATUS_BOUNCED
+EmailLog::STATUS_FAILED
+```
+
+## Scopes
+
+```php
+EmailLog::successful()
+EmailLog::failed()
+EmailLog::forProvider($provider)
+EmailLog::forCorrelation($correlationId)
+EmailLog::recent($days = 7)
+```
+
+## Usage Notes
+
+- Email logs are not scoped by organization; they are platform-wide.
+- Status updates are written by the transactional email service.
+
+## Related Documentation
+
+- [Transactional Email Memory](/.my_agent/memory/transactional-email.md)
+- [Configuration Reference](../configuration/index)

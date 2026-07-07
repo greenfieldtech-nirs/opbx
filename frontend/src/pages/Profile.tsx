@@ -13,7 +13,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useConfig } from '@/context/ConfigContext';
 import { profileService } from '@/services/profile.service';
+import { auth0Service } from '@/services/auth0.service';
 import { getApiErrorMessage } from '@/services/api';
 import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
@@ -46,6 +48,7 @@ import {
   RefreshCw,
   Copy,
   AlertCircle,
+  Link2,
 } from 'lucide-react';
 import type {
   UpdateProfileRequest,
@@ -98,6 +101,7 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
+  const { saasEnabled, auth0Config } = useConfig();
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingOrg, setIsUpdatingOrg] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
@@ -108,6 +112,9 @@ export default function Profile() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
+  const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
 
   const isOwner = user?.role === 'owner';
 
@@ -195,6 +202,14 @@ export default function Profile() {
 
     loadProfile();
   }, [resetOrg, resetProfile]);
+
+  // Sync linked providers from user object or profile data
+  useEffect(() => {
+    const identities = user?.social_identities ?? profileData?.social_identities;
+    if (saasEnabled && identities) {
+      setLinkedProviders(identities.map((i) => i.provider));
+    }
+  }, [saasEnabled, user, profileData]);
 
   // Handle organization update
   const onUpdateOrganization = async (data: OrganizationFormData) => {
@@ -351,6 +366,36 @@ export default function Profile() {
       toast.success('Password copied to clipboard');
     } catch (error) {
       toast.error('Failed to copy password');
+    }
+  };
+
+  // Handle linking a social provider
+  const handleLink = async (provider: string) => {
+    setLinkingProvider(provider);
+    try {
+      const { redirect_url } = await auth0Service.initiateLink(provider);
+      window.location.href = redirect_url;
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      toast.error(message || 'Failed to start account linking.');
+    } finally {
+      setLinkingProvider(null);
+    }
+  };
+
+  // Handle unlinking a social provider
+  const handleUnlink = async (provider: string) => {
+    setUnlinkingProvider(provider);
+    try {
+      await auth0Service.unlink(provider);
+      setLinkedProviders((prev) => prev.filter((p) => p !== provider));
+      await refreshUser();
+      toast.success('Account unlinked.');
+    } catch (error) {
+      const message = getApiErrorMessage(error);
+      toast.error(message || 'Failed to unlink account.');
+    } finally {
+      setUnlinkingProvider(null);
     }
   };
 
@@ -855,6 +900,65 @@ export default function Profile() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Section 4: Linked Accounts */}
+        {saasEnabled && auth0Config.enabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Linked Accounts
+              </CardTitle>
+              <CardDescription>Connect or disconnect social login providers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {auth0Config.providers
+                  ?.filter((provider) => !['x', 'microsoft', 'facebook'].includes(provider))
+                  .map((provider) => {
+                  const isLinked = linkedProviders.includes(provider);
+                  const label = provider.charAt(0).toUpperCase() + provider.slice(1);
+
+                  return (
+                    <div
+                      key={provider}
+                      className="flex items-center justify-between p-3 border rounded-md"
+                    >
+                      <span className="font-medium">{label}</span>
+                      {isLinked ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUnlink(provider)}
+                          disabled={unlinkingProvider === provider}
+                        >
+                          {unlinkingProvider === provider ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Disconnect'
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleLink(provider)}
+                          disabled={linkingProvider === provider}
+                        >
+                          {linkingProvider === provider ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Connect'
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

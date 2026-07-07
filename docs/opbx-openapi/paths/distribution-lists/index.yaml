@@ -2,39 +2,49 @@ paths:
   /v1/auto-dialer-campaigns/lists:
     get:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: List distribution lists
-      description: |
-        Get a paginated list of distribution lists.
-        
+      description: 'Get a paginated list of distribution lists.
+
+
         Returns only the latest versions of each list.
+
         Supports filtering by status and campaign assignment.
+
+        '
       operationId: listDistributionLists
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       parameters:
-        - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [draft, processing, ready, in_use, used, failed, archived]
-          description: Filter by list status
-        - name: campaign_id
-          in: query
-          required: false
-          schema:
-            type: integer
-          description: Filter by assigned campaign ID
-        - name: search
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Search by list name
+      - $ref: ../../components/parameters/query/Page.yaml
+      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - processing
+          - ready
+          - in_use
+          - used
+          - failed
+          - archived
+        description: Filter by list status
+      - name: campaign_id
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Filter by assigned campaign ID
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Search by list name
       responses:
         '200':
           description: List of distribution lists
@@ -46,27 +56,29 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '../../components/schemas/DistributionList.yaml'
+                      $ref: ../../components/schemas/DistributionList.yaml
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
-
+          $ref: ../../components/responses/Forbidden.yaml
     post:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Create distribution list
-      description: |
-        Create a new empty distribution list.
-        
-        The list is created in 'draft' status and can be populated
+      description: 'Create a new empty distribution list.
+
+
+        The list is created in ''draft'' status and can be populated
+
         via upload or by adding destinations individually.
+
+        '
       operationId: createDistributionList
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -78,15 +90,16 @@ paths:
                   type: string
                   maxLength: 255
                   description: List name
-                  example: "Sales Leads Q1"
+                  example: Sales Leads Q1
                 description:
-                  type: string
-                  nullable: true
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 1000
                   description: List description
-                  example: "Qualified sales leads for Q1 2024"
+                  example: Qualified sales leads for Q1 2024
               required:
-                - name
+              - name
       responses:
         '201':
           description: List created successfully
@@ -97,28 +110,29 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "List created successfully"
+                    example: List created successfully
                   data:
-                    $ref: '../../components/schemas/DistributionList.yaml'
+                    $ref: ../../components/schemas/DistributionList.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/auto-dialer-campaigns/lists/example-csv:
     get:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Download example CSV
-      description: |
-        Download an example CSV file showing the expected format
+      description: 'Download an example CSV file showing the expected format
+
         for distribution list uploads.
+
+        '
       operationId: downloadExampleCsv
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Example CSV file
@@ -127,41 +141,43 @@ paths:
               schema:
                 type: string
                 format: binary
-              example: |
-                phone_number,description
+              example: 'phone_number,description
+
                 +14155551212,John Doe - Sales Lead
+
                 +14155551213,Jane Smith - Support Case
+
                 +14155551214,Bob Johnson - Follow-up Call
+
+                '
           headers:
             Content-Disposition:
               schema:
                 type: string
               description: Attachment filename
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
-
+          $ref: ../../components/responses/Forbidden.yaml
   /v1/auto-dialer-campaigns/lists/{list}:
     parameters:
-      - name: list
-        in: path
-        required: true
-        description: Distribution List ID
-        schema:
-          type: integer
-          minimum: 1
-        example: 1
-
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
     get:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Get distribution list
       description: Get a specific distribution list by ID with full details
       operationId: getDistributionList
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Distribution list details
@@ -171,27 +187,29 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '../../components/schemas/DistributionList.yaml'
+                    $ref: ../../components/schemas/DistributionList.yaml
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
-
+          $ref: ../../components/responses/NotFound.yaml
     delete:
       tags:
-        - Distribution Lists
+      - Distribution Lists
       summary: Delete distribution list
-      description: |
-        Delete a distribution list.
-        
-        Only lists in 'failed' status can be deleted by non-owners.
+      description: 'Delete a distribution list.
+
+
+        Only lists in ''failed'' status can be deleted by non-owners.
+
         Owners can delete any list.
+
+        '
       operationId: deleteDistributionList
       security:
-        - bearerAuth: []
-        - cookieAuth: []
+      - bearerAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: List deleted successfully
@@ -202,10 +220,10 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "List deleted successfully"
+                    example: List deleted successfully
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          $ref: ../../components/responses/NotFound.yaml

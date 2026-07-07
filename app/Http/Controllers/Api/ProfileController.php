@@ -15,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Profile management API controller.
@@ -34,13 +33,13 @@ class ProfileController extends Controller
      * Returns detailed profile information for the authenticated user
      * including organization details.
      *
-     * @param Request $request Authenticated request
-     *
+     * @param  Request  $request  Authenticated request
      * @return JsonResponse User profile data
      */
     public function show(Request $request): JsonResponse
     {
         $user = $this->getAuthenticatedUser($request);
+        $user->loadMissing('socialIdentities');
 
         return response()->json([
             'user' => [
@@ -58,6 +57,11 @@ class ProfileController extends Controller
                 'country' => $user->country,
                 'created_at' => $user->created_at?->toIso8601String(),
                 'updated_at' => $user->updated_at?->toIso8601String(),
+                'is_platform_manager' => $user->is_platform_manager,
+                'social_identities' => $user->socialIdentities->map(fn ($identity) => [
+                    'provider' => $identity->provider->value,
+                    'provider_email' => $identity->provider_email,
+                ])->all(),
                 'organization' => [
                     'id' => $user->organization->id,
                     'name' => $user->organization->name,
@@ -76,8 +80,7 @@ class ProfileController extends Controller
      * Email uniqueness is validated across the users table.
      * All changes are logged for audit purposes.
      *
-     * @param UpdateProfileRequest $request Validated profile update data
-     *
+     * @param  UpdateProfileRequest  $request  Validated profile update data
      * @return JsonResponse Updated user profile
      */
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -186,6 +189,10 @@ class ProfileController extends Controller
                     'postal_code' => $user->postal_code,
                     'country' => $user->country,
                     'updated_at' => $user->updated_at?->toIso8601String(),
+                    'social_identities' => $user->socialIdentities->map(fn ($identity) => [
+                        'provider' => $identity->provider->value,
+                        'provider_email' => $identity->provider_email,
+                    ])->all(),
                 ],
             ]);
         } catch (\Exception $e) {
@@ -213,8 +220,7 @@ class ProfileController extends Controller
      * Only users with the OWNER role can perform this operation.
      * All changes are logged for audit purposes.
      *
-     * @param UpdateOrganizationRequest $request Validated organization update data
-     *
+     * @param  UpdateOrganizationRequest  $request  Validated organization update data
      * @return JsonResponse Updated organization data
      */
     public function updateOrganization(UpdateOrganizationRequest $request): JsonResponse
@@ -236,7 +242,7 @@ class ProfileController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($user, $organization, $request) {
+            DB::transaction(function () use ($organization, $request) {
                 // Update organization - only update fields that are present
                 if ($request->has('name')) {
                     $organization->name = $request->input('name');
@@ -298,8 +304,7 @@ class ProfileController extends Controller
      * Password is hashed using bcrypt before storage.
      * All authentication tokens are revoked after password change for security.
      *
-     * @param UpdatePasswordRequest $request Validated password change data
-     *
+     * @param  UpdatePasswordRequest  $request  Validated password change data
      * @return JsonResponse Success message
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse

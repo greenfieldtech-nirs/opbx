@@ -1,0 +1,144 @@
+---
+sidebar_position: 14
+slug: /modules/call-notifications
+sidebar_class_name: cxGuidesSidebar
+title: "Call Notifications"
+description: "Configure webhook notifications for call events"
+---
+
+# Call Notifications
+
+Call Notifications dispatch HTTP POST payloads to a configured URL when call events occur. Each organization has its own settings, event filters, and retry configuration.
+
+## Purpose
+
+Use this module to:
+
+- Send call events to external systems
+- Filter which statuses trigger notifications
+- Configure authentication (none, bearer token, or basic auth)
+- Review delivery logs and rate-limit status
+
+## Event Types
+
+The following normalized statuses can trigger notifications:
+
+| Raw Status | Normalized Event |
+|------------|------------------|
+| new, initiated, created | `new` |
+| ringing, ring, progress | `ringing` |
+| connected, connect | `connected` |
+| answer, answered, active | `answered` |
+| busy | `busy` |
+| cancel, cancelled, canceled | `cancel` |
+| failed, fail, error | `failed` |
+| congestion, congested | `congestion` |
+
+Default enabled events: `new`, `ringing`, `connected`, `answered`, `busy`, `cancel`, `failed`, `congestion`.
+
+## Authentication Methods
+
+| Method | Description |
+|--------|-------------|
+| None | No authentication header |
+| Bearer Token | Sends `Authorization: Bearer {secret}` |
+| Basic Auth | Sends `Authorization: Basic {base64(username:secret)}` |
+
+## SSRF Protection
+
+All webhook URLs are validated to prevent Server-Side Request Forgery:
+
+- Blocks RFC1918 private IPs
+- Blocks loopback and link-local addresses
+- Blocks Docker service names
+- Allows only `http` and `https` schemes
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View notification settings | Yes | Yes | No | No |
+| Update notification settings | Yes | Yes | No | No |
+| Test notifications | Yes | Yes | No | No |
+| View logs | Yes | Yes | No | No |
+
+## UI Workflow
+
+### Configure Notifications
+
+1. Navigate to **Settings** > **Call Notifications**
+2. Enter the webhook URL
+3. Select the authentication method and credentials
+4. Choose enabled events
+5. Set retry attempts, backoff, timeout, and rate limit
+6. Save
+
+### Send a Test Notification
+
+1. Open the Call Notifications settings
+2. Click **Test**
+3. The system sends a sample payload to the configured URL
+4. Review the delivery log for the result
+
+### Review Delivery Logs
+
+1. Open the **Logs** tab
+2. View request payload, response status, response time, and attempt number
+3. Filter by session token or event type
+
+## Key Data Fields
+
+### `call_notifications_settings` Table
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `organization_id` | FK | — | Singleton per org |
+| `webhook_url` | string | null | Must pass SSRF validation |
+| `auth_method` | string | `none` | none, bearer_token, basic_auth |
+| `auth_secret` | string | null | Encrypted |
+| `auth_username` | string | null | For basic auth |
+| `retry_attempts` | integer | 3 | Max retries |
+| `retry_backoff_seconds` | integer | 60 | Base backoff |
+| `request_timeout_seconds` | integer | 30 | HTTP timeout |
+| `enabled_events` | JSON | See defaults | Array of event types |
+| `rate_limit_per_minute` | integer | 500 | Redis-based |
+| `is_active` | boolean | true | Master switch |
+
+### `call_notification_logs` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `organization_id` | FK | Tenant scope |
+| `call_session_token` | string | Session identifier |
+| `event_id` | string | Unique per event |
+| `event_type` | string | `call.status_update` |
+| `status` | string | Call status |
+| `webhook_url` | string | Destination URL |
+| `request_payload` | JSON | Payload sent |
+| `request_headers` | JSON | Sanitized headers |
+| `response_body` | text | Response from endpoint |
+| `response_status_code` | integer | |
+| `response_time_ms` | integer | |
+| `is_success` | boolean | |
+| `attempt_number` | integer | |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/call-notifications/settings` | Get settings |
+| POST | `/v1/call-notifications/settings` | Create settings |
+| PUT | `/v1/call-notifications/settings` | Update settings |
+| DELETE | `/v1/call-notifications/settings` | Delete settings |
+| POST | `/v1/call-notifications/settings/test` | Send test webhook |
+| GET | `/v1/call-notifications/logs` | Delivery logs |
+| GET | `/v1/call-notifications/logs/{token}` | Session-specific logs |
+| GET | `/v1/call-notifications/rate-limit` | Rate limit status |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [Call Logs](/modules/call-logs) — Historical call records
+- [Live Calls](/modules/live-calls) — Real-time session updates
+- [WEBHOOK-AUTHENTICATION.md](https://github.com/greenfieldtech-nirs/opbx/blob/main/docs/WEBHOOK-AUTHENTICATION.md) — Security model for incoming webhooks

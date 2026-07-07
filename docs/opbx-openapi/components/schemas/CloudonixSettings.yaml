@@ -18,8 +18,9 @@ properties:
     type: string
     description: API key for voice routing webhooks
   outbound_trunk_id:
-    type: integer
-    nullable: true
+    type:
+    - integer
+    - 'null'
   webhook_base_url:
     type: string
     format: uri
@@ -30,6 +31,6 @@ properties:
     type: string
     format: date-time
 required:
-  - id
-  - organization_id
-  - domain
+- id
+- organization_id
+- domain

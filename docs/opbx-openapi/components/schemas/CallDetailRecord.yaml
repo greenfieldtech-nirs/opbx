@@ -21,18 +21,20 @@ properties:
     type: integer
     description: Billable seconds
   rated_cost:
-    type: number
-    nullable: true
+    type:
+    - number
+    - 'null'
   recording_url:
-    type: string
+    type:
+    - string
+    - 'null'
     format: uri
-    nullable: true
   created_at:
     type: string
     format: date-time
 required:
-  - id
-  - organization_id
-  - call_id
-  - disposition
-  - duration
+- id
+- organization_id
+- call_id
+- disposition
+- duration

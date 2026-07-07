@@ -1,0 +1,65 @@
+---
+sidebar_position: 13
+slug: /data-models/models/cloudonix-settings
+sidebar_class_name: cxGuidesSidebar
+title: CloudonixSettings Model
+---
+
+# CloudonixSettings Model
+
+The `CloudonixSettings` model stores per-organization Cloudonix CPaaS credentials and voice application configuration.
+
+**Table:** `cloudonix_settings`  
+**Model:** `App\Models\CloudonixSettings`
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | bigint unsigned | No | Primary key |
+| `organization_id` | bigint unsigned | No | One-to-one with organization |
+| `domain_uuid` | string | Yes | Cloudonix domain UUID |
+| `domain_name` | string | Yes | Cloudonix domain name |
+| `domain_api_key` | string | Yes | **Encrypted** API key |
+| `domain_requests_api_key` | string | Yes | **Encrypted** webhook auth key |
+| `webhook_base_url` | string | Yes | Override URL for webhooks |
+| `voice_application_id` | string | Yes | Cloudonix voice app ID |
+| `voice_application_uuid` | string | Yes | |
+| `voice_application_name` | string | Yes | |
+| `no_answer_timeout` | int | Yes | Default ring timeout |
+| `recording_format` | string | Yes | Preferred recording format |
+| `cloudonix_package` | string | Yes | free_tier, standard, etc. |
+| `created_at` | datetime | No | |
+| `updated_at` | datetime | No | |
+
+## Relationships
+
+```php
+$settings->organization() → Organization
+```
+
+## Methods
+
+```php
+$settings->getCallbackUrl(): string
+$settings->getCdrUrl(): string
+$settings->getVoiceRouteUrl(): string
+$settings->getMaskedDomainApiKey(): ?string
+$settings->getMaskedDomainRequestsApiKey(): ?string
+$settings->isConfigured(): bool
+$settings->hasWebhookAuth(): bool
+$settings->getEffectiveWebhookBaseUrlAttribute(): ?string
+$settings->isWebhookUrlOverridden(): bool
+$settings->getWebhookUrlDetails(): array
+```
+
+## Usage Notes
+
+- API keys are encrypted at rest using Laravel's encryption.
+- The effective webhook base URL considers application-level overrides first.
+- Settings are updated through `SettingsController::updateCloudonixSettings`, which also syncs the voice application to Cloudonix.
+
+## Related Documentation
+
+- [Settings Module](../../modules/settings)
+- [Cloudonix Integration Guide](../../installation/cloudonix-setup)

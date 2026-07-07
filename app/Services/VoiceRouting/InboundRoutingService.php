@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
+use App\Enums\AiAssistantStatus;
+use App\Enums\AlbsStatus;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\ExtensionType;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
@@ -13,6 +17,7 @@ use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\VoiceRouting\Strategies\CallTrackingRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +33,8 @@ class InboundRoutingService
     public function __construct(
         private readonly VoiceRoutingCacheService $cache,
         private readonly ExtensionRoutingService $extensionRoutingService,
-        private readonly VoiceRoutingStrategyExecutor $strategyExecutor
+        private readonly VoiceRoutingStrategyExecutor $strategyExecutor,
+        private readonly CallTrackingRoutingStrategy $callTrackingStrategy
     ) {}
 
     /**
@@ -104,6 +110,10 @@ class InboundRoutingService
             'routing_type' => $did->routing_type,
         ]);
 
+        if ($did->routing_type === 'call_tracking') {
+            return $this->callTrackingStrategy->route($request, $did, []);
+        }
+
         $destination = $this->resolveDidDestination($did);
 
         if (empty($destination)) {
@@ -148,6 +158,7 @@ class InboundRoutingService
             'ai_assistant' => $this->resolveAiAssistantDestination($did, $destination),
             'ai_load_balancer' => $this->resolveAiLoadBalancerDestination($did, $destination),
             'business_hours' => $this->resolveBusinessHoursDestination($did, $destination),
+            'call_tracking' => $destination['call_tracking_campaign_id'] = $did->routing_config['call_tracking_campaign_id'] ?? null,
             default => null,
         };
 
@@ -402,10 +413,10 @@ class InboundRoutingService
         }
 
         if ($aiAssistantId) {
-            $aiAssistant = \App\Models\AiAssistant::withoutGlobalScope(OrganizationScope::class)
+            $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $aiAssistantId)
                 ->where('organization_id', $did->organization_id)
-                ->where('status', \App\Enums\AiAssistantStatus::ACTIVE)
+                ->where('status', AiAssistantStatus::ACTIVE)
                 ->first();
 
             if ($aiAssistant) {
@@ -429,10 +440,10 @@ class InboundRoutingService
         }
 
         if ($albsId) {
-            $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+            $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $albsId)
                 ->where('organization_id', $did->organization_id)
-                ->where('status', \App\Enums\AlbsStatus::ACTIVE)
+                ->where('status', AlbsStatus::ACTIVE)
                 ->first();
 
             if ($aiLoadBalancer) {

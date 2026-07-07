@@ -6,6 +6,7 @@ namespace App\Services\Email\Drivers;
 
 use App\Services\Email\DTOs\EmailMessage;
 use App\Services\Email\DTOs\EmailSendResult;
+use App\Services\Email\Exceptions\DriverException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -21,11 +22,19 @@ class SendInBlueDriver extends AbstractEmailDriver
     /**
      * Send an email via SendInBlue/Brevo.
      *
-     * @throws \App\Services\Email\Exceptions\DriverException
+     * @throws DriverException
      */
     public function send(EmailMessage $message): EmailSendResult
     {
         $this->validateConfig(['api_key']);
+
+        $url = 'https://api.brevo.com/v3/smtp/email';
+
+        $this->logApiCall('POST', $url, [
+            'correlation_id' => $message->correlationId,
+            'to' => array_map(fn ($r) => $r->email, $message->to),
+            'subject' => $message->subject,
+        ]);
 
         try {
             $response = Http::withHeaders([
@@ -33,13 +42,17 @@ class SendInBlueDriver extends AbstractEmailDriver
                 'Accept' => 'application/json',
             ])
                 ->timeout(30)
-                ->post('https://api.brevo.com/v3/smtp/email', $this->buildPayload($message));
+                ->post($url, $this->buildPayload($message));
 
             if ($response->failed()) {
+                $this->logApiResponse($response, $message->correlationId, true);
+
                 $error = $response->json();
                 $errorMessage = $error['message'] ?? 'SendInBlue API error';
                 throw new \Exception($errorMessage, $response->status());
             }
+
+            $this->logApiResponse($response, $message->correlationId);
 
             $data = $response->json();
 

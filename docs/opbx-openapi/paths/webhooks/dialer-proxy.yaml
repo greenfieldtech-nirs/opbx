@@ -1,0 +1,104 @@
+paths:
+  /webhooks/cloudonix/dialer:
+    post:
+      tags:
+      - Auto Dialer Webhooks
+      summary: Dialer webhook proxy
+      description: 'Receives Cloudonix webhooks on behalf of the auto-dialer.
+
+
+        Validates the webhook signature and idempotency key, then updates the
+
+        call session and destination status. Supported event types include
+
+        `call.initiated`, `call.ringing`, `call.answered`, `call.connected`,
+
+        `call.completed`, `call.failed`, `call.busy`, and `call.no-answer`.
+
+        '
+      operationId: dialerWebhookProxy
+      security:
+      - webhookBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  description: Cloudonix event type
+                  example: call.completed
+                call_id:
+                  type: string
+                  description: Cloudonix call ID
+                  example: call-xyz789
+                session:
+                  type: object
+                  description: Session information (Cloudonix native shape)
+                  properties:
+                    token:
+                      type: string
+                      example: sess-abc123
+                session_token:
+                  type: string
+                  description: Auto-dialer session token fallback
+                  example: sess-abc123
+                custom_data:
+                  type: object
+                  description: Custom data passed when the call was initiated
+                  additionalProperties: true
+                  properties:
+                    campaign_id:
+                      type: integer
+                      example: 1
+                    destination_id:
+                      type: integer
+                      example: 42
+                    worker_id:
+                      type: string
+                      example: worker-1
+                _organization_id:
+                  type: integer
+                  description: Organization ID injected by Cloudonix
+                  example: 1
+                disposition:
+                  type:
+                  - string
+                  - 'null'
+                  example: completed
+                duration:
+                  type:
+                  - integer
+                  - 'null'
+                  example: 45
+                billsec:
+                  type:
+                  - integer
+                  - 'null'
+                  example: 32
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Session not found

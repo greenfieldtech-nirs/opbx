@@ -30,6 +30,7 @@ interface SidebarSection {
   icon: string;
   items: NavItem[];
   accentColor?: 'default' | 'amber';
+  roles?: string[];
 }
 
 // Sidebar state storage keys
@@ -75,6 +76,7 @@ const sidebarSections: SidebarSection[] = [
     title: 'Apps and Security',
     icon: 'codicon-shield',
     accentColor: 'default',
+    roles: ['owner', 'pbx_admin', 'reporter'],
     items: [
       { name: 'Auto Dialer', href: '', icon: '', isHeader: true },
       { name: 'Campaign Manager', href: '/ui/auto-dialer/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin'] },
@@ -83,6 +85,12 @@ const sidebarSections: SidebarSection[] = [
       { name: 'AI Configuration', href: '', icon: '', isHeader: true },
       { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Call Tracking', href: '', icon: '', isHeader: true },
+      { name: 'Dashboard', href: '/ui/call-tracking/dashboard', icon: 'codicon-dashboard', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Campaigns', href: '/ui/call-tracking/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Sessions', href: '/ui/call-tracking/sessions', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'DNI Snippet', href: '/ui/call-tracking/dni-snippet', icon: 'codicon-code', roles: ['owner', 'pbx_admin'] },
+      { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner'] },
       { name: 'Security', href: '', icon: '', isHeader: true },
       { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
       { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
@@ -297,10 +305,14 @@ export function Sidebar() {
           <div className="flex-1 py-3 space-y-2">
             {sidebarSections.map(section => {
               const isSelected = selectedSectionId === section.id;
-              const hasAccess = section.items.some(item => !item.roles || item.isHeader) ||
-                section.items.some(item => item.roles?.includes(user?.role || ''));
 
-              if (!hasAccess) return null;
+              if (section.roles && (!user?.role || !section.roles.includes(user.role))) {
+                return null;
+              }
+
+              const visibleNavigableItems = getVisibleItems(section.items).filter(item => !item.isHeader);
+
+              if (visibleNavigableItems.length === 0) return null;
 
               return (
                 <button

@@ -1,163 +1,115 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 slug: /modules/ring-groups
 sidebar_class_name: cxGuidesSidebar
-title: Ring Groups
-description: Distributing calls across multiple extensions
+title: "Ring Groups"
+description: "Distribute incoming calls across groups of extensions"
 ---
 
 # Ring Groups
 
-Ring groups distribute incoming calls to multiple extensions. They ensure calls reach available agents and provide coverage for departments.
+Ring groups allow incoming calls to ring multiple extensions simultaneously or sequentially.
 
-## What Is a Ring Group
+## Purpose
 
-A ring group is a collection of extensions that ring simultaneously or sequentially when a call comes in. Ring groups are used to:
+Use this module to:
 
-- Distribute calls across a team
-- Ensure coverage during busy periods
-- Provide backup when primary agents are unavailable
+- Create call distribution groups for departments
+- Choose a ring strategy (simultaneous, round-robin, sequential)
+- Set ring timeout and retry turns
+- Configure fallback actions when no one answers
 
-## Ring Strategies
-
-OPBX supports three ring strategies:
+## Distribution Strategies
 
 | Strategy | Behavior | Best For |
 |----------|----------|----------|
-| Simultaneous | All members ring at once | Small teams, urgent calls |
-| Round Robin | Distributes calls evenly | Load balancing |
-| Sequential | Tries members one by one | Priority-based routing |
-
-### Simultaneous
-
-All members of the ring group receive the call at the same time. The first person to answer takes the call.
-
-**Best for**: Small teams where any member can handle the call, urgent situations where speed matters.
-
-### Round Robin
-
-Calls rotate through members in a fixed order. Each new call goes to the next member in the sequence.
-
-**Best for**: Balancing workload across a team, ensuring equal distribution.
-
-### Sequential
-
-Calls ring the first member. If they do not answer, the call moves to the next member, and so on.
-
-**Best for**: Priority-based routing (manager first, then team), escalations.
-
-## Creating a Ring Group
-
-To create a new ring group:
-
-1. Navigate to **Ring Groups** in the sidebar
-2. Click **Create Ring Group**
-3. Enter a descriptive name
-4. Select the ring strategy
-5. Add member extensions
-6. Configure timeout settings
-7. Set fallback actions
-8. Save the ring group
-
-### Timeout Configuration
-
-| Setting | Description |
-|---------|-------------|
-| Timeout | Seconds to ring before considering unanswered (1-300) |
-| Ring Turns | For sequential strategy, how many times to cycle through members |
+| Simultaneous | All members ring at once | Small teams where anyone can answer |
+| Round Robin | Distributes calls evenly across members | Balancing workload across agents |
+| Sequential | Tries members one by one | Escalation chains or priority routing |
 
 ## Fallback Actions
 
-When nobody in the ring group answers, the call can route to a fallback destination:
+When no member answers within the timeout, the call can route to:
 
-| Fallback | Description |
-|----------|------------|
-| Extension | Route to specific extension |
-| Ring Group | Route to another ring group |
-| IVR Menu | Route to IVR |
-| AI Assistant | Route to AI agent |
-| AI Load Balancer | Route to AI balancer |
-| Hangup | End the call |
+| Action | Description |
+|--------|-------------|
+| Extension | A specific extension |
+| Ring Group | Another ring group |
+| IVR Menu | An IVR menu |
+| AI Assistant | An AI assistant |
+| AI Load Balancer | An AI load balancer |
+| Hangup | Disconnect the call |
 
-:::tip
-Always configure a fallback to prevent callers from hanging up in voicemail limbo. A common pattern is to route to an IVR with a "leave a message" option.
-:::
+## Permissions
 
-## Managing Members
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View ring groups | Yes | Yes | Yes | Yes |
+| Create ring groups | Yes | Yes | No | No |
+| Update ring groups | Yes | Yes | No | No |
+| Delete ring groups | Yes | Yes | No | No |
 
-### Adding Members
+## UI Workflow
 
-1. Open the ring group details
-2. Click **Add Member**
-3. Select an extension
-4. Set priority (for sequential strategy)
-5. Save
+### Create a Ring Group
 
-### Member Priority
+1. Navigate to **Ring Groups** in the sidebar
+2. Click **Create Ring Group**
+3. Enter a name and optional description
+4. Select a strategy
+5. Set the ring timeout (seconds)
+6. Add member extensions
+7. Choose a fallback action
+8. Save
 
-Priority determines the order for sequential ringing. Lower numbers ring first.
+### Update Members
 
-| Priority | Order |
-|----------|-------|
-| 1 | Rings first |
-| 2 | Rings second |
-| 3 | Rings third |
+1. Open the ring group
+2. Add, remove, or reorder members
+3. Save the changes
 
-### Removing Members
+The controller uses a delete-and-recreate pattern for members, so the list is fully replaced on each update.
 
-Click the delete icon next to a member to remove them from the group. This does not delete the extension, only its membership in this group.
+## Key Data Fields
 
-## Ring Group Status
+### `ring_groups` Table
 
-| Status | Behavior |
-|--------|----------|
-| Active | Accepts and routes calls |
-| Inactive | Calls skip this group and go to fallback |
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | Group name |
+| `description` | string nullable | |
+| `strategy` | enum | simultaneous, round_robin, sequential |
+| `timeout` | integer | Ring timeout in seconds |
+| `ring_turns` | integer | Number of ring cycles (sequential) |
+| `fallback_action` | enum | Action when no one answers |
+| `fallback_extension_id` | FK nullable | |
+| `fallback_ring_group_id` | FK nullable | Self-referencing |
+| `fallback_ivr_menu_id` | FK nullable | |
+| `fallback_ai_assistant_id` | FK nullable | |
+| `fallback_ai_load_balancer_id` | FK nullable | |
+| `status` | enum | active, inactive |
 
-Set a ring group to Inactive during:
-- Department meetings
-- After-hours when no one is available
-- System maintenance
+### `ring_group_members` Table
 
-## Ring Group Examples
+| Column | Type | Notes |
+|--------|------|-------|
+| `ring_group_id` | FK | Parent group |
+| `extension_id` | FK | Member extension |
+| `priority` | integer | Member order |
 
-### Sales Department
+## Related API Endpoints
 
-- **Name**: Sales Team
-- **Strategy**: Simultaneous
-- **Members**: Extensions 1001, 1002, 1003
-- **Timeout**: 20 seconds
-- **Fallback**: Sales IVR
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST/PUT/DELETE | `/v1/ring-groups[/{ringGroup}]` | Standard CRUD |
 
-Result: All three sales agents' phones ring. If no one answers, the caller hears the sales menu.
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-### Support Escalation
+## Related Modules
 
-- **Name**: Support L1
-- **Strategy**: Sequential
-- **Members**: Extension 2001 (Priority 1), 2002 (Priority 2), 2003 (Priority 3)
-- **Timeout**: 15 seconds per member
-- **Fallback**: Support L2 Ring Group
-
-Result: Calls try the senior agent first, then junior agents, then escalate to Level 2.
-
-## Best Practices
-
-### Member Selection
-
-- Include only active extensions
-- Avoid adding the same extension to multiple overlapping groups
-- Consider skill levels when setting sequential priorities
-
-### Timeout Settings
-
-- Simultaneous: 20-30 seconds is typical
-- Sequential: 10-15 seconds per member
-- Total timeout should not exceed caller patience (usually 60-90 seconds)
-
-### Fallback Design
-
-- Always have a fallback
-- Use IVR for voicemail options
-- Consider routing to a manager for urgent queues
-- Never leave callers with no destination
+- [Extensions](/modules/extensions) — Members are extensions
+- [Phone Numbers](/modules/phone-numbers) — DIDs can route to ring groups
+- [IVR Menus](/modules/ivr-menus) — IVR options can route to ring groups
+- [AI Load Balancers](/modules/ai-load-balancers) — ALBS fallback can route to ring groups

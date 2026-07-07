@@ -4,10 +4,19 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
+use App\Http\Controllers\Api\AiAssistantProviderController;
+use App\Http\Controllers\Api\Auth0Controller;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
+use App\Http\Controllers\Api\CallTrackingAdPlatformIntegrationController;
+use App\Http\Controllers\Api\CallTrackingAnalyticsController;
+use App\Http\Controllers\Api\CallTrackingCampaignController;
+use App\Http\Controllers\Api\CallTrackingDniController;
+use App\Http\Controllers\Api\CallTrackingNotificationSettingsController;
+use App\Http\Controllers\Api\CallTrackingNumberController;
+use App\Http\Controllers\Api\CallTrackingSessionController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\EmailValidationController;
@@ -16,6 +25,7 @@ use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
 use App\Http\Controllers\Api\InboundBlacklistController;
 use App\Http\Controllers\Api\IvrMenuController;
+use App\Http\Controllers\Api\OrganizationJoinRequestController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
@@ -24,11 +34,14 @@ use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
+use App\Http\Controllers\DistributionListController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+use Pusher\Pusher;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +57,7 @@ use Illuminate\Support\Facades\Route;
 // SECURITY: This route requires HMAC-signed URLs with expiration.
 // The serveMinioFile() method validates the ?expires= and ?sig= query parameters
 // using HMAC-SHA256 with APP_KEY. Unsigned or expired requests are rejected with 403.
-Route::get('storage/recordings/{path}', [\App\Http\Controllers\Api\RecordingsController::class, 'serveMinioFile'])
+Route::get('storage/recordings/{path}', [RecordingsController::class, 'serveMinioFile'])
     ->name('storage.recordings.serve')
     ->where('path', '[0-9]+/.+');
 
@@ -116,7 +129,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
                 'readable' => $isHealthy,
                 'timestamp' => now()->toIso8601String(),
             ], $isHealthy ? 200 : 503);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
                 'timestamp' => now()->toIso8601String(),
@@ -127,7 +140,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
     Route::get('/websocket/health', function () {
         try {
             // Test Pusher/Soketi connection
-            $pusher = new \Pusher\Pusher(
+            $pusher = new Pusher(
                 config('broadcasting.connections.pusher.key'),
                 config('broadcasting.connections.pusher.secret'),
                 config('broadcasting.connections.pusher.options.app_id'),
@@ -141,7 +154,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
                 'status' => 'ok',
                 'timestamp' => now()->toIso8601String(),
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
                 'timestamp' => now()->toIso8601String(),
@@ -172,6 +185,17 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:10,1')
         ->name('validate-email');
 
+    // Call Tracking DNI swap endpoint (public, rate limited)
+    Route::get('call-tracking-dni/swap', [CallTrackingDniController::class, 'swap'])
+        ->middleware(['throttle:call-tracking-dni'])
+        ->name('call-tracking.dni.swap');
+
+    // Application configuration (public)
+    // Required by the login/register pages before authentication to decide whether
+    // to show Auth0 social-provider buttons, reCAPTCHA, etc.
+    Route::get('config/application', [ConfigurationController::class, 'index'])
+        ->name('config.application');
+
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
@@ -185,6 +209,14 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:registration')
             ->name('auth.register');
 
+        Route::post('/auth0/redirect', [Auth0Controller::class, 'redirect'])
+            ->name('auth.auth0.redirect')
+            ->middleware('throttle:auth');
+
+        Route::get('/auth0/callback', [Auth0Controller::class, 'callback'])
+            ->name('auth.auth0.callback')
+            ->middleware('throttle:auth');
+
         Route::get('/register/validate', [RegisterController::class, 'validateRegistration'])
             ->name('auth.register.validate');
 
@@ -193,8 +225,22 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
             Route::post('/refresh', [AuthController::class, 'refresh'])->name('auth.refresh');
             Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
+
+            Route::post('/auth0/link', [Auth0Controller::class, 'initiateLink'])->name('auth.auth0.link');
+            Route::post('/auth0/unlink', [Auth0Controller::class, 'unlink'])->name('auth.auth0.unlink');
         });
     });
+
+    // Organization join requests
+    Route::middleware(['auth:sanctum'])->group(function (): void {
+        Route::get('/organizations/join-requests', [OrganizationJoinRequestController::class, 'index'])->name('join-requests.index');
+        Route::post('/organizations/join-requests/{joinRequest}/approve', [OrganizationJoinRequestController::class, 'approve'])->name('join-requests.approve');
+        Route::post('/organizations/join-requests/{joinRequest}/reject', [OrganizationJoinRequestController::class, 'reject'])->name('join-requests.reject');
+    });
+
+    Route::post('/organizations/join-requests', [OrganizationJoinRequestController::class, 'store'])
+        ->name('join-requests.store')
+        ->middleware('throttle:auth');
 
     // Public token-authenticated routes (for HTML5 audio/video elements that can't send auth headers)
     // These routes use self-authenticating tokens instead of Sanctum middleware
@@ -203,10 +249,6 @@ Route::prefix('v1')->group(function (): void {
 
     // Protected API routes
     Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
-        // Application configuration (public to authenticated users)
-        Route::get('config/application', [ConfigurationController::class, 'index'])
-            ->name('config.application');
-
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
@@ -225,6 +267,8 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('users', UsersController::class);
         Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
             ->name('users.password.update');
+        Route::post('users/invite', [UserInvitationController::class, 'invite'])
+            ->name('users.invite');
 
         // Extensions - Cloudonix sync (using ExtensionCloudonixController)
         // Must be defined BEFORE apiResource to avoid wildcard matching issues
@@ -250,16 +294,56 @@ Route::prefix('v1')->group(function (): void {
 
         // AI Assistant Providers
         Route::prefix('ai-assistant')->group(function (): void {
-            Route::get('providers', [\App\Http\Controllers\Api\AiAssistantProviderController::class, 'index'])
+            Route::get('providers', [AiAssistantProviderController::class, 'index'])
                 ->name('ai-assistant.providers.index');
-            Route::get('providers/{provider}', [\App\Http\Controllers\Api\AiAssistantProviderController::class, 'show'])
+            Route::get('providers/{provider}', [AiAssistantProviderController::class, 'show'])
                 ->name('ai-assistant.providers.show');
-            Route::get('providers/protocol/{protocol}', [\App\Http\Controllers\Api\AiAssistantProviderController::class, 'byProtocol'])
+            Route::get('providers/protocol/{protocol}', [AiAssistantProviderController::class, 'byProtocol'])
                 ->name('ai-assistant.providers.by-protocol');
         });
 
         // Conference Rooms
         Route::apiResource('conference-rooms', ConferenceRoomController::class);
+
+        // Call Tracking Campaigns
+        Route::apiResource('call-tracking-campaigns', CallTrackingCampaignController::class);
+
+        // Call Tracking Numbers (nested under campaigns)
+        Route::apiResource('call-tracking-campaigns.call-tracking-numbers', CallTrackingNumberController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
+
+        // Call Tracking Notification Settings (singleton nested under campaigns)
+        Route::get('call-tracking-campaigns/{callTrackingCampaign}/notification-settings', [CallTrackingNotificationSettingsController::class, 'show'])
+            ->name('call-tracking-campaigns.notification-settings.show');
+        Route::put('call-tracking-campaigns/{callTrackingCampaign}/notification-settings', [CallTrackingNotificationSettingsController::class, 'update'])
+            ->name('call-tracking-campaigns.notification-settings.update');
+        Route::post('call-tracking-campaigns/{callTrackingCampaign}/notification-settings/test', [
+            CallTrackingNotificationSettingsController::class, 'test',
+        ])->middleware(['throttle:5,1'])
+            ->name('call-tracking-campaigns.notification-settings.test');
+
+        Route::get('call-tracking-campaigns/{callTrackingCampaign}/notification-logs', [
+            CallTrackingNotificationSettingsController::class, 'logs',
+        ])->name('call-tracking-campaigns.notification-logs.index');
+
+        // Call Tracking Analytics
+        Route::get('call-tracking-analytics', [CallTrackingAnalyticsController::class, 'index'])
+            ->name('call-tracking-analytics.index');
+        Route::get('call-tracking-analytics/export', [CallTrackingAnalyticsController::class, 'export'])
+            ->name('call-tracking-analytics.export');
+
+        // Call Tracking Sessions
+        Route::get('call-tracking-sessions', [CallTrackingSessionController::class, 'index'])
+            ->name('call-tracking-sessions.index');
+
+        // Call Tracking Ad-Platform Integrations (organization singleton)
+        Route::get('call-tracking-ad-platform-integrations', [
+            CallTrackingAdPlatformIntegrationController::class, 'show',
+        ])->name('call-tracking-ad-platform-integrations.show');
+
+        Route::put('call-tracking-ad-platform-integrations', [
+            CallTrackingAdPlatformIntegrationController::class, 'update',
+        ])->name('call-tracking-ad-platform-integrations.update');
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
@@ -328,6 +412,12 @@ Route::prefix('v1')->group(function (): void {
 
     });
 
+    // User invitations (public token-authenticated endpoints)
+    Route::prefix('users/invite')->middleware('throttle:auth')->group(function (): void {
+        Route::get('validate', [UserInvitationController::class, 'validateToken'])->name('users.invite.validate');
+        Route::post('accept', [UserInvitationController::class, 'accept'])->name('users.invite.accept');
+    });
+
     // Session Updates - NOT rate limited (real-time polling endpoints)
     Route::middleware(['auth:sanctum', 'tenant.scope'])->prefix('session-updates')->group(function (): void {
         Route::get('/active', [SessionUpdateController::class, 'getActiveCalls'])->name('session-updates.active');
@@ -358,45 +448,45 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(functio
         ->name('auto-dialer-campaigns.monitor.detail');
 
     // Distribution Lists (MUST be before apiResource to avoid route conflicts)
-    Route::get('auto-dialer-campaigns/lists', [\App\Http\Controllers\DistributionListController::class, 'index'])
+    Route::get('auto-dialer-campaigns/lists', [DistributionListController::class, 'index'])
         ->name('distribution-lists.index');
-    Route::post('auto-dialer-campaigns/lists', [\App\Http\Controllers\DistributionListController::class, 'store'])
+    Route::post('auto-dialer-campaigns/lists', [DistributionListController::class, 'store'])
         ->name('distribution-lists.store');
-    Route::get('auto-dialer-campaigns/lists/example-csv', [\App\Http\Controllers\DistributionListController::class, 'downloadExample'])
+    Route::get('auto-dialer-campaigns/lists/example-csv', [DistributionListController::class, 'downloadExample'])
         ->name('distribution-lists.example');
-    Route::get('auto-dialer-campaigns/lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'show'])
+    Route::get('auto-dialer-campaigns/lists/{list}', [DistributionListController::class, 'show'])
         ->name('distribution-lists.show');
-    Route::post('auto-dialer-campaigns/lists/{list}/upload', [\App\Http\Controllers\DistributionListController::class, 'upload'])
+    Route::post('auto-dialer-campaigns/lists/{list}/upload', [DistributionListController::class, 'upload'])
         ->name('distribution-lists.upload');
-    Route::get('auto-dialer-campaigns/lists/upload-progress/{jobId}', [\App\Http\Controllers\DistributionListController::class, 'uploadProgress'])
+    Route::get('auto-dialer-campaigns/lists/upload-progress/{jobId}', [DistributionListController::class, 'uploadProgress'])
         ->name('distribution-lists.progress');
-    Route::post('auto-dialer-campaigns/lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'addDestination'])
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations', [DistributionListController::class, 'addDestination'])
         ->name('distribution-lists.destinations.add');
-    Route::post('auto-dialer-campaigns/lists/{list}/destinations/batch', [\App\Http\Controllers\DistributionListController::class, 'addDestinationsBatch'])
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations/batch', [DistributionListController::class, 'addDestinationsBatch'])
         ->name('distribution-lists.destinations.batch');
-    Route::post('auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'resetDialAttempts'])
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts', [DistributionListController::class, 'resetDialAttempts'])
         ->name('distribution-lists.destinations.reset-dial-attempts');
-    Route::post('auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts', [\App\Http\Controllers\DistributionListController::class, 'bulkResetDialAttempts'])
+    Route::post('auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts', [DistributionListController::class, 'bulkResetDialAttempts'])
         ->name('distribution-lists.destinations.bulk-reset-dial-attempts');
-    Route::post('auto-dialer-campaigns/lists/{list}/reset-pending-destinations', [\App\Http\Controllers\DistributionListController::class, 'resetPendingDestinations'])
+    Route::post('auto-dialer-campaigns/lists/{list}/reset-pending-destinations', [DistributionListController::class, 'resetPendingDestinations'])
         ->name('distribution-lists.reset-pending-destinations');
-    Route::get('auto-dialer-campaigns/lists/{list}/destinations', [\App\Http\Controllers\DistributionListController::class, 'getDestinations'])
+    Route::get('auto-dialer-campaigns/lists/{list}/destinations', [DistributionListController::class, 'getDestinations'])
         ->name('distribution-lists.destinations');
-    Route::get('auto-dialer-campaigns/lists/{list}/versions', [\App\Http\Controllers\DistributionListController::class, 'getVersions'])
+    Route::get('auto-dialer-campaigns/lists/{list}/versions', [DistributionListController::class, 'getVersions'])
         ->name('distribution-lists.versions');
-    Route::post('auto-dialer-campaigns/lists/{list}/copy', [\App\Http\Controllers\DistributionListController::class, 'copy'])
+    Route::post('auto-dialer-campaigns/lists/{list}/copy', [DistributionListController::class, 'copy'])
         ->name('distribution-lists.copy');
-    Route::patch('auto-dialer-campaigns/lists/{list}/archive', [\App\Http\Controllers\DistributionListController::class, 'archive'])
+    Route::patch('auto-dialer-campaigns/lists/{list}/archive', [DistributionListController::class, 'archive'])
         ->name('distribution-lists.archive');
-    Route::get('auto-dialer-campaigns/lists/{list}/download', [\App\Http\Controllers\DistributionListController::class, 'download'])
+    Route::get('auto-dialer-campaigns/lists/{list}/download', [DistributionListController::class, 'download'])
         ->name('distribution-lists.download');
-    Route::get('auto-dialer-campaigns/lists/{list}/validation-errors', [\App\Http\Controllers\DistributionListController::class, 'getValidationErrors'])
+    Route::get('auto-dialer-campaigns/lists/{list}/validation-errors', [DistributionListController::class, 'getValidationErrors'])
         ->name('distribution-lists.errors');
-    Route::delete('auto-dialer-campaigns/lists/{list}', [\App\Http\Controllers\DistributionListController::class, 'destroy'])
+    Route::delete('auto-dialer-campaigns/lists/{list}', [DistributionListController::class, 'destroy'])
         ->name('distribution-lists.destroy');
-    Route::post('auto-dialer-campaigns/lists/{list}/assign', [\App\Http\Controllers\DistributionListController::class, 'assignToCampaign'])
+    Route::post('auto-dialer-campaigns/lists/{list}/assign', [DistributionListController::class, 'assignToCampaign'])
         ->name('distribution-lists.assign');
-    Route::post('auto-dialer-campaigns/lists/{list}/unassign', [\App\Http\Controllers\DistributionListController::class, 'unassignFromCampaign'])
+    Route::post('auto-dialer-campaigns/lists/{list}/unassign', [DistributionListController::class, 'unassignFromCampaign'])
         ->name('distribution-lists.unassign');
 
     // Campaigns - Caller ID Pooling (static routes must come BEFORE apiResource)

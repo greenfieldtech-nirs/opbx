@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { DIDNumber, RoutingType, CreateDIDRequest, UpdateDIDRequest } from '@/types/api.types';
+import type { DIDNumber, RoutingType, CreateDIDRequest, UpdateDIDRequest, Status } from '@/types/api.types';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 import {
@@ -46,7 +46,7 @@ export function PhoneNumberDialog({
   const [formData, setFormData] = useState({
     phone_number: '',
     friendly_name: '',
-    status: 'active' as 'active' | 'inactive',
+    status: 'active' as Status,
     routing_type: 'extension' as RoutingType,
     target_id: '',
     enable_non_e164: false,
