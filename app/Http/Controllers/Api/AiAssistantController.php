@@ -273,7 +273,7 @@ class AiAssistantController extends AbstractApiCrudController
 
         if ($provider === 'dograh-cloud') {
             $data['configuration'] = $data['configuration'] ?? [];
-            $data['configuration']['websocket_endpoint'] = 'wss://app.dograh.com/api/v1/agent-stream';
+            $data['configuration']['websocket_endpoint'] = 'wss://api.dograh.com/api/v1/agent-stream/cloudonix';
         }
 
         return $data;

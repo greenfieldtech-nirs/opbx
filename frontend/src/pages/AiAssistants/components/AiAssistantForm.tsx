@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Wifi, Phone, Bot } from 'lucide-react';
+import { useEffect } from 'react';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 
 interface FormData {
@@ -62,6 +63,37 @@ export function AiAssistantForm({
       },
     });
   };
+
+  // Populate read-only provider configuration fields with their default values
+  // whenever the selected provider changes (including initial render in edit mode).
+  useEffect(() => {
+    if (!selectedProvider) return;
+
+    const readOnlyDefaults = selectedProvider.config_fields.reduce<Record<string, string>>(
+      (acc, field) => {
+        if (field.read_only && field.default_value !== undefined) {
+          acc[field.name] = field.default_value;
+        }
+        return acc;
+      },
+      {}
+    );
+
+    const needsUpdate = Object.entries(readOnlyDefaults).some(
+      ([name, value]) => formData.configuration[name] !== value
+    );
+
+    if (!needsUpdate) return;
+
+    onChange({
+      ...formData,
+      configuration: {
+        ...formData.configuration,
+        ...readOnlyDefaults,
+      },
+    });
+    // Run only when the selected provider key changes.
+  }, [selectedProvider?.key]);
 
   // Group providers by protocol
   const sipProviders = providers.filter((p) => p.protocol === 'sip');
@@ -151,7 +183,7 @@ export function AiAssistantForm({
                 value={formData.configuration[field.name] || ''}
                 onChange={(e) => handleConfigChange(field.name, e.target.value)}
                 placeholder={field.placeholder || ''}
-                disabled={disabled}
+                disabled={disabled || field.read_only}
               />
               {field.description && (
                 <p className="text-xs text-muted-foreground">{field.description}</p>

@@ -424,10 +424,10 @@ class ProviderRegistry
                     label: 'WebSocket Endpoint',
                     type: 'url',
                     required: true,
-                    placeholder: 'wss://app.dograh.com/api/v1/agent-stream',
+                    placeholder: 'wss://api.dograh.com/api/v1/agent-stream/cloudonix',
                     description: 'Fixed Dograh Cloud WebSocket endpoint',
                     readOnly: true,
-                    defaultValue: 'wss://app.dograh.com/api/v1/agent-stream',
+                    defaultValue: 'wss://api.dograh.com/api/v1/agent-stream/cloudonix',
                 ),
                 new ProviderConfigField(
                     name: 'agent_uuid',

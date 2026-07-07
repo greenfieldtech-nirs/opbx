@@ -250,7 +250,7 @@ class AiAssistantProviderTest extends TestCase
 
         $endpointField = collect($provider['config_fields'])->firstWhere('name', 'websocket_endpoint');
         $this->assertTrue($endpointField['read_only']);
-        $this->assertEquals('wss://app.dograh.com/api/v1/agent-stream', $endpointField['default_value']);
+        $this->assertEquals('wss://api.dograh.com/api/v1/agent-stream/cloudonix', $endpointField['default_value']);
     }
 
     public function test_dograh_oss_provider_configuration(): void

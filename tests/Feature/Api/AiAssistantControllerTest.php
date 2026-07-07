@@ -232,7 +232,7 @@ class AiAssistantControllerTest extends TestCase
             'status' => 'active',
             'provider' => 'dograh-cloud',
             'configuration' => [
-                'websocket_endpoint' => 'wss://app.dograh.com/api/v1/agent-stream',
+                'websocket_endpoint' => 'wss://api.dograh.com/api/v1/agent-stream/cloudonix',
                 'agent_uuid' => 'agent-uuid-123',
             ],
         ];
@@ -306,7 +306,7 @@ class AiAssistantControllerTest extends TestCase
 
         $assistant = AiAssistant::where('name', 'Dograh Cloud Fixed Endpoint')->first();
         $this->assertNotNull($assistant);
-        $this->assertEquals('wss://app.dograh.com/api/v1/agent-stream', $assistant->configuration['websocket_endpoint']);
+        $this->assertEquals('wss://api.dograh.com/api/v1/agent-stream/cloudonix', $assistant->configuration['websocket_endpoint']);
     }
 
     /**

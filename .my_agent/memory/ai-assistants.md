@@ -8,7 +8,7 @@
 
 ## Overview
 
-AI-powered voice assistants with 19 providers, registry-based configuration, and CXML endpoint proxying. AI assistants can be linked to extensions or used as auto-dialer campaign routing destinations.
+AI-powered voice assistants with 21 providers, registry-based configuration, and CXML endpoint proxying. AI assistants can be linked to extensions or used as auto-dialer campaign routing destinations.
 
 ---
 
@@ -25,18 +25,15 @@ AI-powered voice assistants with 19 providers, registry-based configuration, and
 | `app/Http/Requests/AiAssistant/StoreAiAssistantRequest.php` | Create validation |
 | `app/Http/Requests/AiAssistant/UpdateAiAssistantRequest.php` | Update validation |
 | `app/Http/Resources/AiAssistantResource.php` | API response transformer |
-
-### Resource fix (2026-07-03)
-- `AiAssistantResource` fixed a 500 on `GET /api/v1/ai-assistants/{ai_assistant}`: the `used_by_extensions` mapping was calling `$ext->when(...)` instead of `$this->when(...)`, causing the resource conditional to be invoked on an Eloquent model rather than the resource instance.
 | `app/Policies/AiAssistantPolicy.php` | Authorization |
 
 ### Frontend
 | File | Purpose |
 |------|---------|
 | `frontend/src/pages/AiAssistants.tsx` | AI assistant management page |
-| `frontend/src/services/aiAssistantsApi.ts` | API calls |
-| `frontend/src/hooks/useAiAssistants.ts` | Queries/mutations |
-| `frontend/src/components/Extensions/AiAssistantConfigForm.tsx` | Dynamic provider config form |
+| `frontend/src/services/aiAssistants.service.ts` | API calls |
+| `frontend/src/pages/AiAssistants/components/AiAssistantForm.tsx` | Dynamic provider config form used by create/edit dialogs |
+| `frontend/src/components/Extensions/AiAssistantConfigForm.tsx` | **Unused legacy component** — do not use for new work |
 
 ---
 
@@ -103,11 +100,16 @@ When an extension of type `AI_ASSISTANT` is dialed via subscriber (internal) dir
 ## Provider Registry Notes (2026-07-06)
 
 - Registry now includes 21 providers: two new WebSocket providers `dograh-cloud` and `dograh-oss`.
-- `dograh-cloud` uses a fixed read-only WebSocket endpoint (`wss://app.dograh.com/api/v1/agent-stream`) and requires an `agent_uuid`.
+- `dograh-cloud` uses a fixed read-only WebSocket endpoint (`wss://api.dograh.com/api/v1/agent-stream/cloudonix`) and requires an `agent_uuid`.
 - `dograh-oss` uses a user-supplied `websocket_endpoint` and an `agent_uuid`.
-- The assembled CXML WebSocket URL is `{websocket_endpoint}/{agent_uuid}`.
+- The assembled CXML WebSocket URL is `{websocket_endpoint}/{agent_uuid}`, e.g. `wss://api.dograh.com/api/v1/agent-stream/cloudonix/{agent_uuid}`.
 - `ProviderConfigField` supports `read_only` and `default_value` fields for UI rendering.
 - `WebSocketUrlBuilder` treats `websocket_endpoint` as a raw URL placeholder (not URL-encoded) so the endpoint structure is preserved.
+
+### Read-only / Default Value UI Rendering (2026-07-06)
+- `frontend/src/pages/AiAssistants/components/AiAssistantForm.tsx` applies read-only defaults by populating `formData.configuration[field.name]` with `field.default_value` whenever the selected provider changes.
+- Read-only fields are rendered with `disabled={disabled || field.read_only}` so they cannot be edited.
+- This makes `dograh-cloud` display the fixed WebSocket endpoint (`wss://api.dograh.com/api/v1/agent-stream/cloudonix`) as the field value instead of the placeholder.
 
 ## Related Modules
 
