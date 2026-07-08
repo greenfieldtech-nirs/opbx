@@ -51,31 +51,62 @@ class UserPolicy
      *
      * - Owner and PBX Admin can view any user
      * - PBX User can only view themselves
+     * - Supervisor can view themselves and their assigned users
      * - Reporter cannot view user details
      *
-     * @param  User  $authUser  The authenticated user
-     * @param  User  $targetUser  The user being viewed
-     * @return bool True if authorized to view the target user
+     * @param  User  $currentUser  The authenticated user
+     * @param  User  $user  The user being viewed
+     * @return bool True if authorized to view the user
      */
-    public function view(User $authUser, User $targetUser): bool
+    public function view(User $currentUser, User $user): bool
     {
         // Cross-tenant access is never allowed
-        if ($authUser->organization_id !== $targetUser->organization_id) {
+        if ($currentUser->organization_id !== $user->organization_id) {
             return false;
         }
 
-        // Owner and PBX Admin can view any user
-        if ($authUser->role->canManageUsers()) {
+        if ($currentUser->isSupervisor()) {
+            return $currentUser->id === $user->id || $currentUser->supervisedUsers->contains($user);
+        }
+
+        if ($currentUser->role->canManageUsers()) {
             return true;
         }
 
-        // PBX User can only view themselves
-        if ($authUser->role->isPBXUser()) {
-            return $authUser->id === $targetUser->id;
+        return $currentUser->id === $user->id;
+    }
+
+    /**
+     * Determine if the user can assign supervisors.
+     *
+     * Only Owner and PBX Admin can assign supervisors.
+     *
+     * @param  User  $currentUser  The authenticated user
+     * @return bool True if authorized to assign supervisors
+     */
+    public function assignAsSupervisor(User $currentUser): bool
+    {
+        return $currentUser->role->canAssignSupervisors();
+    }
+
+    /**
+     * Determine if the user can view supervisor assignments.
+     *
+     * - Owner and PBX Admin can view any supervisor's assignments
+     * - Supervisors can view their own assignments
+     *
+     * @param  User  $currentUser  The authenticated user
+     * @param  User  $supervisor  The supervisor whose assignments are being viewed
+     * @return bool True if authorized to view the supervisor's assignments
+     */
+    public function viewSupervisorAssignments(User $currentUser, User $supervisor): bool
+    {
+        // Cross-tenant access is never allowed
+        if ($currentUser->organization_id !== $supervisor->organization_id) {
+            return false;
         }
 
-        // Reporter cannot view user details
-        return false;
+        return $currentUser->role->canAssignSupervisors() || $currentUser->id === $supervisor->id;
     }
 
     /**

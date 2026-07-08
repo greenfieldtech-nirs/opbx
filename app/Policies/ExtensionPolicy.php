@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\UserRole;
 use App\Models\Extension;
 use App\Models\User;
 
@@ -26,7 +27,7 @@ class ExtensionPolicy
      *
      * All authenticated users can view extensions within their organization.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to view extensions list
      */
     public function viewAny(User $user): bool
@@ -38,16 +39,21 @@ class ExtensionPolicy
     /**
      * Determine if the user can view a specific extension.
      *
-     * Users can view any extension within their organization.
+     * - Owner and PBX Admin can view any extension
+     * - PBX User and Reporter can view extensions
+     * - Supervisor can only view extensions of their assigned users
      *
-     * @param User $user The authenticated user
-     * @param Extension $extension The extension being viewed
+     * @param  User  $currentUser  The authenticated user
+     * @param  Extension  $extension  The extension being viewed
      * @return bool True if authorized to view the extension
      */
-    public function view(User $user, Extension $extension): bool
+    public function view(User $currentUser, Extension $extension): bool
     {
-        // All roles can view extensions within their organization
-        return $user->organization_id === $extension->organization_id;
+        if ($currentUser->isSupervisor()) {
+            return $currentUser->supervisedUsers->contains($extension->user_id);
+        }
+
+        return $currentUser->role->canManageConfiguration() || $currentUser->role === UserRole::PBX_USER || $currentUser->role === UserRole::REPORTER;
     }
 
     /**
@@ -55,7 +61,7 @@ class ExtensionPolicy
      *
      * Only Owner and PBX Admin can create extensions.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to create extensions
      */
     public function create(User $user): bool
@@ -70,8 +76,8 @@ class ExtensionPolicy
      * - PBX User can only update their own extension
      * - Reporter cannot update any extension
      *
-     * @param User $user The authenticated user
-     * @param Extension $extension The extension being updated
+     * @param  User  $user  The authenticated user
+     * @param  Extension  $extension  The extension being updated
      * @return bool True if authorized to update the extension
      */
     public function update(User $user, Extension $extension): bool
@@ -100,8 +106,8 @@ class ExtensionPolicy
      *
      * Only Owner and PBX Admin can delete extensions.
      *
-     * @param User $user The authenticated user
-     * @param Extension $extension The extension being deleted
+     * @param  User  $user  The authenticated user
+     * @param  Extension  $extension  The extension being deleted
      * @return bool True if authorized to delete the extension
      */
     public function delete(User $user, Extension $extension): bool
@@ -118,8 +124,8 @@ class ExtensionPolicy
     /**
      * Helper method to check if a user owns the extension.
      *
-     * @param User $user The authenticated user
-     * @param Extension $extension The extension to check
+     * @param  User  $user  The authenticated user
+     * @param  Extension  $extension  The extension to check
      * @return bool True if the user owns the extension
      */
     protected function ownsExtension(User $user, Extension $extension): bool
