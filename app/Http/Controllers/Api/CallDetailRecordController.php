@@ -6,9 +6,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\CallDetailRecordResource;
 use App\Models\CallDetailRecord;
+use App\Services\Supervisor\SupervisorFilterService;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Call Detail Record (CDR) API controller (read-only).
@@ -50,6 +53,21 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
+        // Supervisor-scoped filter: restrict CDRs to resources the Supervisor manages
+        if ($request->boolean('supervisor') && $request->user()?->isSupervisor()) {
+            $identifiers = app(SupervisorFilterService::class)
+                ->resourceIdentifiers($request->user());
+
+            if (count($identifiers) === 0) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($q) use ($identifiers): void {
+                    $q->whereIn('from', $identifiers)
+                        ->orWhereIn('to', $identifiers);
+                });
+            }
+        }
+
         // Filter by caller number (from)
         if ($request->filled('from')) {
             $query->where('from', 'like', '%'.$request->input('from').'%');
@@ -78,7 +96,7 @@ class CallDetailRecordController extends AbstractApiCrudController
     /**
      * Export CDRs to CSV.
      */
-    public function export(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function export(Request $request): StreamedResponse
     {
         $user = $this->getAuthenticatedUser();
 
@@ -111,7 +129,7 @@ class CallDetailRecordController extends AbstractApiCrudController
 
         $filename = 'call-detail-records-'.now()->format('Y-m-d-His').'.csv';
 
-        $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($query) {
+        $response = new StreamedResponse(function () use ($query) {
             $handle = fopen('php://output', 'w');
 
             // CSV Headers - using raw_cdr session data as requested
@@ -138,13 +156,13 @@ class CallDetailRecordController extends AbstractApiCrudController
 
                     // Format timestamps from raw_cdr (milliseconds to seconds)
                     $callStartTime = isset($session['callStartTime']) && $session['callStartTime'] > 0
-                        ? \Carbon\Carbon::createFromTimestampMs($session['callStartTime'])->format('Y-m-d H:i:s')
+                        ? Carbon::createFromTimestampMs($session['callStartTime'])->format('Y-m-d H:i:s')
                         : '';
                     $callAnswerTime = isset($session['callAnswerTime']) && $session['callAnswerTime'] > 0
-                        ? \Carbon\Carbon::createFromTimestampMs($session['callAnswerTime'])->format('Y-m-d H:i:s')
+                        ? Carbon::createFromTimestampMs($session['callAnswerTime'])->format('Y-m-d H:i:s')
                         : '';
                     $callEndTime = isset($session['callEndTime']) && $session['callEndTime'] > 0
-                        ? \Carbon\Carbon::createFromTimestampMs($session['callEndTime'])->format('Y-m-d H:i:s')
+                        ? Carbon::createFromTimestampMs($session['callEndTime'])->format('Y-m-d H:i:s')
                         : '';
 
                     fputcsv($handle, [
