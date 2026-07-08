@@ -94,10 +94,11 @@ class RoleEnumTest extends TestCase
     {
         $cases = UserRole::cases();
 
-        $this->assertCount(4, $cases);
-        $this->assertContains(UserRole::OWNER, $cases);
-        $this->assertContains(UserRole::PBX_ADMIN, $cases);
-        $this->assertContains(UserRole::PBX_USER, $cases);
-        $this->assertContains(UserRole::REPORTER, $cases);
+        $this->assertCount(5, $cases);
+        $this->assertSame('owner', UserRole::OWNER->value);
+        $this->assertSame('pbx_admin', UserRole::PBX_ADMIN->value);
+        $this->assertSame('pbx_user', UserRole::PBX_USER->value);
+        $this->assertSame('reporter', UserRole::REPORTER->value);
+        $this->assertSame('supervisor', UserRole::SUPERVISOR->value);
     }
 }
