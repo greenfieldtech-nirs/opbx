@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Models\Organization;
+use App\Models\SessionUpdate;
+use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\Supervisor\SupervisorFilterService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\SessionUpdate;
 
 /**
  * Session Update API Controller
@@ -49,6 +54,14 @@ class SessionUpdateController extends Controller
 
             $organizationId = $user->organization_id;
 
+            $isSupervisor = $request->boolean('supervisor') && $user->isSupervisor();
+            $supervisorIdentifiers = [];
+
+            if ($isSupervisor) {
+                $supervisorIdentifiers = app(SupervisorFilterService::class)
+                    ->resourceIdentifiers($user);
+            }
+
             // Query for active calls using raw database query to avoid model issues
             try {
                 // First, get sessions that have been completed or deleted
@@ -65,15 +78,25 @@ class SessionUpdateController extends Controller
                 // This ensures we get the most recent status for each session
                 // We also exclude sessions that have ever been deleted or finalized,
                 // even if there are stale records after the deletion
-                // 
+                //
                 // IMPORTANT: Only consider calls active if they've been updated recently
                 // (within the last 30 minutes). This prevents stale records from appearing
                 // in the active calls list when Cloudonix webhooks fail or are delayed.
                 $activeCutoff = now()->subMinutes(30);
-                
+
                 $subquery = DB::table('session_updates')
                     ->select('session_id', DB::raw('MAX(id) as max_id'))
                     ->where('organization_id', $organizationId)
+                    ->when($isSupervisor, function ($query) use ($supervisorIdentifiers): void {
+                        if (count($supervisorIdentifiers) === 0) {
+                            $query->whereRaw('1 = 0');
+                        } else {
+                            $query->where(function ($q) use ($supervisorIdentifiers): void {
+                                $q->whereIn('caller_id', $supervisorIdentifiers)
+                                    ->orWhereIn('destination', $supervisorIdentifiers);
+                            });
+                        }
+                    })
                     ->whereIn('status', ['processing', 'ringing', 'connected', 'answer'])
                     ->where('updated_at', '>=', $activeCutoff)
                     ->groupBy('session_id');
@@ -308,7 +331,7 @@ class SessionUpdateController extends Controller
 
         try {
             // If it's already a Carbon instance (from database cast), use it directly
-            if ($sessionCreatedAt instanceof \Carbon\Carbon) {
+            if ($sessionCreatedAt instanceof Carbon) {
                 return abs(now()->diffInSeconds($sessionCreatedAt, false)); // Always positive
             }
 
@@ -319,10 +342,10 @@ class SessionUpdateController extends Controller
             if (strlen($timestampStr) === 13 && str_starts_with($timestampStr, '17')) {
                 // Convert milliseconds to seconds
                 $timestampSeconds = intval($timestampStr / 1000);
-                $sessionStart = \Carbon\Carbon::createFromTimestamp($timestampSeconds);
+                $sessionStart = Carbon::createFromTimestamp($timestampSeconds);
             } else {
                 // Try to parse as timestamp in seconds, or as datetime string
-                $sessionStart = \Carbon\Carbon::parse($sessionCreatedAt);
+                $sessionStart = Carbon::parse($sessionCreatedAt);
             }
 
             return abs(now()->diffInSeconds($sessionStart, false)); // Always positive
@@ -389,7 +412,7 @@ class SessionUpdateController extends Controller
 
             // Check if user has permission to disconnect calls
             // Convert enum to string value if needed
-            $userRoleValue = $user->role instanceof \App\Enums\UserRole
+            $userRoleValue = $user->role instanceof UserRole
                 ? $user->role->value
                 : $user->role;
 
@@ -454,7 +477,7 @@ class SessionUpdateController extends Controller
             }
 
             // Get organization's Cloudonix settings
-            $organization = \App\Models\Organization::find($user->organization_id);
+            $organization = Organization::find($user->organization_id);
 
             \Log::info('Organization and settings lookup', [
                 'session_id' => $sessionId,
@@ -508,7 +531,7 @@ class SessionUpdateController extends Controller
                 'api_base_url' => config('cloudonix.api.base_url'),
             ]);
 
-            $client = new \App\Services\CloudonixClient\CloudonixClient($organization);
+            $client = new CloudonixClient($organization);
             $success = $client->disconnectSession($sessionToken);
 
             \Log::info('Cloudonix API disconnect result', [
