@@ -55,6 +55,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Google Sans Flex", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings:
+      "slnt" 0,
+      "wdth" 100,
+      "GRAD" 0,
+      "ROND" 0;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -97,5 +106,268 @@
 
   .animate-wave-3 {
     animation: wave-3 6s ease-in-out infinite;
+  }
+
+  .oranienbaum-regular {
+    font-family: "Oranienbaum", serif;
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  .google-sans-flex {
+    font-family: "Google Sans Flex", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings:
+      "slnt" 0,
+      "wdth" 100,
+      "GRAD" 0,
+      "ROND" 0;
+  }
+
+  .home-dark {
+    --background: 0 0% 20%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 27%;
+    --input: 0 0% 27%;
+    --ring: 217 91% 60%;
+    --radius: 0.5rem;
+    font-size: 1.125rem;
+  }
+
+  .home-dark .text-sm {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 20px 8px rgba(59, 130, 246, 0.1);
+    }
+  }
+
+  @keyframes draw-path {
+    from {
+      stroke-dashoffset: 1000;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes ring-pulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease-out forwards;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
+  }
+
+  .animate-draw-path {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: draw-path 2s ease-out forwards;
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .animate-ring-pulse {
+    animation: ring-pulse 1.5s ease-out infinite;
+  }
+
+  @keyframes pbx-ring {
+    0% {
+      transform: scale(0.8);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+
+  @keyframes pbx-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pbx-spin-reverse {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes pbx-flow {
+    from {
+      stroke-dashoffset: 200;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes pbx-bar {
+    0%, 100% {
+      transform: scaleY(0.6);
+    }
+    50% {
+      transform: scaleY(1.4);
+    }
+  }
+
+  .animate-pbx-ring {
+    animation: pbx-ring 2s ease-out infinite;
+    transform-origin: center;
+  }
+
+  .animate-pbx-spin {
+    animation: pbx-spin 12s linear infinite;
+    transform-origin: center;
+  }
+
+  .animate-pbx-spin-reverse {
+    animation: pbx-spin-reverse 18s linear infinite;
+    transform-origin: center;
+  }
+
+  .animate-pbx-flow {
+    animation: pbx-flow 2s linear infinite;
+  }
+
+  .animate-pbx-bar {
+    animation: pbx-bar 1.2s ease-in-out infinite;
+  }
+
+  .hero-net-line {
+    stroke: rgba(96, 165, 250, 0.22);
+    stroke-width: 1.5;
+  }
+
+  .hero-net-flow {
+    fill: none;
+    stroke: url(#flowGrad);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 8 24;
+    filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.6));
+    animation: hero-net-flow 2s linear infinite;
+  }
+
+  .hero-net-flow.reverse {
+    animation-direction: reverse;
+  }
+
+  .hero-net-core {
+    fill: rgba(30, 58, 138, 0.4);
+    stroke: rgba(96, 165, 250, 0.9);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 22px rgba(37, 99, 235, 0.7));
+  }
+
+  .hero-net-logo-frame {
+    fill: #1f2937;
+    stroke: rgba(96, 165, 250, 0.55);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.3));
+  }
+
+  .hero-net-logo-image {
+    pointer-events: none;
+  }
+
+  @keyframes hero-net-flow {
+    from {
+      stroke-dashoffset: 160;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .range-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: hsl(var(--border));
+    outline: none;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    cursor: pointer;
+    border: 2px solid hsl(var(--background));
+  }
+
+  .range-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    cursor: pointer;
+    border: 2px solid hsl(var(--background));
   }
 }
