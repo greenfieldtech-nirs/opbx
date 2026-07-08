@@ -44,16 +44,18 @@ const cloudonixBenefits = [
 
 export function TechnologySection() {
   return (
-    <section className="bg-muted/30 py-20 md:py-32">
+    <section className="py-20 md:py-32">
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/50 mb-6">
               <Code className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Technology</span>
+              <span className="text-xl font-medium text-muted-foreground">Technology</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">Built for Developers</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-foreground">
+              Built for Developers
+            </h2>
+            <p className="text-2xl text-muted-foreground max-w-2xl mx-auto">
               Modern architecture, production-ready deployment, complete control
             </p>
           </div>
@@ -62,14 +64,14 @@ export function TechnologySection() {
             {highlights.map((highlight, idx) => (
               <Card
                 key={idx}
-                className="bg-background/50 backdrop-blur border-2 hover:border-primary/50 transition-all"
+                className="bg-card border-border hover:border-primary/50 transition-all"
               >
                 <CardHeader>
                   <highlight.icon className="h-10 w-10 text-primary mb-4" />
-                  <CardTitle className="text-lg">{highlight.title}</CardTitle>
+                  <CardTitle className="text-2xl text-foreground">{highlight.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-base">
+                  <CardDescription className="text-base text-muted-foreground">
                     {highlight.description}
                   </CardDescription>
                 </CardContent>
@@ -77,23 +79,23 @@ export function TechnologySection() {
             ))}
           </div>
 
-          <div className="p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/20">
+          <div className="p-8 rounded-2xl bg-card border border-border">
             <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold mb-3">Powered by Cloudonix</h3>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              <h3 className="text-3xl font-bold mb-3 text-foreground">Powered by Cloudonix</h3>
+              <p className="text-muted-foreground text-2xl max-w-2xl mx-auto">
                 OPBX integrates seamlessly with the Cloudonix CPaaS platform for enterprise-grade
-                telephony infrastructure
+                telephony infrastructure.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {cloudonixBenefits.map((item, idx) => (
-                <Card key={idx} className="border-2 bg-background/70">
+                <Card key={idx} className="border border-border bg-background">
                   <CardHeader>
                     <item.icon className="h-10 w-10 text-primary mx-auto mb-4" />
-                    <CardTitle className="text-lg text-center">{item.title}</CardTitle>
+                    <CardTitle className="text-2xl text-center text-foreground">{item.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base text-center">
+                    <CardDescription className="text-base text-center text-muted-foreground">
                       {item.description}
                     </CardDescription>
                   </CardContent>

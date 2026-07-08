@@ -81,29 +81,32 @@ export function FeaturesGrid() {
   return (
     <section id="features" className="container mx-auto px-4 py-20 md:py-32">
       <div className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/50 mb-6">
           <Zap className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">Features</span>
+          <span className="text-xl font-medium text-muted-foreground">Features</span>
         </div>
-        <h2 className="text-4xl md:text-5xl font-bold mb-4">Everything You Need</h2>
-        <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+        <h2 className="text-3xl md:text-5xl font-bold mb-4 text-foreground">Everything You Need</h2>
+        <p className="text-2xl text-muted-foreground max-w-3xl mx-auto">
           A complete business PBX solution with powerful features that scale with your organization
         </p>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {features.map((feature, idx) => (
           <Card
             key={idx}
-            className="relative group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-2 hover:border-primary/50"
+            className="group bg-card border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
           >
             <CardHeader>
               <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                 <feature.icon className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle className="text-lg">{feature.title}</CardTitle>
+              <CardTitle className="text-2xl text-foreground">{feature.title}</CardTitle>
             </CardHeader>
             <CardContent>
-              <CardDescription className="text-base">{feature.description}</CardDescription>
+              <CardDescription className="text-base text-muted-foreground">
+                {feature.description}
+              </CardDescription>
             </CardContent>
           </Card>
         ))}

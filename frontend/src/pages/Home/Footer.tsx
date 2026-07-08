@@ -3,21 +3,21 @@ import { Github, Phone } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="border-t py-12 bg-background">
+    <footer className="border-t border-border bg-card py-12">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Phone className="h-5 w-5 text-primary" />
-              <span className="font-bold">OPBX</span>
+              <span className="font-bold text-foreground">OPBX</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Open source business PBX built on Cloudonix CPaaS platform
+            <p className="text-xl text-muted-foreground">
+              Open source business PBX built on Cloudonix CPaaS platform.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold mb-3">Product</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <h4 className="font-semibold mb-3 text-foreground">Product</h4>
+            <ul className="space-y-2 text-xl text-muted-foreground">
               <li>
                 <Link to="/ui/register" className="hover:text-foreground transition-colors">
                   Get Started
@@ -41,8 +41,8 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold mb-3">Resources</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <h4 className="font-semibold mb-3 text-foreground">Resources</h4>
+            <ul className="space-y-2 text-xl text-muted-foreground">
               <li>
                 <a
                   href="https://developers.cloudonix.com/"
@@ -76,8 +76,8 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold mb-3">Community</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <h4 className="font-semibold mb-3 text-foreground">Community</h4>
+            <ul className="space-y-2 text-xl text-muted-foreground">
               <li>
                 <a
                   href="https://discord.gg/etCGgNh9VV"
@@ -111,8 +111,8 @@ export function Footer() {
             </ul>
           </div>
         </div>
-        <div className="border-t pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
+        <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xl text-muted-foreground">
             © {new Date().getFullYear()} OPBX. Open source under MIT License.
           </p>
           <div className="flex items-center gap-4">
