@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\SupervisorAssignmentController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\AutoDialerCampaignController;
@@ -350,6 +351,14 @@ Route::prefix('v1')->group(function (): void {
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
+
+        // Supervisor assignments
+        Route::prefix('supervisors')->group(function (): void {
+            Route::get('{user}/assignments', [SupervisorAssignmentController::class, 'show'])
+                ->name('supervisors.assignments.show');
+            Route::put('{user}/assignments', [SupervisorAssignmentController::class, 'update'])
+                ->name('supervisors.assignments.update');
+        });
 
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);
