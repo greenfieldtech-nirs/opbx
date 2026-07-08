@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Broadcasting;
 
 use App\Enums\CallStatus;
+use App\Enums\UserRole;
 use App\Events\CallAnswered;
 use App\Events\CallEnded;
 use App\Events\CallInitiated;
@@ -35,7 +36,9 @@ final class CallPresenceTest extends TestCase
         parent::setUp();
 
         $this->organization = Organization::factory()->create();
-        $this->user = User::factory()->for($this->organization)->create();
+        $this->user = User::factory()->for($this->organization)->create([
+            'role' => UserRole::SUPERVISOR,
+        ]);
 
         // Configure Pusher for broadcasting auth tests
         config(['broadcasting.default' => 'pusher']);
