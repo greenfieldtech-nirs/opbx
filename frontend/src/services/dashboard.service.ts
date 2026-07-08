@@ -7,6 +7,28 @@
 
 import api from './api';
 import type { DashboardStats, RecentCall, LiveCall } from '@/types';
+import type { CallDetailRecord } from '@/types/api.types';
+
+export interface SupervisorDashboard {
+  assigned_users_count: number;
+  assigned_ring_groups_count: number;
+  active_calls_count: number;
+  recent_calls: CallDetailRecord[];
+  assigned_users: Array<{
+    id: string;
+    name: string;
+    extension_number?: string | null;
+  }>;
+  assigned_ring_groups: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
+export async function getSupervisorDashboard(): Promise<SupervisorDashboard> {
+  const response = await api.get<SupervisorDashboard>('/dashboard/supervisor');
+  return response.data;
+}
 
 export const dashboardService = {
   /**
