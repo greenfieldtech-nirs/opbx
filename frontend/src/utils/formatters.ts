@@ -154,6 +154,7 @@ export function getRoleColor(role: string): string {
     pbx_admin: 'bg-blue-100 text-blue-800 border border-blue-200',
     pbx_user: 'bg-gray-100 text-gray-800 border border-gray-200',
     reporter: 'bg-green-100 text-green-800 border border-green-200',
+    supervisor: 'bg-amber-100 text-amber-800 border border-amber-200',
     // Legacy support
     admin: 'bg-blue-100 text-blue-800 border border-blue-200',
     agent: 'bg-green-100 text-green-800 border border-green-200',
@@ -169,6 +170,7 @@ export function getRoleDisplayName(role: string): string {
     pbx_admin: 'PBX Admin',
     pbx_user: 'PBX User',
     reporter: 'Reporter',
+    supervisor: 'Supervisor',
     // Legacy support
     admin: 'Admin',
     agent: 'Agent',

@@ -19,6 +19,7 @@ export function getRoleLabel(role: UserRole): string {
     pbx_admin: 'PBX Admin',
     pbx_user: 'PBX User',
     reporter: 'Reporter',
+    supervisor: 'Supervisor',
   };
 
   return labels[role] || role;
@@ -37,6 +38,7 @@ export function getRoleColor(role: UserRole): string {
     pbx_admin: 'bg-purple-100 text-purple-800 border-purple-200',
     pbx_user: 'bg-gray-100 text-gray-800 border-gray-200',
     reporter: 'bg-green-100 text-green-800 border-green-200',
+    supervisor: 'bg-amber-100 text-amber-800 border-amber-200',
   };
 
   return colors[role] || 'bg-gray-100 text-gray-800 border-gray-200';
@@ -55,6 +57,7 @@ export function getRoleDescription(role: UserRole): string {
     pbx_admin: 'Can manage PBX configuration including extensions, DIDs, ring groups, and business hours',
     pbx_user: 'Can use PBX features and view own call logs, limited configuration access',
     reporter: 'Read-only access to call logs and statistics, no configuration changes',
+    supervisor: 'Can monitor assigned users and ring groups without full admin access',
   };
 
   return descriptions[role] || 'Unknown role';
@@ -72,7 +75,7 @@ export function getAllRoles(): Array<{
   description: string;
   color: string;
 }> {
-  const roles: UserRole[] = ['owner', 'pbx_admin', 'pbx_user', 'reporter'];
+  const roles: UserRole[] = ['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor'];
 
   return roles.map(role => ({
     value: role,

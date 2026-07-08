@@ -24,7 +24,7 @@ const userSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
-  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter'] as const),
+  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor'] as const),
   status: z.enum(['active', 'inactive', 'suspended', 'pending'] as const),
   extension_number: z.string().optional(),
 });
@@ -147,8 +147,10 @@ export function UserForm({ user, onSubmit, onCancel, isLoading }: UserFormProps)
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="owner">Owner</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="agent">Agent</SelectItem>
+            <SelectItem value="pbx_admin">PBX Admin</SelectItem>
+            <SelectItem value="pbx_user">PBX User</SelectItem>
+            <SelectItem value="reporter">Reporter</SelectItem>
+            <SelectItem value="supervisor">Supervisor</SelectItem>
           </SelectContent>
         </Select>
         {errors.role && (

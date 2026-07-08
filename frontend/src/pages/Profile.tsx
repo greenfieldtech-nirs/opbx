@@ -80,7 +80,7 @@ const profileSchema = z.object({
   state_province: z.string().optional(),
   postal_code: z.string().optional(),
   country: z.string().optional(),
-  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter']).optional(),
+  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor']).optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
