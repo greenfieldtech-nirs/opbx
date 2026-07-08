@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -121,6 +122,39 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the users supervised by this supervisor.
+     */
+    public function supervisedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'supervisor_user_assignments', 'supervisor_id', 'user_id')
+            ->withTimestamps()
+            ->wherePivot('organization_id', $this->organization_id)
+            ->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * Get the supervisors supervising this user.
+     */
+    public function supervisingSupervisors(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'supervisor_user_assignments', 'user_id', 'supervisor_id')
+            ->withTimestamps()
+            ->wherePivot('organization_id', $this->organization_id)
+            ->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
+     * Get the ring groups supervised by this supervisor.
+     */
+    public function supervisedRingGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(RingGroup::class, 'supervisor_ring_group_assignments', 'supervisor_id', 'ring_group_id')
+            ->withTimestamps()
+            ->wherePivot('organization_id', $this->organization_id)
+            ->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    /**
      * Check if user has a specific role.
      */
     public function hasRole(UserRole $role): bool
@@ -158,6 +192,22 @@ class User extends Authenticatable
     public function isReporter(): bool
     {
         return $this->role === UserRole::REPORTER;
+    }
+
+    /**
+     * Check if user is a supervisor.
+     */
+    public function isSupervisor(): bool
+    {
+        return $this->role === UserRole::SUPERVISOR;
+    }
+
+    /**
+     * Check if user can be assigned as a supervised user (not a supervisor).
+     */
+    public function isAssignableAsSupervisor(): bool
+    {
+        return $this->role !== UserRole::SUPERVISOR;
     }
 
     /**
