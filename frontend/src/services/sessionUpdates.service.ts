@@ -17,6 +17,7 @@ export interface ActiveCallsFilters {
   status?: 'processing' | 'ringing' | 'connected';
   direction?: 'incoming' | 'outgoing';
   limit?: number;
+  supervisor?: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export const sessionUpdatesService = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.direction) params.append('direction', filters.direction);
     if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.supervisor) params.append('supervisor', 'true');
 
     const query = params.toString();
     const url = `/session-updates/active${query ? `?${query}` : ''}`;

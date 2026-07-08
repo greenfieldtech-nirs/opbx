@@ -106,7 +106,8 @@ const formatRefreshInterval = (ms: number): string => {
 
 export default function LiveCalls() {
   const { user: currentUser } = useAuth();
-  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
+  const isSupervisor = currentUser?.role === 'supervisor';
+  const isReadOnly = ['reporter', 'pbx_user', 'supervisor'].includes(currentUser?.role);
   const queryClient = useQueryClient();
 
   // Refresh interval state (default: 5 seconds)
@@ -130,8 +131,8 @@ export default function LiveCalls() {
 
   // Initial data fetch via HTTP with configurable refresh
   const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['active-calls'],
-    queryFn: () => sessionUpdatesService.getActiveCalls(),
+    queryKey: ['active-calls', isSupervisor ? 'supervisor' : 'all'],
+    queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: isSupervisor }),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
     refetchIntervalInBackground: true,
     staleTime: 0, // Always consider data stale to enable refresh
@@ -310,7 +311,7 @@ export default function LiveCalls() {
     // Clear local state and query cache immediately for instant feedback
     setLiveCalls([]);
     clearActiveCalls();
-    queryClient.setQueryData(['active-calls'], { data: [] });
+    queryClient.setQueryData(['active-calls', isSupervisor ? 'supervisor' : 'all'], { data: [] });
 
     // Remove call IDs from the recently-disconnected set after a grace
     // period so that genuinely new calls with the same ID can still appear.
