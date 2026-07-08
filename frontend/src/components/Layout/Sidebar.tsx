@@ -61,10 +61,10 @@ const sidebarSections: SidebarSection[] = [
     icon: 'codicon-settings-gear',
     accentColor: 'default',
     items: [
-      { name: 'Users', href: '/ui/users', icon: 'codicon-account', roles: ['owner', 'pbx_admin'] },
+      { name: 'Users', href: '/ui/users', icon: 'codicon-account', roles: ['owner', 'pbx_admin', 'supervisor'] },
       { name: 'Extensions', href: '/ui/extensions', icon: 'codicon-extensions', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Conference Rooms', href: '/ui/conference-rooms', icon: 'codicon-device-camera-video', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-      { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter', 'supervisor'] },
       { name: 'IVR Menus', href: '/ui/ivr-menus', icon: 'codicon-menu', roles: ['owner', 'pbx_admin'] },
       { name: 'Business Hours', href: '/ui/business-hours', icon: 'codicon-clock', roles: ['owner', 'pbx_admin'] },
       { name: 'Announcements', href: '/ui/announcements', icon: 'codicon-megaphone', roles: ['owner', 'pbx_admin'] },
@@ -102,8 +102,8 @@ const sidebarSections: SidebarSection[] = [
     icon: 'codicon-graph',
     accentColor: 'default',
     items: [
-      { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter'] },
-      { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter', 'supervisor'] },
+      { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor'] },
       { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
     ],
   },
