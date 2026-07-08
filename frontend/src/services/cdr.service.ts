@@ -15,6 +15,16 @@ export const cdrService = {
   ...baseCdrService,
 
   /**
+   * Get all CDRs with optional supervisor filter
+   */
+  getAll: async (params?: Record<string, any>, supervisor = false) => {
+    const response = await api.get('/call-detail-records', {
+      params: { ...params, supervisor: supervisor ? 'true' : undefined },
+    });
+    return response.data;
+  },
+
+  /**
    * Get CDR by ID with raw_cdr data included
    */
   getById: (id: number | string): Promise<CallDetailRecord> => {

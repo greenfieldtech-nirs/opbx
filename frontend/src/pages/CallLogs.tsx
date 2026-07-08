@@ -34,7 +34,8 @@ import { JsonViewer } from '@textea/json-viewer';
 export default function CallLogs() {
   const { user: currentUser } = useAuth();
   const isPbxUser = currentUser?.role === 'pbx_user';
-  const isReadOnly = isPbxUser || currentUser?.role === 'reporter';
+  const isSupervisor = currentUser?.role === 'supervisor';
+  const isReadOnly = isPbxUser || currentUser?.role === 'reporter' || isSupervisor;
 
   // CDR state
   const [cdrPage, setCdrPage] = useState(1);
@@ -93,8 +94,8 @@ export default function CallLogs() {
     isFetching: cdrIsFetching,
     refetch: refetchCdr,
   } = useQuery({
-    queryKey: ['cdrs', cdrPage, cdrFilters],
-    queryFn: () => cdrService.getAll({ ...cdrFilters, page: cdrPage }),
+    queryKey: ['cdrs', cdrPage, cdrFilters, isSupervisor ? 'supervisor' : 'all'],
+    queryFn: () => cdrService.getAll({ ...cdrFilters, page: cdrPage }, isSupervisor),
     refetchInterval: refreshInterval,
     refetchIntervalInBackground: true,
     staleTime: 0,
