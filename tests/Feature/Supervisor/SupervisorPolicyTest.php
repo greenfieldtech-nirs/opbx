@@ -73,4 +73,29 @@ final class SupervisorPolicyTest extends TestCase
         $policy = new ExtensionPolicy;
         $this->assertTrue($policy->view($supervisor, $extension));
     }
+
+    public function test_supervisor_cannot_view_extension_from_another_organization(): void
+    {
+        $org = Organization::factory()->create();
+        $otherOrg = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $user = User::factory()->create(['organization_id' => $otherOrg->id, 'role' => UserRole::PBX_USER]);
+        $extension = Extension::factory()->create(['organization_id' => $otherOrg->id, 'user_id' => $user->id, 'type' => 'user']);
+        $supervisor->supervisedUsers()->attach($user->id, ['organization_id' => $otherOrg->id]);
+
+        $policy = new ExtensionPolicy;
+        $this->assertFalse($policy->view($supervisor, $extension));
+    }
+
+    public function test_supervisor_cannot_view_ring_group_from_another_organization(): void
+    {
+        $org = Organization::factory()->create();
+        $otherOrg = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $ringGroup = RingGroup::factory()->create(['organization_id' => $otherOrg->id]);
+        $supervisor->supervisedRingGroups()->attach($ringGroup->id, ['organization_id' => $otherOrg->id]);
+
+        $policy = new RingGroupPolicy;
+        $this->assertFalse($policy->view($supervisor, $ringGroup));
+    }
 }

@@ -49,6 +49,10 @@ class ExtensionPolicy
      */
     public function view(User $currentUser, Extension $extension): bool
     {
+        if ($currentUser->organization_id !== $extension->organization_id) {
+            return false;
+        }
+
         if ($currentUser->isSupervisor()) {
             return $currentUser->supervisedUsers->contains($extension->user_id);
         }

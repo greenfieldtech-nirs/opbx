@@ -49,6 +49,10 @@ class RingGroupPolicy
      */
     public function view(User $currentUser, RingGroup $ringGroup): bool
     {
+        if ($currentUser->organization_id !== $ringGroup->organization_id) {
+            return false;
+        }
+
         if ($currentUser->isSupervisor()) {
             return $currentUser->supervisedRingGroups->contains($ringGroup);
         }
