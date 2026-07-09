@@ -24,6 +24,7 @@ class AdminUserSeeder extends Seeder
 
         if ($adminExists) {
             $this->command->info('Admin user already exists, skipping...');
+
             return;
         }
 
