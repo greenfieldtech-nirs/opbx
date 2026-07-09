@@ -31,7 +31,7 @@ Broadcast::channel('org.{organizationId}', function (User $user, int $organizati
         return null;
     }
 
-    if (! $user->role->canViewLiveCalls()) {
+    if (! $user->role->canViewLiveCalls() || $user->isSupervisor()) {
         return null;
     }
 

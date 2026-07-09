@@ -37,7 +37,7 @@ final class CallPresenceTest extends TestCase
 
         $this->organization = Organization::factory()->create();
         $this->user = User::factory()->for($this->organization)->create([
-            'role' => UserRole::SUPERVISOR,
+            'role' => UserRole::PBX_ADMIN,
         ]);
 
         // Configure Pusher for broadcasting auth tests
@@ -173,6 +173,21 @@ final class CallPresenceTest extends TestCase
         $response = $this->postJson('/api/v1/broadcasting/auth', [
             'socket_id' => '123.456',
             'channel_name' => "presence.org.{$otherOrganization->id}",
+        ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_presence_channel_denies_supervisor(): void
+    {
+        $supervisor = User::factory()->for($this->organization)->create([
+            'role' => UserRole::SUPERVISOR,
+        ]);
+        $this->actingAs($supervisor, 'sanctum');
+
+        $response = $this->postJson('/api/v1/broadcasting/auth', [
+            'socket_id' => '123.456',
+            'channel_name' => "presence-org.{$this->organization->id}",
         ]);
 
         $response->assertForbidden();
