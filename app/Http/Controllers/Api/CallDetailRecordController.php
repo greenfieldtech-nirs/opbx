@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\CallDetailRecordResource;
 use App\Models\CallDetailRecord;
+use App\Models\User;
 use App\Services\Supervisor\SupervisorFilterService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,17 +56,7 @@ class CallDetailRecordController extends AbstractApiCrudController
     {
         // Supervisor-scoped filter: restrict CDRs to resources the Supervisor manages
         if ($request->boolean('supervisor') && $request->user()?->isSupervisor()) {
-            $identifiers = app(SupervisorFilterService::class)
-                ->resourceIdentifiers($request->user());
-
-            if (count($identifiers) === 0) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $query->where(function ($q) use ($identifiers): void {
-                    $q->whereIn('from', $identifiers)
-                        ->orWhereIn('to', $identifiers);
-                });
-            }
+            $this->applySupervisorFilter($query, $request->user());
         }
 
         // Filter by caller number (from)
@@ -94,6 +85,29 @@ class CallDetailRecordController extends AbstractApiCrudController
     }
 
     /**
+     * Apply Supervisor resource filter to a CDR query.
+     */
+    private function applySupervisorFilter(Builder $query, User $user): void
+    {
+        if (! $user->isSupervisor()) {
+            return;
+        }
+
+        $identifiers = app(SupervisorFilterService::class)->resourceIdentifiers($user);
+
+        if (count($identifiers) === 0) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where(function ($q) use ($identifiers): void {
+            $q->whereIn('from', $identifiers)
+                ->orWhereIn('to', $identifiers);
+        });
+    }
+
+    /**
      * Export CDRs to CSV.
      */
     public function export(Request $request): StreamedResponse
@@ -102,6 +116,9 @@ class CallDetailRecordController extends AbstractApiCrudController
 
         // Build query with same filters as index
         $query = CallDetailRecord::forOrganization($user->organization_id);
+
+        // Apply Supervisor-scoped filter
+        $this->applySupervisorFilter($query, $user);
 
         // Apply filters
         if ($request->filled('from')) {
@@ -200,35 +217,32 @@ class CallDetailRecordController extends AbstractApiCrudController
         $toDate = $request->input('to_date', now()->toDateString());
 
         $stats = [
-            'total_calls' => CallDetailRecord::forOrganization($user->organization_id)
-                ->whereDate('session_timestamp', '>=', $fromDate)
-                ->whereDate('session_timestamp', '<=', $toDate)
-                ->count(),
-            'total_duration' => CallDetailRecord::forOrganization($user->organization_id)
-                ->whereDate('session_timestamp', '>=', $fromDate)
-                ->whereDate('session_timestamp', '<=', $toDate)
-                ->sum('duration'),
-            'total_billsec' => CallDetailRecord::forOrganization($user->organization_id)
-                ->whereDate('session_timestamp', '>=', $fromDate)
-                ->whereDate('session_timestamp', '<=', $toDate)
-                ->sum('billsec'),
-            'average_duration' => CallDetailRecord::forOrganization($user->organization_id)
-                ->whereDate('session_timestamp', '>=', $fromDate)
-                ->whereDate('session_timestamp', '<=', $toDate)
-                ->where('duration', '>', 0)
-                ->avg('duration'),
-            'total_cost' => CallDetailRecord::forOrganization($user->organization_id)
-                ->whereDate('session_timestamp', '>=', $fromDate)
-                ->whereDate('session_timestamp', '<=', $toDate)
-                ->sum('sell_cost'),
-            'by_disposition' => CallDetailRecord::forOrganization($user->organization_id)
-                ->whereDate('session_timestamp', '>=', $fromDate)
-                ->whereDate('session_timestamp', '<=', $toDate)
+            'total_calls' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->count(),
+            'total_duration' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('duration'),
+            'total_billsec' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('billsec'),
+            'average_duration' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->where('duration', '>', 0)->avg('duration'),
+            'total_cost' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('sell_cost'),
+            'by_disposition' => $this->buildStatisticsQuery($user, $fromDate, $toDate)
                 ->selectRaw('disposition, COUNT(*) as count')
                 ->groupBy('disposition')
                 ->pluck('count', 'disposition'),
         ];
 
         return response()->json($stats);
+    }
+
+    /**
+     * Build the base CDR query for statistics, scoped to the organization,
+     * date range, and Supervisor-assigned resources.
+     */
+    private function buildStatisticsQuery(User $user, string $fromDate, string $toDate): Builder
+    {
+        $query = CallDetailRecord::forOrganization($user->organization_id)
+            ->whereDate('session_timestamp', '>=', $fromDate)
+            ->whereDate('session_timestamp', '<=', $toDate);
+
+        $this->applySupervisorFilter($query, $user);
+
+        return $query;
     }
 }
