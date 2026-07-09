@@ -30,34 +30,28 @@ final class SupervisorFilterService
         $users = $supervisor->supervisedUsers;
         $ringGroups = $supervisor->supervisedRingGroups;
 
+        $userIds = $users->pluck('id')->toArray();
+        $ringGroupIds = $ringGroups->pluck('id')->toArray();
+
+        $userExtensionNumbers = Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('type', ExtensionType::USER)
+            ->whereIn('user_id', $userIds)
+            ->pluck('extension_number')
+            ->toArray();
+
+        $ringGroupExtensionNumbers = Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('type', ExtensionType::RING_GROUP)
+            ->whereIn('configuration->ring_group_id', $ringGroupIds)
+            ->pluck('extension_number')
+            ->toArray();
+
         $identifiers = new Collection;
-
-        foreach ($users as $user) {
-            $identifiers->push((string) $user->id);
-
-            $extensionNumber = Extension::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $organizationId)
-                ->where('user_id', $user->id)
-                ->value('extension_number');
-
-            if ($extensionNumber) {
-                $identifiers->push((string) $extensionNumber);
-            }
-        }
-
-        foreach ($ringGroups as $ringGroup) {
-            $identifiers->push((string) $ringGroup->id);
-
-            $extensionNumber = Extension::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $organizationId)
-                ->where('type', ExtensionType::RING_GROUP)
-                ->where('configuration->ring_group_id', (string) $ringGroup->id)
-                ->value('extension_number');
-
-            if ($extensionNumber) {
-                $identifiers->push((string) $extensionNumber);
-            }
-        }
+        $identifiers = $identifiers->merge($users->pluck('id')->map(fn ($id) => (string) $id));
+        $identifiers = $identifiers->merge($userExtensionNumbers);
+        $identifiers = $identifiers->merge($ringGroups->pluck('id')->map(fn ($id) => (string) $id));
+        $identifiers = $identifiers->merge($ringGroupExtensionNumbers);
 
         return $identifiers->filter()->unique()->values()->toArray();
     }
@@ -68,13 +62,13 @@ final class SupervisorFilterService
             return [];
         }
 
-        $organizationId = $supervisor->organization_id;
+        $userIds = $supervisor->supervisedUsers->pluck('id')->toArray();
 
-        return $supervisor->supervisedUsers
-            ->map(fn (User $user) => Extension::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $organizationId)
-                ->where('user_id', $user->id)
-                ->value('extension_number'))
+        return Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $supervisor->organization_id)
+            ->where('type', ExtensionType::USER)
+            ->whereIn('user_id', $userIds)
+            ->pluck('extension_number')
             ->filter()
             ->unique()
             ->values()
@@ -87,14 +81,13 @@ final class SupervisorFilterService
             return [];
         }
 
-        $organizationId = $supervisor->organization_id;
+        $ringGroupIds = $supervisor->supervisedRingGroups->pluck('id')->toArray();
 
-        return $supervisor->supervisedRingGroups
-            ->map(fn ($ringGroup) => Extension::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $organizationId)
-                ->where('type', ExtensionType::RING_GROUP)
-                ->where('configuration->ring_group_id', (string) $ringGroup->id)
-                ->value('extension_number'))
+        return Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $supervisor->organization_id)
+            ->where('type', ExtensionType::RING_GROUP)
+            ->whereIn('configuration->ring_group_id', $ringGroupIds)
+            ->pluck('extension_number')
             ->filter()
             ->unique()
             ->values()
