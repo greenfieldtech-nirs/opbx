@@ -128,7 +128,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'supervisor_user_assignments', 'supervisor_id', 'user_id')
             ->withTimestamps()
-            ->wherePivot('organization_id', $this->organization_id)
+            ->whereColumn('supervisor_user_assignments.organization_id', 'users.organization_id')
             ->withoutGlobalScope(OrganizationScope::class);
     }
 
@@ -139,7 +139,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'supervisor_user_assignments', 'user_id', 'supervisor_id')
             ->withTimestamps()
-            ->wherePivot('organization_id', $this->organization_id)
+            ->whereColumn('supervisor_user_assignments.organization_id', 'users.organization_id')
             ->withoutGlobalScope(OrganizationScope::class);
     }
 
@@ -150,7 +150,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(RingGroup::class, 'supervisor_ring_group_assignments', 'supervisor_id', 'ring_group_id')
             ->withTimestamps()
-            ->wherePivot('organization_id', $this->organization_id)
+            ->whereColumn('supervisor_ring_group_assignments.organization_id', 'ring_groups.organization_id')
             ->withoutGlobalScope(OrganizationScope::class);
     }
 

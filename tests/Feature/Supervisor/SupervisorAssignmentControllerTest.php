@@ -30,6 +30,9 @@ final class SupervisorAssignmentControllerTest extends TestCase
             ]);
 
         $response->assertOk();
+        $response->assertJsonPath('data.supervisor_id', $supervisor->id);
+        $response->assertJsonPath('data.user_ids', [$user->id]);
+        $response->assertJsonPath('data.ring_group_ids', [$ringGroup->id]);
         $this->assertTrue($supervisor->fresh()->supervisedUsers->contains($user));
         $this->assertTrue($supervisor->fresh()->supervisedRingGroups->contains($ringGroup));
     }

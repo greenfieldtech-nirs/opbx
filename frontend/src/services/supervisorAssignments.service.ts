@@ -6,9 +6,14 @@
 
 import api from '@/services/api';
 
+import type { User, RingGroup } from '@/types';
+
 export interface SupervisorAssignments {
+  supervisor_id?: number;
   user_ids: number[];
   ring_group_ids: number[];
+  users?: User[];
+  ring_groups?: RingGroup[];
 }
 
 /**

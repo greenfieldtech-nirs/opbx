@@ -13,6 +13,8 @@ final class SupervisorAssignmentResource extends JsonResource
     {
         return [
             'supervisor_id' => $this->id,
+            'user_ids' => $this->whenLoaded('supervisedUsers', fn () => $this->supervisedUsers->pluck('id')->toArray(), []),
+            'ring_group_ids' => $this->whenLoaded('supervisedRingGroups', fn () => $this->supervisedRingGroups->pluck('id')->toArray(), []),
             'users' => UserResource::collection($this->whenLoaded('supervisedUsers')),
             'ring_groups' => RingGroupResource::collection($this->whenLoaded('supervisedRingGroups')),
         ];
