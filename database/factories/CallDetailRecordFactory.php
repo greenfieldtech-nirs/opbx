@@ -9,7 +9,7 @@ use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CallDetailRecord>
+ * @extends Factory\u003cCallDetailRecord\u003e
  */
 class CallDetailRecordFactory extends Factory
 {
