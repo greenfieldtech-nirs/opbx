@@ -23,13 +23,18 @@ class UserPolicy
     /**
      * Determine if the user can view the users list.
      *
-     * Only Owner and PBX Admin can view all users.
+     * - Owner and PBX Admin can view all users
+     * - Supervisor can view themselves and their assigned users
      *
      * @param  User  $user  The authenticated user
      * @return bool True if authorized to view users list
      */
     public function viewAny(User $user): bool
     {
+        if ($user->isSupervisor()) {
+            return true;
+        }
+
         return $user->role->canManageUsers();
     }
 
