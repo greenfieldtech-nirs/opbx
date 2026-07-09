@@ -681,6 +681,7 @@ export default function Profile() {
                             <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                             <SelectItem value="pbx_user">PBX User</SelectItem>
                             <SelectItem value="reporter">Reporter</SelectItem>
+                            <SelectItem value="supervisor">Supervisor</SelectItem>
                           </SelectContent>
                         </Select>
                       )}

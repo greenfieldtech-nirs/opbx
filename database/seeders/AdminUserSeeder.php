@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -16,8 +17,12 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Check if admin user already exists
-        if (User::where('email', 'admin@example.com')->exists()) {
+        // Check if admin user already exists (bypass tenant scope; seeders run unauthenticated)
+        $adminExists = User::withoutGlobalScope(OrganizationScope::class)
+            ->where('email', 'admin@example.com')
+            ->exists();
+
+        if ($adminExists) {
             $this->command->info('Admin user already exists, skipping...');
             return;
         }

@@ -600,11 +600,10 @@ function UsersComplete() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="owner">Owner</SelectItem>
-                    <SelectItem value="pbx_admin">PBX Admin</SelectItem>
-                    <SelectItem value="pbx_user">PBX User</SelectItem>
-                    <SelectItem value="reporter">Reporter</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value="pbx_admin">PBX Admin</SelectItem>
+                <SelectItem value="pbx_user">PBX User</SelectItem>
+                <SelectItem value="reporter">Reporter</SelectItem>
                 <SelectItem value="supervisor">Supervisor</SelectItem>
               </SelectContent>
             </Select>
@@ -892,7 +891,7 @@ function UsersComplete() {
                     setFormData({
                       ...formData,
                       role: value as UserRole,
-                      extension_option: value === 'reporter' ? 'none' : formData.extension_option,
+                      extension_option: ['reporter', 'supervisor'].includes(value) ? 'none' : formData.extension_option,
                     })
                   }
                 >
@@ -1098,6 +1097,7 @@ function UsersComplete() {
                   <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                   <SelectItem value="pbx_user">PBX User</SelectItem>
                   <SelectItem value="reporter">Reporter</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
                 </SelectContent>
               </Select>
               {selectedUser?.role === 'owner' ? (
