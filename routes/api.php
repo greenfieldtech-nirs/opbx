@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\SupervisorAssignmentController;
 use App\Http\Controllers\Api\SupervisorDashboardController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\Api\WebPhoneConfigController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
 use App\Http\Controllers\DistributionListController;
@@ -364,6 +365,10 @@ Route::prefix('v1')->group(function (): void {
         // Supervisor dashboard
         Route::get('dashboard/supervisor', SupervisorDashboardController::class)
             ->name('dashboard.supervisor');
+
+        // Web Phone config
+        Route::get('webphone/config', [WebPhoneConfigController::class, 'config'])
+            ->name('webphone.config');
 
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);
