@@ -20,6 +20,7 @@ import Home from '@/pages/Home';
 import { lazy } from 'react';
 
 const Users = lazy(() => import('@/pages/UsersComplete'));
+const Supervisors = lazy(() => import('@/pages/Supervisors'));
 const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
 const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
@@ -108,6 +109,10 @@ export const router = createBrowserRouter([
       {
         path: 'users',
         element: <Users />,
+      },
+      {
+        path: 'supervisors',
+        element: <Supervisors />,
       },
       {
         path: 'extensions',

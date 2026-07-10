@@ -1,10 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -31,10 +29,6 @@ export function SupervisorAssignmentDialog({
   onOpenChange,
 }: SupervisorAssignmentDialogProps) {
   const queryClient = useQueryClient();
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [selectedRingGroupIds, setSelectedRingGroupIds] = useState<string[]>([]);
-  const [userSearch, setUserSearch] = useState('');
-  const [ringGroupSearch, setRingGroupSearch] = useState('');
 
   const { data: usersResponse } = useQuery({
     queryKey: ['users'],
@@ -56,20 +50,27 @@ export function SupervisorAssignmentDialog({
     enabled: open && !!userId,
   });
 
-  useEffect(() => {
-    if (assignmentsResponse?.data) {
-      const assignments = assignmentsResponse.data;
-      setSelectedUserIds((assignments.user_ids || []).map(String));
-      setSelectedRingGroupIds((assignments.ring_group_ids || []).map(String));
-    }
-  }, [assignmentsResponse]);
+  const users = usersResponse?.data || [];
+  const ringGroups = ringGroupsResponse?.data || [];
+
+  const selectableUsers = useMemo(
+    () => users.filter((u: any) => u.role === 'pbx_user'),
+    [users]
+  );
+
+  const selectedUserIds = useMemo(
+    () => (assignmentsResponse?.data?.user_ids || []).map(String),
+    [assignmentsResponse]
+  );
+
+  const selectedRingGroupIds = useMemo(
+    () => (assignmentsResponse?.data?.ring_group_ids || []).map(String),
+    [assignmentsResponse]
+  );
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      updateSupervisorAssignments(userId as string, {
-        user_ids: selectedUserIds.map(Number),
-        ring_group_ids: selectedRingGroupIds.map(Number),
-      }),
+    mutationFn: (data: { user_ids: number[]; ring_group_ids: number[] }) =>
+      updateSupervisorAssignments(userId as string, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supervisor-assignments', userId] });
       toast.success('Supervisor assignments updated');
@@ -82,47 +83,28 @@ export function SupervisorAssignmentDialog({
     },
   });
 
-  const users = usersResponse?.data || [];
-  const ringGroups = ringGroupsResponse?.data || [];
+  const handleSave = () => {
+    const userSelect = document.getElementById(
+      'supervisor-assigned-users'
+    ) as HTMLSelectElement | null;
+    const ringGroupSelect = document.getElementById(
+      'supervisor-assigned-ring-groups'
+    ) as HTMLSelectElement | null;
 
-  const selectableUsers = useMemo(
-    () => users.filter((u) => u.id !== userId && u.role !== 'supervisor'),
-    [users, userId]
-  );
+    const userIds = Array.from(userSelect?.selectedOptions || [])
+      .map((option) => Number(option.value))
+      .filter((id) => !Number.isNaN(id));
 
-  const filteredUsers = useMemo(
-    () =>
-      selectableUsers.filter(
-        (u) =>
-          u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-          u.email.toLowerCase().includes(userSearch.toLowerCase())
-      ),
-    [selectableUsers, userSearch]
-  );
+    const ringGroupIds = Array.from(ringGroupSelect?.selectedOptions || [])
+      .map((option) => Number(option.value))
+      .filter((id) => !Number.isNaN(id));
 
-  const filteredRingGroups = useMemo(
-    () =>
-      ringGroups.filter((rg) =>
-        rg.name.toLowerCase().includes(ringGroupSearch.toLowerCase())
-      ),
-    [ringGroups, ringGroupSearch]
-  );
-
-  const toggleUser = (id: string, checked: boolean) => {
-    setSelectedUserIds((prev) =>
-      checked ? [...prev, id] : prev.filter((value) => value !== id)
-    );
-  };
-
-  const toggleRingGroup = (id: string, checked: boolean) => {
-    setSelectedRingGroupIds((prev) =>
-      checked ? [...prev, id] : prev.filter((value) => value !== id)
-    );
+    updateMutation.mutate({ user_ids: userIds, ring_group_ids: ringGroupIds });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Supervisor Assignments</DialogTitle>
           <DialogDescription>
@@ -130,71 +112,60 @@ export function SupervisorAssignmentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label className="text-base">Assigned Users</Label>
-            <Input
-              placeholder="Search users..."
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-            />
-            <div className="border rounded-md p-2 max-h-[220px] overflow-y-auto space-y-1">
-              {filteredUsers.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">No users found</p>
-              ) : (
-                filteredUsers.map((user) => (
-                  <div key={user.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`assign-user-${user.id}`}
-                      checked={selectedUserIds.includes(user.id)}
-                      onCheckedChange={(checked) =>
-                        toggleUser(user.id, checked === true)
-                      }
-                    />
-                    <Label
-                      htmlFor={`assign-user-${user.id}`}
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      {user.name}{' '}
-                      <span className="text-muted-foreground">({user.email})</span>
-                    </Label>
-                  </div>
-                ))
-              )}
+        <div className="py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column: PBX Users */}
+            <div className="space-y-2">
+              <Label htmlFor="supervisor-assigned-users" className="text-base">
+                Assigned Users
+              </Label>
+              <select
+                id="supervisor-assigned-users"
+                multiple
+                defaultValue={selectedUserIds}
+                disabled={isLoadingAssignments}
+                className="w-full h-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {selectableUsers.length === 0 ? (
+                  <option disabled>No PBX users available</option>
+                ) : (
+                  selectableUsers.map((user: any) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))
+                )}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Hold Ctrl/Cmd or Shift to select multiple users.
+              </p>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label className="text-base">Assigned Ring Groups</Label>
-            <Input
-              placeholder="Search ring groups..."
-              value={ringGroupSearch}
-              onChange={(e) => setRingGroupSearch(e.target.value)}
-            />
-            <div className="border rounded-md p-2 max-h-[220px] overflow-y-auto space-y-1">
-              {filteredRingGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">
-                  No ring groups found
-                </p>
-              ) : (
-                filteredRingGroups.map((ringGroup) => (
-                  <div key={ringGroup.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`assign-ring-group-${ringGroup.id}`}
-                      checked={selectedRingGroupIds.includes(ringGroup.id)}
-                      onCheckedChange={(checked) =>
-                        toggleRingGroup(ringGroup.id, checked === true)
-                      }
-                    />
-                    <Label
-                      htmlFor={`assign-ring-group-${ringGroup.id}`}
-                      className="text-sm font-normal cursor-pointer"
-                    >
+            {/* Right Column: Ring Groups */}
+            <div className="space-y-2">
+              <Label htmlFor="supervisor-assigned-ring-groups" className="text-base">
+                Assigned Ring Groups
+              </Label>
+              <select
+                id="supervisor-assigned-ring-groups"
+                multiple
+                defaultValue={selectedRingGroupIds}
+                disabled={isLoadingAssignments}
+                className="w-full h-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {ringGroups.length === 0 ? (
+                  <option disabled>No ring groups available</option>
+                ) : (
+                  ringGroups.map((ringGroup: any) => (
+                    <option key={ringGroup.id} value={ringGroup.id}>
                       {ringGroup.name}
-                    </Label>
-                  </div>
-                ))
-              )}
+                    </option>
+                  ))
+                )}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Hold Ctrl/Cmd or Shift to select multiple ring groups.
+              </p>
             </div>
           </div>
         </div>
@@ -208,7 +179,7 @@ export function SupervisorAssignmentDialog({
             Cancel
           </Button>
           <Button
-            onClick={() => updateMutation.mutate()}
+            onClick={handleSave}
             disabled={updateMutation.isPending || isLoadingAssignments}
           >
             {updateMutation.isPending ? 'Saving...' : 'Save Assignments'}

@@ -19,6 +19,9 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   PhoneOff,
+  Headphones,
+  Mic,
+  Phone,
   Wifi,
   WifiOff,
   AlertTriangle,
@@ -47,6 +50,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { CallStatus, getCallStatusColor, getCallStatusLabel, LiveCallStatuses } from '@/types/call.types';
 import type { ActiveCall as ApiActiveCall } from '@/types/api.types';
 import { toast } from 'sonner';
@@ -108,6 +116,7 @@ export default function LiveCalls() {
   const { user: currentUser } = useAuth();
   const isSupervisor = currentUser?.role === 'supervisor';
   const isReadOnly = ['reporter', 'pbx_user', 'supervisor'].includes(currentUser?.role);
+  const canUseLiveCallActions = ['owner', 'supervisor'].includes(currentUser?.role);
   const queryClient = useQueryClient();
 
   // Refresh interval state (default: 5 seconds)
@@ -653,25 +662,88 @@ export default function LiveCalls() {
                     </span>
                   ),
                 },
-                ...(!isReadOnly
+                ...(canUseLiveCallActions
                   ? [
                       {
                         header: 'Actions',
                         cell: (call: LiveCall) =>
                           call.session_id ? (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDisconnect(call.session_id!);
-                              }}
-                              disabled={disconnectMutation.isPending}
-                              className="gap-2"
-                            >
-                              <PhoneOff className="h-4 w-4" />
-                              Disconnect
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    disabled
+                                    aria-label="Spy"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Headphones className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Spy</p>
+                                </TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    disabled
+                                    aria-label="Whisper"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Mic className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Whisper</p>
+                                </TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    disabled
+                                    aria-label="Barge"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Phone className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Barge</p>
+                                </TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    aria-label="Disconnect"
+                                    disabled={disconnectMutation.isPending}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDisconnect(call.session_id!);
+                                    }}
+                                  >
+                                    <PhoneOff className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Disconnect</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           ),

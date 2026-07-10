@@ -62,6 +62,7 @@ const sidebarSections: SidebarSection[] = [
     accentColor: 'default',
     items: [
       { name: 'Users', href: '/ui/users', icon: 'codicon-account', roles: ['owner', 'pbx_admin', 'supervisor'] },
+      { name: 'Supervisors', href: '/ui/supervisors', icon: 'codicon-shield', roles: ['owner', 'pbx_admin'] },
       { name: 'Extensions', href: '/ui/extensions', icon: 'codicon-extensions', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Conference Rooms', href: '/ui/conference-rooms', icon: 'codicon-device-camera-video', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter', 'supervisor'] },
