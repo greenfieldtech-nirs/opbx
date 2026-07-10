@@ -73,8 +73,14 @@ final class WebPhoneConfigControllerTest extends TestCase
             ->assertJsonPath('data.sip_username', $extension->extension_number)
             ->assertJsonPath('data.sip_password', $extension->password)
             ->assertJsonPath('data.sip_domain', 'test.cloudonix.io')
+            ->assertJsonPath('data.sip_uri', 'sip:1000@test.cloudonix.io')
+            ->assertJsonPath('data.display_name', $owner->name)
             ->assertJsonPath('data.wss_server', 'wss://webrtc.cloudonix.io')
-            ->assertJsonPath('data.websocket_port', 443);
+            ->assertJsonPath('data.websocket_port', 443)
+            ->assertJsonPath('data.server_path', '')
+            ->assertJsonPath('data.sip_contact', $extension->extension_number)
+            ->assertJsonPath('data.profile_name', $owner->name)
+            ->assertJsonPath('data.registration_mode', 'Direct');
     }
 
     public function test_supervisor_with_extension_can_get_config(): void
@@ -110,6 +116,46 @@ final class WebPhoneConfigControllerTest extends TestCase
         ]);
 
         Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/v1/webphone/config');
+
+        $response->assertStatus(403)
+            ->assertJsonPath('message', 'Web Phone is not available for this role.');
+    }
+
+    public function test_pbx_user_cannot_get_config(): void
+    {
+        $pbxUser = $this->createUser(UserRole::PBX_USER);
+        Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $pbxUser->id,
+            'extension_number' => '1004',
+            'password' => 'secret123',
+            'type' => ExtensionType::USER,
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($pbxUser);
+
+        $response = $this->getJson('/api/v1/webphone/config');
+
+        $response->assertStatus(403)
+            ->assertJsonPath('message', 'Web Phone is not available for this role.');
+    }
+
+    public function test_reporter_cannot_get_config(): void
+    {
+        $reporter = $this->createUser(UserRole::REPORTER);
+        Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $reporter->id,
+            'extension_number' => '1005',
+            'password' => 'secret123',
+            'type' => ExtensionType::USER,
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($reporter);
 
         $response = $this->getJson('/api/v1/webphone/config');
 
@@ -153,5 +199,27 @@ final class WebPhoneConfigControllerTest extends TestCase
         $response = $this->getJson('/api/v1/webphone/config');
 
         $response->assertStatus(404);
+    }
+
+    public function test_owner_without_cloudonix_settings_gets_404(): void
+    {
+        $owner = $this->createUser(UserRole::OWNER);
+        Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $owner->id,
+            'extension_number' => '1003',
+            'password' => 'secret123',
+            'type' => ExtensionType::USER,
+            'status' => 'active',
+        ]);
+
+        CloudonixSettings::where('organization_id', $this->organization->id)->delete();
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->getJson('/api/v1/webphone/config');
+
+        $response->assertStatus(404)
+            ->assertJsonPath('message', 'Cloudonix settings are not configured for this organization.');
     }
 }

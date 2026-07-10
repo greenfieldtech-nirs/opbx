@@ -61,8 +61,14 @@ final class WebPhoneConfigController extends Controller
                 'sip_username' => $extension->extension_number,
                 'sip_password' => $extension->password,
                 'sip_domain' => $cloudonixSettings->domain_name,
+                'sip_uri' => "sip:{$extension->extension_number}@{$cloudonixSettings->domain_name}",
+                'display_name' => $user->name,
                 'wss_server' => 'wss://webrtc.cloudonix.io',
                 'websocket_port' => 443,
+                'server_path' => '',
+                'sip_contact' => $extension->extension_number,
+                'profile_name' => $user->name,
+                'registration_mode' => 'Direct',
             ],
         ]);
     }
