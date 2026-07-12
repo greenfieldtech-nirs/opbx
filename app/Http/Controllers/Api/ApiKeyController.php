@@ -66,10 +66,7 @@ class ApiKeyController extends Controller
         }
 
         if ($request->has('permissions')) {
-            $apiKey->permissions()->delete();
-            foreach ($request->input('permissions') as $permission) {
-                $apiKey->permissions()->create($permission);
-            }
+            $this->apiKeys->replacePermissions($apiKey, $request->input('permissions'));
         }
 
         return (new ApiKeyResource($apiKey->fresh('permissions')))->response();

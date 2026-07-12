@@ -46,6 +46,32 @@ class ApiKeyService
     }
 
     /**
+     * Atomically replace an API key's permission set. The old permissions and
+     * the new ones are swapped inside a single transaction so a mid-write failure
+     * can never leave the key with a partial (over- or under-scoped) permission
+     * set. Returns the key with its fresh permissions loaded.
+     *
+     * @param  array<int, array{resource: string, level: string}>  $permissions
+     */
+    public function replacePermissions(ApiKey $apiKey, array $permissions): ApiKey
+    {
+        return OrganizationScope::bypass(function () use ($apiKey, $permissions) {
+            return DB::transaction(function () use ($apiKey, $permissions) {
+                $apiKey->permissions()->delete();
+
+                foreach ($permissions as $permission) {
+                    $apiKey->permissions()->create([
+                        'resource' => $permission['resource'],
+                        'level' => $permission['level'],
+                    ]);
+                }
+
+                return $apiKey->load('permissions');
+            });
+        });
+    }
+
+    /**
      * Resolve a plaintext bearer token to an active (non-revoked) ApiKey, or null.
      */
     public function resolve(string $plaintext): ?ApiKey

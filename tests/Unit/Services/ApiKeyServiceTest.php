@@ -113,4 +113,56 @@ class ApiKeyServiceTest extends TestCase
         $this->assertDatabaseCount('api_keys', 0);
         $this->assertDatabaseCount('api_key_permissions', 0);
     }
+
+    public function test_replace_permissions_swaps_the_set_atomically(): void
+    {
+        $org = Organization::factory()->create();
+        [$apiKey] = $this->service()->create(
+            organizationId: $org->id,
+            name: 'k',
+            permissions: [['resource' => 'business-hours', 'level' => 'read']],
+            createdBy: null,
+        );
+
+        $this->service()->replacePermissions($apiKey, [
+            ['resource' => 'ring-groups', 'level' => 'write'],
+        ]);
+
+        $this->assertDatabaseMissing('api_key_permissions', [
+            'api_key_id' => $apiKey->id, 'resource' => 'business-hours',
+        ]);
+        $this->assertDatabaseHas('api_key_permissions', [
+            'api_key_id' => $apiKey->id, 'resource' => 'ring-groups', 'level' => 'write',
+        ]);
+        $this->assertDatabaseCount('api_key_permissions', 1);
+    }
+
+    public function test_replace_permissions_rolls_back_and_keeps_original_on_failure(): void
+    {
+        $org = Organization::factory()->create();
+        [$apiKey] = $this->service()->create(
+            organizationId: $org->id,
+            name: 'k',
+            permissions: [['resource' => 'business-hours', 'level' => 'read']],
+            createdBy: null,
+        );
+
+        // Duplicate resource violates unique(['api_key_id','resource']) on the
+        // second insert. The whole replace must roll back — leaving the ORIGINAL
+        // permission intact rather than an empty or partial set.
+        try {
+            $this->service()->replacePermissions($apiKey, [
+                ['resource' => 'ring-groups', 'level' => 'read'],
+                ['resource' => 'ring-groups', 'level' => 'write'],
+            ]);
+            $this->fail('Expected the duplicate-resource insert to throw.');
+        } catch (\Throwable $e) {
+            // expected
+        }
+
+        $this->assertDatabaseHas('api_key_permissions', [
+            'api_key_id' => $apiKey->id, 'resource' => 'business-hours', 'level' => 'read',
+        ]);
+        $this->assertDatabaseCount('api_key_permissions', 1);
+    }
 }
