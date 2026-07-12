@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\ApiKeyPermissionLevel;
 use App\Enums\GrantableResource;
+use App\Enums\UserRole;
 use App\Scopes\OrganizationScope;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -79,6 +80,54 @@ class ApiKey extends Model implements AuthenticatableContract
      * `$user->is_platform_manager` check does not rely on implicit null.
      */
     public function getIsPlatformManagerAttribute(): bool
+    {
+        return false;
+    }
+
+    // --- User role-method compatibility ---
+    //
+    // A granted key request has ALREADY been authorized by EnforceApiKeyScope.
+    // Downstream FormRequests/controllers still call User role methods (they were
+    // written for User actors). The key answers them as an OWNER-level actor so
+    // pure authorization GATES pass, while the role-specific BRANCHING methods
+    // (isPBXAdmin/isPBXUser/isSupervisor/isReporter) return false so key requests
+    // do NOT get the supervisor-narrowed CDR view, the "own extension only"
+    // restriction, or the reduced pbx-admin create rules. Real authz stays 100%
+    // in the enforcer; this shim only keeps User-shaped call sites from erroring.
+    // ponytail: if a future call site needs a distinct key persona, revisit — a
+    // blanket owner-shim is the least code that satisfies every current gate.
+
+    public function getRoleAttribute(): UserRole
+    {
+        return UserRole::OWNER;
+    }
+
+    public function hasRole(UserRole $role): bool
+    {
+        return $role === UserRole::OWNER;
+    }
+
+    public function isOwner(): bool
+    {
+        return true;
+    }
+
+    public function isPBXAdmin(): bool
+    {
+        return false;
+    }
+
+    public function isPBXUser(): bool
+    {
+        return false;
+    }
+
+    public function isReporter(): bool
+    {
+        return false;
+    }
+
+    public function isSupervisor(): bool
     {
         return false;
     }
