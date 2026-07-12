@@ -449,6 +449,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
         Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
         Route::delete('/{sessionId}/disconnect', [SessionUpdateController::class, 'disconnectSession'])->name('session-updates.disconnect');
+        Route::post('/{sessionId}/coach-target', [SessionUpdateController::class, 'coachTarget'])->name('session-updates.coach-target');
     });
 
     // Call Notifications Settings

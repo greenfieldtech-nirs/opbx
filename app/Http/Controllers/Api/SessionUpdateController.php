@@ -7,8 +7,10 @@ namespace App\Http\Controllers\Api;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
+use App\Http\Requests\CoachTargetRequest;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
+use App\Scopes\OrganizationScope;
 use App\Services\CloudonixClient\CloudonixClient;
 use App\Services\Supervisor\SupervisorFilterService;
 use Carbon\Carbon;
@@ -572,5 +574,79 @@ class SessionUpdateController extends Controller
                 'message' => 'Failed to disconnect session: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Resolve a coaching (spy/whisper/barge) destination for an active session.
+     *
+     * Owners and supervisors only; supervisors are additionally restricted to
+     * sessions within their assigned scope. Returns the sentinel destination the
+     * Web Phone should dial (the /route webhook re-authorizes and emits <Coach>).
+     */
+    public function coachTarget(CoachTargetRequest $request, int $sessionId, SupervisorFilterService $filter): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return response()->json(['error' => 'Authentication required'], 401);
+        }
+
+        $roleValue = $user->role instanceof UserRole ? $user->role->value : $user->role;
+        if (! in_array($roleValue, ['owner', 'supervisor'], true)) {
+            return response()->json([
+                'error' => 'Forbidden',
+                'message' => 'You do not have permission to monitor calls',
+            ], 403);
+        }
+
+        $session = SessionUpdate::withoutGlobalScope(OrganizationScope::class)
+            ->where('session_id', $sessionId)
+            ->where('organization_id', $user->organization_id)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $session) {
+            return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        // Supervisors may only coach sessions within their assigned scope.
+        if ($roleValue === 'supervisor') {
+            $identifiers = $filter->resourceIdentifiers($user);
+            $inScope = in_array((string) $session->caller_id, $identifiers, true)
+                || in_array((string) $session->destination, $identifiers, true);
+
+            if (! $inScope) {
+                return response()->json([
+                    'error' => 'Forbidden',
+                    'message' => 'This call is outside your supervised scope',
+                ], 403);
+            }
+        }
+
+        if (! in_array($session->status, ['processing', 'ringing', 'connected'], true)
+            || empty($session->session_token)) {
+            return response()->json([
+                'error' => 'Unprocessable',
+                'message' => 'This call is not active or has no session token',
+            ], 422);
+        }
+
+        $policy = $request->validated('policy');
+        $token = $session->session_token;
+
+        $destination = match ($policy) {
+            'spy' => "spy_{$token}",
+            'barge' => "barge_{$token}",
+            'whisper' => 'whisper_'.$request->validated('whisper_party')."_{$token}",
+        };
+
+        \Log::info('Coach target resolved', [
+            'session_id' => $sessionId,
+            'user_id' => $user->id,
+            'policy' => $policy,
+            'security_event' => true,
+        ]);
+
+        return response()->json(['data' => ['destination' => $destination]]);
     }
 }
