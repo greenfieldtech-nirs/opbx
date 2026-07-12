@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -34,6 +34,7 @@ import type { User, UserStatus } from '@/types';
 
 export default function Supervisors() {
   const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -103,6 +104,27 @@ export default function Supervisors() {
 
   const handleCreated = (userId: string) => {
     openAssignmentDialog(userId);
+  };
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: UserStatus }) => {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      return usersService.patch(id, { status: newStatus });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Supervisor status updated');
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message || error?.message || 'Failed to update supervisor status';
+      toast.error(message);
+    },
+  });
+
+  const handleStatusToggle = (supervisor: User, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleStatusMutation.mutate({ id: supervisor.id, currentStatus: supervisor.status });
   };
 
   const handleAssignmentClose = (open: boolean) => {
@@ -220,10 +242,22 @@ export default function Supervisors() {
             columns={[
               {
                 header: 'Status',
+                className: 'text-center',
                 cell: (supervisor) => (
-                  <Badge className={cn('text-xs', getStatusColor(supervisor.status))}>
-                    {supervisor.status}
-                  </Badge>
+                  <div className="flex justify-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-2 py-1 hover:bg-transparent hover:opacity-80"
+                      onClick={(e) => handleStatusToggle(supervisor, e)}
+                      disabled={toggleStatusMutation.isPending}
+                      title="Click to toggle supervisor access"
+                    >
+                        <Badge className={cn('text-xs cursor-pointer', getStatusColor(supervisor.status))}>
+                          {supervisor.status === 'active' ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                    </Button>
+                  </div>
                 ),
               },
               {
