@@ -7,7 +7,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { sessionUpdatesService } from '@/services/sessionUpdates.service';
+import { sessionUpdatesService, getCoachTarget } from '@/services/sessionUpdates.service';
+import { startCoach } from '@/components/WebPhone/webPhoneBus';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
@@ -244,6 +251,24 @@ export default function LiveCalls() {
       toast.error(errorMessage);
     },
   });
+
+  const handleCoach = useCallback(
+    async (
+      sessionId: number,
+      policy: 'spy' | 'whisper' | 'barge',
+      whisperParty?: 'caller' | 'callee' | 'both'
+    ) => {
+      try {
+        const { data } = await getCoachTarget(sessionId, policy, whisperParty);
+        startCoach(data.destination);
+      } catch (error: any) {
+        toast.error(
+          error?.response?.data?.message ?? 'Unable to start monitoring this call.'
+        );
+      }
+    },
+    []
+  );
 
   // Disconnect all calls state
   const [isDisconnectingAll, setIsDisconnectingAll] = useState(false);
@@ -674,9 +699,11 @@ export default function LiveCalls() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    disabled
                                     aria-label="Spy"
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'spy');
+                                    }}
                                   >
                                     <Headphones className="h-4 w-4" />
                                   </Button>
@@ -686,23 +713,52 @@ export default function LiveCalls() {
                                 </TooltipContent>
                               </Tooltip>
 
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    disabled
-                                    aria-label="Whisper"
-                                    onClick={(e) => e.stopPropagation()}
+                              <DropdownMenu>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        aria-label="Whisper"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Mic className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Whisper</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'whisper', 'caller');
+                                    }}
                                   >
-                                    <Mic className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Whisper</p>
-                                </TooltipContent>
-                              </Tooltip>
+                                    Whisper to caller
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'whisper', 'callee');
+                                    }}
+                                  >
+                                    Whisper to callee
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'whisper', 'both');
+                                    }}
+                                  >
+                                    Whisper to both
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
 
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -710,9 +766,11 @@ export default function LiveCalls() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    disabled
                                     aria-label="Barge"
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'barge');
+                                    }}
                                   >
                                     <Phone className="h-4 w-4" />
                                   </Button>
