@@ -390,6 +390,15 @@ paths:
   /v1/business-hours/{business_hour}:
     $ref: './paths/business-hours/index.yaml#/paths/~1v1~1business-hours~1{business_hour}'
 
+  /v1/api-keys:
+    $ref: './paths/api-keys/index.yaml#/paths/~1v1~1api-keys'
+
+  /v1/api-keys/grantable-resources:
+    $ref: './paths/api-keys/index.yaml#/paths/~1v1~1api-keys~1grantable-resources'
+
+  /v1/api-keys/{apiKey}:
+    $ref: './paths/api-keys/index.yaml#/paths/~1v1~1api-keys~1{apiKey}'
+
   /v1/call-detail-records:
     $ref: './paths/call-detail-records/index.yaml#/paths/~1v1~1call-detail-records'
 
@@ -742,6 +751,10 @@ components:
       $ref: './components/schemas/ConferenceRoom.yaml'
     BusinessHoursSchedule:
       $ref: './components/schemas/BusinessHoursSchedule.yaml'
+    ApiKey:
+      $ref: './components/schemas/ApiKey.yaml'
+    ApiKeyPermission:
+      $ref: './components/schemas/ApiKeyPermission.yaml'
     IvrMenu:
       $ref: './components/schemas/IvrMenu.yaml'
     PhoneNumber:
@@ -867,6 +880,8 @@ tags:
     description: Ring group management for call distribution
   - name: Business Hours
     description: Business hours schedule management
+  - name: API Keys
+    description: Owner-managed scoped API keys with per-resource read/write permissions
   - name: IVR Menus
     description: Interactive Voice Response menu management
   - name: Phone Numbers
