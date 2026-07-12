@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 use App\Http\Middleware\BypassOrganizationScope;
 use App\Http\Middleware\DialerWorkerAuth;
+use App\Http\Middleware\EnforceApiKeyScope;
 use App\Http\Middleware\EnsurePlatformManager;
 use App\Http\Middleware\EnsureTenantScope;
 use App\Http\Middleware\EnsureWebhookIdempotency;
 use App\Http\Middleware\RateLimitPerOrganization;
 use App\Http\Middleware\RateLimitSensitiveOperations;
+use App\Http\Middleware\ResolveApiKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -54,7 +57,25 @@ return Application::configure(basePath: dirname(__DIR__))
             'platform.manager' => EnsurePlatformManager::class,
             'bypass.organization.scope' => BypassOrganizationScope::class,
             'dialer.worker.auth' => DialerWorkerAuth::class,
+            'resolve.api.key' => ResolveApiKey::class,
+            'enforce.api.key.scope' => EnforceApiKeyScope::class,
         ]);
+
+        // ResolveApiKey must run BEFORE auth:sanctum. Laravel's middleware
+        // priority pulls Authenticate (AuthenticatesRequests) to a fixed slot,
+        // so listing resolve.api.key first in the route group is not enough —
+        // register it ahead of Authenticate in the priority list explicitly.
+        $middleware->prependToPriorityList(
+            before: AuthenticatesRequests::class,
+            prepend: ResolveApiKey::class,
+        );
+
+        // DO NOT add EnforceApiKeyScope to the priority list. It must keep its
+        // route-group position, which runs AFTER auth:sanctum (so $request->user()
+        // is populated) and BEFORE controllers/model-binding. If it were pulled
+        // ahead of Authenticate, user() would be null, every request would fall
+        // through its `! instanceof ApiKey` guard, and scope enforcement would be
+        // silently bypassed for all keys.
 
         // Configure authentication to return JSON for API routes instead of redirecting
         $middleware->redirectGuestsTo(function ($request) {

@@ -106,6 +106,7 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter', 'supervisor'] },
       { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor'] },
       { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
+      { name: 'API Keys', href: '/ui/api-keys', icon: 'codicon-key', roles: ['owner'] },
     ],
   },
 ];

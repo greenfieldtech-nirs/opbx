@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Auth\BypassScopeEloquentUserProvider;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\ApiKey;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerList;
 use App\Models\BlockedCallLog;
@@ -32,6 +33,7 @@ use App\Observers\BusinessHoursCacheObserver;
 use App\Observers\ExtensionCacheObserver;
 use App\Policies\AiAssistantLoadBalancerPolicy;
 use App\Policies\AiAssistantPolicy;
+use App\Policies\ApiKeyPolicy;
 use App\Policies\AutoDialerCampaignPolicy;
 use App\Policies\CallDetailRecordPolicy;
 use App\Policies\CallTrackingAdPlatformIntegrationPolicy;
@@ -253,6 +255,26 @@ class AppServiceProvider extends ServiceProvider
             $this->validateSecurityConfiguration();
         }
 
+        // API keys are authorized solely by their per-resource permissions
+        // (enforced by the EnforceApiKeyScope middleware before the controller),
+        // never by role-based policies. Policy methods type-hint App\Models\User,
+        // so let key-authenticated requests bypass Gate entirely.
+        // SECURITY INVARIANT: API-key authorization is handled EXCLUSIVELY by the
+        // EnforceApiKeyScope middleware (route-name -> resource read/write matching),
+        // NOT by Gate/policies. This Gate::before intentionally bypasses all policy
+        // checks for ApiKey actors so that User-typed policies don't TypeError on a
+        // key. Consequence: any Gate::allows()/authorize() call for a key-authenticated
+        // request passes here — the route-scope enforcer is the ONLY gate. Do not add
+        // policy-based authorization expecting it to constrain API keys; add it to
+        // EnforceApiKeyScope instead.
+        Gate::before(function ($user) {
+            if ($user instanceof ApiKey) {
+                return true;
+            }
+
+            return null;
+        });
+
         // Register model policies
         Gate::policy(Extension::class, ExtensionPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
@@ -271,6 +293,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BlockedCallLog::class, InboundBlacklistPolicy::class);
         Gate::policy(AutoDialerCampaign::class, AutoDialerCampaignPolicy::class);
         Gate::policy(AutoDialerList::class, DistributionListPolicy::class);
+        Gate::policy(ApiKey::class, ApiKeyPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes

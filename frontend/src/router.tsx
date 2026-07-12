@@ -37,6 +37,7 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
+const ApiKeysSettings = lazy(() => import('@/pages/ApiKeysSettings'));
 const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
 const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
 const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
@@ -189,6 +190,14 @@ export const router = createBrowserRouter([
       {
         path: 'call-notifications',
         element: <CallNotificationsSettings />,
+      },
+      {
+        path: 'api-keys',
+        element: (
+          <OwnerRoute>
+            <ApiKeysSettings />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer',
