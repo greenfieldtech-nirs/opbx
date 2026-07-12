@@ -10,4 +10,5 @@ export interface WebPhoneConfig {
   sip_contact: string;
   profile_name: string;
   registration_mode: string;
+  country: string;
 }

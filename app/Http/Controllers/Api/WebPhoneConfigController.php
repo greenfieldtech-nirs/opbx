@@ -47,6 +47,15 @@ final class WebPhoneConfigController extends Controller
             ], 404);
         }
 
+        $organization = $user->organization;
+        $country = 'us';
+        if ($organization && $organization->settings) {
+            $settingsCountry = strtolower(trim((string) ($organization->settings['country'] ?? '')));
+            if ($settingsCountry !== '') {
+                $country = $settingsCountry;
+            }
+        }
+
         Log::info('Web Phone config retrieved', [
             'request_id' => $this->getRequestId(),
             'user_id' => $user->id,
@@ -69,6 +78,7 @@ final class WebPhoneConfigController extends Controller
                 'sip_contact' => $extension->extension_number,
                 'profile_name' => $user->name,
                 'registration_mode' => 'Direct',
+                'country' => $country,
             ],
         ]);
     }

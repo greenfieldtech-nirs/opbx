@@ -46,8 +46,10 @@ class CxmlBuilder
      * @param  int|null  $timeout  Timeout in seconds
      * @param  string|null  $action  Callback URL after dial completes
      * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
+     * @param  string|null  $callerId  Presented caller ID (a valid phone number)
+     * @param  string|null  $callerName  Presented caller display name (any text)
      */
-    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null): self
+    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null, ?string $callerId = null, ?string $callerName = null): self
     {
         $dial = $this->document->createElement('Dial');
 
@@ -61,6 +63,15 @@ class CxmlBuilder
 
         if ($trunks !== null) {
             $dial->setAttribute('trunks', $trunks);
+        }
+
+        // DOMDocument::setAttribute XML-escapes the value automatically.
+        if ($callerId !== null) {
+            $dial->setAttribute('callerId', $callerId);
+        }
+
+        if ($callerName !== null) {
+            $dial->setAttribute('callerName', $callerName);
         }
 
         // Handle multiple targets
@@ -349,14 +360,15 @@ class CxmlBuilder
      * Build a simple dial response.
      *
      * @param  string  $destination  The destination to dial
-     * @param  string|null  $callerId  Optional caller ID
+     * @param  string|null  $callerId  Optional caller ID (a valid phone number)
      * @param  int|null  $timeout  Optional timeout in seconds
      * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
+     * @param  string|null  $callerName  Optional caller display name (any text)
      */
-    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null): string
+    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null, ?string $callerName = null): string
     {
         $builder = new self;
-        $builder->dial($destination, $timeout, null, $trunks);
+        $builder->dial($destination, $timeout, null, $trunks, $callerId, $callerName);
 
         return $builder->build();
     }

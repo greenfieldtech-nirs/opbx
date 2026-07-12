@@ -391,6 +391,12 @@ Route::prefix('v1')->group(function (): void {
             ->name('business-hours.toggle-status');
 
         // Phone Numbers (DIDs)
+        // Static routes MUST be registered before the apiResource so that
+        // "default-caller-id" is not captured by the {phone_number} wildcard.
+        Route::get('phone-numbers/default-caller-id', [PhoneNumberController::class, 'getDefaultCallerId'])
+            ->name('phone-numbers.default-caller-id.show');
+        Route::put('phone-numbers/default-caller-id', [PhoneNumberController::class, 'setDefaultCallerId'])
+            ->name('phone-numbers.default-caller-id.update');
         Route::apiResource('phone-numbers', PhoneNumberController::class);
 
         // Outbound Whitelist

@@ -23,7 +23,8 @@ class OutboundRoutingService
 {
     public function __construct(
         private readonly PhoneNumberService $phoneNumberService,
-        private readonly VoiceRoutingCacheService $cache
+        private readonly VoiceRoutingCacheService $cache,
+        private readonly OutboundCallerIdResolver $callerIdResolver
     ) {}
 
     /**
@@ -118,11 +119,18 @@ class OutboundRoutingService
             'whitelist_entry_id' => $whitelistEntry->id,
         ]);
 
-        // Route via trunk using the caller ID from the extension
-        $callerId = $fromExtension->caller_id ?? $from;
+        // Resolve the outbound caller ID to present (extension DID -> org default -> Unknown)
+        $resolved = $this->callerIdResolver->resolve($fromExtension, $orgId);
+
+        Log::info('OutboundRoutingService: Resolved outbound caller ID', [
+            'from' => $from,
+            'org_id' => $orgId,
+            'caller_id' => $resolved['callerId'],
+            'caller_name' => $resolved['callerName'],
+        ]);
 
         return response(
-            CxmlBuilder::simpleDial($to, $callerId, null, $trunkName),
+            CxmlBuilder::simpleDial($to, $resolved['callerId'], null, $trunkName, $resolved['callerName']),
             200,
             ['Content-Type' => 'application/xml']
         );

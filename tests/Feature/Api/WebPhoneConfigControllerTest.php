@@ -80,7 +80,54 @@ final class WebPhoneConfigControllerTest extends TestCase
             ->assertJsonPath('data.server_path', '')
             ->assertJsonPath('data.sip_contact', $extension->extension_number)
             ->assertJsonPath('data.profile_name', $owner->name)
-            ->assertJsonPath('data.registration_mode', 'Direct');
+            ->assertJsonPath('data.registration_mode', 'Direct')
+            ->assertJsonPath('data.country', 'us');
+    }
+
+    public function test_config_returns_country_from_organization_settings(): void
+    {
+        $this->organization->settings = ['country' => 'uk'];
+        $this->organization->save();
+
+        $owner = $this->createUser(UserRole::OWNER);
+        Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $owner->id,
+            'extension_number' => '1000',
+            'password' => 'secret123',
+            'type' => ExtensionType::USER,
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->getJson('/api/v1/webphone/config');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.country', 'uk');
+    }
+
+    public function test_config_normalizes_country_to_lowercase(): void
+    {
+        $this->organization->settings = ['country' => 'UK'];
+        $this->organization->save();
+
+        $owner = $this->createUser(UserRole::OWNER);
+        Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $owner->id,
+            'extension_number' => '1000',
+            'password' => 'secret123',
+            'type' => ExtensionType::USER,
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $response = $this->getJson('/api/v1/webphone/config');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.country', 'uk');
     }
 
     public function test_supervisor_with_extension_can_get_config(): void

@@ -112,6 +112,106 @@ class PhoneNumberController extends Controller
     }
 
     /**
+     * Get the organization's default outbound caller ID DID.
+     *
+     * Returns the configured DID (id, phone_number, friendly_name) or null when unset.
+     */
+    public function getDefaultCallerId(Request $request): JsonResponse
+    {
+        $user = $this->getAuthenticatedUser();
+
+        $this->authorize('viewAny', DidNumber::class);
+
+        $organization = $user->organization;
+        $didId = $organization->settings['default_outbound_caller_id_did_id'] ?? null;
+
+        $did = $didId !== null
+            ? DidNumber::where('id', (int) $didId)->first()
+            : null;
+
+        Log::info('Retrieving default outbound caller ID', [
+            'request_id' => $this->getRequestId(),
+            'user_id' => $user->id,
+            'organization_id' => $user->organization_id,
+            'did_id' => $did?->id,
+        ]);
+
+        return response()->json([
+            'data' => $did === null ? null : [
+                'did_id' => $did->id,
+                'phone_number' => $did->phone_number,
+                'friendly_name' => $did->friendly_name,
+            ],
+        ]);
+    }
+
+    /**
+     * Set (or clear) the organization's default outbound caller ID DID.
+     *
+     * Body: { did_id: int|null }. When non-null the DID must exist, belong to the
+     * authenticated organization, and be active. When null the setting is removed.
+     */
+    public function setDefaultCallerId(Request $request): JsonResponse
+    {
+        $user = $this->getAuthenticatedUser();
+
+        // Owner/PBX Admin only — reuse the DID create ability (owner/pbx_admin).
+        $this->authorize('create', DidNumber::class);
+
+        $validated = $request->validate([
+            'did_id' => ['present', 'nullable', 'integer'],
+        ]);
+
+        $didId = $validated['did_id'];
+        $did = null;
+
+        if ($didId !== null) {
+            $did = DidNumber::where('id', (int) $didId)->first();
+
+            if ($did === null || $did->organization_id !== $user->organization_id) {
+                return response()->json([
+                    'error' => 'Invalid DID',
+                    'message' => 'The selected phone number does not exist in your organization.',
+                ], 422);
+            }
+
+            if (! $did->isActive()) {
+                return response()->json([
+                    'error' => 'Inactive DID',
+                    'message' => 'The selected phone number is not active.',
+                ], 422);
+            }
+        }
+
+        $organization = $user->organization;
+        $settings = $organization->settings ?? [];
+
+        if ($didId === null) {
+            unset($settings['default_outbound_caller_id_did_id']);
+        } else {
+            $settings['default_outbound_caller_id_did_id'] = (int) $didId;
+        }
+
+        $organization->settings = $settings;
+        $organization->save();
+
+        Log::info('Updated default outbound caller ID', [
+            'request_id' => $this->getRequestId(),
+            'user_id' => $user->id,
+            'organization_id' => $user->organization_id,
+            'did_id' => $did?->id,
+        ]);
+
+        return response()->json([
+            'data' => $did === null ? null : [
+                'did_id' => $did->id,
+                'phone_number' => $did->phone_number,
+                'friendly_name' => $did->friendly_name,
+            ],
+        ]);
+    }
+
+    /**
      * Display the specified phone number.
      */
     public function show(Request $request, DidNumber $phoneNumber): PhoneNumberResource
@@ -521,7 +621,7 @@ class PhoneNumberController extends Controller
         $aiAssistantId = $phoneNumber->getTargetAiAssistantId();
         if ($aiAssistantId) {
             $aiAssistant = AiAssistant::where('id', $aiAssistantId)
-                ->where('status', \App\Enums\AiAssistantStatus::ACTIVE)
+                ->where('status', AiAssistantStatus::ACTIVE)
                 ->first();
             if ($aiAssistant) {
                 $phoneNumber->setAiAssistant($aiAssistant);

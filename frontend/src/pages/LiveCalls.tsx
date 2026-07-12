@@ -49,8 +49,6 @@ import { AlertDialog,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { WebPhoneToggle } from '@/components/WebPhone/WebPhoneToggle';
-import { WebPhoneDrawer } from '@/components/WebPhone/WebPhoneDrawer';
 import {
   Tooltip,
   TooltipContent,
@@ -252,7 +250,6 @@ export default function LiveCalls() {
   const [disconnectProgress, setDisconnectProgress] = useState(0);
   const [totalToDisconnect, setTotalToDisconnect] = useState(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [isWebPhoneOpen, setIsWebPhoneOpen] = useState(false);
 
   // Check for stale calls (WebSocket-only calls without session_id)
   const staleCallsCount = liveCalls.filter((call) => !call.session_id).length;
@@ -391,11 +388,6 @@ export default function LiveCalls() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          {/* Web Phone Toggle */}
-          {canUseLiveCallActions && (
-            <WebPhoneToggle onClick={() => setIsWebPhoneOpen(true)} />
-          )}
-
           {/* Disconnect All Calls Button */}
           {!isReadOnly && liveCalls.length > 0 && (
             <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
@@ -772,7 +764,6 @@ export default function LiveCalls() {
           </CardContent>
         </Card>
       )}
-      <WebPhoneDrawer open={isWebPhoneOpen} onOpenChange={setIsWebPhoneOpen} />
     </div>
   );
 }
