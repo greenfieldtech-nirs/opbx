@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Enums;
 
 use App\Enums\GrantableResource;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class GrantableResourceTest extends TestCase
@@ -40,5 +41,22 @@ class GrantableResourceTest extends TestCase
         $this->assertNull(GrantableResource::fromRouteName('settings.cloudonix.show'));
         $this->assertNull(GrantableResource::fromRouteName('profile.show'));
         $this->assertNull(GrantableResource::fromRouteName(null));
+    }
+
+    public function test_every_grantable_slug_has_a_registered_route(): void
+    {
+        // ponytail: catches enum/route drift — the one thing that silently breaks scoping
+        $routeNames = collect(Route::getRoutes())
+            ->map(fn ($r) => $r->getName())
+            ->filter()
+            ->values();
+
+        foreach (GrantableResource::slugs() as $slug) {
+            $matches = $routeNames->contains(
+                fn (string $name) => $name === $slug || str_starts_with($name, $slug.'.')
+            );
+
+            $this->assertTrue($matches, "No route registered for grantable slug: {$slug}");
+        }
     }
 }
