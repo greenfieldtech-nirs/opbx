@@ -251,7 +251,7 @@ Route::prefix('v1')->group(function (): void {
         ->name('recordings.secure-download');
 
     // Protected API routes
-    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');

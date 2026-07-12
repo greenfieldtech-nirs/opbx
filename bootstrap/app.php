@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Middleware\BypassOrganizationScope;
 use App\Http\Middleware\DialerWorkerAuth;
+use App\Http\Middleware\EnforceApiKeyScope;
 use App\Http\Middleware\EnsurePlatformManager;
 use App\Http\Middleware\EnsureTenantScope;
 use App\Http\Middleware\EnsureWebhookIdempotency;
@@ -57,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'bypass.organization.scope' => BypassOrganizationScope::class,
             'dialer.worker.auth' => DialerWorkerAuth::class,
             'resolve.api.key' => ResolveApiKey::class,
+            'enforce.api.key.scope' => EnforceApiKeyScope::class,
         ]);
 
         // ResolveApiKey must run BEFORE auth:sanctum. Laravel's middleware
