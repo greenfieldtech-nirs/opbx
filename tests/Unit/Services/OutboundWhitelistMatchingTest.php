@@ -7,8 +7,6 @@ namespace Tests\Unit\Services;
 use App\Models\Organization;
 use App\Models\OutboundWhitelist;
 use App\Services\VoiceRouting\OutboundRoutingService;
-use App\Services\VoiceRouting\VoiceRoutingCacheService;
-use App\Services\PhoneNumberService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,16 +21,16 @@ class OutboundWhitelistMatchingTest extends TestCase
     use RefreshDatabase;
 
     private OutboundRoutingService $outboundRoutingService;
+
     private Organization $organization;
+
     private Organization $otherOrganization;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $phoneNumberService = app(PhoneNumberService::class);
-        $cache = app(VoiceRoutingCacheService::class);
-        $this->outboundRoutingService = new OutboundRoutingService($phoneNumberService, $cache);
+        $this->outboundRoutingService = app(OutboundRoutingService::class);
         $this->organization = Organization::factory()->create();
         $this->otherOrganization = Organization::factory()->create();
     }

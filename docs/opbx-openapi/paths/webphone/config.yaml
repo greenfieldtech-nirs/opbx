@@ -1,0 +1,82 @@
+paths:
+  /v1/webphone/config:
+    get:
+      tags:
+        - Web Phone
+      summary: Get Web Phone SIP provisioning
+      description: |
+        Returns JsSIP-compatible SIP provisioning for the authenticated user's own
+        extension so the in-browser softphone can register with Cloudonix over WebRTC.
+
+        Restricted to `owner` and `supervisor` roles. The user must have a `user`-type
+        extension assigned and the organization must have Cloudonix settings configured,
+        otherwise `404` is returned. The `country` field is read from the organization
+        `settings` JSON (defaults to `us`) and drives call-progress tone cadences.
+      operationId: getWebPhoneConfig
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: SIP provisioning for the browser softphone
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      sip_username:
+                        type: string
+                        description: Extension number used as the SIP username.
+                        example: '1001'
+                      sip_password:
+                        type: string
+                        description: Extension SIP password.
+                      sip_domain:
+                        type: string
+                        description: Cloudonix domain name.
+                        example: acme.cloudonix.net
+                      sip_uri:
+                        type: string
+                        example: sip:1001@acme.cloudonix.net
+                      display_name:
+                        type: string
+                        example: Jane Owner
+                      wss_server:
+                        type: string
+                        example: wss://webrtc.cloudonix.io
+                      websocket_port:
+                        type: integer
+                        example: 443
+                      server_path:
+                        type: string
+                        example: ''
+                      sip_contact:
+                        type: string
+                        example: '1001'
+                      profile_name:
+                        type: string
+                        example: Jane Owner
+                      registration_mode:
+                        type: string
+                        example: Direct
+                      country:
+                        type: string
+                        description: ISO country code driving tone cadences.
+                        example: us
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          description: Role not permitted to use the Web Phone
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+        '404':
+          description: No extension assigned or Cloudonix settings missing
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'

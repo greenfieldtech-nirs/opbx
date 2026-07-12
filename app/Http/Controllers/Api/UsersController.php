@@ -11,8 +11,11 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpKernel\Exception\HttpResponseException;
 
 /**
@@ -99,6 +102,25 @@ class UsersController extends AbstractApiCrudController
     protected function getDefaultSortOrder(): string
     {
         return 'desc';
+    }
+
+    /**
+     * Restrict the user list for supervisors to themselves and their assigned users.
+     */
+    protected function buildIndexQuery(Builder $query, Request $request): void
+    {
+        $currentUser = $request->user();
+
+        if ($currentUser && $currentUser->isSupervisor()) {
+            $assignedUserIds = $currentUser->supervisedUsers
+                ->pluck('id')
+                ->push($currentUser->id)
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $query->whereIn('id', $assignedUserIds);
+        }
     }
 
     /**
@@ -264,7 +286,7 @@ class UsersController extends AbstractApiCrudController
     {
         // Clear user from cache
         try {
-            \Illuminate\Support\Facades\Cache::forget('user.'.$model->id);
+            Cache::forget('user.'.$model->id);
         } catch (\Exception $e) {
             // Ignore cache errors
         }
@@ -307,7 +329,7 @@ class UsersController extends AbstractApiCrudController
      *
      * @param  User  $user  The user whose password is being changed
      */
-    public function updatePassword(User $user, Request $request): \Illuminate\Http\JsonResponse
+    public function updatePassword(User $user, Request $request): JsonResponse
     {
         $currentUser = $this->getAuthenticatedUser();
 

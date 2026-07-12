@@ -1,0 +1,92 @@
+paths:
+  /v1/session-updates/{sessionId}/coach-target:
+    post:
+      tags:
+        - Session Updates
+      summary: Resolve a call-coaching dial target
+      description: |
+        Resolves the sentinel dial string an Owner or Supervisor uses to spy on,
+        whisper to, or barge into a live call via the in-browser Web Phone.
+
+        This is the UI-facing authorization layer. It enforces:
+        - `owner`/`supervisor` role (403 otherwise);
+        - for Supervisors, the session must be within their assigned scope (403 otherwise);
+        - tenant isolation via an explicit `organization_id` filter (cross-org lookups return 404);
+        - the session must be active (`processing`/`ringing`/`connected`) with a
+          non-empty session token (422 otherwise).
+
+        The returned `destination` embeds the target session's secret token and the
+        coaching policy. Dialing it triggers the `/voice/route` webhook, where
+        `CoachRoutingService` re-authorizes the request and emits `<Coach>` CXML — the
+        real telephony-side gate. The token is only ever handed out per-request here;
+        it is never included in the bulk active-calls list.
+      operationId: resolveCoachTarget
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Cloudonix numeric session ID of the call to monitor.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - policy
+              properties:
+                policy:
+                  type: string
+                  description: Coaching mode.
+                  enum:
+                    - spy
+                    - whisper
+                    - barge
+                whisper_party:
+                  type: string
+                  description: >
+                    Required when `policy` is `whisper`. Which party hears the
+                    supervisor. `both` is accepted by the API but not offered in the UI
+                    (functionally equivalent to `barge`).
+                  enum:
+                    - caller
+                    - callee
+                    - both
+      responses:
+        '200':
+          description: Resolved coaching dial target
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      destination:
+                        type: string
+                        description: >
+                          Sentinel dial string: `spy_{token}`, `barge_{token}`, or
+                          `whisper_{party}_{token}`.
+                        example: spy_a1b2c3d4e5f6a7b8
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          description: Role not permitted, or session outside the Supervisor's scope
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+        '404':
+          $ref: '../../openapi.yaml#/components/responses/NotFound'
+        '422':
+          description: Call is not active, has no session token, or whisper_party missing
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'

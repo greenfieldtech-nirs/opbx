@@ -48,7 +48,7 @@ export interface APIError {
 export type Status = 'active' | 'inactive';
 
 // User Roles
-export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter';
+export type UserRole = 'owner' | 'pbx_admin' | 'pbx_user' | 'reporter' | 'supervisor';
 
 // Extension Types
 export type ExtensionType = 'user' | 'virtual' | 'queue' | 'ai_assistant' | 'conference' | 'ring_group' | 'ivr' | 'custom_logic' | 'forward' | 'ai_load_balancer';

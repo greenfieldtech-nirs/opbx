@@ -132,7 +132,7 @@ export function StandardDataTable<T extends { id: string | number }>({
                                 <button
                                     onClick={() => column.sortKey && onSort?.(column.sortKey)}
                                     className={cn(
-                                        "flex items-center gap-1",
+                                        "inline-flex items-center gap-1",
                                         column.sortKey && onSort && "hover:text-foreground cursor-pointer"
                                     )}
                                 >

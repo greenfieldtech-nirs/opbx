@@ -155,4 +155,31 @@ class CxmlBuilderTest extends TestCase
 
         $this->assertStringNotContainsString('<Header', $cxml);
     }
+
+    public function test_simple_dial_emits_caller_id_and_caller_name(): void
+    {
+        $cxml = CxmlBuilder::simpleDial('+15551234567', '+18005551000', null, 'trunk-a', 'Acme Corp');
+
+        $this->assertStringContainsString('callerId="+18005551000"', $cxml);
+        $this->assertStringContainsString('callerName="Acme Corp"', $cxml);
+        $this->assertStringContainsString('trunks="trunk-a"', $cxml);
+        $this->assertStringContainsString('<Number>+15551234567</Number>', $cxml);
+    }
+
+    public function test_simple_dial_omits_caller_attributes_when_null(): void
+    {
+        $cxml = CxmlBuilder::simpleDial('+15551234567');
+
+        $this->assertStringNotContainsString('callerId=', $cxml);
+        $this->assertStringNotContainsString('callerName=', $cxml);
+    }
+
+    public function test_simple_dial_emits_caller_name_without_caller_id(): void
+    {
+        // "Unknown" case: callerName set, callerId omitted.
+        $cxml = CxmlBuilder::simpleDial('+15551234567', null, null, 'trunk-a', 'Unknown');
+
+        $this->assertStringNotContainsString('callerId=', $cxml);
+        $this->assertStringContainsString('callerName="Unknown"', $cxml);
+    }
 }

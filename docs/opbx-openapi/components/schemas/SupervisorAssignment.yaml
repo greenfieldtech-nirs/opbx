@@ -1,0 +1,35 @@
+type: object
+description: |
+  A Supervisor's monitoring assignments — the users and ring groups they are
+  permitted to observe on Live Calls and in Call Logs.
+properties:
+  supervisor_id:
+    type: integer
+    description: ID of the Supervisor user.
+    example: 42
+  user_ids:
+    type: array
+    description: IDs of assigned (supervised) users.
+    items:
+      type: integer
+    example: [10, 11, 12]
+  ring_group_ids:
+    type: array
+    description: IDs of assigned (supervised) ring groups.
+    items:
+      type: integer
+    example: [3, 4]
+  users:
+    type: array
+    description: Assigned user objects (present when the relation is loaded).
+    items:
+      $ref: ./User.yaml
+  ring_groups:
+    type: array
+    description: Assigned ring group objects (present when the relation is loaded).
+    items:
+      $ref: ./RingGroup.yaml
+required:
+  - supervisor_id
+  - user_ids
+  - ring_group_ids

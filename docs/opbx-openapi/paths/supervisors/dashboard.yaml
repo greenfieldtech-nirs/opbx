@@ -1,0 +1,28 @@
+paths:
+  /v1/dashboard/supervisor:
+    get:
+      tags:
+        - Supervisors
+      summary: Supervisor dashboard
+      description: |
+        Returns dashboard statistics scoped to the authenticated Supervisor's assigned
+        users and ring groups. Only accessible to users with the `supervisor` role.
+      operationId: getSupervisorDashboard
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Supervisor-scoped dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    description: Dashboard metrics restricted to assigned resources.
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'

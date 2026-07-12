@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AiAssistantProviderController;
+use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\Auth0Controller;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
@@ -34,8 +35,11 @@ use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\SupervisorAssignmentController;
+use App\Http\Controllers\Api\SupervisorDashboardController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\Api\WebPhoneConfigController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
 use App\Http\Controllers\DistributionListController;
@@ -248,7 +252,7 @@ Route::prefix('v1')->group(function (): void {
         ->name('recordings.secure-download');
 
     // Protected API routes
-    Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
@@ -351,6 +355,22 @@ Route::prefix('v1')->group(function (): void {
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
 
+        // Supervisor assignments
+        Route::prefix('supervisors')->group(function (): void {
+            Route::get('{user}/assignments', [SupervisorAssignmentController::class, 'show'])
+                ->name('supervisors.assignments.show');
+            Route::put('{user}/assignments', [SupervisorAssignmentController::class, 'update'])
+                ->name('supervisors.assignments.update');
+        });
+
+        // Supervisor dashboard
+        Route::get('dashboard/supervisor', SupervisorDashboardController::class)
+            ->name('dashboard.supervisor');
+
+        // Web Phone config
+        Route::get('webphone/config', [WebPhoneConfigController::class, 'config'])
+            ->name('webphone.config');
+
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);
 
@@ -372,6 +392,12 @@ Route::prefix('v1')->group(function (): void {
             ->name('business-hours.toggle-status');
 
         // Phone Numbers (DIDs)
+        // Static routes MUST be registered before the apiResource so that
+        // "default-caller-id" is not captured by the {phone_number} wildcard.
+        Route::get('phone-numbers/default-caller-id', [PhoneNumberController::class, 'getDefaultCallerId'])
+            ->name('phone-numbers.default-caller-id.show');
+        Route::put('phone-numbers/default-caller-id', [PhoneNumberController::class, 'setDefaultCallerId'])
+            ->name('phone-numbers.default-caller-id.update');
         Route::apiResource('phone-numbers', PhoneNumberController::class);
 
         // Outbound Whitelist
@@ -410,6 +436,13 @@ Route::prefix('v1')->group(function (): void {
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
         });
 
+        // API Keys (Owner only; keys cannot manage keys — enforced by EnforceApiKeyScope
+        // since 'api-keys' is not a GrantableResource). The grantable-resources route
+        // MUST precede the apiResource so it isn't captured by the {apiKey} wildcard.
+        Route::get('api-keys/grantable-resources', [ApiKeyController::class, 'grantableResources'])
+            ->name('api-keys.grantable-resources');
+        Route::apiResource('api-keys', ApiKeyController::class)->parameters(['api-keys' => 'apiKey']);
+
     });
 
     // User invitations (public token-authenticated endpoints)
@@ -424,6 +457,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
         Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
         Route::delete('/{sessionId}/disconnect', [SessionUpdateController::class, 'disconnectSession'])->name('session-updates.disconnect');
+        Route::post('/{sessionId}/coach-target', [SessionUpdateController::class, 'coachTarget'])->name('session-updates.coach-target');
     });
 
     // Call Notifications Settings

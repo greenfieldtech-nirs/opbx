@@ -20,6 +20,7 @@ import Home from '@/pages/Home';
 import { lazy } from 'react';
 
 const Users = lazy(() => import('@/pages/UsersComplete'));
+const Supervisors = lazy(() => import('@/pages/Supervisors'));
 const Extensions = lazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
 const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
@@ -36,6 +37,7 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
+const ApiKeysSettings = lazy(() => import('@/pages/ApiKeysSettings'));
 const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
 const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
 const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
@@ -108,6 +110,10 @@ export const router = createBrowserRouter([
       {
         path: 'users',
         element: <Users />,
+      },
+      {
+        path: 'supervisors',
+        element: <Supervisors />,
       },
       {
         path: 'extensions',
@@ -184,6 +190,14 @@ export const router = createBrowserRouter([
       {
         path: 'call-notifications',
         element: <CallNotificationsSettings />,
+      },
+      {
+        path: 'api-keys',
+        element: (
+          <OwnerRoute>
+            <ApiKeysSettings />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer',

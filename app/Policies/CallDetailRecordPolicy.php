@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Models\CallDetailRecord;
 use App\Models\User;
+use App\Services\Supervisor\SupervisorFilterService;
 
 /**
  * Call Detail Record Policy
@@ -29,7 +30,23 @@ class CallDetailRecordPolicy
     public function view(User $user, CallDetailRecord $callDetailRecord): bool
     {
         // User can view if the CDR belongs to their organization
-        return $user->organization_id === $callDetailRecord->organization_id;
+        if ($user->organization_id !== $callDetailRecord->organization_id) {
+            return false;
+        }
+
+        // Supervisors can only view CDRs for their assigned resources
+        if ($user->isSupervisor()) {
+            $identifiers = app(SupervisorFilterService::class)->resourceIdentifiers($user);
+
+            if (count($identifiers) === 0) {
+                return false;
+            }
+
+            return in_array((string) $callDetailRecord->from, $identifiers, true)
+                || in_array((string) $callDetailRecord->to, $identifiers, true);
+        }
+
+        return true;
     }
 
     /**

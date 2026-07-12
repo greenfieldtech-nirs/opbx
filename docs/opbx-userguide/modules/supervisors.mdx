@@ -1,0 +1,152 @@
+---
+sidebar_position: 23
+slug: /modules/supervisors
+sidebar_class_name: cxGuidesSidebar
+title: "Supervisors"
+description: "Assign read-only call-monitoring supervisors scoped to specific users and ring groups"
+---
+
+# Supervisors
+
+The Supervisor role is a read-only monitoring role for team leads and floor
+managers. A Supervisor is explicitly assigned one or more **users** and/or
+**ring groups**, and can only see data for those assigned resources.
+
+## Purpose
+
+Use the Supervisor role to:
+
+- Give a team lead visibility into their team's live and historical calls
+- Restrict that visibility to only the users and ring groups they manage
+- Enable live call coaching (spy, whisper, barge) for supervised calls
+- Keep configuration, exports, and user management out of their reach
+
+## The Supervisor Role
+
+`supervisor` is a distinct role, parallel to `reporter`, in the OPBX role
+hierarchy. Unlike a Reporter (who can see all organization data read-only), a
+Supervisor sees **only** the users and ring groups assigned to them.
+
+| Capability | Supervisor |
+|------------|-----------|
+| View Dashboard (scoped) | Yes |
+| View Live Calls (assigned only) | Yes |
+| View Call Logs (assigned only) | Yes |
+| Coach live calls (spy/whisper/barge) | Yes, for assigned calls |
+| Disconnect an individual call | Yes |
+| Use the [Web Phone](/modules/web-phone) | Yes |
+| Manage users, extensions, ring groups | No |
+| Export call logs or CDRs | No |
+| Disconnect All / Clear Stale | No |
+| Configure routing, settings, campaigns | No |
+
+:::info Scope enforcement
+Every supervisor-scoped endpoint enforces both tenant isolation (organization
+scope) and assignment scope. A Supervisor requesting data outside their assigned
+users/ring groups receives an empty result or a `403`.
+:::
+
+## What a Supervisor Sees
+
+The `SupervisorFilterService` builds the set of identifiers a Supervisor is
+allowed to see. This set contains:
+
+- Assigned user IDs
+- Assigned users' extension numbers
+- Assigned ring group IDs
+- Assigned ring groups' extension numbers
+
+Live calls are filtered where the call `caller_id` or `destination` matches any
+identifier in the set. Call logs (CDRs) are filtered on `from` or `to`.
+
+## Permissions
+
+| Action | Owner | PBX Admin | Supervisor | PBX User | Reporter |
+|--------|-------|-----------|------------|----------|----------|
+| Create a Supervisor user | Yes | Yes | No | No | No |
+| Assign users/ring groups | Yes | Yes | No | No | No |
+| View own assignments | — | — | Read-only | No | No |
+
+Only Owners and PBX Admins can create Supervisor users and manage their
+assignments.
+
+## UI Workflow
+
+### Create a Supervisor
+
+1. Navigate to **Supervisors** in the sidebar (visible to Owner and PBX Admin)
+2. Click **Create Supervisor**
+3. Enter the user's name, email, and password — the role is pre-filled as `Supervisor`
+4. Save
+
+You can also change any existing user's role to **Supervisor** from the
+**Users** page.
+
+### Assign Users and Ring Groups
+
+1. On the **Supervisors** page, click a supervisor's row (or the status badge)
+2. In the **Assignment** dialog, use the two side-by-side multi-select boxes:
+   - **Left** — PBX Users this supervisor may monitor (Ctrl/Cmd or Shift to multi-select)
+   - **Right** — ring groups this supervisor may monitor
+3. Click **Save Assignments**
+
+Saving replaces the supervisor's assignments with the current selection.
+
+:::warning Assignment rules
+- Only users with the **PBX User** role can be supervised.
+- A Supervisor cannot be assigned to themselves or to another Supervisor.
+- All assigned users and ring groups must belong to the same organization.
+:::
+
+## Coaching Supervised Calls
+
+Supervisors (and Owners) can coach live calls directly from the **Live Calls**
+page using the [Web Phone](/modules/web-phone). Supervisors may only coach calls
+within their assigned scope. See [Live Calls → Call Coaching](/modules/live-calls#call-coaching-spy--whisper--barge)
+for the spy/whisper/barge workflow.
+
+## Real-Time Behavior
+
+Supervisors are **not** subscribed to the organization-wide WebSocket channel
+(to prevent leakage of events for unassigned resources). Instead, the Live Calls
+page falls back to HTTP polling for supervisors.
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/supervisors/{user}/assignments` | Fetch a supervisor's assignments |
+| PUT | `/v1/supervisors/{user}/assignments` | Replace a supervisor's assignments |
+| GET | `/v1/dashboard/supervisor` | Supervisor-scoped dashboard |
+| GET | `/v1/session-updates/active?supervisor=true` | Live calls (assigned only) |
+| GET | `/v1/call-detail-records?supervisor=true` | Call logs (assigned only) |
+| POST | `/v1/session-updates/{sessionId}/coach-target` | Resolve a coaching dial target |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Key Data Fields
+
+### `supervisor_user_assignments`
+
+| Column | Notes |
+|--------|-------|
+| `supervisor_id` | FK to the supervisor user |
+| `user_id` | FK to the supervised user |
+| `organization_id` | Tenant scope |
+
+### `supervisor_ring_group_assignments`
+
+| Column | Notes |
+|--------|-------|
+| `supervisor_id` | FK to the supervisor user |
+| `ring_group_id` | FK to the supervised ring group |
+| `organization_id` | Tenant scope |
+
+The `users.role` enum includes the `supervisor` value.
+
+## Related Modules
+
+- [User Management](/modules/user-management) — Create and manage users and roles
+- [Live Calls](/modules/live-calls) — Monitor and coach active calls
+- [Call Logs](/modules/call-logs) — Historical call records
+- [Web Phone](/modules/web-phone) — In-browser softphone used for coaching

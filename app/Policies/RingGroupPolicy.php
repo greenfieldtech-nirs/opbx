@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\UserRole;
 use App\Models\RingGroup;
 use App\Models\User;
 
@@ -26,7 +27,7 @@ class RingGroupPolicy
      *
      * All authenticated users can view ring groups within their organization.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to view ring groups list
      */
     public function viewAny(User $user): bool
@@ -38,16 +39,25 @@ class RingGroupPolicy
     /**
      * Determine if the user can view a specific ring group.
      *
-     * Users can view any ring group within their organization.
+     * - Owner and PBX Admin can view any ring group
+     * - PBX User and Reporter can view ring groups
+     * - Supervisor can only view their assigned ring groups
      *
-     * @param User $user The authenticated user
-     * @param RingGroup $ringGroup The ring group being viewed
+     * @param  User  $currentUser  The authenticated user
+     * @param  RingGroup  $ringGroup  The ring group being viewed
      * @return bool True if authorized to view the ring group
      */
-    public function view(User $user, RingGroup $ringGroup): bool
+    public function view(User $currentUser, RingGroup $ringGroup): bool
     {
-        // All roles can view ring groups within their organization
-        return $user->organization_id === $ringGroup->organization_id;
+        if ($currentUser->organization_id !== $ringGroup->organization_id) {
+            return false;
+        }
+
+        if ($currentUser->isSupervisor()) {
+            return $currentUser->supervisedRingGroups->contains($ringGroup);
+        }
+
+        return $currentUser->role->canManageConfiguration() || $currentUser->role === UserRole::PBX_USER || $currentUser->role === UserRole::REPORTER;
     }
 
     /**
@@ -55,7 +65,7 @@ class RingGroupPolicy
      *
      * Only Owner and PBX Admin can create ring groups.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to create ring groups
      */
     public function create(User $user): bool
@@ -68,8 +78,8 @@ class RingGroupPolicy
      *
      * Only Owner and PBX Admin can update ring groups.
      *
-     * @param User $user The authenticated user
-     * @param RingGroup $ringGroup The ring group being updated
+     * @param  User  $user  The authenticated user
+     * @param  RingGroup  $ringGroup  The ring group being updated
      * @return bool True if authorized to update the ring group
      */
     public function update(User $user, RingGroup $ringGroup): bool
@@ -88,8 +98,8 @@ class RingGroupPolicy
      *
      * Only Owner and PBX Admin can delete ring groups.
      *
-     * @param User $user The authenticated user
-     * @param RingGroup $ringGroup The ring group being deleted
+     * @param  User  $user  The authenticated user
+     * @param  RingGroup  $ringGroup  The ring group being deleted
      * @return bool True if authorized to delete the ring group
      */
     public function delete(User $user, RingGroup $ringGroup): bool

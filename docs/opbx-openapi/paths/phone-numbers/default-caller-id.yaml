@@ -1,0 +1,95 @@
+paths:
+  /v1/phone-numbers/default-caller-id:
+    get:
+      tags:
+        - Phone Numbers
+      summary: Get default outbound caller ID
+      description: |
+        Returns the organization's default outbound caller ID DID, or `null` if none
+        is configured. Requires the DID `viewAny` ability.
+      operationId: getDefaultCallerId
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Default outbound caller ID (or null)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type:
+                      - object
+                      - 'null'
+                    properties:
+                      did_id:
+                        type: integer
+                      phone_number:
+                        type: string
+                      friendly_name:
+                        type:
+                          - string
+                          - 'null'
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'
+    put:
+      tags:
+        - Phone Numbers
+      summary: Set default outbound caller ID
+      description: |
+        Sets or clears the organization's default outbound caller ID. When `did_id`
+        is non-null the DID must exist in the organization and be active; when null the
+        setting is removed. Owner and PBX Admin only.
+      operationId: setDefaultCallerId
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - did_id
+              properties:
+                did_id:
+                  type:
+                    - integer
+                    - 'null'
+                  description: DID ID to use as the default caller ID, or null to clear.
+      responses:
+        '200':
+          description: Updated default outbound caller ID (or null)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type:
+                      - object
+                      - 'null'
+                    properties:
+                      did_id:
+                        type: integer
+                      phone_number:
+                        type: string
+                      friendly_name:
+                        type:
+                          - string
+                          - 'null'
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'
+        '422':
+          description: DID does not belong to the organization or is inactive
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'

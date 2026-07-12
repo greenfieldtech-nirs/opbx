@@ -116,7 +116,9 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | **Inbound Blacklist** | Blocked caller management |
 | **Outbound Whitelist** | Outbound dialing restrictions |
 | **Settings** | Organization and Cloudonix settings |
-| **Session Updates** | Real-time call session management |
+| **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
+| **Supervisors** | Supervisor assignments + supervisor dashboard |
+| **Web Phone** | In-browser softphone SIP provisioning (Owner/Supervisor) |
 | **Call Notifications** | Webhook notification settings |
 
 ### Execution Plane (Webhooks)

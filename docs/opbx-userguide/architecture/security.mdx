@@ -55,6 +55,7 @@ Token abilities are derived from the user's role:
 |------|-------------------|
 | Owner | `extension:*`, `user:*`, `settings:*`, `recording-download:*`, `platform:*` (if PM) |
 | PBX Admin | `extension:*`, `user:read`, `user:update`, `ring-group:*`, `did-number:*` |
+| Supervisor | `call-log:read`, `session-update:read` (scoped to assigned users/ring groups) |
 | PBX User | `extension:read`, `extension:update:own`, `user:read`, `call-log:read` |
 | Reporter | `extension:read`, `user:read`, `ring-group:read`, `call-log:read` |
 
@@ -69,6 +70,29 @@ Authorization combines three layers:
 3. **Policies** — Eloquent policies enforce role-based permissions on resources.
 
 Platform managers use the `platform.manager` middleware for cross-tenant operations.
+
+### Supervisor Scope
+
+The Supervisor role adds a fourth layer: assignment scope. `SupervisorFilterService`
+resolves the set of user IDs, extension numbers, and ring group IDs a supervisor
+is assigned to, and supervisor-scoped endpoints (`?supervisor=true` live calls and
+CDRs, the supervisor dashboard) restrict results to that set. Supervisors are also
+denied the organization-wide WebSocket channel to prevent event leakage for
+unassigned resources.
+
+### Call Coaching Authorization
+
+Live call coaching (spy/whisper/barge) is protected by two independent layers
+(defense in depth):
+
+1. **UI layer** — `POST /v1/session-updates/{sessionId}/coach-target` enforces
+   `owner`/`supervisor` role, supervisor assignment scope, tenant isolation, and
+   an active session. It returns a short-lived dial target embedding the target
+   session's secret token; that token is never exposed in the bulk active-calls list.
+2. **Telephony layer** — When the coaching target is dialed, `CoachRoutingService`
+   re-authorizes the request at the `/voice/route` webhook before emitting the
+   Cloudonix `<Coach>` verb. This is the authoritative gate — a guessed or replayed
+   target is re-checked at call time.
 
 ---
 

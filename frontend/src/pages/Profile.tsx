@@ -80,7 +80,7 @@ const profileSchema = z.object({
   state_province: z.string().optional(),
   postal_code: z.string().optional(),
   country: z.string().optional(),
-  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter']).optional(),
+  role: z.enum(['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor']).optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -681,6 +681,7 @@ export default function Profile() {
                             <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                             <SelectItem value="pbx_user">PBX User</SelectItem>
                             <SelectItem value="reporter">Reporter</SelectItem>
+                            <SelectItem value="supervisor">Supervisor</SelectItem>
                           </SelectContent>
                         </Select>
                       )}

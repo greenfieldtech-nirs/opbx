@@ -444,6 +444,35 @@ curl http://localhost/api/v1/extensions \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+#### Scoped API Keys
+
+Organization Owners can issue long-lived, revocable **scoped API keys** (prefixed `opbxk_`) for
+integrations and automation. Each key carries its own per-resource `read`/`write` permission set,
+which is the sole authorization gate for requests made with it — independent of the user role model.
+The plaintext value is shown only once at creation.
+
+```bash
+# Create a key (Owner session token). The plaintext key is returned ONCE.
+curl -X POST http://localhost/api/v1/api-keys \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI deploy key",
+    "permissions": [
+      {"resource": "business-hours", "level": "read"},
+      {"resource": "extensions", "level": "write"}
+    ]
+  }'
+
+# Response: {"data": {...}, "key": "opbxk_XXXXXXXX..."}
+
+# Use the key like any other bearer token
+curl http://localhost/api/v1/business-hours \
+  -H "Authorization: Bearer opbxk_XXXXXXXX..."
+```
+
+See the [API Keys module guide](docs/opbx-userguide/modules/api-keys.mdx) for details.
+
 ### Extensions
 
 ```bash

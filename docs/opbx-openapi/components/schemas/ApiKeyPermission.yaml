@@ -1,0 +1,14 @@
+type: object
+description: A single resource grant on an API key. `write` implies `read`; `read` permits GET/HEAD only.
+properties:
+  resource:
+    type: string
+    description: Grantable resource slug (see GET /v1/api-keys/grantable-resources).
+    example: business-hours
+  level:
+    type: string
+    enum: [read, write]
+    example: write
+required:
+  - resource
+  - level

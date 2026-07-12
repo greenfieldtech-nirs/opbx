@@ -9,7 +9,7 @@
  * - Role-based UI
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -84,6 +84,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Tooltip,
   TooltipContent,
@@ -97,8 +98,13 @@ import {
 } from '@/components/design-system';
 import { useAuth } from '@/hooks/useAuth';
 import type { User, UserRole, UserStatus } from '@/types';
-import { usersService } from '@/services/createResourceService';
+import { usersService, ringGroupsService } from '@/services/createResourceService';
+import {
+  getSupervisorAssignments,
+  updateSupervisorAssignments,
+} from '@/services/supervisorAssignments.service';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
+import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorAssignmentDialog';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -121,7 +127,7 @@ interface UserFormData {
   extension_number: string;
 }
 
-export default function UsersComplete() {
+function UsersComplete() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canCreateUsers = user?.role === 'owner' || user?.role === 'pbx_admin';
@@ -144,6 +150,8 @@ export default function UsersComplete() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserDetail, setShowUserDetail] = useState(false);
+  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+  const [assignmentUserId, setAssignmentUserId] = useState<string | null>(null);
 
   // Password form state
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
@@ -198,11 +206,16 @@ export default function UsersComplete() {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: usersService.create,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setShowCreateDialog(false);
       resetForm();
       toast.success('User created successfully');
+
+      if (response?.data?.role === 'supervisor') {
+        setAssignmentUserId(response.data.id);
+        setShowAssignmentDialog(true);
+      }
     },
     onError: (error: any) => {
       toast.error('Failed to create user', {
@@ -214,12 +227,18 @@ export default function UsersComplete() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => usersService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setShowEditDialog(false);
+      const updatedUserId = selectedUser?.id;
       setSelectedUser(null);
       resetForm();
       toast.success('User updated successfully');
+
+      if (variables.data.role === 'supervisor' && updatedUserId) {
+        setAssignmentUserId(updatedUserId);
+        setShowAssignmentDialog(true);
+      }
     },
     onError: (error: any) => {
       toast.error('Failed to update user', {
@@ -586,6 +605,7 @@ export default function UsersComplete() {
                 <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                 <SelectItem value="pbx_user">PBX User</SelectItem>
                 <SelectItem value="reporter">Reporter</SelectItem>
+                <SelectItem value="supervisor">Supervisor</SelectItem>
               </SelectContent>
             </Select>
 
@@ -872,7 +892,7 @@ export default function UsersComplete() {
                     setFormData({
                       ...formData,
                       role: value as UserRole,
-                      extension_option: value === 'reporter' ? 'none' : formData.extension_option,
+                      extension_option: ['reporter', 'supervisor'].includes(value) ? 'none' : formData.extension_option,
                     })
                   }
                 >
@@ -883,6 +903,7 @@ export default function UsersComplete() {
                     <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                     <SelectItem value="pbx_user">PBX User</SelectItem>
                     <SelectItem value="reporter">Reporter</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1077,6 +1098,7 @@ export default function UsersComplete() {
                   <SelectItem value="pbx_admin">PBX Admin</SelectItem>
                   <SelectItem value="pbx_user">PBX User</SelectItem>
                   <SelectItem value="reporter">Reporter</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
                 </SelectContent>
               </Select>
               {selectedUser?.role === 'owner' ? (
@@ -1434,6 +1456,12 @@ export default function UsersComplete() {
         </SheetContent>
       </Sheet>
 
+      <SupervisorAssignmentDialog
+        userId={assignmentUserId}
+        open={showAssignmentDialog}
+        onOpenChange={setShowAssignmentDialog}
+      />
+
       <InviteUserDialog
         open={showInviteDialog}
         onOpenChange={setShowInviteDialog}
@@ -1442,3 +1470,5 @@ export default function UsersComplete() {
     </div >
   );
 }
+
+export default UsersComplete;

@@ -1,0 +1,117 @@
+---
+sidebar_position: 25
+slug: /modules/api-keys
+sidebar_class_name: cxGuidesSidebar
+title: "API Keys"
+description: "Owner-managed scoped API keys with per-resource read/write permissions"
+---
+
+# API Keys
+
+API Keys let an organization Owner issue long-lived credentials that grant programmatic access to a defined set of business and configuration resources. Each key carries its own permission set, which is the sole gate on what the key can do — a key's access is independent of any user's role.
+
+## Purpose
+
+Use this module to:
+
+- Issue credentials for integrations, scripts, and CI/CD pipelines
+- Grant fine-grained, per-resource read or write access
+- Revoke access without disturbing user accounts
+
+## How Access Works
+
+A key is granted a list of permissions, each pairing a resource with a level:
+
+- **read** — allows `GET` and `HEAD` requests to that resource
+- **write** — allows all methods (write implies read)
+
+Requests authenticated with a key are authorized **only** by the key's permissions. The role model that governs user sessions is not consulted. A key can never be granted access to management endpoints — including the API Keys endpoints themselves, which means a key can never create, modify, or revoke keys.
+
+Keys never expire. They remain valid until an Owner revokes them.
+
+## The One-Time Key Value
+
+When a key is created, the plaintext value (prefixed `opbxk_`) is returned **once** and shown once in the UI. Only a hash is stored server-side, so the value can never be retrieved again. Store it securely at creation time; if it is lost, revoke the key and create a new one.
+
+Authenticate requests with the standard bearer header:
+
+```
+Authorization: Bearer opbxk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+## Grantable Resources
+
+Only business and configuration resources are grantable. The current allowlist:
+
+`users`, `extensions`, `conference-rooms`, `ai-assistants`, `ring-groups`, `ai-assistant-load-balancers`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`
+
+Retrieve the live list from `GET /v1/api-keys/grantable-resources`.
+
+## Permissions
+
+| Action | Owner | PBX Admin | PBX User | Reporter |
+|--------|-------|-----------|----------|----------|
+| View API keys | Yes | No | No | No |
+| Create API keys | Yes | No | No | No |
+| Update API keys | Yes | No | No | No |
+| Revoke API keys | Yes | No | No | No |
+
+API Key management is Owner-only. Non-owners receive a `403` response and the sidebar entry is hidden.
+
+## UI Workflow
+
+### Create a Key
+
+1. Navigate to **API Keys** in the sidebar (Owner only)
+2. Click **Create API Key**
+3. Enter a name
+4. For each resource, choose **None**, **Read**, or **Write**
+5. Save — at least one permission is required
+6. Copy the one-time key value from the reveal dialog and store it securely
+
+### Revoke a Key
+
+1. Find the key in the list
+2. Click **Revoke** and confirm
+
+Revoked keys remain listed with a revocation timestamp and can no longer authenticate requests.
+
+## Key Data Fields
+
+### `api_keys` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `organization_id` | FK | Tenant scope |
+| `name` | string | |
+| `token` | string | SHA-256 hash of the key; plaintext never stored |
+| `last_used_at` | datetime | Nullable; write throttled to once per 5 seconds per key |
+| `revoked_at` | datetime | Nullable; set when revoked |
+
+### `api_key_permissions` Table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | bigint | Primary key |
+| `api_key_id` | FK | Owning key |
+| `resource` | string | Grantable resource slug |
+| `level` | enum | read, write |
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/api-keys` | List keys |
+| POST | `/v1/api-keys` | Create a key (returns one-time value) |
+| GET | `/v1/api-keys/grantable-resources` | List grantable resource slugs |
+| GET | `/v1/api-keys/{apiKey}` | Get a key |
+| PUT | `/v1/api-keys/{apiKey}` | Update name and/or replace permissions |
+| DELETE | `/v1/api-keys/{apiKey}` | Revoke a key |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related Modules
+
+- [User Management](/modules/user-management) — Roles governing interactive (session) access
+- [Settings](/modules/settings) — Organization-level configuration
