@@ -42,6 +42,17 @@ class EnforceApiKeyScopeTest extends TestCase
         $this->assertNotSame(403, $status);
     }
 
+    /**
+     * Write implies read: a write grant must permit read verbs (GET). Guards
+     * against a regression where WRITE stops covering GET/HEAD.
+     */
+    public function test_write_grant_permits_read_verbs(): void
+    {
+        $token = $this->keyFor([['resource' => 'business-hours', 'level' => 'write']]);
+
+        $this->withToken($token)->getJson('/api/v1/business-hours')->assertStatus(200);
+    }
+
     public function test_ungranted_resource_is_forbidden(): void
     {
         $token = $this->keyFor([['resource' => 'business-hours', 'level' => 'read']]);

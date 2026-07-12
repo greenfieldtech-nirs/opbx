@@ -70,6 +70,13 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: ResolveApiKey::class,
         );
 
+        // DO NOT add EnforceApiKeyScope to the priority list. It must keep its
+        // route-group position, which runs AFTER auth:sanctum (so $request->user()
+        // is populated) and BEFORE controllers/model-binding. If it were pulled
+        // ahead of Authenticate, user() would be null, every request would fall
+        // through its `! instanceof ApiKey` guard, and scope enforcement would be
+        // silently bypassed for all keys.
+
         // Configure authentication to return JSON for API routes instead of redirecting
         $middleware->redirectGuestsTo(function ($request) {
             // For API routes, always return JSON 401 instead of redirecting
