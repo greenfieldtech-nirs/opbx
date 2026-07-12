@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { getWebPhoneConfig } from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
+import { subscribeCoach } from './webPhoneBus';
 import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
@@ -27,6 +28,15 @@ type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error';
 type CallState = 'idle' | 'ringing' | 'connected';
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
+
+function coachLabelFor(destination: string): string {
+  if (destination.startsWith('spy_')) return 'Spying on call';
+  if (destination.startsWith('barge_')) return 'Barged into call';
+  if (destination.startsWith('whisper_caller_')) return 'Whispering to caller';
+  if (destination.startsWith('whisper_callee_')) return 'Whispering to callee';
+  if (destination.startsWith('whisper_both_')) return 'Whispering to both';
+  return 'Coaching';
+}
 
 // Scale the number-display font so at least 14 digits fit without clipping.
 function numberSizeClass(len: number): string {
@@ -52,6 +62,8 @@ export function WebPhone() {
   const [volume, setVolume] = useState(1);
   const [incomingSession, setIncomingSession] = useState<any>(null);
   const [incomingNumber, setIncomingNumber] = useState('');
+  const pendingCoachRef = useRef<string | null>(null);
+  const [coachLabel, setCoachLabel] = useState<string | null>(null);
 
   // Active call = mid-call OR an incoming ringing session. While active the
   // dialer cannot be collapsed and the rest of the UI is blocked.
@@ -73,6 +85,7 @@ export function WebPhone() {
     setIsHeld(false);
     setIncomingSession(null);
     setIncomingNumber('');
+    setCoachLabel(null);
   }, []);
 
   // Apply the volume slider to the remote audio element.
@@ -81,6 +94,16 @@ export function WebPhone() {
       audioRef.current.volume = volume;
     }
   }, [volume]);
+
+  // Live Calls -> Web Phone: open and queue a coach auto-dial.
+  useEffect(() => {
+    return subscribeCoach((destination) => {
+      pendingCoachRef.current = destination;
+      setCoachLabel(coachLabelFor(destination));
+      setNumber(destination);
+      setOpen(true);
+    });
+  }, []);
 
   const getTonePlayer = useCallback(() => {
     if (!tonePlayerRef.current) {
@@ -288,6 +311,14 @@ export function WebPhone() {
     handleSessionEvents(session);
   }, [number, config, handleSessionEvents, getTonePlayer]);
 
+  // When a coach destination is queued and the UA is registered, place the call.
+  useEffect(() => {
+    if (state === 'ready' && callState === 'idle' && pendingCoachRef.current) {
+      pendingCoachRef.current = null;
+      handleCall();
+    }
+  }, [state, callState, handleCall]);
+
   const handleHangup = useCallback(() => {
     if (sessionRef.current) {
       try {
@@ -484,7 +515,7 @@ export function WebPhone() {
                   ) : callState === 'connected' ? (
                     <div className="flex flex-col items-center justify-center gap-10 py-6">
                       <div className="text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">{status}</p>
+                        <p className="text-sm text-muted-foreground">{coachLabel ?? status}</p>
                         <p className={`font-medium break-all px-4 ${numberSizeClass(number.length)}`}>
                           {number || ' '}
                         </p>
