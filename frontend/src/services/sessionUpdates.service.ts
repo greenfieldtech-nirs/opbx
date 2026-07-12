@@ -106,3 +106,19 @@ export const sessionUpdatesService = {
     return response.data;
   },
 };
+
+export interface CoachTargetResponse {
+  data: { destination: string };
+}
+
+export async function getCoachTarget(
+  sessionId: number,
+  policy: 'spy' | 'whisper' | 'barge',
+  whisperParty?: 'caller' | 'callee' | 'both'
+): Promise<CoachTargetResponse> {
+  const response = await api.post(`/session-updates/${sessionId}/coach-target`, {
+    policy,
+    ...(policy === 'whisper' ? { whisper_party: whisperParty } : {}),
+  });
+  return response.data;
+}
