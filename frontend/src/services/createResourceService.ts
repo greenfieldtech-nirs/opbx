@@ -98,6 +98,27 @@ export const ringGroupsService = createResourceService<RingGroup>('ring-groups')
 export const aiAssistantLoadBalancersService = createResourceService<AiAssistantLoadBalancer>('ai-assistant-load-balancers');
 export const callDetailRecordsService = createResourceService<CallDetailRecord>('call-detail-records');
 export const phoneNumbersService = createResourceService<DIDNumber>('phone-numbers');
+
+/**
+ * Default Outbound Caller ID
+ */
+export type DefaultCallerId = {
+  did_id: number;
+  phone_number: string;
+  friendly_name: string | null;
+};
+
+export async function getDefaultCallerId(): Promise<{ data: DefaultCallerId | null }> {
+  const response = await api.get('/phone-numbers/default-caller-id');
+  return response.data;
+}
+
+export async function setDefaultCallerId(
+  didId: number | null
+): Promise<{ data: DefaultCallerId | null }> {
+  const response = await api.put('/phone-numbers/default-caller-id', { did_id: didId });
+  return response.data;
+}
 export const ivrMenusService = createResourceService<IvrMenu>('ivr-menus');
 export const businessHoursService = createResourceService<BusinessHours>('business-hours');
 export const outboundWhitelistService = createResourceService<OutboundWhitelist>('outbound-whitelist');

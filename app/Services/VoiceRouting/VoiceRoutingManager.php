@@ -6,6 +6,9 @@ namespace App\Services\VoiceRouting;
 
 use App\Enums\ExtensionType;
 use App\Models\DidNumber;
+use App\Models\Extension;
+use App\Scopes\OrganizationScope;
+use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\InboundBlacklist\InboundBlacklistService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -38,7 +41,8 @@ class VoiceRoutingManager
         private readonly ExtensionRoutingService $extensionRouting,
         private readonly IvrRoutingService $ivrRouting,
         private readonly RingGroupRoutingService $ringGroupRouting,
-        private readonly VoiceRoutingStrategyExecutor $strategyExecutor
+        private readonly VoiceRoutingStrategyExecutor $strategyExecutor,
+        private readonly CoachRoutingService $coachRouting
     ) {}
 
     /**
@@ -52,6 +56,11 @@ class VoiceRoutingManager
      */
     public function handleInbound(Request $request): Response
     {
+        $coachResponse = $this->coachRouting->tryHandle($request);
+        if ($coachResponse !== null) {
+            return $coachResponse;
+        }
+
         $direction = $request->input('Direction', 'unknown');
         $to = $request->input('To');
         $from = $request->input('From');
@@ -154,7 +163,7 @@ class VoiceRoutingManager
         }
 
         // Check blacklist for external calls
-        $did = DidNumber::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $did = DidNumber::withoutGlobalScope(OrganizationScope::class)
             ->where('phone_number', $to)
             ->where('organization_id', $orgId)
             ->where('status', 'active')
@@ -467,10 +476,10 @@ class VoiceRoutingManager
     /**
      * Validate extension configuration for potential issues.
      *
-     * @param  \App\Models\Extension  $extension  The extension to validate
+     * @param  Extension  $extension  The extension to validate
      * @return array<string, mixed> Validation result with issues and suggestions
      */
-    public function validateExtensionConfiguration(\App\Models\Extension $extension): array
+    public function validateExtensionConfiguration(Extension $extension): array
     {
         return $this->extensionRouting->validateExtensionConfiguration($extension);
     }
@@ -484,7 +493,7 @@ class VoiceRoutingManager
     private function createErrorResponse(string $message): Response
     {
         return response(
-            \App\Services\CxmlBuilder\CxmlBuilder::sayWithHangup($message, true),
+            CxmlBuilder::sayWithHangup($message, true),
             200,
             ['Content-Type' => 'application/xml']
         );

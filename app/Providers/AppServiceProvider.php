@@ -64,6 +64,7 @@ use App\Services\IvrStateService;
 use App\Services\PasswordGenerator;
 use App\Services\RoutingSentryService;
 use App\Services\VoiceRouting\BusinessHoursRoutingService;
+use App\Services\VoiceRouting\CoachRoutingService;
 use App\Services\VoiceRouting\ExtensionRoutingService;
 use App\Services\VoiceRouting\InboundRoutingService;
 use App\Services\VoiceRouting\IvrRoutingService;
@@ -219,7 +220,8 @@ class AppServiceProvider extends ServiceProvider
                     $extensionRouting,
                     $ivrRouting,
                     $ringGroupRouting,
-                    $strategyExecutor
+                    $strategyExecutor,
+                    $app->make(CoachRoutingService::class)
                 );
             }
         );

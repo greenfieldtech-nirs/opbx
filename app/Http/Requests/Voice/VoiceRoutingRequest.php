@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Voice;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -28,7 +29,7 @@ class VoiceRoutingRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -39,8 +40,14 @@ class VoiceRoutingRequest extends FormRequest
             // Caller number - required, E.164 format or extension
             'From' => ['required', 'string', 'regex:/^(\+?[1-9]\d{1,14}|\d{1,10})$/', 'max:16'],
 
-            // Called number - required, E.164 format or extension
-            'To' => ['required', 'string', 'regex:/^(\+?[1-9]\d{1,14}|\d{1,10})$/', 'max:16'],
+            // Called number - required, E.164 format, extension, or coach sentinel
+            // (spy/barge/whisper) dialed by the supervisor call-coaching feature.
+            'To' => [
+                'required',
+                'string',
+                'max:64',
+                'regex:/^(\+?[1-9]\d{1,14}|\d{1,10}|(spy|barge)_[0-9a-f]{16,}|whisper_(caller|callee|both)_[0-9a-f]{16,})$/',
+            ],
 
             // Domain - optional, hostname format
             'Domain' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', 'max:255'],

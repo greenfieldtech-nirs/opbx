@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Extension;
+use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -21,16 +23,18 @@ use Illuminate\Support\Facades\Broadcast;
  * Users can join their organization's presence channel to receive
  * real-time call updates and see other online users from their org.
  *
- * Authorization: User must belong to the organization
- * Returns: User info (id, name, role) for presence list
+ * Authorization: User must belong to the organization and be able to view live calls
+ * Returns: User info (id, name, email, role) for presence list
  */
-Broadcast::channel('org.{organizationId}', function ($user, $organizationId) {
-    // Check if user belongs to this organization
-    if ((string) $user->organization_id !== (string) $organizationId) {
-        return false;
+Broadcast::channel('org.{organizationId}', function (User $user, int $organizationId): ?array {
+    if ($user->organization_id !== $organizationId) {
+        return null;
     }
 
-    // Return user data to be shared with other channel members
+    if (! $user->role->canViewLiveCalls() || $user->isSupervisor()) {
+        return null;
+    }
+
     return [
         'id' => $user->id,
         'name' => $user->name,
@@ -59,7 +63,7 @@ Broadcast::channel('user.{userId}', function ($user, $userId) {
  */
 Broadcast::channel('extension.{extensionId}', function ($user, $extensionId) {
     // Load extension with organization relationship
-    $extension = \App\Models\Extension::with('organization')->find($extensionId);
+    $extension = Extension::with('organization')->find($extensionId);
 
     if (! $extension) {
         return false;

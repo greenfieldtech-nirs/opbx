@@ -7,7 +7,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { sessionUpdatesService } from '@/services/sessionUpdates.service';
+import { sessionUpdatesService, getCoachTarget } from '@/services/sessionUpdates.service';
+import { startCoach } from '@/components/WebPhone/webPhoneBus';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
@@ -19,6 +26,9 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   PhoneOff,
+  Headphones,
+  Mic,
+  Phone,
   Wifi,
   WifiOff,
   AlertTriangle,
@@ -36,8 +46,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import {
-  AlertDialog,
+import { AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
@@ -47,6 +56,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { CallStatus, getCallStatusColor, getCallStatusLabel, LiveCallStatuses } from '@/types/call.types';
 import type { ActiveCall as ApiActiveCall } from '@/types/api.types';
 import { toast } from 'sonner';
@@ -106,7 +120,9 @@ const formatRefreshInterval = (ms: number): string => {
 
 export default function LiveCalls() {
   const { user: currentUser } = useAuth();
-  const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
+  const isSupervisor = currentUser?.role === 'supervisor';
+  const isReadOnly = ['reporter', 'pbx_user', 'supervisor'].includes(currentUser?.role);
+  const canUseLiveCallActions = ['owner', 'supervisor'].includes(currentUser?.role);
   const queryClient = useQueryClient();
 
   // Refresh interval state (default: 5 seconds)
@@ -130,8 +146,8 @@ export default function LiveCalls() {
 
   // Initial data fetch via HTTP with configurable refresh
   const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['active-calls'],
-    queryFn: () => sessionUpdatesService.getActiveCalls(),
+    queryKey: ['active-calls', isSupervisor ? 'supervisor' : 'all'],
+    queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: isSupervisor }),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
     refetchIntervalInBackground: true,
     staleTime: 0, // Always consider data stale to enable refresh
@@ -236,6 +252,24 @@ export default function LiveCalls() {
     },
   });
 
+  const handleCoach = useCallback(
+    async (
+      sessionId: number,
+      policy: 'spy' | 'whisper' | 'barge',
+      whisperParty?: 'caller' | 'callee' | 'both'
+    ) => {
+      try {
+        const { data } = await getCoachTarget(sessionId, policy, whisperParty);
+        startCoach(data.destination);
+      } catch (error: any) {
+        toast.error(
+          error?.response?.data?.message ?? 'Unable to start monitoring this call.'
+        );
+      }
+    },
+    []
+  );
+
   // Disconnect all calls state
   const [isDisconnectingAll, setIsDisconnectingAll] = useState(false);
   const [disconnectProgress, setDisconnectProgress] = useState(0);
@@ -310,7 +344,7 @@ export default function LiveCalls() {
     // Clear local state and query cache immediately for instant feedback
     setLiveCalls([]);
     clearActiveCalls();
-    queryClient.setQueryData(['active-calls'], { data: [] });
+    queryClient.setQueryData(['active-calls', isSupervisor ? 'supervisor' : 'all'], { data: [] });
 
     // Remove call IDs from the recently-disconnected set after a grace
     // period so that genuinely new calls with the same ID can still appear.
@@ -652,25 +686,113 @@ export default function LiveCalls() {
                     </span>
                   ),
                 },
-                ...(!isReadOnly
+                ...(canUseLiveCallActions
                   ? [
                       {
                         header: 'Actions',
                         cell: (call: LiveCall) =>
                           call.session_id ? (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDisconnect(call.session_id!);
-                              }}
-                              disabled={disconnectMutation.isPending}
-                              className="gap-2"
-                            >
-                              <PhoneOff className="h-4 w-4" />
-                              Disconnect
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    aria-label="Spy"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'spy');
+                                    }}
+                                  >
+                                    <Headphones className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Spy</p>
+                                </TooltipContent>
+                              </Tooltip>
+
+                              <DropdownMenu>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        aria-label="Whisper"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Mic className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Whisper</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'whisper', 'caller');
+                                    }}
+                                  >
+                                    Whisper to caller
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'whisper', 'callee');
+                                    }}
+                                  >
+                                     Whisper to callee
+                                   </DropdownMenuItem>
+                                 </DropdownMenuContent>
+                              </DropdownMenu>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    aria-label="Barge"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCoach(call.session_id!, 'barge');
+                                    }}
+                                  >
+                                    <Phone className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Barge</p>
+                                </TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    aria-label="Disconnect"
+                                    disabled={disconnectMutation.isPending}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDisconnect(call.session_id!);
+                                    }}
+                                  >
+                                    <PhoneOff className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Disconnect</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           ),

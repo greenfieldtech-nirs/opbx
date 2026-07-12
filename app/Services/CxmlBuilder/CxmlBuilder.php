@@ -46,8 +46,10 @@ class CxmlBuilder
      * @param  int|null  $timeout  Timeout in seconds
      * @param  string|null  $action  Callback URL after dial completes
      * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
+     * @param  string|null  $callerId  Presented caller ID (a valid phone number)
+     * @param  string|null  $callerName  Presented caller display name (any text)
      */
-    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null): self
+    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null, ?string $callerId = null, ?string $callerName = null): self
     {
         $dial = $this->document->createElement('Dial');
 
@@ -61,6 +63,15 @@ class CxmlBuilder
 
         if ($trunks !== null) {
             $dial->setAttribute('trunks', $trunks);
+        }
+
+        // DOMDocument::setAttribute XML-escapes the value automatically.
+        if ($callerId !== null) {
+            $dial->setAttribute('callerId', $callerId);
+        }
+
+        if ($callerName !== null) {
+            $dial->setAttribute('callerName', $callerName);
         }
 
         // Handle multiple targets
@@ -349,14 +360,15 @@ class CxmlBuilder
      * Build a simple dial response.
      *
      * @param  string  $destination  The destination to dial
-     * @param  string|null  $callerId  Optional caller ID
+     * @param  string|null  $callerId  Optional caller ID (a valid phone number)
      * @param  int|null  $timeout  Optional timeout in seconds
      * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
+     * @param  string|null  $callerName  Optional caller display name (any text)
      */
-    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null): string
+    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null, ?string $callerName = null): string
     {
         $builder = new self;
-        $builder->dial($destination, $timeout, null, $trunks);
+        $builder->dial($destination, $timeout, null, $trunks, $callerId, $callerName);
 
         return $builder->build();
     }
@@ -383,6 +395,52 @@ class CxmlBuilder
         }
 
         return $builder->build();
+    }
+
+    /**
+     * Build a <Coach> response for supervisor call monitoring.
+     *
+     * @param  string  $sessionToken  Target Cloudonix session token (ringing/connected).
+     * @param  string  $policy  listen | whisper | barge
+     * @param  string|null  $whisperDirection  caller | callee | both (mapped to Cloudonix "calee")
+     * @param  string|null  $spyDirection  caller | callee | both (mapped to Cloudonix "calee")
+     * @param  string  $finishOnKey  DTMF key(s) that end the coach session
+     */
+    public static function coach(
+        string $sessionToken,
+        string $policy,
+        ?string $whisperDirection = null,
+        ?string $spyDirection = null,
+        string $finishOnKey = '#'
+    ): string {
+        $builder = new self;
+
+        $coach = $builder->document->createElement(
+            'Coach',
+            htmlspecialchars($sessionToken, self::XML_ENCODING, 'UTF-8')
+        );
+        $coach->setAttribute('policy', $policy);
+        $coach->setAttribute('finishOnKey', $finishOnKey);
+
+        if ($whisperDirection !== null) {
+            $coach->setAttribute('whisperDirection', self::mapCoachDirection($whisperDirection));
+        }
+        if ($spyDirection !== null) {
+            $coach->setAttribute('spyDirection', self::mapCoachDirection($spyDirection));
+        }
+
+        $builder->response->appendChild($coach);
+
+        return $builder->build();
+    }
+
+    /**
+     * Map our clean direction value to Cloudonix's spelling.
+     * Cloudonix uses "calee" (their typo) for the callee side.
+     */
+    private static function mapCoachDirection(string $direction): string
+    {
+        return $direction === 'callee' ? 'calee' : $direction;
     }
 
     /**

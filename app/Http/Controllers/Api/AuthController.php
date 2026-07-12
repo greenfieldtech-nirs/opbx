@@ -98,6 +98,18 @@ class AuthController extends Controller
             'call-log:read',
             'business-hours:read',
         ],
+        // Supervisor: Read-only access to assigned resources plus supervisor features
+        'supervisor' => [
+            'extension:read',
+            'user:read',
+            'ring-group:read',
+            'did-number:read',
+            'recording:read',
+            'call-log:read',
+            'business-hours:read',
+            'supervisor:view',
+            'supervisor:assignments',
+        ],
     ];
 
     /**

@@ -7,7 +7,12 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { phoneNumbersService } from '@/services/createResourceService';
+import {
+  phoneNumbersService,
+  getDefaultCallerId,
+  setDefaultCallerId,
+  type DefaultCallerId,
+} from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import type {
   DIDNumber,
@@ -21,6 +26,7 @@ import { PhoneNumberDialog } from '@/components/PhoneNumbers/PhoneNumberDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -191,6 +197,44 @@ export default function PhoneNumbers() {
     },
   });
 
+  // --- Default Outbound Caller ID ---
+  const NONE_VALUE = 'none';
+
+  // Fetch org's active DIDs independently of page filters/pagination
+  const { data: activeDidsResponse } = useQuery<{ data: DIDNumber[] }>({
+    queryKey: ['phone-numbers', 'active-for-caller-id'],
+    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
+  });
+  const activeDids = activeDidsResponse?.data || [];
+
+  // Current default caller ID
+  const { data: defaultCallerIdResponse, isLoading: isDefaultLoading } = useQuery<{
+    data: DefaultCallerId | null;
+  }>({
+    queryKey: ['default-caller-id'],
+    queryFn: getDefaultCallerId,
+  });
+  const defaultCallerId = defaultCallerIdResponse?.data ?? null;
+  const defaultCallerIdValue = defaultCallerId ? String(defaultCallerId.did_id) : NONE_VALUE;
+
+  const defaultCallerIdMutation = useMutation({
+    mutationFn: (didId: number | null) => setDefaultCallerId(didId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['default-caller-id'] });
+      toast.success('Default outbound caller ID updated');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to update default caller ID';
+      toast.error(message);
+      // Reset the Select to the server value on failure
+      queryClient.invalidateQueries({ queryKey: ['default-caller-id'] });
+    },
+  });
+
+  const handleDefaultCallerIdChange = (value: string) => {
+    defaultCallerIdMutation.mutate(value === NONE_VALUE ? null : Number(value));
+  };
+
   // Handle actions
   const handleCreateClick = () => {
     setIsCreateDialogOpen(true);
@@ -354,12 +398,48 @@ export default function PhoneNumbers() {
             <span className="text-foreground">Phone Numbers</span>
           </div>
         </div>
-        {canManage && (
-          <Button onClick={handleCreateClick}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Phone Number
-          </Button>
-        )}
+        <div className="flex items-end gap-4">
+          {/* Default Outbound Caller ID */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="default-caller-id" className="text-xs text-muted-foreground">
+              Default Outbound Caller ID
+            </Label>
+            <Select
+              value={defaultCallerIdValue}
+              onValueChange={handleDefaultCallerIdChange}
+              disabled={!canManage || isDefaultLoading || defaultCallerIdMutation.isPending}
+            >
+              <SelectTrigger id="default-caller-id" className="w-[240px]">
+                <SelectValue placeholder="Select caller ID" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_VALUE}>None (Unknown)</SelectItem>
+                {/* Ensure the current default is selectable even if absent from the active list */}
+                {defaultCallerId && !activeDids.some((d) => d.id === String(defaultCallerId.did_id)) && (
+                  <SelectItem value={String(defaultCallerId.did_id)}>
+                    {defaultCallerId.friendly_name
+                      ? `${defaultCallerId.friendly_name} (${formatPhoneNumber(defaultCallerId.phone_number)})`
+                      : formatPhoneNumber(defaultCallerId.phone_number)}
+                  </SelectItem>
+                )}
+                {activeDids.map((did) => (
+                  <SelectItem key={did.id} value={String(did.id)}>
+                    {did.friendly_name
+                      ? `${did.friendly_name} (${formatPhoneNumber(did.phone_number)})`
+                      : formatPhoneNumber(did.phone_number)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {canManage && (
+            <Button onClick={handleCreateClick}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Phone Number
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters & Search */}
