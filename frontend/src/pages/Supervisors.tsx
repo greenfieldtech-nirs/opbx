@@ -242,9 +242,9 @@ export default function Supervisors() {
               },
               {
                 header: 'Actions',
-                className: 'text-right',
+                className: 'text-center',
                 cell: (supervisor) => (
-                  <div className="flex justify-end">
+                  <div className="flex justify-center">
                     <Button
                       variant="outline"
                       size="sm"
