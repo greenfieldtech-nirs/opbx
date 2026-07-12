@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AiAssistantProviderController;
+use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\Auth0Controller;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
@@ -434,6 +435,13 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
         });
+
+        // API Keys (Owner only; keys cannot manage keys — enforced by EnforceApiKeyScope
+        // since 'api-keys' is not a GrantableResource). The grantable-resources route
+        // MUST precede the apiResource so it isn't captured by the {apiKey} wildcard.
+        Route::get('api-keys/grantable-resources', [ApiKeyController::class, 'grantableResources'])
+            ->name('api-keys.grantable-resources');
+        Route::apiResource('api-keys', ApiKeyController::class)->parameters(['api-keys' => 'apiKey']);
 
     });
 
