@@ -33,6 +33,7 @@ use App\Observers\BusinessHoursCacheObserver;
 use App\Observers\ExtensionCacheObserver;
 use App\Policies\AiAssistantLoadBalancerPolicy;
 use App\Policies\AiAssistantPolicy;
+use App\Policies\ApiKeyPolicy;
 use App\Policies\AutoDialerCampaignPolicy;
 use App\Policies\CallDetailRecordPolicy;
 use App\Policies\CallTrackingAdPlatformIntegrationPolicy;
@@ -292,6 +293,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BlockedCallLog::class, InboundBlacklistPolicy::class);
         Gate::policy(AutoDialerCampaign::class, AutoDialerCampaignPolicy::class);
         Gate::policy(AutoDialerList::class, DistributionListPolicy::class);
+        Gate::policy(ApiKey::class, ApiKeyPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes
