@@ -2,112 +2,83 @@ paths:
   /v1/call-tracking-ad-platform-integrations:
     get:
       tags:
-      - Call Tracking Ad Platform Integrations
-      summary: Get ad platform integrations
+        - Call Tracking Ad Platform Integrations
+      summary: Get ad-platform integration settings
       description: |
-        Get the ad platform integration status for the authenticated user's
-        organization. Returns whether Google Ads and Meta integrations are
-        enabled and fully configured.
-      operationId: getCallTrackingAdPlatformIntegrations
+        Returns the organization's Google Ads and Meta conversion-upload integration
+        settings (singleton). When no integration exists a default disabled/unconfigured
+        shape is returned. Secret credentials are never echoed back.
+      operationId: getAdPlatformIntegration
       security:
-      - bearerAuth: []
-      - cookieAuth: []
+        - bearerAuth: []
+        - cookieAuth: []
       responses:
         '200':
-          description: Ad platform integration status
+          description: Integration settings
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    $ref: ../../components/schemas/CallTrackingAdPlatformIntegration.yaml
+                    $ref: '../../openapi.yaml#/components/schemas/CallTrackingAdPlatformIntegration'
         '401':
-          $ref: ../../components/responses/Unauthorized.yaml
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
         '403':
-          $ref: ../../components/responses/Forbidden.yaml
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'
     put:
       tags:
-      - Call Tracking Ad Platform Integrations
-      summary: Update ad platform integrations
+        - Call Tracking Ad Platform Integrations
+      summary: Update ad-platform integration settings
       description: |
-        Update the ad platform integration settings for the organization. When
-        enabling Google Ads or Meta for the first time, the corresponding
-        credentials are required. Subsequent updates may omit credentials that
-        are already stored.
-      operationId: updateCallTrackingAdPlatformIntegrations
+        Creates or updates the organization's Google Ads and Meta conversion-upload
+        integration settings. Only supplied secret credential fields are written;
+        omitting a credential leaves the stored value untouched.
+      operationId: updateAdPlatformIntegration
       security:
-      - bearerAuth: []
-      - cookieAuth: []
+        - bearerAuth: []
+        - cookieAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - google_ads_enabled
+                - meta_enabled
               properties:
                 google_ads_enabled:
                   type: boolean
-                  description: Whether Google Ads conversion upload is enabled
-                  example: true
-                google_ads_developer_token:
-                  type:
-                  - string
-                  - 'null'
-                  minLength: 1
-                  maxLength: 1024
-                  description: Google Ads developer token (required when enabling Google Ads for the first time)
-                  example: dAbCdEfGhIjKlMnOpQrStUvWxYz
-                google_ads_refresh_token:
-                  type:
-                  - string
-                  - 'null'
-                  minLength: 1
-                  maxLength: 8192
-                  description: Google Ads refresh token (required when enabling Google Ads for the first time)
-                  example: 1//04xxxxxxxxxxxxxxxxxxxxxxxxxx
-                google_ads_customer_id:
-                  type:
-                  - string
-                  - 'null'
-                  minLength: 1
-                  maxLength: 255
-                  description: Google Ads customer ID (required when enabling Google Ads for the first time)
-                  example: '123-456-7890'
-                google_ads_conversion_action_resource_name:
-                  type:
-                  - string
-                  - 'null'
-                  minLength: 1
-                  maxLength: 1024
-                  description: Google Ads conversion action resource name (required when enabling Google Ads for the first time)
-                  example: customers/1234567890/conversionActions/0987654321
                 meta_enabled:
                   type: boolean
-                  description: Whether Meta conversion upload is enabled
-                  example: false
+                google_ads_developer_token:
+                  type:
+                    - string
+                    - 'null'
+                google_ads_refresh_token:
+                  type:
+                    - string
+                    - 'null'
+                google_ads_customer_id:
+                  type:
+                    - string
+                    - 'null'
+                google_ads_conversion_action_resource_name:
+                  type:
+                    - string
+                    - 'null'
                 meta_pixel_id:
                   type:
-                  - string
-                  - 'null'
-                  minLength: 1
-                  maxLength: 255
-                  description: Meta pixel ID (required when enabling Meta for the first time)
-                  example: '123456789012345'
+                    - string
+                    - 'null'
                 meta_access_token:
                   type:
-                  - string
-                  - 'null'
-                  minLength: 1
-                  maxLength: 8192
-                  description: Meta access token (required when enabling Meta for the first time)
-                  example: EAAxxxxx
-              required:
-              - google_ads_enabled
-              - meta_enabled
+                    - string
+                    - 'null'
       responses:
         '200':
-          description: Ad platform integrations updated
+          description: Updated integration settings
           content:
             application/json:
               schema:
@@ -115,12 +86,11 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Ad platform integrations updated successfully
                   data:
-                    $ref: ../../components/schemas/CallTrackingAdPlatformIntegration.yaml
+                    $ref: '../../openapi.yaml#/components/schemas/CallTrackingAdPlatformIntegration'
         '401':
-          $ref: ../../components/responses/Unauthorized.yaml
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
         '403':
-          $ref: ../../components/responses/Forbidden.yaml
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          $ref: '../../openapi.yaml#/components/responses/ValidationError'

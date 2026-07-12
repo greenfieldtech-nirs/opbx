@@ -3,12 +3,13 @@ sidebar_position: 12
 slug: /modules/live-calls
 sidebar_class_name: cxGuidesSidebar
 title: "Live Calls"
-description: "Monitor and disconnect active calls in real time"
+description: "Monitor, disconnect, and coach active calls in real time"
 ---
 
 # Live Calls
 
-The Live Calls module provides real-time monitoring of active call sessions.
+The Live Calls module provides real-time monitoring of active call sessions,
+plus live call coaching (spy, whisper, barge) for Owners and Supervisors.
 
 ## Purpose
 
@@ -17,6 +18,7 @@ Use this module to:
 - View active calls across your organization
 - See call status, caller ID, destination, and duration
 - Disconnect individual calls or all active calls
+- Coach live calls — spy (listen), whisper (talk to one party), or barge (join)
 - Merge WebSocket updates with HTTP polling
 
 ## Data Sources
@@ -49,10 +51,16 @@ Live call data comes from Cloudonix session-update webhooks stored in the `sessi
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View live calls | Yes | Yes | No | No |
-| Disconnect calls | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | Supervisor | PBX User | Reporter |
+|--------|-------|-----------|------------|----------|----------|
+| View live calls | Yes | Yes | Assigned only | No | No |
+| Disconnect a single call | Yes | Yes | Yes (assigned) | No | No |
+| Disconnect All / Clear Stale | Yes | Yes | No | No | No |
+| Coach calls (spy/whisper/barge) | Yes | No | Yes (assigned) | No | No |
+
+The per-row **Actions** column (Spy, Whisper, Barge, Disconnect) is visible only
+to **Owner** and **Supervisor**. Supervisors see and act on only the calls within
+their [assigned scope](/modules/supervisors).
 
 ## UI Workflow
 
@@ -78,6 +86,41 @@ The call is marked as `recentlyDisconnected` for 10 seconds so it does not reapp
 
 :::warning
 Disconnecting calls is immediate and cannot be undone. Use this power responsibly.
+:::
+
+## Call Coaching (Spy / Whisper / Barge)
+
+Owners and Supervisors can coach a live call directly from the Actions column,
+using the [Web Phone](/modules/web-phone). Three modes are available:
+
+| Mode | Icon | What it does |
+|------|------|--------------|
+| **Spy** | Listen | Silently monitor the call; neither party hears you |
+| **Whisper** | Talk | Speak to one party (caller or callee) without the other hearing |
+| **Barge** | Join | Join the call so all parties hear you |
+
+### How to Coach a Call
+
+1. Ensure your [Web Phone](/modules/web-phone) is available (Owner/Supervisor with an extension).
+2. On a live call row, click **Spy** or **Barge**, or choose a party from the **Whisper** dropdown (Caller or Callee).
+3. The Web Phone automatically opens and dials the coaching target, showing a short label (**Spy**, **Whisper**, or **Barge**).
+4. Press `#` on the keypad, or end the call, to stop coaching. The Web Phone then closes.
+
+### Security
+
+Coaching is protected by two independent authorization layers:
+
+- **UI layer** — The `coach-target` endpoint enforces role (`owner`/`supervisor`),
+  supervisor scope, tenant isolation, and that the call is active. It only ever
+  hands out the target's secret session token per request; the token is never in
+  the bulk active-calls list.
+- **Telephony layer** — When the coaching target is dialed, the `/voice/route`
+  webhook re-authorizes the request before emitting the Cloudonix `<Coach>` verb.
+  This is the real gate: a guessed or replayed target is re-checked at call time.
+
+:::info Supervisor scope
+Supervisors can only coach calls that fall within their assigned users and ring
+groups. Attempting to coach an out-of-scope call returns `403`.
 :::
 
 ## Key Data Fields
@@ -108,14 +151,17 @@ Disconnecting calls is immediate and cannot be undone. Use this power responsibl
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/session-updates/active` | List active calls |
+| GET | `/v1/session-updates/active` | List active calls (add `?supervisor=true` to scope) |
 | GET | `/v1/session-updates/active/stats` | Active call statistics |
 | GET | `/v1/session-updates/{sessionId}` | Session details |
 | DELETE | `/v1/session-updates/{sessionId}/disconnect` | Disconnect a call |
+| POST | `/v1/session-updates/{sessionId}/coach-target` | Resolve a spy/whisper/barge dial target |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Related Modules
 
+- [Supervisors](/modules/supervisors) — Scope which calls a supervisor can view and coach
+- [Web Phone](/modules/web-phone) — In-browser softphone used to place and coach calls
 - [Call Logs](/modules/call-logs) — Historical CDR view
 - [Call Notifications](/modules/call-notifications) — Webhook events for call status changes

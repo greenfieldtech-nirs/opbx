@@ -44,7 +44,9 @@ info:
       | **Inbound Blacklist** | Blocked caller management |
       | **Outbound Whitelist** | Outbound dialing restrictions |
       | **Settings** | Organization and Cloudonix settings |
-      | **Session Updates** | Real-time call session management |
+      | **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
+      | **Supervisors** | Supervisor assignments + supervisor dashboard |
+      | **Web Phone** | In-browser softphone SIP provisioning (Owner/Supervisor) |
       | **Call Notifications** | Webhook notification settings |
       | **Auto Dialer** | Campaign management, monitoring, lifecycle |
       | **Distribution Lists** | List upload, assignment, management |
@@ -245,6 +247,7 @@ paths:
 
   /v1/call-tracking-ad-platform-integrations:
     $ref: './paths/call-tracking-ad-platform-integrations/index.yaml#/paths/~1v1~1call-tracking-ad-platform-integrations'
+
 
   /v1/call-tracking-analytics:
     $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics'
@@ -522,6 +525,9 @@ paths:
   /v1/phone-numbers:
     $ref: './paths/phone-numbers/index.yaml#/paths/~1v1~1phone-numbers'
 
+  /v1/phone-numbers/default-caller-id:
+    $ref: './paths/phone-numbers/default-caller-id.yaml#/paths/~1v1~1phone-numbers~1default-caller-id'
+
   /v1/phone-numbers/{phone_number}:
     $ref: './paths/phone-numbers/index.yaml#/paths/~1v1~1phone-numbers~1{phone_number}'
 
@@ -594,6 +600,9 @@ paths:
   /v1/session-updates/{sessionId}/disconnect:
     $ref: './paths/session-updates/disconnect.yaml#/paths/~1v1~1session-updates~1{sessionId}~1disconnect'
 
+  /v1/session-updates/{sessionId}/coach-target:
+    $ref: './paths/session-updates/coach-target.yaml#/paths/~1v1~1session-updates~1{sessionId}~1coach-target'
+
   /v1/settings/cloudonix:
     $ref: './paths/settings/cloudonix.yaml#/paths/~1v1~1settings~1cloudonix'
 
@@ -605,6 +614,15 @@ paths:
 
   /v1/settings/cloudonix/validate:
     $ref: './paths/settings/validate.yaml#/paths/~1v1~1settings~1cloudonix~1validate'
+
+  /v1/supervisors/{user}/assignments:
+    $ref: './paths/supervisors/assignments.yaml#/paths/~1v1~1supervisors~1{user}~1assignments'
+
+  /v1/dashboard/supervisor:
+    $ref: './paths/supervisors/dashboard.yaml#/paths/~1v1~1dashboard~1supervisor'
+
+  /v1/webphone/config:
+    $ref: './paths/webphone/config.yaml#/paths/~1v1~1webphone~1config'
 
   /v1/users:
     $ref: './paths/users/index.yaml#/paths/~1v1~1users'
@@ -746,6 +764,8 @@ components:
       $ref: './components/schemas/CallNotificationsSettings.yaml'
     SessionUpdate:
       $ref: './components/schemas/SessionUpdate.yaml'
+    SupervisorAssignment:
+      $ref: './components/schemas/SupervisorAssignment.yaml'
     AutoDialerCampaign:
       $ref: './components/schemas/AutoDialerCampaign.yaml'
     CallTrackingCampaign:
@@ -866,7 +886,11 @@ tags:
   - name: Settings
     description: Organization and integration settings
   - name: Session Updates
-    description: Real-time call session management
+    description: Real-time call session management, including supervisor call coaching (spy/whisper/barge)
+  - name: Supervisors
+    description: Supervisor role assignments and supervisor-scoped dashboard
+  - name: Web Phone
+    description: In-browser softphone (JsSIP/WebRTC) SIP provisioning for Owner and Supervisor
   - name: Call Notifications
     description: Call notification configuration
   - name: Auto Dialer Campaigns

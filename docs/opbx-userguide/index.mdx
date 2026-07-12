@@ -13,7 +13,7 @@ OPBX is an open-source, multi-tenant business PBX platform built on top of the [
 ## Key Features
 
 - **Multi-tenant organizations** with complete data isolation between tenants
-- **Role-based access control** supporting Owner, PBX Admin, PBX User, and Reporter roles
+- **Role-based access control** supporting Owner, PBX Admin, Supervisor, PBX User, and Reporter roles
 - **Extension management** with automatic Cloudonix SIP subscriber synchronization
 - **DID phone number routing** to extensions, ring groups, IVRs, business hours, conference rooms, AI assistants, and AI load balancers
 - **Ring groups** with simultaneous, round-robin, and sequential distribution strategies
@@ -26,6 +26,9 @@ OPBX is an open-source, multi-tenant business PBX platform built on top of the [
 - **Call recordings and CDR reporting** for compliance and analysis
 - **Inbound blacklist and outbound whitelist** for call security
 - **Real-time call monitoring** with live call tracking and WebSocket updates
+- **Supervisor role** for read-only, scoped monitoring of specific users and ring groups
+- **Live call coaching** with spy (listen), whisper, and barge modes for Owners and Supervisors
+- **In-browser Web Phone** (JsSIP/WebRTC softphone) for placing, receiving, and coaching calls
 - **Call notifications** with per-organization webhook configuration, event filtering, and retry logic
 - **Platform management** tools for service providers hosting multiple organizations
 
@@ -72,6 +75,7 @@ OPBX implements a hierarchical permission system. Each user belongs to exactly o
 |------|-------------|------------------|
 | Owner | Organization creator | Full access to all features, can manage all users including other owners, configure system-wide settings |
 | PBX Admin | System administrator | Manage extensions, routing rules, users (except owners), view all reports |
+| Supervisor | Scoped monitor | Read-only view of assigned users/ring groups; coach live calls (spy/whisper/barge); use the Web Phone; no configuration or exports |
 | PBX User | Regular user | View assigned resources, update own extension settings, view personal call history |
 | Reporter | Read-only access | View call logs, generate reports, access dashboards without modification rights |
 

@@ -8,7 +8,7 @@ description: "Create and manage user accounts with role-based access control"
 
 # User Management
 
-The User Management module controls who can access your OPBX organization and what they can do. Each user belongs to exactly one organization and has one of four roles.
+The User Management module controls who can access your OPBX organization and what they can do. Each user belongs to exactly one organization and has one of five roles.
 
 ## Purpose
 
@@ -22,17 +22,18 @@ Use this module to:
 
 ## Role Hierarchy
 
-OPBX uses four roles with decreasing permissions:
+OPBX uses five roles:
 
 | Role | Level | Capabilities |
 |------|-------|--------------|
 | Owner | 1 | Full access; can manage other owners and system-wide settings |
 | PBX Admin | 2 | Manage extensions, routing, users (except owners and other PBX admins) |
+| Supervisor | 3 | Read-only monitoring scoped to assigned users/ring groups; coach live calls; use the Web Phone |
 | PBX User | 3 | View assigned resources; update own extension settings |
 | Reporter | 4 | Read-only access to call logs, reports, and dashboards |
 
 :::info Role Assignment
-Only Owners can assign the Owner role. PBX Admins cannot create or modify other PBX Admins or Owners.
+Only Owners can assign the Owner role. PBX Admins cannot create or modify other PBX Admins or Owners. See [Supervisors](/modules/supervisors) for how supervisor assignments scope what a supervisor can see and coach.
 :::
 
 ## Permissions
@@ -88,7 +89,7 @@ Password changes made by an administrator force the user to log in again.
 | `name` | string | Display name |
 | `email` | string | Globally unique |
 | `password` | string | Hashed with bcrypt |
-| `role` | enum | owner, pbx_admin, pbx_user, reporter |
+| `role` | enum | owner, pbx_admin, supervisor, pbx_user, reporter |
 | `status` | enum | active, inactive |
 | `is_platform_manager` | boolean | Cross-tenant admin flag |
 

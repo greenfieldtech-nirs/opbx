@@ -1,0 +1,122 @@
+---
+sidebar_position: 24
+slug: /modules/web-phone
+sidebar_class_name: cxGuidesSidebar
+title: "Web Phone"
+description: "In-browser softphone for placing, receiving, and coaching calls without a physical device"
+---
+
+# Web Phone
+
+The Web Phone is an in-browser softphone that lets Owners and Supervisors place,
+receive, and coach calls directly from the OPBX interface — no desk phone or
+external SIP client required. It registers with Cloudonix over WebRTC using the
+user's own extension.
+
+## Purpose
+
+Use the Web Phone to:
+
+- Make and receive calls from any page in the application
+- Coach live calls (spy, whisper, barge) from the [Live Calls](/modules/live-calls) page
+- Work without provisioning a physical SIP device
+
+## Availability
+
+| Role | Web Phone access |
+|------|-----------------|
+| Owner | Yes |
+| Supervisor | Yes |
+| PBX Admin | No |
+| PBX User | No |
+| Reporter | No |
+
+The Web Phone requires:
+
+- A **user-type extension** assigned to the signed-in user
+- Configured **Cloudonix settings** for the organization
+
+If either is missing, the Web Phone shows an "unavailable" state instead of
+registering.
+
+## How It Works
+
+1. The frontend calls `GET /v1/webphone/config` to retrieve JsSIP-compatible SIP
+   provisioning for the user's extension.
+2. It loads the JsSIP library and creates a SIP user agent.
+3. The user agent registers with Cloudonix over secure WebSocket
+   (`wss://webrtc.cloudonix.io:443`).
+4. Once registered, the phone is ready to place and receive calls.
+
+The SIP credentials are the user's own extension number and password; the SIP
+domain is the organization's Cloudonix domain.
+
+## User Interface
+
+The Web Phone is an app-wide floating dialer available on every page:
+
+- **Collapsed** — a fixed "Web Phone" pull tab on the right edge of the screen.
+- **Expanded (idle)** — a centered floating dialer panel; the rest of the page
+  stays interactive.
+- **Expanded (active call)** — a dimming backdrop blocks the rest of the UI, and
+  the close button is disabled until the call ends.
+
+The dialer provides an iOS-style keypad with:
+
+- A large number display that auto-scales for long numbers
+- Backspace
+- A green call button and a red hangup/end button
+- Answer / reject controls for incoming calls
+- Mute, hold, and an in-call volume slider with a speaker toggle
+
+## Call-Progress Tones
+
+The Web Phone plays country-appropriate call-progress tones (ring, busy,
+congestion, dial) using the Web Audio API. The country is read from the
+organization's settings (defaulting to `us`) and returned in the `country`
+field of the Web Phone config. Tone cadences are derived from the standard
+Asterisk indications data set.
+
+## Coaching Calls
+
+When an Owner or Supervisor starts a spy, whisper, or barge action on the
+**Live Calls** page, the Web Phone automatically opens, dials the coaching
+target, and shows a short label (**Spy**, **Whisper**, or **Barge**). When the
+coaching call ends, the Web Phone closes and collapses back to the pull tab.
+
+See [Live Calls → Call Coaching](/modules/live-calls#call-coaching-spy--whisper--barge)
+for the full workflow.
+
+## Related API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/webphone/config` | Get SIP provisioning for the signed-in user |
+| POST | `/v1/session-updates/{sessionId}/coach-target` | Resolve a coaching dial target |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Config Response Fields
+
+| Field | Description |
+|-------|-------------|
+| `sip_username` | Extension number used as the SIP username |
+| `sip_password` | Extension SIP password |
+| `sip_domain` | Cloudonix domain name |
+| `sip_uri` | Full SIP URI (`sip:{ext}@{domain}`) |
+| `display_name` | User's display name |
+| `wss_server` | WebRTC WebSocket server |
+| `websocket_port` | WebSocket port (443) |
+| `country` | ISO country code driving tone cadences |
+
+:::info Licensing
+The Web Phone uses the MIT-licensed JsSIP library, keeping OPBX fully
+MIT-compatible.
+:::
+
+## Related Modules
+
+- [Live Calls](/modules/live-calls) — Monitor and coach active calls
+- [Supervisors](/modules/supervisors) — The other role that can use the Web Phone
+- [Extensions](/modules/extensions) — Provision the extension the Web Phone registers as
+- [Settings](/modules/settings) — Configure Cloudonix integration
