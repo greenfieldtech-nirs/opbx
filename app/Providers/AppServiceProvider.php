@@ -258,6 +258,14 @@ class AppServiceProvider extends ServiceProvider
         // (enforced by the EnforceApiKeyScope middleware before the controller),
         // never by role-based policies. Policy methods type-hint App\Models\User,
         // so let key-authenticated requests bypass Gate entirely.
+        // SECURITY INVARIANT: API-key authorization is handled EXCLUSIVELY by the
+        // EnforceApiKeyScope middleware (route-name -> resource read/write matching),
+        // NOT by Gate/policies. This Gate::before intentionally bypasses all policy
+        // checks for ApiKey actors so that User-typed policies don't TypeError on a
+        // key. Consequence: any Gate::allows()/authorize() call for a key-authenticated
+        // request passes here — the route-scope enforcer is the ONLY gate. Do not add
+        // policy-based authorization expecting it to constrain API keys; add it to
+        // EnforceApiKeyScope instead.
         Gate::before(function ($user) {
             if ($user instanceof ApiKey) {
                 return true;

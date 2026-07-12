@@ -56,13 +56,15 @@ class ResolveApiKey
         return $next($request);
     }
 
+    // ponytail: synchronous throttled UPDATE — fine at this scale; if it ever gets
+    // hot or needs to be async, move to a queued TouchApiKeyLastUsed job.
     private function touchLastUsed(Request $request, ApiKey $apiKey): void
     {
         $resourceSlug = GrantableResource::fromRouteName($request->route()?->getName())?->value;
         $always = in_array($resourceSlug, self::ALWAYS_TRACK, true);
 
         $stale = $apiKey->last_used_at === null
-            || $apiKey->last_used_at->diffInSeconds(now()) >= self::THROTTLE_SECONDS;
+            || $apiKey->last_used_at->diffInSeconds(now(), absolute: true) >= self::THROTTLE_SECONDS;
 
         if ($always || $stale) {
             OrganizationScope::bypass(

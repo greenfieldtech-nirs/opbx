@@ -74,6 +74,15 @@ class ApiKey extends Model implements AuthenticatableContract
         return $this->revoked_at !== null;
     }
 
+    /**
+     * An API key is never a platform manager. Made explicit so EnsureTenantScope's
+     * `$user->is_platform_manager` check does not rely on implicit null.
+     */
+    public function getIsPlatformManagerAttribute(): bool
+    {
+        return false;
+    }
+
     // --- Authenticatable ---
 
     public function getAuthIdentifierName(): string
