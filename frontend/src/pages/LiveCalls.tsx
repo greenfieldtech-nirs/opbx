@@ -747,17 +747,9 @@ export default function LiveCalls() {
                                       handleCoach(call.session_id!, 'whisper', 'callee');
                                     }}
                                   >
-                                    Whisper to callee
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCoach(call.session_id!, 'whisper', 'both');
-                                    }}
-                                  >
-                                    Whisper to both
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
+                                     Whisper to callee
+                                   </DropdownMenuItem>
+                                 </DropdownMenuContent>
                               </DropdownMenu>
 
                               <Tooltip>

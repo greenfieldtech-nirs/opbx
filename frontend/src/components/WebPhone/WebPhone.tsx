@@ -30,11 +30,9 @@ type CallState = 'idle' | 'ringing' | 'connected';
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
 function coachLabelFor(destination: string): string {
-  if (destination.startsWith('spy_')) return 'Spying on call';
-  if (destination.startsWith('barge_')) return 'Barged into call';
-  if (destination.startsWith('whisper_caller_')) return 'Whispering to caller';
-  if (destination.startsWith('whisper_callee_')) return 'Whispering to callee';
-  if (destination.startsWith('whisper_both_')) return 'Whispering to both';
+  if (destination.startsWith('spy_')) return 'Spy';
+  if (destination.startsWith('barge_')) return 'Barge';
+  if (destination.startsWith('whisper_')) return 'Whisper';
   return 'Coaching';
 }
 
@@ -63,6 +61,7 @@ export function WebPhone() {
   const [incomingSession, setIncomingSession] = useState<any>(null);
   const [incomingNumber, setIncomingNumber] = useState('');
   const pendingCoachRef = useRef<string | null>(null);
+  const isCoachCallRef = useRef(false);
   const [coachLabel, setCoachLabel] = useState<string | null>(null);
 
   // Active call = mid-call OR an incoming ringing session. While active the
@@ -86,6 +85,7 @@ export function WebPhone() {
     setIncomingSession(null);
     setIncomingNumber('');
     setCoachLabel(null);
+    isCoachCallRef.current = false;
   }, []);
 
   // Apply the volume slider to the remote audio element.
@@ -99,6 +99,7 @@ export function WebPhone() {
   useEffect(() => {
     return subscribeCoach((destination) => {
       pendingCoachRef.current = destination;
+      isCoachCallRef.current = true;
       setCoachLabel(coachLabelFor(destination));
       setNumber(destination);
       setOpen(true);
@@ -141,6 +142,11 @@ export function WebPhone() {
 
       session.on('ended', () => {
         getTonePlayer().stop();
+        if (isCoachCallRef.current) {
+          isCoachCallRef.current = false;
+          setOpen(false); // Coaching finished: close the Web Phone entirely.
+          return;
+        }
         resetCallState();
         setStatus('Registered');
       });
@@ -153,6 +159,12 @@ export function WebPhone() {
           getTonePlayer().play('busy', country);
         } else if (['congestion', 'unavailable', 'request_timeout', 'timeout'].some((c) => cause.includes(c))) {
           getTonePlayer().play('congestion', country);
+        }
+
+        if (isCoachCallRef.current) {
+          isCoachCallRef.current = false;
+          setOpen(false); // Coaching attempt ended/failed: close the Web Phone entirely.
+          return;
         }
 
         resetCallState();
