@@ -73,4 +73,44 @@ class ApiKeyServiceTest extends TestCase
         $this->assertNull($this->service()->resolve('opbxk_'.str_repeat('x', 40)));
         $this->assertNull($this->service()->resolve('not-a-key'));
     }
+
+    public function test_plaintext_is_never_persisted(): void
+    {
+        $org = Organization::factory()->create();
+
+        [, $plaintext] = $this->service()->create(
+            organizationId: $org->id,
+            name: 'k',
+            permissions: [],
+            createdBy: null,
+        );
+
+        $this->assertDatabaseMissing('api_keys', ['token' => $plaintext]);
+    }
+
+    public function test_create_is_atomic_when_a_permission_is_invalid(): void
+    {
+        $org = Organization::factory()->create();
+
+        // Two permissions with the SAME resource violate the
+        // unique(['api_key_id','resource']) constraint on the second insert,
+        // which must roll back the whole create() — no key, no permissions.
+        try {
+            $this->service()->create(
+                organizationId: $org->id,
+                name: 'k',
+                permissions: [
+                    ['resource' => 'business-hours', 'level' => 'read'],
+                    ['resource' => 'business-hours', 'level' => 'write'],
+                ],
+                createdBy: null,
+            );
+            $this->fail('Expected the duplicate-resource insert to throw.');
+        } catch (\Throwable $e) {
+            // expected
+        }
+
+        $this->assertDatabaseCount('api_keys', 0);
+        $this->assertDatabaseCount('api_key_permissions', 0);
+    }
 }

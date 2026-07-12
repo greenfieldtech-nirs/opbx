@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\ApiKey;
 use App\Scopes\OrganizationScope;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ApiKeyService
@@ -24,21 +25,23 @@ class ApiKeyService
         $plaintext = self::PREFIX.Str::random(40);
 
         return OrganizationScope::bypass(function () use ($organizationId, $name, $plaintext, $permissions, $createdBy) {
-            $apiKey = ApiKey::create([
-                'organization_id' => $organizationId,
-                'name' => $name,
-                'token' => hash('sha256', $plaintext),
-                'created_by' => $createdBy,
-            ]);
-
-            foreach ($permissions as $permission) {
-                $apiKey->permissions()->create([
-                    'resource' => $permission['resource'],
-                    'level' => $permission['level'],
+            return DB::transaction(function () use ($organizationId, $name, $plaintext, $permissions, $createdBy) {
+                $apiKey = ApiKey::create([
+                    'organization_id' => $organizationId,
+                    'name' => $name,
+                    'token' => hash('sha256', $plaintext),
+                    'created_by' => $createdBy,
                 ]);
-            }
 
-            return [$apiKey->load('permissions'), $plaintext];
+                foreach ($permissions as $permission) {
+                    $apiKey->permissions()->create([
+                        'resource' => $permission['resource'],
+                        'level' => $permission['level'],
+                    ]);
+                }
+
+                return [$apiKey->load('permissions'), $plaintext];
+            });
         });
     }
 
