@@ -13,6 +13,13 @@ use Illuminate\Auth\Access\Response;
  * Only organization Owners (authenticated as Users) may manage API keys.
  * A request authenticated by an ApiKey is never permitted — keys cannot
  * mint or manage keys (no privilege-escalation loop).
+ *
+ * ApiKey is intentionally NOT ScopedBy(OrganizationScope), so route-model
+ * binding resolves any key by id; the org-match in view()/update()/delete() is
+ * the cross-org barrier. Consequence: an owner probing ids can distinguish a key
+ * in another org (403) from a non-existent id (404). Accepted: ids are opaque
+ * ints, no key material leaks, and a cross-org owner cannot act on the key.
+ * ponytail: uniform 404 via scoped binding if existence-disclosure ever matters.
  */
 class ApiKeyPolicy
 {

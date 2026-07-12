@@ -13,6 +13,7 @@ use App\Models\ApiKey;
 use App\Services\ApiKeyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ApiKeyController extends Controller
 {
@@ -39,6 +40,10 @@ class ApiKeyController extends Controller
 
     public function store(StoreApiKeyRequest $request): JsonResponse
     {
+        // Authorized by StoreApiKeyRequest::authorize(); repeated here for
+        // defense-in-depth and grep-ability (see index/show/destroy).
+        $this->authorize('create', ApiKey::class);
+
         [$apiKey, $plaintext] = $this->apiKeys->create(
             organizationId: $request->user()->organization_id,
             name: $request->string('name')->toString(),
@@ -61,13 +66,21 @@ class ApiKeyController extends Controller
 
     public function update(UpdateApiKeyRequest $request, ApiKey $apiKey): JsonResponse
     {
-        if ($request->has('name')) {
-            $apiKey->update(['name' => $request->string('name')->toString()]);
-        }
+        // Authorized by UpdateApiKeyRequest::authorize(); repeated for
+        // defense-in-depth and grep-ability.
+        $this->authorize('update', $apiKey);
 
-        if ($request->has('permissions')) {
-            $this->apiKeys->replacePermissions($apiKey, $request->input('permissions'));
-        }
+        // Name and permissions must change together-or-not-at-all: a partial
+        // failure must not leave the name updated while permissions are stale.
+        DB::transaction(function () use ($request, $apiKey): void {
+            if ($request->filled('name')) {
+                $apiKey->update(['name' => $request->string('name')->toString()]);
+            }
+
+            if ($request->has('permissions')) {
+                $this->apiKeys->replacePermissions($apiKey, $request->input('permissions'));
+            }
+        });
 
         return (new ApiKeyResource($apiKey->fresh('permissions')))->response();
     }

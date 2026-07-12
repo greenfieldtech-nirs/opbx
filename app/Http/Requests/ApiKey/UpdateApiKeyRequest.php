@@ -21,7 +21,7 @@ class UpdateApiKeyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
             'permissions' => ['sometimes', 'array', 'min:1'],
             'permissions.*.resource' => ['required_with:permissions', 'string', Rule::in(GrantableResource::slugs())],
             'permissions.*.level' => ['required_with:permissions', 'string', Rule::in(['read', 'write'])],
