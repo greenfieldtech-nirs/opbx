@@ -9,11 +9,13 @@ use App\Http\Middleware\EnsureTenantScope;
 use App\Http\Middleware\EnsureWebhookIdempotency;
 use App\Http\Middleware\RateLimitPerOrganization;
 use App\Http\Middleware\RateLimitSensitiveOperations;
+use App\Http\Middleware\ResolveApiKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -54,7 +56,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'platform.manager' => EnsurePlatformManager::class,
             'bypass.organization.scope' => BypassOrganizationScope::class,
             'dialer.worker.auth' => DialerWorkerAuth::class,
+            'resolve.api.key' => ResolveApiKey::class,
         ]);
+
+        // ResolveApiKey must run BEFORE auth:sanctum. Laravel's middleware
+        // priority pulls Authenticate (AuthenticatesRequests) to a fixed slot,
+        // so listing resolve.api.key first in the route group is not enough —
+        // register it ahead of Authenticate in the priority list explicitly.
+        $middleware->prependToPriorityList(
+            before: AuthenticatesRequests::class,
+            prepend: ResolveApiKey::class,
+        );
 
         // Configure authentication to return JSON for API routes instead of redirecting
         $middleware->redirectGuestsTo(function ($request) {

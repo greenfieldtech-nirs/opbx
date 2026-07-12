@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Auth\BypassScopeEloquentUserProvider;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\ApiKey;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerList;
 use App\Models\BlockedCallLog;
@@ -252,6 +253,18 @@ class AppServiceProvider extends ServiceProvider
             // Also validate other critical security settings
             $this->validateSecurityConfiguration();
         }
+
+        // API keys are authorized solely by their per-resource permissions
+        // (enforced by the EnforceApiKeyScope middleware before the controller),
+        // never by role-based policies. Policy methods type-hint App\Models\User,
+        // so let key-authenticated requests bypass Gate entirely.
+        Gate::before(function ($user) {
+            if ($user instanceof ApiKey) {
+                return true;
+            }
+
+            return null;
+        });
 
         // Register model policies
         Gate::policy(Extension::class, ExtensionPolicy::class);
