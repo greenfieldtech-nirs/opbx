@@ -88,7 +88,10 @@ class ApiKey extends Model implements AuthenticatableContract
 
     public function getAuthPassword(): string
     {
-        return '';
+        // API keys are resolved from a bearer token and never authenticate via a
+        // password/credential provider. Reaching here means a misconfiguration
+        // (e.g. an ApiKey routed through Auth::attempt()); fail loud, not silent.
+        throw new \LogicException('API keys do not authenticate by password.');
     }
 
     public function getAuthPasswordName(): string
