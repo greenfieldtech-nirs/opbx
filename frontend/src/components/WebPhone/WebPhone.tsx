@@ -36,6 +36,58 @@ function coachLabelFor(destination: string): string {
   return 'Coaching';
 }
 
+interface ErrorDetail {
+  title: string;
+  message: string;
+  hint: string;
+  cause?: string;
+}
+
+// Turn a raw JsSIP registration cause into something a human can act on.
+// Cause values come from JsSIP.C.causes (e.g. "Request Timeout", "Connection Error").
+function explainRegistrationFailure(cause: string): ErrorDetail {
+  const c = cause.toLowerCase();
+
+  if (c.includes('timeout')) {
+    return {
+      title: 'Web Phone Error',
+      message: 'The registration request reached the voice server but no reply came back in time.',
+      hint: 'This is usually a temporary network or upstream issue — retry in a moment. If it keeps happening, the Cloudonix WebRTC service may be unreachable.',
+      cause,
+    };
+  }
+  if (c.includes('connection') || c.includes('websocket') || c.includes('transport')) {
+    return {
+      title: 'Connection Failed',
+      message: 'Could not open a connection to the voice server.',
+      hint: 'Check your internet connection and that wss://webrtc.cloudonix.io is reachable, then retry.',
+      cause,
+    };
+  }
+  if (c.includes('401') || c.includes('403') || c.includes('unauthorized') || c.includes('forbidden') || c.includes('authentication')) {
+    return {
+      title: 'Authentication Rejected',
+      message: 'The voice server rejected your extension credentials.',
+      hint: 'Your extension password may be out of sync with Cloudonix. Contact your administrator.',
+      cause,
+    };
+  }
+  if (c.includes('404') || c.includes('not found')) {
+    return {
+      title: 'Extension Not Found',
+      message: 'The voice server does not recognize this extension.',
+      hint: 'The subscriber may not be provisioned in Cloudonix. Contact your administrator.',
+      cause,
+    };
+  }
+  return {
+    title: 'Web Phone Error',
+    message: 'Registration with the voice server failed.',
+    hint: 'Retry, and if the problem persists contact your administrator.',
+    cause,
+  };
+}
+
 // Scale the number-display font so at least 14 digits fit without clipping.
 function numberSizeClass(len: number): string {
   if (len <= 10) return 'text-4xl tracking-widest';
@@ -53,6 +105,7 @@ export function WebPhone() {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<PhoneLifecycle>('loading');
   const [status, setStatus] = useState('Initializing...');
+  const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
   const [number, setNumber] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
   const [isMuted, setIsMuted] = useState(false);
@@ -184,6 +237,7 @@ export function WebPhone() {
       setState('loading');
       resetCallState();
       setStatus('Initializing...');
+      setErrorDetail(null);
       getTonePlayer().stop();
       if (uaRef.current) {
         try {
@@ -201,6 +255,11 @@ export function WebPhone() {
       if (status === 404) {
         setState('no_extension');
       } else {
+        setErrorDetail({
+          title: 'Web Phone Unavailable',
+          message: 'Could not load the Web Phone configuration from the server.',
+          hint: 'Retry, and if the problem persists contact your administrator.',
+        });
         setState('error');
       }
       return;
@@ -220,6 +279,11 @@ export function WebPhone() {
 
         const JsSIP = (window as any).JsSIP;
         if (!JsSIP) {
+          setErrorDetail({
+            title: 'Web Phone Error',
+            message: 'The Web Phone engine failed to load.',
+            hint: 'Reload the page and retry. If it persists, check your network or contact your administrator.',
+          });
           setState('error');
           setStatus('Failed to load the Web Phone.');
           return;
@@ -257,7 +321,9 @@ export function WebPhone() {
         });
 
         ua.on('registrationFailed', (event: any) => {
-          setStatus(`Registration failed: ${event.cause || 'unknown'}`);
+          const cause = event?.cause || 'unknown';
+          setStatus(`Registration failed: ${cause}`);
+          setErrorDetail(explainRegistrationFailure(cause));
           setState('error');
         });
 
@@ -281,6 +347,12 @@ export function WebPhone() {
       } catch (error: any) {
         console.error('[WebPhone] Initialization failed:', error);
         setStatus('The Web Phone could not register.');
+        setErrorDetail({
+          title: 'Web Phone Error',
+          message: 'The Web Phone could not start.',
+          hint: 'Reload the page and retry. If it persists, contact your administrator.',
+          cause: error?.message,
+        });
         setState('error');
       }
     }
@@ -420,6 +492,20 @@ export function WebPhone() {
     setOpen(false);
   }, [inActiveCall]);
 
+  // Retry from the error screen. Config errors need a refetch; registration
+  // failures need a full UA re-init, so close+reopen to re-run the init effect.
+  const handleRetry = useCallback(() => {
+    setErrorDetail(null);
+    setStatus('Initializing...');
+    setState('loading');
+    if (configError) {
+      refetch();
+      return;
+    }
+    setOpen(false);
+    setTimeout(() => setOpen(true), 0);
+  }, [configError, refetch]);
+
   return (
     <>
       {/* Right-edge pull tab — hidden while the dialer is open */}
@@ -476,20 +562,32 @@ export function WebPhone() {
               )}
 
               {(state === 'no_extension' || state === 'error') && (
-                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
                   <AlertTriangle className="h-10 w-10 text-destructive" />
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <h4 className="font-semibold">
-                      {state === 'no_extension' ? 'Web Phone Unavailable' : 'Web Phone Error'}
+                      {state === 'no_extension'
+                        ? 'Web Phone Unavailable'
+                        : errorDetail?.title ?? 'Web Phone Error'}
                     </h4>
                     <p className="text-sm text-muted-foreground">
                       {state === 'no_extension'
                         ? 'No extension is assigned to your account. Web Phone cannot be used.'
-                        : status}
+                        : errorDetail?.message ?? status}
                     </p>
+                    {state === 'error' && errorDetail?.hint && (
+                      <p className="text-xs text-muted-foreground/80">{errorDetail.hint}</p>
+                    )}
                   </div>
+
+                  {state === 'error' && errorDetail?.cause && (
+                    <p className="rounded-md bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground">
+                      {errorDetail.cause}
+                    </p>
+                  )}
+
                   {state === 'error' && (
-                    <Button variant="outline" size="sm" onClick={() => refetch()}>
+                    <Button variant="outline" size="sm" onClick={handleRetry}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Retry
                     </Button>
