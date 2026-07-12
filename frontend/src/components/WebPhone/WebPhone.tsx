@@ -625,10 +625,19 @@ export function WebPhone() {
                   ) : callState === 'connected' ? (
                     <div className="flex flex-col items-center justify-center gap-10 py-6">
                       <div className="text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">{coachLabel ?? status}</p>
-                        <p className={`font-medium break-all px-4 ${numberSizeClass(number.length)}`}>
-                          {number || ' '}
-                        </p>
+                        {coachLabel ? (
+                          // Coaching: show only the function name, never the raw sentinel destination.
+                          <p className={`font-medium px-4 ${numberSizeClass(coachLabel.length)}`}>
+                            {coachLabel}
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-sm text-muted-foreground">{status}</p>
+                            <p className={`font-medium break-all px-4 ${numberSizeClass(number.length)}`}>
+                              {number || ' '}
+                            </p>
+                          </>
+                        )}
                       </div>
                       <div className="flex items-center justify-center gap-6">
                         <button
@@ -700,25 +709,34 @@ export function WebPhone() {
                       {/* Number display */}
                       <div className="flex flex-col items-center justify-center w-full gap-3">
                         <p className="text-sm text-muted-foreground">{status}</p>
-                        <div className="flex items-center justify-center gap-2 min-h-[3.5rem] px-4">
-                          <input
-                            type="text"
-                            value={number}
-                            onChange={(e) => setNumber(e.target.value)}
-                            className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-none focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
-                            aria-label="Phone number"
-                          />
-                          {number && (
-                            <button
-                              type="button"
-                              onClick={backspace}
-                              className="h-10 w-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-gray-100 active:scale-95 transition-all shrink-0"
-                              aria-label="Backspace"
-                            >
-                              <Delete className="h-5 w-5" />
-                            </button>
-                          )}
-                        </div>
+                        {coachLabel ? (
+                          // Coaching dial-out: show the function name, never the raw sentinel destination.
+                          <div className="flex items-center justify-center min-h-[3.5rem] px-4">
+                            <p className={`font-medium text-foreground ${numberSizeClass(coachLabel.length)}`}>
+                              {coachLabel}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2 min-h-[3.5rem] px-4">
+                            <input
+                              type="text"
+                              value={number}
+                              onChange={(e) => setNumber(e.target.value)}
+                              className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-none focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
+                              aria-label="Phone number"
+                            />
+                            {number && (
+                              <button
+                                type="button"
+                                onClick={backspace}
+                                className="h-10 w-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-gray-100 active:scale-95 transition-all shrink-0"
+                                aria-label="Backspace"
+                              >
+                                <Delete className="h-5 w-5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Dial pad */}
