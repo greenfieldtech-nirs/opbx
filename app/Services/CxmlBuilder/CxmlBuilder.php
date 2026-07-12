@@ -398,6 +398,52 @@ class CxmlBuilder
     }
 
     /**
+     * Build a <Coach> response for supervisor call monitoring.
+     *
+     * @param  string  $sessionToken  Target Cloudonix session token (ringing/connected).
+     * @param  string  $policy  listen | whisper | barge
+     * @param  string|null  $whisperDirection  caller | callee | both (mapped to Cloudonix "calee")
+     * @param  string|null  $spyDirection  caller | callee | both (mapped to Cloudonix "calee")
+     * @param  string  $finishOnKey  DTMF key(s) that end the coach session
+     */
+    public static function coach(
+        string $sessionToken,
+        string $policy,
+        ?string $whisperDirection = null,
+        ?string $spyDirection = null,
+        string $finishOnKey = '#'
+    ): string {
+        $builder = new self;
+
+        $coach = $builder->document->createElement(
+            'Coach',
+            htmlspecialchars($sessionToken, self::XML_ENCODING, 'UTF-8')
+        );
+        $coach->setAttribute('policy', $policy);
+        $coach->setAttribute('finishOnKey', $finishOnKey);
+
+        if ($whisperDirection !== null) {
+            $coach->setAttribute('whisperDirection', self::mapCoachDirection($whisperDirection));
+        }
+        if ($spyDirection !== null) {
+            $coach->setAttribute('spyDirection', self::mapCoachDirection($spyDirection));
+        }
+
+        $builder->response->appendChild($coach);
+
+        return $builder->build();
+    }
+
+    /**
+     * Map our clean direction value to Cloudonix's spelling.
+     * Cloudonix uses "calee" (their typo) for the callee side.
+     */
+    private static function mapCoachDirection(string $direction): string
+    {
+        return $direction === 'callee' ? 'calee' : $direction;
+    }
+
+    /**
      * Build a simple hangup response.
      */
     public static function simpleHangup(): string
