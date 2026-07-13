@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, AlertTriangle, PhoneOutgoing, Clock } from 'lucide-react';
+import { Loader2, AlertTriangle, PhoneOutgoing, Clock, RotateCw } from 'lucide-react';
 import { getWebPhoneCallsLog } from '@/services/webPhone.service';
 import type { WebPhoneCallLogEntry } from '@/types/webPhone.types';
 
@@ -66,11 +66,15 @@ export function CallsLogView({ onRedial, active }: CallsLogViewProps) {
           <button
             type="button"
             onClick={() => onRedial(entry.to)}
-            className="flex w-full items-center justify-between gap-3 px-1 py-3 text-left hover:bg-muted/50 active:bg-muted transition-colors rounded-md"
+            className="group flex w-full items-center justify-between gap-3 px-1 py-3 text-left hover:bg-muted/50 active:bg-muted transition-colors rounded-md"
             aria-label={`Redial ${entry.to}`}
           >
             <div className="flex items-center gap-3 min-w-0">
-              <PhoneOutgoing className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <PhoneOutgoing
+                className={`h-4 w-4 shrink-0 ${
+                  entry.disposition === 'ANSWERED' ? 'text-green-500' : 'text-red-500'
+                }`}
+              />
               <div className="min-w-0">
                 <p className="truncate font-medium text-foreground">{entry.to}</p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -79,8 +83,11 @@ export function CallsLogView({ onRedial, active }: CallsLogViewProps) {
                 </p>
               </div>
             </div>
-            <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-              {entry.disposition}
+            <span
+              className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10 text-green-600 group-hover:bg-green-500 group-hover:text-white transition-colors"
+              aria-hidden="true"
+            >
+              <RotateCw className="h-4 w-4" />
             </span>
           </button>
         </li>
