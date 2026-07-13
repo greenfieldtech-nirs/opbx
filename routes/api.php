@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\SupervisorAssignmentController;
 use App\Http\Controllers\Api\SupervisorDashboardController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\Api\WebPhoneCallsLogController;
 use App\Http\Controllers\Api\WebPhoneConfigController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
@@ -370,6 +371,10 @@ Route::prefix('v1')->group(function (): void {
         // Web Phone config
         Route::get('webphone/config', [WebPhoneConfigController::class, 'config'])
             ->name('webphone.config');
+
+        // Web Phone calls log
+        Route::get('webphone/calls-log', [WebPhoneCallsLogController::class, 'index'])
+            ->name('webphone.calls-log');
 
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);
