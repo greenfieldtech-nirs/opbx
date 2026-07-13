@@ -73,6 +73,14 @@ The dialer provides an iOS-style keypad with:
 - Answer / reject controls for incoming calls
 - Mute, hold, and an in-call volume slider with a speaker toggle
 
+A bottom tab bar (phone-app style) switches between two views:
+
+- **Keypad** — the dialer described above.
+- **Recents** — the calls log (see below).
+
+The tab bar is locked during an active call so the user cannot navigate away
+from the live dialer.
+
 ## Call-Progress Tones
 
 The Web Phone plays country-appropriate call-progress tones (ring, busy,
@@ -91,11 +99,26 @@ coaching call ends, the Web Phone closes and collapses back to the pull tab.
 See [Live Calls → Call Coaching](/modules/live-calls#call-coaching-spy--whisper--barge)
 for the full workflow.
 
+## Recents (Calls Log)
+
+The **Recents** tab shows the last 50 calls the signed-in user placed from
+their own extension, newest first. Each row shows the dialed number, when the
+call was placed, its duration, and its disposition (for example `ANSWERED`).
+
+Tap any row to redial: the Web Phone switches to the Keypad tab, prefills the
+number, and places the call automatically.
+
+The log is refreshed each time the Recents tab is opened. Coaching calls
+(spy, whisper, barge) are excluded — only regular outbound calls appear. The
+list is scoped to the signed-in user's extension only; it never shows other
+users' or other organizations' calls.
+
 ## Related API Endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/v1/webphone/config` | Get SIP provisioning for the signed-in user |
+| GET | `/v1/webphone/calls-log` | Last 50 calls placed from the user's extension |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Resolve a coaching dial target |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
