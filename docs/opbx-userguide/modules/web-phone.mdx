@@ -8,10 +8,10 @@ description: "In-browser softphone for placing, receiving, and coaching calls wi
 
 # Web Phone
 
-The Web Phone is an in-browser softphone that lets Owners and Supervisors place,
-receive, and coach calls directly from the OPBX interface — no desk phone or
-external SIP client required. It registers with Cloudonix over WebRTC using the
-user's own extension.
+The Web Phone is an in-browser softphone that lets any user place and receive
+calls directly from the OPBX interface — no desk phone or external SIP client
+required. It registers with Cloudonix over WebRTC using the user's own
+extension. Owners and Supervisors can additionally coach live calls.
 
 ## Purpose
 
@@ -23,21 +23,25 @@ Use the Web Phone to:
 
 ## Availability
 
+The Web Phone is available to **every role**. What determines whether it works
+is not the role but whether the signed-in user has an assigned extension:
+
 | Role | Web Phone access |
 |------|-----------------|
-| Owner | Yes |
-| Supervisor | Yes |
-| PBX Admin | No |
-| PBX User | No |
-| Reporter | No |
+| Owner | Yes (with extension) |
+| Supervisor | Yes (with extension) |
+| PBX Admin | Yes (with extension) |
+| PBX User | Yes (with extension) |
+| Reporter | Yes (with extension) |
 
 The Web Phone requires:
 
 - A **user-type extension** assigned to the signed-in user
 - Configured **Cloudonix settings** for the organization
 
-If either is missing, the Web Phone shows an "unavailable" state instead of
-registering.
+If the user has no assigned extension, the Web Phone shows an "unavailable"
+state explaining that no extension is assigned. Coaching (spy/whisper/barge)
+remains limited to Owners and Supervisors.
 
 ## How It Works
 

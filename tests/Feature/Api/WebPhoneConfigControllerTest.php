@@ -150,7 +150,7 @@ final class WebPhoneConfigControllerTest extends TestCase
             ->assertJsonPath('data.sip_username', '1001');
     }
 
-    public function test_pbx_admin_cannot_get_config(): void
+    public function test_pbx_admin_with_extension_can_get_config(): void
     {
         $admin = $this->createUser(UserRole::PBX_ADMIN);
         Extension::create([
@@ -166,11 +166,11 @@ final class WebPhoneConfigControllerTest extends TestCase
 
         $response = $this->getJson('/api/v1/webphone/config');
 
-        $response->assertStatus(403)
-            ->assertJsonPath('message', 'Web Phone is not available for this role.');
+        $response->assertStatus(200)
+            ->assertJsonPath('data.sip_username', '1002');
     }
 
-    public function test_pbx_user_cannot_get_config(): void
+    public function test_pbx_user_with_extension_can_get_config(): void
     {
         $pbxUser = $this->createUser(UserRole::PBX_USER);
         Extension::create([
@@ -186,11 +186,11 @@ final class WebPhoneConfigControllerTest extends TestCase
 
         $response = $this->getJson('/api/v1/webphone/config');
 
-        $response->assertStatus(403)
-            ->assertJsonPath('message', 'Web Phone is not available for this role.');
+        $response->assertStatus(200)
+            ->assertJsonPath('data.sip_username', '1004');
     }
 
-    public function test_reporter_cannot_get_config(): void
+    public function test_reporter_with_extension_can_get_config(): void
     {
         $reporter = $this->createUser(UserRole::REPORTER);
         Extension::create([
@@ -206,8 +206,20 @@ final class WebPhoneConfigControllerTest extends TestCase
 
         $response = $this->getJson('/api/v1/webphone/config');
 
-        $response->assertStatus(403)
-            ->assertJsonPath('message', 'Web Phone is not available for this role.');
+        $response->assertStatus(200)
+            ->assertJsonPath('data.sip_username', '1005');
+    }
+
+    public function test_pbx_user_without_extension_gets_404(): void
+    {
+        $pbxUser = $this->createUser(UserRole::PBX_USER);
+
+        Sanctum::actingAs($pbxUser);
+
+        $response = $this->getJson('/api/v1/webphone/config');
+
+        $response->assertStatus(404)
+            ->assertJsonPath('message', 'No extension is assigned to this user.');
     }
 
     public function test_owner_without_extension_gets_404(): void

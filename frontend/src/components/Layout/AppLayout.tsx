@@ -10,7 +10,6 @@ import { Header } from './Header';
 import { useEchoConnection } from '@/hooks/useEchoConnection';
 import { RefreshTimerProvider, useRefreshTimerState } from '@/context/RefreshTimerContext';
 import { RefreshTimer } from '@/components/design-system';
-import { useAuth } from '@/hooks/useAuth';
 import { WebPhone } from '@/components/WebPhone/WebPhone';
 
 function RefreshTimerBar() {
@@ -33,9 +32,6 @@ export function AppLayout() {
   // Initialize Laravel Echo WebSocket connection for real-time updates
   useEchoConnection();
 
-  const { user } = useAuth();
-  const canUseWebPhone = ['owner', 'supervisor'].includes(user?.role ?? '');
-
   return (
     <RefreshTimerProvider>
       <div className="flex h-screen overflow-hidden">
@@ -57,8 +53,8 @@ export function AppLayout() {
         </div>
       </div>
 
-      {/* App-wide floating Web Phone (Owner/Supervisor only) */}
-      {canUseWebPhone && <WebPhone />}
+      {/* App-wide floating Web Phone — available to any user with an assigned extension */}
+      <WebPhone />
     </RefreshTimerProvider>
   );
 }
