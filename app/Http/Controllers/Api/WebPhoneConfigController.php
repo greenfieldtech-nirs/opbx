@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\ExtensionType;
-use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Models\CloudonixSettings;
@@ -21,12 +20,6 @@ final class WebPhoneConfigController extends Controller
     public function config(Request $request): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
-
-        if (! in_array($user->role, [UserRole::OWNER, UserRole::SUPERVISOR], true)) {
-            return response()->json([
-                'message' => 'Web Phone is not available for this role.',
-            ], 403);
-        }
 
         $extension = Extension::where('user_id', $user->id)
             ->where('type', ExtensionType::USER)

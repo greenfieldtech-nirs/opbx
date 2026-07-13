@@ -12,3 +12,11 @@ export interface WebPhoneConfig {
   registration_mode: string;
   country: string;
 }
+
+export interface WebPhoneCallLogEntry {
+  to: string;
+  session_timestamp: string;
+  duration: number;
+  duration_formatted: string;
+  disposition: string;
+}
