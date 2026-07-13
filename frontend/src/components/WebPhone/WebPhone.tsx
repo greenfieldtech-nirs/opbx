@@ -21,6 +21,8 @@ import { Button } from '@/components/ui/button';
 import { getWebPhoneConfig } from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
+import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
+import { CallsLogView } from './CallsLogView';
 import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
@@ -116,6 +118,8 @@ export function WebPhone() {
   const pendingCoachRef = useRef<string | null>(null);
   const isCoachCallRef = useRef(false);
   const [coachLabel, setCoachLabel] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<WebPhoneTab>('dialer');
+  const pendingRedialRef = useRef<string | null>(null);
 
   // Active call = mid-call OR an incoming ringing session. While active the
   // dialer cannot be collapsed and the rest of the UI is blocked.
@@ -403,6 +407,21 @@ export function WebPhone() {
     }
   }, [state, callState, handleCall]);
 
+  // Redial from the calls log: number is set via setNumber, then this effect
+  // places the call once the number state has flushed and the UA is idle.
+  // Mirrors the coach queue pattern rather than calling handleCall synchronously.
+  useEffect(() => {
+    if (
+      state === 'ready' &&
+      callState === 'idle' &&
+      pendingRedialRef.current &&
+      number === pendingRedialRef.current
+    ) {
+      pendingRedialRef.current = null;
+      handleCall();
+    }
+  }, [state, callState, number, handleCall]);
+
   const handleHangup = useCallback(() => {
     if (sessionRef.current) {
       try {
@@ -436,6 +455,16 @@ export function WebPhone() {
       }
     }
   }, [incomingSession]);
+
+  // Tap-to-redial from the calls log: switch to the dialer, prefill the number,
+  // and queue an auto-dial (the redial effect fires once the number flushes).
+  const handleRedial = useCallback((destination: string) => {
+    setCoachLabel(null);
+    isCoachCallRef.current = false;
+    pendingRedialRef.current = destination;
+    setNumber(destination);
+    setActiveTab('dialer');
+  }, []);
 
   const handleReject = useCallback(() => {
     if (incomingSession) {
@@ -704,6 +733,8 @@ export function WebPhone() {
                         />
                       </div>
                     </div>
+                  ) : activeTab === 'calls' ? (
+                    <CallsLogView onRedial={handleRedial} active={open && activeTab === 'calls'} />
                   ) : (
                     <div className="flex flex-col items-center gap-6">
                       {/* Number display */}
@@ -782,6 +813,15 @@ export function WebPhone() {
 
               <audio ref={audioRef} autoPlay playsInline className="hidden" />
             </div>
+
+            {/* Bottom tab bar — locked during an active call */}
+            {state === 'ready' && (
+              <WebPhoneTabs
+                active={activeTab}
+                onChange={setActiveTab}
+                disabled={inActiveCall}
+              />
+            )}
         </div>
       )}
     </>

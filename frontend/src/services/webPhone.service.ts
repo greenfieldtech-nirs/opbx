@@ -1,8 +1,15 @@
 import api from '@/services/api';
-import type { WebPhoneConfig } from '@/types/webPhone.types';
+import type {
+  WebPhoneCallLogEntry,
+  WebPhoneConfig,
+} from '@/types/webPhone.types';
 
 export interface WebPhoneConfigResponse {
   data: WebPhoneConfig;
+}
+
+export interface WebPhoneCallsLogResponse {
+  data: WebPhoneCallLogEntry[];
 }
 
 /**
@@ -10,5 +17,13 @@ export interface WebPhoneConfigResponse {
  */
 export async function getWebPhoneConfig(): Promise<WebPhoneConfigResponse> {
   const response = await api.get<WebPhoneConfigResponse>('/webphone/config');
+  return response.data;
+}
+
+/**
+ * Fetch the last 50 calls placed from the current user's extension.
+ */
+export async function getWebPhoneCallsLog(): Promise<WebPhoneCallsLogResponse> {
+  const response = await api.get<WebPhoneCallsLogResponse>('/webphone/calls-log');
   return response.data;
 }
