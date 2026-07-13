@@ -64,7 +64,7 @@ final class WebPhoneCallsLogControllerTest extends TestCase
             'session_timestamp' => $ts,
             'from' => $from,
             'to' => $to,
-            'disposition' => 'ANSWERED',
+            'disposition' => 'ANSWER',
             'duration' => 154,
             'billsec' => 150,
         ]);
@@ -82,7 +82,7 @@ final class WebPhoneCallsLogControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('data.0.to', '12125551234')
-            ->assertJsonPath('data.0.disposition', 'ANSWERED')
+            ->assertJsonPath('data.0.disposition', 'ANSWER')
             ->assertJsonPath('data.0.duration', 154);
     }
 
@@ -156,7 +156,7 @@ final class WebPhoneCallsLogControllerTest extends TestCase
             'session_timestamp' => '2026-07-13 10:00:00',
             'from' => '1000',
             'to' => '19998887777',
-            'disposition' => 'ANSWERED',
+            'disposition' => 'ANSWER',
             'duration' => 10,
             'billsec' => 10,
         ]);

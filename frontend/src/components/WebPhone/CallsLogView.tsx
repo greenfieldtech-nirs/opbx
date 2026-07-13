@@ -72,7 +72,7 @@ export function CallsLogView({ onRedial, active }: CallsLogViewProps) {
             <div className="flex items-center gap-3 min-w-0">
               <PhoneOutgoing
                 className={`h-4 w-4 shrink-0 ${
-                  entry.disposition === 'ANSWERED' ? 'text-green-500' : 'text-red-500'
+                  entry.disposition === 'ANSWER' ? 'text-green-500' : 'text-red-500'
                 }`}
               />
               <div className="min-w-0">
