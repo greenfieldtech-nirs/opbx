@@ -16,4 +16,16 @@ return [
 
     'widget_url' => env('EMBED_WIDGET_URL', '/embed/assets/embed-widget.js'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Embedded Dialer Widget Stylesheet URL
+    |--------------------------------------------------------------------------
+    |
+    | The widget bundle is built with cssCodeSplit disabled, so its styles are
+    | emitted as a separate file the iframe must load alongside the script.
+    |
+    */
+
+    'widget_css_url' => env('EMBED_WIDGET_CSS_URL', '/embed/assets/embed-widget.css'),
+
 ];

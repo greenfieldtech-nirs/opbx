@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:embed": "vite build --config vite.embed.config.ts && mkdir -p ../public/embed/assets && cp dist-embed/embed-widget.js dist-embed/embed-widget.css ../public/embed/assets/",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit"

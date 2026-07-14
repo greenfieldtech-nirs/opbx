@@ -67,6 +67,7 @@ final class EmbedDialerController extends Controller
         $iconPosition = $embedToken->icon_position?->value ?? 'bottom-right';
         $iconColor = $embedToken->icon_background_color ?? '#007acc';
         $widgetUrl = config('embed.widget_url', '/embed/assets/embed-widget.js');
+        $widgetCssUrl = config('embed.widget_css_url', '/embed/assets/embed-widget.css');
 
         $config = json_encode([
             'token' => $token,
@@ -75,6 +76,7 @@ final class EmbedDialerController extends Controller
         ], JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
         $widgetUrlAttr = htmlspecialchars($widgetUrl, ENT_QUOTES);
+        $widgetCssUrlAttr = htmlspecialchars($widgetCssUrl, ENT_QUOTES);
 
         return <<<HTML
 <!doctype html>
@@ -83,6 +85,7 @@ final class EmbedDialerController extends Controller
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OPBX Dialer</title>
+  <link rel="stylesheet" href="{$widgetCssUrlAttr}">
   <style>html,body{margin:0;padding:0;background:transparent;height:100%;}</style>
 </head>
 <body>
