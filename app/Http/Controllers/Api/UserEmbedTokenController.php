@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserEmbedToken;
 use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
+use App\Services\WebhookUrlResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -64,7 +65,7 @@ final class UserEmbedTokenController extends Controller
         return response()->json([
             'data' => new EmbedTokenResource($model),
             'token' => $plaintext,
-            'snippet' => $this->buildSnippet($model, $plaintext),
+            'snippet' => $this->buildSnippet($model, $plaintext, $target),
         ]);
     }
 
@@ -102,9 +103,20 @@ final class UserEmbedTokenController extends Controller
         return $model;
     }
 
-    private function buildSnippet(UserEmbedToken $model, string $plaintext): string
+    private function buildSnippet(UserEmbedToken $model, string $plaintext, User $target): string
     {
-        $loaderUrl = url('/embed/loader.js');
+        // Use the organization's public webhook base URL — the same address
+        // Cloudonix reaches OpBX on — so the snippet points at a routable host
+        // rather than the internal request host (e.g. "nginx" inside Docker).
+        $organization = OrganizationScope::bypass(fn () => $target->organization);
+        $baseUrl = $organization
+            ? WebhookUrlResolver::resolveWebhookBaseUrl($organization)
+            : null;
+
+        // Fall back to APP_URL (same fallback the webhook URL getters use) rather
+        // than the request host, which is internal inside Docker.
+        $baseUrl = rtrim($baseUrl ?? (string) config('app.url'), '/');
+        $loaderUrl = "{$baseUrl}/embed/loader.js";
         $iconPosition = $model->icon_position?->value ?? 'bottom-right';
         $iconColor = $model->icon_background_color ?? '#007acc';
 

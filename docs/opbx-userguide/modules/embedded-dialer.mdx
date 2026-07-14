@@ -83,7 +83,7 @@ commands and events over `postMessage` with an explicit target origin.
 
 | Variable | Description |
 |----------|-------------|
-| `loaderUrl` | URL of the OPBX loader script. Prefilled in the snippet. |
+| `loaderUrl` | URL of the OPBX loader script. Prefilled in the snippet, derived from the organization's **webhook base URL** (the same public address Cloudonix uses to reach OPBX), falling back to `APP_URL`. Make sure that URL is set and publicly routable, otherwise the snippet points at an unreachable host. |
 | `token` | The per-user embed token (prefix `opbxd_`). Identifies and authenticates the user. |
 | `iconPosition` | Floating launcher position: `bottom-right`, `bottom-left`, `top-right`, or `top-left`. |
 | `iconBackgroundColor` | Hex color for the floating launcher, e.g. `#007acc`. |

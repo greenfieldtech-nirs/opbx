@@ -54,6 +54,23 @@ final class UserEmbedTokenControllerTest extends TestCase
         $this->assertStringContainsString('opbxd_', $response->json('snippet'));
     }
 
+    public function test_snippet_loader_url_uses_org_webhook_base_url(): void
+    {
+        [$org, $owner, $target] = $this->orgWithActor(UserRole::OWNER);
+        \App\Models\CloudonixSettings::factory()->create([
+            'organization_id' => $org->id,
+            'webhook_base_url' => 'https://pbx.acme.com',
+        ]);
+
+        $snippet = $this->actingAs($owner)
+            ->postJson("/api/v1/users/{$target->id}/embed-token/regenerate")
+            ->assertOk()
+            ->json('snippet');
+
+        $this->assertStringContainsString("loaderUrl:'https://pbx.acme.com/embed/loader.js'", $snippet);
+        $this->assertStringNotContainsString('http://nginx', $snippet);
+    }
+
     public function test_supervisor_is_forbidden(): void
     {
         [, $supervisor, $target] = $this->orgWithActor(UserRole::SUPERVISOR);
