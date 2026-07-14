@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SupervisorAssignmentController;
 use App\Http\Controllers\Api\SupervisorDashboardController;
+use App\Http\Controllers\Api\UserEmbedTokenController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WebPhoneCallsLogController;
@@ -298,6 +299,14 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('users', UsersController::class);
         Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
             ->name('users.password.update');
+
+        // Embedded dialer token management (Owner + PBX Admin only).
+        Route::get('users/{user}/embed-token', [UserEmbedTokenController::class, 'show'])
+            ->name('users.embed-token.show');
+        Route::patch('users/{user}/embed-token', [UserEmbedTokenController::class, 'update'])
+            ->name('users.embed-token.update');
+        Route::post('users/{user}/embed-token/regenerate', [UserEmbedTokenController::class, 'regenerate'])
+            ->name('users.embed-token.regenerate');
         Route::post('users/invite', [UserInvitationController::class, 'invite'])
             ->name('users.invite');
 
