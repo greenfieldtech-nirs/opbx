@@ -36,6 +36,7 @@ import {
   Shield,
   Activity,
   RefreshCw,
+  Code2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getRoleColor, getRoleDisplayName, getStatusColor } from '@/utils/formatters';
@@ -105,6 +106,7 @@ import {
 } from '@/services/supervisorAssignments.service';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
 import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorAssignmentDialog';
+import { EmbeddedDialerDialog } from '@/components/Users/EmbeddedDialerDialog';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -154,6 +156,8 @@ function UsersComplete() {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [assignmentUserId, setAssignmentUserId] = useState<string | null>(null);
+  const [embedUser, setEmbedUser] = useState<User | null>(null);
+  const [showEmbedDialog, setShowEmbedDialog] = useState(false);
 
   // Password form state
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
@@ -735,7 +739,24 @@ function UsersComplete() {
                     {user.status}
                   </Badge>
                 )
-              }
+              },
+              ...(canCreateUsers ? [{
+                header: 'Embed',
+                cell: (user: User) => (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEmbedUser(user);
+                      setShowEmbedDialog(true);
+                    }}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Embedded dialer settings"
+                    aria-label={`Embedded dialer for ${user.name}`}
+                  >
+                    <Code2 className="h-4 w-4" />
+                  </button>
+                )
+              }] : [])
             ]}
             emptyState={
               <EmptyState
@@ -1464,6 +1485,13 @@ function UsersComplete() {
         userId={assignmentUserId}
         open={showAssignmentDialog}
         onOpenChange={setShowAssignmentDialog}
+      />
+
+      <EmbeddedDialerDialog
+        userId={embedUser?.id ?? null}
+        userName={embedUser?.name}
+        open={showEmbedDialog}
+        onOpenChange={setShowEmbedDialog}
       />
 
       <InviteUserDialog
