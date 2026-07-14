@@ -26,7 +26,6 @@ final class EmbedTokenService
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
             'token' => hash('sha256', $plaintext),
-            'allowed_domains' => [],
             'icon_position' => 'bottom-right',
             'icon_background_color' => '#007acc',
         ]));
@@ -35,7 +34,7 @@ final class EmbedTokenService
     }
 
     /**
-     * Rotate the token hash in place, preserving allowed_domains + icon config.
+     * Rotate the token hash in place, preserving icon config.
      * Returns [model, plaintext].
      *
      * @return array{0: UserEmbedToken, 1: string}

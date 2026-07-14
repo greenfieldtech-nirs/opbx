@@ -40,15 +40,9 @@ final class UserEmbedTokenController extends Controller
 
         OrganizationScope::bypass(function () use ($model, $validated): void {
             $model->fill(array_filter([
-                'allowed_domains' => $validated['allowed_domains'] ?? null,
                 'icon_position' => $validated['icon_position'] ?? null,
                 'icon_background_color' => $validated['icon_background_color'] ?? null,
             ], static fn ($v) => $v !== null));
-
-            // array_filter drops an explicitly empty allowed_domains list; re-apply.
-            if (array_key_exists('allowed_domains', $validated)) {
-                $model->allowed_domains = $validated['allowed_domains'];
-            }
 
             $model->save();
         });

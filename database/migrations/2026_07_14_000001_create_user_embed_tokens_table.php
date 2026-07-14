@@ -15,7 +15,6 @@ return new class extends Migration
             $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
             $table->string('token', 64)->unique();
-            $table->json('allowed_domains');
             $table->string('icon_position')->default('bottom-right');
             $table->string('icon_background_color')->default('#007acc');
             $table->timestamp('last_used_at')->nullable();

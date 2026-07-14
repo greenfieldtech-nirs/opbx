@@ -23,8 +23,6 @@ final class UpdateEmbedTokenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'allowed_domains' => ['sometimes', 'array'],
-            'allowed_domains.*' => ['string', 'regex:/^(?=.{1,253}$)([a-zA-Z0-9](-*[a-zA-Z0-9])*)(\.[a-zA-Z0-9](-*[a-zA-Z0-9])*)+$/'],
             'icon_position' => ['sometimes', Rule::enum(EmbedIconPosition::class)],
             'icon_background_color' => ['sometimes', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ];

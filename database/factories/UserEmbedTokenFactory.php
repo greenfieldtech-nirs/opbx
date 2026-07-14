@@ -19,7 +19,6 @@ class UserEmbedTokenFactory extends Factory
             'user_id' => User::factory(),
             'organization_id' => Organization::factory(),
             'token' => hash('sha256', 'opbxd_'.fake()->unique()->sha1()),
-            'allowed_domains' => ['example.com'],
             'icon_position' => 'bottom-right',
             'icon_background_color' => '#007acc',
         ];

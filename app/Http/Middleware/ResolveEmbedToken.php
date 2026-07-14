@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\UserEmbedToken;
+use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
 use Closure;
 use Illuminate\Http\Request;
@@ -23,7 +25,7 @@ final class ResolveEmbedToken
         }
 
         $origin = $request->headers->get('Origin');
-        if (! $this->originAllowed($origin, $embedToken->allowed_domains ?? [])) {
+        if (! $this->originAllowed($origin, $this->allowedDomainsFor($embedToken))) {
             return response()->json(['message' => 'Origin not allowed.'], 403);
         }
 
@@ -48,6 +50,19 @@ final class ResolveEmbedToken
         }
 
         return $response;
+    }
+
+    /**
+     * Organization-level allowlist of hostnames permitted to embed the dialer.
+     * Single source of truth: cloudonix_settings.embed_allowed_domains.
+     *
+     * @return array<int, string>
+     */
+    private function allowedDomainsFor(UserEmbedToken $embedToken): array
+    {
+        return OrganizationScope::bypass(
+            fn () => $embedToken->organization?->cloudonixSettings?->embed_allowed_domains ?? []
+        );
     }
 
     /**

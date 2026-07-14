@@ -20,7 +20,6 @@ class UserEmbedToken extends Model
         'user_id',
         'organization_id',
         'token',
-        'allowed_domains',
         'icon_position',
         'icon_background_color',
         'last_used_at',
@@ -31,7 +30,6 @@ class UserEmbedToken extends Model
     protected function casts(): array
     {
         return [
-            'allowed_domains' => 'array',
             'icon_position' => EmbedIconPosition::class,
             'last_used_at' => 'datetime',
         ];
@@ -40,5 +38,10 @@ class UserEmbedToken extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withoutGlobalScope(OrganizationScope::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class)->withoutGlobalScope(OrganizationScope::class);
     }
 }

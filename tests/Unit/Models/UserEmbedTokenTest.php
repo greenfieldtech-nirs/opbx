@@ -22,12 +22,10 @@ final class UserEmbedTokenTest extends TestCase
         $token = UserEmbedToken::factory()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'allowed_domains' => ['crm.acme.com'],
             'icon_position' => EmbedIconPosition::TOP_LEFT->value,
         ]);
 
         $this->assertSame($user->id, $token->user->id);
-        $this->assertSame(['crm.acme.com'], $token->allowed_domains);
         $this->assertSame(EmbedIconPosition::TOP_LEFT, $token->icon_position);
     }
 

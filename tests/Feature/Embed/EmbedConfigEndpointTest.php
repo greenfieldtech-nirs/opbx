@@ -8,7 +8,6 @@ use App\Models\CloudonixSettings;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
-use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -28,10 +27,13 @@ final class EmbedConfigEndpointTest extends TestCase
             'organization_id' => $org->id, 'user_id' => $user->id,
             'type' => 'user', 'extension_number' => '1001', 'password' => 'sipsecret',
         ]);
-        CloudonixSettings::factory()->create(['organization_id' => $org->id, 'domain_name' => 'acme.cx']);
+        CloudonixSettings::factory()->create([
+            'organization_id' => $org->id,
+            'domain_name' => 'acme.cx',
+            'embed_allowed_domains' => $domains,
+        ]);
 
-        [$model, $plaintext] = app(EmbedTokenService::class)->generateFor($user);
-        OrganizationScope::bypass(fn () => $model->update(['allowed_domains' => $domains]));
+        [, $plaintext] = app(EmbedTokenService::class)->generateFor($user);
 
         return [$plaintext, $org, $user];
     }

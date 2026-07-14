@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\UserEmbedToken;
+use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -58,8 +59,13 @@ final class EmbedDialerController extends Controller
             ? ['https://', 'http://']
             : ['https://'];
 
+        // Organization-level allowlist (cloudonix_settings.embed_allowed_domains).
+        $allowedDomains = OrganizationScope::bypass(
+            fn () => $embedToken->organization?->cloudonixSettings?->embed_allowed_domains ?? []
+        );
+
         $ancestors = [];
-        foreach ($embedToken->allowed_domains ?? [] as $domain) {
+        foreach ($allowedDomains as $domain) {
             foreach ($schemes as $scheme) {
                 $ancestors[] = $scheme.$domain;
             }

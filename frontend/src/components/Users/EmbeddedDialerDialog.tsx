@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Copy, Plus, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { Copy, RefreshCw, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -53,8 +53,6 @@ export function EmbeddedDialerDialog({
 }: EmbeddedDialerDialogProps) {
   const queryClient = useQueryClient();
 
-  const [domains, setDomains] = useState<string[]>([]);
-  const [newDomain, setNewDomain] = useState('');
   const [iconPosition, setIconPosition] = useState<EmbedIconPosition>('bottom-right');
   const [iconColor, setIconColor] = useState('#007acc');
   // The one-time snippet revealed after a regenerate (never re-fetchable).
@@ -69,7 +67,6 @@ export function EmbeddedDialerDialog({
   // Seed the form from the loaded config each time it arrives.
   useEffect(() => {
     if (config) {
-      setDomains(config.allowed_domains ?? []);
       setIconPosition(config.icon_position ?? 'bottom-right');
       setIconColor(config.icon_background_color ?? '#007acc');
     }
@@ -83,7 +80,6 @@ export function EmbeddedDialerDialog({
   const saveMutation = useMutation({
     mutationFn: () =>
       embedTokensService.update(userId!, {
-        allowed_domains: domains,
         icon_position: iconPosition,
         icon_background_color: iconColor,
       }),
@@ -104,19 +100,6 @@ export function EmbeddedDialerDialog({
     onError: () => toast.error('Failed to regenerate token'),
   });
 
-  const addDomain = () => {
-    const d = newDomain.trim().toLowerCase();
-    if (!d) return;
-    if (domains.includes(d)) {
-      toast.error('Domain already added');
-      return;
-    }
-    setDomains((prev) => [...prev, d]);
-    setNewDomain('');
-  };
-
-  const removeDomain = (d: string) => setDomains((prev) => prev.filter((x) => x !== d));
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -133,51 +116,13 @@ export function EmbeddedDialerDialog({
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Allowed domains */}
-            <div className="space-y-2">
-              <Label>Allowed Domains</Label>
-              <p className="text-xs text-muted-foreground">
-                Only these domains may embed the dialer. Enter hostnames without
-                the scheme (e.g. <code>crm.acme.com</code>).
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addDomain();
-                    }
-                  }}
-                  placeholder="crm.acme.com"
-                />
-                <Button type="button" variant="outline" onClick={addDomain}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              {domains.length > 0 ? (
-                <ul className="flex flex-col divide-y rounded-md border">
-                  {domains.map((d) => (
-                    <li key={d} className="flex items-center justify-between px-3 py-2 text-sm">
-                      <code>{d}</code>
-                      <button
-                        type="button"
-                        onClick={() => removeDomain(d)}
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label={`Remove ${d}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">
-                  No domains yet — the dialer cannot be embedded until you add one.
-                </p>
-              )}
-            </div>
+            {/* Allowed domains are an organization-level setting */}
+            <p className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+              The list of websites allowed to embed the dialer is configured
+              once for the whole organization under{' '}
+              <span className="font-medium">Settings → Cloudonix → Embedded Dialer</span>.
+              The dialer will not load on any site that is not on that list.
+            </p>
 
             {/* Icon position + color */}
             <div className="grid grid-cols-2 gap-4">

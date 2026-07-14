@@ -52,6 +52,8 @@ import {
     XCircle,
     FileText,
     Shield,
+    Plus,
+    Trash2,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -81,6 +83,9 @@ export default function Settings() {
   const [showRequestsApiKey, setShowRequestsApiKey] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | null>(null);
+  // Organization-level allowlist of hostnames permitted to embed the dialer.
+  const [embedDomains, setEmbedDomains] = useState<string[]>([]);
+  const [newEmbedDomain, setNewEmbedDomain] = useState('');
 
   // Settings form
   const {
@@ -114,6 +119,7 @@ export default function Settings() {
         const data = await settingsService.getCloudonixSettings();
 
         setSettingsData(data);
+        setEmbedDomains(data.embed_allowed_domains ?? []);
 
         // Reset form with loaded data
         reset({
@@ -183,6 +189,7 @@ export default function Settings() {
           domain_api_key: formValues.domain_api_key || undefined,
           domain_requests_api_key: formValues.domain_requests_api_key || undefined,
           webhook_base_url: formValues.webhook_base_url || undefined,
+          embed_allowed_domains: embedDomains,
           no_answer_timeout: formValues.no_answer_timeout,
           recording_format: formValues.recording_format,
         };
@@ -630,6 +637,81 @@ export default function Settings() {
                   </p>
                 </div>
               )}
+
+              {/* Divider */}
+              <div className="border-t pt-6" />
+
+              {/* Embedded Dialer allowed domains (organization-level) */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Embedded Dialer — Allowed Domains
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Websites permitted to embed the Web Phone dialer. Enter hostnames
+                  without the scheme (e.g. <code>crm.acme.com</code>). The dialer will
+                  not load on any site that is not listed here.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newEmbedDomain}
+                    onChange={(e) => setNewEmbedDomain(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const d = newEmbedDomain.trim().toLowerCase();
+                        if (!d) return;
+                        if (embedDomains.includes(d)) {
+                          toast.error('Domain already added');
+                          return;
+                        }
+                        setEmbedDomains((prev) => [...prev, d]);
+                        setNewEmbedDomain('');
+                      }
+                    }}
+                    placeholder="crm.acme.com"
+                    disabled={isValidating}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isValidating}
+                    onClick={() => {
+                      const d = newEmbedDomain.trim().toLowerCase();
+                      if (!d) return;
+                      if (embedDomains.includes(d)) {
+                        toast.error('Domain already added');
+                        return;
+                      }
+                      setEmbedDomains((prev) => [...prev, d]);
+                      setNewEmbedDomain('');
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {embedDomains.length > 0 ? (
+                  <ul className="flex flex-col divide-y rounded-md border">
+                    {embedDomains.map((d) => (
+                      <li key={d} className="flex items-center justify-between px-3 py-2 text-sm">
+                        <code>{d}</code>
+                        <button
+                          type="button"
+                          onClick={() => setEmbedDomains((prev) => prev.filter((x) => x !== d))}
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={`Remove ${d}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    No domains yet — the embedded dialer cannot be used until you add one.
+                  </p>
+                )}
+              </div>
 
               {/* Divider */}
               <div className="border-t pt-6" />

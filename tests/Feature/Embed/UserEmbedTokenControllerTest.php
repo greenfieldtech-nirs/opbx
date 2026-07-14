@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Embed;
 
 use App\Enums\UserRole;
+use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\EmbedTokenService;
@@ -33,12 +34,11 @@ final class UserEmbedTokenControllerTest extends TestCase
         [, $owner, $target] = $this->orgWithActor(UserRole::OWNER);
 
         $this->actingAs($owner)->patchJson("/api/v1/users/{$target->id}/embed-token", [
-            'allowed_domains' => ['crm.acme.com'],
             'icon_position' => 'top-left',
             'icon_background_color' => '#123456',
         ])->assertOk()
-            ->assertJsonPath('data.allowed_domains', ['crm.acme.com'])
             ->assertJsonPath('data.icon_position', 'top-left')
+            ->assertJsonMissingPath('data.allowed_domains')
             ->assertJsonMissingPath('data.token');
     }
 
@@ -57,7 +57,7 @@ final class UserEmbedTokenControllerTest extends TestCase
     public function test_snippet_loader_url_uses_org_webhook_base_url(): void
     {
         [$org, $owner, $target] = $this->orgWithActor(UserRole::OWNER);
-        \App\Models\CloudonixSettings::factory()->create([
+        CloudonixSettings::factory()->create([
             'organization_id' => $org->id,
             'webhook_base_url' => 'https://pbx.acme.com',
         ]);

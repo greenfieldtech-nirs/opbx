@@ -5,7 +5,6 @@ export type EmbedIconPosition =
   | 'top-left';
 
 export interface EmbedTokenConfig {
-  allowed_domains: string[];
   icon_position: EmbedIconPosition;
   icon_background_color: string;
   last_used_at: string | null;

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Embed;
 
+use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\User;
-use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,8 +19,11 @@ final class EmbedDialerPageTest extends TestCase
     {
         $org = Organization::factory()->create();
         $user = User::factory()->create(['organization_id' => $org->id]);
-        [$model, $token] = app(EmbedTokenService::class)->generateFor($user);
-        OrganizationScope::bypass(fn () => $model->update(['allowed_domains' => ['crm.acme.com']]));
+        CloudonixSettings::factory()->create([
+            'organization_id' => $org->id,
+            'embed_allowed_domains' => ['crm.acme.com'],
+        ]);
+        [, $token] = app(EmbedTokenService::class)->generateFor($user);
 
         $response = $this->get('/embed/dialer?token='.$token);
 

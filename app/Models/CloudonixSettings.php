@@ -8,6 +8,7 @@ use App\Services\WebhookUrlResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Cloudonix integration settings for an organization.
@@ -19,14 +20,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $domain_api_key
  * @property string|null $domain_requests_api_key
  * @property string|null $webhook_base_url
+ * @property array<int, string>|null $embed_allowed_domains
  * @property int|null $voice_application_id
  * @property string|null $voice_application_uuid
  * @property string|null $voice_application_name
  * @property int $no_answer_timeout
  * @property string $recording_format
  * @property string|null $cloudonix_package
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  * @property-read Organization $organization
  */
 class CloudonixSettings extends Model
@@ -52,6 +54,7 @@ class CloudonixSettings extends Model
         'domain_api_key',
         'domain_requests_api_key',
         'webhook_base_url',
+        'embed_allowed_domains',
         'voice_application_id',
         'voice_application_uuid',
         'voice_application_name',
@@ -72,6 +75,7 @@ class CloudonixSettings extends Model
             'domain_api_key' => 'encrypted',
             'domain_requests_api_key' => 'encrypted',
             'no_answer_timeout' => 'integer',
+            'embed_allowed_domains' => 'array',
         ];
     }
 

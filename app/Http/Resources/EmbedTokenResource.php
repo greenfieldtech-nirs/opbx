@@ -23,7 +23,6 @@ final class EmbedTokenResource extends JsonResource
     {
         return [
             'user_id' => $this->user_id,
-            'allowed_domains' => $this->allowed_domains ?? [],
             'icon_position' => $this->icon_position?->value,
             'icon_background_color' => $this->icon_background_color,
             'last_used_at' => $this->last_used_at?->toIso8601String(),

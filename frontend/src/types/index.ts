@@ -921,6 +921,7 @@ export interface CloudonixSettings {
   domain_api_key: string | null;
   domain_requests_api_key: string | null;
   webhook_base_url: string | null;
+  embed_allowed_domains: string[];
   no_answer_timeout: number;
   recording_format: RecordingFormat;
   cloudonix_package: string | null;
@@ -939,6 +940,7 @@ export interface UpdateCloudonixSettingsRequest {
   domain_api_key?: string;
   domain_requests_api_key?: string;
   webhook_base_url?: string;
+  embed_allowed_domains?: string[];
   no_answer_timeout?: number;
   recording_format?: RecordingFormat;
   cloudonix_package?: string;
