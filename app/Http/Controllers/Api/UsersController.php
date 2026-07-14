@@ -9,6 +9,9 @@ use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Models\UserEmbedToken;
+use App\Scopes\OrganizationScope;
+use App\Services\EmbedTokenService;
 use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
@@ -225,6 +228,22 @@ class UsersController extends AbstractApiCrudController
     {
         // Reload extension relationship
         $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+
+        // Auto-provision an embedded-dialer token for the new user.
+        try {
+            assert($model instanceof User);
+            $existing = OrganizationScope::bypass(
+                fn () => UserEmbedToken::where('user_id', $model->id)->exists()
+            );
+            if (! $existing) {
+                app(EmbedTokenService::class)->generateFor($model);
+            }
+        } catch (\Exception $embedException) {
+            Log::error('Failed to generate embed token for new user', [
+                'user_id' => $model->id,
+                'error' => $embedException->getMessage(),
+            ]);
+        }
 
         // Add audit logging for user creation
         try {
