@@ -131,6 +131,8 @@ function UsersComplete() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canCreateUsers = user?.role === 'owner' || user?.role === 'pbx_admin';
+  // Supervisors get a strictly view-only Users page: no create/edit/delete.
+  const isReadOnly = user?.role === 'supervisor';
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -674,7 +676,7 @@ function UsersComplete() {
             onSort={handleSort}
             canView={false}
             canEdit={false}
-            onDelete={(user) => {
+            onDelete={isReadOnly ? undefined : (user) => {
               setSelectedUser(user);
               setShowDeleteDialog(true);
             }}
@@ -740,7 +742,7 @@ function UsersComplete() {
                 icon={UserX}
                 title="No users found"
                 description={hasActiveFilters ? 'Try adjusting your filters' : 'Get started by creating your first user'}
-                action={!hasActiveFilters ? {
+                action={!hasActiveFilters && !isReadOnly ? {
                   label: "Add User",
                   onClick: () => setShowCreateDialog(true),
                 } : undefined}
@@ -1019,9 +1021,9 @@ function UsersComplete() {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>{isReadOnly ? 'User Details' : 'Edit User'}</DialogTitle>
             <DialogDescription>
-              Update user information and permissions
+              {isReadOnly ? 'View user information' : 'Update user information and permissions'}
             </DialogDescription>
           </DialogHeader>
 
@@ -1178,11 +1180,13 @@ function UsersComplete() {
               }}
               disabled={updateUserMutation.isPending}
             >
-              Cancel
+              {isReadOnly ? 'Close' : 'Cancel'}
             </Button>
-            <Button onClick={handleEditUser} disabled={updateUserMutation.isPending}>
-              {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
+            {!isReadOnly && (
+              <Button onClick={handleEditUser} disabled={updateUserMutation.isPending}>
+                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

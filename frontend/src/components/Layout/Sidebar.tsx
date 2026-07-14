@@ -7,7 +7,7 @@
  * - Right: Contextual sidebar with section title in header
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -61,11 +61,11 @@ const sidebarSections: SidebarSection[] = [
     icon: 'codicon-settings-gear',
     accentColor: 'default',
     items: [
-      { name: 'Users', href: '/ui/users', icon: 'codicon-account', roles: ['owner', 'pbx_admin', 'supervisor'] },
+      { name: 'Users', href: '/ui/users', icon: 'codicon-account', roles: ['owner', 'pbx_admin'] },
       { name: 'Supervisors', href: '/ui/supervisors', icon: 'codicon-shield', roles: ['owner', 'pbx_admin'] },
       { name: 'Extensions', href: '/ui/extensions', icon: 'codicon-extensions', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Conference Rooms', href: '/ui/conference-rooms', icon: 'codicon-device-camera-video', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-      { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter', 'supervisor'] },
+      { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'IVR Menus', href: '/ui/ivr-menus', icon: 'codicon-menu', roles: ['owner', 'pbx_admin'] },
       { name: 'Business Hours', href: '/ui/business-hours', icon: 'codicon-clock', roles: ['owner', 'pbx_admin'] },
       { name: 'Announcements', href: '/ui/announcements', icon: 'codicon-megaphone', roles: ['owner', 'pbx_admin'] },
@@ -103,13 +103,30 @@ const sidebarSections: SidebarSection[] = [
     icon: 'codicon-graph',
     accentColor: 'default',
     items: [
-      { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter', 'supervisor'] },
-      { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor'] },
+      { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
       { name: 'API Keys', href: '/ui/api-keys', icon: 'codicon-key', roles: ['owner'] },
     ],
   },
 ];
+
+// Supervisor section — supervisors get a single top-level section with a
+// fixed, use-case-driven item order. When a supervisor is signed in this
+// REPLACES all other sections (they see nothing else).
+const supervisorSection: SidebarSection = {
+  id: 'supervisor',
+  title: 'Supervisor',
+  icon: 'codicon-shield',
+  accentColor: 'default',
+  items: [
+    { name: 'Dashboard', href: '/ui/dashboard', icon: 'codicon-dashboard' },
+    { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun' },
+    { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat' },
+    { name: 'Users', href: '/ui/users', icon: 'codicon-account' },
+    { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming' },
+  ],
+};
 
 // Platform Management section (shown only to platform managers)
 const platformSection: SidebarSection = {
@@ -146,10 +163,17 @@ export function Sidebar() {
   // Check if user is a platform manager
   const isPlatformManager = user?.is_platform_manager === true;
 
+  // Supervisors get ONLY the single Supervisor section; everyone else gets the
+  // full section set. This is the source of truth for the whole sidebar.
+  const baseSections = useMemo(
+    () => (user?.role === 'supervisor' ? [supervisorSection] : sidebarSections),
+    [user?.role]
+  );
+
   // Load saved state from localStorage and sync with current URL
   useEffect(() => {
     const savedSection = localStorage.getItem(SELECTED_SECTION_KEY);
-    const allSectionsList = [...sidebarSections, ...(isPlatformManager ? [platformSection] : [])];
+    const allSectionsList = [...baseSections, ...(isPlatformManager ? [platformSection] : [])];
     
     // First, check if current URL matches any section's items
     const currentPath = location.pathname;
@@ -175,7 +199,7 @@ export function Sidebar() {
         setSidebarWidth(width);
       }
     }
-  }, [isPlatformManager, location.pathname]);
+  }, [isPlatformManager, location.pathname, baseSections]);
 
   // Save selected section to localStorage
   useEffect(() => {
@@ -238,8 +262,8 @@ export function Sidebar() {
 
 
   // Get the currently selected section
-  const allSections = [...sidebarSections, ...(isPlatformManager ? [platformSection] : [])];
-  const selectedSection = allSections.find(s => s.id === selectedSectionId) || sidebarSections[0];
+  const allSections = [...baseSections, ...(isPlatformManager ? [platformSection] : [])];
+  const selectedSection = allSections.find(s => s.id === selectedSectionId) || baseSections[0];
 
   // Render a navigation item
   const renderNavItem = (item: NavItem) => {
@@ -305,7 +329,7 @@ export function Sidebar() {
         >
           {/* Activity Icons */}
           <div className="flex-1 py-3 space-y-2">
-            {sidebarSections.map(section => {
+            {baseSections.map(section => {
               const isSelected = selectedSectionId === section.id;
 
               if (section.roles && (!user?.role || !section.roles.includes(user.role))) {
