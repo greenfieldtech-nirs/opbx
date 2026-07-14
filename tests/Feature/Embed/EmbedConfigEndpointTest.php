@@ -8,8 +8,8 @@ use App\Models\CloudonixSettings;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
-use App\Services\EmbedTokenService;
 use App\Scopes\OrganizationScope;
+use App\Services\EmbedTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
