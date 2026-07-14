@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\CallTrackingSessionController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\EmailValidationController;
+use App\Http\Controllers\Api\EmbedConfigController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
 use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\Api\WebPhoneConfigController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
 use App\Http\Controllers\DistributionListController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 use Pusher\Pusher;
@@ -194,6 +196,30 @@ Route::prefix('v1')->group(function (): void {
     Route::get('call-tracking-dni/swap', [CallTrackingDniController::class, 'swap'])
         ->middleware(['throttle:call-tracking-dni'])
         ->name('call-tracking.dni.swap');
+
+    // Embedded dialer public API (token-authenticated, per-request CORS via
+    // resolve.embed.token). Deliberately OUTSIDE auth:sanctum.
+    Route::prefix('embed')->group(function (): void {
+        // CORS preflight: reflect Origin + allow the Authorization header.
+        // Preflight cannot carry the bearer token, so it must not run through
+        // resolve.embed.token; the real GET enforces the token + origin.
+        Route::options('{any}', function (Request $request) {
+            $origin = (string) $request->headers->get('Origin');
+
+            return response('', 204)->withHeaders([
+                'Access-Control-Allow-Origin' => $origin,
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
+                'Access-Control-Max-Age' => '600',
+                'Vary' => 'Origin',
+            ]);
+        })->where('any', '.*');
+
+        Route::middleware(['throttle:embed', 'resolve.embed.token'])->group(function (): void {
+            Route::get('config', [EmbedConfigController::class, 'config'])->name('embed.config');
+            Route::get('calls-log', [EmbedConfigController::class, 'callsLog'])->name('embed.calls-log');
+        });
+    });
 
     // Application configuration (public)
     // Required by the login/register pages before authentication to decide whether

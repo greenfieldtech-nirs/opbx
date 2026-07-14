@@ -393,6 +393,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->input('organization_id').'|'.$request->ip());
         });
 
+        // Embedded dialer public API - 60 requests per minute per token + IP
+        RateLimiter::for('embed', function (Request $request) {
+            return Limit::perMinute(60)->by(((string) $request->bearerToken()).'|'.$request->ip());
+        });
+
         // Webhook routes - 100 requests per minute per IP
         RateLimiter::for('webhooks', function (Request $request) {
             return Limit::perMinute(config('rate_limiting.webhooks', 100))
