@@ -122,6 +122,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the embedded-dialer token associated with the user.
+     */
+    public function embedToken(): HasOne
+    {
+        return $this->hasOne(UserEmbedToken::class);
+    }
+
+    /**
      * Get the users supervised by this supervisor.
      */
     public function supervisedUsers(): BelongsToMany
