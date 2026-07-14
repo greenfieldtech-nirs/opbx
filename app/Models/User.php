@@ -69,6 +69,7 @@ class User extends Authenticatable
      */
     protected $attributes = [
         'is_platform_manager' => false,
+        'status' => UserStatus::ACTIVE->value,
     ];
 
     /**
