@@ -51,14 +51,21 @@ final class EmbedDialerController extends Controller
 
     private function frameAncestors(UserEmbedToken $embedToken): string
     {
-        $domains = array_map(
-            static fn (string $d): string => 'https://'.$d,
-            $embedToken->allowed_domains ?? []
-        );
+        // Normally https-only. For local dev, EMBED_ALLOW_INSECURE_FRAMING also
+        // emits http:// ancestors so http://localhost demo pages can frame the
+        // dialer. Must stay off in production.
+        $schemes = config('embed.allow_insecure_framing')
+            ? ['https://', 'http://']
+            : ['https://'];
 
-        $ancestors = $domains === [] ? "'none'" : implode(' ', $domains);
+        $ancestors = [];
+        foreach ($embedToken->allowed_domains ?? [] as $domain) {
+            foreach ($schemes as $scheme) {
+                $ancestors[] = $scheme.$domain;
+            }
+        }
 
-        return 'frame-ancestors '.$ancestors;
+        return 'frame-ancestors '.($ancestors === [] ? "'none'" : implode(' ', $ancestors));
     }
 
     private function renderIframe(Request $request, UserEmbedToken $embedToken): string

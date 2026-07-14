@@ -28,4 +28,19 @@ return [
 
     'widget_css_url' => env('EMBED_WIDGET_CSS_URL', '/embed/assets/embed-widget.css'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Allow Insecure (http) Framing
+    |--------------------------------------------------------------------------
+    |
+    | The iframe's frame-ancestors CSP normally forces the https:// scheme so
+    | the dialer can only be embedded on secure origins. For LOCAL DEVELOPMENT
+    | against http://localhost demo pages, enable this to also emit http://
+    | ancestors. NEVER enable this in production — it lets the dialer (and the
+    | SIP credentials it loads) be framed by insecure origins.
+    |
+    */
+
+    'allow_insecure_framing' => (bool) env('EMBED_ALLOW_INSECURE_FRAMING', false),
+
 ];

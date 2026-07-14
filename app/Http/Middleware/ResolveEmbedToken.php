@@ -40,8 +40,12 @@ final class ResolveEmbedToken
 
         // Per-request CORS: reflect only the validated origin. This deliberately
         // owns CORS for embed routes instead of the static config/cors.php list.
-        $response->headers->set('Access-Control-Allow-Origin', (string) $origin);
-        $response->headers->set('Vary', 'Origin');
+        // Only emit CORS headers when there is an Origin to reflect (same-origin
+        // requests carry none and need no CORS header).
+        if ($origin !== null && $origin !== '') {
+            $response->headers->set('Access-Control-Allow-Origin', $origin);
+            $response->headers->set('Vary', 'Origin');
+        }
 
         return $response;
     }
@@ -51,8 +55,13 @@ final class ResolveEmbedToken
      */
     public function originAllowed(?string $origin, array $allowedDomains): bool
     {
+        // No Origin header: the request is same-origin with the iframe (the
+        // widget calls /embed/config on its own origin) or a non-browser
+        // client. The bearer token is the authentication here; the Origin
+        // allowlist exists to block *other* browser origins, which always send
+        // an Origin. So an absent Origin passes.
         if ($origin === null || $origin === '') {
-            return false;
+            return true;
         }
 
         $host = parse_url($origin, PHP_URL_HOST);
