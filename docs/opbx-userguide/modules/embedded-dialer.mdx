@@ -129,16 +129,25 @@ document.querySelector('#call-lead').addEventListener('click', () => {
 
 The Embedded Dialer is protected by several layers:
 
-- **Domain allowlist** — The token carries a list of allowed hostnames. The
+- **Domain allowlist** — The token carries a list of allowed hostnames,
+  configured per user in the UI (**Users → Embed → Allowed Domains**) or via the
+  embed-token API. This is application data on the user's token
+  (`user_embed_tokens.allowed_domains`), **not** an environment variable. The
   iframe document sets a per-token `frame-ancestors` Content-Security-Policy so
   only those domains can frame it, and the embed API refuses requests whose
-  `Origin` is not in the list.
+  `Origin` is present but not in the list. Same-origin calls from inside the
+  iframe send no `Origin` and are allowed — the bearer token is the auth there.
 - **Per-user token** — Each token maps to exactly one user and is stored hashed
   (never in plaintext). It is shown only at generation time.
 - **Regenerate = revoke** — Regenerating a token immediately invalidates the old
   one. This is the fast mitigation if a token is leaked.
 - **HTTPS-only framing** — `frame-ancestors` is emitted with an `https://`
-  scheme, so the dialer can only be embedded on secure origins.
+  scheme, so the dialer can only be embedded on secure origins. A local-dev
+  escape hatch, `EMBED_ALLOW_INSECURE_FRAMING`, additionally emits `http://`
+  ancestors so an `http://localhost` page can frame the dialer while testing.
+  It defaults to `false` and **must stay `false` in production** — enabling it
+  lets insecure origins frame the widget, exposing the extension's SIP
+  credentials.
 
 ### Residual Risk: SIP password exposure
 
