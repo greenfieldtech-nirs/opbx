@@ -11,6 +11,7 @@ use App\Http\Middleware\EnsureWebhookIdempotency;
 use App\Http\Middleware\RateLimitPerOrganization;
 use App\Http\Middleware\RateLimitSensitiveOperations;
 use App\Http\Middleware\ResolveApiKey;
+use App\Http\Middleware\ResolveEmbedToken;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
@@ -59,6 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'dialer.worker.auth' => DialerWorkerAuth::class,
             'resolve.api.key' => ResolveApiKey::class,
             'enforce.api.key.scope' => EnforceApiKeyScope::class,
+            'resolve.embed.token' => ResolveEmbedToken::class,
         ]);
 
         // ResolveApiKey must run BEFORE auth:sanctum. Laravel's middleware
