@@ -18,9 +18,14 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getWebPhoneConfig } from '@/services/webPhone.service';
+import {
+  getWebPhoneConfig,
+  type WebPhoneConfigResponse,
+  type WebPhoneCallsLogResponse,
+} from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
+import { getEmbedBus } from './embedBus';
 import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
 import { CallsLogView } from './CallsLogView';
 import { TonePlayer } from '@/lib/TonePlayer';
@@ -28,6 +33,27 @@ import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error';
 type CallState = 'idle' | 'ringing' | 'connected';
+
+type IconPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
+interface WebPhoneProps {
+  // Config/calls-log sources; embed overrides these to hit /embed/*.
+  configQueryFn?: () => Promise<WebPhoneConfigResponse>;
+  callsLogQueryFn?: () => Promise<WebPhoneCallsLogResponse>;
+  // Pull-tab placement + color (embed is themable per token).
+  iconPosition?: IconPosition;
+  iconBackgroundColor?: string;
+  // Embed may open the dialer immediately.
+  autoOpen?: boolean;
+}
+
+// Map the 4 corners to fixed-position Tailwind classes for the pull tab + panel.
+const CORNER_CLASSES: Record<IconPosition, string> = {
+  'bottom-right': 'bottom-6 right-6',
+  'bottom-left': 'bottom-6 left-6',
+  'top-right': 'top-6 right-6',
+  'top-left': 'top-6 left-6',
+};
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
@@ -98,13 +124,21 @@ function numberSizeClass(len: number): string {
   return 'text-xl tracking-tight';
 }
 
-export function WebPhone() {
+export function WebPhone({
+  configQueryFn,
+  callsLogQueryFn,
+  iconPosition = 'bottom-right',
+  iconBackgroundColor,
+  autoOpen = false,
+}: WebPhoneProps = {}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const tonePlayerRef = useRef<TonePlayer | null>(null);
 
-  const [open, setOpen] = useState(false);
+  const cornerClass = CORNER_CLASSES[iconPosition];
+
+  const [open, setOpen] = useState(autoOpen);
   const [state, setState] = useState<PhoneLifecycle>('loading');
   const [status, setStatus] = useState('Initializing...');
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
@@ -127,7 +161,7 @@ export function WebPhone() {
 
   const { data: configResponse, error: configError, refetch } = useQuery({
     queryKey: ['webphone-config'],
-    queryFn: getWebPhoneConfig,
+    queryFn: configQueryFn ?? getWebPhoneConfig,
     enabled: open,
     retry: false,
     staleTime: Infinity,
@@ -195,10 +229,12 @@ export function WebPhone() {
         setCallState('connected');
         setStatus('On call');
         attachRemoteStream(session);
+        getEmbedBus()?.emit('call.started');
       });
 
       session.on('ended', () => {
         getTonePlayer().stop();
+        getEmbedBus()?.emit('call.ended');
         if (isCoachCallRef.current) {
           isCoachCallRef.current = false;
           setOpen(false); // Coaching finished: close the Web Phone entirely.
@@ -210,6 +246,7 @@ export function WebPhone() {
 
       session.on('failed', (event: any) => {
         getTonePlayer().stop();
+        getEmbedBus()?.emit('call.failed', { cause: event?.cause });
 
         const cause = (event?.cause ?? '').toString().toLowerCase();
         if (cause === 'busy') {
@@ -441,6 +478,45 @@ export function WebPhone() {
     }
   }, [incomingSession]);
 
+  // Embed command bus: host page -> widget. Reuses the redial queue so a `dial`
+  // command auto-places once the UA is registered. No-op in the SPA (no bus).
+  useEffect(() => {
+    const bus = getEmbedBus();
+    if (!bus) return;
+
+    bus.onCommand((name, args) => {
+      switch (name) {
+        case 'dial': {
+          const destination = String(args?.[0] ?? '').trim();
+          if (!destination) return;
+          setCoachLabel(null);
+          isCoachCallRef.current = false;
+          pendingRedialRef.current = destination;
+          setNumber(destination);
+          setActiveTab('dialer');
+          setOpen(true);
+          break;
+        }
+        case 'hangup':
+          handleHangup();
+          break;
+        case 'open':
+          setOpen(true);
+          break;
+        case 'close':
+          setOpen(false);
+          break;
+      }
+    });
+  }, [handleHangup]);
+
+  // Tell the host the widget is registered and ready to take commands.
+  useEffect(() => {
+    if (state === 'ready') {
+      getEmbedBus()?.emit('ready');
+    }
+  }, [state]);
+
   const handleAnswer = useCallback(() => {
     if (incomingSession) {
       try {
@@ -542,7 +618,8 @@ export function WebPhone() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full rounded-br-none bg-primary text-primary-foreground shadow-lg hover:scale-105 hover:shadow-xl transition-all"
+          className={`fixed ${cornerClass} z-40 flex h-16 w-16 items-center justify-center rounded-full rounded-br-none bg-primary text-primary-foreground shadow-lg hover:scale-105 hover:shadow-xl transition-all`}
+          style={iconBackgroundColor ? { backgroundColor: iconBackgroundColor } : undefined}
           aria-label="Open Web Phone"
           title="Web Phone"
         >
@@ -560,7 +637,7 @@ export function WebPhone() {
 
       {/* Bottom-right floating dialer */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border bg-background shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-4rem)]">
+        <div className={`fixed ${cornerClass} z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border bg-background shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-4rem)]`}>
             {/* Header */}
             <div className="flex items-center justify-between border-b px-5 py-3">
               <div className="min-w-0">
@@ -734,7 +811,11 @@ export function WebPhone() {
                       </div>
                     </div>
                   ) : activeTab === 'calls' ? (
-                    <CallsLogView onRedial={handleRedial} active={open && activeTab === 'calls'} />
+                    <CallsLogView
+                      onRedial={handleRedial}
+                      active={open && activeTab === 'calls'}
+                      callsLogQueryFn={callsLogQueryFn}
+                    />
                   ) : (
                     <div className="flex flex-col items-center gap-6">
                       {/* Number display */}

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, AlertTriangle, PhoneOutgoing, Clock, RotateCw } from 'lucide-react';
-import { getWebPhoneCallsLog } from '@/services/webPhone.service';
+import { getWebPhoneCallsLog, type WebPhoneCallsLogResponse } from '@/services/webPhone.service';
 import type { WebPhoneCallLogEntry } from '@/types/webPhone.types';
 
 interface CallsLogViewProps {
@@ -8,6 +8,8 @@ interface CallsLogViewProps {
   onRedial: (destination: string) => void;
   // Log is refetched whenever this becomes true (i.e. the tab is opened).
   active: boolean;
+  // Source of the calls log; embed overrides this to hit /embed/calls-log.
+  callsLogQueryFn?: () => Promise<WebPhoneCallsLogResponse>;
 }
 
 function formatWhen(iso: string): string {
@@ -21,10 +23,10 @@ function formatWhen(iso: string): string {
   });
 }
 
-export function CallsLogView({ onRedial, active }: CallsLogViewProps) {
+export function CallsLogView({ onRedial, active, callsLogQueryFn }: CallsLogViewProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['webphone-calls-log'],
-    queryFn: getWebPhoneCallsLog,
+    queryFn: callsLogQueryFn ?? getWebPhoneCallsLog,
     enabled: active,
     refetchOnMount: 'always',
     staleTime: 0,
