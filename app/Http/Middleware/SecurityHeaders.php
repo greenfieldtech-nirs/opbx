@@ -31,11 +31,19 @@ class SecurityHeaders
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
+
+        // Embedded dialer routes serve an iframe that MUST be framed by allowed
+        // third-party origins and load a widget bundle. The global CSP here
+        // (frame-ancestors 'none', X-Frame-Options: DENY, strict script-src)
+        // would break that, so EmbedDialerController owns its own headers.
+        if ($request->is('embed/*') || $request->is('embed')) {
+            return $response;
+        }
 
         // Generate CSP nonce for inline scripts (if not already set by view)
         $nonce = $request->attributes->get('csp_nonce') ?? $this->generateNonce();
