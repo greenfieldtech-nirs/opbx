@@ -111,10 +111,11 @@ class SecurityHeaders
         // Control referrer information
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // Restrict browser features and APIs
+        // Restrict browser features and APIs.
+        // microphone=(self) is required for the WebRTC Web Phone (JsSIP getUserMedia).
         $response->headers->set('Permissions-Policy', implode(', ', [
             'geolocation=()',
-            'microphone=()',
+            'microphone=(self)',
             'camera=()',
             'payment=()',
             'usb=()',

@@ -111,6 +111,12 @@ class ListValidationService
         $rowNumber = 0;
 
         while (($rowData = fgetcsv($handle, escape: '\\')) !== false) {
+            $rowData = $this->normalizeRowToUtf8($rowData);
+
+            if ($this->isBlankRow($rowData)) {
+                continue;
+            }
+
             $rowNumber++;
 
             if ($rowNumber === 1 && $hasHeader) {
@@ -178,7 +184,7 @@ class ListValidationService
                 );
             }
 
-            $headers = array_map(fn ($h) => trim((string) $h), $headers);
+            $headers = array_map(fn ($h) => trim((string) $h), $this->normalizeRowToUtf8($headers));
             $phoneColumn = $mapping['phone'] ?? null;
 
             if (empty($phoneColumn) || ! in_array($phoneColumn, $headers, true)) {
@@ -205,6 +211,12 @@ class ListValidationService
             $rowNumber = 0;
 
             while (($rowData = fgetcsv($handle, escape: '\\')) !== false) {
+                $rowData = $this->normalizeRowToUtf8($rowData);
+
+                if ($this->isBlankRow($rowData)) {
+                    continue;
+                }
+
                 $rowNumber++;
 
                 $record = $this->combineWithHeaders($headers, $rowData);
@@ -370,6 +382,66 @@ class ListValidationService
             NumberParseException::TOO_LONG => 'Phone number is too long',
             default => 'Invalid phone number format',
         };
+    }
+
+    /**
+     * Normalize a raw CSV row to valid UTF-8.
+     *
+     * CSV files exported from spreadsheet software are frequently encoded in a
+     * legacy single-byte charset (e.g. Windows-1255/1252, ISO-8859-*) rather
+     * than UTF-8. Passing such bytes through unchanged causes json_encode() to
+     * fail with "Malformed UTF-8 characters", surfacing as an HTTP 500. This
+     * detects the source encoding per field and converts it to UTF-8.
+     *
+     * @param  array<int, string|null>  $rowData
+     * @return array<int, string>
+     */
+    private function normalizeRowToUtf8(array $rowData): array
+    {
+        return array_map(function ($value): string {
+            $value = (string) $value;
+
+            // Strip a UTF-8 BOM if present (common on the first field).
+            $value = preg_replace('/^\xEF\xBB\xBF/', '', $value) ?? $value;
+
+            if ($value === '' || mb_check_encoding($value, 'UTF-8')) {
+                return $value;
+            }
+
+            // The bytes are not valid UTF-8, so the field originates from a
+            // legacy single-byte charset. mb_detect_encoding cannot reliably
+            // distinguish single-byte charsets (every byte is "valid"), so we
+            // attempt conversion from the most common CSV export encodings via
+            // iconv, which supports Windows-1255 (Hebrew) that mbstring lacks.
+            foreach (['WINDOWS-1255', 'WINDOWS-1252', 'ISO-8859-8', 'ISO-8859-1'] as $sourceEncoding) {
+                $converted = @iconv($sourceEncoding, 'UTF-8//IGNORE', $value);
+
+                if ($converted !== false && mb_check_encoding($converted, 'UTF-8')) {
+                    return $converted;
+                }
+            }
+
+            // Final safety net: drop any bytes that are still invalid so the
+            // value can always be JSON-encoded.
+            return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        }, $rowData);
+    }
+
+    /**
+     * Determine whether a CSV row is entirely blank (all fields empty after
+     * trimming). Trailing newlines in CSV files produce such phantom rows.
+     *
+     * @param  array<int, string>  $rowData
+     */
+    private function isBlankRow(array $rowData): bool
+    {
+        foreach ($rowData as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

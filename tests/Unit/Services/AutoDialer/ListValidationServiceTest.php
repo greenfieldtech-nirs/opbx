@@ -114,4 +114,69 @@ class ListValidationServiceTest extends TestCase
         $this->assertTrue($result->valid);
         $this->assertEquals('+14155551212', $result->normalizedNumber);
     }
+
+    /** @test */
+    public function it_normalizes_non_utf8_csv_preview_to_valid_utf8(): void
+    {
+        // Row containing Windows-1255 (Hebrew) encoded bytes for "אהרון".
+        $hebrewBytes = "\xE0\xE4\xF8\xE5\xEF";
+        $csv = "phone_number,description,ID\r\n+972546828882,{$hebrewBytes},303607923\r\n";
+
+        $path = $this->writeTempCsv($csv);
+
+        try {
+            $preview = $this->service->parseCsvPreview($path, true, 5);
+
+            // The preview must be JSON-encodable (the original 500 root cause).
+            $json = json_encode(['data' => $preview]);
+            $this->assertNotFalse($json, 'Preview should be JSON-encodable');
+            $this->assertSame(JSON_ERROR_NONE, json_last_error());
+
+            $this->assertSame('אהרון', $preview['rows'][0]['description']);
+            $this->assertSame('+972546828882', $preview['rows'][0]['phone_number']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /** @test */
+    public function it_skips_trailing_blank_rows_in_csv_preview(): void
+    {
+        $csv = "phone_number,description,ID\r\n+972546828882,Aaron,303607923\r\n\r\n\r\n";
+
+        $path = $this->writeTempCsv($csv);
+
+        try {
+            $preview = $this->service->parseCsvPreview($path, true, 5);
+
+            $this->assertSame(1, $preview['total_rows']);
+            $this->assertCount(1, $preview['rows']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /** @test */
+    public function it_strips_utf8_bom_from_csv_headers(): void
+    {
+        $csv = "\xEF\xBB\xBFphone_number,description\r\n+14155551212,Test\r\n";
+
+        $path = $this->writeTempCsv($csv);
+
+        try {
+            $preview = $this->service->parseCsvPreview($path, true, 5);
+
+            $this->assertSame('phone_number', $preview['headers'][0]);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    private function writeTempCsv(string $contents): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'csv_test_');
+        file_put_contents($path, $contents);
+
+        return $path;
+    }
 }

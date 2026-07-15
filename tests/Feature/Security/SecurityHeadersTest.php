@@ -128,8 +128,11 @@ class SecurityHeadersTest extends TestCase
 
         // Should restrict dangerous features
         $this->assertStringContainsString('geolocation=()', $policy);
-        $this->assertStringContainsString('microphone=()', $policy);
         $this->assertStringContainsString('camera=()', $policy);
+
+        // Microphone must be allowed for same-origin so the WebRTC Web Phone
+        // (JsSIP getUserMedia) can request audio access.
+        $this->assertStringContainsString('microphone=(self)', $policy);
     }
 
     public function test_hsts_header_in_production(): void
