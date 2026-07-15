@@ -749,11 +749,16 @@ function UsersComplete() {
                       setEmbedUser(user);
                       setShowEmbedDialog(true);
                     }}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
                     title="Embedded dialer settings"
-                    aria-label={`Embedded dialer for ${user.name}`}
+                    aria-label={`Get embed code for ${user.name}`}
                   >
-                    <Code2 className="h-4 w-4" />
+                    <Badge
+                      variant="outline"
+                      className="text-xs gap-1 cursor-pointer hover:bg-muted transition-colors"
+                    >
+                      <Code2 className="h-3 w-3" />
+                      Get Code
+                    </Badge>
                   </button>
                 )
               }] : [])

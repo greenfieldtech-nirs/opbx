@@ -34,6 +34,10 @@ class UserResource extends JsonResource
                 'provider' => $identity->provider->value,
                 'provider_email' => $identity->provider_email,
             ])->all(),
+            'extension' => $this->whenLoaded(
+                'extension',
+                fn () => $this->extension ? new ExtensionResource($this->extension) : null
+            ),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
