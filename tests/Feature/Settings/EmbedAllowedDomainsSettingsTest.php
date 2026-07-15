@@ -69,4 +69,63 @@ final class EmbedAllowedDomainsSettingsTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('embed_allowed_domains.0');
     }
+
+    /**
+     * @dataProvider validDevDomainProvider
+     */
+    public function test_dev_domains_with_localhost_ip_and_port_are_accepted(string $domain): void
+    {
+        $owner = $this->owner();
+
+        $this->actingAs($owner)
+            ->putJson('/api/v1/settings/cloudonix', $this->validPayload([
+                'embed_allowed_domains' => [$domain],
+            ]))
+            ->assertOk();
+
+        $settings = CloudonixSettings::where('organization_id', $owner->organization_id)->first();
+        $this->assertSame([$domain], $settings->embed_allowed_domains);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function validDevDomainProvider(): array
+    {
+        return [
+            'localhost' => ['localhost'],
+            'localhost with port' => ['localhost:3000'],
+            'ipv4' => ['192.168.2.240'],
+            'ipv4 with port' => ['127.0.0.1:3000'],
+            'hostname with port' => ['crm.acme.com:8443'],
+        ];
+    }
+
+    /**
+     * @dataProvider invalidDomainProvider
+     */
+    public function test_invalid_domains_are_rejected(string $domain): void
+    {
+        $owner = $this->owner();
+
+        $this->actingAs($owner)
+            ->putJson('/api/v1/settings/cloudonix', $this->validPayload([
+                'embed_allowed_domains' => [$domain],
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('embed_allowed_domains.0');
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidDomainProvider(): array
+    {
+        return [
+            'space' => ['not a domain'],
+            'scheme included' => ['http://crm.acme.com'],
+            'path included' => ['crm.acme.com/foo'],
+            'port too long' => ['localhost:123456'],
+        ];
+    }
 }

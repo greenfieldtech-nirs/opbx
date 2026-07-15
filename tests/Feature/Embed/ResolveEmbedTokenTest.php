@@ -39,4 +39,24 @@ final class ResolveEmbedTokenTest extends TestCase
         $this->assertFalse($mw->originAllowed('https://evil.com', ['crm.acme.com']));
         $this->assertFalse($mw->originAllowed('https://evil.com', []));
     }
+
+    public function test_dev_origins_with_localhost_ip_and_port_match(): void
+    {
+        // Local dev origins carry a port. A host:port allowlist entry matches
+        // the corresponding origin; a portless entry still matches any port.
+        $mw = new ResolveEmbedToken(app(EmbedTokenService::class));
+
+        $this->assertTrue($mw->originAllowed('http://localhost:3000', ['localhost:3000']));
+        $this->assertTrue($mw->originAllowed('http://localhost:3000', ['localhost']));
+        $this->assertTrue($mw->originAllowed('http://127.0.0.1:3000', ['127.0.0.1:3000']));
+        $this->assertTrue($mw->originAllowed('https://192.168.2.240', ['192.168.2.240']));
+    }
+
+    public function test_dev_origin_with_wrong_port_is_rejected(): void
+    {
+        // When the allowlist entry pins a port, a different port is refused.
+        $mw = new ResolveEmbedToken(app(EmbedTokenService::class));
+
+        $this->assertFalse($mw->originAllowed('http://localhost:4000', ['localhost:3000']));
+    }
 }

@@ -53,7 +53,7 @@ import {
     FileText,
     Shield,
     Plus,
-    Trash2,
+    X,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -72,6 +72,30 @@ const settingsSchema = z.object({
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
+
+// Accepts a bare hostname (crm.acme.com), localhost, or an IPv4 address, each
+// with an optional :port for local dev origins. Mirrors the backend regex in
+// UpdateCloudonixSettingsRequest.
+const EMBED_DOMAIN_PATTERN =
+  /^(?:(?:[a-z0-9](?:-*[a-z0-9])*)(?:\.[a-z0-9](?:-*[a-z0-9])*)+|localhost|(?:\d{1,3})(?:\.\d{1,3}){3})(?::\d{1,5})?$/i;
+
+/**
+ * Normalize user input to the stored host[:port] form: strip the scheme, any
+ * path/query, and a trailing slash, then lowercase. `http://localhost:3000/foo`
+ * becomes `localhost:3000`. Returns null if the result is not a valid entry.
+ */
+function normalizeEmbedDomain(raw: string): string | null {
+  let value = raw.trim();
+  if (!value) return null;
+
+  // Drop scheme and everything from the first path/query/hash separator.
+  value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  value = value.split(/[/?#]/)[0];
+  value = value.toLowerCase();
+
+  if (!EMBED_DOMAIN_PATTERN.test(value)) return null;
+  return value;
+}
 
 export default function Settings() {
   const { shouldHideWebhookFields } = useConfig();
@@ -290,6 +314,20 @@ export default function Settings() {
     } catch (error) {
       toast.error(`Failed to copy ${label}`);
     }
+  };
+
+  const addEmbedDomain = () => {
+    const domain = normalizeEmbedDomain(newEmbedDomain);
+    if (!domain) {
+      toast.error('Enter a valid hostname, localhost, or IP address (a port is allowed).');
+      return;
+    }
+    if (embedDomains.includes(domain)) {
+      toast.error('Domain already added');
+      return;
+    }
+    setEmbedDomains((prev) => [...prev, domain]);
+    setNewEmbedDomain('');
   };
 
 
@@ -648,9 +686,12 @@ export default function Settings() {
                   Embedded Dialer — Allowed Domains
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Websites permitted to embed the Web Phone dialer. Enter hostnames
-                  without the scheme (e.g. <code>crm.acme.com</code>). The dialer will
-                  not load on any site that is not listed here.
+                  Websites permitted to embed the Web Phone dialer (e.g.{' '}
+                  <code>crm.acme.com</code>). For local development you may also use{' '}
+                  <code>localhost</code> or an IP address, with an optional port — e.g.{' '}
+                  <code>localhost:3000</code> or <code>127.0.0.1:3000</code>. The scheme
+                  is optional and will be stripped. The dialer will not load on any site
+                  that is not listed here.
                 </p>
                 <div className="flex gap-2">
                   <Input
@@ -659,53 +700,41 @@ export default function Settings() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        const d = newEmbedDomain.trim().toLowerCase();
-                        if (!d) return;
-                        if (embedDomains.includes(d)) {
-                          toast.error('Domain already added');
-                          return;
-                        }
-                        setEmbedDomains((prev) => [...prev, d]);
-                        setNewEmbedDomain('');
+                        addEmbedDomain();
                       }
                     }}
-                    placeholder="crm.acme.com"
+                    placeholder="crm.acme.com or localhost:3000"
                     disabled={isValidating}
                   />
                   <Button
                     type="button"
                     variant="outline"
                     disabled={isValidating}
-                    onClick={() => {
-                      const d = newEmbedDomain.trim().toLowerCase();
-                      if (!d) return;
-                      if (embedDomains.includes(d)) {
-                        toast.error('Domain already added');
-                        return;
-                      }
-                      setEmbedDomains((prev) => [...prev, d]);
-                      setNewEmbedDomain('');
-                    }}
+                    onClick={addEmbedDomain}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
                 {embedDomains.length > 0 ? (
-                  <ul className="flex flex-col divide-y rounded-md border">
+                  <div className="flex flex-wrap gap-2">
                     {embedDomains.map((d) => (
-                      <li key={d} className="flex items-center justify-between px-3 py-2 text-sm">
-                        <code>{d}</code>
+                      <Badge
+                        key={d}
+                        variant="secondary"
+                        className="gap-1 pl-2.5 pr-1 py-1 font-mono text-xs font-normal"
+                      >
+                        {d}
                         <button
                           type="button"
                           onClick={() => setEmbedDomains((prev) => prev.filter((x) => x !== d))}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="rounded-full p-0.5 text-muted-foreground hover:bg-muted-foreground/20 hover:text-destructive"
                           aria-label={`Remove ${d}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <X className="h-3 w-3" />
                         </button>
-                      </li>
+                      </Badge>
                     ))}
-                  </ul>
+                  </div>
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
                     No domains yet — the embedded dialer cannot be used until you add one.

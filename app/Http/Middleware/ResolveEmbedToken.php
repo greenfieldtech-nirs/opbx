@@ -84,6 +84,23 @@ final class ResolveEmbedToken
             return false;
         }
 
-        return in_array($host, $allowedDomains, true);
+        $host = strtolower($host);
+        $port = parse_url($origin, PHP_URL_PORT);
+
+        // Match the bare host (e.g. crm.acme.com) or, for dev origins that carry
+        // a port (e.g. localhost:3000, 127.0.0.1:3000), the host:port form. Both
+        // are accepted so existing portless entries keep working.
+        $candidates = [$host];
+        if ($port !== null) {
+            $candidates[] = $host.':'.$port;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (in_array($candidate, $allowedDomains, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
