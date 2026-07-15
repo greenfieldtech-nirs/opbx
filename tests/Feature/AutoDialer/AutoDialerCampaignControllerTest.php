@@ -235,6 +235,24 @@ class AutoDialerCampaignControllerTest extends TestCase
         $this->assertEquals(10, $campaign->concurrent_active_calls);
     }
 
+    public function test_store_allows_enabled_day_with_empty_time_ranges(): void
+    {
+        $schedule = $this->validSchedule();
+        // A day may be enabled but have no active hours configured yet.
+        $schedule['saturday'] = ['enabled' => true, 'time_ranges' => []];
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload([
+                'schedule' => $schedule,
+            ]));
+
+        $response->assertCreated();
+
+        $campaign = AutoDialerCampaign::first();
+        $this->assertTrue($campaign->schedule['saturday']['enabled']);
+        $this->assertSame([], $campaign->schedule['saturday']['time_ranges']);
+    }
+
     // ==================== SHOW ====================
 
     public function test_show_returns_campaign_details(): void
@@ -311,6 +329,28 @@ class AutoDialerCampaignControllerTest extends TestCase
 
         $campaign->refresh();
         $this->assertEquals('New Name', $campaign->name);
+    }
+
+    public function test_update_allows_enabled_day_with_empty_time_ranges(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+
+        $schedule = $this->validSchedule();
+        // A day may be enabled but have no active hours configured.
+        $schedule['saturday'] = ['enabled' => true, 'time_ranges' => []];
+
+        $response = $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, [
+                'schedule' => $schedule,
+            ]);
+
+        $response->assertOk();
+
+        $campaign->refresh();
+        $this->assertTrue($campaign->schedule['saturday']['enabled']);
+        $this->assertSame([], $campaign->schedule['saturday']['time_ranges']);
     }
 
     public function test_update_returns_404_for_other_organization_campaign(): void
