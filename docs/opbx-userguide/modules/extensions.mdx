@@ -17,6 +17,7 @@ Use this module to:
 - Create and manage extension endpoints
 - Assign extensions to users
 - Configure extension-specific routing
+- Assign a default outbound caller ID per extension
 - Sync user extensions to Cloudonix as SIP subscribers
 - Reset SIP passwords
 
@@ -70,6 +71,16 @@ Extension numbers cannot be changed after creation. If you need a different numb
 Resetting the SIP password disconnects any active registrations. The SIP phone must re-register with the new credentials.
 :::
 
+### Set a Default Caller ID
+
+An extension can be assigned a **Default Caller ID** — an active DID owned by your organization that is presented when the user places an outbound call.
+
+1. Open the extension's create or edit dialog
+2. Select a DID under **Default Caller ID** (or leave it unset)
+3. Save
+
+An extension's Default Caller ID takes precedence over the caller ID configured on an [Outbound Whitelist](/modules/outbound-whitelist) rule. See the [Outbound Calling Overview](/installation/outbound-calling-overview) for the full precedence order and rationale.
+
 ### Sync to Cloudonix
 
 1. Go to **Extensions** in the sidebar
@@ -103,7 +114,10 @@ User extensions sync to Cloudonix as SIP subscribers. The sync lifecycle is:
 | `voicemail_enabled` | boolean | Only for USER type |
 | `configuration` | JSON | Type-specific config |
 | `ai_assistant_id` | FK nullable | Direct AI assistant link |
+| `default_caller_id_did_id` | FK nullable | DID presented as caller ID on outbound calls |
 | `cloudonix_subscriber_id` | string nullable | Cloudonix sync tracking |
+
+The API also returns a nested `default_caller_id` object (`id`, `phone_number`, `friendly_name`) when the relationship is loaded.
 
 ## Related API Endpoints
 
@@ -136,6 +150,7 @@ Develop a consistent numbering plan for your organization:
 ## Related Modules
 
 - [User Management](/modules/user-management) — Assign users to extensions
-- [Phone Numbers](/modules/phone-numbers) — DIDs route to extensions
+- [Phone Numbers](/modules/phone-numbers) — DIDs route to extensions and serve as caller IDs
 - [Ring Groups](/modules/ring-groups) — Extensions are ring group members
 - [AI Assistants](/modules/ai-assistants) — AI_ASSISTANT type extensions
+- [Outbound Calling Overview](/installation/outbound-calling-overview) — How the per-extension caller ID is used
