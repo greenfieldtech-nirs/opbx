@@ -434,6 +434,8 @@ Route::prefix('v1')->group(function (): void {
         // Phone Numbers (DIDs)
         // Static routes MUST be registered before the apiResource so that
         // "default-caller-id" is not captured by the {phone_number} wildcard.
+        // @deprecated org-level default caller ID — superseded by per-extension and
+        // per-whitelist default_caller_id_did_id; no longer used by voice routing.
         Route::get('phone-numbers/default-caller-id', [PhoneNumberController::class, 'getDefaultCallerId'])
             ->name('phone-numbers.default-caller-id.show');
         Route::put('phone-numbers/default-caller-id', [PhoneNumberController::class, 'setDefaultCallerId'])
