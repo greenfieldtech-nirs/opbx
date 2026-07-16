@@ -6,9 +6,14 @@ namespace App\Http\Requests\Extension;
 
 use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
+use App\Models\DidNumber;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for creating a new extension.
@@ -54,6 +59,7 @@ class StoreExtensionRequest extends FormRequest
                 'integer',
                 'exists:users,id',
             ],
+            'default_caller_id_did_id' => ['nullable', 'integer', 'exists:did_numbers,id'],
             'type' => [
                 'required',
                 new Enum(ExtensionType::class),
@@ -177,7 +183,7 @@ class StoreExtensionRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -188,11 +194,25 @@ class StoreExtensionRequest extends FormRequest
 
             // If user_id is provided, ensure it belongs to the same organization
             if ($userId) {
-                $targetUser = \App\Models\User::find($userId);
+                $targetUser = User::find($userId);
                 if ($targetUser && $targetUser->organization_id !== $user->organization_id) {
                     $validator->errors()->add(
                         'user_id',
                         'The selected user does not belong to your organization.'
+                    );
+                }
+            }
+
+            // Validate default caller ID DID belongs to same organization.
+            // DidNumber is org-scoped, so find() returns null for DIDs in other
+            // organizations even though the exists rule (raw SQL) passes.
+            $didId = $this->input('default_caller_id_did_id');
+            if ($didId) {
+                $did = DidNumber::find($didId);
+                if (! $did || $did->organization_id !== $user->organization_id) {
+                    $validator->errors()->add(
+                        'default_caller_id_did_id',
+                        'The selected caller ID does not belong to your organization.'
                     );
                 }
             }
@@ -217,7 +237,7 @@ class StoreExtensionRequest extends FormRequest
             if ($type === ExtensionType::AI_ASSISTANT->value) {
                 $aiAssistantId = $this->input('configuration.ai_assistant_id');
                 if ($aiAssistantId) {
-                    $aiAssistant = \App\Models\AiAssistant::find($aiAssistantId);
+                    $aiAssistant = AiAssistant::find($aiAssistantId);
                     if ($aiAssistant && $aiAssistant->organization_id !== $user->organization_id) {
                         $validator->errors()->add(
                             'configuration.ai_assistant_id',
@@ -231,7 +251,7 @@ class StoreExtensionRequest extends FormRequest
             if ($type === ExtensionType::AI_LOAD_BALANCER->value) {
                 $aiLoadBalancerId = $this->input('configuration.ai_load_balancer_id');
                 if ($aiLoadBalancerId) {
-                    $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::find($aiLoadBalancerId);
+                    $aiLoadBalancer = AiAssistantLoadBalancer::find($aiLoadBalancerId);
                     if ($aiLoadBalancer && $aiLoadBalancer->organization_id !== $user->organization_id) {
                         $validator->errors()->add(
                             'configuration.ai_load_balancer_id',

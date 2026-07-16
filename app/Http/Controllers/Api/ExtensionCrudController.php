@@ -136,6 +136,7 @@ class ExtensionCrudController extends AbstractApiCrudController
             Extension::DEFAULT_USER_FIELDS,
             'aiAssistant:id,organization_id,name,provider,protocol,status',
             'aiLoadBalancer:id,name,organization_id,strategy',
+            'defaultCallerId',
         ]);
     }
 
