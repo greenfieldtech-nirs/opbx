@@ -5,23 +5,58 @@ paths:
         - Supervisors
       summary: Supervisor dashboard
       description: |
-        Returns dashboard statistics scoped to the authenticated Supervisor's assigned
-        users and ring groups. Only accessible to users with the `supervisor` role.
+        Returns dashboard statistics for assigned users and ring groups. Accessible
+        to `owner`, `pbx_admin`, and `supervisor` roles
+        (`UserRole::canViewAssignedDashboard`). Supervisors receive data scoped to
+        their own assignments; Owner and PBX Admin receive an unscoped, org-wide view.
       operationId: getSupervisorDashboard
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         '200':
-          description: Supervisor-scoped dashboard data
+          description: Assigned dashboard data
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  data:
-                    type: object
-                    description: Dashboard metrics restricted to assigned resources.
+                  assigned_users_count:
+                    type: integer
+                    description: Number of users in scope.
+                  assigned_ring_groups_count:
+                    type: integer
+                    description: Number of ring groups in scope.
+                  active_calls_count:
+                    type: integer
+                    description: Number of active calls in scope.
+                  recent_calls:
+                    type: array
+                    description: Recent calls in scope.
+                    items:
+                      type: object
+                  assigned_users:
+                    type: array
+                    description: Users in scope.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        extension_number:
+                          type: string
+                  assigned_ring_groups:
+                    type: array
+                    description: Ring groups in scope.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
         '401':
           $ref: '../../openapi.yaml#/components/responses/Unauthorized'
         '403':
