@@ -99,6 +99,28 @@ properties:
         type: string
       members:
         type: array
+  default_caller_id_did_id:
+    type:
+    - integer
+    - 'null'
+    description: >-
+      ID of an active DID owned by the organization to present as the caller ID when
+      this extension places an outbound call. Takes precedence over the matched
+      outbound whitelist rule's caller ID. See the Outbound Calling Overview.
+  default_caller_id:
+    type:
+    - object
+    - 'null'
+    description: Nested DID summary, present only when the relationship is loaded.
+    properties:
+      id:
+        type: integer
+      phone_number:
+        type: string
+      friendly_name:
+        type:
+        - string
+        - 'null'
   cloudonix_synced:
     type: boolean
     description: Whether extension is synced with Cloudonix
