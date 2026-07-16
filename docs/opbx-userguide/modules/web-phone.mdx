@@ -74,8 +74,10 @@ The dialer provides an iOS-style keypad with:
 - A large number display that auto-scales for long numbers
 - Backspace
 - A green call button and a red hangup/end button
+- **Press Enter** in the number field to place the call, the same as clicking the green call button
 - Answer / reject controls for incoming calls
 - Mute, hold, and an in-call volume slider with a speaker toggle
+- A live **elapsed call timer** shown while a call is connected (`M:SS`, switching to `H:MM:SS` after one hour)
 
 A bottom tab bar (phone-app style) switches between two views:
 
@@ -107,10 +109,14 @@ for the full workflow.
 
 The **Recents** tab shows the last 50 calls the signed-in user placed from
 their own extension, newest first. Each row shows the dialed number, when the
-call was placed, its duration, and its disposition (for example `ANSWERED`).
+call was placed, its duration, and its disposition. Answered calls (disposition
+`ANSWER`) are color-coded green; all other dispositions are shown in red.
 
 Tap any row to redial: the Web Phone switches to the Keypad tab, prefills the
 number, and places the call automatically.
+
+Each calls-log entry returns the fields `to`, `session_timestamp`, `duration`,
+`duration_formatted`, and `disposition`.
 
 The log is refreshed each time the Recents tab is opened. Coaching calls
 (spy, whisper, barge) are excluded — only regular outbound calls appear. The
@@ -138,6 +144,10 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 | `display_name` | User's display name |
 | `wss_server` | WebRTC WebSocket server |
 | `websocket_port` | WebSocket port (443) |
+| `server_path` | WebSocket server path |
+| `sip_contact` | SIP contact (extension number) |
+| `profile_name` | JsSIP profile name |
+| `registration_mode` | SIP registration mode (for example `Direct`) |
 | `country` | ISO country code driving tone cadences |
 
 :::info Licensing
