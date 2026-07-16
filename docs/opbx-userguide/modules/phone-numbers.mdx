@@ -18,6 +18,7 @@ Use this module to:
 - Configure inbound call routing
 - Enable or disable numbers
 - Choose from multiple destination types
+- Use a DID as the outbound caller ID for an extension or whitelist rule
 
 ## Phone Number Format
 
@@ -97,6 +98,16 @@ Set a number to Inactive when:
 - You want to temporarily block calls
 - The number is reserved for future use
 
+## Using a DID as an Outbound Caller ID
+
+Besides receiving inbound calls, an **active** DID can be presented as the caller ID on **outbound** calls. Assign it as a Default Caller ID on an [Extension](/modules/extensions) or an [Outbound Whitelist](/modules/outbound-whitelist) rule.
+
+Only active DIDs owned by your organization can be used this way. If a DID selected as a caller ID is deactivated, outbound calls fall through to the next caller ID in the precedence order. See the [Outbound Calling Overview](/installation/outbound-calling-overview) for details.
+
+:::note
+A previous organization-wide "default caller ID" setting has been superseded by the per-extension and per-whitelist Default Caller ID. The organization-level endpoints (`GET`/`PUT /v1/phone-numbers/default-caller-id`) are deprecated and no longer consulted during call routing.
+:::
+
 ## Key Data Fields
 
 ### `did_numbers` Table
@@ -129,7 +140,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related Modules
 
-- [Extensions](/modules/extensions) — Extension routing target
+- [Extensions](/modules/extensions) — Extension routing target and per-extension caller ID
 - [Ring Groups](/modules/ring-groups) — Ring group routing target
 - [IVR Menus](/modules/ivr-menus) — IVR routing target
 - [Business Hours](/modules/business-hours) — Time-based routing target
+- [Outbound Calling Overview](/installation/outbound-calling-overview) — Using a DID as an outbound caller ID
