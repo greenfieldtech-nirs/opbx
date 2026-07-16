@@ -124,6 +124,19 @@ function numberSizeClass(len: number): string {
   return 'text-xl tracking-tight';
 }
 
+// Format elapsed call time: "M:SS" under an hour, "H:MM:SS" from an hour on.
+export function formatCallDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const seconds = s % 60;
+  const minutes = Math.floor(s / 60) % 60;
+  const hours = Math.floor(s / 3600);
+  const ss = String(seconds).padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`;
+  }
+  return `${minutes}:${ss}`;
+}
+
 export function WebPhone({
   configQueryFn,
   callsLogQueryFn,
@@ -155,9 +168,41 @@ export function WebPhone({
   const [activeTab, setActiveTab] = useState<WebPhoneTab>('dialer');
   const pendingRedialRef = useRef<string | null>(null);
 
+  // Elapsed call time (seconds), ticking from connect to disconnect.
+  const [callSeconds, setCallSeconds] = useState(0);
+  const callStartRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopCallTimer = useCallback(() => {
+    if (timerIntervalRef.current !== null) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    callStartRef.current = null;
+  }, []);
+
+  const startCallTimer = useCallback(() => {
+    stopCallTimer();
+    callStartRef.current = Date.now();
+    setCallSeconds(0);
+    // Derive from the start timestamp so it stays accurate if the tab throttles the interval.
+    timerIntervalRef.current = setInterval(() => {
+      if (callStartRef.current !== null) {
+        setCallSeconds(Math.floor((Date.now() - callStartRef.current) / 1000));
+      }
+    }, 1000);
+  }, [stopCallTimer]);
+
+  // Clear the interval if the component unmounts mid-call.
+  useEffect(() => stopCallTimer, [stopCallTimer]);
+
   // Active call = mid-call OR an incoming ringing session. While active the
   // dialer cannot be collapsed and the rest of the UI is blocked.
   const inActiveCall = callState !== 'idle' || incomingSession !== null;
+
+  // During a coaching call the header names the coaching function, e.g. "On call - Coaching: Spy".
+  const headerStatus =
+    coachLabel && callState === 'connected' ? `${status} - Coaching: ${coachLabel}` : status;
 
   const { data: configResponse, error: configError, refetch } = useQuery({
     queryKey: ['webphone-config'],
@@ -177,7 +222,8 @@ export function WebPhone({
     setIncomingNumber('');
     setCoachLabel(null);
     isCoachCallRef.current = false;
-  }, []);
+    stopCallTimer();
+  }, [stopCallTimer]);
 
   // Apply the volume slider to the remote audio element.
   useEffect(() => {
@@ -228,6 +274,7 @@ export function WebPhone({
         getTonePlayer().stop();
         setCallState('connected');
         setStatus('On call');
+        startCallTimer();
         attachRemoteStream(session);
         getEmbedBus()?.emit('call.started');
       });
@@ -235,6 +282,7 @@ export function WebPhone({
       session.on('ended', () => {
         getTonePlayer().stop();
         getEmbedBus()?.emit('call.ended');
+        stopCallTimer();
         if (isCoachCallRef.current) {
           isCoachCallRef.current = false;
           setOpen(false); // Coaching finished: close the Web Phone entirely.
@@ -247,6 +295,7 @@ export function WebPhone({
       session.on('failed', (event: any) => {
         getTonePlayer().stop();
         getEmbedBus()?.emit('call.failed', { cause: event?.cause });
+        stopCallTimer();
 
         const cause = (event?.cause ?? '').toString().toLowerCase();
         if (cause === 'busy') {
@@ -270,7 +319,7 @@ export function WebPhone({
       session.on('muted', () => setIsMuted(true));
       session.on('unmuted', () => setIsMuted(false));
     },
-    [attachRemoteStream, config, getTonePlayer, resetCallState]
+    [attachRemoteStream, config, getTonePlayer, resetCallState, startCallTimer, stopCallTimer]
   );
 
   useEffect(() => {
@@ -645,7 +694,7 @@ export function WebPhone({
                   <Phone className="h-4 w-4" />
                   Web Phone
                 </div>
-                <p className="truncate text-xs text-muted-foreground">{status}</p>
+                <p className="truncate text-xs text-muted-foreground">{headerStatus}</p>
               </div>
               <button
                 type="button"
@@ -659,7 +708,9 @@ export function WebPhone({
               </button>
             </div>
 
-            <div className="flex flex-col p-6 gap-4 min-h-0 overflow-y-auto">
+            {/* ponytail: fixed height pinned to the dial-pad view (tallest view) so the panel never
+                resizes between views; re-measure if the keypad layout changes. */}
+            <div className="flex flex-col p-6 gap-4 h-[556px] overflow-y-auto">
               {state === 'loading' && (
                 <div className="flex flex-col items-center justify-center gap-3 py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -733,12 +784,19 @@ export function WebPhone({
                       <div className="text-center space-y-2">
                         {coachLabel ? (
                           // Coaching: show only the function name, never the raw sentinel destination.
-                          <p className={`font-medium px-4 ${numberSizeClass(coachLabel.length)}`}>
-                            {coachLabel}
-                          </p>
+                          <>
+                            <p className={`font-medium px-4 ${numberSizeClass(coachLabel.length)}`}>
+                              {coachLabel}
+                            </p>
+                            <p className="text-sm text-muted-foreground tabular-nums">
+                              {formatCallDuration(callSeconds)}
+                            </p>
+                          </>
                         ) : (
                           <>
-                            <p className="text-sm text-muted-foreground">{status}</p>
+                            <p className="text-sm text-muted-foreground tabular-nums">
+                              {formatCallDuration(callSeconds)}
+                            </p>
                             <p className={`font-medium break-all px-4 ${numberSizeClass(number.length)}`}>
                               {number || ' '}
                             </p>
