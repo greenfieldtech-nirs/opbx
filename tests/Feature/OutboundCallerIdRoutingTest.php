@@ -19,7 +19,7 @@ use Tests\TestCase;
 
 /**
  * Integration test for the outbound (subscriber-direction) caller-ID precedence:
- * extension's selected DID -> whitelist rule's selected DID -> "00000000".
+ * extension's selected DID -> whitelist rule's selected DID -> "Unknown".
  */
 class OutboundCallerIdRoutingTest extends TestCase
 {
@@ -127,7 +127,7 @@ class OutboundCallerIdRoutingTest extends TestCase
         $content = $this->handle($this->outboundRequest('+15551234567', '1001'));
 
         $this->assertStringContainsString('<Dial', $content);
-        $this->assertStringContainsString('callerId="00000000"', $content);
+        $this->assertStringContainsString('callerId="Unknown"', $content);
         $this->assertStringContainsString('trunks="trunk-us"', $content);
         $this->assertStringNotContainsString('callerName=', $content);
     }

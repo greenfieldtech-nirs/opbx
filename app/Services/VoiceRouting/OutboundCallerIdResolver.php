@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  * Resolution order:
  *   1. The from-extension's selected default caller ID DID (active).
  *   2. The matched whitelist rule's selected default caller ID DID (active).
- *   3. The literal "00000000" — no caller ID configured anywhere.
+ *   3. The literal "Unknown" — no caller ID configured anywhere.
  *
  * Runs outside an authenticated tenant context (voice routing webhooks), so all
  * queries bypass OrganizationScope and filter by organization_id explicitly,
@@ -31,7 +31,8 @@ final class OutboundCallerIdResolver
     /**
      * Fallback caller ID presented when nothing is configured.
      */
-    public const NO_CALLER_ID = '00000000';
+    // ponytail: "Unknown" not "00000000" — some carriers reject the all-zeros number.
+    public const NO_CALLER_ID = 'Unknown';
 
     /**
      * Resolve the caller ID and caller name to present for an outbound call.

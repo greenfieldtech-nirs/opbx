@@ -87,7 +87,7 @@ class OutboundCallerIdResolverTest extends TestCase
 
         $result = $this->resolver->resolve($extension, $whitelist, $this->organization->id);
 
-        $this->assertSame('00000000', $result['callerId']);
+        $this->assertSame('Unknown', $result['callerId']);
         $this->assertNull($result['callerName']);
     }
 
@@ -111,7 +111,7 @@ class OutboundCallerIdResolverTest extends TestCase
 
         $result = $this->resolver->resolve($extension, $whitelist, $this->organization->id);
 
-        $this->assertSame('00000000', $result['callerId']);
+        $this->assertSame('Unknown', $result['callerId']);
     }
 
     public function test_ignores_did_from_another_org(): void
@@ -129,6 +129,6 @@ class OutboundCallerIdResolverTest extends TestCase
 
         $result = $this->resolver->resolve($extension, $whitelist, $this->organization->id);
 
-        $this->assertSame('00000000', $result['callerId']);
+        $this->assertSame('Unknown', $result['callerId']);
     }
 }

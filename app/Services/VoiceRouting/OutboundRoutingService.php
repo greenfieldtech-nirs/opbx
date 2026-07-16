@@ -120,7 +120,7 @@ class OutboundRoutingService
         ]);
 
         // Resolve the outbound caller ID to present.
-        // Precedence: extension's selected DID -> whitelist rule's selected DID -> "00000000".
+        // Precedence: extension's selected DID -> whitelist rule's selected DID -> "Unknown".
         // ponytail: callerName always null now, kept for the simpleDial() signature.
         $resolved = $this->callerIdResolver->resolve($fromExtension, $whitelistEntry, $orgId);
 
