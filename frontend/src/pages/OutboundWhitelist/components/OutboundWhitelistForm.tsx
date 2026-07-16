@@ -18,12 +18,14 @@ import { RefreshCw } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import type { CloudonixTrunk } from '@/services/settings.service';
+import type { DIDNumber } from '@/types';
 
 interface FormData {
   name: string;
   destination_country: string;
   destination_prefix?: string;
   outbound_trunk_name: string;
+  default_caller_id_did_id: string;
 }
 
 interface OutboundWhitelistFormProps {
@@ -32,6 +34,7 @@ interface OutboundWhitelistFormProps {
   countryOptions: Array<{ value: string; label: string }>;
   trunks: CloudonixTrunk[];
   trunksLoading: boolean;
+  activeDids: DIDNumber[];
   onChange: (data: FormData) => void;
   onRefreshTrunks: () => void;
 }
@@ -42,6 +45,7 @@ export function OutboundWhitelistForm({
   countryOptions,
   trunks,
   trunksLoading,
+  activeDids,
   onChange,
   onRefreshTrunks,
 }: OutboundWhitelistFormProps) {
@@ -136,6 +140,31 @@ export function OutboundWhitelistForm({
         {formErrors.outbound_trunk_name && (
           <p className="text-sm text-destructive mt-1">{formErrors.outbound_trunk_name}</p>
         )}
+      </div>
+
+      <div>
+        <Label htmlFor="default_caller_id_did_id">Default Caller ID</Label>
+        <Select
+          value={formData.default_caller_id_did_id || 'none'}
+          onValueChange={(value) =>
+            onChange({ ...formData, default_caller_id_did_id: value === 'none' ? '' : value })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="None" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {activeDids.map((did) => (
+              <SelectItem key={did.id} value={String(did.id)}>
+                {did.friendly_name ? `${did.friendly_name} (${did.phone_number})` : did.phone_number}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-1">
+          Phone number presented as the caller ID for outbound calls matching this rule.
+        </p>
       </div>
     </div>
   );

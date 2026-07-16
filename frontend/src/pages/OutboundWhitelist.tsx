@@ -48,16 +48,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { outboundWhitelistService } from '@/services/outboundWhitelist.service';
+import { phoneNumbersService } from '@/services/createResourceService';
 import { settingsService, type CloudonixTrunk } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
 import { OutboundWhitelistForm } from './OutboundWhitelist/components/OutboundWhitelistForm';
-import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest } from '@/types';
+import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest, DIDNumber } from '@/types';
 
 type WhitelistFormData = {
   name: string;
   destination_country: string;
   destination_prefix?: string;
   outbound_trunk_name: string;
+  default_caller_id_did_id: string;
 };
 
 const emptyFormData: WhitelistFormData = {
@@ -65,6 +67,7 @@ const emptyFormData: WhitelistFormData = {
   destination_country: '',
   destination_prefix: '',
   outbound_trunk_name: '',
+  default_caller_id_did_id: '',
 };
 
 const OutboundWhitelistPage: React.FC = () => {
@@ -121,7 +124,12 @@ const OutboundWhitelistPage: React.FC = () => {
     queryFn: () => settingsService.getOutboundTrunks(),
   });
 
-
+  // Fetch active DIDs for Default Caller ID selector
+  const { data: didsData } = useQuery({
+    queryKey: ['phone-numbers', 'active-for-caller-id'],
+    queryFn: () => phoneNumbersService.getAll({ status: 'active' }),
+  });
+  const activeDids: DIDNumber[] = didsData?.data ?? [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -205,6 +213,10 @@ const OutboundWhitelistPage: React.FC = () => {
     e.preventDefault();
     setFormErrors({});
 
+    const defaultCallerIdDidId = formData.default_caller_id_did_id
+      ? parseInt(formData.default_caller_id_did_id, 10)
+      : null;
+
     if (editingItem) {
       updateMutation.mutate({
         id: editingItem.id,
@@ -213,6 +225,7 @@ const OutboundWhitelistPage: React.FC = () => {
           destination_country: formData.destination_country,
           destination_prefix: formData.destination_prefix || undefined,
           outbound_trunk_name: formData.outbound_trunk_name,
+          default_caller_id_did_id: defaultCallerIdDidId,
         },
       });
     } else {
@@ -221,6 +234,7 @@ const OutboundWhitelistPage: React.FC = () => {
         destination_country: formData.destination_country,
         destination_prefix: formData.destination_prefix || undefined,
         outbound_trunk_name: formData.outbound_trunk_name,
+        default_caller_id_did_id: defaultCallerIdDidId,
       });
     }
   };
@@ -242,6 +256,7 @@ const OutboundWhitelistPage: React.FC = () => {
       destination_country: item.destination_country,
       destination_prefix: prefix,
       outbound_trunk_name: item.outbound_trunk_name,
+      default_caller_id_did_id: item.default_caller_id_did_id != null ? String(item.default_caller_id_did_id) : '',
     });
     setIsEditDialogOpen(true);
   };
@@ -502,6 +517,7 @@ const OutboundWhitelistPage: React.FC = () => {
               countryOptions={countryOptions}
               trunks={trunks}
               trunksLoading={trunksLoading}
+              activeDids={activeDids}
               onChange={setFormData}
               onRefreshTrunks={refetchTrunks}
             />
@@ -537,6 +553,7 @@ const OutboundWhitelistPage: React.FC = () => {
               countryOptions={countryOptions}
               trunks={trunks}
               trunksLoading={trunksLoading}
+              activeDids={activeDids}
               onChange={setFormData}
               onRefreshTrunks={refetchTrunks}
             />
