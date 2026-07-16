@@ -96,4 +96,30 @@ class ExtensionDefaultCallerIdTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors('default_caller_id_did_id');
     }
+
+    public function test_index_serializes_nested_default_caller_id(): void
+    {
+        $did = DidNumber::factory()->create([
+            'organization_id' => $this->organization->id,
+            'phone_number' => '+15557778888',
+            'friendly_name' => 'Main Line',
+            'routing_type' => 'ring_group',
+            'routing_config' => ['ring_group_id' => 1],
+            'status' => 'active',
+        ]);
+
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'default_caller_id_did_id' => $did->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/extensions');
+
+        $response->assertOk();
+        $response->assertJsonFragment(['default_caller_id' => [
+            'id' => $did->id,
+            'phone_number' => '+15557778888',
+            'friendly_name' => 'Main Line',
+        ]]);
+    }
 }
