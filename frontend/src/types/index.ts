@@ -138,8 +138,14 @@ export interface Extension {
   voicemail_pin?: string;
   call_forwarding_enabled: boolean;
   call_forwarding_number?: string;
+  default_caller_id_did_id: number | null;
   configuration?: Record<string, any>;
   // Eager loaded relationships
+  default_caller_id?: {
+    id: number;
+    phone_number: string;
+    friendly_name: string | null;
+  } | null;
   user?: User | null;
   ai_assistant?: {
     id: number;
@@ -500,6 +506,7 @@ export interface CreateExtensionRequest {
   user_id?: string | null;
   status?: Status;
   voicemail_enabled?: boolean;
+  default_caller_id_did_id?: number | null;
   configuration?: Record<string, any>;
 }
 
@@ -508,6 +515,7 @@ export interface UpdateExtensionRequest {
   status?: Status;
   user_id?: string | null;
   voicemail_enabled?: boolean;
+  default_caller_id_did_id?: number | null;
   configuration?: Record<string, any>;
 }
 
@@ -978,6 +986,12 @@ export interface OutboundWhitelist {
   destination_prefix?: string;
   outbound_trunk_name: string;
   status: Status;
+  default_caller_id_did_id: number | null;
+  default_caller_id?: {
+    id: number;
+    phone_number: string;
+    friendly_name: string | null;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -987,6 +1001,7 @@ export interface CreateOutboundWhitelistRequest {
   destination_country: string;
   destination_prefix?: string;
   outbound_trunk_name: string;
+  default_caller_id_did_id?: number | null;
 }
 
 export interface UpdateOutboundWhitelistRequest {
@@ -994,6 +1009,7 @@ export interface UpdateOutboundWhitelistRequest {
   destination_country?: string;
   destination_prefix?: string;
   outbound_trunk_name?: string;
+  default_caller_id_did_id?: number | null;
 }
 
 export interface OutboundWhitelistFilterParams extends PaginationParams {
