@@ -892,6 +892,13 @@ export function WebPhone({
                               type="text"
                               value={number}
                               onChange={(e) => setNumber(e.target.value)}
+                              onKeyDown={(e) => {
+                                // Enter dials, mirroring the green call button's guards.
+                                if (e.key === 'Enter' && callState === 'idle' && number) {
+                                  e.preventDefault();
+                                  handleCall();
+                                }
+                              }}
                               className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-none focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
                               aria-label="Phone number"
                             />
