@@ -112,7 +112,7 @@ class UpdateOutboundWhitelistRequest extends FormRequest
         }
 
         // Normalize destination_prefix by removing extra spaces
-        if ($this->has('destination_prefix')) {
+        if ($this->filled('destination_prefix')) {
             $prefix = $this->input('destination_prefix');
             $this->merge([
                 'destination_prefix' => trim(preg_replace('/\s+/', ' ', $prefix)),

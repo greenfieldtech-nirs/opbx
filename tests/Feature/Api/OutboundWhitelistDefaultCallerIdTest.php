@@ -102,6 +102,45 @@ class OutboundWhitelistDefaultCallerIdTest extends TestCase
         $response->assertJsonValidationErrors('default_caller_id_did_id');
     }
 
+    public function test_create_accepts_explicit_null_destination_prefix(): void
+    {
+        $response = $this->postJson('/api/v1/outbound-whitelist', [
+            'name' => 'US no prefix',
+            'destination_country' => 'US',
+            'destination_prefix' => null,
+            'outbound_trunk_name' => 'trunk-a',
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('outbound_whitelists', [
+            'name' => 'US no prefix',
+            'destination_prefix' => null,
+        ]);
+    }
+
+    public function test_update_accepts_explicit_null_destination_prefix(): void
+    {
+        $entry = OutboundWhitelist::factory()->create([
+            'organization_id' => $this->organization->id,
+            'destination_country' => 'FR',
+            'destination_prefix' => '33',
+            'outbound_trunk_name' => 'trunk-a',
+        ]);
+
+        $response = $this->putJson("/api/v1/outbound-whitelist/{$entry->id}", [
+            'name' => $entry->name,
+            'destination_country' => $entry->destination_country,
+            'destination_prefix' => null,
+            'outbound_trunk_name' => $entry->outbound_trunk_name,
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('outbound_whitelists', [
+            'id' => $entry->id,
+            'destination_prefix' => null,
+        ]);
+    }
+
     public function test_index_serializes_nested_default_caller_id(): void
     {
         $did = $this->did($this->organization->id, '+15557778888', 'Main Line');
