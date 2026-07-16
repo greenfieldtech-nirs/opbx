@@ -13,7 +13,45 @@ paths:
           in: path
           required: true
           schema:
-            type: string
+            type: integer
       responses:
         '200':
           description: Session details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: integer
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            event_id:
+                              type: string
+                            status:
+                              type: string
+                            action:
+                              type: string
+                            reason:
+                              type: string
+                            created_at:
+                              type: string
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  session_id:
+                    type: integer
