@@ -1,5 +1,5 @@
 type: object
-description: Outbound Whitelist entry
+description: Outbound Whitelist entry. Authorizes outbound calls to a destination country/prefix over a named trunk, and optionally sets the caller ID presented on matching calls.
 properties:
   id:
     type: integer
@@ -7,17 +7,43 @@ properties:
     type: integer
   name:
     type: string
-    example: Allowed Destinations
-  pattern:
+    example: US Long Distance
+  destination_country:
     type: string
-    example: ^\+1[0-9]{10}$
-  description:
+    description: Destination country. Unique within the organization.
+    example: US
+  destination_prefix:
     type:
     - string
     - 'null'
-  priority:
-    type: integer
-    default: 0
+    description: Optional additional dialing prefix. Digits, spaces, '+' and '-' only; max 12 characters.
+    example: '1'
+  outbound_trunk_name:
+    type: string
+    description: Name of the Cloudonix outbound trunk used to place matching calls.
+    example: primary-trunk
+  default_caller_id_did_id:
+    type:
+    - integer
+    - 'null'
+    description: >-
+      ID of an active DID owned by the organization to present as the caller ID on
+      outbound calls matching this rule. Overridden by the calling extension's own
+      default caller ID when set. See the Outbound Calling Overview in the user guide.
+  default_caller_id:
+    type:
+    - object
+    - 'null'
+    description: Nested DID summary, present only when the relationship is loaded.
+    properties:
+      id:
+        type: integer
+      phone_number:
+        type: string
+      friendly_name:
+        type:
+        - string
+        - 'null'
   status:
     type: string
     enum:
@@ -33,5 +59,6 @@ required:
 - id
 - organization_id
 - name
-- pattern
+- destination_country
+- outbound_trunk_name
 - status
