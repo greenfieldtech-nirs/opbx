@@ -13,7 +13,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
+import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService, phoneNumbersService } from '@/services/createResourceService';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -102,7 +102,8 @@ import type {
   CreateExtensionRequest,
   UpdateExtensionRequest,
   RingGroupMember,
-  IvrMenuOption
+  IvrMenuOption,
+  DIDNumber
 } from '@/types';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 import { DestinationTypeAndSelector } from '@/components/destinations';
@@ -139,6 +140,8 @@ interface ExtensionFormData {
   container_block_name: string;
   // Forward
   forward_to: string;
+  // Default Caller ID
+  default_caller_id_did_id: string;
 }
 
 
@@ -255,6 +258,7 @@ export default function ExtensionsComplete() {
     container_application_name: '',
     container_block_name: '',
     forward_to: '',
+    default_caller_id_did_id: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -308,6 +312,13 @@ export default function ExtensionsComplete() {
   });
 
   const aiProviders = aiProvidersData?.data?.providers || [];
+
+  // Fetch active DIDs for Default Caller ID selector
+  const { data: didsData } = useQuery({
+    queryKey: ['phone-numbers', 'active-for-caller-id'],
+    queryFn: () => phoneNumbersService.getAll({ status: 'active' }),
+  });
+  const activeDids: DIDNumber[] = didsData?.data ?? [];
 
   // Create mutation
   const createMutation = useMutation({
@@ -827,6 +838,10 @@ export default function ExtensionsComplete() {
       }
     }
 
+    createData.default_caller_id_did_id = formData.default_caller_id_did_id
+      ? parseInt(formData.default_caller_id_did_id, 10)
+      : null;
+
     createMutation.mutate(createData, {
       onSuccess: () => {
         setShowCreateDialog(false);
@@ -912,6 +927,10 @@ export default function ExtensionsComplete() {
       }
     }
 
+    updateData.default_caller_id_did_id = formData.default_caller_id_did_id
+      ? parseInt(formData.default_caller_id_did_id, 10)
+      : null;
+
     updateMutation.mutate(
       { id: selectedExtension.id, data: updateData },
       {
@@ -965,6 +984,7 @@ export default function ExtensionsComplete() {
       container_application_name: '',
       container_block_name: '',
       forward_to: '',
+      default_caller_id_did_id: '',
     });
     setFormErrors({});
   };
@@ -1073,6 +1093,7 @@ export default function ExtensionsComplete() {
       container_application_name: (typeof config === 'object' && config?.container_application_name) ? config.container_application_name : '',
       container_block_name: (typeof config === 'object' && config?.container_block_name) ? config.container_block_name : '',
       forward_to: (typeof config === 'object' && config?.forward_to) ? config.forward_to : '',
+      default_caller_id_did_id: extension.default_caller_id_did_id != null ? String(extension.default_caller_id_did_id) : '',
     });
     setShowEditDialog(true);
   };
@@ -1480,6 +1501,35 @@ export default function ExtensionsComplete() {
             {formErrors.ai_assistant_id && <p className="text-sm text-destructive">{formErrors.ai_assistant_id}</p>}
             {formErrors.ai_load_balancer_id && <p className="text-sm text-destructive">{formErrors.ai_load_balancer_id}</p>}
             {formErrors.forward_to && <p className="text-sm text-destructive">{formErrors.forward_to}</p>}
+
+            {/* Default Caller ID (outbound calls) */}
+            <div className="space-y-2">
+              <Label htmlFor="default_caller_id_did_id">Default Caller ID</Label>
+              <Select
+                value={formData.default_caller_id_did_id || 'none'}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    default_caller_id_did_id: value === 'none' ? '' : value,
+                  })
+                }
+              >
+                <SelectTrigger id="default_caller_id_did_id">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {activeDids.map((did) => (
+                    <SelectItem key={did.id} value={String(did.id)}>
+                      {did.friendly_name ? `${did.friendly_name} (${did.phone_number})` : did.phone_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Phone number presented as the caller ID for outbound calls placed from this extension.
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
@@ -1534,6 +1584,35 @@ export default function ExtensionsComplete() {
               layout="vertical"
               disabled={currentUser?.role === 'pbx_user'}
             />
+
+            {/* Default Caller ID (outbound calls) */}
+            <div className="space-y-2">
+              <Label htmlFor="edit_default_caller_id_did_id">Default Caller ID</Label>
+              <Select
+                value={formData.default_caller_id_did_id || 'none'}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    default_caller_id_did_id: value === 'none' ? '' : value,
+                  })
+                }
+              >
+                <SelectTrigger id="edit_default_caller_id_did_id">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {activeDids.map((did) => (
+                    <SelectItem key={did.id} value={String(did.id)}>
+                      {did.friendly_name ? `${did.friendly_name} (${did.phone_number})` : did.phone_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Phone number presented as the caller ID for outbound calls placed from this extension.
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
