@@ -29,6 +29,7 @@ class OutboundWhitelist extends Model
         'destination_prefix',
         'outbound_trunk_name',
         'status',
+        'default_caller_id_did_id',
     ];
 
     /**
@@ -49,6 +50,14 @@ class OutboundWhitelist extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Get the DID selected as this whitelist rule's outbound caller ID.
+     */
+    public function defaultCallerId(): BelongsTo
+    {
+        return $this->belongsTo(DidNumber::class, 'default_caller_id_did_id');
     }
 
     /**

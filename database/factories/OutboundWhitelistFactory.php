@@ -33,6 +33,7 @@ class OutboundWhitelistFactory extends Factory
             'destination_country' => $this->faker->country(),
             'destination_prefix' => $this->faker->numerify('+##########'),
             'outbound_trunk_name' => $this->faker->word(),
+            'default_caller_id_did_id' => null,
         ];
     }
 
