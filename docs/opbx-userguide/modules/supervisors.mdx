@@ -27,13 +27,16 @@ Use the Supervisor role to:
 hierarchy. Unlike a Reporter (who can see all organization data read-only), a
 Supervisor sees **only** the users and ring groups assigned to them.
 
+The valid OPBX roles are: `owner`, `pbx_admin`, `pbx_user`, `reporter`, and
+`supervisor`. There is no bare `admin` role.
+
 | Capability | Supervisor |
 |------------|-----------|
 | View Dashboard (scoped) | Yes |
 | View Live Calls (assigned only) | Yes |
 | View Call Logs (assigned only) | Yes |
 | Coach live calls (spy/whisper/barge) | Yes, for assigned calls |
-| Disconnect an individual call | Yes |
+| Disconnect an individual call | No — Owner only |
 | Use the [Web Phone](/modules/web-phone) | Yes |
 | Manage users, extensions, ring groups | No |
 | Export call logs or CDRs | No |
@@ -44,6 +47,12 @@ Supervisor sees **only** the users and ring groups assigned to them.
 Every supervisor-scoped endpoint enforces both tenant isolation (organization
 scope) and assignment scope. A Supervisor requesting data outside their assigned
 users/ring groups receives an empty result or a `403`.
+:::
+
+:::note Disconnecting active calls
+Disconnecting an individual active call requires the **Owner** role
+(`SessionUpdatePolicy::disconnect` → `canManageOrganization`, which is owner
+only). Supervisors and PBX Admins cannot disconnect calls.
 :::
 
 ## What a Supervisor Sees
@@ -86,16 +95,18 @@ You can also change any existing user's role to **Supervisor** from the
 
 1. On the **Supervisors** page, click a supervisor's row (or the status badge)
 2. In the **Assignment** dialog, use the two side-by-side multi-select boxes:
-   - **Left** — PBX Users this supervisor may monitor (Ctrl/Cmd or Shift to multi-select)
+   - **Left** — users this supervisor may monitor (Ctrl/Cmd or Shift to multi-select)
    - **Right** — ring groups this supervisor may monitor
 3. Click **Save Assignments**
 
 Saving replaces the supervisor's assignments with the current selection.
 
 :::warning Assignment rules
-- Only users with the **PBX User** role can be supervised.
-- A Supervisor cannot be assigned to themselves or to another Supervisor.
-- All assigned users and ring groups must belong to the same organization.
+- Assigned users and ring groups must belong to the same organization.
+- A Supervisor cannot be assigned to themselves.
+- Another Supervisor cannot be assigned as a supervised user.
+- There is no role restriction on supervised users — any organization user
+  (other than the supervisor themselves or another supervisor) may be assigned.
 :::
 
 ## Coaching Supervised Calls
