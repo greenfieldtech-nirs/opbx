@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\OutboundWhitelist;
 
-use App\Models\OutboundWhitelist;
+use App\Models\DidNumber;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,8 +14,6 @@ use Illuminate\Validation\Rule;
  */
 class StoreOutboundWhitelistRequest extends FormRequest
 {
-
-
     /**
      * Get the validation rules that apply to the request.
      *
@@ -50,7 +49,31 @@ class StoreOutboundWhitelistRequest extends FormRequest
                 'string',
                 'max:255',
             ],
+            'default_caller_id_did_id' => [
+                'nullable',
+                'integer',
+                'exists:did_numbers,id',
+            ],
         ];
+    }
+
+    /**
+     * Configure the validator instance.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $didId = $this->input('default_caller_id_did_id');
+            if ($didId) {
+                $did = DidNumber::find($didId);
+                if (! $did || $did->organization_id !== $this->user()->organization_id) {
+                    $validator->errors()->add(
+                        'default_caller_id_did_id',
+                        'The selected caller ID does not belong to your organization.'
+                    );
+                }
+            }
+        });
     }
 
     /**
@@ -75,8 +98,6 @@ class StoreOutboundWhitelistRequest extends FormRequest
 
     /**
      * Prepare the data for validation.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {

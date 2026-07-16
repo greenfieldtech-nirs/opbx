@@ -119,7 +119,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
 
         // Build query
         $modelClass = $this->getModelClass();
-        $query = $modelClass::query()->forOrganization($user->organization_id);
+        $query = $modelClass::query()->forOrganization($user->organization_id)->with('defaultCallerId');
 
         // Apply custom filters
         $this->applyCustomFilters($query, $request);
