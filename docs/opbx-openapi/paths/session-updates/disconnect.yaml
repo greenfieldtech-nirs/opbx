@@ -4,6 +4,10 @@ paths:
       tags:
         - Session Updates
       summary: Disconnect session
+      description: |
+        Disconnects an active call. Owner only
+        (`SessionUpdatePolicy::disconnect`). Supervisors and PBX Admins cannot
+        disconnect calls.
       operationId: disconnectSession
       security:
         - bearerAuth: []
@@ -13,7 +17,48 @@ paths:
           in: path
           required: true
           schema:
-            type: string
+            type: integer
       responses:
         '200':
           description: Session disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+        '400':
+          description: Dial token not available
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          description: Insufficient permissions (Owner role required)
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  session_id:
+                    type: integer
+        '500':
+          description: Cloudonix configuration or API error
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
