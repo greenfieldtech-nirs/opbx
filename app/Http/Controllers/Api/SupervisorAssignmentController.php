@@ -42,7 +42,7 @@ final class SupervisorAssignmentController extends Controller
         $organizationId = $user->organization_id;
 
         $this->validateResourcesBelongToOrganization($userIds, $ringGroupIds, $organizationId);
-        $this->validateNoSupervisorUsers($userIds, $user->id);
+        $this->validateSupervisableUsers($userIds, $user->id);
 
         DB::transaction(function () use ($user, $userIds, $ringGroupIds, $organizationId): void {
             $user->supervisedUsers()->detach();
@@ -85,18 +85,27 @@ final class SupervisorAssignmentController extends Controller
         }
     }
 
-    private function validateNoSupervisorUsers(array $userIds, int $supervisorId): void
+    /**
+     * Only PBX Users may be supervised. Owner, PBX Admin, Reporter, and Supervisor
+     * roles are all rejected (the supervisor themselves is a Supervisor, so the
+     * self-assignment case is covered here too, but is reported with a clearer message).
+     */
+    private function validateSupervisableUsers(array $userIds, int $supervisorId): void
     {
         if (in_array($supervisorId, $userIds, true)) {
             abort(422, 'A Supervisor cannot be assigned to themselves.');
         }
 
-        $supervisorCount = User::whereIn('id', $userIds)
-            ->where('role', UserRole::SUPERVISOR)
+        if (count($userIds) === 0) {
+            return;
+        }
+
+        $nonPbxUserCount = User::whereIn('id', $userIds)
+            ->where('role', '!=', UserRole::PBX_USER)
             ->count();
 
-        if ($supervisorCount > 0) {
-            abort(422, 'A Supervisor cannot be assigned to another Supervisor.');
+        if ($nonPbxUserCount > 0) {
+            abort(422, 'Only PBX Users can be assigned as supervised users.');
         }
     }
 }
