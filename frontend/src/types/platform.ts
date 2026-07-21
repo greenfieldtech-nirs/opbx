@@ -28,6 +28,19 @@ export interface PlatformOrganizationDetail extends PlatformOrganization {
   business_hours_count: number;
 }
 
+export interface ImpersonationResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  impersonating: boolean;
+  organization: {
+    id: number | string;
+    name: string;
+    slug: string;
+    status: string;
+  };
+}
+
 export interface PlatformUser {
   id: string;
   organization_id: string;

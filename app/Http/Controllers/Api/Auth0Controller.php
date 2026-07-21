@@ -13,6 +13,7 @@ use App\Scopes\OrganizationScope;
 use App\Services\Auth0\Auth0AccountResolver;
 use App\Services\Auth0\Auth0Config;
 use App\Services\Auth0\Auth0Service;
+use App\Support\TokenAbilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -268,65 +269,6 @@ class Auth0Controller extends Controller
      */
     private function getTokenAbilities(User $user): array
     {
-        $abilities = match ($user->role->value) {
-            'owner' => [
-                'extension:*',
-                'user:*',
-                'ring-group:*',
-                'did-number:*',
-                'recording:*',
-                'settings:*',
-                'business-hours:*',
-                'conference:*',
-                'ivr:*',
-                'voice-agent:*',
-                'call-log:*',
-                'outbound-whitelist:*',
-                'recording-download:*',
-            ],
-            'pbx_admin' => [
-                'extension:*',
-                'user:read',
-                'user:update',
-                'ring-group:*',
-                'did-number:*',
-                'recording:read',
-                'business-hours:*',
-                'conference:*',
-                'ivr:*',
-                'call-log:*',
-            ],
-            'pbx_user' => [
-                'extension:read',
-                'extension:update:own',
-                'user:read',
-                'ring-group:read',
-                'did-number:read',
-                'recording:read',
-                'call-log:read',
-            ],
-            'reporter' => [
-                'extension:read',
-                'user:read',
-                'ring-group:read',
-                'did-number:read',
-                'recording:read',
-                'call-log:read',
-                'business-hours:read',
-            ],
-            default => [],
-        };
-
-        if ($user->is_platform_manager) {
-            $abilities = array_merge($abilities, [
-                'platform:read',
-                'platform:write',
-                'platform:manage-users',
-                'platform:manage-organizations',
-                'platform:audit-logs',
-            ]);
-        }
-
-        return $abilities;
+        return TokenAbilities::forRole($user->role, (bool) $user->is_platform_manager);
     }
 }

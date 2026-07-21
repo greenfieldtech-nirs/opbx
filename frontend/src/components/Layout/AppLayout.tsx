@@ -11,6 +11,7 @@ import { useEchoConnection } from '@/hooks/useEchoConnection';
 import { RefreshTimerProvider, useRefreshTimerState } from '@/context/RefreshTimerContext';
 import { RefreshTimer } from '@/components/design-system';
 import { WebPhone } from '@/components/WebPhone/WebPhone';
+import { ImpersonationBanner } from '@/components/impersonation/ImpersonationBanner';
 
 function RefreshTimerBar() {
   const { state } = useRefreshTimerState();
@@ -40,6 +41,9 @@ export function AppLayout() {
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Impersonation banner (only visible while impersonating) */}
+          <ImpersonationBanner />
+
           {/* Header */}
           <Header />
 

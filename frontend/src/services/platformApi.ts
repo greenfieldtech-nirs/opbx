@@ -17,6 +17,7 @@ import type {
   UpdateOrganizationStatusRequest,
   UpdateOrganizationSettingsRequest,
   SetPlatformManagerRequest,
+  ImpersonationResponse,
 } from '@/types/platform';
 import type { PaginatedResponse } from '@/types';
 
@@ -53,6 +54,29 @@ export const platformOrganizationsApi = {
     api
       .patch<{ data: { id: string; status: string; previous_status: string } }>(`/platform/organizations/${id}/status`, data)
       .then((r) => r.data.data),
+
+  /**
+   * Start impersonating an organization ("open as admin"). Returns a
+   * short-lived, org-scoped token the new tab uses to act as an org owner.
+   */
+  impersonate: (id: string) =>
+    api
+      .post<ImpersonationResponse>(`/platform/organizations/${id}/impersonate`)
+      .then((r) => r.data),
+};
+
+/**
+ * Platform Impersonation API
+ */
+export const platformImpersonationApi = {
+  /**
+   * Stop the current impersonation session. Must be called with the
+   * impersonation token (i.e. from within an impersonation tab).
+   */
+  stop: () =>
+    api
+      .post<{ ok: boolean; message: string }>('/platform/impersonation/stop')
+      .then((r) => r.data),
 };
 
 /**
@@ -118,6 +142,7 @@ export const platformApi = {
   organizations: platformOrganizationsApi,
   users: platformUsersApi,
   auditLogs: platformAuditLogsApi,
+  impersonation: platformImpersonationApi,
 };
 
 export default platformApi;

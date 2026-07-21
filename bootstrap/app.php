@@ -13,6 +13,7 @@ use App\Http\Middleware\RateLimitSensitiveOperations;
 use App\Http\Middleware\ResolveApiKey;
 use App\Http\Middleware\ResolveEmbedToken;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SetImpersonationContext;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -57,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'sensitive-operations' => RateLimitSensitiveOperations::class,
             'platform.manager' => EnsurePlatformManager::class,
             'bypass.organization.scope' => BypassOrganizationScope::class,
+            'impersonation.context' => SetImpersonationContext::class,
             'dialer.worker.auth' => DialerWorkerAuth::class,
             'resolve.api.key' => ResolveApiKey::class,
             'enforce.api.key.scope' => EnforceApiKeyScope::class,

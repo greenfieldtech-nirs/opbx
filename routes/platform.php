@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Platform\PlatformAuditLogController;
 use App\Http\Controllers\Platform\PlatformDashboardController;
+use App\Http\Controllers\Platform\PlatformImpersonationController;
 use App\Http\Controllers\Platform\PlatformOrganizationController;
 use App\Http\Controllers\Platform\PlatformUserController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,10 @@ Route::prefix('v1/platform')
         Route::get('/organizations/{organization}', [PlatformOrganizationController::class, 'show']);
         Route::put('/organizations/{organization}', [PlatformOrganizationController::class, 'update']);
         Route::patch('/organizations/{organization}/status', [PlatformOrganizationController::class, 'updateStatus']);
+
+        // Impersonation ("open as admin")
+        Route::post('/organizations/{organization}/impersonate', [PlatformImpersonationController::class, 'start']);
+        Route::post('/impersonation/stop', [PlatformImpersonationController::class, 'stop']);
 
         // Users (across organizations)
         Route::get('/users', [PlatformUserController::class, 'index']);

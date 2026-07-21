@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Scopes;
 
+use App\Support\ImpersonationContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Organization Scope
@@ -71,10 +73,24 @@ class OrganizationScope implements Scope
     }
 
     /**
-     * Get the current organization ID from the authenticated user.
+     * Get the current organization ID.
+     *
+     * Resolution order:
+     *   1. Impersonation context — set only by SetImpersonationContext middleware
+     *      from an org id stamped on the authenticated Sanctum token at mint time.
+     *      This lets a platform manager act inside a target organization while
+     *      keeping their own user identity.
+     *   2. The authenticated user's own organization_id (normal behavior).
      */
     protected function getOrganizationId(): ?int
     {
+        // Impersonation overrides the user's own organization when active.
+        $impersonatedOrganizationId = ImpersonationContext::get();
+
+        if ($impersonatedOrganizationId !== null) {
+            return $impersonatedOrganizationId;
+        }
+
         $user = auth()->user();
 
         if ($user && isset($user->organization_id)) {
@@ -82,7 +98,7 @@ class OrganizationScope implements Scope
         }
 
         // Log when no organization ID is found
-        \Illuminate\Support\Facades\Log::debug('OrganizationScope: No authenticated user or organization_id', [
+        Log::debug('OrganizationScope: No authenticated user or organization_id', [
             'user' => $user ? $user->id : null,
             'has_organization_id' => $user && isset($user->organization_id),
         ]);

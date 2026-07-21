@@ -11,6 +11,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Support\TokenAbilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -310,15 +311,7 @@ class AuthController extends Controller
      */
     private function getTokenAbilities(UserRole $role, bool $isPlatformManager = false): array
     {
-        $roleValue = $role->value;
-        $abilities = self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
-
-        // Add platform abilities for platform managers
-        if ($isPlatformManager) {
-            $abilities = array_merge($abilities, self::PLATFORM_ABILITIES);
-        }
-
-        return $abilities;
+        return TokenAbilities::forRole($role, $isPlatformManager);
     }
 
     /**

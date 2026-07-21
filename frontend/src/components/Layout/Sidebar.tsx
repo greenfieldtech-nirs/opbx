@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { storage } from '@/utils/storage';
 import opbxLogo from '@/assets/opbx_logo.png';
 
 // VSCode Codicons
@@ -160,8 +161,10 @@ export function Sidebar() {
   const startXRef = useRef(0);
   const startWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
 
-  // Check if user is a platform manager
-  const isPlatformManager = user?.is_platform_manager === true;
+  // Check if user is a platform manager. While impersonating an organization,
+  // hide the platform-management nav — the session is org-scoped and platform
+  // endpoints are not part of the impersonated experience.
+  const isPlatformManager = user?.is_platform_manager === true && !storage.isImpersonating();
 
   // Supervisors get ONLY the single Supervisor section; everyone else gets the
   // full section set. This is the source of truth for the whole sidebar.

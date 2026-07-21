@@ -73,6 +73,29 @@ export function useUpdateOrganizationSettings() {
 }
 
 /**
+ * Impersonation
+ */
+
+/**
+ * Start impersonating an organization ("open as admin"). Returns a short-lived,
+ * org-scoped token; the caller opens a new tab that bootstraps the session.
+ */
+export function useImpersonateOrganization() {
+  return useMutation({
+    mutationFn: (id: string) => platformApi.organizations.impersonate(id),
+  });
+}
+
+/**
+ * Stop the current impersonation session (called from an impersonation tab).
+ */
+export function useStopImpersonation() {
+  return useMutation({
+    mutationFn: () => platformApi.impersonation.stop(),
+  });
+}
+
+/**
  * Users
  */
 export function usePlatformUsers(params?: PlatformUsersParams) {

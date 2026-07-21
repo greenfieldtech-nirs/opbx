@@ -280,7 +280,7 @@ Route::prefix('v1')->group(function (): void {
         ->name('recordings.secure-download');
 
     // Protected API routes
-    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'impersonation.context', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
@@ -494,7 +494,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // Session Updates - NOT rate limited (real-time polling endpoints)
-    Route::middleware(['auth:sanctum', 'tenant.scope'])->prefix('session-updates')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'impersonation.context', 'tenant.scope'])->prefix('session-updates')->group(function (): void {
         Route::get('/active', [SessionUpdateController::class, 'getActiveCalls'])->name('session-updates.active');
         Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
         Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
@@ -503,7 +503,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // Call Notifications Settings
-    Route::middleware(['auth:sanctum', 'tenant.scope', 'rate_limit_org:api'])->prefix('call-notifications')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'impersonation.context', 'tenant.scope', 'rate_limit_org:api'])->prefix('call-notifications')->group(function (): void {
         Route::get('/settings', [CallNotificationsSettingsController::class, 'show'])->name('call-notifications.settings.show');
         Route::post('/settings', [CallNotificationsSettingsController::class, 'store'])->name('call-notifications.settings.store');
         Route::put('/settings', [CallNotificationsSettingsController::class, 'update'])->name('call-notifications.settings.update');
@@ -516,7 +516,7 @@ Route::prefix('v1')->group(function (): void {
 });
 
 // Auto Dialer Campaigns — no rate limiting (high-frequency monitor polling)
-Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.scope'])->group(function (): void {
+Route::prefix('v1')->middleware(['auth:sanctum', 'impersonation.context', 'tenant.scope'])->group(function (): void {
     // Monitor (MUST be before apiResource to avoid 'monitor' matching {campaign})
     Route::get('auto-dialer-campaigns/monitor/summary', [AutoDialerCampaignController::class, 'monitorSummary'])
         ->name('auto-dialer-campaigns.monitor.summary');

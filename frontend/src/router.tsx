@@ -55,6 +55,9 @@ const CallTrackingSessions = lazy(() => import('@/pages/CallTrackingSessions'));
 const CallTrackingDniSnippet = lazy(() => import('@/pages/CallTrackingDniSnippet'));
 const CallTrackingIntegrations = lazy(() => import('@/pages/CallTrackingIntegrations'));
 
+// Impersonation callback (lazy loaded) — bootstraps a per-tab admin session
+const ImpersonateCallback = lazy(() => import('@/pages/ImpersonateCallback'));
+
 // Platform Management (lazy loaded)
 const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
 const PlatformOrganizations = lazy(() => import('@/pages/platform/PlatformOrganizations'));
@@ -82,6 +85,13 @@ export const router = createBrowserRouter([
   {
     path: '/ui/auth/callback',
     element: <Auth0Callback />,
+  },
+  {
+    // Impersonation bootstrap tab. Reads the scoped token from the URL fragment
+    // and establishes a per-tab (sessionStorage) session, then redirects into
+    // the protected app as the target organization's admin.
+    path: '/ui/impersonate/callback',
+    element: <ImpersonateCallback />,
   },
   {
     path: '/ui/auth/onboarding',

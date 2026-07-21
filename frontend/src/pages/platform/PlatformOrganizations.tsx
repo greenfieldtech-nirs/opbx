@@ -25,6 +25,7 @@ import {
   Globe,
   ChevronDown,
   ChevronUp,
+  LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -65,6 +66,7 @@ import {
   usePlatformOrganizations,
   useUpdateOrganizationStatus,
   useUpdateOrganizationSettings,
+  useImpersonateOrganization,
 } from '@/hooks/platform';
 import type { PlatformOrganization, OrganizationStatus } from '@/types/platform';
 
@@ -121,6 +123,34 @@ export default function PlatformOrganizations() {
 
   const updateStatusMutation = useUpdateOrganizationStatus();
   const updateSettingsMutation = useUpdateOrganizationSettings();
+  const impersonateMutation = useImpersonateOrganization();
+
+  /**
+   * Start impersonating ("open as admin"): mint a scoped token and open a new
+   * tab that bootstraps the impersonation session. The token is passed via the
+   * URL fragment (never the query string) so it is not sent to servers/logs.
+   */
+  const handleImpersonate = async (org: PlatformOrganization, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+
+    if (org.status !== 'active') {
+      toast.error('Only active organizations can be managed.');
+      return;
+    }
+
+    try {
+      const result = await impersonateMutation.mutateAsync(org.id);
+      const payload = encodeURIComponent(
+        JSON.stringify({
+          token: result.access_token,
+          organization: result.organization,
+        })
+      );
+      window.open(`/ui/impersonate/callback#${payload}`, '_blank', 'noopener');
+    } catch {
+      toast.error('Failed to open organization as admin.');
+    }
+  };
 
   // Dialog states
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -252,6 +282,21 @@ export default function PlatformOrganizations() {
       header: 'Created',
       sortKey: 'created_at',
       cell: (org) => formatDate(org.created_at),
+    },
+    {
+      header: 'Manage',
+      cell: (org) => (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={org.status !== 'active' || impersonateMutation.isPending}
+          onClick={(e) => handleImpersonate(org, e)}
+          title="Open this organization as an admin in a new tab"
+        >
+          <LogIn className="h-4 w-4 mr-2" />
+          Open as admin
+        </Button>
+      ),
     },
   ];
 

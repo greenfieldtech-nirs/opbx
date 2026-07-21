@@ -11,6 +11,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\Organization;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Support\TokenAbilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,25 +20,6 @@ use Illuminate\Support\Facades\Log;
 
 class RegisterController extends Controller
 {
-    /**
-     * Owner token abilities - must match AuthController::TOKEN_ABILITIES['owner'].
-     */
-    private const OWNER_TOKEN_ABILITIES = [
-        'extension:*',
-        'user:*',
-        'ring-group:*',
-        'did-number:*',
-        'recording:*',
-        'settings:*',
-        'business-hours:*',
-        'conference:*',
-        'ivr:*',
-        'voice-agent:*',
-        'call-log:*',
-        'outbound-whitelist:*',
-        'recording-download:*',
-    ];
-
     public function register(RegisterRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -63,7 +45,7 @@ class RegisterController extends Controller
 
                 $token = $user->createToken(
                     'registration-token',
-                    self::OWNER_TOKEN_ABILITIES,
+                    TokenAbilities::owner(),
                     now()->addDay()
                 )->plainTextToken;
 
