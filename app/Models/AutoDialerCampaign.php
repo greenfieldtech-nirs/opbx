@@ -208,9 +208,13 @@ class AutoDialerCampaign extends Model
      */
     public function scopeRunnable($query)
     {
+        // Coarse date-window pre-filter. Widened by one day on each side so that
+        // campaigns near their start/end boundary in a non-UTC timezone are not
+        // wrongly excluded here; the precise, timezone-aware gating happens in
+        // isRunnable().
         return $query->where('status', CampaignStatus::ACTIVE)
-            ->whereDate('start_date', '<=', now())
-            ->whereDate('end_date', '>=', now());
+            ->whereDate('start_date', '<=', now()->addDay())
+            ->whereDate('end_date', '>=', now()->subDay());
     }
 
     /**
@@ -249,13 +253,23 @@ class AutoDialerCampaign extends Model
             return false;
         }
 
-        // Check date range
-        $now = now();
-        if ($now->lt($this->start_date) || $now->gt($this->end_date)) {
+        // Evaluate "now" in the campaign's configured timezone so that the
+        // schedule windows (which are defined in local wall-clock time) are
+        // compared correctly rather than against the app default (UTC).
+        $now = now($this->timezone ?? 'UTC');
+
+        // Check date range by comparing calendar dates only. start_date/end_date
+        // are cast to dates (midnight), so compare the current local date string
+        // against them to avoid timezone-offset edge cases.
+        $currentDate = $now->format('Y-m-d');
+        if ($this->start_date && $currentDate < $this->start_date->format('Y-m-d')) {
+            return false;
+        }
+        if ($this->end_date && $currentDate > $this->end_date->format('Y-m-d')) {
             return false;
         }
 
-        // Get current day and time
+        // Get current day and time (in the campaign's timezone)
         $currentDay = strtolower($now->format('l')); // monday, tuesday, etc.
         $currentTime = $now->format('H:i'); // 24-hour format: 20:43
 
