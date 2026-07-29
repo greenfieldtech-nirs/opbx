@@ -100,6 +100,8 @@ Campaigns connect answered calls to: AI_ASSISTANT, AI_LOAD_BALANCER, HANGUP
 
 A campaign is runnable when: status is ACTIVE, current date within start_date/end_date range, current day/time within the `schedule` JSON's enabled time ranges for today.
 
+**Timezone**: `AutoDialerCampaign::isRunnable()` evaluates "now" via `now($this->timezone ?? 'UTC')` so day-of-week and time-of-day are compared against the schedule in the campaign's local timezone (not the app default UTC). Date range is compared on calendar-date strings to avoid tz-offset edge cases. The dialer worker has no schedule logic — it relies entirely on this server-side check via `CampaignQueryService::getActiveRunnableCampaigns()` -> `DialerWorkerController::getActiveCampaigns()`. The SQL date pre-filters in `scopeRunnable()` and `getActiveRunnableCampaigns()` are widened by +/-1 day so non-UTC campaigns near a boundary aren't excluded before the precise `isRunnable()` check. Note: `DialingScheduler::isWithinSchedule()` is a separate, timezone-aware checker used by the Laravel queue jobs that reads the legacy `start_time`/`end_time`/`days_active` columns instead of the `schedule` JSON.
+
 ---
 
 ## Dialer Worker API Routes (routes/api.php)
