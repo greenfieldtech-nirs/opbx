@@ -236,6 +236,41 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $this->assertStringContainsString('<Hangup/>', $cxml);
     }
 
+    public function test_build_payload_includes_deadline_five_minutes_ahead(): void
+    {
+        $campaign = $this->createCampaign([
+            'routing_destination_type' => RoutingDestinationType::HANGUP,
+        ]);
+        $destination = $this->createDestination();
+        $webhookUrl = 'https://example.com/webhooks/cloudonix';
+
+        // buildPayload -> determineOutboundTrunk consults the outbound routing service.
+        $this->mockOutboundRouting
+            ->shouldReceive('findOutboundWhitelistEntry')
+            ->once()
+            ->with($this->organization->id, $destination->phone_number)
+            ->andReturn(null);
+
+        $this->travelTo(now());
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildPayload');
+        $method->setAccessible(true);
+
+        $payload = $method->invoke($this->service, $campaign, $destination, $webhookUrl, null);
+
+        $this->assertArrayHasKey('deadline', $payload);
+
+        // Deadline must be a valid ISO-8601 timestamp, 5 minutes ahead of now.
+        $deadline = \Carbon\Carbon::parse($payload['deadline']);
+        $this->assertEqualsWithDelta(
+            now()->addMinutes(5)->getTimestamp(),
+            $deadline->getTimestamp(),
+            2,
+            'Deadline should be ~5 minutes in the future'
+        );
+    }
+
     public function test_validate_credentials_delegates_to_client(): void
     {
         // This is a static method that delegates to CloudonixClient

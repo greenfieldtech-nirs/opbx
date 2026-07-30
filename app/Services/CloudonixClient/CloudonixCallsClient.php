@@ -246,6 +246,10 @@ class CloudonixCallsClient extends CloudonixBaseClient
                         $payload['timeLimit'] = $options['timeLimit'];
                     }
 
+                    if (isset($options['deadline'])) {
+                        $payload['deadline'] = $options['deadline'];
+                    }
+
                     if (isset($options['recording'])) {
                         $payload['recording'] = $options['recording'];
 

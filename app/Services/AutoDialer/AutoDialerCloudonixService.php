@@ -199,6 +199,10 @@ class AutoDialerCloudonixService
         // Optional: Callback URL for session status updates
         $payload['callback'] = $webhookUrl;
 
+        // Deadline: reject the call if it has not started within 5 minutes.
+        // Cloudonix expects an ISO-8601 timestamp for this field.
+        $payload['deadline'] = now()->addMinutes(5)->toIso8601String();
+
         return $payload;
     }
 

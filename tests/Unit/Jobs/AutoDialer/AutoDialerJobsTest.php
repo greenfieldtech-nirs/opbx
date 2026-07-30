@@ -169,6 +169,63 @@ class AutoDialerJobsTest extends TestCase
         $this->assertEquals('test-call-123', $destination->last_call_id);
     }
 
+    public function test_dial_destination_job_passes_five_minute_deadline_to_cloudonix(): void
+    {
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::ACTIVE,
+            'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT,
+            'routing_destination_id' => 1,
+            'caller_id' => '+1234567890',
+            'max_dial_attempts' => 3,
+        ]);
+        $destination = $this->createDestination($campaign, [
+            'status' => DestinationStatus::PENDING,
+            'phone_number' => '+14155551234',
+        ]);
+
+        $mockValidator = $this->createMock(DestinationValidator::class);
+        $mockValidator->method('validate')->willReturn([
+            'valid' => true,
+            'error' => null,
+            'trunk' => 'test-trunk',
+        ]);
+        $this->instance(DestinationValidator::class, $mockValidator);
+
+        $capturedOptions = null;
+        $mockClient = \Mockery::mock(CloudonixClient::class);
+        $mockClient->shouldReceive('initiateCall')
+            ->once()
+            ->with(
+                \Mockery::any(),
+                \Mockery::any(),
+                \Mockery::any(),
+                \Mockery::on(function ($options) use (&$capturedOptions) {
+                    $capturedOptions = $options;
+
+                    return true;
+                })
+            )
+            ->andReturn(['sessionToken' => 't', 'callId' => 'c']);
+        $this->instance(CloudonixClient::class, $mockClient);
+
+        $this->travelTo(now());
+
+        $validator = app(DestinationValidator::class);
+        $job = new DialDestinationJob($destination->id, $campaign->id);
+        $job->handle($validator, $mockClient);
+
+        $this->assertIsArray($capturedOptions);
+        $this->assertArrayHasKey('deadline', $capturedOptions);
+
+        $deadline = \Carbon\Carbon::parse($capturedOptions['deadline']);
+        $this->assertEqualsWithDelta(
+            now()->addMinutes(5)->getTimestamp(),
+            $deadline->getTimestamp(),
+            2,
+            'Deadline should be ~5 minutes in the future'
+        );
+    }
+
     public function test_dial_destination_job_marks_invalid_as_invalid(): void
     {
         $campaign = $this->createCampaign([
