@@ -103,15 +103,50 @@ class Auth0AccountResolver
         ]);
     }
 
+    /**
+     * Link a social identity to an existing user.
+     *
+     * @param  array<string, mixed>  $profile
+     *
+     * @throws \RuntimeException when the identity is already linked (to this or another user)
+     */
     public function linkIdentity(User $user, array $profile): UserSocialIdentity
     {
-        return UserSocialIdentity::create([
-            'user_id' => $user->id,
-            'provider' => $profile['provider'],
-            'provider_subject' => $profile['subject'],
-            'provider_email' => $profile['email'],
-            'provider_data' => $profile['raw'] ?? [],
-        ]);
+        return DB::transaction(function () use ($user, $profile) {
+            // Pre-check the (provider, provider_subject) unique constraint: this
+            // social account may already be linked to some user.
+            $existingIdentity = UserSocialIdentity::withoutGlobalScope(OrganizationScope::class)
+                ->where('provider', $profile['provider'])
+                ->where('provider_subject', $profile['subject'])
+                ->first();
+
+            if ($existingIdentity !== null) {
+                if ($existingIdentity->user_id === $user->id) {
+                    throw new \RuntimeException('This account is already linked to your profile.');
+                }
+
+                throw new \RuntimeException('This account is already linked to another user.');
+            }
+
+            // Pre-check the (user_id, provider) unique constraint: the user may
+            // already have a different identity for this provider.
+            $existingProvider = UserSocialIdentity::withoutGlobalScope(OrganizationScope::class)
+                ->where('user_id', $user->id)
+                ->where('provider', $profile['provider'])
+                ->first();
+
+            if ($existingProvider !== null) {
+                throw new \RuntimeException('Your profile is already linked to a '.$existingProvider->provider->value.' account.');
+            }
+
+            return UserSocialIdentity::create([
+                'user_id' => $user->id,
+                'provider' => $profile['provider'],
+                'provider_subject' => $profile['subject'],
+                'provider_email' => $profile['email'],
+                'provider_data' => $profile['raw'] ?? [],
+            ]);
+        });
     }
 
     /**

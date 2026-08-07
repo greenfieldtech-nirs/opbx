@@ -188,15 +188,32 @@ class Auth0Controller extends Controller
      */
     private function handleLink(array $profile): JsonResponse
     {
-        $user = User::find($profile['user_id']);
+        // The OAuth callback is a public route: during the Auth0 redirect there
+        // is no guaranteed authenticated context, and the target user may not be
+        // in the current organization scope. Load the user without the global
+        // OrganizationScope (the user id is trusted because it came from the
+        // signed/encrypted OAuth state created during initiateLink()).
+        $user = User::withoutGlobalScope(OrganizationScope::class)->find($profile['user_id']);
 
-        if ($user === null || $user->email !== $profile['email']) {
+        // Compare emails case-insensitively: the profile email is normalized to
+        // lowercase (Auth0ProfileNormalizer), while the stored email may differ
+        // in casing/whitespace.
+        $profileEmail = strtolower(trim((string) ($profile['email'] ?? '')));
+        $userEmail = $user !== null ? strtolower(trim((string) $user->email)) : null;
+
+        if ($user === null || $userEmail !== $profileEmail || $profileEmail === '') {
             return response()->json([
                 'error' => ['code' => 'AUTH0_LINK_EMAIL_MISMATCH', 'message' => 'Auth0 email does not match your account email.'],
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        app(Auth0AccountResolver::class)->linkIdentity($user, $profile);
+        try {
+            app(Auth0AccountResolver::class)->linkIdentity($user, $profile);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'error' => ['code' => 'AUTH0_LINK_ALREADY_LINKED', 'message' => $e->getMessage()],
+            ], Response::HTTP_CONFLICT);
+        }
 
         return response()->json(['message' => 'Identity linked successfully.']);
     }
@@ -233,6 +250,13 @@ class Auth0Controller extends Controller
 
         $token = $this->issueToken($user, 'auth0-token', $this->getTokenAbilities($user), self::TOKEN_EXPIRATION_MINUTES);
 
+        // Keep this user payload in parity with AuthController::formatUserResponse()
+        // (used by password login and /me). Omitting fields such as
+        // is_platform_manager here caused the platform owner to appear to "lose"
+        // their platform-owner status after signing in via Auth0, because the
+        // frontend overwrites the stored user with this response.
+        $user->loadMissing('socialIdentities');
+
         return response()->json([
             'user' => [
                 'id' => $user->id,
@@ -241,6 +265,11 @@ class Auth0Controller extends Controller
                 'email' => $user->email,
                 'role' => $user->role->value,
                 'status' => $user->status->value,
+                'is_platform_manager' => $user->is_platform_manager,
+                'social_identities' => $user->socialIdentities->map(fn ($identity) => [
+                    'provider' => $identity->provider->value,
+                    'provider_email' => $identity->provider_email,
+                ])->all(),
             ],
             'organization' => [
                 'id' => $user->organization->id,

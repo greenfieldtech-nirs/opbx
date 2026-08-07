@@ -63,6 +63,30 @@ class Auth0ControllerCallbackTest extends TestCase
         $response->assertJsonPath('access_token', fn ($t) => ! empty($t));
     }
 
+    public function test_callback_login_response_includes_platform_manager_flag(): void
+    {
+        $this->enableAuth0();
+
+        // Existing platform owner links & signs in via Google.
+        $identity = UserSocialIdentity::factory()->create([
+            'provider' => SocialIdentityProvider::GOOGLE,
+            'provider_subject' => 'google-oauth2|123',
+        ]);
+        $identity->user->update(['is_platform_manager' => true]);
+
+        $state = $this->fakeAuth0Responses($identity->provider_email);
+
+        $response = $this->getJson("/api/v1/auth/auth0/callback?code=valid&state={$state}");
+
+        $response->assertOk();
+        // The Auth0 login payload must carry is_platform_manager so the frontend
+        // does not overwrite the stored user and drop platform-owner status.
+        $response->assertJsonPath('user.is_platform_manager', true);
+        $response->assertJsonStructure([
+            'user' => ['id', 'organization_id', 'name', 'email', 'role', 'status', 'is_platform_manager', 'social_identities'],
+        ]);
+    }
+
     public function test_callback_returns_registration_required_for_new_user(): void
     {
         $this->enableAuth0();

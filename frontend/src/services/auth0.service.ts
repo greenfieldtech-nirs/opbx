@@ -19,6 +19,8 @@ export interface Auth0CallbackResponse {
     email: string;
     role: string;
     status: string;
+    is_platform_manager: boolean;
+    social_identities?: Array<{ provider: string; provider_email: string | null }>;
   };
   organization: {
     id: number;
@@ -46,12 +48,19 @@ export interface Auth0Error {
   error: { code: string; message: string };
 }
 
+export interface Auth0LinkSuccess {
+  message: string;
+}
+
 export const auth0Service = {
   redirect(provider: string, intent: 'login' | 'register' | 'link'): Promise<Auth0RedirectResponse> {
     return api.post('/auth/auth0/redirect', { provider, intent }).then((res) => res.data);
   },
 
-  callback(code: string, state: string): Promise<Auth0CallbackResponse | Auth0RegistrationRequired | Auth0Error> {
+  callback(
+    code: string,
+    state: string
+  ): Promise<Auth0CallbackResponse | Auth0RegistrationRequired | Auth0LinkSuccess | Auth0Error> {
     return api.get('/auth/auth0/callback', { params: { code, state } }).then((res) => res.data);
   },
 

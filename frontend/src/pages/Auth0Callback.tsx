@@ -71,6 +71,25 @@ export default function Auth0Callback() {
             return;
           }
 
+          // Account-linking errors: the user was linking a provider from their
+          // Profile page, so route them back there with a clear message.
+          if (code === 'AUTH0_LINK_EMAIL_MISMATCH') {
+            toast.error('Could not link account', {
+              description:
+                'The email on your social account does not match your account email. Please use the social account that matches your email.',
+            });
+            navigate('/ui/profile');
+            return;
+          }
+
+          if (code === 'AUTH0_LINK_ALREADY_LINKED') {
+            toast.error('Could not link account', {
+              description: data.error.message,
+            });
+            navigate('/ui/profile');
+            return;
+          }
+
           if (code === 'INVITE_INVALID_USER') {
             toast.error('Invalid invitation', {
               description: 'This invitation is not valid for the selected account.',
@@ -89,6 +108,15 @@ export default function Auth0Callback() {
 
           toast.error(data.error.message);
           navigate('/ui/login');
+          return;
+        }
+
+        // Account-linking success returns { message } with no access token.
+        // The user is already logged in (they linked from their Profile page),
+        // so send them back to Profile rather than mis-handling it as a login.
+        if (!('access_token' in data)) {
+          toast.success('Account linked successfully!');
+          navigate('/ui/profile');
           return;
         }
 
