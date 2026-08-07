@@ -1,0 +1,51 @@
+# Production overrides for OpBX.
+#
+# Serves the frontend as a compiled static SPA (built by frontend/Dockerfile)
+# instead of the Vite dev server. This eliminates exposing the Vite dev server
+# to the internet (the source of the `across.config.ts` overlay error and the
+# `/proc/<pid>/fd/*?raw` file-read probes) and yields a faster, safer prod site.
+#
+# Deploy with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# The VITE_* build args are inlined into the bundle at build time. Override them
+# via the environment (e.g. in your deploy .env) to match the public host.
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      # Production multi-stage build: `npm run build` then nginx serving dist/.
+      dockerfile: Dockerfile
+      args:
+        # Same-origin relative API path; the reverse proxy routes /api -> Laravel.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        VITE_PUSHER_APP_KEY: ${PUSHER_APP_KEY:-pbxappkey}
+        VITE_PUSHER_APP_CLUSTER: ${PUSHER_APP_CLUSTER:-mt1}
+        # WebSocket connects to the public host over TLS via the /app/ proxy.
+        VITE_WS_HOST: ${VITE_WS_HOST:-opbx.cloudonix.cloud}
+        VITE_WS_PORT: ${VITE_WS_PORT:-443}
+        VITE_WS_SCHEME: ${VITE_WS_SCHEME:-https}
+    # The production image is a self-contained static nginx on port 80.
+    # `!reset` drops the values inherited from the base compose file (Compose
+    # spec override tag) so no dev-only settings leak into production.
+    expose: !reset
+      - "80"
+    # Drop the dev bind mounts (./frontend:/app + node_modules) so the built
+    # image's compiled assets are served, not the host source tree.
+    volumes: !reset []
+    # The production image uses its own nginx CMD; drop the dev entrypoint.
+    entrypoint: !reset null
+    command: ["nginx", "-g", "daemon off;"]
+    # Remove dev-only Vite env; production values are baked in at build time.
+    environment: !reset []
+
+  nginx:
+    # Swap the reverse-proxy vhost for the production one that serves the built
+    # SPA (frontend:80) instead of proxying to the Vite dev server (frontend:3000).
+    # We mount the prod conf.d directory over the whole /etc/nginx/conf.d so the
+    # dev default.conf (which proxies to frontend:3000) is not present.
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/conf.d.prod:/etc/nginx/conf.d:ro
