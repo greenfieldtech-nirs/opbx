@@ -5,7 +5,7 @@
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Building2, Users, Phone, Globe, Save, PauseCircle, Play, Trash2 } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Phone, Globe, Save, PauseCircle, Play, Trash2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlatformLayout } from '@/components/platform';
 import { OrganizationStatusBadge } from '@/components/platform';
 import { usePlatformOrganization, useUpdateOrganizationSettings, useUpdateOrganizationStatus } from '@/hooks/platform';
+import { useOperateAs } from '@/context/OperateAsContext';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 
@@ -23,6 +24,7 @@ export default function PlatformOrganizationDetail() {
   const { data: organization, isLoading } = usePlatformOrganization(id || '');
   const updateSettings = useUpdateOrganizationSettings();
   const updateStatus = useUpdateOrganizationStatus();
+  const { enter: enterOperateAs } = useOperateAs();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -48,6 +50,16 @@ export default function PlatformOrganizationDetail() {
       toast.success('Organization settings updated');
     } catch {
       toast.error('Failed to update settings');
+    }
+  };
+
+  const handleOperateAs = async () => {
+    if (!organization) return;
+    try {
+      await enterOperateAs({ id: Number(organization.id), name: organization.name });
+      navigate('/ui/dashboard');
+    } catch {
+      // enter() already surfaces the error toast; nothing persisted.
     }
   };
 
@@ -105,6 +117,15 @@ export default function PlatformOrganizationDetail() {
           </div>
 
           <div className="flex items-center gap-2">
+            {organization.status === 'active' && (
+              <Button
+                variant="default"
+                onClick={handleOperateAs}
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Operate as this organization
+              </Button>
+            )}
             {organization.status === 'active' && (
               <>
                 <Button

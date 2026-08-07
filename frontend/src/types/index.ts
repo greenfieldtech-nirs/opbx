@@ -114,6 +114,11 @@ export interface User {
   country?: string | null;
   extension?: Extension | null;
   social_identities?: Array<{ provider: string; provider_email?: string }>;
+  operate_as?: {
+    active: boolean;
+    organization: { id: string | number; name: string };
+    real_user_id?: string | number;
+  };
   created_at: string;
   updated_at: string;
 }

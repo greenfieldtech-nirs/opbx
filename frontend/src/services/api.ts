@@ -27,6 +27,13 @@ api.interceptors.request.use(
     const token = storage.getToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+
+      // Operate-as (platform owner impersonation): attach the target org header
+      // so the backend resolves an effective org-admin user for this request.
+      const operateAsOrg = storage.getOperateAsOrg();
+      if (operateAsOrg) {
+        config.headers['X-Operate-As-Organization'] = String(operateAsOrg.id);
+      }
     }
 
     // Prevent browser caching of API responses

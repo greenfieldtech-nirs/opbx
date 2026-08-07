@@ -256,7 +256,11 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
             Route::post('/refresh', [AuthController::class, 'refresh'])->name('auth.refresh');
-            Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
+            // operate.as lets a platform manager's /me reflect the impersonated
+            // organization/role when the X-Operate-As-Organization header is set.
+            Route::get('/me', [AuthController::class, 'me'])
+                ->middleware('operate.as')
+                ->name('auth.me');
 
             Route::post('/auth0/link', [Auth0Controller::class, 'initiateLink'])->name('auth.auth0.link');
             Route::post('/auth0/unlink', [Auth0Controller::class, 'unlink'])->name('auth.auth0.unlink');
@@ -280,7 +284,7 @@ Route::prefix('v1')->group(function (): void {
         ->name('recordings.secure-download');
 
     // Protected API routes
-    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'operate.as', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');

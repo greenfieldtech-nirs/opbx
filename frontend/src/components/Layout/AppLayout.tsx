@@ -7,6 +7,7 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { OperateAsBanner } from './OperateAsBanner';
 import { useEchoConnection } from '@/hooks/useEchoConnection';
 import { RefreshTimerProvider, useRefreshTimerState } from '@/context/RefreshTimerContext';
 import { RefreshTimer } from '@/components/design-system';
@@ -40,6 +41,9 @@ export function AppLayout() {
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Operate-As banner — spans the content area on every authenticated page */}
+          <OperateAsBanner />
+
           {/* Header */}
           <Header />
 

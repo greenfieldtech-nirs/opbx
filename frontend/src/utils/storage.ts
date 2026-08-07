@@ -4,6 +4,12 @@
 
 const TOKEN_KEY = 'opbx_token';
 const USER_KEY = 'opbx_user';
+const OPERATE_AS_KEY = 'opbx_operate_as';
+
+export interface OperateAsOrg {
+  id: number;
+  name: string;
+}
 
 export const storage = {
   // Token management
@@ -33,9 +39,29 @@ export const storage = {
     localStorage.removeItem(USER_KEY);
   },
 
+  // Operate-as (platform owner impersonation) management
+  getOperateAsOrg(): OperateAsOrg | null {
+    const value = localStorage.getItem(OPERATE_AS_KEY);
+    if (!value) return null;
+    try {
+      return JSON.parse(value) as OperateAsOrg;
+    } catch {
+      return null;
+    }
+  },
+
+  setOperateAsOrg(org: OperateAsOrg): void {
+    localStorage.setItem(OPERATE_AS_KEY, JSON.stringify(org));
+  },
+
+  clearOperateAsOrg(): void {
+    localStorage.removeItem(OPERATE_AS_KEY);
+  },
+
   // Clear all
   clearAll(): void {
     this.removeToken();
     this.removeUser();
+    this.clearOperateAsOrg();
   },
 };

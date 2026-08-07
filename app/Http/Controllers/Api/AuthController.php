@@ -519,6 +519,21 @@ class AuthController extends Controller
             ];
         }
 
+        // When operating-as is active (platform-owner impersonation), $user is
+        // already the effective org OWNER, so the fields above reflect the target
+        // organization. Surface a top-level operate_as block so the SPA can render
+        // the impersonation banner and knows the real platform-manager id.
+        if (request()->attributes->get('operate_as_active') === true) {
+            $data['operate_as'] = [
+                'active' => true,
+                'organization' => $user->organization ? [
+                    'id' => $user->organization->id,
+                    'name' => $user->organization->name,
+                ] : null,
+                'real_user_id' => request()->attributes->get('operate_as_real_user_id'),
+            ];
+        }
+
         return $data;
     }
 }

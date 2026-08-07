@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\ApplyOperateAsOrganization;
 use App\Http\Middleware\BypassOrganizationScope;
 use App\Http\Middleware\DialerWorkerAuth;
 use App\Http\Middleware\EnforceApiKeyScope;
@@ -61,6 +62,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'resolve.api.key' => ResolveApiKey::class,
             'enforce.api.key.scope' => EnforceApiKeyScope::class,
             'resolve.embed.token' => ResolveEmbedToken::class,
+            'operate.as' => ApplyOperateAsOrganization::class,
         ]);
 
         // ResolveApiKey must run BEFORE auth:sanctum. Laravel's middleware
@@ -138,6 +140,23 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return $context;
+        });
+
+        // Translate the operate-as effective-user save guard (User model
+        // saving() hook) into a clean 403 instead of a 500. This fires only if
+        // a request attempts to persist the platform owner's own account while
+        // they are operating as an organization.
+        $exceptions->render(function (\RuntimeException $e, $request) {
+            if (str_contains($e->getMessage(), 'operate-as effective user')
+                && ($request->is('api/*') || $request->expectsJson())) {
+                return response()->json([
+                    'error' => [
+                        'code' => 'OPERATE_AS_SELF_MUTATION_FORBIDDEN',
+                        'message' => 'You cannot modify your own account while operating as an organization. '.
+                            'Exit the organization first.',
+                    ],
+                ], 403);
+            }
         });
 
         // Handle authorization exceptions for API routes
