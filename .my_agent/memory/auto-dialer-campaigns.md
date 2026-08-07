@@ -25,7 +25,7 @@ Outbound calling campaigns that automatically dial phone numbers from distributi
 | `app/Models/AutoDialerCallerIdStat.php` | Per-DID usage statistics |
 | `app/Enums/CampaignStatus.php` | DRAFT, ACTIVE, PAUSED, COMPLETED, ARCHIVED |
 | `app/Enums/DestinationStatus.php` | PENDING, DIALING, CONNECTED, FAILED, COMPLETED, INVALID |
-| `app/Services/AutoDialer/AutoDialerCloudonixService.php` | Cloudonix API calls + CXML generation with AMD stream wrapper (~937 lines) |
+| `app/Services/AutoDialer/AutoDialerCloudonixService.php` | Cloudonix API calls + CXML generation with AMD stream wrapper (~937 lines). Outbound payload built in `buildPayload()` (POST `/calls/{domain}/application`); always includes `deadline` = now+5min (ISO-8601) so Cloudonix rejects the call if not started within 5 minutes. |
 | `app/Services/AutoDialer/CampaignLifecycleManager.php` | State transitions (~197 lines) |
 | `app/Services/AutoDialer/CampaignProcessor.php` | Batch processing (~156 lines) |
 | `app/Services/AutoDialer/CampaignStatistics.php` | Stats with caching |
