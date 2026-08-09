@@ -1,0 +1,58 @@
+paths:
+  /v1/webphone/calls-log:
+    get:
+      tags:
+        - Web Phone
+      summary: Get Web Phone recent calls
+      description: |
+        Returns the 50 most recent calls placed from the authenticated user's
+        own `user`-type extension, most recent first. Coaching sentinel
+        destinations (spy/barge/whisper) are excluded.
+
+        Available to any authenticated role. The user must have a
+        `user`-type extension assigned, otherwise `404` is returned.
+      operationId: getWebPhoneCallsLog
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Recent calls for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        to:
+                          type: string
+                          example: '+14155551212'
+                        session_timestamp:
+                          type: string
+                          format: date-time
+                        duration:
+                          type: integer
+                          description: Duration in seconds
+                          example: 125
+                        duration_formatted:
+                          type: string
+                          example: '02:05'
+                        disposition:
+                          type: string
+                          example: answered
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          description: No extension is assigned to this user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: No extension is assigned to this user.

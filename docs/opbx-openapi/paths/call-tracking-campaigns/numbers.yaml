@@ -173,6 +173,60 @@ paths:
           $ref: ../../components/responses/NotFound.yaml
         '422':
           $ref: ../../components/responses/ValidationError.yaml
+    patch:
+      tags:
+      - Call Tracking Campaigns
+      summary: Update tracking number (partial)
+      description: |
+        Equivalent to `PUT .../{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}`
+        — Laravel's `apiResource` routing registers both PUT and PATCH
+        against the same update action.
+      operationId: patchCallTrackingNumber
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                friendly_name:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Friendly name for the tracking number
+                  example: Updated Sales Line
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  description: Tracking number status
+                  example: active
+      responses:
+        '200':
+          description: Tracking number updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Tracking number updated successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingNumber.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
     delete:
       tags:
       - Call Tracking Campaigns

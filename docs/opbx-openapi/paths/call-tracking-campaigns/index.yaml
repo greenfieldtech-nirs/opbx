@@ -378,6 +378,96 @@ paths:
           $ref: ../../components/responses/NotFound.yaml
         '422':
           $ref: ../../components/responses/ValidationError.yaml
+    patch:
+      tags:
+      - Call Tracking Campaigns
+      summary: Update campaign (partial)
+      description: |
+        Equivalent to `PUT /v1/call-tracking-campaigns/{call_tracking_campaign}`
+        — Laravel's `apiResource` routing registers both PUT and PATCH
+        against the same update action.
+      operationId: patchCallTrackingCampaign
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: Campaign name
+                  example: Updated Campaign Name
+                source:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: Marketing source
+                  example: google
+                medium:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 100
+                  description: Marketing medium
+                  example: cpc
+                description:
+                  type:
+                  - string
+                  - 'null'
+                  description: Campaign description
+                  example: Updated description
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  description: Campaign status
+                  example: active
+                destination_type:
+                  type: string
+                  enum:
+                  - forward
+                  - extension
+                  - ring_group
+                  - business_hours
+                  - conference_room
+                  - ivr_menu
+                  - ai_assistant
+                  - ai_load_balancer
+                  description: Destination type for incoming calls
+                  example: forward
+                destination_config:
+                  type: object
+                  description: |
+                    Destination configuration. Required field depends on `destination_type`.
+              additionalProperties: true
+      responses:
+        '200':
+          description: Campaign updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Campaign updated successfully
+                  data:
+                    $ref: ../../components/schemas/CallTrackingCampaign.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
     delete:
       tags:
       - Call Tracking Campaigns

@@ -1,0 +1,31 @@
+type: object
+description: >
+  A user's Embedded Dialer authentication token. Maps to exactly one user and
+  is stored hashed — the plaintext value is only ever returned once, at
+  generate/regenerate time. Used to authenticate the embedded widget's
+  runtime API (`/v1/embed/*`) via `Authorization: Bearer <token>`.
+properties:
+  user_id:
+    type: integer
+    example: 1
+  icon_position:
+    type: [string, 'null']
+    enum:
+      - bottom-right
+      - bottom-left
+      - top-right
+      - top-left
+      - null
+    description: Floating launcher position. Defaults to bottom-right.
+    example: bottom-right
+  icon_background_color:
+    type: [string, 'null']
+    pattern: '^#[0-9a-fA-F]{6}$'
+    description: Hex color for the floating launcher.
+    example: '#007acc'
+  last_used_at:
+    type: [string, 'null']
+    format: date-time
+    description: When the token last authenticated a request. Write is throttled to at most once per 5 seconds.
+required:
+  - user_id
