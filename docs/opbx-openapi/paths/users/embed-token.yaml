@@ -1,0 +1,158 @@
+paths:
+  /v1/users/{user}/embed-token:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        description: User ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    get:
+      tags:
+        - Users
+      summary: Get user embed token settings
+      description: |
+        Get the [Embedded Dialer](/modules/embedded-dialer) settings for a
+        user's embed token (icon position/color, last-used timestamp). Never
+        returns the plaintext token — only the initial generate/regenerate
+        response does.
+
+        If the user has no embed token yet, one is created (with default
+        settings) on first access.
+
+        Caller must be Owner or PBX Admin, in the same organization as the
+        target user.
+      operationId: getUserEmbedToken
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Embed token settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/EmbedToken.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    patch:
+      tags:
+        - Users
+      summary: Update user embed token settings
+      description: |
+        Update the floating launcher icon position and/or background color
+        for a user's embed token. Does not rotate the token value — use the
+        `regenerate` endpoint for that.
+
+        Caller must be Owner or PBX Admin, in the same organization as the
+        target user.
+      operationId: updateUserEmbedToken
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                icon_position:
+                  type: string
+                  enum:
+                    - bottom-right
+                    - bottom-left
+                    - top-right
+                    - top-left
+                  example: bottom-right
+                icon_background_color:
+                  type: string
+                  pattern: '^#[0-9a-fA-F]{6}$'
+                  example: '#007acc'
+      responses:
+        '200':
+          description: Embed token settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/EmbedToken.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+  /v1/users/{user}/embed-token/regenerate:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        description: User ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    post:
+      tags:
+        - Users
+      summary: Regenerate user embed token
+      description: |
+        Rotate the user's embed token: the previous token is immediately
+        revoked (any host page still using it stops working) and a new one
+        is issued. The response includes the one-time plaintext token value
+        and a ready-to-paste `<script>` snippet — neither is ever returned
+        again after this response.
+
+        Caller must be Owner or PBX Admin, in the same organization as the
+        target user. See the
+        [Embedded Dialer guide](/modules/embedded-dialer) for how to install
+        the snippet.
+      operationId: regenerateUserEmbedToken
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Token regenerated. `token` and `snippet` are one-time values.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/EmbedToken.yaml'
+                  token:
+                    type: string
+                    description: The one-time plaintext embed token. Shown only on generate/regenerate.
+                    example: opbxd_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+                  snippet:
+                    type: string
+                    description: Ready-to-paste HTML `<script>` snippet embedding the token.
+                required:
+                  - data
+                  - token
+                  - snippet
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

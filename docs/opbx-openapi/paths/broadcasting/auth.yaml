@@ -1,5 +1,42 @@
 paths:
   /v1/broadcasting/auth:
+    get:
+      tags:
+        - Broadcasting
+      summary: Authenticate broadcasting channel (GET)
+      description: |
+        Equivalent to `POST /v1/broadcasting/auth`, registered by Laravel's
+        `Broadcast::routes()` helper for client libraries that authenticate
+        channels via GET with query parameters instead of a POST body.
+      operationId: authenticateBroadcastingChannelGet
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: socket_id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "1234.5678"
+        - name: channel_name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "private-organization.1"
+      responses:
+        '200':
+          description: Channel authentication payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
     post:
       tags:
         - Broadcasting

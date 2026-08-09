@@ -136,6 +136,68 @@ Grant or revoke platform manager access for any user. When you revoke platform m
 Revoking platform manager access immediately invalidates all tokens and forces re-login.
 :::
 
+## Operating as an Organization
+
+Platform managers can temporarily act **as the Owner** of any active
+organization directly from the Organizations list — useful for
+troubleshooting a customer's configuration or reproducing a support ticket
+without needing the customer's own credentials.
+
+### Starting a session
+
+1. Open **Platform → Organizations**.
+2. Click **Operate As** on the row for the target organization.
+
+You are immediately switched into that organization with **Owner**
+permissions. Every screen — dashboard, extensions, ring groups, settings,
+and so on — reflects the target organization's data, exactly as that
+organization's own Owner would see it.
+
+A persistent yellow banner is shown at the top of every page for the
+duration of the session:
+
+> ⚠️ Operating as **{Organization Name}** — you are acting as an organization admin. [Exit organization]
+
+### Ending a session
+
+Click **Exit organization** in the banner. This restores your real
+platform-manager identity and returns you to **Platform → Organizations**.
+The session also ends automatically if you log out or your token expires —
+there is no server-side session to time out separately.
+
+### How it works
+
+- The switch is driven entirely by an `X-Operate-As-Organization` request
+  header the SPA attaches to every API call while a session is active. Start
+  and stop are lightweight validate-and-audit calls — they do not themselves
+  hold any server-side session state.
+- Only a **real platform-manager user** can trigger a switch. API keys and
+  non-platform-manager users are rejected with a `403` even if they somehow
+  send the header.
+- Only **active** organizations can be targeted — suspended or deleted
+  organizations return a `403`.
+- While operating as an organization, you cannot accidentally modify your own
+  platform-owner user record (e.g. via **Profile**) — the effective identity
+  used for the session exists only in memory for the duration of each
+  request and is never saved.
+- Entering or exiting a session clears the SPA's cached data so nothing from
+  the previous context (real or impersonated) leaks into the new view.
+
+### Audit trail
+
+Every start and stop is recorded in the [platform audit log](#audit-logs) as
+`operate_as.started` / `operate_as.stopped`, attributed to your real
+platform-manager user id and the target organization. Starting a session
+accepts an optional free-text reason (e.g. "Investigating ticket #1234") that
+is stored on the audit entry.
+
+:::warning Treat this as full Owner access
+While operating as an organization you can view and change anything that
+organization's own Owner could — including billing-adjacent settings, user
+management, and call routing. Use it deliberately and exit as soon as you're
+done.
+:::
+
 ## Audit Logs
 
 Every platform management action is logged with:

@@ -101,7 +101,7 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | **Health** | `GET /health`, `GET /storage/health`, `GET /websocket/health` |
 | **Auth** | Login, logout, refresh, register, me, Auth0 social login |
 | **Profile** | Get/update profile, password, organization |
-| **Users** | CRUD operations for organization users |
+| **Users** | CRUD operations for organization users + per-user Embedded Dialer token management |
 | **Extensions** | CRUD + sync + password management |
 | **Conference Rooms** | CRUD for conference rooms |
 | **Ring Groups** | CRUD for ring groups |
@@ -118,7 +118,8 @@ redocly lint docs/opbx-openapi/openapi.yaml
 | **Settings** | Organization and Cloudonix settings |
 | **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
 | **Supervisors** | Supervisor assignments + supervisor dashboard |
-| **Web Phone** | In-browser softphone SIP provisioning (Owner/Supervisor) |
+| **Web Phone** | In-browser softphone SIP provisioning + recent calls log (any authenticated role with a user-type extension) |
+| **Embedded Dialer** | Token-authenticated widget runtime API (config + calls log) for embedding the Web Phone on third-party sites |
 | **Call Notifications** | Webhook notification settings |
 
 ### Execution Plane (Webhooks)
@@ -148,6 +149,7 @@ redocly lint docs/opbx-openapi/openapi.yaml
 |----------|-----------|
 | **Dashboard** | Cross-tenant statistics |
 | **Organizations** | Organization management |
+| **Operate As** | Start/stop platform-owner impersonation of an organization (acts as its Owner) |
 | **Users** | Cross-tenant user management |
 | **Audit Logs** | Platform-wide audit trail |
 

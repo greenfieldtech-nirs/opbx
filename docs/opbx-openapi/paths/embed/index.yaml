@@ -1,0 +1,155 @@
+paths:
+  /v1/embed/config:
+    get:
+      tags:
+        - Embedded Dialer
+      summary: Get embedded Web Phone SIP provisioning
+      description: |
+        Returns JsSIP-compatible SIP provisioning for the embed token's
+        target user, identical in shape to `GET /v1/webphone/config` but
+        authenticated by an embed token instead of a session/bearer token.
+
+        Called by the widget iframe (`/embed/dialer`), not directly by host
+        pages. See the [Embedded Dialer guide](/modules/embedded-dialer).
+      operationId: getEmbedConfig
+      security:
+        - embedTokenAuth: []
+      responses:
+        '200':
+          description: SIP provisioning for the embedded softphone
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      sip_username:
+                        type: string
+                        example: '1001'
+                      sip_password:
+                        type: string
+                      sip_domain:
+                        type: string
+                        example: acme.cloudonix.net
+                      sip_uri:
+                        type: string
+                        example: sip:1001@acme.cloudonix.net
+                      display_name:
+                        type: string
+                        example: Jane Owner
+                      wss_server:
+                        type: string
+                        example: wss://webrtc.cloudonix.io
+                      websocket_port:
+                        type: integer
+                        example: 443
+                      server_path:
+                        type: string
+                        example: ''
+                      sip_contact:
+                        type: string
+                        example: '1001'
+                      profile_name:
+                        type: string
+                        example: Jane Owner
+                      registration_mode:
+                        type: string
+                        example: Direct
+                      country:
+                        type: string
+                        example: us
+        '401':
+          description: Missing or invalid embed token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid embed token.
+        '403':
+          description: Request Origin is not in the organization's embed allowlist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Origin not allowed.
+        '404':
+          description: The target user has no extension assigned or the organization has no Cloudonix settings configured
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Embedded dialer configuration is unavailable.
+
+  /v1/embed/calls-log:
+    get:
+      tags:
+        - Embedded Dialer
+      summary: Get embedded Web Phone recent calls
+      description: |
+        Returns the 50 most recent calls placed from the embed token's target
+        user's extension, identical in shape to `GET /v1/webphone/calls-log`
+        but authenticated by an embed token instead of a session/bearer token.
+        Coaching sentinel destinations (spy/barge/whisper) are excluded.
+      operationId: getEmbedCallsLog
+      security:
+        - embedTokenAuth: []
+      responses:
+        '200':
+          description: Recent calls for the embedded user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        to:
+                          type: string
+                          example: '+14155551212'
+                        session_timestamp:
+                          type: string
+                          format: date-time
+                        duration:
+                          type: integer
+                          description: Duration in seconds
+                          example: 125
+                        duration_formatted:
+                          type: string
+                          example: '02:05'
+                        disposition:
+                          type: string
+                          example: answered
+        '401':
+          description: Missing or invalid embed token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid embed token.
+        '403':
+          description: Request Origin is not in the organization's embed allowlist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Origin not allowed.

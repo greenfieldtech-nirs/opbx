@@ -1,0 +1,153 @@
+paths:
+  /v1/platform/operate-as/{organization}:
+    parameters:
+      - name: organization
+        in: path
+        required: true
+        description: Target organization ID to operate as
+        schema:
+          type: integer
+          minimum: 1
+        example: 42
+
+    post:
+      tags:
+        - Platform
+      summary: Start operating as an organization
+      description: |
+        Begin a platform-owner impersonation session: the calling platform
+        manager acts as the **owner** of the target organization on all
+        subsequent requests.
+
+        This endpoint does **not** itself switch scope. It validates the
+        target organization (must be `active`) and writes an
+        `operate_as.started` audit log entry. The actual per-request scope
+        switch is driven by the client sending the `X-Operate-As-Organization`
+        request header (set to the target organization ID) on every
+        subsequent request; see
+        [`ApplyOperateAsOrganization`](/architecture/security) middleware.
+
+        Only a real, authenticated platform-manager `User` may call this —
+        API key principals and non-platform-manager users are rejected.
+      operationId: startOperateAsOrganization
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type:
+                    - string
+                    - 'null'
+                  description: Optional free-text reason recorded on the audit log entry.
+                  example: Investigating a support ticket
+      responses:
+        '200':
+          description: Impersonation session started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      organization:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 42
+                          name:
+                            type: string
+                            example: Acme Corporation
+                          slug:
+                            type: string
+                            example: acme-corporation
+                          status:
+                            type: string
+                            example: active
+                          timezone:
+                            type: string
+                            example: America/New_York
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: |
+            Caller is not a platform manager, or the target organization is
+            suspended/deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                          - OPERATE_AS_FORBIDDEN
+                          - OPERATE_AS_ORG_INACTIVE
+                        example: OPERATE_AS_ORG_INACTIVE
+                      message:
+                        type: string
+                        example: The target organization is not active.
+        '404':
+          description: Target organization not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: OPERATE_AS_ORG_NOT_FOUND
+                      message:
+                        type: string
+                        example: The target organization could not be found.
+
+  /v1/platform/operate-as:
+    delete:
+      tags:
+        - Platform
+      summary: Stop operating as an organization
+      description: |
+        End the current impersonation session and restore the caller's real
+        platform-owner identity. Writes an `operate_as.stopped` audit log
+        entry. The client is responsible for dropping the
+        `X-Operate-As-Organization` header on subsequent requests — this
+        endpoint does not track session state server-side.
+
+        Always succeeds (returns `204`) regardless of whether an
+        impersonation session was actually active.
+      operationId: stopOperateAsOrganization
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organization_id:
+                  type: integer
+                  description: |
+                    Target organization ID to attribute the exit to in the
+                    audit log. Optional — accepted via query string or body.
+                  example: 42
+      responses:
+        '204':
+          description: Impersonation session stopped
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'

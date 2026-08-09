@@ -91,6 +91,87 @@ paths:
                 message: "Cannot upload to list in status: In Use"
                 code: "INVALID_STATUS"
 
+  /v1/auto-dialer-campaigns/lists/{list}/preview-csv:
+    parameters:
+      - name: list
+        in: path
+        required: true
+        description: Distribution List ID
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+
+    post:
+      tags:
+        - Distribution Lists
+      summary: Preview a CSV before uploading
+      description: |
+        Parse the first 5 data rows of a CSV file without persisting anything,
+        so the UI can show a preview before committing to
+        `POST .../{list}/upload`. The file is written to a temp path for
+        parsing and deleted immediately afterward — nothing is stored.
+      operationId: previewDistributionListCsv
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV or TXT file to preview (max 50MB)
+                has_header:
+                  type: boolean
+                  default: true
+                  description: Whether the first row is a header row.
+              required:
+                - file
+      responses:
+        '200':
+          description: Parsed preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      headers:
+                        type: array
+                        items:
+                          type: string
+                        description: Column headers (empty if has_header is false).
+                        example: ['phone_number', 'description']
+                      rows:
+                        type: array
+                        description: Up to 5 parsed data rows, keyed by header name (or column index when has_header is false).
+                        items:
+                          type: object
+                          additionalProperties:
+                            type: string
+                      total_rows:
+                        type: integer
+                        description: Total data row count in the file (excluding the header row).
+                        example: 1000
+                      has_header:
+                        type: boolean
+                        example: true
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
   /v1/auto-dialer-campaigns/lists/upload-progress/{jobId}:
     parameters:
       - name: jobId

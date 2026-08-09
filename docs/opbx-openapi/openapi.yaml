@@ -324,6 +324,9 @@ paths:
   /v1/auto-dialer-campaigns/lists/{list}/download:
     $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1download'
 
+  /v1/auto-dialer-campaigns/lists/{list}/preview-csv:
+    $ref: './paths/distribution-lists/upload.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1preview-csv'
+
   /v1/auto-dialer-campaigns/lists/{list}/reset-pending-destinations:
     $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1reset-pending-destinations'
 
@@ -468,6 +471,12 @@ paths:
   /v1/dialer/worker/state/{workerId}:
     $ref: './paths/dialer-worker/index.yaml#/paths/~1v1~1dialer~1worker~1state~1{workerId}'
 
+  /v1/embed/config:
+    $ref: './paths/embed/index.yaml#/paths/~1v1~1embed~1config'
+
+  /v1/embed/calls-log:
+    $ref: './paths/embed/index.yaml#/paths/~1v1~1embed~1calls-log'
+
   /v1/extensions:
     $ref: './paths/extensions/index.yaml#/paths/~1v1~1extensions'
 
@@ -545,6 +554,12 @@ paths:
 
   /v1/platform/dashboard:
     $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
+
+  /v1/platform/operate-as:
+    $ref: './paths/platform/operate-as.yaml#/paths/~1v1~1platform~1operate-as'
+
+  /v1/platform/operate-as/{organization}:
+    $ref: './paths/platform/operate-as.yaml#/paths/~1v1~1platform~1operate-as~1{organization}'
 
   /v1/platform/organizations:
     $ref: './paths/platform/organizations.yaml#/paths/~1v1~1platform~1organizations'
@@ -633,11 +648,20 @@ paths:
   /v1/webphone/config:
     $ref: './paths/webphone/config.yaml#/paths/~1v1~1webphone~1config'
 
+  /v1/webphone/calls-log:
+    $ref: './paths/webphone/calls-log.yaml#/paths/~1v1~1webphone~1calls-log'
+
   /v1/users:
     $ref: './paths/users/index.yaml#/paths/~1v1~1users'
 
   /v1/users/{user}:
     $ref: './paths/users/index.yaml#/paths/~1v1~1users~1{user}'
+
+  /v1/users/{user}/embed-token:
+    $ref: './paths/users/embed-token.yaml#/paths/~1v1~1users~1{user}~1embed-token'
+
+  /v1/users/{user}/embed-token/regenerate:
+    $ref: './paths/users/embed-token.yaml#/paths/~1v1~1users~1{user}~1embed-token~1regenerate'
 
   /v1/users/{user}/password:
     $ref: './paths/users/password.yaml#/paths/~1v1~1users~1{user}~1password'
@@ -709,6 +733,15 @@ components:
       type: http
       scheme: bearer
       description: Bearer token authentication for Cloudonix webhooks. Required only if domain_requests_api_key is configured in CloudonixSettings.
+    embedTokenAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Per-user Embedded Dialer token (prefix `opbxd_`), issued via
+        `POST /v1/users/{user}/embed-token/regenerate`. Used by the embedded
+        widget's runtime API (`/v1/embed/*`). Requests carrying a browser
+        `Origin` header are additionally checked against the organization's
+        `embed_allowed_domains` allowlist.
     voiceWebhookAuth:
       type: apiKey
       in: header
