@@ -36,6 +36,7 @@ import {
   Shield,
   Activity,
   RefreshCw,
+  Code2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getRoleColor, getRoleDisplayName, getStatusColor } from '@/utils/formatters';
@@ -105,6 +106,7 @@ import {
 } from '@/services/supervisorAssignments.service';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
 import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorAssignmentDialog';
+import { EmbeddedDialerDialog } from '@/components/Users/EmbeddedDialerDialog';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -131,6 +133,8 @@ function UsersComplete() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canCreateUsers = user?.role === 'owner' || user?.role === 'pbx_admin';
+  // Supervisors get a strictly view-only Users page: no create/edit/delete.
+  const isReadOnly = user?.role === 'supervisor';
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,6 +156,8 @@ function UsersComplete() {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [assignmentUserId, setAssignmentUserId] = useState<string | null>(null);
+  const [embedUser, setEmbedUser] = useState<User | null>(null);
+  const [showEmbedDialog, setShowEmbedDialog] = useState(false);
 
   // Password form state
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
@@ -674,7 +680,7 @@ function UsersComplete() {
             onSort={handleSort}
             canView={false}
             canEdit={false}
-            onDelete={(user) => {
+            onDelete={isReadOnly ? undefined : (user) => {
               setSelectedUser(user);
               setShowDeleteDialog(true);
             }}
@@ -733,14 +739,36 @@ function UsersComplete() {
                     {user.status}
                   </Badge>
                 )
-              }
+              },
+              ...(canCreateUsers ? [{
+                header: 'Embed',
+                cell: (user: User) => (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEmbedUser(user);
+                      setShowEmbedDialog(true);
+                    }}
+                    title="Embedded dialer settings"
+                    aria-label={`Get embed code for ${user.name}`}
+                  >
+                    <Badge
+                      variant="outline"
+                      className="text-xs gap-1 cursor-pointer hover:bg-muted transition-colors"
+                    >
+                      <Code2 className="h-3 w-3" />
+                      Get Code
+                    </Badge>
+                  </button>
+                )
+              }] : [])
             ]}
             emptyState={
               <EmptyState
                 icon={UserX}
                 title="No users found"
                 description={hasActiveFilters ? 'Try adjusting your filters' : 'Get started by creating your first user'}
-                action={!hasActiveFilters ? {
+                action={!hasActiveFilters && !isReadOnly ? {
                   label: "Add User",
                   onClick: () => setShowCreateDialog(true),
                 } : undefined}
@@ -1019,9 +1047,9 @@ function UsersComplete() {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>{isReadOnly ? 'User Details' : 'Edit User'}</DialogTitle>
             <DialogDescription>
-              Update user information and permissions
+              {isReadOnly ? 'View user information' : 'Update user information and permissions'}
             </DialogDescription>
           </DialogHeader>
 
@@ -1178,11 +1206,13 @@ function UsersComplete() {
               }}
               disabled={updateUserMutation.isPending}
             >
-              Cancel
+              {isReadOnly ? 'Close' : 'Cancel'}
             </Button>
-            <Button onClick={handleEditUser} disabled={updateUserMutation.isPending}>
-              {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
+            {!isReadOnly && (
+              <Button onClick={handleEditUser} disabled={updateUserMutation.isPending}>
+                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1460,6 +1490,13 @@ function UsersComplete() {
         userId={assignmentUserId}
         open={showAssignmentDialog}
         onOpenChange={setShowAssignmentDialog}
+      />
+
+      <EmbeddedDialerDialog
+        userId={embedUser?.id ?? null}
+        userName={embedUser?.name}
+        open={showEmbedDialog}
+        onOpenChange={setShowEmbedDialog}
       />
 
       <InviteUserDialog

@@ -11,3 +11,34 @@ paths:
       responses:
         '200':
           description: Statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total_active:
+                        type: integer
+                      by_status:
+                        type: object
+                        properties:
+                          processing:
+                            type: integer
+                          ringing:
+                            type: integer
+                          connected:
+                            type: integer
+                      by_direction:
+                        type: object
+                        description: Currently always 0 for both directions.
+                        properties:
+                          incoming:
+                            type: integer
+                          outgoing:
+                            type: integer
+                      average_duration:
+                        type: number
+                      longest_call:
+                        type: number

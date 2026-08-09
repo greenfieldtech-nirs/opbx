@@ -43,9 +43,32 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - destination_country
+                - outbound_trunk_name
               properties:
                 name:
                   type: string
+                  maxLength: 255
+                destination_country:
+                  type: string
+                  maxLength: 100
+                  description: Unique within the organization.
+                destination_prefix:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 12
+                  description: Digits, spaces, '+' and '-' only.
+                outbound_trunk_name:
+                  type: string
+                  maxLength: 255
+                default_caller_id_did_id:
+                  type:
+                    - integer
+                    - 'null'
+                  description: Must reference an active DID owned by the authenticated organization.
       responses:
         '201':
           description: Outbound Whitelist Entry created
@@ -92,6 +115,26 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                destination_country:
+                  type: string
+                  maxLength: 100
+                destination_prefix:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 12
+                outbound_trunk_name:
+                  type: string
+                  maxLength: 255
+                default_caller_id_did_id:
+                  type:
+                    - integer
+                    - 'null'
+                  description: Must reference an active DID owned by the authenticated organization.
       responses:
         '200':
           description: Outbound Whitelist Entry updated

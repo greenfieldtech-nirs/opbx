@@ -52,6 +52,8 @@ import {
     XCircle,
     FileText,
     Shield,
+    Plus,
+    X,
 } from 'lucide-react';
 import type {
   CloudonixSettings,
@@ -71,6 +73,30 @@ const settingsSchema = z.object({
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
+// Accepts a bare hostname (crm.acme.com), localhost, or an IPv4 address, each
+// with an optional :port for local dev origins. Mirrors the backend regex in
+// UpdateCloudonixSettingsRequest.
+const EMBED_DOMAIN_PATTERN =
+  /^(?:(?:[a-z0-9](?:-*[a-z0-9])*)(?:\.[a-z0-9](?:-*[a-z0-9])*)+|localhost|(?:\d{1,3})(?:\.\d{1,3}){3})(?::\d{1,5})?$/i;
+
+/**
+ * Normalize user input to the stored host[:port] form: strip the scheme, any
+ * path/query, and a trailing slash, then lowercase. `http://localhost:3000/foo`
+ * becomes `localhost:3000`. Returns null if the result is not a valid entry.
+ */
+function normalizeEmbedDomain(raw: string): string | null {
+  let value = raw.trim();
+  if (!value) return null;
+
+  // Drop scheme and everything from the first path/query/hash separator.
+  value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  value = value.split(/[/?#]/)[0];
+  value = value.toLowerCase();
+
+  if (!EMBED_DOMAIN_PATTERN.test(value)) return null;
+  return value;
+}
+
 export default function Settings() {
   const { shouldHideWebhookFields } = useConfig();
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +107,9 @@ export default function Settings() {
   const [showRequestsApiKey, setShowRequestsApiKey] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'valid' | 'invalid' | null>(null);
+  // Organization-level allowlist of hostnames permitted to embed the dialer.
+  const [embedDomains, setEmbedDomains] = useState<string[]>([]);
+  const [newEmbedDomain, setNewEmbedDomain] = useState('');
 
   // Settings form
   const {
@@ -114,6 +143,7 @@ export default function Settings() {
         const data = await settingsService.getCloudonixSettings();
 
         setSettingsData(data);
+        setEmbedDomains(data.embed_allowed_domains ?? []);
 
         // Reset form with loaded data
         reset({
@@ -183,6 +213,7 @@ export default function Settings() {
           domain_api_key: formValues.domain_api_key || undefined,
           domain_requests_api_key: formValues.domain_requests_api_key || undefined,
           webhook_base_url: formValues.webhook_base_url || undefined,
+          embed_allowed_domains: embedDomains,
           no_answer_timeout: formValues.no_answer_timeout,
           recording_format: formValues.recording_format,
         };
@@ -283,6 +314,20 @@ export default function Settings() {
     } catch (error) {
       toast.error(`Failed to copy ${label}`);
     }
+  };
+
+  const addEmbedDomain = () => {
+    const domain = normalizeEmbedDomain(newEmbedDomain);
+    if (!domain) {
+      toast.error('Enter a valid hostname, localhost, or IP address (a port is allowed).');
+      return;
+    }
+    if (embedDomains.includes(domain)) {
+      toast.error('Domain already added');
+      return;
+    }
+    setEmbedDomains((prev) => [...prev, domain]);
+    setNewEmbedDomain('');
   };
 
 
@@ -630,6 +675,72 @@ export default function Settings() {
                   </p>
                 </div>
               )}
+
+              {/* Divider */}
+              <div className="border-t pt-6" />
+
+              {/* Embedded Dialer allowed domains (organization-level) */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Embedded Dialer — Allowed Domains
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Websites permitted to embed the Web Phone dialer (e.g.{' '}
+                  <code>crm.acme.com</code>). For local development you may also use{' '}
+                  <code>localhost</code> or an IP address, with an optional port — e.g.{' '}
+                  <code>localhost:3000</code> or <code>127.0.0.1:3000</code>. The scheme
+                  is optional and will be stripped. The dialer will not load on any site
+                  that is not listed here.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newEmbedDomain}
+                    onChange={(e) => setNewEmbedDomain(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addEmbedDomain();
+                      }
+                    }}
+                    placeholder="crm.acme.com or localhost:3000"
+                    disabled={isValidating}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isValidating}
+                    onClick={addEmbedDomain}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {embedDomains.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {embedDomains.map((d) => (
+                      <Badge
+                        key={d}
+                        variant="secondary"
+                        className="gap-1 pl-2.5 pr-1 py-1 font-mono text-xs font-normal"
+                      >
+                        {d}
+                        <button
+                          type="button"
+                          onClick={() => setEmbedDomains((prev) => prev.filter((x) => x !== d))}
+                          className="rounded-full p-0.5 text-muted-foreground hover:bg-muted-foreground/20 hover:text-destructive"
+                          aria-label={`Remove ${d}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    No domains yet — the embedded dialer cannot be used until you add one.
+                  </p>
+                )}
+              </div>
 
               {/* Divider */}
               <div className="border-t pt-6" />

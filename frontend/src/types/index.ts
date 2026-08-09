@@ -114,6 +114,11 @@ export interface User {
   country?: string | null;
   extension?: Extension | null;
   social_identities?: Array<{ provider: string; provider_email?: string }>;
+  operate_as?: {
+    active: boolean;
+    organization: { id: string | number; name: string };
+    real_user_id?: string | number;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -138,8 +143,14 @@ export interface Extension {
   voicemail_pin?: string;
   call_forwarding_enabled: boolean;
   call_forwarding_number?: string;
+  default_caller_id_did_id: number | null;
   configuration?: Record<string, any>;
   // Eager loaded relationships
+  default_caller_id?: {
+    id: number;
+    phone_number: string;
+    friendly_name: string | null;
+  } | null;
   user?: User | null;
   ai_assistant?: {
     id: number;
@@ -500,6 +511,7 @@ export interface CreateExtensionRequest {
   user_id?: string | null;
   status?: Status;
   voicemail_enabled?: boolean;
+  default_caller_id_did_id?: number | null;
   configuration?: Record<string, any>;
 }
 
@@ -508,6 +520,7 @@ export interface UpdateExtensionRequest {
   status?: Status;
   user_id?: string | null;
   voicemail_enabled?: boolean;
+  default_caller_id_did_id?: number | null;
   configuration?: Record<string, any>;
 }
 
@@ -921,6 +934,7 @@ export interface CloudonixSettings {
   domain_api_key: string | null;
   domain_requests_api_key: string | null;
   webhook_base_url: string | null;
+  embed_allowed_domains: string[];
   no_answer_timeout: number;
   recording_format: RecordingFormat;
   cloudonix_package: string | null;
@@ -939,6 +953,7 @@ export interface UpdateCloudonixSettingsRequest {
   domain_api_key?: string;
   domain_requests_api_key?: string;
   webhook_base_url?: string;
+  embed_allowed_domains?: string[];
   no_answer_timeout?: number;
   recording_format?: RecordingFormat;
   cloudonix_package?: string;
@@ -976,6 +991,12 @@ export interface OutboundWhitelist {
   destination_prefix?: string;
   outbound_trunk_name: string;
   status: Status;
+  default_caller_id_did_id: number | null;
+  default_caller_id?: {
+    id: number;
+    phone_number: string;
+    friendly_name: string | null;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -985,6 +1006,7 @@ export interface CreateOutboundWhitelistRequest {
   destination_country: string;
   destination_prefix?: string;
   outbound_trunk_name: string;
+  default_caller_id_did_id?: number | null;
 }
 
 export interface UpdateOutboundWhitelistRequest {
@@ -992,6 +1014,7 @@ export interface UpdateOutboundWhitelistRequest {
   destination_country?: string;
   destination_prefix?: string;
   outbound_trunk_name?: string;
+  default_caller_id_did_id?: number | null;
 }
 
 export interface OutboundWhitelistFilterParams extends PaginationParams {

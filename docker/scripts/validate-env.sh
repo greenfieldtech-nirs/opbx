@@ -14,12 +14,44 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Environment Variable Validation ===${NC}"
 
-# Critical security variables that must not be default values
+# Load values from the application's .env file when they are not already present
+# in the process environment. This project keeps secrets (APP_KEY, DB_PASSWORD,
+# etc.) in .env — Laravel reads them at runtime, and they are NOT injected into
+# the container's process environment. Process env takes precedence when set.
+ENV_FILE="${ENV_FILE:-/var/www/html/.env}"
+if [[ -f "$ENV_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip comments and blank lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+        # Only handle KEY=VALUE lines
+        [[ "$line" != *"="* ]] && continue
+        key="${line%%=*}"
+        value="${line#*=}"
+        # Trim surrounding whitespace from key
+        key="${key//[[:space:]]/}"
+        [[ -z "$key" ]] && continue
+        # Strip matching surrounding quotes from the value
+        value="${value%$'\r'}"
+        if [[ "$value" == \"*\" ]]; then
+            value="${value#\"}"; value="${value%\"}"
+        elif [[ "$value" == \'*\' ]]; then
+            value="${value#\'}"; value="${value%\'}"
+        fi
+        # Only set if not already present/non-empty in the process environment
+        if [[ -z "${!key:-}" ]]; then
+            export "$key=$value"
+        fi
+    done < "$ENV_FILE"
+fi
+
+# Critical security variables that must not be default values.
+# NOTE: CLOUDONIX_API_TOKEN and CLOUDONIX_WEBHOOK_SECRET are intentionally NOT
+# validated here — they are managed per-organization in the database
+# (organization settings), not via global environment variables.
 REQUIRED_VARS=(
     "DB_PASSWORD"
     "APP_KEY"
-    "CLOUDONIX_API_TOKEN"
-    "CLOUDONIX_WEBHOOK_SECRET"
 )
 
 # Track validation status
@@ -28,7 +60,7 @@ VALIDATION_FAILED=0
 # Function to check if a variable is set to a default/placeholder value
 check_placeholder() {
     local var_name=$1
-    local var_value="${!var_name}"
+    local var_value="${!var_name:-}"
 
     # Check for common placeholder values
     local placeholders=("CHANGE_ME" "GENERATE_32_CHAR" "64_CHAR_SECRET" "default123" "password" "secret")
@@ -62,14 +94,14 @@ done
 echo -e "${GREEN}Security Checks:${NC}"
 
 # Check if running in production mode with debug enabled
-if [[ "$APP_ENV" == "production" ]] && [[ "$APP_DEBUG" == "true" ]]; then
+if [[ "${APP_ENV:-}" == "production" ]] && [[ "${APP_DEBUG:-}" == "true" ]]; then
     echo -e "${YELLOW}⚠ WARNING: APP_DEBUG is true in production${NC}"
     echo -e "${YELLOW}  This is a security risk and should be set to false${NC}"
     VALIDATION_FAILED=1
 fi
 
 # Check for weak passwords (basic check for common patterns)
-if [[ -n "$DB_PASSWORD" ]]; then
+if [[ -n "${DB_PASSWORD:-}" ]]; then
     PASSWORD_LENGTH=${#DB_PASSWORD}
     if [[ $PASSWORD_LENGTH -lt 8 ]]; then
         echo -e "${YELLOW}⚠ WARNING: DB_PASSWORD is less than 8 characters${NC}"
@@ -79,12 +111,12 @@ if [[ -n "$DB_PASSWORD" ]]; then
 fi
 
 # Check Redis port exposure warning
-if [[ -n "$REDIS_EXPOSE_PORT" ]]; then
+if [[ -n "${REDIS_EXPOSE_PORT:-}" ]]; then
     echo -e "${YELLOW}⚠ WARNING: REDIS_EXPOSE_PORT is set to ${REDIS_EXPOSE_PORT}${NC}"
     echo -e "${YELLOW}  Redis port will be exposed externally to host${NC}"
     echo -e "${YELLOW}  This increases attack surface and is NOT recommended for production${NC}"
 
-    if [[ "$APP_ENV" == "production" ]]; then
+    if [[ "${APP_ENV:-}" == "production" ]]; then
         echo -e "${RED}✗ CRITICAL: Redis port exposure in production is strongly discouraged${NC}"
         echo -e "${RED}  Please remove REDIS_EXPOSE_PORT or set it to empty${NC}"
         VALIDATION_FAILED=1

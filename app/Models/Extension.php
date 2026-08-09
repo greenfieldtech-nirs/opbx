@@ -45,6 +45,7 @@ class Extension extends Model
         'service_token',
         'service_params',
         'ai_assistant_id',
+        'default_caller_id_did_id',
     ];
 
     /**
@@ -106,6 +107,14 @@ class Extension extends Model
     public function aiLoadBalancer(): BelongsTo
     {
         return $this->belongsTo(AiAssistantLoadBalancer::class, 'configuration->ai_load_balancer_id');
+    }
+
+    /**
+     * Get the DID selected as this extension's outbound caller ID.
+     */
+    public function defaultCallerId(): BelongsTo
+    {
+        return $this->belongsTo(DidNumber::class, 'default_caller_id_did_id');
     }
 
     /**

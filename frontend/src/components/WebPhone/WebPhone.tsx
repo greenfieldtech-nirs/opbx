@@ -18,9 +18,14 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getWebPhoneConfig } from '@/services/webPhone.service';
+import {
+  getWebPhoneConfig,
+  type WebPhoneConfigResponse,
+  type WebPhoneCallsLogResponse,
+} from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
+import { getEmbedBus } from './embedBus';
 import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
 import { CallsLogView } from './CallsLogView';
 import { TonePlayer } from '@/lib/TonePlayer';
@@ -28,6 +33,27 @@ import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error';
 type CallState = 'idle' | 'ringing' | 'connected';
+
+type IconPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
+interface WebPhoneProps {
+  // Config/calls-log sources; embed overrides these to hit /embed/*.
+  configQueryFn?: () => Promise<WebPhoneConfigResponse>;
+  callsLogQueryFn?: () => Promise<WebPhoneCallsLogResponse>;
+  // Pull-tab placement + color (embed is themable per token).
+  iconPosition?: IconPosition;
+  iconBackgroundColor?: string;
+  // Embed may open the dialer immediately.
+  autoOpen?: boolean;
+}
+
+// Map the 4 corners to fixed-position Tailwind classes for the pull tab + panel.
+const CORNER_CLASSES: Record<IconPosition, string> = {
+  'bottom-right': 'bottom-6 right-6',
+  'bottom-left': 'bottom-6 left-6',
+  'top-right': 'top-6 right-6',
+  'top-left': 'top-6 left-6',
+};
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
@@ -98,13 +124,34 @@ function numberSizeClass(len: number): string {
   return 'text-xl tracking-tight';
 }
 
-export function WebPhone() {
+// Format elapsed call time: "M:SS" under an hour, "H:MM:SS" from an hour on.
+export function formatCallDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const seconds = s % 60;
+  const minutes = Math.floor(s / 60) % 60;
+  const hours = Math.floor(s / 3600);
+  const ss = String(seconds).padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${ss}`;
+  }
+  return `${minutes}:${ss}`;
+}
+
+export function WebPhone({
+  configQueryFn,
+  callsLogQueryFn,
+  iconPosition = 'bottom-right',
+  iconBackgroundColor,
+  autoOpen = false,
+}: WebPhoneProps = {}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const tonePlayerRef = useRef<TonePlayer | null>(null);
 
-  const [open, setOpen] = useState(false);
+  const cornerClass = CORNER_CLASSES[iconPosition];
+
+  const [open, setOpen] = useState(autoOpen);
   const [state, setState] = useState<PhoneLifecycle>('loading');
   const [status, setStatus] = useState('Initializing...');
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
@@ -121,13 +168,45 @@ export function WebPhone() {
   const [activeTab, setActiveTab] = useState<WebPhoneTab>('dialer');
   const pendingRedialRef = useRef<string | null>(null);
 
+  // Elapsed call time (seconds), ticking from connect to disconnect.
+  const [callSeconds, setCallSeconds] = useState(0);
+  const callStartRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopCallTimer = useCallback(() => {
+    if (timerIntervalRef.current !== null) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    callStartRef.current = null;
+  }, []);
+
+  const startCallTimer = useCallback(() => {
+    stopCallTimer();
+    callStartRef.current = Date.now();
+    setCallSeconds(0);
+    // Derive from the start timestamp so it stays accurate if the tab throttles the interval.
+    timerIntervalRef.current = setInterval(() => {
+      if (callStartRef.current !== null) {
+        setCallSeconds(Math.floor((Date.now() - callStartRef.current) / 1000));
+      }
+    }, 1000);
+  }, [stopCallTimer]);
+
+  // Clear the interval if the component unmounts mid-call.
+  useEffect(() => stopCallTimer, [stopCallTimer]);
+
   // Active call = mid-call OR an incoming ringing session. While active the
   // dialer cannot be collapsed and the rest of the UI is blocked.
   const inActiveCall = callState !== 'idle' || incomingSession !== null;
 
+  // During a coaching call the header names the coaching function, e.g. "On call - Coaching: Spy".
+  const headerStatus =
+    coachLabel && callState === 'connected' ? `${status} - Coaching: ${coachLabel}` : status;
+
   const { data: configResponse, error: configError, refetch } = useQuery({
     queryKey: ['webphone-config'],
-    queryFn: getWebPhoneConfig,
+    queryFn: configQueryFn ?? getWebPhoneConfig,
     enabled: open,
     retry: false,
     staleTime: Infinity,
@@ -143,7 +222,8 @@ export function WebPhone() {
     setIncomingNumber('');
     setCoachLabel(null);
     isCoachCallRef.current = false;
-  }, []);
+    stopCallTimer();
+  }, [stopCallTimer]);
 
   // Apply the volume slider to the remote audio element.
   useEffect(() => {
@@ -194,11 +274,15 @@ export function WebPhone() {
         getTonePlayer().stop();
         setCallState('connected');
         setStatus('On call');
+        startCallTimer();
         attachRemoteStream(session);
+        getEmbedBus()?.emit('call.started');
       });
 
       session.on('ended', () => {
         getTonePlayer().stop();
+        getEmbedBus()?.emit('call.ended');
+        stopCallTimer();
         if (isCoachCallRef.current) {
           isCoachCallRef.current = false;
           setOpen(false); // Coaching finished: close the Web Phone entirely.
@@ -210,6 +294,8 @@ export function WebPhone() {
 
       session.on('failed', (event: any) => {
         getTonePlayer().stop();
+        getEmbedBus()?.emit('call.failed', { cause: event?.cause });
+        stopCallTimer();
 
         const cause = (event?.cause ?? '').toString().toLowerCase();
         if (cause === 'busy') {
@@ -233,7 +319,7 @@ export function WebPhone() {
       session.on('muted', () => setIsMuted(true));
       session.on('unmuted', () => setIsMuted(false));
     },
-    [attachRemoteStream, config, getTonePlayer, resetCallState]
+    [attachRemoteStream, config, getTonePlayer, resetCallState, startCallTimer, stopCallTimer]
   );
 
   useEffect(() => {
@@ -441,6 +527,45 @@ export function WebPhone() {
     }
   }, [incomingSession]);
 
+  // Embed command bus: host page -> widget. Reuses the redial queue so a `dial`
+  // command auto-places once the UA is registered. No-op in the SPA (no bus).
+  useEffect(() => {
+    const bus = getEmbedBus();
+    if (!bus) return;
+
+    bus.onCommand((name, args) => {
+      switch (name) {
+        case 'dial': {
+          const destination = String(args?.[0] ?? '').trim();
+          if (!destination) return;
+          setCoachLabel(null);
+          isCoachCallRef.current = false;
+          pendingRedialRef.current = destination;
+          setNumber(destination);
+          setActiveTab('dialer');
+          setOpen(true);
+          break;
+        }
+        case 'hangup':
+          handleHangup();
+          break;
+        case 'open':
+          setOpen(true);
+          break;
+        case 'close':
+          setOpen(false);
+          break;
+      }
+    });
+  }, [handleHangup]);
+
+  // Tell the host the widget is registered and ready to take commands.
+  useEffect(() => {
+    if (state === 'ready') {
+      getEmbedBus()?.emit('ready');
+    }
+  }, [state]);
+
   const handleAnswer = useCallback(() => {
     if (incomingSession) {
       try {
@@ -542,7 +667,8 @@ export function WebPhone() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full rounded-br-none bg-primary text-primary-foreground shadow-lg hover:scale-105 hover:shadow-xl transition-all"
+          className={`fixed ${cornerClass} z-40 flex h-16 w-16 items-center justify-center rounded-full rounded-br-none bg-primary text-primary-foreground shadow-lg hover:scale-105 hover:shadow-xl transition-all`}
+          style={iconBackgroundColor ? { backgroundColor: iconBackgroundColor } : undefined}
           aria-label="Open Web Phone"
           title="Web Phone"
         >
@@ -560,7 +686,7 @@ export function WebPhone() {
 
       {/* Bottom-right floating dialer */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border bg-background shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-4rem)]">
+        <div className={`fixed ${cornerClass} z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border bg-background shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-4rem)]`}>
             {/* Header */}
             <div className="flex items-center justify-between border-b px-5 py-3">
               <div className="min-w-0">
@@ -568,7 +694,7 @@ export function WebPhone() {
                   <Phone className="h-4 w-4" />
                   Web Phone
                 </div>
-                <p className="truncate text-xs text-muted-foreground">{status}</p>
+                <p className="truncate text-xs text-muted-foreground">{headerStatus}</p>
               </div>
               <button
                 type="button"
@@ -582,7 +708,9 @@ export function WebPhone() {
               </button>
             </div>
 
-            <div className="flex flex-col p-6 gap-4 min-h-0 overflow-y-auto">
+            {/* ponytail: fixed height pinned to the dial-pad view (tallest view) so the panel never
+                resizes between views; re-measure if the keypad layout changes. */}
+            <div className="flex flex-col p-6 gap-4 h-[556px] overflow-y-auto">
               {state === 'loading' && (
                 <div className="flex flex-col items-center justify-center gap-3 py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -656,12 +784,19 @@ export function WebPhone() {
                       <div className="text-center space-y-2">
                         {coachLabel ? (
                           // Coaching: show only the function name, never the raw sentinel destination.
-                          <p className={`font-medium px-4 ${numberSizeClass(coachLabel.length)}`}>
-                            {coachLabel}
-                          </p>
+                          <>
+                            <p className={`font-medium px-4 ${numberSizeClass(coachLabel.length)}`}>
+                              {coachLabel}
+                            </p>
+                            <p className="text-sm text-muted-foreground tabular-nums">
+                              {formatCallDuration(callSeconds)}
+                            </p>
+                          </>
                         ) : (
                           <>
-                            <p className="text-sm text-muted-foreground">{status}</p>
+                            <p className="text-sm text-muted-foreground tabular-nums">
+                              {formatCallDuration(callSeconds)}
+                            </p>
                             <p className={`font-medium break-all px-4 ${numberSizeClass(number.length)}`}>
                               {number || ' '}
                             </p>
@@ -734,7 +869,11 @@ export function WebPhone() {
                       </div>
                     </div>
                   ) : activeTab === 'calls' ? (
-                    <CallsLogView onRedial={handleRedial} active={open && activeTab === 'calls'} />
+                    <CallsLogView
+                      onRedial={handleRedial}
+                      active={open && activeTab === 'calls'}
+                      callsLogQueryFn={callsLogQueryFn}
+                    />
                   ) : (
                     <div className="flex flex-col items-center gap-6">
                       {/* Number display */}
@@ -753,6 +892,13 @@ export function WebPhone() {
                               type="text"
                               value={number}
                               onChange={(e) => setNumber(e.target.value)}
+                              onKeyDown={(e) => {
+                                // Enter dials, mirroring the green call button's guards.
+                                if (e.key === 'Enter' && callState === 'idle' && number) {
+                                  e.preventDefault();
+                                  handleCall();
+                                }
+                              }}
                               className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-none focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
                               aria-label="Phone number"
                             />

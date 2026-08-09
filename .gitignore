@@ -122,11 +122,15 @@ docker-compose.override.yml
 # ============================================================================
 /frontend/node_modules
 /frontend/dist
+/frontend/dist-embed
 /frontend/build
 /frontend/.env
 /frontend/.env.local
 /frontend/.env.*.local
 /frontend/coverage
+
+# Embedded Dialer widget bundle (built from frontend/src/embed via `npm run build:embed`)
+/public/embed/assets
 
 # ============================================================================
 # Testing & Coverage

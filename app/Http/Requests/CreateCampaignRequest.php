@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Enums\CallerIdStrategy;
 use App\Enums\RoutingDestinationType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -51,64 +52,43 @@ class CreateCampaignRequest extends FormRequest
             'schedule' => ['required', 'array'],
             'schedule.monday' => ['required', 'array'],
             'schedule.monday.enabled' => ['required', 'boolean'],
-            'schedule.monday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.monday.enabled')),
-                'array',
-            ],
+            'schedule.monday.time_ranges' => ['sometimes', 'array'],
             'schedule.monday.time_ranges.*.id' => ['required', 'string'],
             'schedule.monday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.monday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.tuesday' => ['required', 'array'],
             'schedule.tuesday.enabled' => ['required', 'boolean'],
-            'schedule.tuesday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.tuesday.enabled')),
-                'array',
-            ],
+            'schedule.tuesday.time_ranges' => ['sometimes', 'array'],
             'schedule.tuesday.time_ranges.*.id' => ['required', 'string'],
             'schedule.tuesday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.tuesday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.wednesday' => ['required', 'array'],
             'schedule.wednesday.enabled' => ['required', 'boolean'],
-            'schedule.wednesday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.wednesday.enabled')),
-                'array',
-            ],
+            'schedule.wednesday.time_ranges' => ['sometimes', 'array'],
             'schedule.wednesday.time_ranges.*.id' => ['required', 'string'],
             'schedule.wednesday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.wednesday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.thursday' => ['required', 'array'],
             'schedule.thursday.enabled' => ['required', 'boolean'],
-            'schedule.thursday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.thursday.enabled')),
-                'array',
-            ],
+            'schedule.thursday.time_ranges' => ['sometimes', 'array'],
             'schedule.thursday.time_ranges.*.id' => ['required', 'string'],
             'schedule.thursday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.thursday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.friday' => ['required', 'array'],
             'schedule.friday.enabled' => ['required', 'boolean'],
-            'schedule.friday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.friday.enabled')),
-                'array',
-            ],
+            'schedule.friday.time_ranges' => ['sometimes', 'array'],
             'schedule.friday.time_ranges.*.id' => ['required', 'string'],
             'schedule.friday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.friday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.saturday' => ['required', 'array'],
             'schedule.saturday.enabled' => ['required', 'boolean'],
-            'schedule.saturday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.saturday.enabled')),
-                'array',
-            ],
+            'schedule.saturday.time_ranges' => ['sometimes', 'array'],
             'schedule.saturday.time_ranges.*.id' => ['required', 'string'],
             'schedule.saturday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.saturday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
             'schedule.sunday' => ['required', 'array'],
             'schedule.sunday.enabled' => ['required', 'boolean'],
-            'schedule.sunday.time_ranges' => [
-                Rule::requiredIf(fn () => $this->boolean('schedule.sunday.enabled')),
-                'array',
-            ],
+            'schedule.sunday.time_ranges' => ['sometimes', 'array'],
             'schedule.sunday.time_ranges.*.id' => ['required', 'string'],
             'schedule.sunday.time_ranges.*.start_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'schedule.sunday.time_ranges.*.end_time' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]|24:00$/'],
@@ -138,7 +118,7 @@ class CreateCampaignRequest extends FormRequest
             'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
             'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
             'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'caller_id_strategy' => ['sometimes', Rule::enum(\App\Enums\CallerIdStrategy::class)],
+            'caller_id_strategy' => ['sometimes', Rule::enum(CallerIdStrategy::class)],
         ];
     }
 

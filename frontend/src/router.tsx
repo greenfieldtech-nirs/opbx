@@ -8,6 +8,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/Layout/AppLayout';
 import { ProtectedRoute } from '@/components/Auth/ProtectedRoute';
 import { OwnerRoute } from '@/components/Auth/OwnerRoute';
+import { SupervisorGuard } from '@/components/Auth/SupervisorGuard';
 import { PlatformManagerRoute } from '@/components/platform/PlatformManagerRoute';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -95,7 +96,9 @@ export const router = createBrowserRouter([
     path: '/ui',
     element: (
       <ProtectedRoute>
-        <AppLayout />
+        <SupervisorGuard>
+          <AppLayout />
+        </SupervisorGuard>
       </ProtectedRoute>
     ),
     children: [

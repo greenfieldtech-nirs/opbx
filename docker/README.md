@@ -255,7 +255,7 @@ Nginx adds the following headers to all responses:
 - `X-Frame-Options: SAMEORIGIN`
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- `Permissions-Policy: geolocation=(), microphone=(), camera=()`
+- `Permissions-Policy: geolocation=(), microphone=(self), camera=()` (`microphone=(self)` enables the WebRTC Web Phone)
 
 ### Sensitive File Protection
 

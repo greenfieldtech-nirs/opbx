@@ -24,6 +24,33 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
+     * Marks this instance as an in-memory "operate as organization" effective
+     * user (platform-owner impersonation). Such an instance has its
+     * organization_id/role/is_platform_manager overridden in memory and MUST
+     * NEVER be persisted, otherwise it would corrupt the real platform owner's
+     * row. Not a database column; runtime-only.
+     */
+    public bool $isOperateAsEffective = false;
+
+    /**
+     * Guard against ever persisting an operate-as effective user instance.
+     * This is a defence-in-depth backstop: no request path should save the
+     * effective user, but if one ever does (e.g. a self-mutating /profile
+     * route), this hard-fails instead of silently corrupting the real row.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $user): void {
+            if ($user->isOperateAsEffective) {
+                throw new \RuntimeException(
+                    'Refusing to persist an operate-as effective user. The platform '.
+                    'owner cannot modify their own account while operating as an organization.'
+                );
+            }
+        });
+    }
+
+    /**
      * Resolve route bindings for platform management routes without the tenant
      * scope, so platform managers can act on users across all organizations.
      */
@@ -37,11 +64,6 @@ class User extends Authenticatable
 
         return parent::resolveRouteBinding($value, $field);
     }
-
-    /**
-     * Default field list for eager/lazy loading extension relationship.
-     */
-    public const DEFAULT_EXTENSION_FIELDS = 'extension:id,user_id,extension_number';
 
     /**
      * The attributes that are mass assignable.
@@ -69,6 +91,7 @@ class User extends Authenticatable
      */
     protected $attributes = [
         'is_platform_manager' => false,
+        'status' => UserStatus::ACTIVE->value,
     ];
 
     /**
@@ -119,6 +142,14 @@ class User extends Authenticatable
     public function extension(): HasOne
     {
         return $this->hasOne(Extension::class);
+    }
+
+    /**
+     * Get the embedded-dialer token associated with the user.
+     */
+    public function embedToken(): HasOne
+    {
+        return $this->hasOne(UserEmbedToken::class);
     }
 
     /**

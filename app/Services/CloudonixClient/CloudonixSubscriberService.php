@@ -208,22 +208,25 @@ class CloudonixSubscriberService
         );
 
         if ($response === null) {
-            $error = 'Cloudonix API request failed to update subscriber';
-            Log::error($error, [
+            // The stored subscriber may no longer exist in Cloudonix (e.g. it was
+            // deleted/recreated out-of-band, leaving a stale cloudonix_subscriber_id
+            // while cloudonix_synced is still true). In that case an update returns
+            // an error/404 and the extension can never register. Recover by
+            // re-provisioning: clear the stale id and create a fresh subscriber
+            // with the current password.
+            Log::warning('Cloudonix subscriber update failed; attempting re-create (stale subscriber id)', [
                 'extension_id' => $extension->id,
-                'subscriber_id' => $extension->cloudonix_subscriber_id,
+                'stale_subscriber_id' => $extension->cloudonix_subscriber_id,
+                'extension_number' => $extension->extension_number,
             ]);
 
-            return [
-                'success' => false,
-                'error' => $error,
-                'details' => [
-                    'reason' => 'api_request_failed',
-                    'operation' => 'update_subscriber',
-                    'subscriber_id' => $extension->cloudonix_subscriber_id,
-                    'hint' => 'Check logs for HTTP status code and response body',
-                ],
-            ];
+            $extension->update([
+                'cloudonix_subscriber_id' => null,
+                'cloudonix_uuid' => null,
+                'cloudonix_synced' => false,
+            ]);
+
+            return $this->createSubscriber($client, $extension);
         }
 
         // Update sync timestamp

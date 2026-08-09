@@ -11,6 +11,7 @@ RUN apk add --no-cache \
     bash \
     supervisor \
     icu-dev \
+    su-exec \
     && docker-php-ext-install \
     pdo_mysql \
     mbstring \
@@ -72,7 +73,9 @@ RUN chmod 755 /usr/local/bin/entrypoint.sh
 COPY docker/php/scheduler.sh /usr/local/bin/scheduler.sh
 RUN chmod 755 /usr/local/bin/scheduler.sh
 
-USER www-data
-
+# NOTE: We intentionally do NOT switch to `USER www-data` here.
+# The entrypoint starts as root so it can create/chown the bind-mounted
+# runtime directories (storage/*, bootstrap/cache), then drops privileges
+# to www-data via su-exec before exec-ing php-fpm.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm"]

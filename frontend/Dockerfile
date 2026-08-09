@@ -14,7 +14,25 @@ RUN npm ci --silent
 # Copy source code
 COPY . .
 
-# Build the application
+# Vite inlines VITE_* variables at build time, so they must be provided as
+# build args (runtime env vars have no effect on an already-built static SPA).
+# Defaults keep same-origin/relative behaviour that works behind the reverse
+# proxy; override per-environment via docker-compose build args.
+ARG VITE_API_BASE_URL=/api/v1
+ARG VITE_PUSHER_APP_KEY=pbxappkey
+ARG VITE_PUSHER_APP_CLUSTER=mt1
+ARG VITE_WS_HOST=localhost
+ARG VITE_WS_PORT=443
+ARG VITE_WS_SCHEME=https
+
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL} \
+    VITE_PUSHER_APP_KEY=${VITE_PUSHER_APP_KEY} \
+    VITE_PUSHER_APP_CLUSTER=${VITE_PUSHER_APP_CLUSTER} \
+    VITE_WS_HOST=${VITE_WS_HOST} \
+    VITE_WS_PORT=${VITE_WS_PORT} \
+    VITE_WS_SCHEME=${VITE_WS_SCHEME}
+
+# Build the application (tsc + vite build)
 RUN npm run build
 
 # Stage 2: Serve with nginx

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\OutboundWhitelist;
 
-use App\Models\OutboundWhitelist;
+use App\Models\DidNumber;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,8 +14,6 @@ use Illuminate\Validation\Rule;
  */
 class UpdateOutboundWhitelistRequest extends FormRequest
 {
-
-
     /**
      * Get the validation rules that apply to the request.
      *
@@ -53,7 +52,31 @@ class UpdateOutboundWhitelistRequest extends FormRequest
                 'string',
                 'max:255',
             ],
+            'default_caller_id_did_id' => [
+                'nullable',
+                'integer',
+                'exists:did_numbers,id',
+            ],
         ];
+    }
+
+    /**
+     * Configure the validator instance.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $didId = $this->input('default_caller_id_did_id');
+            if ($didId) {
+                $did = DidNumber::find($didId);
+                if (! $did || $did->organization_id !== $this->user()->organization_id) {
+                    $validator->errors()->add(
+                        'default_caller_id_did_id',
+                        'The selected caller ID does not belong to your organization.'
+                    );
+                }
+            }
+        });
     }
 
     /**
@@ -78,8 +101,6 @@ class UpdateOutboundWhitelistRequest extends FormRequest
 
     /**
      * Prepare the data for validation.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {
@@ -91,7 +112,7 @@ class UpdateOutboundWhitelistRequest extends FormRequest
         }
 
         // Normalize destination_prefix by removing extra spaces
-        if ($this->has('destination_prefix')) {
+        if ($this->filled('destination_prefix')) {
             $prefix = $this->input('destination_prefix');
             $this->merge([
                 'destination_prefix' => trim(preg_replace('/\s+/', ' ', $prefix)),

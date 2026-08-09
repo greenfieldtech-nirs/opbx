@@ -68,4 +68,30 @@ final class SupervisorAssignmentControllerTest extends TestCase
 
         $response->assertUnprocessable();
     }
+
+    /**
+     * Only PBX Users may be supervised; owner, pbx_admin, reporter, and supervisor
+     * roles are all rejected.
+     */
+    public function test_cannot_assign_non_pbx_user_role_as_supervised_user(): void
+    {
+        foreach ([UserRole::OWNER, UserRole::PBX_ADMIN, UserRole::REPORTER] as $role) {
+            $org = Organization::factory()->create();
+            $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+            $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+            $target = User::factory()->create(['organization_id' => $org->id, 'role' => $role]);
+
+            $response = $this->actingAs($owner)
+                ->putJson("/api/v1/supervisors/{$supervisor->id}/assignments", [
+                    'user_ids' => [$target->id],
+                    'ring_group_ids' => [],
+                ]);
+
+            $response->assertUnprocessable();
+            $this->assertFalse(
+                $supervisor->fresh()->supervisedUsers->contains($target),
+                "Role {$role->value} should not be assignable as a supervised user."
+            );
+        }
+    }
 }

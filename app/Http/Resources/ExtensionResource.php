@@ -47,6 +47,12 @@ class ExtensionResource extends JsonResource
                     'status' => $member->status->value,
                 ])->toArray(),
             ] : null),
+            'default_caller_id_did_id' => $this->default_caller_id_did_id,
+            'default_caller_id' => $this->whenLoaded('defaultCallerId', fn () => $this->defaultCallerId ? [
+                'id' => $this->defaultCallerId->id,
+                'phone_number' => $this->defaultCallerId->phone_number,
+                'friendly_name' => $this->defaultCallerId->friendly_name,
+            ] : null),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

@@ -97,6 +97,7 @@ paths:
                   - ring_group
                   - ivr
                   - ai_assistant
+                  - custom_logic
                   - forward
                   - ai_load_balancer
                   example: user
@@ -116,6 +117,11 @@ paths:
                   type:
                   - integer
                   - 'null'
+                default_caller_id_did_id:
+                  type:
+                  - integer
+                  - 'null'
+                  description: Must reference an active DID owned by the authenticated organization.
               required:
               - extension_number
               - type
@@ -191,6 +197,7 @@ paths:
                   - ring_group
                   - ivr
                   - ai_assistant
+                  - custom_logic
                   - forward
                   - ai_load_balancer
                 status:
@@ -206,6 +213,11 @@ paths:
                   type:
                   - integer
                   - 'null'
+                default_caller_id_did_id:
+                  type:
+                  - integer
+                  - 'null'
+                  description: Must reference an active DID owned by the authenticated organization.
       responses:
         '200':
           description: Extension updated
@@ -255,6 +267,7 @@ paths:
                   - ring_group
                   - ivr
                   - ai_assistant
+                  - custom_logic
                   - forward
                   - ai_load_balancer
                 status:
@@ -270,6 +283,11 @@ paths:
                   type:
                   - integer
                   - 'null'
+                default_caller_id_did_id:
+                  type:
+                  - integer
+                  - 'null'
+                  description: Must reference an active DID owned by the authenticated organization.
       responses:
         '200':
           description: Extension updated

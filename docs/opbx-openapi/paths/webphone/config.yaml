@@ -8,7 +8,7 @@ paths:
         Returns JsSIP-compatible SIP provisioning for the authenticated user's own
         extension so the in-browser softphone can register with Cloudonix over WebRTC.
 
-        Restricted to `owner` and `supervisor` roles. The user must have a `user`-type
+        Available to any authenticated role. The user must have a `user`-type
         extension assigned and the organization must have Cloudonix settings configured,
         otherwise `404` is returned. The `country` field is read from the organization
         `settings` JSON (defaults to `us`) and drives call-progress tone cadences.
@@ -68,12 +68,6 @@ paths:
                         example: us
         '401':
           $ref: '../../openapi.yaml#/components/responses/Unauthorized'
-        '403':
-          description: Role not permitted to use the Web Phone
-          content:
-            application/json:
-              schema:
-                $ref: '../../openapi.yaml#/components/schemas/Error'
         '404':
           description: No extension assigned or Cloudonix settings missing
           content:

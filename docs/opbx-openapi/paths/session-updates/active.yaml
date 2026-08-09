@@ -8,6 +8,95 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - name: supervisor
+          in: query
+          required: false
+          description: When true, scope results to the supervisor's assigned resources.
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          required: false
+          description: Filter by call status.
+          schema:
+            type: string
+            enum:
+              - processing
+              - ringing
+              - connected
+        - name: direction
+          in: query
+          required: false
+          description: Filter by call direction.
+          schema:
+            type: string
+            enum:
+              - incoming
+              - outgoing
       responses:
         '200':
           description: Active calls retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        session_id:
+                          type: integer
+                        caller_id:
+                          type: string
+                        destination:
+                          type: string
+                        direction:
+                          type: string
+                        status:
+                          type: string
+                        session_created_at:
+                          type: string
+                        last_updated_at:
+                          type: string
+                        duration_seconds:
+                          type: integer
+                        formatted_duration:
+                          type: string
+                        domain:
+                          type: string
+                        subscriber_id:
+                          type: string
+                        call_ids:
+                          type: array
+                          items:
+                            type: string
+                        has_qos_data:
+                          type: boolean
+                  meta:
+                    type: object
+                    properties:
+                      total_active_calls:
+                        type: integer
+                      by_status:
+                        type: object
+                        properties:
+                          processing:
+                            type: integer
+                          ringing:
+                            type: integer
+                          connected:
+                            type: integer
+                      by_direction:
+                        type: object
+                        properties:
+                          incoming:
+                            type: integer
+                          outgoing:
+                            type: integer
+                      last_updated:
+                        type: string
+                      cache_expires_in:
+                        type: integer

@@ -115,6 +115,10 @@ class PhoneNumberController extends Controller
      * Get the organization's default outbound caller ID DID.
      *
      * Returns the configured DID (id, phone_number, friendly_name) or null when unset.
+     *
+     * @deprecated Superseded by per-extension and per-whitelist default_caller_id_did_id.
+     *             The org-level default outbound caller ID is no longer consulted by voice
+     *             routing and is retained only for backward compatibility. Scheduled for removal.
      */
     public function getDefaultCallerId(Request $request): JsonResponse
     {
@@ -150,6 +154,10 @@ class PhoneNumberController extends Controller
      *
      * Body: { did_id: int|null }. When non-null the DID must exist, belong to the
      * authenticated organization, and be active. When null the setting is removed.
+     *
+     * @deprecated Superseded by per-extension and per-whitelist default_caller_id_did_id.
+     *             The org-level default outbound caller ID is no longer consulted by voice
+     *             routing and is retained only for backward compatibility. Scheduled for removal.
      */
     public function setDefaultCallerId(Request $request): JsonResponse
     {

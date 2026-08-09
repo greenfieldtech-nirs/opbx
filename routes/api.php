@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\CallTrackingSessionController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\EmailValidationController;
+use App\Http\Controllers\Api\EmbedConfigController;
 use App\Http\Controllers\Api\ExtensionCloudonixController;
 use App\Http\Controllers\Api\ExtensionCrudController;
 use App\Http\Controllers\Api\ExtensionPasswordController;
@@ -37,6 +38,7 @@ use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SupervisorAssignmentController;
 use App\Http\Controllers\Api\SupervisorDashboardController;
+use App\Http\Controllers\Api\UserEmbedTokenController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WebPhoneCallsLogController;
@@ -44,6 +46,7 @@ use App\Http\Controllers\Api\WebPhoneConfigController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
 use App\Http\Controllers\DistributionListController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 use Pusher\Pusher;
@@ -195,6 +198,30 @@ Route::prefix('v1')->group(function (): void {
         ->middleware(['throttle:call-tracking-dni'])
         ->name('call-tracking.dni.swap');
 
+    // Embedded dialer public API (token-authenticated, per-request CORS via
+    // resolve.embed.token). Deliberately OUTSIDE auth:sanctum.
+    Route::prefix('embed')->group(function (): void {
+        // CORS preflight: reflect Origin + allow the Authorization header.
+        // Preflight cannot carry the bearer token, so it must not run through
+        // resolve.embed.token; the real GET enforces the token + origin.
+        Route::options('{any}', function (Request $request) {
+            $origin = (string) $request->headers->get('Origin');
+
+            return response('', 204)->withHeaders([
+                'Access-Control-Allow-Origin' => $origin,
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
+                'Access-Control-Max-Age' => '600',
+                'Vary' => 'Origin',
+            ]);
+        })->where('any', '.*');
+
+        Route::middleware(['throttle:embed', 'resolve.embed.token'])->group(function (): void {
+            Route::get('config', [EmbedConfigController::class, 'config'])->name('embed.config');
+            Route::get('calls-log', [EmbedConfigController::class, 'callsLog'])->name('embed.calls-log');
+        });
+    });
+
     // Application configuration (public)
     // Required by the login/register pages before authentication to decide whether
     // to show Auth0 social-provider buttons, reCAPTCHA, etc.
@@ -229,7 +256,11 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
             Route::post('/refresh', [AuthController::class, 'refresh'])->name('auth.refresh');
-            Route::get('/me', [AuthController::class, 'me'])->name('auth.me');
+            // operate.as lets a platform manager's /me reflect the impersonated
+            // organization/role when the X-Operate-As-Organization header is set.
+            Route::get('/me', [AuthController::class, 'me'])
+                ->middleware('operate.as')
+                ->name('auth.me');
 
             Route::post('/auth0/link', [Auth0Controller::class, 'initiateLink'])->name('auth.auth0.link');
             Route::post('/auth0/unlink', [Auth0Controller::class, 'unlink'])->name('auth.auth0.unlink');
@@ -253,7 +284,7 @@ Route::prefix('v1')->group(function (): void {
         ->name('recordings.secure-download');
 
     // Protected API routes
-    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'operate.as', 'rate_limit_org:api', 'enforce.api.key.scope'])->group(function (): void {
         // Profile management (user-scoped, no tenant required)
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show'])->name('profile.show');
@@ -272,6 +303,14 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('users', UsersController::class);
         Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
             ->name('users.password.update');
+
+        // Embedded dialer token management (Owner + PBX Admin only).
+        Route::get('users/{user}/embed-token', [UserEmbedTokenController::class, 'show'])
+            ->name('users.embed-token.show');
+        Route::patch('users/{user}/embed-token', [UserEmbedTokenController::class, 'update'])
+            ->name('users.embed-token.update');
+        Route::post('users/{user}/embed-token/regenerate', [UserEmbedTokenController::class, 'regenerate'])
+            ->name('users.embed-token.regenerate');
         Route::post('users/invite', [UserInvitationController::class, 'invite'])
             ->name('users.invite');
 
@@ -399,6 +438,8 @@ Route::prefix('v1')->group(function (): void {
         // Phone Numbers (DIDs)
         // Static routes MUST be registered before the apiResource so that
         // "default-caller-id" is not captured by the {phone_number} wildcard.
+        // @deprecated org-level default caller ID — superseded by per-extension and
+        // per-whitelist default_caller_id_did_id; no longer used by voice routing.
         Route::get('phone-numbers/default-caller-id', [PhoneNumberController::class, 'getDefaultCallerId'])
             ->name('phone-numbers.default-caller-id.show');
         Route::put('phone-numbers/default-caller-id', [PhoneNumberController::class, 'setDefaultCallerId'])

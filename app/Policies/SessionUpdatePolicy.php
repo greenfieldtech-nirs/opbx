@@ -64,7 +64,7 @@ class SessionUpdatePolicy
      */
     public function disconnect(User $user): bool
     {
-        // Only admins and owners can disconnect calls
+        // Only the Owner can disconnect calls (canManageOrganization is owner-only).
         return $user->role->canManageOrganization();
     }
 }

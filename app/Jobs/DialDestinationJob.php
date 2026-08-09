@@ -177,6 +177,9 @@ class DialDestinationJob implements ShouldQueue
         $options = [
             'timeout' => $campaign->dial_timeout,
             'execute' => $campaign->destination_connect,
+            // Reject the call if it has not started within 5 minutes.
+            // Cloudonix expects an ISO-8601 timestamp for this field.
+            'deadline' => now()->addMinutes(5)->toIso8601String(),
         ];
 
         // Add time limit if configured

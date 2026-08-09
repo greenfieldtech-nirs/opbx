@@ -9,6 +9,9 @@ use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Models\UserEmbedToken;
+use App\Scopes\OrganizationScope;
+use App\Services\EmbedTokenService;
 use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
@@ -109,18 +112,38 @@ class UsersController extends AbstractApiCrudController
      */
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
+        // Eager-load the assigned extension so the users list can render the
+        // Extension column (and the detail/edit views) without an N+1.
+        $query->with('extension');
+
         $currentUser = $request->user();
 
         if ($currentUser && $currentUser->isSupervisor()) {
-            $assignedUserIds = $currentUser->supervisedUsers
-                ->pluck('id')
-                ->push($currentUser->id)
-                ->unique()
-                ->values()
-                ->toArray();
-
-            $query->whereIn('id', $assignedUserIds);
+            $this->restrictToSupervisedUsers($query, $currentUser);
         }
+    }
+
+    /**
+     * Load relationships needed by UserResource on the show endpoint.
+     */
+    protected function afterShow(Model $model, Request $request): void
+    {
+        $model->loadMissing('extension');
+    }
+
+    /**
+     * Restrict a query to the supervisor and their assigned users.
+     */
+    private function restrictToSupervisedUsers(Builder $query, User $currentUser): void
+    {
+        $assignedUserIds = $currentUser->supervisedUsers
+            ->pluck('id')
+            ->push($currentUser->id)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $query->whereIn('id', $assignedUserIds);
     }
 
     /**
@@ -223,8 +246,24 @@ class UsersController extends AbstractApiCrudController
      */
     protected function afterStore(Model $model, Request $request): void
     {
-        // Reload extension relationship
-        $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+        // Reload extension relationship (full, so UserResource can serialize it)
+        $model->loadMissing('extension');
+
+        // Auto-provision an embedded-dialer token for the new user.
+        try {
+            assert($model instanceof User);
+            $existing = OrganizationScope::bypass(
+                fn () => UserEmbedToken::where('user_id', $model->id)->exists()
+            );
+            if (! $existing) {
+                app(EmbedTokenService::class)->generateFor($model);
+            }
+        } catch (\Exception $embedException) {
+            Log::error('Failed to generate embed token for new user', [
+                'user_id' => $model->id,
+                'error' => $embedException->getMessage(),
+            ]);
+        }
 
         // Add audit logging for user creation
         try {
@@ -245,8 +284,8 @@ class UsersController extends AbstractApiCrudController
      */
     protected function afterUpdate(Model $model, Request $request): void
     {
-        // Reload extension relationship
-        $model->loadMissing(User::DEFAULT_EXTENSION_FIELDS);
+        // Reload extension relationship (full, so UserResource can serialize it)
+        $model->loadMissing('extension');
 
         // Add audit logging for user updates
         try {

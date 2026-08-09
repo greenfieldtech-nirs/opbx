@@ -388,10 +388,12 @@ class SessionUpdateController extends Controller
      * Disconnect an active session.
      *
      * Makes a DELETE request to Cloudonix API to terminate the session.
-     * Requires admin or owner role.
+     * Requires the Owner role (enforced by SessionUpdatePolicy::disconnect).
      */
     public function disconnectSession(int $sessionId): JsonResponse
     {
+        // Owner-only. The policy runs before any logic below and throws a 403
+        // AuthorizationException for every other role.
         $this->authorize('disconnect', SessionUpdate::class);
 
         try {
@@ -410,38 +412,6 @@ class SessionUpdateController extends Controller
                 \Log::warning('Disconnect failed: User not authenticated', ['session_id' => $sessionId]);
 
                 return response()->json(['error' => 'Authentication required'], 401);
-            }
-
-            // Check if user has permission to disconnect calls
-            // Convert enum to string value if needed
-            $userRoleValue = $user->role instanceof UserRole
-                ? $user->role->value
-                : $user->role;
-
-            $allowedRoles = ['admin', 'owner', 'pbx_admin'];
-            $hasPermission = in_array($userRoleValue, $allowedRoles);
-
-            \Log::info('Permission check for disconnect', [
-                'session_id' => $sessionId,
-                'user_id' => $user->id,
-                'user_role' => $userRoleValue,
-                'user_role_type' => gettype($user->role),
-                'user_role_class' => is_object($user->role) ? get_class($user->role) : 'not an object',
-                'allowed_roles' => $allowedRoles,
-                'has_permission' => $hasPermission,
-            ]);
-
-            if (! $hasPermission) {
-                \Log::warning('Disconnect failed: Insufficient permissions', [
-                    'session_id' => $sessionId,
-                    'user_id' => $user->id,
-                    'user_role' => $userRoleValue,
-                ]);
-
-                return response()->json([
-                    'error' => 'Forbidden',
-                    'message' => 'You do not have permission to disconnect calls',
-                ], 403);
             }
 
             if (! isset($user->organization_id) || empty($user->organization_id)) {

@@ -101,6 +101,29 @@ export const platformUsersApi = {
 };
 
 /**
+ * Operate-As (Platform Owner Impersonation) API
+ *
+ * `start` validates the target org and writes an audit entry; the actual
+ * context switch is driven by the `X-Operate-As-Organization` request header
+ * (see api.ts interceptor). `stop` writes the stop audit entry.
+ */
+export const platformOperateAsApi = {
+  start: (organizationId: string | number) =>
+    api
+      .post<{ data: { organization: { id: string; name: string; slug: string; status: string } } }>(
+        `/platform/operate-as/${organizationId}`,
+      )
+      .then((r) => r.data.data),
+
+  stop: (organizationId?: string | number) =>
+    api
+      .delete('/platform/operate-as', {
+        data: organizationId ? { organization_id: organizationId } : undefined,
+      })
+      .then(() => undefined),
+};
+
+/**
  * Platform Audit Logs API
  */
 export const platformAuditLogsApi = {
@@ -118,6 +141,7 @@ export const platformApi = {
   organizations: platformOrganizationsApi,
   users: platformUsersApi,
   auditLogs: platformAuditLogsApi,
+  operateAs: platformOperateAsApi,
 };
 
 export default platformApi;

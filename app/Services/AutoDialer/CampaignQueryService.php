@@ -30,10 +30,13 @@ class CampaignQueryService
     public function getActiveRunnableCampaigns(): Collection
     {
         return OrganizationScope::bypass(function () {
+            // Coarse date-window pre-filter widened by one day on each side to
+            // avoid excluding campaigns near their boundary in non-UTC
+            // timezones. Precise, timezone-aware gating is done by isRunnable().
             return AutoDialerCampaign::with(['organization.cloudonixSettings', 'callerIds'])
                 ->where('status', CampaignStatus::ACTIVE)
-                ->whereDate('start_date', '<=', now())
-                ->whereDate('end_date', '>=', now())
+                ->whereDate('start_date', '<=', now()->addDay())
+                ->whereDate('end_date', '>=', now()->subDay())
                 ->get()
                 ->filter(fn ($campaign) => $campaign->isRunnable())
                 ->values();

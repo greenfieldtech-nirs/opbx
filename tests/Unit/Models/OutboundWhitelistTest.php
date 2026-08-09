@@ -45,6 +45,7 @@ class OutboundWhitelistTest extends TestCase
             'destination_prefix',
             'outbound_trunk_name',
             'status',
+            'default_caller_id_did_id',
         ];
 
         $this->assertEquals($expectedFillable, $outboundWhitelist->getFillable());

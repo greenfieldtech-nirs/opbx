@@ -82,6 +82,7 @@ class SettingsController extends Controller
                 'domain_api_key' => $settings->getMaskedDomainApiKey(),
                 'domain_requests_api_key' => $settings->getMaskedDomainRequestsApiKey(),
                 'webhook_base_url' => $settings->webhook_base_url,
+                'embed_allowed_domains' => $settings->embed_allowed_domains ?? [],
                 'no_answer_timeout' => $settings->no_answer_timeout,
                 'recording_format' => $settings->recording_format,
                 'cloudonix_package' => $settings->cloudonix_package,
@@ -154,6 +155,9 @@ class SettingsController extends Controller
                 }
                 if (isset($validated['webhook_base_url'])) {
                     $changes[] = 'webhook_base_url';
+                }
+                if (array_key_exists('embed_allowed_domains', $validated)) {
+                    $changes[] = 'embed_allowed_domains';
                 }
                 if (isset($validated['no_answer_timeout'])) {
                     $changes[] = 'no_answer_timeout';

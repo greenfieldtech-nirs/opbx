@@ -29,6 +29,12 @@ class OutboundWhitelistResource extends JsonResource
             'destination_country' => $this->destination_country,
             'destination_prefix' => $this->destination_prefix,
             'outbound_trunk_name' => $this->outbound_trunk_name,
+            'default_caller_id_did_id' => $this->default_caller_id_did_id,
+            'default_caller_id' => $this->whenLoaded('defaultCallerId', fn () => $this->defaultCallerId ? [
+                'id' => $this->defaultCallerId->id,
+                'phone_number' => $this->defaultCallerId->phone_number,
+                'friendly_name' => $this->defaultCallerId->friendly_name,
+            ] : null),
             'status' => $this->status?->value ?? WhitelistStatus::ACTIVE->value,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

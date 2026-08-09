@@ -119,8 +119,10 @@ class OutboundRoutingService
             'whitelist_entry_id' => $whitelistEntry->id,
         ]);
 
-        // Resolve the outbound caller ID to present (extension DID -> org default -> Unknown)
-        $resolved = $this->callerIdResolver->resolve($fromExtension, $orgId);
+        // Resolve the outbound caller ID to present.
+        // Precedence: extension's selected DID -> whitelist rule's selected DID -> "Unknown".
+        // ponytail: callerName always null now, kept for the simpleDial() signature.
+        $resolved = $this->callerIdResolver->resolve($fromExtension, $whitelistEntry, $orgId);
 
         Log::info('OutboundRoutingService: Resolved outbound caller ID', [
             'from' => $from,

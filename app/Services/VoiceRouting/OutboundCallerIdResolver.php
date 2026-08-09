@@ -6,19 +6,21 @@ namespace App\Services\VoiceRouting;
 
 use App\Models\DidNumber;
 use App\Models\Extension;
-use App\Models\Organization;
+use App\Models\OutboundWhitelist;
 use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Resolves the outbound caller ID to present for a call originating from an
- * internal extension.
+ * internal extension and routed via an outbound whitelist rule.
  *
- * Resolution order (see design spec 2026-07-12-outbound-caller-id-design):
- *   1. The extension's own assigned inbound DID (reverse-derived from routing_config).
- *   2. The organization's designated default outbound caller ID DID.
- *   3. "Unknown" — no assigned number; present the literal "Unknown" for both
- *      callerId and callerName (Cloudonix expects callerId set to "Unknown").
+ * Applies ONLY to outbound calls (internal extension -> external destination).
+ * Internal and inbound calls do not use this resolver.
+ *
+ * Resolution order:
+ *   1. The from-extension's selected default caller ID DID (active).
+ *   2. The matched whitelist rule's selected default caller ID DID (active).
+ *   3. The literal "Unknown" — no caller ID configured anywhere.
  *
  * Runs outside an authenticated tenant context (voice routing webhooks), so all
  * queries bypass OrganizationScope and filter by organization_id explicitly,
@@ -27,69 +29,69 @@ use Illuminate\Support\Facades\Log;
 final class OutboundCallerIdResolver
 {
     /**
+     * Fallback caller ID presented when nothing is configured.
+     */
+    // ponytail: "Unknown" not "00000000" — some carriers reject the all-zeros number.
+    public const NO_CALLER_ID = 'Unknown';
+
+    /**
      * Resolve the caller ID and caller name to present for an outbound call.
      *
-     * @return array{callerId: ?string, callerName: ?string}
+     * @return array{callerId: string, callerName: ?string}
      */
-    public function resolve(Extension $fromExtension, int $orgId): array
+    public function resolve(Extension $fromExtension, OutboundWhitelist $whitelistEntry, int $orgId): array
     {
-        // Step 1 — the extension's own assigned inbound DID (reverse-derive).
-        $extensionDid = DidNumber::withoutGlobalScope(OrganizationScope::class)
-            ->where('organization_id', $orgId)
-            ->where('routing_type', 'extension')
-            ->where('routing_config->extension_id', $fromExtension->id)
-            ->orderBy('status') // 'active' sorts before 'inactive', preferring active
-            ->orderBy('id')
-            ->first();
+        // Step 1 — the extension's explicitly selected caller ID DID.
+        $extensionCallerId = $this->activeDidPhoneNumber($fromExtension->default_caller_id_did_id, $orgId);
 
-        if ($extensionDid !== null) {
-            Log::info('OutboundCallerIdResolver: resolved from extension DID', [
+        if ($extensionCallerId !== null) {
+            Log::info('OutboundCallerIdResolver: resolved from extension caller ID', [
                 'org_id' => $orgId,
                 'extension_id' => $fromExtension->id,
-                'did_id' => $extensionDid->id,
-                'caller_id' => $extensionDid->phone_number,
+                'caller_id' => $extensionCallerId,
             ]);
 
-            return ['callerId' => $extensionDid->phone_number, 'callerName' => null];
+            return ['callerId' => $extensionCallerId, 'callerName' => null];
         }
 
-        // Step 2 — the organization's default outbound caller ID DID.
-        $organization = Organization::find($orgId);
-        $defaultDidId = $organization?->settings['default_outbound_caller_id_did_id'] ?? null;
+        // Step 2 — the matched whitelist rule's selected caller ID DID.
+        $whitelistCallerId = $this->activeDidPhoneNumber($whitelistEntry->default_caller_id_did_id, $orgId);
 
-        if ($defaultDidId !== null) {
-            $defaultDid = DidNumber::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $orgId)
-                ->where('id', (int) $defaultDidId)
-                ->where('status', 'active')
-                ->first();
-
-            if ($defaultDid !== null) {
-                Log::info('OutboundCallerIdResolver: resolved from org default DID', [
-                    'org_id' => $orgId,
-                    'extension_id' => $fromExtension->id,
-                    'did_id' => $defaultDid->id,
-                    'caller_id' => $defaultDid->phone_number,
-                ]);
-
-                return ['callerId' => $defaultDid->phone_number, 'callerName' => null];
-            }
-
-            Log::debug('OutboundCallerIdResolver: configured default DID invalid or inactive', [
+        if ($whitelistCallerId !== null) {
+            Log::info('OutboundCallerIdResolver: resolved from whitelist caller ID', [
                 'org_id' => $orgId,
-                'extension_id' => $fromExtension->id,
-                'configured_did_id' => $defaultDidId,
+                'whitelist_entry_id' => $whitelistEntry->id,
+                'caller_id' => $whitelistCallerId,
             ]);
+
+            return ['callerId' => $whitelistCallerId, 'callerName' => null];
         }
 
-        // Step 3 — no assigned number; present the literal "Unknown".
-        // Cloudonix requires callerId to be set explicitly to "Unknown" for
-        // withheld/anonymous presentation, not omitted.
-        Log::info('OutboundCallerIdResolver: no caller ID resolved, presenting Unknown', [
+        // Step 3 — nothing configured; present the zero caller ID.
+        Log::info('OutboundCallerIdResolver: no caller ID configured, presenting zeros', [
             'org_id' => $orgId,
             'extension_id' => $fromExtension->id,
+            'whitelist_entry_id' => $whitelistEntry->id,
         ]);
 
-        return ['callerId' => 'Unknown', 'callerName' => 'Unknown'];
+        return ['callerId' => self::NO_CALLER_ID, 'callerName' => null];
+    }
+
+    /**
+     * Return the phone number of an active DID owned by the given org, or null.
+     */
+    private function activeDidPhoneNumber(?int $didId, int $orgId): ?string
+    {
+        if ($didId === null) {
+            return null;
+        }
+
+        $did = DidNumber::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $orgId)
+            ->where('id', $didId)
+            ->where('status', 'active')
+            ->first();
+
+        return $did?->phone_number;
     }
 }

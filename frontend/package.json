@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:embed": "vite build --config vite.embed.config.ts && mkdir -p ../public/embed/assets && cp dist-embed/embed-widget.js dist-embed/embed-widget.css ../public/embed/assets/",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit"
@@ -50,7 +51,7 @@
     "react-dom": "^18.3.1",
     "react-google-recaptcha": "^3.1.0",
     "react-hook-form": "^7.53.0",
-    "react-router-dom": "^6.26.0",
+    "react-router-dom": "^7.18.0",
     "react-syntax-highlighter": "^16.1.0",
     "recharts": "^3.8.1",
     "sonner": "^1.5.0",

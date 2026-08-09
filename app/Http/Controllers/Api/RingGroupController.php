@@ -67,6 +67,16 @@ class RingGroupController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
+        // Supervisors only see ring groups they are assigned to (empty assignment => empty list).
+        $currentUser = $request->user();
+        if ($currentUser && $currentUser->isSupervisor()) {
+            $assignedRingGroupIds = $currentUser->supervisedRingGroups
+                ->pluck('id')
+                ->all();
+
+            $query->whereIn('id', $assignedRingGroupIds);
+        }
+
         $query->with([
             'members' => function ($query) {
                 $query->select('id', 'ring_group_id', 'extension_id', 'priority')

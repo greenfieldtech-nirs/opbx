@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Models\CloudonixSettings;
 use App\Models\Extension;
+use App\Services\WebPhoneConfigBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +18,7 @@ final class WebPhoneConfigController extends Controller
 {
     use ApiRequestHandler;
 
-    public function config(Request $request): JsonResponse
+    public function config(Request $request, WebPhoneConfigBuilder $builder): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
@@ -40,15 +41,6 @@ final class WebPhoneConfigController extends Controller
             ], 404);
         }
 
-        $organization = $user->organization;
-        $country = 'us';
-        if ($organization && $organization->settings) {
-            $settingsCountry = strtolower(trim((string) ($organization->settings['country'] ?? '')));
-            if ($settingsCountry !== '') {
-                $country = $settingsCountry;
-            }
-        }
-
         Log::info('Web Phone config retrieved', [
             'request_id' => $this->getRequestId(),
             'user_id' => $user->id,
@@ -59,20 +51,7 @@ final class WebPhoneConfigController extends Controller
         ]);
 
         return response()->json([
-            'data' => [
-                'sip_username' => $extension->extension_number,
-                'sip_password' => $extension->password,
-                'sip_domain' => $cloudonixSettings->domain_name,
-                'sip_uri' => "sip:{$extension->extension_number}@{$cloudonixSettings->domain_name}",
-                'display_name' => $user->name,
-                'wss_server' => 'wss://webrtc.cloudonix.io',
-                'websocket_port' => 443,
-                'server_path' => '',
-                'sip_contact' => $extension->extension_number,
-                'profile_name' => $user->name,
-                'registration_mode' => 'Direct',
-                'country' => $country,
-            ],
+            'data' => $builder->buildForUser($user),
         ]);
     }
 }

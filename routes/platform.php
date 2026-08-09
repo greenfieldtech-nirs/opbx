@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Platform\PlatformAuditLogController;
 use App\Http\Controllers\Platform\PlatformDashboardController;
+use App\Http\Controllers\Platform\PlatformOperateAsController;
 use App\Http\Controllers\Platform\PlatformOrganizationController;
 use App\Http\Controllers\Platform\PlatformUserController;
 use Illuminate\Support\Facades\Route;
@@ -43,4 +44,8 @@ Route::prefix('v1/platform')
 
         // Audit Logs
         Route::get('/audit-logs', [PlatformAuditLogController::class, 'index']);
+
+        // Operate As Organization (platform-owner impersonation)
+        Route::post('/operate-as/{organization}', [PlatformOperateAsController::class, 'start']);
+        Route::delete('/operate-as', [PlatformOperateAsController::class, 'stop']);
     });

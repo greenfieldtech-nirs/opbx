@@ -8,6 +8,7 @@ use App\Enums\ExtensionType;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Models\Extension;
+use App\Services\CloudonixClient\CloudonixSubscriberService;
 use App\Services\PasswordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,8 @@ class ExtensionPasswordController extends Controller
     use ApiRequestHandler;
 
     public function __construct(
-        protected PasswordGenerator $passwordGenerator
+        protected PasswordGenerator $passwordGenerator,
+        protected CloudonixSubscriberService $subscriberService
     ) {}
 
     /**
@@ -125,6 +127,32 @@ class ExtensionPasswordController extends Controller
             $newPassword = $this->passwordGenerator->generate($length);
 
             $extension->update(['password' => $newPassword]);
+
+            // Push the new SIP password to Cloudonix so the subscriber's
+            // sipPassword matches the local value. Without this, the Web Phone
+            // (and any SIP client) registers with the new DB password while
+            // Cloudonix still holds the old one, causing "Authentication
+            // Rejected" on registration. forceUpdate=true ensures an update of
+            // the already-synced subscriber.
+            $syncResult = $this->subscriberService->syncToCloudnonix($extension, forceUpdate: true);
+
+            if (! ($syncResult['success'] ?? false)) {
+                Log::error('Extension password reset but Cloudonix sync failed', [
+                    'request_id' => $requestId,
+                    'user_id' => $user->id,
+                    'organization_id' => $user->organization_id,
+                    'extension_id' => $extension->id,
+                    'extension_number' => $extension->extension_number,
+                    'error' => $syncResult['error'] ?? 'Unknown error',
+                    'details' => $syncResult['details'] ?? [],
+                ]);
+
+                return response()->json([
+                    'error' => 'Password sync failed',
+                    'message' => 'The password was reset locally but could not be synced to the voice provider. '.
+                        'The extension may fail to register until this is resolved.',
+                ], 502);
+            }
 
             Log::info('Extension password reset successfully', [
                 'request_id' => $requestId,

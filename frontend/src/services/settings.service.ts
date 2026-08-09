@@ -44,6 +44,7 @@ export const settingsService = {
             domain_uuid: null,
             domain_api_key: null,
             domain_requests_api_key: null,
+            embed_allowed_domains: [],
             no_answer_timeout: 60,
             recording_format: 'mp3',
             callback_url: res.data.callback_url,

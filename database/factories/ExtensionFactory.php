@@ -33,6 +33,7 @@ class ExtensionFactory extends Factory
             'configuration' => [
                 'sip_uri' => 'sip:' . fake()->unique()->numberBetween(1000, 9999) . '@example.com',
             ],
+            'default_caller_id_did_id' => null,
         ];
     }
 

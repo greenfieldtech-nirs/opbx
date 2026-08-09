@@ -19,6 +19,7 @@ import {
   Filter,
   Search,
   History,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -131,6 +132,7 @@ export default function DistributionListDetail() {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: listData, isLoading: isListLoading } = useDistributionList(id!);
   const { data: destinationsData, isLoading: isDestinationsLoading } = useListDestinations(
@@ -178,6 +180,25 @@ export default function DistributionListDetail() {
       </div>
     );
   }
+
+  const refreshListData = () => {
+    // Page queries key off the string route param (id!), so invalidate with the
+    // same value — invalidating with the numeric list.id would not match.
+    queryClient.invalidateQueries({ queryKey: distributionListKeys.detail(id!) });
+    queryClient.invalidateQueries({ queryKey: distributionListKeys.destinations(id!) });
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: distributionListKeys.detail(id!) }),
+        queryClient.refetchQueries({ queryKey: distributionListKeys.destinations(id!) }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleDownload = async () => {
     try {
@@ -303,6 +324,10 @@ export default function DistributionListDetail() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           {canManage && list.status !== 'in_use' && (
             <Button variant="outline" onClick={() => setIsUploadOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
@@ -750,8 +775,7 @@ export default function DistributionListDetail() {
         onOpenChange={setIsUploadOpen}
         onSuccess={() => {
           // Refresh current list data - same list is updated
-          queryClient.invalidateQueries({ queryKey: distributionListKeys.detail(list.id) });
-          queryClient.invalidateQueries({ queryKey: distributionListKeys.destinations(list.id) });
+          refreshListData();
           toast.success('Upload completed successfully');
         }}
       />

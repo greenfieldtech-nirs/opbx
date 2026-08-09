@@ -16,7 +16,12 @@ Use this module to:
 
 - Restrict outbound dialing by destination country and prefix
 - Assign outbound trunks to specific destinations
+- Assign a default outbound caller ID for destinations matching a rule
 - Enable or disable rules per destination
+
+:::tip
+For a full explanation of how OPBX authorizes outbound calls and decides which caller ID to present, see the [Outbound Calling Overview](/installation/outbound-calling-overview).
+:::
 
 ## Matching Algorithm
 
@@ -45,9 +50,16 @@ The entry with the highest score wins. A prefix that does not match rejects the 
 2. Click **Add Rule**
 3. Enter a name
 4. Select the destination country
-5. Enter the destination prefix
+5. Enter the destination prefix (optional)
 6. Select the outbound trunk name
-7. Save
+7. Optionally select a **Default Caller ID** — an active DID owned by your organization to present on calls matching this rule
+8. Save
+
+The destination country must be unique within your organization — you cannot create two rules for the same country.
+
+### Default Caller ID
+
+When set, the rule's Default Caller ID is presented on outbound calls matching this rule **unless the calling extension has its own caller ID**, which takes precedence. See the [Outbound Calling Overview](/installation/outbound-calling-overview) for the full precedence order.
 
 ### Toggle Status
 
@@ -62,10 +74,13 @@ Use the status toggle to enable or disable a rule. Disabled rules are not used f
 | `id` | bigint | Primary key |
 | `organization_id` | FK | Tenant scope |
 | `name` | string | |
-| `destination_country` | string | |
-| `destination_prefix` | string | |
+| `destination_country` | string | Unique per organization |
+| `destination_prefix` | string nullable | Digits, spaces, `+`, `-` only; max 12 chars |
 | `outbound_trunk_name` | string | |
+| `default_caller_id_did_id` | FK nullable | DID presented as caller ID for matching calls |
 | `status` | enum | active, inactive |
+
+The API also returns a nested `default_caller_id` object (`id`, `phone_number`, `friendly_name`) when the relationship is loaded.
 
 ## Related API Endpoints
 
@@ -78,5 +93,7 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related Modules
 
+- [Outbound Calling Overview](/installation/outbound-calling-overview) — How outbound calls are authorized and caller IDs assigned
+- [Phone Numbers (DIDs)](/modules/phone-numbers) — DIDs used as the default caller ID
 - [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Outbound trunk selection for campaigns
 - [Voice Routing Engine](/installation/concepts) — OutboundRoutingService is used during call routing

@@ -37,8 +37,15 @@ class PlatformAuditService
         ?array $afterState = null,
         ?string $reason = null,
     ): PlatformAuditLog {
+        // Anchor attribution to the REAL platform manager. During an operate-as
+        // session the resolved user ($request->user()) is the in-memory effective
+        // org owner but retains the real user id; the real id is also stashed as a
+        // request attribute. Prefer that attribute so attribution is unambiguous.
+        $platformManagerId = $request->attributes->get('operate_as_real_user_id')
+            ?? $request->user()->id;
+
         return PlatformAuditLog::create([
-            'platform_manager_user_id' => $request->user()->id,
+            'platform_manager_user_id' => $platformManagerId,
             'target_organization_id' => $targetOrganizationId,
             'action' => $action,
             'target_entity_type' => $targetEntityType,

@@ -25,7 +25,7 @@ Outbound calling campaigns that automatically dial phone numbers from distributi
 | `app/Models/AutoDialerCallerIdStat.php` | Per-DID usage statistics |
 | `app/Enums/CampaignStatus.php` | DRAFT, ACTIVE, PAUSED, COMPLETED, ARCHIVED |
 | `app/Enums/DestinationStatus.php` | PENDING, DIALING, CONNECTED, FAILED, COMPLETED, INVALID |
-| `app/Services/AutoDialer/AutoDialerCloudonixService.php` | Cloudonix API calls + CXML generation with AMD stream wrapper (~937 lines) |
+| `app/Services/AutoDialer/AutoDialerCloudonixService.php` | Cloudonix API calls + CXML generation with AMD stream wrapper (~937 lines). Outbound payload built in `buildPayload()` (POST `/calls/{domain}/application`); always includes `deadline` = now+5min (ISO-8601) so Cloudonix rejects the call if not started within 5 minutes. |
 | `app/Services/AutoDialer/CampaignLifecycleManager.php` | State transitions (~197 lines) |
 | `app/Services/AutoDialer/CampaignProcessor.php` | Batch processing (~156 lines) |
 | `app/Services/AutoDialer/CampaignStatistics.php` | Stats with caching |
@@ -99,6 +99,8 @@ Campaigns connect answered calls to: AI_ASSISTANT, AI_LOAD_BALANCER, HANGUP
 ## Campaign Scheduling (isRunnable)
 
 A campaign is runnable when: status is ACTIVE, current date within start_date/end_date range, current day/time within the `schedule` JSON's enabled time ranges for today.
+
+**Timezone**: `AutoDialerCampaign::isRunnable()` evaluates "now" via `now($this->timezone ?? 'UTC')` so day-of-week and time-of-day are compared against the schedule in the campaign's local timezone (not the app default UTC). Date range is compared on calendar-date strings to avoid tz-offset edge cases. The dialer worker has no schedule logic — it relies entirely on this server-side check via `CampaignQueryService::getActiveRunnableCampaigns()` -> `DialerWorkerController::getActiveCampaigns()`. The SQL date pre-filters in `scopeRunnable()` and `getActiveRunnableCampaigns()` are widened by +/-1 day so non-UTC campaigns near a boundary aren't excluded before the precise `isRunnable()` check. Note: `DialingScheduler::isWithinSchedule()` is a separate, timezone-aware checker used by the Laravel queue jobs that reads the legacy `start_time`/`end_time`/`days_active` columns instead of the `schedule` JSON.
 
 ---
 

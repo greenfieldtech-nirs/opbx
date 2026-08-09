@@ -7,7 +7,8 @@ paths:
       description: |
         Returns the users and ring groups assigned to a Supervisor. If the target
         user is not a Supervisor, the `user_ids` and `ring_group_ids` arrays are empty.
-        Owner and PBX Admin only.
+        Owner and PBX Admin can view any supervisor's assignments; a supervisor may
+        view their own.
       operationId: getSupervisorAssignments
       security:
         - bearerAuth: []
@@ -42,8 +43,7 @@ paths:
       description: |
         Replaces the Supervisor's assigned users and ring groups with the supplied
         sets. All resources must belong to the same organization. A Supervisor cannot
-        be assigned to themselves or to another Supervisor; only `pbx_user` users are
-        valid supervised users. Owner and PBX Admin only.
+        be assigned to themselves or to another Supervisor. Owner and PBX Admin only.
       operationId: updateSupervisorAssignments
       security:
         - bearerAuth: []
@@ -67,7 +67,7 @@ paths:
               properties:
                 user_ids:
                   type: array
-                  description: IDs of PBX Users this Supervisor may monitor.
+                  description: IDs of organization users this Supervisor may monitor.
                   items:
                     type: integer
                 ring_group_ids:

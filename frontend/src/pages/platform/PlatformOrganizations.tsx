@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { useOperateAs } from '@/context/OperateAsContext';
 import {
   Building2,
   Plus,
@@ -25,6 +26,7 @@ import {
   Globe,
   ChevronDown,
   ChevronUp,
+  LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -75,6 +77,7 @@ export default function PlatformOrganizations() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
+  const { enter: enterOperateAs } = useOperateAs();
   const hasRefreshed = useRef(false);
 
   // Refresh cache on mount (only once)
@@ -154,6 +157,15 @@ export default function PlatformOrganizations() {
       toast.success(`Organization ${newStatus === 'active' ? 'activated' : newStatus === 'suspended' ? 'suspended' : 'deleted'}`);
     } catch {
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleOperateAs = async (org: PlatformOrganization) => {
+    try {
+      await enterOperateAs({ id: Number(org.id), name: org.name });
+      navigate('/ui/dashboard');
+    } catch {
+      // enter() already surfaces the error toast; nothing persisted.
     }
   };
 
@@ -252,6 +264,23 @@ export default function PlatformOrganizations() {
       header: 'Created',
       sortKey: 'created_at',
       cell: (org) => formatDate(org.created_at),
+    },
+    {
+      header: 'Operate As',
+      cell: (org) => (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={org.status !== 'active'}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOperateAs(org);
+          }}
+        >
+          <LogIn className="h-4 w-4 mr-2" />
+          Operate as
+        </Button>
+      ),
     },
   ];
 
