@@ -536,6 +536,7 @@ export interface ActiveCall {
   subscriber_id: number | null;
   call_ids: string[];
   has_qos_data: boolean;
+  user_full_name: string;
 }
 
 export interface ActiveCallsResponse {
@@ -635,6 +636,7 @@ export interface CallDetailRecord {
   // Call participants
   from: string;
   to: string;
+  direction: string | null;
 
   // Call details
   disposition: string;
@@ -653,6 +655,7 @@ export interface CallDetailRecord {
   // Routing information
   domain: string;
   subscriber?: string;
+  user_full_name: string;
   cx_trunk_id?: string;
   application?: string;
   route?: string;
@@ -688,6 +691,10 @@ export interface CDRFilters {
   from_date?: string; // ISO date string
   to_date?: string; // ISO date string
   disposition?: string;
+  user?: string; // partial match on the extension's assigned user's name
+  direction?: string; // incoming | outgoing | internal | application
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 // ============================================================================

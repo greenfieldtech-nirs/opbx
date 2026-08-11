@@ -150,15 +150,52 @@ class SessionUpdateController extends Controller
 
             // Limit results and transform to API format
             $calls = array_slice(array_values($latestBySession), 0, 100);
-            $calls = array_map(function ($call) {
+
+            // Resolve the user assigned to each call's extension, keyed by the
+            // Cloudonix subscriber ID that Cloudonix reports for the session.
+            $subscriberIds = collect($calls)
+                ->pluck('subscriber_id')
+                ->filter()
+                ->map(fn ($id) => (string) $id)
+                ->unique()
+                ->values();
+
+            $userNamesBySubscriberId = $subscriberIds->isEmpty()
+                ? collect()
+                : \App\Models\Extension::whereIn('cloudonix_subscriber_id', $subscriberIds)
+                    ->with('user:id,name')
+                    ->get()
+                    ->keyBy('cloudonix_subscriber_id')
+                    ->map(fn ($extension) => $extension->user?->name);
+
+            // Session updates are stored with callerId/destination normalized to
+            // E.164 (leading "+") regardless of whether the party is an internal
+            // extension or an external phone number. Strip the "+" back off for
+            // display when the value is actually one of this organization's
+            // extension numbers, so internal legs read as plain extensions.
+            $extensionNumbers = \App\Models\Extension::pluck('extension_number')
+                ->map(fn ($number) => (string) $number)
+                ->flip();
+
+            $formatParty = function (?string $value) use ($extensionNumbers) {
+                if ($value === null) {
+                    return $value;
+                }
+
+                $stripped = ltrim($value, '+');
+
+                return $extensionNumbers->has($stripped) ? $stripped : $value;
+            };
+
+            $calls = array_map(function ($call) use ($userNamesBySubscriberId, $formatParty) {
                 try {
                     $callIds = json_decode($call->call_ids ?? '[]', true);
                     $profile = json_decode($call->profile ?? '{}', true);
 
                     return [
                         'session_id' => $call->session_id,
-                        'caller_id' => $call->caller_id,
-                        'destination' => $call->destination,
+                        'caller_id' => $formatParty($call->caller_id),
+                        'destination' => $formatParty($call->destination),
                         'direction' => $call->direction,
                         'status' => $call->status,
                         'session_created_at' => $call->session_created_at,
@@ -175,6 +212,9 @@ class SessionUpdateController extends Controller
                         'subscriber_id' => $call->subscriber_id,
                         'call_ids' => is_array($callIds) ? $callIds : [],
                         'has_qos_data' => isset($profile['qos']),
+                        'user_full_name' => $call->subscriber_id
+                            ? ($userNamesBySubscriberId->get((string) $call->subscriber_id) ?? 'Unassigned')
+                            : 'Unassigned',
                     ];
                 } catch (\Exception $e) {
                     // Log the error and return a minimal response for this call
@@ -190,6 +230,7 @@ class SessionUpdateController extends Controller
                         'destination' => $call->destination ?? 'unknown',
                         'direction' => $call->direction ?? 'unknown',
                         'status' => $call->status ?? 'unknown',
+                        'user_full_name' => 'Unassigned',
                         'error' => 'Data processing error',
                     ];
                 }

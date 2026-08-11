@@ -33,6 +33,9 @@ class CallDetailRecordResource extends JsonResource
             // Call participants
             'from' => $this->from,
             'to' => $this->to,
+            'direction' => $this->resource->relationLoaded('sessionUpdate')
+                ? $this->sessionUpdate?->direction
+                : null,
 
             // Call details
             'disposition' => $this->disposition,
@@ -51,6 +54,9 @@ class CallDetailRecordResource extends JsonResource
             // Routing information
             'domain' => $this->domain,
             'subscriber' => $this->subscriber,
+            'user_full_name' => $this->resource->relationLoaded('extension')
+                ? ($this->extension?->user?->name ?? 'Unassigned')
+                : 'Unassigned',
             'cx_trunk_id' => $this->cx_trunk_id,
             'application' => $this->application,
             'route' => $this->route,

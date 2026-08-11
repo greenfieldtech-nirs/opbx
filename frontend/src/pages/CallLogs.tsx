@@ -44,6 +44,19 @@ export default function CallLogs() {
   const [selectedCdr, setSelectedCdr] = useState<CallDetailRecord | null>(null);
   const [showCdrDetails, setShowCdrDetails] = useState(false);
 
+  // Sorting state - always defaults to Session Time descending
+  const [sortField, setSortField] = useState('session_timestamp');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (field: string) => {
+    if (field === sortField) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
   // Form state for filters
   const [filterForm, setFilterForm] = useState({
     from: '',
@@ -51,6 +64,8 @@ export default function CallLogs() {
     from_date: '',
     to_date: '',
     disposition: '',
+    user: '',
+    direction: '',
   });
 
   // Auto-refresh interval state (default: 30 seconds)
@@ -94,8 +109,11 @@ export default function CallLogs() {
     isFetching: cdrIsFetching,
     refetch: refetchCdr,
   } = useQuery({
-    queryKey: ['cdrs', cdrPage, cdrFilters, isSupervisor ? 'supervisor' : 'all'],
-    queryFn: () => cdrService.getAll({ ...cdrFilters, page: cdrPage }, isSupervisor),
+    queryKey: ['cdrs', cdrPage, cdrFilters, sortField, sortDirection, isSupervisor ? 'supervisor' : 'all'],
+    queryFn: () => cdrService.getAll(
+      { ...cdrFilters, page: cdrPage, sort_by: sortField, sort_order: sortDirection },
+      isSupervisor
+    ),
     refetchInterval: refreshInterval,
     refetchIntervalInBackground: true,
     staleTime: 0,
@@ -124,6 +142,8 @@ export default function CallLogs() {
     if (filterForm.from_date) newFilters.from_date = filterForm.from_date;
     if (filterForm.to_date) newFilters.to_date = filterForm.to_date;
     if (filterForm.disposition) newFilters.disposition = filterForm.disposition;
+    if (filterForm.user) newFilters.user = filterForm.user;
+    if (filterForm.direction) newFilters.direction = filterForm.direction;
 
     setCdrFilters(newFilters);
     setCdrPage(1);
@@ -136,6 +156,8 @@ export default function CallLogs() {
       from_date: '',
       to_date: '',
       disposition: '',
+      user: '',
+      direction: '',
     });
     setCdrFilters({ per_page: 50 });
     setCdrPage(1);
@@ -238,7 +260,7 @@ export default function CallLogs() {
           {/* Filters */}
           {showFilters && (
             <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
                   <Label htmlFor="filter-from">From Number</Label>
                   <Input
@@ -273,6 +295,32 @@ export default function CallLogs() {
                       <SelectItem value="FAILED">Failed</SelectItem>
                       <SelectItem value="CANCELLED">Cancelled</SelectItem>
                       <SelectItem value="CONGESTION">Congestion</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="filter-user">User</Label>
+                  <Input
+                    id="filter-user"
+                    placeholder="e.g., Jane Doe"
+                    value={filterForm.user}
+                    onChange={(e) => setFilterForm({ ...filterForm, user: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="filter-direction">Direction</Label>
+                  <Select
+                    value={filterForm.direction || undefined}
+                    onValueChange={(value) => setFilterForm({ ...filterForm, direction: value })}
+                  >
+                    <SelectTrigger id="filter-direction">
+                      <SelectValue placeholder="All directions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="incoming">Incoming</SelectItem>
+                      <SelectItem value="outgoing">Outgoing</SelectItem>
+                      <SelectItem value="internal">Internal</SelectItem>
+                      <SelectItem value="application">Application</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -312,6 +360,7 @@ export default function CallLogs() {
           <StandardDataTable<CallDetailRecord & { id: string | number }>
             data={(cdrData?.data || []).map(cdr => ({ ...cdr, id: cdr.id }))}
             isLoading={cdrIsLoading}
+            showIdentityColumn={false}
             identityIcon={Database}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
@@ -321,15 +370,54 @@ export default function CallLogs() {
             canView={false}
             canEdit={false}
             canDelete={false}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
             columns={[
               {
                 header: 'Session Time',
                 accessorKey: 'session_timestamp' as any,
+                sortKey: 'session_timestamp',
                 cell: (cdr) => formatDateTime(cdr.session_timestamp)
+              },
+              {
+                header: 'Extension Number',
+                accessorKey: 'from' as any,
+                sortKey: 'from',
+                cell: (cdr) => formatPhoneNumber(cdr.from),
+              },
+              {
+                header: 'User',
+                accessorKey: 'user_full_name' as any,
+                sortKey: 'user_full_name',
+                cell: (cdr) => (
+                  <span className={cn(
+                    'text-sm',
+                    cdr.user_full_name === 'Unassigned' && 'text-muted-foreground italic'
+                  )}>
+                    {cdr.user_full_name}
+                  </span>
+                ),
+              },
+              {
+                header: 'Destination',
+                accessorKey: 'to' as any,
+                cell: (cdr) => formatPhoneNumber(cdr.to),
+              },
+              {
+                header: 'Direction',
+                accessorKey: 'direction' as any,
+                sortKey: 'direction',
+                cell: (cdr) => (
+                  <span className="text-sm capitalize">
+                    {cdr.direction || '-'}
+                  </span>
+                ),
               },
               {
                 header: 'Disposition',
                 accessorKey: 'disposition' as any,
+                sortKey: 'disposition',
                 cell: (cdr) => (
                   <span
                     className={cn(
