@@ -52,6 +52,16 @@ class CallDetailRecordController extends AbstractApiCrudController
         return 'desc';
     }
 
+    protected function buildIndexQuery(Builder $query, Request $request): void
+    {
+        $query->with('extension.user:id,name');
+    }
+
+    protected function afterShow(\Illuminate\Database\Eloquent\Model $model, Request $request): void
+    {
+        $model->loadMissing('extension.user:id,name');
+    }
+
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
         // Supervisor-scoped filter: restrict CDRs to resources the Supervisor manages

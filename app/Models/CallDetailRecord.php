@@ -119,6 +119,15 @@ class CallDetailRecord extends Model
     }
 
     /**
+     * Get the extension whose Cloudonix subscriber UUID matches this CDR's
+     * `subscriber` field, if any.
+     */
+    public function extension(): BelongsTo
+    {
+        return $this->belongsTo(Extension::class, 'subscriber', 'cloudonix_uuid');
+    }
+
+    /**
      * Create a CDR from Cloudonix webhook payload
      *
      * @param  array  $payload  Cloudonix CDR webhook payload

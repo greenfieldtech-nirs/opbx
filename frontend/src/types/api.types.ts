@@ -654,6 +654,7 @@ export interface CallDetailRecord {
   // Routing information
   domain: string;
   subscriber?: string;
+  user_full_name: string;
   cx_trunk_id?: string;
   application?: string;
   route?: string;

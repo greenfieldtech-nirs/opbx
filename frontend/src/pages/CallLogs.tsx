@@ -312,6 +312,7 @@ export default function CallLogs() {
           <StandardDataTable<CallDetailRecord & { id: string | number }>
             data={(cdrData?.data || []).map(cdr => ({ ...cdr, id: cdr.id }))}
             isLoading={cdrIsLoading}
+            showIdentityColumn={false}
             identityIcon={Database}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
@@ -326,6 +327,28 @@ export default function CallLogs() {
                 header: 'Session Time',
                 accessorKey: 'session_timestamp' as any,
                 cell: (cdr) => formatDateTime(cdr.session_timestamp)
+              },
+              {
+                header: 'Extension Number',
+                accessorKey: 'from' as any,
+                cell: (cdr) => formatPhoneNumber(cdr.from),
+              },
+              {
+                header: 'User',
+                accessorKey: 'user_full_name' as any,
+                cell: (cdr) => (
+                  <span className={cn(
+                    'text-sm',
+                    cdr.user_full_name === 'Unassigned' && 'text-muted-foreground italic'
+                  )}>
+                    {cdr.user_full_name}
+                  </span>
+                ),
+              },
+              {
+                header: 'Destination',
+                accessorKey: 'to' as any,
+                cell: (cdr) => formatPhoneNumber(cdr.to),
               },
               {
                 header: 'Disposition',
