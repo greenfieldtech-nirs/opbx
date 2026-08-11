@@ -33,6 +33,9 @@ class CallDetailRecordResource extends JsonResource
             // Call participants
             'from' => $this->from,
             'to' => $this->to,
+            'direction' => $this->resource->relationLoaded('sessionUpdate')
+                ? $this->sessionUpdate?->direction
+                : null,
 
             // Call details
             'disposition' => $this->disposition,

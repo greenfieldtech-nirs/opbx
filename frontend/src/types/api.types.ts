@@ -636,6 +636,7 @@ export interface CallDetailRecord {
   // Call participants
   from: string;
   to: string;
+  direction: string | null;
 
   // Call details
   disposition: string;
@@ -690,6 +691,10 @@ export interface CDRFilters {
   from_date?: string; // ISO date string
   to_date?: string; // ISO date string
   disposition?: string;
+  user?: string; // partial match on the extension's assigned user's name
+  direction?: string; // incoming | outgoing | internal | application
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 // ============================================================================

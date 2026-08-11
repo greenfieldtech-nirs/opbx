@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Call Detail Record (CDR) Model
@@ -125,6 +126,16 @@ class CallDetailRecord extends Model
     public function extension(): BelongsTo
     {
         return $this->belongsTo(Extension::class, 'subscriber', 'cloudonix_uuid');
+    }
+
+    /**
+     * Get the most recent session_updates row for this CDR's session, used to
+     * surface data (e.g. call direction) that Cloudonix's CDR webhook itself
+     * doesn't include but the session-update webhooks do.
+     */
+    public function sessionUpdate(): HasOne
+    {
+        return $this->hasOne(SessionUpdate::class, 'session_id', 'session_id')->latestOfMany('id');
     }
 
     /**

@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -34,12 +35,12 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['from', 'to', 'disposition', 'from_date', 'to_date'];
+        return ['from', 'to', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
     }
 
     protected function getAllowedSortFields(): array
     {
-        return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition'];
+        return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition', 'user_full_name', 'direction'];
     }
 
     protected function getDefaultSortField(): string
@@ -54,12 +55,56 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
-        $query->with('extension.user:id,name');
+        $query->with(['extension.user:id,name', 'sessionUpdate']);
+
+        // Sorting by the assigned user's name or call direction requires joining
+        // through to tables that aren't directly on call_detail_records. The
+        // joined subqueries deliberately avoid selecting `organization_id` -
+        // joining the raw `extensions`/`session_updates` tables would pull an
+        // ambiguous `organization_id` column into scope and break the
+        // unqualified `organization_id` predicate Eloquent's OrganizationScope
+        // adds elsewhere in the query. Matching on `cloudonix_uuid`/`session_id`
+        // alone is safe since both are Cloudonix-assigned, platform-wide unique
+        // identifiers, not values scoped per organization.
+        $sortBy = $request->input('sort_by');
+        $organizationId = $request->user()?->organization_id;
+
+        if ($sortBy === 'user_full_name') {
+            $extensionUsers = DB::table('extensions')
+                ->join('users', 'users.id', '=', 'extensions.user_id')
+                ->where('extensions.organization_id', $organizationId)
+                ->select('extensions.cloudonix_uuid', 'users.name as user_name');
+
+            $query->select('call_detail_records.*')
+                ->leftJoinSub($extensionUsers, 'extension_users', function ($join): void {
+                    $join->on('extension_users.cloudonix_uuid', '=', 'call_detail_records.subscriber');
+                })
+                ->addSelect('extension_users.user_name as user_full_name');
+        }
+
+        if ($sortBy === 'direction') {
+            $latestSessionUpdates = DB::table('session_updates')
+                ->where('organization_id', $organizationId)
+                ->select('session_id', DB::raw('MAX(id) as max_id'))
+                ->groupBy('session_id');
+
+            $callDirections = DB::table('session_updates')
+                ->joinSub($latestSessionUpdates, 'latest_session_updates', function ($join): void {
+                    $join->on('session_updates.id', '=', 'latest_session_updates.max_id');
+                })
+                ->select('session_updates.session_id', 'session_updates.direction');
+
+            $query->select('call_detail_records.*')
+                ->leftJoinSub($callDirections, 'call_directions', function ($join): void {
+                    $join->on('call_directions.session_id', '=', 'call_detail_records.session_id');
+                })
+                ->addSelect('call_directions.direction as direction');
+        }
     }
 
     protected function afterShow(\Illuminate\Database\Eloquent\Model $model, Request $request): void
     {
-        $model->loadMissing('extension.user:id,name');
+        $model->loadMissing(['extension.user:id,name', 'sessionUpdate']);
     }
 
     protected function applyCustomFilters(Builder $query, Request $request): void
@@ -82,6 +127,23 @@ class CallDetailRecordController extends AbstractApiCrudController
         // Filter by disposition
         if ($request->filled('disposition')) {
             $query->where('disposition', $request->input('disposition'));
+        }
+
+        // Filter by the extension's assigned user (partial name match)
+        if ($request->filled('user')) {
+            $search = $request->input('user');
+            $query->whereHas('extension.user', function ($q) use ($search): void {
+                $q->where('name', 'like', '%'.$search.'%');
+            });
+        }
+
+        // Filter by call direction (incoming/outgoing/internal/application),
+        // as reported by the session-update webhooks for this CDR's session.
+        if ($request->filled('direction')) {
+            $direction = $request->input('direction');
+            $query->whereHas('sessionUpdate', function ($q) use ($direction): void {
+                $q->where('direction', $direction);
+            });
         }
 
         // Filter by date range
@@ -141,6 +203,20 @@ class CallDetailRecordController extends AbstractApiCrudController
 
         if ($request->filled('disposition')) {
             $query->where('disposition', $request->input('disposition'));
+        }
+
+        if ($request->filled('user')) {
+            $search = $request->input('user');
+            $query->whereHas('extension.user', function ($q) use ($search): void {
+                $q->where('name', 'like', '%'.$search.'%');
+            });
+        }
+
+        if ($request->filled('direction')) {
+            $direction = $request->input('direction');
+            $query->whereHas('sessionUpdate', function ($q) use ($direction): void {
+                $q->where('direction', $direction);
+            });
         }
 
         if ($request->filled('from_date')) {
