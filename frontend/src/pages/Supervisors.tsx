@@ -3,7 +3,6 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  Plus,
   Search,
   Users,
   X,
@@ -27,7 +26,6 @@ import {
   EmptyState,
 } from '@/components/design-system';
 import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorAssignmentDialog';
-import { CreateSupervisorDialog } from '@/components/Supervisors/CreateSupervisorDialog';
 import { usersService } from '@/services/createResourceService';
 import { getSupervisorAssignments } from '@/services/supervisorAssignments.service';
 import type { User, UserStatus } from '@/types';
@@ -37,7 +35,6 @@ export default function Supervisors() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [assignmentUserId, setAssignmentUserId] = useState<string | null>(null);
 
@@ -100,10 +97,6 @@ export default function Supervisors() {
   const openAssignmentDialog = (userId: string) => {
     setAssignmentUserId(userId);
     setShowAssignmentDialog(true);
-  };
-
-  const handleCreated = (userId: string) => {
-    openAssignmentDialog(userId);
   };
 
   const toggleStatusMutation = useMutation({
@@ -179,10 +172,6 @@ export default function Supervisors() {
             Manage supervisors and their monitoring assignments
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Supervisor
-        </Button>
       </div>
 
       {/* Filters */}
@@ -297,22 +286,12 @@ export default function Supervisors() {
               <EmptyState
                 icon={Users}
                 title="No supervisors yet"
-                description="Supervisors can monitor assigned users and ring groups. Create your first supervisor to get started."
-                action={{
-                  label: 'Create Supervisor',
-                  onClick: () => setShowCreateDialog(true),
-                }}
+                description="Assign the Supervisor role to a user on the Users page to get started."
               />
             }
           />
         </CardContent>
       </Card>
-
-      <CreateSupervisorDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onCreated={handleCreated}
-      />
 
       <SupervisorAssignmentDialog
         userId={assignmentUserId}
