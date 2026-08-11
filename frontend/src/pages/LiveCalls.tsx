@@ -94,6 +94,7 @@ interface LiveCall {
   session_created_at: string;
   duration_seconds: number;
   formatted_duration: string;
+  user_full_name: string;
 }
 
 /**
@@ -181,6 +182,7 @@ export default function LiveCalls() {
             session_created_at: call.session_created_at,
             duration_seconds: call.duration_seconds || 0,
             formatted_duration: call.formatted_duration || '0s',
+            user_full_name: call.user_full_name || 'Unassigned',
           };
         });
       setLiveCalls(calls);
@@ -227,6 +229,7 @@ export default function LiveCalls() {
             session_created_at: wsCall.initiated_at,
             duration_seconds: wsCall.duration,
             formatted_duration: formatCallDuration(wsCall.duration),
+            user_full_name: 'Unassigned',
           });
         }
       });
@@ -651,6 +654,18 @@ export default function LiveCalls() {
                       {getDirectionIcon(call.direction)}
                       <span className="capitalize text-sm">{call.direction}</span>
                     </div>
+                  ),
+                },
+                {
+                  header: 'User',
+                  accessorKey: 'user_full_name',
+                  cell: (call) => (
+                    <span className={cn(
+                      'text-sm',
+                      call.user_full_name === 'Unassigned' && 'text-muted-foreground italic'
+                    )}>
+                      {call.user_full_name}
+                    </span>
                   ),
                 },
                 {

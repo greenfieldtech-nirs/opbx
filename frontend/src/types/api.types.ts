@@ -536,6 +536,7 @@ export interface ActiveCall {
   subscriber_id: number | null;
   call_ids: string[];
   has_qos_data: boolean;
+  user_full_name: string;
 }
 
 export interface ActiveCallsResponse {
