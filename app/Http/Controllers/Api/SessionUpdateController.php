@@ -11,6 +11,7 @@ use App\Http\Requests\CoachTargetRequest;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
+use App\Services\ActiveCallsService;
 use App\Services\CloudonixClient\CloudonixClient;
 use App\Services\Supervisor\SupervisorFilterService;
 use Carbon\Carbon;
@@ -57,68 +58,20 @@ class SessionUpdateController extends Controller
             $organizationId = $user->organization_id;
 
             $isSupervisor = $request->boolean('supervisor') && $user->isSupervisor();
-            $supervisorIdentifiers = [];
+            $supervisorIdentifiers = null;
 
             if ($isSupervisor) {
                 $supervisorIdentifiers = app(SupervisorFilterService::class)
                     ->resourceIdentifiers($user);
             }
 
-            // Query for active calls using raw database query to avoid model issues
             try {
-                // First, get sessions that have been completed or deleted
-                // These sessions should not appear in the active calls list
-                // Look back 24 hours to catch any recent completions
-                $completedSessionIds = DB::table('session_updates')
-                    ->where('organization_id', $organizationId)
-                    ->whereIn('action', ['cdr_final_status', 'deleted'])
-                    ->where('updated_at', '>=', now()->subHours(24))
-                    ->pluck('session_id')
-                    ->unique();
-
-                // Get the latest session_update for each active session using a subquery
-                // This ensures we get the most recent status for each session
-                // We also exclude sessions that have ever been deleted or finalized,
-                // even if there are stale records after the deletion
-                //
-                // IMPORTANT: Only consider calls active if they've been updated recently
-                // (within the last 30 minutes). This prevents stale records from appearing
-                // in the active calls list when Cloudonix webhooks fail or are delayed.
-                $activeCutoff = now()->subMinutes(30);
-
-                $subquery = DB::table('session_updates')
-                    ->select('session_id', DB::raw('MAX(id) as max_id'))
-                    ->where('organization_id', $organizationId)
-                    ->when($isSupervisor, function ($query) use ($supervisorIdentifiers): void {
-                        if (count($supervisorIdentifiers) === 0) {
-                            $query->whereRaw('1 = 0');
-                        } else {
-                            $query->where(function ($q) use ($supervisorIdentifiers): void {
-                                $q->whereIn('caller_id', $supervisorIdentifiers)
-                                    ->orWhereIn('destination', $supervisorIdentifiers);
-                            });
-                        }
-                    })
-                    ->whereIn('status', ['processing', 'ringing', 'connected', 'answer'])
-                    ->where('updated_at', '>=', $activeCutoff)
-                    ->groupBy('session_id');
-
-                $activeCalls = DB::table('session_updates as su1')
-                    ->select('su1.*')
-                    ->joinSub($subquery, 'su2', function ($join) {
-                        $join->on('su1.session_id', '=', 'su2.session_id')
-                            ->on('su1.id', '=', 'su2.max_id');
-                    })
-                    ->where('su1.organization_id', $organizationId)
-                    ->whereNotIn('su1.session_id', $completedSessionIds)
-                    ->whereNotIn('su1.action', ['deleted', 'cdr_final_status'])
-                    ->orderBy('su1.updated_at', 'desc')
-                    ->get();
+                $activeCalls = app(ActiveCallsService::class)
+                    ->forOrganization($organizationId, $supervisorIdentifiers);
 
                 \Log::info('Active calls query executed', [
                     'organization_id' => $organizationId,
                     'result_count' => $activeCalls->count(),
-                    'excluded_completed_sessions' => $completedSessionIds->count(),
                 ]);
             } catch (\Exception $e) {
                 \Log::error('Database query failed', [

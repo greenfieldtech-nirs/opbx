@@ -6,14 +6,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CallDetailRecord;
-use App\Models\SessionUpdate;
+use App\Services\ActiveCallsService;
 use App\Services\Supervisor\SupervisorFilterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
 final class SupervisorDashboardController extends Controller
 {
-    public function __invoke(SupervisorFilterService $filterService): JsonResponse
+    public function __invoke(SupervisorFilterService $filterService, ActiveCallsService $activeCallsService): JsonResponse
     {
         $user = Auth::user();
 
@@ -21,17 +21,19 @@ final class SupervisorDashboardController extends Controller
             abort(403);
         }
 
-        if ($user->isSupervisor()) {
+        $isSupervisor = $user->isSupervisor();
+
+        if ($isSupervisor) {
             $assignedUsers = $user->supervisedUsers;
             $assignedRingGroups = $user->supervisedRingGroups;
             $identifiers = $filterService->resourceIdentifiers($user);
         } else {
             $assignedUsers = $user->organization->users()->where('role', '!=', 'supervisor')->get();
             $assignedRingGroups = $user->organization->ringGroups()->get();
-            $identifiers = [];
+            $identifiers = null;
         }
 
-        $activeCalls = $this->getActiveCallsForSupervisor($identifiers);
+        $activeCalls = $activeCallsService->forOrganization($user->organization_id, $identifiers);
         $recentCalls = $this->getRecentCallsForSupervisor($identifiers);
 
         return response()->json([
@@ -44,31 +46,19 @@ final class SupervisorDashboardController extends Controller
         ]);
     }
 
-    private function getActiveCallsForSupervisor(array $identifiers)
-    {
-        $query = SessionUpdate::query()
-            ->whereIn('status', ['processing', 'ringing', 'connected', 'answer'])
-            ->where('session_modified_at', '>=', now()->subMinutes(30));
-
-        if (count($identifiers) > 0) {
-            $query->where(function ($q) use ($identifiers): void {
-                $q->whereIn('caller_id', $identifiers)
-                    ->orWhereIn('destination', $identifiers);
-            });
-        }
-
-        return $query->get();
-    }
-
-    private function getRecentCallsForSupervisor(array $identifiers)
+    private function getRecentCallsForSupervisor(?array $identifiers)
     {
         $query = CallDetailRecord::query()->orderByDesc('session_timestamp')->limit(5);
 
-        if (count($identifiers) > 0) {
-            $query->where(function ($q) use ($identifiers): void {
-                $q->whereIn('from', $identifiers)
-                    ->orWhereIn('to', $identifiers);
-            });
+        if ($identifiers !== null) {
+            if (count($identifiers) === 0) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($q) use ($identifiers): void {
+                    $q->whereIn('from', $identifiers)
+                        ->orWhereIn('to', $identifiers);
+                });
+            }
         }
 
         return $query->get();
