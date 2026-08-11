@@ -168,15 +168,34 @@ class SessionUpdateController extends Controller
                     ->keyBy('cloudonix_subscriber_id')
                     ->map(fn ($extension) => $extension->user?->name);
 
-            $calls = array_map(function ($call) use ($userNamesBySubscriberId) {
+            // Session updates are stored with callerId/destination normalized to
+            // E.164 (leading "+") regardless of whether the party is an internal
+            // extension or an external phone number. Strip the "+" back off for
+            // display when the value is actually one of this organization's
+            // extension numbers, so internal legs read as plain extensions.
+            $extensionNumbers = \App\Models\Extension::pluck('extension_number')
+                ->map(fn ($number) => (string) $number)
+                ->flip();
+
+            $formatParty = function (?string $value) use ($extensionNumbers) {
+                if ($value === null) {
+                    return $value;
+                }
+
+                $stripped = ltrim($value, '+');
+
+                return $extensionNumbers->has($stripped) ? $stripped : $value;
+            };
+
+            $calls = array_map(function ($call) use ($userNamesBySubscriberId, $formatParty) {
                 try {
                     $callIds = json_decode($call->call_ids ?? '[]', true);
                     $profile = json_decode($call->profile ?? '{}', true);
 
                     return [
                         'session_id' => $call->session_id,
-                        'caller_id' => $call->caller_id,
-                        'destination' => $call->destination,
+                        'caller_id' => $formatParty($call->caller_id),
+                        'destination' => $formatParty($call->destination),
                         'direction' => $call->direction,
                         'status' => $call->status,
                         'session_created_at' => $call->session_created_at,
