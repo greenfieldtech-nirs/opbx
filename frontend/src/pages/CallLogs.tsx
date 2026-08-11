@@ -237,21 +237,19 @@ export default function CallLogs() {
                 <RefreshCw className={cn('h-4 w-4 mr-2', cdrIsFetching && 'animate-spin')} />
                 Refresh
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                {showFilters ? 'Hide Filters' : 'Show Filters'}
+              </Button>
               {!isReadOnly && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    {showFilters ? 'Hide Filters' : 'Show Filters'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportCdr}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </>
+                <Button variant="outline" size="sm" onClick={handleExportCdr}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               )}
             </div>
           </div>

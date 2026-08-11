@@ -37,6 +37,82 @@ final class SupervisorAssignmentControllerTest extends TestCase
         $this->assertTrue($supervisor->fresh()->supervisedRingGroups->contains($ringGroup));
     }
 
+    public function test_owner_can_clear_all_assignments(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $user = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER]);
+        $ringGroup = RingGroup::factory()->create(['organization_id' => $org->id]);
+        $supervisor->supervisedUsers()->attach($user->id, ['organization_id' => $org->id]);
+        $supervisor->supervisedRingGroups()->attach($ringGroup->id, ['organization_id' => $org->id]);
+
+        $response = $this->actingAs($owner)
+            ->putJson("/api/v1/supervisors/{$supervisor->id}/assignments", [
+                'user_ids' => [],
+                'ring_group_ids' => [],
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.user_ids', []);
+        $response->assertJsonPath('data.ring_group_ids', []);
+        $this->assertCount(0, $supervisor->fresh()->supervisedUsers);
+        $this->assertCount(0, $supervisor->fresh()->supervisedRingGroups);
+    }
+
+    public function test_owner_can_assign_only_users_with_no_ring_groups(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $user = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER]);
+
+        $response = $this->actingAs($owner)
+            ->putJson("/api/v1/supervisors/{$supervisor->id}/assignments", [
+                'user_ids' => [$user->id],
+                'ring_group_ids' => [],
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.user_ids', [$user->id]);
+        $response->assertJsonPath('data.ring_group_ids', []);
+        $this->assertTrue($supervisor->fresh()->supervisedUsers->contains($user));
+        $this->assertCount(0, $supervisor->fresh()->supervisedRingGroups);
+    }
+
+    public function test_owner_can_assign_only_ring_groups_with_no_users(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $ringGroup = RingGroup::factory()->create(['organization_id' => $org->id]);
+
+        $response = $this->actingAs($owner)
+            ->putJson("/api/v1/supervisors/{$supervisor->id}/assignments", [
+                'user_ids' => [],
+                'ring_group_ids' => [$ringGroup->id],
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.user_ids', []);
+        $response->assertJsonPath('data.ring_group_ids', [$ringGroup->id]);
+        $this->assertCount(0, $supervisor->fresh()->supervisedUsers);
+        $this->assertTrue($supervisor->fresh()->supervisedRingGroups->contains($ringGroup));
+    }
+
+    public function test_missing_assignment_keys_are_still_rejected(): void
+    {
+        $org = Organization::factory()->create();
+        $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+
+        $response = $this->actingAs($owner)
+            ->putJson("/api/v1/supervisors/{$supervisor->id}/assignments", []);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['user_ids', 'ring_group_ids']);
+    }
+
     public function test_pbx_user_cannot_assign(): void
     {
         $org = Organization::factory()->create();
