@@ -19,6 +19,12 @@ final class SupervisorFilterService
      * - assigned users' extension numbers
      * - assigned ring group IDs
      * - assigned ring groups' extension numbers (if available)
+     *
+     * Also includes a "+"-prefixed variant of every identifier: session_updates
+     * (used for live calls) stores caller_id/destination E.164-normalized with
+     * a leading "+" even for internal extension numbers, while CDR's from/to
+     * columns don't. Returning both forms lets every consumer match against
+     * either data source without needing to know which format applies.
      */
     public function resourceIdentifiers(User $supervisor): array
     {
@@ -53,7 +59,16 @@ final class SupervisorFilterService
         $identifiers = $identifiers->merge($ringGroups->pluck('id')->map(fn ($id) => (string) $id));
         $identifiers = $identifiers->merge($ringGroupExtensionNumbers);
 
-        return $identifiers->filter()->unique()->values()->toArray();
+        $identifiers = $identifiers->filter()->unique()->values();
+
+        // Strict uniqueness matters here: PHP's loose comparison treats
+        // numeric strings like "1006" and "+1006" as equal, which would
+        // silently collapse the "+"-prefixed variants back out.
+        return $identifiers
+            ->merge($identifiers->map(fn ($identifier) => '+'.$identifier))
+            ->unique(null, true)
+            ->values()
+            ->toArray();
     }
 
     public function userExtensionNumbers(User $supervisor): array

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
 use App\Models\User;
@@ -142,5 +143,39 @@ final class CoachTargetControllerTest extends TestCase
 
         $this->postJson('/api/v1/session-updates/555/coach-target', ['policy' => 'spy'])
             ->assertStatus(403);
+    }
+
+    /**
+     * caller_id/destination are stored E.164-normalized with a leading "+"
+     * (even for internal extension numbers) by the Cloudonix webhook
+     * ingestion path, so this reproduces the real-world storage format that
+     * a supervisor's assigned-extension scope must still match.
+     */
+    public function test_supervisor_can_coach_call_from_assigned_extension(): void
+    {
+        $supervisor = $this->user(UserRole::SUPERVISOR);
+        $assignedUser = $this->user(UserRole::PBX_USER);
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $assignedUser->id,
+            'type' => 'user',
+            'extension_number' => '1006',
+        ]);
+        $supervisor->supervisedUsers()->attach($assignedUser->id, ['organization_id' => $this->organization->id]);
+
+        OrganizationScope::bypass(fn () => SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_id' => 555,
+            'session_token' => 'abc123def4567890',
+            'status' => 'connected',
+            'caller_id' => '+1006',
+            'destination' => '+60002',
+        ]));
+
+        Sanctum::actingAs($supervisor);
+
+        $this->postJson('/api/v1/session-updates/555/coach-target', ['policy' => 'spy'])
+            ->assertOk()
+            ->assertJsonPath('data.destination', 'spy_abc123def4567890');
     }
 }
