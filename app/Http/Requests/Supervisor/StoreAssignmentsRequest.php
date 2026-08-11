@@ -16,9 +16,9 @@ final class StoreAssignmentsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_ids' => ['required', 'array'],
+            'user_ids' => ['present', 'array'],
             'user_ids.*' => ['integer', 'exists:users,id'],
-            'ring_group_ids' => ['required', 'array'],
+            'ring_group_ids' => ['present', 'array'],
             'ring_group_ids.*' => ['integer', 'exists:ring_groups,id'],
         ];
     }
