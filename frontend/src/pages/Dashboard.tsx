@@ -271,10 +271,12 @@ export default function Dashboard() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-4 font-medium whitespace-nowrap">Time</th>
-                        <th className="text-left p-4 font-medium whitespace-nowrap">From</th>
-                        <th className="text-left p-4 font-medium whitespace-nowrap">To</th>
+                        <th className="text-left p-4 font-medium whitespace-nowrap">Source Number</th>
+                        <th className="text-left p-4 font-medium whitespace-nowrap">Source User</th>
+                        <th className="text-left p-4 font-medium whitespace-nowrap">Destination</th>
                         <th className="text-left p-4 font-medium whitespace-nowrap">Status</th>
                         <th className="text-left p-4 font-medium whitespace-nowrap">Duration</th>
+                        <th className="text-left p-4 font-medium whitespace-nowrap">Call Direction</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -284,6 +286,13 @@ export default function Dashboard() {
                             {formatTimeAgo(call.created_at)}
                           </td>
                           <td className="p-4 whitespace-nowrap">{formatPhoneNumber(call.from)}</td>
+                          <td className="p-4 whitespace-nowrap">
+                            <span className={cn(
+                              call.user_full_name === 'Unassigned' && 'text-muted-foreground italic'
+                            )}>
+                              {call.user_full_name}
+                            </span>
+                          </td>
                           <td className="p-4 whitespace-nowrap">{formatPhoneNumber(call.to)}</td>
                           <td className="p-4">
                             <span
@@ -297,6 +306,9 @@ export default function Dashboard() {
                           </td>
                           <td className="p-4 text-muted-foreground whitespace-nowrap">
                             {call.duration_formatted}
+                          </td>
+                          <td className="p-4 text-muted-foreground whitespace-nowrap capitalize">
+                            {call.direction || '-'}
                           </td>
                         </tr>
                       ))}

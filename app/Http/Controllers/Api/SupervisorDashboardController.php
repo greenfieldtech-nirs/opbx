@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CallDetailRecordResource;
 use App\Models\CallDetailRecord;
 use App\Services\ActiveCallsService;
 use App\Services\Supervisor\SupervisorFilterService;
@@ -40,7 +41,7 @@ final class SupervisorDashboardController extends Controller
             'assigned_users_count' => $assignedUsers->count(),
             'assigned_ring_groups_count' => $assignedRingGroups->count(),
             'active_calls_count' => $activeCalls->count(),
-            'recent_calls' => $recentCalls,
+            'recent_calls' => CallDetailRecordResource::collection($recentCalls),
             'assigned_users' => $assignedUsers->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'extension_number' => $u->extension?->extension_number]),
             'assigned_ring_groups' => $assignedRingGroups->map(fn ($rg) => ['id' => $rg->id, 'name' => $rg->name]),
         ]);
@@ -48,7 +49,10 @@ final class SupervisorDashboardController extends Controller
 
     private function getRecentCallsForSupervisor(?array $identifiers)
     {
-        $query = CallDetailRecord::query()->orderByDesc('session_timestamp')->limit(5);
+        $query = CallDetailRecord::query()
+            ->with(['extension.user:id,name', 'sessionUpdate'])
+            ->orderByDesc('session_timestamp')
+            ->limit(5);
 
         if ($identifiers !== null) {
             if (count($identifiers) === 0) {

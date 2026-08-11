@@ -147,6 +147,39 @@ final class SupervisorDashboardTest extends TestCase
             ->assertJsonPath('recent_calls', fn ($recentCalls) => count($recentCalls) === 0);
     }
 
+    public function test_recent_calls_include_source_user_and_direction(): void
+    {
+        $org = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $assignedUser = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER, 'name' => 'Jane Doe']);
+        $supervisor->supervisedUsers()->attach($assignedUser->id, ['organization_id' => $org->id]);
+        Extension::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $assignedUser->id,
+            'extension_number' => '1006',
+            'cloudonix_uuid' => 'dash-recent-uuid',
+        ]);
+
+        SessionUpdate::factory()->create([
+            'organization_id' => $org->id,
+            'session_id' => 800001,
+            'direction' => 'outgoing',
+        ]);
+        CallDetailRecord::factory()->create([
+            'organization_id' => $org->id,
+            'session_id' => 800001,
+            'from' => '1006',
+            'subscriber' => 'dash-recent-uuid',
+        ]);
+
+        $response = $this->actingAs($supervisor)
+            ->getJson('/api/v1/dashboard/supervisor');
+
+        $response->assertOk()
+            ->assertJsonPath('recent_calls.0.user_full_name', 'Jane Doe')
+            ->assertJsonPath('recent_calls.0.direction', 'outgoing');
+    }
+
     public function test_pbx_user_cannot_access_supervisor_dashboard(): void
     {
         $org = Organization::factory()->create();
