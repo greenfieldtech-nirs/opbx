@@ -7,6 +7,7 @@ namespace App\Services\VoiceRouting\Strategies;
 use App\Enums\ExtensionType;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -34,10 +35,15 @@ class ForwardRoutingStrategy implements RoutingStrategy
             return response(CxmlBuilder::unavailable('Forward destination not configured'), 200, ['Content-Type' => 'application/xml']);
         }
 
+        $recording = app(CallRecordingDecisionService::class)->resolve(
+            (int) $request->input('_organization_id'),
+            $request->input('_call_category', 'inbound')
+        );
+
         // Case 1: SIP URI (starts with sip:)
         if (str_starts_with(strtolower($forwardTo), 'sip:')) {
             return response(
-                CxmlBuilder::dialExtension($forwardTo),
+                CxmlBuilder::dialExtension($forwardTo, null, $recording->record, $recording->recordingStatusCallback),
                 200,
                 ['Content-Type' => 'application/xml']
             );
@@ -46,7 +52,7 @@ class ForwardRoutingStrategy implements RoutingStrategy
         // Case 2: External phone number (E.164 format, starts with +)
         if (preg_match('/^\+[1-9]\d{1,14}$/', $forwardTo)) {
             return response(
-                CxmlBuilder::simpleDial($forwardTo),
+                CxmlBuilder::simpleDial($forwardTo, null, null, null, null, $recording->record, $recording->recordingStatusCallback),
                 200,
                 ['Content-Type' => 'application/xml']
             );
@@ -73,7 +79,7 @@ class ForwardRoutingStrategy implements RoutingStrategy
         }
 
         return response(
-            CxmlBuilder::dialExtension($sipUri),
+            CxmlBuilder::dialExtension($sipUri, null, $recording->record, $recording->recordingStatusCallback),
             200,
             ['Content-Type' => 'application/xml']
         );

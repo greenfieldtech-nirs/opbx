@@ -7,6 +7,7 @@ namespace App\Services\VoiceRouting\Strategies;
 use App\Enums\ExtensionType;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy;
 use Illuminate\Http\Request;
@@ -50,8 +51,18 @@ class UserRoutingStrategy implements RoutingStrategy
         // For internal extension dialing, use just the extension number
         // This creates <Number> tags instead of <Sip> tags for proper internal routing
 
+        $recording = app(CallRecordingDecisionService::class)->resolve(
+            (int) $request->input('_organization_id'),
+            $request->input('_call_category', 'inbound')
+        );
+
         return response(
-            CxmlBuilder::dialExtension($extension->extension_number, 30),
+            CxmlBuilder::dialExtension(
+                $extension->extension_number,
+                30,
+                $recording->record,
+                $recording->recordingStatusCallback,
+            ),
             200,
             ['Content-Type' => 'application/xml']
         );

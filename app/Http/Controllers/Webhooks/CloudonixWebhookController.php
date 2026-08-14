@@ -9,12 +9,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\HandlesWebhookErrors;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
 use App\Http\Requests\Webhook\CdrRequest;
+use App\Http\Requests\Webhook\RecordingStatusRequest;
 use App\Http\Requests\Webhook\SessionUpdateRequest;
+use App\Jobs\DownloadCallRecordingJob;
 use App\Jobs\ProcessInboundCallJob;
+use App\Models\CallDetailRecord;
 use App\Models\CallNotificationsSettings;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
+use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
 use App\Services\CallNotifications\WebhookDispatcher;
@@ -458,6 +462,108 @@ class CloudonixWebhookController extends Controller
                 'message' => 'Failed to process the call detail record. Please check the logs for more details.',
             ], 500);
         }
+    }
+
+    /**
+     * Handle Cloudonix's recordingStatusCallback webhook, fired once a
+     * `<Dial record="...">` recording has finished processing.
+     *
+     * Per Cloudonix's docs (developers.cloudonix.com/Documentation/voiceApplication/Verb/dial),
+     * this callback's parameters are CallSid, Session, RecordingSid, RecordingUrl,
+     * RecordingStatus, RecordingDuration, RecordingStartTime - it carries no
+     * `domain` field, unlike every other Cloudonix webhook. That means this
+     * endpoint deliberately can't use the shared `webhook.signature` middleware
+     * (which needs `domain` to resolve the organization). Instead, the
+     * organization is derived from whichever CallDetailRecord the CallSid/Session
+     * matches, and authenticated from there (see below). snake_case fallbacks
+     * are also checked in case Cloudonix's real payload differs from the docs.
+     */
+    public function recordingStatus(RecordingStatusRequest $request): \Illuminate\Http\JsonResponse
+    {
+        $callId = $request->input('CallSid') ?? $request->input('call_id');
+        $sessionToken = $request->input('Session') ?? $request->input('session_token') ?? $request->input('session.token');
+        $recordingUrl = $request->input('RecordingUrl') ?? $request->input('recording_url');
+        $recordingStatus = $request->input('RecordingStatus') ?? $request->input('recording_status');
+        $recordingDuration = $request->input('RecordingDuration') ?? $request->input('recording_duration');
+
+        Log::info('Received recording status webhook', [
+            'call_id' => $callId,
+            'session_token' => $sessionToken,
+            'recording_status' => $recordingStatus,
+            'recording_url' => $recordingUrl,
+            'recording_duration' => $recordingDuration,
+            'payload' => $request->all(),
+        ]);
+
+        // 'absent' means Cloudonix determined there is no recording to fetch;
+        // 'in-progress' only arrives if recordingStatusCallbackEvent is
+        // explicitly widened beyond the 'completed' default this app requests -
+        // neither carries a usable RecordingUrl.
+        if ($recordingStatus === 'absent' || ! $recordingUrl) {
+            Log::info('Recording status webhook: nothing to download', [
+                'call_id' => $callId,
+                'recording_status' => $recordingStatus,
+            ]);
+
+            $query = CallDetailRecord::withoutGlobalScope(OrganizationScope::class);
+            $cdr = $callId ? $query->where('call_id', $callId)->first() : null;
+            $cdr?->update(['recording_status' => 'failed']);
+
+            return response()->json(['message' => 'No recording to download'], 200);
+        }
+
+        $query = CallDetailRecord::withoutGlobalScope(OrganizationScope::class);
+
+        $cdr = $callId
+            ? $query->where('call_id', $callId)->first()
+            : null;
+
+        if (! $cdr && $sessionToken) {
+            $cdr = CallDetailRecord::withoutGlobalScope(OrganizationScope::class)
+                ->where('session_token', $sessionToken)
+                ->first();
+        }
+
+        if (! $cdr) {
+            Log::warning('Recording status webhook: no matching CDR found', [
+                'call_id' => $callId,
+                'session_token' => $sessionToken,
+            ]);
+
+            return response()->json(['message' => 'No matching call detail record found'], 200);
+        }
+
+        // This payload carries no `domain` field, so the shared webhook.signature
+        // middleware can't run for this route (see routes/webhooks.php). Once the
+        // organization is known via the matched CDR, apply the same bearer-token
+        // check that middleware performs for every other Cloudonix webhook.
+        $settings = CloudonixSettings::where('organization_id', $cdr->organization_id)->first();
+        if ($settings && $settings->domain_requests_api_key) {
+            $token = $request->bearerToken();
+            if (! $token || ! hash_equals($settings->domain_requests_api_key, $token)) {
+                Log::warning('Recording status webhook: authentication failed', [
+                    'organization_id' => $cdr->organization_id,
+                    'call_id' => $callId,
+                ]);
+
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+        }
+
+        $cdr->update([
+            'recording_status' => 'pending',
+            'recording_source_url' => $recordingUrl,
+            'recording_duration' => $recordingDuration !== null ? (int) $recordingDuration : null,
+        ]);
+
+        DownloadCallRecordingJob::dispatch($cdr->id, $recordingUrl);
+
+        Log::info('Recording download job dispatched', [
+            'call_detail_record_id' => $cdr->id,
+            'call_id' => $callId,
+        ]);
+
+        return response()->json(['message' => 'Recording status processed'], 200);
     }
 
     /**

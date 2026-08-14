@@ -27,6 +27,7 @@ final class EmbedAllowedDomainsSettingsTest extends TestCase
         return array_merge([
             'no_answer_timeout' => 30,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ], $overrides);
     }
 

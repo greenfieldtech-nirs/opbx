@@ -84,6 +84,7 @@ class SettingsController extends Controller
                 'webhook_base_url' => $settings->webhook_base_url,
                 'embed_allowed_domains' => $settings->embed_allowed_domains ?? [],
                 'no_answer_timeout' => $settings->no_answer_timeout,
+                'call_recording_mode' => $settings->call_recording_mode,
                 'recording_format' => $settings->recording_format,
                 'cloudonix_package' => $settings->cloudonix_package,
                 'is_configured' => $settings->isConfigured(),
@@ -161,6 +162,9 @@ class SettingsController extends Controller
                 }
                 if (isset($validated['no_answer_timeout'])) {
                     $changes[] = 'no_answer_timeout';
+                }
+                if (isset($validated['call_recording_mode'])) {
+                    $changes[] = 'call_recording_mode';
                 }
                 if (isset($validated['recording_format'])) {
                     $changes[] = 'recording_format';
@@ -252,6 +256,7 @@ class SettingsController extends Controller
                     'domain_requests_api_key' => $settings->getMaskedDomainRequestsApiKey(),
                     'webhook_base_url' => $settings->webhook_base_url,
                     'no_answer_timeout' => $settings->no_answer_timeout,
+                    'call_recording_mode' => $settings->call_recording_mode,
                     'recording_format' => $settings->recording_format,
                     'is_configured' => $settings->isConfigured(),
                     'has_webhook_auth' => $settings->hasWebhookAuth(),

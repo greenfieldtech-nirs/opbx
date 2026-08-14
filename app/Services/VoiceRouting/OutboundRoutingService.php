@@ -7,6 +7,7 @@ namespace App\Services\VoiceRouting;
 use App\Models\Extension;
 use App\Models\OutboundWhitelist;
 use App\Scopes\OrganizationScope;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\PhoneNumberService;
 use Illuminate\Http\Request;
@@ -24,7 +25,8 @@ class OutboundRoutingService
     public function __construct(
         private readonly PhoneNumberService $phoneNumberService,
         private readonly VoiceRoutingCacheService $cache,
-        private readonly OutboundCallerIdResolver $callerIdResolver
+        private readonly OutboundCallerIdResolver $callerIdResolver,
+        private readonly CallRecordingDecisionService $recordingDecision
     ) {}
 
     /**
@@ -131,8 +133,18 @@ class OutboundRoutingService
             'caller_name' => $resolved['callerName'],
         ]);
 
+        $recording = $this->recordingDecision->resolve($orgId, 'outbound');
+
         return response(
-            CxmlBuilder::simpleDial($to, $resolved['callerId'], null, $trunkName, $resolved['callerName']),
+            CxmlBuilder::simpleDial(
+                $to,
+                $resolved['callerId'],
+                null,
+                $trunkName,
+                $resolved['callerName'],
+                $recording->record,
+                $recording->recordingStatusCallback,
+            ),
             200,
             ['Content-Type' => 'application/xml']
         );

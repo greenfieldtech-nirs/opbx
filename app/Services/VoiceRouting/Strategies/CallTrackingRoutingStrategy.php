@@ -9,6 +9,7 @@ use App\Enums\ExtensionType;
 use App\Models\CallTrackingNumber;
 use App\Models\DidNumber;
 use App\Scopes\OrganizationScope;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CallTracking\CallTrackingDestinationResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\VoiceRoutingStrategyExecutor;
@@ -96,8 +97,14 @@ class CallTrackingRoutingStrategy implements RoutingStrategy
                 'forward_to' => $forwardTo,
             ]);
 
+            // Call tracking DIDs are always reached by an external caller.
+            $recording = app(CallRecordingDecisionService::class)->resolve(
+                $did->organization_id,
+                'inbound'
+            );
+
             return response(
-                CxmlBuilder::simpleDial($forwardTo),
+                CxmlBuilder::simpleDial($forwardTo, null, null, null, null, $recording->record, $recording->recordingStatusCallback),
                 200,
                 ['Content-Type' => 'application/xml']
             );

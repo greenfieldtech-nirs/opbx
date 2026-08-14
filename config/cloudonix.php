@@ -39,6 +39,6 @@ return [
     */
 
     'cxml' => [
-        'default_timeout' => env('CXML_DEFAULT_TIMEOUT', 30),
+        'default_timeout' => (int) env('CXML_DEFAULT_TIMEOUT', 30),
     ],
 ];

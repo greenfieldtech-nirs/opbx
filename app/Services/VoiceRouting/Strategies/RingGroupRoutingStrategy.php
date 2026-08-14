@@ -12,6 +12,8 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
+use App\Services\CallRecording\CallRecordingDecision;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -59,6 +61,14 @@ class RingGroupRoutingStrategy implements RoutingStrategy
     public function canHandle(ExtensionType $type): bool
     {
         return $type === ExtensionType::RING_GROUP;
+    }
+
+    private function resolveRecording(Request $request): CallRecordingDecision
+    {
+        return app(CallRecordingDecisionService::class)->resolve(
+            (int) $request->input('_organization_id'),
+            $request->input('_call_category', 'inbound')
+        );
     }
 
     public function route(Request $request, DidNumber $did, array $destination): Response
@@ -171,8 +181,10 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             'callback_url' => $callbackUrl,
         ]);
 
+        $recording = $this->resolveRecording($request);
+
         return response(
-            CxmlBuilder::dialRingGroup($targets, $ringGroup->timeout ?? 30, $callbackUrl),
+            CxmlBuilder::dialRingGroup($targets, $ringGroup->timeout ?? 30, $callbackUrl, $recording->record, $recording->recordingStatusCallback),
             200,
             ['Content-Type' => 'application/xml']
         );
@@ -256,11 +268,15 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         // Also need to construct SessionData xml element if strictly required,
         // but CxmlBuilder -> dial(...) takes 'action'.
 
+        $recording = $this->resolveRecording($request);
+
         $builder = new CxmlBuilder;
         $builder->dial(
             $sipUri,
             $ringGroup->timeout ?? 20,
-            $callbackUrl
+            $callbackUrl,
+            record: $recording->record,
+            recordingStatusCallback: $recording->recordingStatusCallback,
         );
 
         return $builder->toResponse();
@@ -298,11 +314,19 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         $nextAttempt = $attempt + 1;
         $callbackUrl = $this->getRingGroupCallbackUrl($ringGroup, $request, $nextAttempt);
 
+        $recording = $this->resolveRecording($request);
+
         // Check if forwardTo is a SIP URI
         if (str_starts_with(strtolower($forwardTo), 'sip:')) {
             // Dial the SIP URI directly with action callback
             $builder = new CxmlBuilder;
-            $builder->dial($forwardTo, $ringGroup->timeout ?? 20, $callbackUrl);
+            $builder->dial(
+                $forwardTo,
+                $ringGroup->timeout ?? 20,
+                $callbackUrl,
+                record: $recording->record,
+                recordingStatusCallback: $recording->recordingStatusCallback,
+            );
 
             return $builder->toResponse();
         }
@@ -311,7 +335,13 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         if (preg_match('/^\+[1-9]\d{1,14}$/', $forwardTo)) {
             // Dial the phone number directly with action callback
             $builder = new CxmlBuilder;
-            $builder->dial($forwardTo, $ringGroup->timeout ?? 20, $callbackUrl);
+            $builder->dial(
+                $forwardTo,
+                $ringGroup->timeout ?? 20,
+                $callbackUrl,
+                record: $recording->record,
+                recordingStatusCallback: $recording->recordingStatusCallback,
+            );
 
             return $builder->toResponse();
         }

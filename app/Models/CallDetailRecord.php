@@ -43,6 +43,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property Carbon|null $call_answer_time
  * @property string|null $status
  * @property array $raw_cdr Complete CDR JSON
+ * @property string $recording_status none|pending|available|failed
+ * @property string|null $recording_source_url The RecordingUrl Cloudonix reported
+ * @property string|null $recording_stored_path Object key on the 'recordings' disk
+ * @property string|null $recording_mime_type
+ * @property int|null $recording_duration Recording length in seconds
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Organization $organization
@@ -89,6 +94,11 @@ class CallDetailRecord extends Model
         'call_answer_time',
         'status',
         'raw_cdr',
+        'recording_status',
+        'recording_source_url',
+        'recording_stored_path',
+        'recording_mime_type',
+        'recording_duration',
     ];
 
     /**
@@ -105,6 +115,7 @@ class CallDetailRecord extends Model
         'billsec' => 'integer',
         'cx_trunk_id' => 'integer',
         'session_id' => 'integer',
+        'recording_duration' => 'integer',
         'rated_cost' => 'decimal:4',
         'approx_cost' => 'decimal:4',
         'sell_cost' => 'decimal:4',
@@ -154,20 +165,33 @@ class CallDetailRecord extends Model
         $amdResult = $amd['result'] ?? null;
         $amdConfidence = isset($amd['confidence']) ? (float) $amd['confidence'] : null;
 
+        $from = $payload['from'] ?? 'Unknown';
+        $subscriber = $payload['subscriber'] ?? null;
+
+        // Calls initiated via the Cloudonix API (Direction: application) have
+        // no logged-in subscriber, so Cloudonix's CDR payload carries no
+        // `subscriber` UUID and the call would otherwise show as unassigned.
+        // If the caller ID matches one of the organization's extension
+        // numbers, assert that extension as the call's origin so it's still
+        // attributed to its assigned user.
+        if (! $subscriber && $from !== 'Unknown') {
+            $subscriber = self::assertSubscriberFromCallerId($from, $organizationId);
+        }
+
         return self::create([
             'organization_id' => $organizationId,
             'session_timestamp' => isset($payload['timestamp'])
                 ? Carbon::createFromTimestamp($payload['timestamp'])
                 : now(),
             'session_token' => $session['token'] ?? null,
-            'from' => $payload['from'] ?? 'Unknown',
+            'from' => $from,
             'to' => $payload['to'] ?? 'Unknown',
             'disposition' => $payload['disposition'] ?? 'UNKNOWN',
             'duration' => $payload['duration'] ?? 0,
             'billsec' => $payload['billsec'] ?? 0,
             'call_id' => $payload['call_id'] ?? 'unknown',
             'domain' => $payload['domain'] ?? null,
-            'subscriber' => $payload['subscriber'] ?? null,
+            'subscriber' => $subscriber,
             'cx_trunk_id' => $payload['cx_trunk_id'] ?? null,
             'application' => $payload['application'] ?? null,
             'route' => $payload['route'] ?? null,
@@ -190,6 +214,19 @@ class CallDetailRecord extends Model
             'amd_confidence' => $amdConfidence,
             'raw_cdr' => $payload,
         ]);
+    }
+
+    /**
+     * Assert a subscriber UUID for a CDR whose payload didn't include one, by
+     * matching the caller ID against an extension number in the organization.
+     * Returns null (no assertion) if no matching extension is found.
+     */
+    private static function assertSubscriberFromCallerId(string $from, int $organizationId): ?string
+    {
+        return Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('extension_number', ltrim($from, '+'))
+            ->value('cloudonix_uuid');
     }
 
     /**

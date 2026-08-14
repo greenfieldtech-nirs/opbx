@@ -40,6 +40,7 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             // (e.g. localhost:3000, 127.0.0.1:3000). Scheme is stripped client-side.
             'embed_allowed_domains.*' => ['string', 'regex:/^(?:(?=.{1,253}(?::|$))(?:[a-z0-9](?:-*[a-z0-9])*)(?:\.[a-z0-9](?:-*[a-z0-9])*)+|localhost|(?:\d{1,3})(?:\.\d{1,3}){3})(?::\d{1,5})?$/i'],
             'no_answer_timeout' => ['required', 'integer', 'min:5', 'max:120'],
+            'call_recording_mode' => ['required', 'string', 'in:disabled,inbound,outbound,internal,inbound_outbound,all'],
             'recording_format' => ['required', 'string', 'in:wav,mp3'],
             'cloudonix_package' => ['nullable', 'string', 'max:255'],
         ];
@@ -60,6 +61,7 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'webhook_base_url' => 'webhook base URL',
             'embed_allowed_domains' => 'embed allowed domains',
             'no_answer_timeout' => 'no answer timeout',
+            'call_recording_mode' => 'call recording',
             'recording_format' => 'recording format',
             'cloudonix_package' => 'Cloudonix package',
         ];
@@ -77,6 +79,7 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'no_answer_timeout.min' => 'The no answer timeout must be at least 5 seconds.',
             'no_answer_timeout.max' => 'The no answer timeout must not exceed 120 seconds.',
             'recording_format.in' => 'The recording format must be either wav or mp3.',
+            'call_recording_mode.in' => 'The call recording setting must be one of: disabled, inbound, outbound, internal, inbound_outbound, or all.',
             'embed_allowed_domains.*.regex' => 'Each embed allowed domain must be a valid hostname, localhost, or IP address, optionally with a port (e.g. crm.acme.com, localhost:3000, 127.0.0.1:3000).',
         ];
     }

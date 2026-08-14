@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $voice_application_uuid
  * @property string|null $voice_application_name
  * @property int $no_answer_timeout
+ * @property string $call_recording_mode
  * @property string $recording_format
  * @property string|null $cloudonix_package
  * @property Carbon $created_at
@@ -59,6 +60,7 @@ class CloudonixSettings extends Model
         'voice_application_uuid',
         'voice_application_name',
         'no_answer_timeout',
+        'call_recording_mode',
         'recording_format',
         'cloudonix_package',
     ];

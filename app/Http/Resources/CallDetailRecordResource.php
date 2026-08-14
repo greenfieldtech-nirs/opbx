@@ -55,8 +55,8 @@ class CallDetailRecordResource extends JsonResource
             'domain' => $this->domain,
             'subscriber' => $this->subscriber,
             'user_full_name' => $this->resource->relationLoaded('extension')
-                ? ($this->extension?->user?->name ?? 'Unassigned')
-                : 'Unassigned',
+                ? ($this->extension?->user?->name ?? 'Unassigned User')
+                : 'Unassigned User',
             'cx_trunk_id' => $this->cx_trunk_id,
             'application' => $this->application,
             'route' => $this->route,
@@ -71,6 +71,11 @@ class CallDetailRecordResource extends JsonResource
             'amd_status' => $this->amd_status,
             'amd_result' => $this->amd_result,
             'amd_confidence' => $this->amd_confidence ? (float) $this->amd_confidence : null,
+
+            // Call recording
+            'recording_status' => $this->recording_status,
+            'recording_duration' => $this->recording_duration,
+            'has_recording' => $this->recording_status === 'available',
 
             // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
             'raw_cdr' => $this->when(

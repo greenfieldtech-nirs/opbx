@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -177,6 +178,40 @@ class CallDetailRecordController extends AbstractApiCrudController
             $q->whereIn('from', $identifiers)
                 ->orWhereIn('to', $identifiers);
         });
+    }
+
+    /**
+     * Stream a call's stored recording for playback.
+     *
+     * Route model binding scopes this to the authenticated user's
+     * organization via CallDetailRecord's OrganizationScope, but that alone
+     * doesn't apply the supervisor resource-scoping CallDetailRecordPolicy::view()
+     * enforces - authorize() below is required, not just defense in depth.
+     */
+    public function recording(CallDetailRecord $call_detail_record): StreamedResponse|JsonResponse
+    {
+        $this->authorize('view', $call_detail_record);
+
+        if ($call_detail_record->recording_status !== 'available' || ! $call_detail_record->recording_stored_path) {
+            return response()->json(['error' => 'Recording not available'], 404);
+        }
+
+        $storagePath = "{$call_detail_record->organization_id}/{$call_detail_record->recording_stored_path}";
+
+        if (! Storage::disk('recordings')->exists($storagePath)) {
+            return response()->json(['error' => 'Recording file not found in storage'], 404);
+        }
+
+        $fileContent = Storage::disk('recordings')->get($storagePath);
+
+        return response()->stream(function () use ($fileContent) {
+            echo $fileContent;
+        }, 200, [
+            'Content-Type' => $call_detail_record->recording_mime_type ?? 'audio/mpeg',
+            'Content-Length' => strlen($fileContent),
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'private, no-cache',
+        ]);
     }
 
     /**

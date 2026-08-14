@@ -918,6 +918,14 @@ export type ExtensionStatus = Status;
 
 export type RecordingFormat = 'wav' | 'mp3';
 
+export type CallRecordingMode =
+  | 'disabled'
+  | 'inbound'
+  | 'outbound'
+  | 'internal'
+  | 'inbound_outbound'
+  | 'all';
+
 export interface WebhookUrlDetails {
   effective_url: string | null;
   application_url: string | null;
@@ -936,6 +944,7 @@ export interface CloudonixSettings {
   webhook_base_url: string | null;
   embed_allowed_domains: string[];
   no_answer_timeout: number;
+  call_recording_mode: CallRecordingMode;
   recording_format: RecordingFormat;
   cloudonix_package: string | null;
   callback_url?: string | null;
@@ -955,6 +964,7 @@ export interface UpdateCloudonixSettingsRequest {
   webhook_base_url?: string;
   embed_allowed_domains?: string[];
   no_answer_timeout?: number;
+  call_recording_mode?: CallRecordingMode;
   recording_format?: RecordingFormat;
   cloudonix_package?: string;
 }
