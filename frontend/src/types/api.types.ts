@@ -675,6 +675,11 @@ export interface CallDetailRecord {
   // AMD detection confidence (0.00 - 1.00)
   amd_confidence?: number;
 
+  // Call recording
+  recording_status: 'none' | 'pending' | 'available' | 'failed';
+  recording_duration?: number;
+  has_recording: boolean;
+
   // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
   raw_cdr?: Record<string, unknown>;
 

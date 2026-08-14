@@ -41,6 +41,7 @@ import {
     RefreshCw,
     Clock,
     Mic,
+    Disc,
     Link as LinkIcon,
     Copy,
     Eye,
@@ -68,6 +69,7 @@ const settingsSchema = z.object({
   domain_requests_api_key: z.string().optional().or(z.literal('')),
   webhook_base_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
   no_answer_timeout: z.number().min(5, 'Minimum 5 seconds').max(120, 'Maximum 120 seconds'),
+  call_recording_mode: z.enum(['disabled', 'inbound', 'outbound', 'internal', 'inbound_outbound', 'all']),
   recording_format: z.enum(['wav', 'mp3']),
 });
 
@@ -128,6 +130,7 @@ export default function Settings() {
       domain_requests_api_key: '',
       webhook_base_url: '',
       no_answer_timeout: 60,
+      call_recording_mode: 'disabled',
       recording_format: 'mp3',
 
     },
@@ -153,6 +156,7 @@ export default function Settings() {
           domain_requests_api_key: data.domain_requests_api_key || '',
           webhook_base_url: data.webhook_base_url || '',
           no_answer_timeout: data.no_answer_timeout,
+          call_recording_mode: data.call_recording_mode,
           recording_format: data.recording_format,
         });
 
@@ -215,6 +219,7 @@ export default function Settings() {
           webhook_base_url: formValues.webhook_base_url || undefined,
           embed_allowed_domains: embedDomains,
           no_answer_timeout: formValues.no_answer_timeout,
+          call_recording_mode: formValues.call_recording_mode,
           recording_format: formValues.recording_format,
         };
 
@@ -745,8 +750,8 @@ export default function Settings() {
               {/* Divider */}
               <div className="border-t pt-6" />
 
-              {/* No Answer Timeout and Recording Format - Side by Side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* No Answer Timeout, Call Recording, and Recording Format - Side by Side */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* No Answer Timeout */}
                 <div className="space-y-2">
                   <Label htmlFor="no_answer_timeout" className="flex items-center gap-2">
@@ -780,6 +785,56 @@ export default function Settings() {
                   )}
                   <p className="text-xs text-muted-foreground">
                     Time to wait before considering call unanswered (5-120 seconds)
+                  </p>
+                </div>
+
+                {/* Call Recording */}
+                <div className="space-y-2">
+                  <Label htmlFor="call_recording_mode" className="flex items-center gap-2">
+                    <Disc className="h-4 w-4" />
+                    Call Recording
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          Choose which calls are recorded for this organization.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Controller
+                    name="call_recording_mode"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={isValidating}
+                      >
+                        <SelectTrigger id="call_recording_mode">
+                          <SelectValue placeholder="Select call recording mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="disabled">Do not record calls</SelectItem>
+                          <SelectItem value="inbound">Record all inbound calls</SelectItem>
+                          <SelectItem value="outbound">Record all outbound calls</SelectItem>
+                          <SelectItem value="internal">Record all internal calls</SelectItem>
+                          <SelectItem value="inbound_outbound">Record all inbound/outbound calls</SelectItem>
+                          <SelectItem value="all">Record all calls (inbound/outbound/internal)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.call_recording_mode && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      {errors.call_recording_mode.message}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Which calls get recorded
                   </p>
                 </div>
 

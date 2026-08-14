@@ -72,6 +72,11 @@ class CallDetailRecordResource extends JsonResource
             'amd_result' => $this->amd_result,
             'amd_confidence' => $this->amd_confidence ? (float) $this->amd_confidence : null,
 
+            // Call recording
+            'recording_status' => $this->recording_status,
+            'recording_duration' => $this->recording_duration,
+            'has_recording' => $this->recording_status === 'available',
+
             // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
             'raw_cdr' => $this->when(
                 $request->input('include') === 'raw_cdr',

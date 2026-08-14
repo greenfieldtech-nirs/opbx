@@ -2,11 +2,13 @@
  * Call Logs Page
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
 import { extensionsService } from '@/services/extensions.service';
+import api from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
@@ -19,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Lock } from 'lucide-react';
+import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Lock, Play, Pause } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -54,6 +56,50 @@ export default function CallLogs() {
     } else {
       setSortField(field);
       setSortDirection('asc');
+    }
+  };
+
+  // Recording playback
+  const { play, pause, isPlaying } = useAudioPlayer();
+  const [loadingRecordingId, setLoadingRecordingId] = useState<number | null>(null);
+  // Tracks the blob URL backing the currently-loaded recording so it can be
+  // revoked once playback moves on - object URLs otherwise leak for the
+  // lifetime of the page, which matters here since this page auto-refreshes.
+  const activeBlobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      }
+    };
+  }, []);
+
+  const handlePlayRecording = async (cdr: CallDetailRecord) => {
+    const id = Number(cdr.id);
+
+    if (isPlaying(id)) {
+      pause();
+      return;
+    }
+
+    setLoadingRecordingId(id);
+    try {
+      const response = await api.get(`/call-detail-records/${id}/recording`, {
+        responseType: 'blob',
+      });
+
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      }
+
+      const blobUrl = URL.createObjectURL(response.data);
+      activeBlobUrlRef.current = blobUrl;
+      await play(id, blobUrl);
+    } catch (error) {
+      logger.error('Failed to load recording:', { error });
+    } finally {
+      setLoadingRecordingId(null);
     }
   };
 
@@ -454,6 +500,40 @@ export default function CallLogs() {
               {
                 header: 'Connected Time',
                 accessorKey: 'billsec_formatted' as any,
+              },
+              {
+                header: 'Recording',
+                accessorKey: 'has_recording' as any,
+                cell: (cdr) => {
+                  if (!cdr.has_recording) {
+                    return <span className="text-muted-foreground text-sm">-</span>;
+                  }
+
+                  const id = Number(cdr.id);
+                  const loading = loadingRecordingId === id;
+                  const playing = isPlaying(id);
+
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      disabled={loading}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayRecording(cdr);
+                      }}
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : playing ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                    </Button>
+                  );
+                },
               }
             ]}
             emptyState={

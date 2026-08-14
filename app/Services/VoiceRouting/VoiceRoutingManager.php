@@ -97,6 +97,11 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
+        // Extension-to-extension traffic - recorded under call_recording_mode
+        // 'internal'. Read downstream by whichever Dial-building strategy
+        // ultimately handles this request.
+        $request->merge(['_call_category' => 'internal']);
+
         Log::info('VoiceRoutingManager: Subscriber direction call', [
             'to' => $to,
             'from' => $from,
@@ -211,6 +216,10 @@ class VoiceRoutingManager
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
 
+        // Call from the org's own assigned DID - treated as internal traffic
+        // for recording purposes, matching this method's own naming.
+        $request->merge(['_call_category' => 'internal']);
+
         Log::debug('VoiceRoutingManager: Processing internal call from DID', [
             'from_did' => $from,
             'to' => $to,
@@ -256,6 +265,10 @@ class VoiceRoutingManager
         $to = $request->input('To');
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
+
+        // Genuine external caller reaching an assigned DID - recorded under
+        // call_recording_mode 'inbound'.
+        $request->merge(['_call_category' => 'inbound']);
 
         Log::info('VoiceRoutingManager: Processing external inbound call to DID', [
             'from_external' => $from,
@@ -324,6 +337,9 @@ class VoiceRoutingManager
         $to = $request->input('To');
         $from = $request->input('From');
         $orgId = (int) $request->input('_organization_id');
+
+        // API-initiated calls use the same internal-routing logic as subscriber calls.
+        $request->merge(['_call_category' => 'internal']);
 
         Log::debug('VoiceRoutingManager: Application direction call', [
             'to' => $to,

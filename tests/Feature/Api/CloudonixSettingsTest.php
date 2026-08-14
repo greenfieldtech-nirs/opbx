@@ -112,6 +112,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_requests_api_key' => 'test-requests-key-12345678',
             'no_answer_timeout' => 45,
             'recording_format' => 'mp3',
+            'call_recording_mode' => 'disabled',
         ]);
 
         $response = $this->getJson('/api/v1/settings/cloudonix');
@@ -140,6 +141,7 @@ class CloudonixSettingsTest extends TestCase
                     'domain_requests_api_key' => 'test***5678', // Masked
                     'no_answer_timeout' => 45,
                     'recording_format' => 'mp3',
+                    'call_recording_mode' => 'disabled',
                     'is_configured' => true,
                     'has_webhook_auth' => true,
                 ],
@@ -186,6 +188,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_requests_api_key' => 'test-requests-key-12345678',
             'no_answer_timeout' => 60,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
 
         $response->assertStatus(200)
@@ -217,6 +220,7 @@ class CloudonixSettingsTest extends TestCase
                     'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
                     'no_answer_timeout' => 60,
                     'recording_format' => 'wav',
+                    'call_recording_mode' => 'disabled',
                     'is_configured' => true,
                     'has_webhook_auth' => true,
                 ],
@@ -228,6 +232,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
             'no_answer_timeout' => 60,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
     }
 
@@ -245,6 +250,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_api_key' => 'old-api-key',
             'no_answer_timeout' => 30,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
 
         // Update settings
@@ -253,6 +259,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_api_key' => 'new-api-key-12345678',
             'no_answer_timeout' => 90,
             'recording_format' => 'mp3',
+            'call_recording_mode' => 'disabled',
         ]);
 
         $response->assertStatus(200)
@@ -269,6 +276,7 @@ class CloudonixSettingsTest extends TestCase
                     'domain_uuid' => '660e8400-e29b-41d4-a716-446655440000',
                     'no_answer_timeout' => 90,
                     'recording_format' => 'mp3',
+                    'call_recording_mode' => 'disabled',
                 ],
             ]);
 
@@ -278,6 +286,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_uuid' => '660e8400-e29b-41d4-a716-446655440000',
             'no_answer_timeout' => 90,
             'recording_format' => 'mp3',
+            'call_recording_mode' => 'disabled',
         ]);
     }
 
@@ -293,6 +302,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_api_key' => 'test-api-key',
             'no_answer_timeout' => 60,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
 
         $response->assertStatus(403);
@@ -310,6 +320,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_uuid' => 'not-a-uuid',
             'no_answer_timeout' => 60,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['domain_uuid']);
@@ -318,6 +329,7 @@ class CloudonixSettingsTest extends TestCase
         $response = $this->putJson('/api/v1/settings/cloudonix', [
             'no_answer_timeout' => 3,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['no_answer_timeout']);
@@ -326,6 +338,7 @@ class CloudonixSettingsTest extends TestCase
         $response = $this->putJson('/api/v1/settings/cloudonix', [
             'no_answer_timeout' => 150,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['no_answer_timeout']);
@@ -334,6 +347,7 @@ class CloudonixSettingsTest extends TestCase
         $response = $this->putJson('/api/v1/settings/cloudonix', [
             'no_answer_timeout' => 60,
             'recording_format' => 'ogg',
+            'call_recording_mode' => 'disabled',
         ]);
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['recording_format']);
@@ -495,6 +509,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_requests_api_key' => $plainRequestsKey,
             'no_answer_timeout' => 60,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
 
         // Get raw database record
@@ -526,6 +541,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_requests_api_key' => 'test-requests-key-12345678',
             'no_answer_timeout' => 30,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
 
         $response = $this->getJson('/api/v1/settings/cloudonix');
@@ -570,6 +586,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_api_key' => 'org1-api-key',
             'no_answer_timeout' => 30,
             'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
         ]);
 
         // Create settings for second organization
@@ -579,6 +596,7 @@ class CloudonixSettingsTest extends TestCase
             'domain_api_key' => 'org2-api-key',
             'no_answer_timeout' => 60,
             'recording_format' => 'mp3',
+            'call_recording_mode' => 'disabled',
         ]);
 
         // First owner can only see their settings

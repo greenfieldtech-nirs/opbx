@@ -43,6 +43,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property Carbon|null $call_answer_time
  * @property string|null $status
  * @property array $raw_cdr Complete CDR JSON
+ * @property string $recording_status none|pending|available|failed
+ * @property string|null $recording_source_url The RecordingUrl Cloudonix reported
+ * @property string|null $recording_stored_path Object key on the 'recordings' disk
+ * @property string|null $recording_mime_type
+ * @property int|null $recording_duration Recording length in seconds
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Organization $organization
@@ -89,6 +94,11 @@ class CallDetailRecord extends Model
         'call_answer_time',
         'status',
         'raw_cdr',
+        'recording_status',
+        'recording_source_url',
+        'recording_stored_path',
+        'recording_mime_type',
+        'recording_duration',
     ];
 
     /**
@@ -105,6 +115,7 @@ class CallDetailRecord extends Model
         'billsec' => 'integer',
         'cx_trunk_id' => 'integer',
         'session_id' => 'integer',
+        'recording_duration' => 'integer',
         'rated_cost' => 'decimal:4',
         'approx_cost' => 'decimal:4',
         'sell_cost' => 'decimal:4',

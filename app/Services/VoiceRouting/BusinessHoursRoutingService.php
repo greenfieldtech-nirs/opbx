@@ -9,6 +9,7 @@ use App\Models\BusinessHoursSchedule;
 use App\Models\Extension;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -23,7 +24,8 @@ use Illuminate\Support\Facades\Log;
 class BusinessHoursRoutingService
 {
     public function __construct(
-        private readonly VoiceRoutingCacheService $cache
+        private readonly VoiceRoutingCacheService $cache,
+        private readonly CallRecordingDecisionService $recordingDecision
     ) {}
 
     /**
@@ -70,7 +72,7 @@ class BusinessHoursRoutingService
     {
         // Handle array format from new BusinessHoursSchedule
         if (is_array($action)) {
-            return $this->routeArrayAction($action, $organizationId, $callSid);
+            return $this->routeArrayAction($action, $organizationId, $callSid, $request);
         }
 
         // Handle legacy string format (backward compatibility)
@@ -94,7 +96,7 @@ class BusinessHoursRoutingService
      * @param string $callSid The call SID
      * @return Response CXML response
      */
-    private function routeArrayAction(array $action, int $organizationId, string $callSid): Response
+    private function routeArrayAction(array $action, int $organizationId, string $callSid, Request $request): Response
     {
         $type = $action['type'] ?? 'unknown';
         $config = $action['config'] ?? [];
@@ -106,8 +108,8 @@ class BusinessHoursRoutingService
         ]);
 
         return match ($type) {
-            'extension' => $this->routeToExtension($config['extension_id'] ?? null, $organizationId, $callSid),
-            'ring_group' => $this->routeToRingGroup($config['ring_group_id'] ?? null, $organizationId, $callSid),
+            'extension' => $this->routeToExtension($config['extension_id'] ?? null, $organizationId, $callSid, $request),
+            'ring_group' => $this->routeToRingGroup($config['ring_group_id'] ?? null, $organizationId, $callSid, $request),
             'conference_room' => $this->routeToConferenceRoom($config['conference_room_id'] ?? null, $organizationId, $callSid),
             'ivr_menu' => $this->routeToIvrMenu($config['ivr_menu_id'] ?? null, $organizationId, $callSid),
             'voicemail' => response(CxmlBuilder::sendToVoicemail(), 200, ['Content-Type' => 'application/xml']),
@@ -123,7 +125,7 @@ class BusinessHoursRoutingService
     /**
      * Route to extension.
      */
-    private function routeToExtension(?int $extensionId, int $organizationId, string $callSid): Response
+    private function routeToExtension(?int $extensionId, int $organizationId, string $callSid, Request $request): Response
     {
         if (! $extensionId) {
             return response(
@@ -162,8 +164,10 @@ class BusinessHoursRoutingService
             );
         }
 
+        $recording = $this->recordingDecision->resolve($organizationId, $request->input('_call_category', 'inbound'));
+
         return response(
-            CxmlBuilder::simpleDial($sipUri),
+            CxmlBuilder::simpleDial($sipUri, null, null, null, null, $recording->record, $recording->recordingStatusCallback),
             200,
             ['Content-Type' => 'application/xml']
         );
@@ -172,7 +176,7 @@ class BusinessHoursRoutingService
     /**
      * Route to ring group.
      */
-    private function routeToRingGroup(?int $ringGroupId, int $organizationId, string $callSid): Response
+    private function routeToRingGroup(?int $ringGroupId, int $organizationId, string $callSid, Request $request): Response
     {
         if (! $ringGroupId) {
             return response(
@@ -212,8 +216,10 @@ class BusinessHoursRoutingService
             );
         }
 
+        $recording = $this->recordingDecision->resolve($organizationId, $request->input('_call_category', 'inbound'));
+
         return response(
-            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout),
+            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout, null, $recording->record, $recording->recordingStatusCallback),
             200,
             ['Content-Type' => 'application/xml']
         );

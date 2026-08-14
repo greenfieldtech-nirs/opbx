@@ -466,6 +466,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/export', [CallDetailRecordController::class, 'export'])->name('call-detail-records.export');
             Route::get('/statistics', [CallDetailRecordController::class, 'statistics'])->name('call-detail-records.statistics');
             Route::get('/{call_detail_record}', [CallDetailRecordController::class, 'show'])->name('call-detail-records.show');
+            Route::get('/{call_detail_record}/recording', [CallDetailRecordController::class, 'recording'])->name('call-detail-records.recording');
         });
 
         // Recordings (Owner/Admin only)

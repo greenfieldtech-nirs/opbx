@@ -48,8 +48,10 @@ class CxmlBuilder
      * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
      * @param  string|null  $callerId  Presented caller ID (a valid phone number)
      * @param  string|null  $callerName  Presented caller display name (any text)
+     * @param  string|null  $record  Recording mode: "record-from-answer" or "record-from-ringing" (omit for no recording)
+     * @param  string|null  $recordingStatusCallback  URL Cloudonix notifies once the recording is ready
      */
-    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null, ?string $callerId = null, ?string $callerName = null): self
+    public function dial(string|array $targets, ?int $timeout = null, ?string $action = null, ?string $trunks = null, ?string $callerId = null, ?string $callerName = null, ?string $record = null, ?string $recordingStatusCallback = null): self
     {
         $dial = $this->document->createElement('Dial');
 
@@ -72,6 +74,14 @@ class CxmlBuilder
 
         if ($callerName !== null) {
             $dial->setAttribute('callerName', $callerName);
+        }
+
+        if ($record !== null) {
+            $dial->setAttribute('record', $record);
+        }
+
+        if ($recordingStatusCallback !== null) {
+            $dial->setAttribute('recordingStatusCallback', $recordingStatusCallback);
         }
 
         // Handle multiple targets
@@ -266,11 +276,13 @@ class CxmlBuilder
      *
      * @param  string  $sipUri  SIP URI of the extension
      * @param  int|null  $timeout  Timeout in seconds
+     * @param  string|null  $record  Recording mode: "record-from-answer" or "record-from-ringing" (omit for no recording)
+     * @param  string|null  $recordingStatusCallback  URL Cloudonix notifies once the recording is ready
      */
-    public static function dialExtension(string $sipUri, ?int $timeout = null): string
+    public static function dialExtension(string $sipUri, ?int $timeout = null, ?string $record = null, ?string $recordingStatusCallback = null): string
     {
         $builder = new self;
-        $builder->dial($sipUri, $timeout ?? config('cloudonix.cxml.default_timeout', 30));
+        $builder->dial($sipUri, $timeout ?? config('cloudonix.cxml.default_timeout', 30), null, null, null, null, $record, $recordingStatusCallback);
 
         return $builder->build();
     }
@@ -281,11 +293,13 @@ class CxmlBuilder
      * @param  array<string>  $sipUris  Array of SIP URIs
      * @param  int|null  $timeout  Timeout in seconds
      * @param  string|null  $action  Callback URL when dial completes (for fallback handling)
+     * @param  string|null  $record  Recording mode: "record-from-answer" or "record-from-ringing" (omit for no recording)
+     * @param  string|null  $recordingStatusCallback  URL Cloudonix notifies once the recording is ready
      */
-    public static function dialRingGroup(array $sipUris, ?int $timeout = null, ?string $action = null): string
+    public static function dialRingGroup(array $sipUris, ?int $timeout = null, ?string $action = null, ?string $record = null, ?string $recordingStatusCallback = null): string
     {
         $builder = new self;
-        $builder->dial($sipUris, $timeout ?? config('cloudonix.cxml.default_timeout', 30), $action);
+        $builder->dial($sipUris, $timeout ?? config('cloudonix.cxml.default_timeout', 30), $action, null, null, null, $record, $recordingStatusCallback);
 
         return $builder->build();
     }
@@ -364,11 +378,13 @@ class CxmlBuilder
      * @param  int|null  $timeout  Optional timeout in seconds
      * @param  string|null  $trunks  Trunk identifier(s) to use for dialing
      * @param  string|null  $callerName  Optional caller display name (any text)
+     * @param  string|null  $record  Recording mode: "record-from-answer" or "record-from-ringing" (omit for no recording)
+     * @param  string|null  $recordingStatusCallback  URL Cloudonix notifies once the recording is ready
      */
-    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null, ?string $callerName = null): string
+    public static function simpleDial(string $destination, ?string $callerId = null, ?int $timeout = null, ?string $trunks = null, ?string $callerName = null, ?string $record = null, ?string $recordingStatusCallback = null): string
     {
         $builder = new self;
-        $builder->dial($destination, $timeout, null, $trunks, $callerId, $callerName);
+        $builder->dial($destination, $timeout, null, $trunks, $callerId, $callerName, $record, $recordingStatusCallback);
 
         return $builder->build();
     }

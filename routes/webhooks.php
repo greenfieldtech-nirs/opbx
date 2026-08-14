@@ -32,6 +32,11 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
     Route::post('/session-update', [CloudonixWebhookController::class, 'sessionUpdate'])
         ->middleware(['webhook.signature'])  // High-velocity endpoint - no rate limiting
         ->name('webhooks.cloudonix.session-update');
+
+    // Not gated behind webhook.signature - see recordingStatus() docblock for why.
+    Route::post('/recording-status', [CloudonixWebhookController::class, 'recordingStatus'])
+        ->middleware(['webhook.idempotency'])
+        ->name('webhooks.cloudonix.recording-status');
 });
 
 /*
