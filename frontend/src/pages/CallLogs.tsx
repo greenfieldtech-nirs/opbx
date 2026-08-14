@@ -437,7 +437,7 @@ export default function CallLogs() {
                 cell: (cdr) => (
                   <span className={cn(
                     'text-sm',
-                    cdr.user_full_name === 'Unassigned' && 'text-muted-foreground italic'
+                    cdr.user_full_name === 'Unassigned User' && 'text-muted-foreground italic'
                   )}>
                     {cdr.user_full_name}
                   </span>

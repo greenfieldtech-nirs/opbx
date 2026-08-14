@@ -288,7 +288,7 @@ export default function Dashboard() {
                           <td className="p-4 whitespace-nowrap">{formatPhoneNumber(call.from)}</td>
                           <td className="p-4 whitespace-nowrap">
                             <span className={cn(
-                              call.user_full_name === 'Unassigned' && 'text-muted-foreground italic'
+                              call.user_full_name === 'Unassigned User' && 'text-muted-foreground italic'
                             )}>
                               {call.user_full_name}
                             </span>
