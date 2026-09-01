@@ -53,6 +53,23 @@ jobs:
           cp .env.example .env
           sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env || true
 
+          # The app entrypoint and validate-env.sh fail fast on empty/weak
+          # secrets (APP_KEY, DB_PASSWORD, DB_ROOT_PASSWORD, MINIO_ACCESS_KEY,
+          # MINIO_SECRET_KEY). .env.example leaves them blank/default, which would
+          # abort the container with exit 1 in CI. Generate strong throwaway
+          # values for the ephemeral CI stack.
+          APP_KEY="base64:$(head -c 32 /dev/urandom | base64)"
+          DB_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
+          DB_ROOT_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
+          MINIO_ACCESS_KEY="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
+          MINIO_SECRET_KEY="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
+
+          sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY}|" .env
+          sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD}|" .env
+          sed -i "s|^DB_ROOT_PASSWORD=.*|DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}|" .env
+          sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}|" .env
+          sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=${MINIO_SECRET_KEY}|" .env
+
       - name: Prepare docker compose file
         # docker-compose.yml is gitignored (local, may contain secrets); the repo
         # ships docker-compose.yml.example as the canonical template. Without
