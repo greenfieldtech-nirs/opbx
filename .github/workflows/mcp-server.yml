@@ -53,6 +53,13 @@ jobs:
           cp .env.example .env
           sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env || true
 
+      - name: Prepare docker compose file
+        # docker-compose.yml is gitignored (local, may contain secrets); the repo
+        # ships docker-compose.yml.example as the canonical template. Without
+        # generating it, `docker compose up` fails with "no configuration file
+        # provided: not found".
+        run: cp docker-compose.yml.example docker-compose.yml
+
       - name: Boot OPBX stack
         run: docker compose up -d mysql redis minio app nginx
 
