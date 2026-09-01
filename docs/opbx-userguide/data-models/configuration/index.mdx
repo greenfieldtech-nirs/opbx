@@ -152,7 +152,8 @@ Per-organization credentials are stored in `cloudonix_settings`.
 | `DIALER_WORKER_ID` | `worker-1` | Worker identifier |
 | `DIALER_LARAVEL_API_URL` | `http://nginx` | Laravel API URL |
 | `DIALER_WORKER_API_TOKEN` | — | Worker auth token |
-| `DIALER_WEBHOOK_PORT` | `8081` | Worker webhook port |
+| `DIALER_WEBHOOK_PORT` | `8081` | Worker webhook port (container) |
+| `DIALER_WEBHOOK_HOST_PORT` | `8181` | Host port publishing the worker webhook endpoint |
 | `DIALER_WEBHOOK_SECRET` | — | HMAC secret for CDR webhooks |
 | `DIALER_POLL_INTERVAL` | `10s` | Campaign poll interval |
 

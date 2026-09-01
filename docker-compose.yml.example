@@ -333,7 +333,9 @@ services:
       - WEBHOOK_PORT=${DIALER_WEBHOOK_PORT:-8081}
       - WEBHOOK_SECRET=${DIALER_WEBHOOK_SECRET:-}
     ports:
-      - "${DIALER_WEBHOOK_PORT:-8081}:8081"  # Webhook endpoint for CDR
+      # Host-side port is separate from the container's WEBHOOK_PORT (8081)
+      # because dev machines often have other services on 8081.
+      - "${DIALER_WEBHOOK_HOST_PORT:-8181}:8081"  # Webhook endpoint for CDR
     networks:
       - opbx
     depends_on:
@@ -379,6 +381,33 @@ services:
     # Set NGROK_AUTHTOKEN in .env
     # Optional: Set NGROK_DOMAIN to use a custom domain (e.g., opbx.ngrok.io)
     # Public URL will be shown in logs: docker compose logs ngrok
+
+  # OPBX MCP Server - semantic MCP facade over the OPBX REST API
+  # MCP clients connect to http://localhost:${MCP_PORT}/mcp with their OPBX
+  # personal access token or opbxk_ API key as the Bearer credential.
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: opbx_mcp
+    ports:
+      - "${MCP_PORT:-8080}:8080"
+    environment:
+      NODE_ENV: production
+      OPBX_BASE_URL: http://nginx
+      LOG_LEVEL: ${MCP_LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    depends_on:
+      - nginx
+    networks:
+      - opbx
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:8080/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
 networks:
   opbx:

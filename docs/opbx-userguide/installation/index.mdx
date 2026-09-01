@@ -30,7 +30,7 @@ You also need these ports available on your host machine (all can be remapped vi
 | 3000 | React frontend (Vite dev server) |
 | 6001 | Soketi WebSocket server |
 | 4040 | ngrok web interface |
-| 8081 | Dialer worker webhook listener |
+| 8181 | Dialer worker webhook listener (container port 8081) |
 
 ## Installation Steps
 
@@ -104,7 +104,7 @@ This command builds images and starts the following services:
 | `soketi` | `opbx_websocket` | WebSocket server | 6001 |
 | `queue-worker` | `opbx_queue_worker` | Laravel queue worker | — |
 | `scheduler` | `opbx_scheduler` | Laravel task scheduler | — |
-| `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker | 8081 |
+| `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker | 8181 (host) → 8081 (container) |
 | `amd-worker` | `opbx_amd_worker` | Java/Vert.x AMD worker | *(internal)* |
 | `ngrok` | `opbx_ngrok` | Webhook tunnel (dev only) | 4040 |
 
