@@ -26,6 +26,10 @@ export async function buildHttpServer(deps: HttpServerDeps) {
     loggerInstance: logger,
     trustProxy: true,
     genReqId: () => randomUUID(),
+    // Accept both `/mcp` and `/mcp/` (and any other trailing-slash variant).
+    // MCP clients and reverse proxies are inconsistent about the trailing
+    // slash; without this, `POST /mcp/` 404s because only `/mcp` is registered.
+    ignoreTrailingSlash: true,
   });
 
   // Coarse per-identity guard at the HTTP edge; per-tool class limits are

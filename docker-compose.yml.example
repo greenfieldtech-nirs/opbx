@@ -402,7 +402,10 @@ services:
     networks:
       - opbx
     healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:8080/health']
+      # Use 127.0.0.1, not localhost: in the alpine container `localhost` resolves
+      # to ::1 (IPv6) but the Fastify server listens on 0.0.0.0 (IPv4-only), so a
+      # localhost probe gets connection refused and marks the container unhealthy.
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:8080/health']
       interval: 30s
       timeout: 5s
       retries: 3
