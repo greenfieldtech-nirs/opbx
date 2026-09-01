@@ -63,7 +63,7 @@ const toolsMd = [
   "",
   `> AUTO-GENERATED from the tool registry by \`npm run generate:docs\`. ${tools.length} tools.`,
   "> Do not edit by hand. Output shape for all tools: JSON structuredContent",
-  "> (success payload, or \`{success:false, error:{...}}\`, or \`{confirmation_required:true, preview:{...}}\`).",
+  "> (success payload, or `{success:false, error:{...}}`, or `{confirmation_required:true, preview:{...}}`).",
   "",
   ...tools.flatMap((t) => [
     `## \`${t.name}\``,
@@ -115,7 +115,7 @@ const fvMd = [
   "",
   "> AUTO-GENERATED mapping section. Every MCP tool and its underlying OPBX REST",
   "> operation (validated against the OpenAPI spec by the contract tests,",
-  "> \`npm run validate:opbx-api\`). All tools listed were additionally exercised",
+  "> `npm run validate:opbx-api`). All tools listed were additionally exercised",
   "> against a live local OPBX instance during development; destructive tools",
   "> were verified with the confirmation gate (preview without mutation,",
   "> execution only with confirm=true).",
