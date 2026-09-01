@@ -31,6 +31,7 @@ You also need these ports available on your host machine (all can be remapped vi
 | 6001 | Soketi WebSocket server |
 | 4040 | ngrok web interface |
 | 8181 | Dialer worker webhook listener (container port 8081) |
+| 8080 | MCP server (AI-agent API; configurable via `MCP_PORT`) |
 
 ## Installation Steps
 
@@ -107,6 +108,7 @@ This command builds images and starts the following services:
 | `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker | 8181 (host) → 8081 (container) |
 | `amd-worker` | `opbx_amd_worker` | Java/Vert.x AMD worker | *(internal)* |
 | `ngrok` | `opbx_ngrok` | Webhook tunnel (dev only) | 4040 |
+| `mcp-server` | `opbx_mcp` | MCP server for AI agents (see [MCP Server](/modules/mcp-server)) | 8080 |
 
 :::tip First Boot
 The PHP entrypoint runs migrations, seeds, and configuration validation on first startup. Wait **120 seconds** after starting containers before testing.
@@ -156,9 +158,11 @@ Proceed to [First Login](./first-login) to create your organization and admin ac
 If you see errors about ports already in use, change the corresponding variable in your `.env` file:
 
 ```bash
-APP_PORT=8080        # Use port 8080 instead of 80
+APP_PORT=8080        # Use port 8080 instead of 80 (but see MCP_PORT below)
 FRONTEND_PORT=3001   # Use port 3001 instead of 3000
 ```
+
+Available port overrides: `APP_PORT` (nginx), `FRONTEND_PORT` (Vite), `MCP_PORT` (MCP server, default 8080), `DIALER_WEBHOOK_HOST_PORT` (dialer worker webhooks, default 8181).
 
 ### MySQL Slow Start
 
@@ -185,7 +189,7 @@ Check individual service logs for errors:
 docker compose logs -f [service-name]
 ```
 
-Common service names: `app`, `nginx`, `mysql`, `redis`, `queue-worker`, `dialer-worker`, `amd-worker`.
+Common service names: `app`, `nginx`, `mysql`, `redis`, `queue-worker`, `dialer-worker`, `amd-worker`, `mcp-server`.
 
 ### Migrations Do Not Run
 
