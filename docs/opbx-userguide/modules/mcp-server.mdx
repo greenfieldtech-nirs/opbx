@@ -1,0 +1,73 @@
+---
+sidebar_position: 26
+slug: /modules/mcp-server
+sidebar_class_name: cxGuidesSidebar
+title: "MCP Server"
+description: "Let AI agents safely operate your PBX through the Model Context Protocol"
+---
+
+# MCP Server
+
+OPBX ships an optional **MCP (Model Context Protocol) server** (`opbx-mcp`) that exposes a curated, secure, agent-friendly interface over the OPBX REST API. It lets AI agents (Claude, IDE assistants, custom LLM tooling) inspect and operate your phone system: extensions, phone numbers, ring groups, IVR menus, business hours, conference rooms, AI assistants, auto-dialer campaigns, call records, and more.
+
+## What it is (and isn't)
+
+- **It is** a semantic facade over the OPBX REST API — tools map to intent (`configure_phone_number_routing`, `start_campaign`, `validate_configuration`), not raw HTTP.
+- **It is not** a generic REST proxy, and it never touches the OPBX database directly. All operations go through the official REST API with the caller's own permissions.
+- The execution plane (voice routing webhooks, dialer-worker internals) is never exposed.
+
+## Running it
+
+The MCP server is a service in the main Docker Compose stack:
+
+```bash
+docker compose up -d --build mcp-server
+```
+
+It listens on host port **8080** by default (`MCP_PORT`), and reaches OPBX internally via nginx.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `http://localhost:8080/mcp` | MCP endpoint (Streamable HTTP) |
+| `http://localhost:8080/health` | Liveness |
+| `http://localhost:8080/ready` | Readiness (includes OPBX reachability probe) |
+
+## Connecting an MCP client
+
+Clients authenticate with **their own OPBX credential** as a Bearer token — the server stores nothing:
+
+| Credential | Best for | Notes |
+|------------|----------|-------|
+| Scoped API key (`opbxk_…`) | Long-lived agents | Never expires; per-resource read/write grants (see [API Keys](/modules/api-keys)). Campaign and live-call tools require a user token instead. |
+| Personal access token | Interactive use | Full role-based access; expires after 24 hours. |
+
+Example client configuration:
+
+```json
+{
+  "mcpServers": {
+    "opbx": {
+      "url": "http://localhost:8080/mcp",
+      "headers": { "Authorization": "Bearer opbxk_your_key" }
+    }
+  }
+}
+```
+
+The organization is always derived from the credential — agents cannot select or override the tenant.
+
+## Safety model
+
+- **Role-based access control** mirrors your OPBX role (and is stricter than the raw API in a few places).
+- **High-impact operations** (deletes, campaign start/pause/resume/archive, call disconnect, coaching, security-rule removal) require a two-step confirmation: the first call returns a live preview with warnings, and execution only happens when re-invoked with `confirm: true`.
+- **Rate limiting** per identity, plus OPBX's own per-organization limits upstream.
+
+## Useful tools to try
+
+- `validate_configuration` — audits your whole configuration for broken references (DID routes to inactive targets, ring groups without members, campaigns without ready lists, …) and suggests fixes.
+- `list_extensions`, `search_calls`, `list_active_calls` — instant read visibility.
+- `configure_phone_number_routing` — validated one-step DID routing.
+
+## More documentation
+
+The full reference lives in the repository under `mcp-server/`: tool catalog (`docs/mcp-tools.md`), resources, prompts, security model, deployment, and the implementation report.

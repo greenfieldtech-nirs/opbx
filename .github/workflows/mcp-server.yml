@@ -1,0 +1,84 @@
+name: mcp-server
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "mcp-server/**"
+      - "docs/opbx-openapi/**"
+      - ".github/workflows/mcp-server.yml"
+  pull_request:
+    paths:
+      - "mcp-server/**"
+      - "docs/opbx-openapi/**"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test                       # unit + contract + security (integration is env-gated)
+      - run: npm run validate:opbx-api      # OpenAPI drift check (also part of npm test; explicit gate)
+      - run: npm run build
+
+  integration:
+    # Full-stack: boots OPBX from the repo's compose file and runs the live suite.
+    # Manual + develop pushes only (heavy).
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Prepare OPBX env
+        run: |
+          cp .env.example .env
+          sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env || true
+
+      - name: Boot OPBX stack
+        run: docker compose up -d mysql redis minio app nginx
+
+      - name: Wait for OPBX health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost/api/health | grep -q healthy; then exit 0; fi
+            sleep 5
+          done
+          echo "OPBX did not become healthy"; docker compose logs app | tail -50; exit 1
+
+      - name: Create integration test token
+        id: token
+        run: |
+          TOKEN=$(docker compose exec -T app php artisan tinker --execute='
+            $org = App\Models\Organization::first() ?? App\Models\Organization::create(["name"=>"CI Org","slug"=>"ci-org","status"=>"active","timezone"=>"UTC"]);
+            $u = App\Models\User::withoutGlobalScopes()->firstOrCreate(["email"=>"mcp-ci@example.com"],["organization_id"=>$org->id,"name"=>"CI","password"=>bcrypt("ci"),"role"=>"owner","status"=>"active"]);
+            $u->organization_id = $org->id; $u->save();
+            echo "TK:".$u->createToken("ci")->plainTextToken;' | grep -oE 'TK:[0-9]+\|[A-Za-z0-9]+' | sed 's/TK://')
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Run integration tests
+        working-directory: mcp-server
+        env:
+          OPBX_TEST_BASE_URL: http://localhost
+          OPBX_TEST_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          npm ci
+          npx vitest run tests/integration
