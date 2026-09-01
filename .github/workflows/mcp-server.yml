@@ -78,18 +78,27 @@ jobs:
         run: cp docker-compose.yml.example docker-compose.yml
 
       - name: Boot OPBX stack
+        # COMPOSE_FILE layers docker-compose.ci.yml over the generated
+        # docker-compose.yml so the `app` service is NOT bind-mounted to the repo
+        # (the CI checkout has no vendor/; the app image bakes its own).
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: docker compose up -d mysql redis minio app nginx
 
       - name: Wait for OPBX health
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: |
           for i in $(seq 1 60); do
             if curl -sf http://localhost/api/health | grep -q healthy; then exit 0; fi
             sleep 5
           done
-          echo "OPBX did not become healthy"; docker compose logs app | tail -50; exit 1
+          echo "OPBX did not become healthy"; docker compose logs app | tail -80; exit 1
 
       - name: Create integration test token
         id: token
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: |
           TOKEN=$(docker compose exec -T app php artisan tinker --execute='
             $org = App\Models\Organization::first() ?? App\Models\Organization::create(["name"=>"CI Org","slug"=>"ci-org","status"=>"active","timezone"=>"UTC"]);

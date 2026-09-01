@@ -1,0 +1,28 @@
+# CI overrides for the OPBX integration test stack.
+#
+# Why this exists:
+# The `app` service in docker-compose.yml(.example) bind-mounts the repo
+# (`./:/var/www/html`) for local development hot-reload. In CI the checkout has
+# NO `vendor/` directory (composer install is not run for the integration job),
+# so the bind mount shadows the image's baked `/var/www/html/vendor/` and the app
+# entrypoint fails with "vendor/autoload.php not found" -> container exits 1.
+#
+# The app image is self-contained (docker/php/Dockerfile does `composer install`
+# + `composer dump-autoload` + `COPY . .`). In CI we keep the repo bind mount
+# (the app needs .env for APP_KEY, and nginx needs public/) but overlay `vendor/`
+# with a named volume. A named volume is seeded from the image's directory
+# contents on first creation, so the image's baked vendor/ is used and survives
+# the bind mount shadowing it.
+#
+# Usage (in CI):
+#   cp docker-compose.yml.example docker-compose.yml
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml docker compose up -d mysql redis minio app nginx
+
+services:
+  app:
+    volumes:
+      - ./:/var/www/html
+      - app_vendor:/var/www/html/vendor
+
+volumes:
+  app_vendor:
