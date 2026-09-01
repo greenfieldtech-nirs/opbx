@@ -1,0 +1,12 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+exporters:
+  debug:
+    verbosity: basic
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]

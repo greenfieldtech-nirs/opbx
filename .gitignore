@@ -3,6 +3,9 @@
 # ============================================================================
 .env
 .env.*
+# ...but keep example env files (incl. subprojects like mcp-server)
+!.env.example
+!*/.env.example
 .env.local
 .env.*.local
 .env.backup
@@ -116,6 +119,8 @@ desktop.ini
 # Docker & Deployment (may contain secrets)
 # ============================================================================
 docker-compose.yml
+# ...but keep subproject compose files (mcp-server ships its own)
+!mcp-server/docker-compose.yml
 docker-compose.override.yml
 .dockerignore.local
 

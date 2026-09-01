@@ -1,0 +1,23 @@
+services:
+  mcp:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      # Default: reach the OPBX stack running on the Docker host.
+      # Override OPBX_BASE_URL in .env (e.g. http://app when sharing a network).
+      OPBX_BASE_URL: ${OPBX_BASE_URL:-http://host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # Optional local tracing backend. Enable with: docker compose --profile telemetry up
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    profiles: ["telemetry"]
+    command: ["--config=/etc/otel-collector.yaml"]
+    ports:
+      - "4318:4318"
+    volumes:
+      - ./docker/otel-collector.yaml:/etc/otel-collector.yaml:ro
