@@ -85,12 +85,25 @@ jobs:
           COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: docker compose up -d mysql redis minio app nginx
 
+      - name: Resolve OPBX public URL
+        id: baseurl
+        env:
+          COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+        run: |
+          # nginx publishes ${APP_PORT:-80}:80. Resolve the actual host port so the
+          # health check and the MCP integration tests talk to the right endpoint
+          # instead of assuming plain http://localhost (which may be a different
+          # service or unavailable on the runner).
+          PORT=$(docker compose port nginx 80 | head -1 | sed 's/.*://')
+          echo "Resolved nginx host port: ${PORT}"
+          echo "base_url=http://127.0.0.1:${PORT}" >> "$GITHUB_OUTPUT"
+
       - name: Wait for OPBX health
         env:
           COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
         run: |
           for i in $(seq 1 60); do
-            if curl -sf http://localhost/api/health | grep -q healthy; then exit 0; fi
+            if curl -sf "${{ steps.baseurl.outputs.base_url }}/api/health" | grep -q healthy; then exit 0; fi
             sleep 5
           done
           echo "OPBX did not become healthy"; docker compose logs app | tail -80; exit 1
@@ -104,13 +117,26 @@ jobs:
             $org = App\Models\Organization::first() ?? App\Models\Organization::create(["name"=>"CI Org","slug"=>"ci-org","status"=>"active","timezone"=>"UTC"]);
             $u = App\Models\User::withoutGlobalScopes()->firstOrCreate(["email"=>"mcp-ci@example.com"],["organization_id"=>$org->id,"name"=>"CI","password"=>bcrypt("ci"),"role"=>"owner","status"=>"active"]);
             $u->organization_id = $org->id; $u->save();
+            // The ring-group cycle test needs at least one USER extension in the org.
+            \App\Scopes\OrganizationScope::bypass(function () use ($org, $u) {
+              if (!\App\Models\Extension::where("organization_id", $org->id)->where("type", "user")->exists()) {
+                \App\Models\Extension::create([
+                  "organization_id" => $org->id,
+                  "user_id" => $u->id,
+                  "extension_number" => "9000",
+                  "password" => bin2hex(random_bytes(16)),
+                  "type" => "user",
+                  "status" => "active",
+                ]);
+              }
+            });
             echo "TK:".$u->createToken("ci")->plainTextToken;' | grep -oE 'TK:[0-9]+\|[A-Za-z0-9]+' | sed 's/TK://')
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Run integration tests
         working-directory: mcp-server
         env:
-          OPBX_TEST_BASE_URL: http://localhost
+          OPBX_TEST_BASE_URL: ${{ steps.baseurl.outputs.base_url }}
           OPBX_TEST_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           npm ci
