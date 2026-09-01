@@ -1,0 +1,35 @@
+name: mcp-server
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "mcp-server/**"
+      - "docs/opbx-openapi/**"
+      - ".github/workflows/mcp-server.yml"
+  pull_request:
+    paths:
+      - "mcp-server/**"
+      - "docs/opbx-openapi/**"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test                       # unit + contract + security (integration is env-gated)
+      - run: npm run validate:opbx-api      # OpenAPI drift check (also part of npm test; explicit gate)
+      - run: npm run build

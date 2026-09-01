@@ -333,7 +333,9 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `app` | Laravel PHP-FPM application | - |
 | `queue-worker` | Laravel queue processor | - |
 | `scheduler` | Laravel cron scheduler | - |
-| `dialer-worker` | Go auto-dialer worker | - |
+| `dialer-worker` | Go auto-dialer worker | 8181 |
+| `amd-worker` | Java/Vert.x AMD worker | - |
+| `mcp-server` | MCP server for AI agents ([docs](mcp-server/README.md)) | 8080 |
 | `mysql` | MySQL 8.0 database | 3306 |
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
 | `minio` | S3-compatible storage | 9000, 9001 |
@@ -450,6 +452,13 @@ Organization Owners can issue long-lived, revocable **scoped API keys** (prefixe
 integrations and automation. Each key carries its own per-resource `read`/`write` permission set,
 which is the sole authorization gate for requests made with it — independent of the user role model.
 The plaintext value is shown only once at creation.
+
+#### MCP Server (AI Agents)
+
+OPBX includes an optional [MCP server](mcp-server/README.md) (`mcp-server` compose service) that
+exposes a curated, safety-gated [Model Context Protocol](https://modelcontextprotocol.io) interface
+over the REST API — letting AI agents manage extensions, routing, campaigns, and configuration
+audits with role-based access and confirmation-gated destructive operations.
 
 ```bash
 # Create a key (Owner session token). The plaintext key is returned ONCE.

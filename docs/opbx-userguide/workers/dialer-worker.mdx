@@ -106,7 +106,7 @@ make run
 | `REDIS_DB` | `0` | No | Redis database |
 | `WORKER_ID` | `worker-1` | Yes | Unique worker identifier |
 | `POLL_INTERVAL` | `10s` | No | Campaign polling interval |
-| `WEBHOOK_PORT` | `8081` | Yes | HTTP server port for CDR webhooks and health checks |
+| `WEBHOOK_PORT` | `8081` | Yes | HTTP server port for CDR webhooks and health checks (container-internal; published to the host as 8181 by default, see `DIALER_WEBHOOK_HOST_PORT`) |
 
 :::note
 The worker exposes a single HTTP server on `WEBHOOK_PORT`. Health checks are available at `GET /webhooks/health` on this port.
