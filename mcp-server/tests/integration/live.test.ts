@@ -47,7 +47,20 @@ suite("live OPBX integration", () => {
     });
     const line = res.body.split("\n").find((l) => l.startsWith("data:"));
     const msg = JSON.parse(line ? line.slice(5).trim() : res.body);
-    return msg.result?.structuredContent;
+    // Surface the real error instead of returning undefined, so CI logs show the
+    // actual failure (e.g. OPBX unreachable, auth rejection) rather than a bare
+    // "expected undefined to match object" assertion error.
+    if (msg.error) {
+      throw new Error(
+        `MCP tools/call "${name}" failed: ${JSON.stringify(msg.error)}`,
+      );
+    }
+    if (!msg.result) {
+      throw new Error(
+        `MCP tools/call "${name}" returned no result (HTTP ${res.statusCode}): ${res.body.slice(0, 500)}`,
+      );
+    }
+    return msg.result.structuredContent;
   }
 
   it("resolves identity and lists real data", async () => {

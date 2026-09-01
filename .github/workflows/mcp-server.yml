@@ -140,4 +140,7 @@ jobs:
           OPBX_TEST_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           npm ci
-          npx vitest run tests/integration
+          # Live integration tests drive many OPBX API calls (validate_configuration
+          # fans out across every collection). The default vitest 10s timeout is too
+          # tight on a CI runner, so allow 60s per test.
+          npx vitest run --testTimeout 60000 tests/integration
