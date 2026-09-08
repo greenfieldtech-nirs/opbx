@@ -12,14 +12,20 @@ use App\Http\Requests\UpdateRecordingRequest;
 use App\Http\Resources\RecordingResource;
 use App\Jobs\ProcessRecordingUpload;
 use App\Jobs\ValidateRemoteUrl;
+use App\Models\ApiKey;
 use App\Models\Recording;
 use App\Services\Recording\RecordingAccessService;
 use App\Services\Recording\RecordingRemoteService;
 use App\Services\Recording\RecordingUploadService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RecordingsController extends Controller
 {
@@ -39,7 +45,7 @@ class RecordingsController extends Controller
         $user = $this->getAuthenticatedUser();
 
         // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        if ($user instanceof JsonResponse) {
             // This shouldn't happen for authenticated endpoints, but return error if it does
             return $user;
         }
@@ -67,13 +73,20 @@ class RecordingsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreRecordingRequest $request): \Illuminate\Http\JsonResponse
+    public function store(StoreRecordingRequest $request): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
         // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        if ($user instanceof JsonResponse) {
             return $user;
+        }
+        // Recording creation is tracked per-user (created_by/updated_by are FKs
+        // to users); API keys have no user identity, so creation requires a user token.
+        if ($user instanceof ApiKey) {
+            return response()->json([
+                'message' => 'Creating recordings requires a user token; API keys cannot create recordings.',
+            ], 403);
         }
         $validated = $request->validated();
 
@@ -153,12 +166,12 @@ class RecordingsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
+    public function show(Request $request, Recording $recording): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
         // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        if ($user instanceof JsonResponse) {
             return $user;
         }
 
@@ -177,12 +190,12 @@ class RecordingsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateRecordingRequest $request, Recording $recording): \Illuminate\Http\JsonResponse
+    public function update(UpdateRecordingRequest $request, Recording $recording): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
         // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        if ($user instanceof JsonResponse) {
             return $user;
         }
 
@@ -211,12 +224,12 @@ class RecordingsController extends Controller
      * Security Improvement: Returns download endpoint URL without embedding token.
      * Client should use Authorization header for secure token transmission.
      */
-    public function download(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
+    public function download(Request $request, Recording $recording): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
         // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        if ($user instanceof JsonResponse) {
             return $user;
         }
 
@@ -256,7 +269,7 @@ class RecordingsController extends Controller
      * Security Improvement: Accepts token from Authorization header to prevent token
      * exposure in URL query strings, server logs, and browser history.
      */
-    public function secureDownload(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Symfony\Component\HttpFoundation\StreamedResponse|\Illuminate\Http\JsonResponse
+    public function secureDownload(Request $request): BinaryFileResponse|StreamedResponse|JsonResponse
     {
         // Security improvement: Accept token from Authorization header (preferred)
         // Fall back to query parameter for backwards compatibility
@@ -301,7 +314,7 @@ class RecordingsController extends Controller
 
         // Extract user ID from token payload for logging (since $user may be null)
         try {
-            $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($token);
+            $decrypted = Crypt::decryptString($token);
             $payload = json_decode($decrypted, true);
             $userId = $payload['user_id'] ?? ($user ? $user->id : null);
         } catch (\Exception $e) {
@@ -347,12 +360,12 @@ class RecordingsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, Recording $recording): \Illuminate\Http\JsonResponse
+    public function destroy(Request $request, Recording $recording): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
         // Handle unauthenticated response
-        if ($user instanceof \Illuminate\Http\JsonResponse) {
+        if ($user instanceof JsonResponse) {
             return $user;
         }
 
@@ -398,7 +411,7 @@ class RecordingsController extends Controller
      * Serve MinIO files for external access (used by Cloudonix for IVR audio files).
      * Requires a valid HMAC signature with expiration to prevent unauthorized access.
      */
-    public function serveMinioFile(Request $request, string $path): \Illuminate\Http\Response
+    public function serveMinioFile(Request $request, string $path): Response
     {
         try {
             // Verify signed URL parameters

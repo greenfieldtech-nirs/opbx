@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ValueObjects;
 
+use App\Models\ApiKey;
 use App\Models\Recording;
 use App\Models\User;
 
@@ -25,9 +26,9 @@ class IvrAudioConfig
      * Handles recording resolution and audio configuration.
      *
      * @param  array  $data  Request data
-     * @param  User|null  $user  Current user for recording resolution
+     * @param  User|ApiKey|null  $user  Current principal (user or API key) for recording resolution
      */
-    public static function fromRequest(array $data, ?User $user): self
+    public static function fromRequest(array $data, User|ApiKey|null $user): self
     {
         // Priority 1: recording_id
         if ($recordingId = $data['recording_id'] ?? null) {
@@ -61,7 +62,7 @@ class IvrAudioConfig
      *
      * @param  int|string  $recordingId
      */
-    private static function resolveRecordingUrl($recordingId, ?User $user): ?string
+    private static function resolveRecordingUrl($recordingId, User|ApiKey|null $user): ?string
     {
         $recording = Recording::find($recordingId);
 
