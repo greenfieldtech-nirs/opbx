@@ -7,6 +7,7 @@
  */
 
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -55,6 +56,14 @@ export function ApiKeyPermissionBuilder({
     onChange([...without, { resource, level: selection }]);
   };
 
+  const setAll = (selection: Selection) => {
+    if (selection === 'none') {
+      onChange([]);
+      return;
+    }
+    onChange(resources.map((resource) => ({ resource, level: selection })));
+  };
+
   if (resources.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -65,7 +74,38 @@ export function ApiKeyPermissionBuilder({
 
   return (
     <div className="space-y-2">
-      <Label>Permissions</Label>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label>Permissions</Label>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setAll('none')}
+          >
+            Disable All
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setAll('read')}
+          >
+            Grant Read-Only All
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setAll('write')}
+          >
+            Grant Write All
+          </Button>
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-2 lg:grid-cols-3">
         {resources.map((resource) => {
           const current = levelFor(resource);
