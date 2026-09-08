@@ -17,13 +17,19 @@ it (in-memory, per request) to the OPBX REST API.
 ### 2. Scoped API key (`opbxk_…`)
 
 - The intended machine credential: never expires, revocable, per-resource read/write
-  grants, deny-by-default (`EnforceApiKeyScope`), 12 grantable resources.
+  grants, deny-by-default (`EnforceApiKeyScope`).
 - OPBX has **no identity echo endpoint** for keys (keys cannot call `/auth/me`):
   the MCP identity is minimal (`principalType: "apikey"`), and resource authorization
   is delegated to OPBX. Tenant scoping is implicit and enforced upstream.
-- Keys cannot reach the Sanctum-only route groups (campaigns, session-updates/live
-  calls, call notifications) — calls there return a clear `authentication_error`
-  explaining the limitation. Use a PAT for those.
+- Grantable resources (23): users, extensions, conference-rooms, ai-assistants,
+  ai-assistant-providers, ring-groups, ai-assistant-load-balancers, ivr-menus,
+  business-hours, phone-numbers, outbound-whitelist, inbound-blacklist,
+  call-detail-records, recordings, call-tracking-campaigns, call-tracking-analytics,
+  call-tracking-sessions, call-tracking-ad-platform-integrations, supervisors,
+  auto-dialer-campaigns, distribution-lists, session-updates, call-notifications.
+- Credential-bearing subroutes are never key-accessible, even under a granted parent
+  (`extensions.password`, `extensions.reset-password`, `users.password.update`,
+  `users.embed-token.*`).
 
 ### What is never accepted
 
