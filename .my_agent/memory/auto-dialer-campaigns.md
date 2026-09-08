@@ -204,6 +204,7 @@ Exponential backoff: `5 * 2^(attempt-1)` minutes, capped at 60 minutes. Retryabl
 
 ## Notes
 
+- Scheduler commands (`routes/console.php`): only `auto-dialer:check-campaigns` (every minute) and `auto-dialer:reset-pending-destinations` exist. The `auto-dialer:update-stats` schedule was removed 2026-09-08 — the command class was never implemented (schedule added without it in 621d0f15); stats are event-driven (`CallerIdPoolService::syncCallerIdStats`) or computed on demand by monitor endpoints. Do not re-add the schedule without creating the command.
 - Distribution list destinations now support `name`, `batch_identifier`, and `metadata` via CSV column mapping; see [Distribution Lists](distribution-lists.md).
 - `AutoDialerCampaignController::buildCampaignData` supplies defaults for optional fields when they are omitted from `CreateCampaignRequest`: `caller_id_strategy` defaults to `round_robin` and `time_limit` defaults to `3600`.
 - Campaign deletion sets `auto_dialer_lists.campaign_id` to `NULL` (foreign key `onDelete('set null')`) rather than cascading to lists/destinations.
