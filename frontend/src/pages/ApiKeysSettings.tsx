@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { EmptyState } from '@/components/design-system/EmptyState';
+import { ApiEndpointsInfo } from '@/components/settings/ApiEndpointsInfo';
 import { ApiKeyPermissionBuilder } from '@/components/settings/ApiKeyPermissionBuilder';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -129,7 +130,8 @@ export default function ApiKeysSettings() {
   };
 
   return (
-    <div className="p-6">
+    <div className="space-y-4 p-6">
+      <ApiEndpointsInfo />
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>

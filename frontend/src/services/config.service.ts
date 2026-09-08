@@ -13,6 +13,14 @@ export interface Auth0Config {
   providers?: string[];
 }
 
+export interface ApplicationEndpoints {
+  /** REST API base URL, derived from the request origin (e.g. https://pbx.example.com/api/v1). */
+  api_base_url: string;
+  /** MCP server endpoint, derived from the request host + configured MCP port. */
+  mcp_url: string;
+  mcp_port: number;
+}
+
 export interface ApplicationConfig {
   mode: 'development' | 'production';
   is_production: boolean;
@@ -26,6 +34,8 @@ export interface ApplicationConfig {
   };
   saas_enabled: boolean;
   auth0: Auth0Config;
+  /** Present on OPBX >= the endpoints feature; absent on error fallback. */
+  endpoints?: ApplicationEndpoints;
 }
 
 let cachedConfig: ApplicationConfig | null = null;
