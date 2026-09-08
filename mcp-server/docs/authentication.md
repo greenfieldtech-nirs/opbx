@@ -21,12 +21,13 @@ it (in-memory, per request) to the OPBX REST API.
 - OPBX has **no identity echo endpoint** for keys (keys cannot call `/auth/me`):
   the MCP identity is minimal (`principalType: "apikey"`), and resource authorization
   is delegated to OPBX. Tenant scoping is implicit and enforced upstream.
-- Grantable resources (23): users, extensions, conference-rooms, ai-assistants,
+- Grantable resources (24): users, extensions, conference-rooms, ai-assistants,
   ai-assistant-providers, ring-groups, ai-assistant-load-balancers, ivr-menus,
   business-hours, phone-numbers, outbound-whitelist, inbound-blacklist,
   call-detail-records, recordings, call-tracking-campaigns, call-tracking-analytics,
   call-tracking-sessions, call-tracking-ad-platform-integrations, supervisors,
-  auto-dialer-campaigns, distribution-lists, session-updates, call-notifications.
+  auto-dialer-campaigns, distribution-lists, session-updates, call-notifications,
+  dashboard.
 - Credential-bearing subroutes are never key-accessible, even under a granted parent
   (`extensions.password`, `extensions.reset-password`, `users.password.update`,
   `users.embed-token.*`).
