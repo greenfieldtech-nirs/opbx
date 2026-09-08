@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\CallDetailRecordResource;
+use App\Models\ApiKey;
 use App\Models\CallDetailRecord;
 use App\Models\User;
 use App\Services\Supervisor\SupervisorFilterService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +105,7 @@ class CallDetailRecordController extends AbstractApiCrudController
         }
     }
 
-    protected function afterShow(\Illuminate\Database\Eloquent\Model $model, Request $request): void
+    protected function afterShow(Model $model, Request $request): void
     {
         $model->loadMissing(['extension.user:id,name', 'sessionUpdate']);
     }
@@ -160,7 +162,7 @@ class CallDetailRecordController extends AbstractApiCrudController
     /**
      * Apply Supervisor resource filter to a CDR query.
      */
-    private function applySupervisorFilter(Builder $query, User $user): void
+    private function applySupervisorFilter(Builder $query, User|ApiKey $user): void
     {
         if (! $user->isSupervisor()) {
             return;
@@ -356,7 +358,7 @@ class CallDetailRecordController extends AbstractApiCrudController
      * Build the base CDR query for statistics, scoped to the organization,
      * date range, and Supervisor-assigned resources.
      */
-    private function buildStatisticsQuery(User $user, string $fromDate, string $toDate): Builder
+    private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate): Builder
     {
         $query = CallDetailRecord::forOrganization($user->organization_id)
             ->whereDate('session_timestamp', '>=', $fromDate)

@@ -166,6 +166,18 @@ Available port overrides: `APP_PORT` (nginx), `FRONTEND_PORT` (Vite), `MCP_PORT`
 
 ### MySQL Slow Start
 
+### "No such image" Errors (podman-compose)
+
+Podman-compose does **not** build images automatically on `docker compose up` the way Docker Compose does. If a service fails with `no such image: ...-mcp-server` (or another locally-built service), build it explicitly first:
+
+```bash
+docker compose build mcp-server   # or: docker compose build
+docker compose up -d mcp-server
+```
+
+Using `docker compose up -d --build` also works.
+
+
 MySQL may take longer to initialize on first boot. Wait up to 120 seconds after starting containers before testing:
 
 ```bash

@@ -35,6 +35,9 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8000',
         changeOrigin: true,
+        // Forward the browser's original Host/Proto so the backend can derive
+        // public endpoint URLs (e.g. the API/MCP endpoint info box).
+        xfwd: true,
       },
     },
   },

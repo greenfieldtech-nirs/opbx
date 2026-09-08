@@ -67,5 +67,23 @@ paths:
                         - 'null'
                         description: reCAPTCHA site key (if enabled)
                         example: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+                  endpoints:
+                    type: object
+                    description: >-
+                      Public API and MCP endpoint URLs, derived from the
+                      incoming request origin and the configured MCP port.
+                    properties:
+                      api_base_url:
+                        type: string
+                        description: REST API base URL (request origin + /api/v1)
+                        example: https://pbx.example.com/api/v1
+                      mcp_url:
+                        type: string
+                        description: MCP server endpoint (request host + MCP port)
+                        example: https://pbx.example.com:8080/mcp
+                      mcp_port:
+                        type: integer
+                        description: Configured MCP host port (MCP_PORT)
+                        example: 8080
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
