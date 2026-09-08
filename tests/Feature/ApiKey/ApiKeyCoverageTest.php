@@ -103,6 +103,22 @@ class ApiKeyCoverageTest extends TestCase
         $this->withToken($token)->getJson('/api/v1/session-updates/active')->assertStatus(403);
     }
 
+    public function test_cdr_statistics_works_for_api_key_principals(): void
+    {
+        // Regression: statistics() passed the principal to a User-typed helper;
+        // an ApiKey principal caused a TypeError (HTTP 500).
+        $token = $this->keyFor([['resource' => 'call-detail-records', 'level' => 'read']]);
+
+        $this->withToken($token)->getJson('/api/v1/call-detail-records/statistics')->assertStatus(200);
+    }
+
+    public function test_dashboard_is_grantable_read_only(): void
+    {
+        $token = $this->keyFor([['resource' => 'dashboard', 'level' => 'read']]);
+
+        $this->withToken($token)->getJson('/api/v1/dashboard/supervisor')->assertStatus(200);
+    }
+
     public function test_credential_subroutes_are_never_grantable(): void
     {
         $org = Organization::factory()->create();
@@ -142,7 +158,6 @@ class ApiKeyCoverageTest extends TestCase
             'profile.',
             'settings.cloudonix.',
             'webphone.',
-            'dashboard.supervisor',
         ];
 
         $uncovered = [];

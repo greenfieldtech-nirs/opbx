@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\CoachTargetRequest;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
@@ -115,7 +116,7 @@ class SessionUpdateController extends Controller
 
             $userNamesBySubscriberId = $subscriberIds->isEmpty()
                 ? collect()
-                : \App\Models\Extension::whereIn('cloudonix_subscriber_id', $subscriberIds)
+                : Extension::whereIn('cloudonix_subscriber_id', $subscriberIds)
                     ->with('user:id,name')
                     ->get()
                     ->keyBy('cloudonix_subscriber_id')
@@ -126,7 +127,7 @@ class SessionUpdateController extends Controller
             // extension or an external phone number. Strip the "+" back off for
             // display when the value is actually one of this organization's
             // extension numbers, so internal legs read as plain extensions.
-            $extensionNumbers = \App\Models\Extension::pluck('extension_number')
+            $extensionNumbers = Extension::pluck('extension_number')
                 ->map(fn ($number) => (string) $number)
                 ->flip();
 
@@ -293,7 +294,9 @@ class SessionUpdateController extends Controller
         $activeSessionIds = $activeSessions->pluck('session_id');
         $sessionsWithDuration = SessionUpdate::whereIn('session_id', $activeSessionIds)
             ->whereNotNull('session_created_at')
-            ->selectRaw('session_id, TIMESTAMPDIFF(SECOND, session_created_at, NOW()) as duration_seconds')
+            // MIN(): session_created_at is constant per session; MIN keeps the query
+            // valid under ONLY_FULL_GROUP_BY (plain column is rejected).
+            ->selectRaw('session_id, TIMESTAMPDIFF(SECOND, MIN(session_created_at), NOW()) as duration_seconds')
             ->groupBy('session_id')
             ->having('duration_seconds', '>', 0)
             ->get();

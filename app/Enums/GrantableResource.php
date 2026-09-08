@@ -35,6 +35,7 @@ enum GrantableResource: string
     case DISTRIBUTION_LISTS = 'distribution-lists';
     case SESSION_UPDATES = 'session-updates';
     case CALL_NOTIFICATIONS = 'call-notifications';
+    case DASHBOARD = 'dashboard';
 
     /**
      * Route-name prefixes that map to a resource whose slug differs from the
