@@ -3,6 +3,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+  RefreshCw,
   Search,
   Users,
   X,
@@ -44,7 +45,7 @@ export default function Supervisors() {
     return <Navigate to="/ui/dashboard" replace />;
   }
 
-  const { data: usersResponse, isLoading } = useQuery({
+  const { data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['users'],
     queryFn: () => usersService.getAll({ per_page: 1000 }),
     staleTime: 30000,
@@ -188,6 +189,19 @@ export default function Supervisors() {
                 autoComplete="off"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                refetch();
+                queryClient.invalidateQueries({ queryKey: ['supervisor-assignments'] });
+              }}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
 
             <Select
               value={statusFilter}

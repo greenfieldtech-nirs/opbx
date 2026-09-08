@@ -183,7 +183,7 @@ function UsersComplete() {
   const [showContactInfo, setShowContactInfo] = useState(false);
 
   // Fetch users with React Query
-  const { data: usersResponse, isLoading, isError, error } = useQuery({
+  const { data: usersResponse, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['users', {
       search: searchQuery || undefined,
       role: roleFilter !== 'all' ? roleFilter : undefined,
@@ -592,6 +592,16 @@ function UsersComplete() {
                 autoComplete="off"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
 
             {/* Filter dropdowns */}
             <Select
