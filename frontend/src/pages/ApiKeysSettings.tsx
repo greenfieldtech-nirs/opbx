@@ -230,7 +230,7 @@ export default function ApiKeysSettings() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Create API Key</DialogTitle>
             <DialogDescription>
