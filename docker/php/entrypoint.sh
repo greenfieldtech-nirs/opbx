@@ -24,6 +24,15 @@ validate_password "MINIO_ACCESS_KEY" "$MINIO_ACCESS_KEY"
 validate_password "MINIO_SECRET_KEY" "$MINIO_SECRET_KEY"
 echo "Security validation passed."
 
+# Development convenience: when OPCACHE_VALIDATE_TIMESTAMPS=1, PHP opcache
+# re-reads changed files on every request (needed for bind-mounted source in
+# local development). Default (unset/0) keeps production behavior: code changes
+# require a container restart.
+if [ "${OPCACHE_VALIDATE_TIMESTAMPS:-0}" = "1" ]; then
+    echo "OPCACHE_VALIDATE_TIMESTAMPS=1: enabling opcache timestamp revalidation (dev mode)"
+    printf '[opcache]\nopcache.validate_timestamps=1\nopcache.revalidate_freq=0\n' > /usr/local/etc/php/conf.d/zz-opcache-dev.ini
+fi
+
 # The user the application should run as after privilege drop.
 APP_USER="${APP_USER:-www-data}"
 APP_GROUP="${APP_GROUP:-www-data}"
