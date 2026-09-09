@@ -17,6 +17,17 @@ use Illuminate\Support\Facades\Log;
 class CloudonixTrunksClient extends CloudonixBaseClient
 {
     /**
+     * HTTP status of the last getTrunk() response (null when the call never
+     * completed, e.g. connection failure or open circuit breaker).
+     */
+    protected ?int $lastHttpStatus = null;
+
+    public function getLastHttpStatus(): ?int
+    {
+        return $this->lastHttpStatus;
+    }
+
+    /**
      * List outbound trunks for the domain.
      *
      * Fetches trunks from /customers/{customer-id}/domains/{domain-id}/trunks
@@ -217,6 +228,7 @@ class CloudonixTrunksClient extends CloudonixBaseClient
     public function getTrunk(int|string $trunkId): ?array
     {
         $this->requireDomainUuid();
+        $this->lastHttpStatus = null;
 
         return $this->withCircuitBreaker(
             callback: function () use ($trunkId) {
@@ -231,6 +243,8 @@ class CloudonixTrunksClient extends CloudonixBaseClient
 
                     $response = $this->client()
                         ->get($url);
+
+                    $this->lastHttpStatus = $response->status();
 
                     if ($response->successful()) {
                         $trunk = $response->json();

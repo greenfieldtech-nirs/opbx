@@ -41,7 +41,24 @@ class CloudonixTrunksClientTest extends TestCase
             $this->trunksUrl => Http::response('Server Error', 500),
         ]);
 
+        // With a cold cache an upstream failure yields null; with a warm
+        // cache the circuit breaker serves the stale list instead — that
+        // graceful degradation is intentional, do not "fix" it.
         $this->assertNull($this->client->listTrunks());
+    }
+
+    public function test_get_trunk_records_last_http_status(): void
+    {
+        Http::fake([
+            $this->trunksUrl.'/7' => Http::response('Server Error', 500),
+            $this->trunksUrl.'/8' => Http::response(['id' => 8, 'name' => 'OK']),
+        ]);
+
+        $this->assertNull($this->client->getTrunk(7));
+        $this->assertSame(500, $this->client->getLastHttpStatus());
+
+        $this->assertSame(['id' => 8, 'name' => 'OK'], $this->client->getTrunk(8));
+        $this->assertSame(200, $this->client->getLastHttpStatus());
     }
 
     public function test_create_trunk_posts_to_trunks_endpoint(): void

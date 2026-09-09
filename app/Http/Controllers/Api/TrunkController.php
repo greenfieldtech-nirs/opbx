@@ -11,6 +11,7 @@ use App\Http\Resources\TrunkResource;
 use App\Models\CloudonixSettings;
 use App\Models\OutboundWhitelist;
 use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\CloudonixClient\CloudonixTrunksClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -36,9 +37,9 @@ class TrunkController extends Controller
         return new CloudonixClient($settings);
     }
 
-    private function authorizeTrunks(): void
+    private function authorizeTrunks(Request $request): void
     {
-        $user = auth()->user();
+        $user = $request->user();
         abort_unless($user && ($user->isOwner() || $user->isPBXAdmin()), 403);
     }
 
@@ -47,7 +48,7 @@ class TrunkController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeTrunks();
+        $this->authorizeTrunks($request);
         $organizationId = (int) $request->user()->organization_id;
 
         $trunks = $this->client($organizationId)->trunks()->listTrunks();
@@ -87,15 +88,16 @@ class TrunkController extends Controller
     /**
      * Show a single trunk by Cloudonix id/uuid.
      */
-    public function show(string $trunk): JsonResponse
+    public function show(Request $request, string $trunk): JsonResponse
     {
-        $this->authorizeTrunks();
-        $organizationId = (int) auth()->user()->organization_id;
+        $this->authorizeTrunks($request);
+        $organizationId = (int) $request->user()->organization_id;
 
-        $payload = $this->client($organizationId)->trunks()->getTrunk($trunk);
+        $client = $this->client($organizationId);
+        $payload = $client->trunks()->getTrunk($trunk);
 
         if ($payload === null) {
-            return response()->json(['error' => 'not_found', 'message' => 'Trunk not found.'], 404);
+            return $this->trunkFetchError($client->trunks());
         }
 
         $inUseBy = $this->inUseByFor($payload['name'] ?? null);
@@ -164,7 +166,7 @@ class TrunkController extends Controller
         $existing = $client->trunks()->getTrunk($trunk);
 
         if ($existing === null) {
-            return response()->json(['error' => 'not_found', 'message' => 'Trunk not found.'], 404);
+            return $this->trunkFetchError($client->trunks());
         }
 
         if ($readonly = $this->publicTrunkGuard($existing, $organizationId, 'update')) {
@@ -211,16 +213,16 @@ class TrunkController extends Controller
     /**
      * Delete a trunk in Cloudonix. Public-* trunks are read-only.
      */
-    public function destroy(string $trunk): JsonResponse
+    public function destroy(Request $request, string $trunk): JsonResponse
     {
-        $this->authorizeTrunks();
-        $organizationId = (int) auth()->user()->organization_id;
+        $this->authorizeTrunks($request);
+        $organizationId = (int) $request->user()->organization_id;
         $client = $this->client($organizationId);
 
         $existing = $client->trunks()->getTrunk($trunk);
 
         if ($existing === null) {
-            return response()->json(['error' => 'not_found', 'message' => 'Trunk not found.'], 404);
+            return $this->trunkFetchError($client->trunks());
         }
 
         if ($readonly = $this->publicTrunkGuard($existing, $organizationId, 'delete')) {
@@ -330,6 +332,19 @@ class TrunkController extends Controller
             'error' => 'public_trunk_read_only',
             'message' => 'Public trunks are managed by Cloudonix and cannot be modified.',
         ], 403);
+    }
+
+    /**
+     * Map a null getTrunk() result to 404 (Cloudonix said "not found") or
+     * 502 (upstream failure / unreachable) based on the last HTTP status.
+     */
+    private function trunkFetchError(CloudonixTrunksClient $trunks): JsonResponse
+    {
+        if ($trunks->getLastHttpStatus() === 404) {
+            return response()->json(['error' => 'not_found', 'message' => 'Trunk not found.'], 404);
+        }
+
+        return $this->cloudonixUnavailable();
     }
 
     private function cloudonixUnavailable(): JsonResponse

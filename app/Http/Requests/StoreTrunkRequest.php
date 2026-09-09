@@ -33,7 +33,7 @@ class StoreTrunkRequest extends FormRequest
             // public-inbound / public-outbound are Cloudonix-managed and not creatable
             'direction' => ['required', 'in:inbound,outbound'],
             'prefix' => ['nullable', 'string', 'max:20'],
-            'username' => ['nullable', 'string', 'max:128'],
+            'username' => ['nullable', 'string', 'max:128', 'required_with:password'],
             'password' => ['nullable', 'string', 'max:128', 'required_with:username'],
             'overwrite_from' => ['boolean'],
         ];
@@ -47,6 +47,7 @@ class StoreTrunkRequest extends FormRequest
         return [
             'ip.regex' => 'The ip must be a valid IPv4 address, IPv6 address, or hostname.',
             'password.required_with' => 'A password is required when a username is provided.',
+            'username.required_with' => 'A username is required when a password is provided.',
         ];
     }
 }

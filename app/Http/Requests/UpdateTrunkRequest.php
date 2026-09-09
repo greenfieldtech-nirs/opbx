@@ -34,8 +34,11 @@ class UpdateTrunkRequest extends FormRequest
             'port' => ['sometimes', 'integer', 'min:1', 'max:65535'],
             'transport' => ['sometimes', 'in:udp,tcp,tls'],
             'prefix' => ['sometimes', 'nullable', 'string', 'max:20'],
-            'username' => ['sometimes', 'nullable', 'string', 'max:128'],
-            'password' => ['sometimes', 'nullable', 'string', 'max:128', 'required_with:username'],
+            // No 'sometimes' on username: required_with:password must fire
+            // even when username is absent from the payload. Username alone
+            // is allowed (keeps the stored password in Cloudonix).
+            'username' => ['nullable', 'string', 'max:128', 'required_with:password'],
+            'password' => ['sometimes', 'nullable', 'string', 'max:128'],
             'overwrite_from' => ['sometimes', 'boolean'],
         ];
     }
@@ -47,7 +50,7 @@ class UpdateTrunkRequest extends FormRequest
     {
         return [
             'ip.regex' => 'The ip must be a valid IPv4 address, IPv6 address, or hostname.',
-            'password.required_with' => 'A password is required when a username is provided.',
+            'username.required_with' => 'A username is required when a password is provided.',
         ];
     }
 }

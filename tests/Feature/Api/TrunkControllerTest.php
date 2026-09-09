@@ -333,4 +333,24 @@ class TrunkControllerTest extends TestCase
         Sanctum::actingAs($this->owner);
         $this->getJson('/api/v1/trunks/999')->assertNotFound();
     }
+
+    public function test_show_returns_502_when_cloudonix_fails(): void
+    {
+        Http::fake([
+            $this->trunksUrl.'/101' => Http::response('boom', 500),
+        ]);
+
+        Sanctum::actingAs($this->owner);
+        $this->getJson('/api/v1/trunks/101')
+            ->assertStatus(502)
+            ->assertJsonPath('error', 'cloudonix_unavailable');
+    }
+
+    public function test_update_with_password_without_username_returns_422(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/trunks/101', ['password' => 'new-secret'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('username');
+    }
 }
