@@ -485,8 +485,8 @@ Route::prefix('v1')->group(function (): void {
         });
 
         // Trunks (Owner/PBX Admin only; proxied to Cloudonix — {trunk} is a
-        // Cloudonix id/uuid string, no implicit model binding).
-        // Not a GrantableResource: key-authenticated requests are denied by EnforceApiKeyScope.
+        // Cloudonix id/uuid string, no implicit model binding). Grantable to
+        // API keys via the 'trunks' resource (slug matches route-name prefix).
         Route::apiResource('trunks', TrunkController::class)
             ->only(['index', 'show', 'store', 'update', 'destroy']);
 

@@ -1,0 +1,124 @@
+paths:
+  /v1/trunks/{trunk}:
+    parameters:
+      - name: trunk
+        in: path
+        required: true
+        description: Cloudonix trunk id or uuid.
+        schema:
+          type: string
+
+    get:
+      tags:
+        - Trunks
+      summary: Get Trunk
+      operationId: getTrunk
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Trunk details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Trunk.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '502':
+          description: Cloudonix API unavailable
+
+    put:
+      tags:
+        - Trunks
+      summary: Update Trunk
+      description: >-
+        Update a trunk in Cloudonix. `name` and `direction` are immutable
+        post-create. All fields are optional. Omitting `password` leaves the
+        stored credential untouched; `password` is write-only and is never
+        returned in responses.
+      operationId: updateTrunk
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip:
+                  type: string
+                  description: IPv4, IPv6, or hostname of the trunk peer.
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                transport:
+                  type: string
+                  enum:
+                  - udp
+                  - tcp
+                  - tls
+                prefix:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                username:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 128
+                  description: May be sent alone (keeps the stored password).
+                password:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 128
+                  writeOnly: true
+                  description: Requires `username`. Never serialized in responses.
+                overwrite_from:
+                  type: boolean
+      responses:
+        '200':
+          description: Trunk updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Trunk.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '502':
+          description: Cloudonix API unavailable
+
+    delete:
+      tags:
+        - Trunks
+      summary: Delete Trunk
+      operationId: deleteTrunk
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Trunk deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '502':
+          description: Cloudonix API unavailable
