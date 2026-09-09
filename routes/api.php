@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SupervisorAssignmentController;
 use App\Http\Controllers\Api\SupervisorDashboardController;
+use App\Http\Controllers\Api\TrunkController;
 use App\Http\Controllers\Api\UserEmbedTokenController;
 use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
@@ -482,6 +483,12 @@ Route::prefix('v1')->group(function (): void {
             Route::post('cloudonix/generate-requests-key', [SettingsController::class, 'generateRequestsApiKey'])->name('settings.cloudonix.generate-key');
             Route::get('cloudonix/outbound-trunks', [SettingsController::class, 'getOutboundTrunks'])->name('settings.cloudonix.outbound-trunks');
         });
+
+        // Trunks (Owner/PBX Admin only; proxied to Cloudonix — {trunk} is a
+        // Cloudonix id/uuid string, no implicit model binding).
+        // Not a GrantableResource: key-authenticated requests are denied by EnforceApiKeyScope.
+        Route::apiResource('trunks', TrunkController::class)
+            ->only(['index', 'show', 'store', 'update', 'destroy']);
 
         // API Keys (Owner only; keys cannot manage keys — enforced by EnforceApiKeyScope
         // since 'api-keys' is not a GrantableResource). The grantable-resources route
