@@ -16,6 +16,7 @@ import "./active-calls.js";
 import "./campaigns.js";
 import "./distribution-lists.js";
 import "./security-lists.js";
+import "./trunks.js";
 import "./users.js";
 import "./reporting.js";
 import "./lifecycle.js";

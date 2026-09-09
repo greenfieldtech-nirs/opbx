@@ -3788,6 +3788,55 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/v1/trunks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Trunks
+         * @description List SIP trunks proxied from Cloudonix, optionally filtered by direction.
+         */
+        get: operations["listTrunks"];
+        put?: never;
+        /**
+         * Create Trunk
+         * @description Create a trunk in Cloudonix. Only `inbound`/`outbound` directions are accepted; Cloudonix normalizes them to `public-inbound`/`public-outbound`. `password` is write-only and is never returned in responses.
+         */
+        post: operations["createTrunk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trunks/{trunk}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cloudonix trunk id or uuid. */
+                trunk: string;
+            };
+            cookie?: never;
+        };
+        /** Get Trunk */
+        get: operations["getTrunk"];
+        /**
+         * Update Trunk
+         * @description Update a trunk in Cloudonix. `name` and `direction` are immutable post-create. All fields are optional. Omitting `password` leaves the stored credential untouched; `password` is write-only and is never returned in responses.
+         */
+        put: operations["updateTrunk"];
+        post?: never;
+        /** Delete Trunk */
+        delete: operations["deleteTrunk"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/users": {
         parameters: {
             query?: never;
@@ -6824,6 +6873,31 @@ export type components = {
             user_ids: number[];
             /** @description Assigned user objects (present when the relation is loaded). */
             users?: components["schemas"]["User"][];
+        };
+        /** @description SIP trunk proxied from Cloudonix (trunks are not stored locally). `password` is WRITE-ONLY: it is accepted on create/update requests but is never serialized in responses. Cloudonix normalizes `direction` on create: `inbound` becomes `public-inbound` and `outbound` becomes `public-outbound`. */
+        Trunk: {
+            active?: boolean;
+            /** Format: date-time */
+            created_at?: string | null;
+            /** @enum {string} */
+            direction: "inbound" | "outbound" | "public-inbound" | "public-outbound";
+            /** @description True when the trunk has authentication credentials configured. */
+            has_credentials?: boolean;
+            id: number;
+            /** @description Names of outbound-whitelist entries referencing this trunk. */
+            in_use_by?: string[];
+            /** @description IPv4, IPv6, or hostname of the trunk peer. */
+            ip: string;
+            name: string;
+            /** @description Whether the trunk overwrites the caller's From header. */
+            overwrite_from?: boolean;
+            /** @description Cloudonix may return the port as an integer or a string. */
+            port?: number | string;
+            prefix?: string | null;
+            /** @enum {string} */
+            transport: "udp" | "tcp" | "tls";
+            username?: string | null;
+            uuid?: string;
         };
         /** @description User model representing a person in the organization */
         User: {
@@ -13248,6 +13322,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Public API and MCP endpoint URLs, derived from the incoming request origin and the configured MCP port. */
+                        endpoints?: {
+                            /**
+                             * @description REST API base URL (request origin + /api/v1)
+                             * @example https://pbx.example.com/api/v1
+                             */
+                            api_base_url?: string;
+                            /**
+                             * @description Configured MCP host port (MCP_PORT)
+                             * @example 8080
+                             */
+                            mcp_port?: number;
+                            /**
+                             * @description MCP server endpoint (request host + MCP port)
+                             * @example https://pbx.example.com:8080/mcp
+                             */
+                            mcp_url?: string;
+                        };
                         /**
                          * @description Whether an application webhook URL is configured
                          * @example true
@@ -16594,6 +16686,205 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    listTrunks: {
+        parameters: {
+            query?: {
+                /** @description Filter trunks by direction. */
+                direction?: "inbound" | "outbound" | "public-inbound" | "public-outbound";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of trunks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Trunk"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Cloudonix API unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createTrunk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    direction: "inbound" | "outbound";
+                    /** @description IPv4, IPv6, or hostname of the trunk peer. */
+                    ip: string;
+                    name: string;
+                    overwrite_from?: boolean;
+                    /** @description Required when `username` is provided. Never serialized in responses. */
+                    password?: string | null;
+                    port: number;
+                    prefix?: string | null;
+                    /** @enum {string} */
+                    transport: "udp" | "tcp" | "tls";
+                    /** @description Required when `password` is provided. */
+                    username?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Trunk created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Trunk"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+            /** @description Cloudonix API unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getTrunk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cloudonix trunk id or uuid. */
+                trunk: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trunk details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Trunk"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Cloudonix API unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateTrunk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cloudonix trunk id or uuid. */
+                trunk: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description IPv4, IPv6, or hostname of the trunk peer. */
+                    ip?: string;
+                    overwrite_from?: boolean;
+                    /** @description Requires `username`. Never serialized in responses. */
+                    password?: string | null;
+                    port?: number;
+                    prefix?: string | null;
+                    /** @enum {string} */
+                    transport?: "udp" | "tcp" | "tls";
+                    /** @description May be sent alone (keeps the stored password). */
+                    username?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Trunk updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Trunk"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            /** @description Cloudonix API unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteTrunk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cloudonix trunk id or uuid. */
+                trunk: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trunk deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Cloudonix API unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listUsers: {
