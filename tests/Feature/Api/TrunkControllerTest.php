@@ -94,12 +94,13 @@ class TrunkControllerTest extends TestCase
         $this->assertStringNotContainsString('super-secret', $response->getContent());
 
         $data = $response->json('data');
+        // Direction passes through unchanged — no read_only flag, all trunks are equal
         $public = collect($data)->firstWhere('direction', 'public-outbound');
-        $this->assertTrue($public['read_only']);
+        $this->assertSame('public-outbound', $public['direction']);
         $this->assertFalse($public['has_credentials']);
 
         $regular = collect($data)->firstWhere('name', 'carrier-a');
-        $this->assertFalse($regular['read_only']);
+        $this->assertSame('outbound', $regular['direction']);
         $this->assertTrue($regular['has_credentials']);
         $this->assertSame('sipuser', $regular['username']);
     }
@@ -203,33 +204,34 @@ class TrunkControllerTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_update_public_trunk_forbidden(): void
+    public function test_can_update_public_outbound_trunk(): void
     {
+        // getTrunk GET fires first, then the PUT on the same URL
         Http::fake([
-            $this->trunksUrl.'/9' => Http::response($this->trunkFixture(['direction' => 'public-outbound'])),
+            $this->trunksUrl.'/9' => Http::sequence()
+                ->push($this->trunkFixture(['direction' => 'public-outbound']))
+                ->push($this->trunkFixture(['direction' => 'public-outbound', 'port' => 5070])),
         ]);
 
         Sanctum::actingAs($this->owner);
-        $response = $this->putJson('/api/v1/trunks/9', ['port' => 5070]);
+        $this->putJson('/api/v1/trunks/9', ['port' => 5070])
+            ->assertOk()
+            ->assertJsonPath('data.direction', 'public-outbound');
 
-        $response->assertForbidden()
-            ->assertJsonPath('error', 'public_trunk_read_only');
-
-        // Only the getTrunk GET may hit Cloudonix — never a PUT
-        Http::assertSentCount(1);
-        Http::assertSent(fn (HttpClientRequest $request): bool => $request->method() === 'GET');
+        Http::assertSent(fn (HttpClientRequest $request): bool => $request->method() === 'PUT');
     }
 
-    public function test_delete_public_trunk_forbidden(): void
+    public function test_can_delete_public_inbound_trunk(): void
     {
+        // getTrunk GET fires first, then the DELETE on the same URL
         Http::fake([
-            $this->trunksUrl.'/9' => Http::response($this->trunkFixture(['direction' => 'public-inbound'])),
+            $this->trunksUrl.'/9' => Http::sequence()
+                ->push($this->trunkFixture(['direction' => 'public-inbound']))
+                ->push(null, 204),
         ]);
 
         Sanctum::actingAs($this->owner);
-        $this->deleteJson('/api/v1/trunks/9')
-            ->assertForbidden()
-            ->assertJsonPath('error', 'public_trunk_read_only');
+        $this->deleteJson('/api/v1/trunks/9')->assertNoContent();
     }
 
     public function test_delete_trunk_success(): void

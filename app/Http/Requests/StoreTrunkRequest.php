@@ -30,7 +30,8 @@ class StoreTrunkRequest extends FormRequest
             'ip' => ['required', 'string', 'max:255', 'regex:'.self::HOST_REGEX],
             'port' => ['required', 'integer', 'min:1', 'max:65535'],
             'transport' => ['required', 'in:udp,tcp,tls'],
-            // public-inbound / public-outbound are Cloudonix-managed and not creatable
+            // Cloudonix normalizes inbound→public-inbound and outbound→public-outbound
+            // on create (verified 2026-09-09); only inbound/outbound are accepted here.
             'direction' => ['required', 'in:inbound,outbound'],
             'prefix' => ['nullable', 'string', 'max:20'],
             'username' => ['nullable', 'string', 'max:128', 'required_with:password'],

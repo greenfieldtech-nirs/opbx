@@ -21,12 +21,10 @@ use Illuminate\Support\Facades\Log;
  *
  * Trunks are not local models — they live in Cloudonix. This controller is a
  * thin, authorized proxy over CloudonixTrunksClient with credential masking
- * (TrunkResource) and guards for Cloudonix-managed public-* trunks.
+ * (TrunkResource). All trunks are mutable — Cloudonix has no read-only trunks.
  */
 class TrunkController extends Controller
 {
-    private const PUBLIC_DIRECTIONS = ['public-inbound', 'public-outbound'];
-
     /**
      * CloudonixSettings has no OrganizationScope — filter explicitly.
      */
@@ -156,21 +154,15 @@ class TrunkController extends Controller
     }
 
     /**
-     * Update a trunk in Cloudonix. Public-* trunks are read-only.
+     * Update a trunk in Cloudonix.
      */
     public function update(UpdateTrunkRequest $request, string $trunk): JsonResponse
     {
         $organizationId = (int) $request->user()->organization_id;
         $client = $this->client($organizationId);
 
-        $existing = $client->trunks()->getTrunk($trunk);
-
-        if ($existing === null) {
+        if ($client->trunks()->getTrunk($trunk) === null) {
             return $this->trunkFetchError($client->trunks());
-        }
-
-        if ($readonly = $this->publicTrunkGuard($existing, $organizationId, 'update')) {
-            return $readonly;
         }
 
         $validated = $request->validated();
@@ -211,7 +203,7 @@ class TrunkController extends Controller
     }
 
     /**
-     * Delete a trunk in Cloudonix. Public-* trunks are read-only.
+     * Delete a trunk in Cloudonix.
      */
     public function destroy(Request $request, string $trunk): JsonResponse
     {
@@ -219,14 +211,8 @@ class TrunkController extends Controller
         $organizationId = (int) $request->user()->organization_id;
         $client = $this->client($organizationId);
 
-        $existing = $client->trunks()->getTrunk($trunk);
-
-        if ($existing === null) {
+        if ($client->trunks()->getTrunk($trunk) === null) {
             return $this->trunkFetchError($client->trunks());
-        }
-
-        if ($readonly = $this->publicTrunkGuard($existing, $organizationId, 'delete')) {
-            return $readonly;
         }
 
         if (! $client->trunks()->deleteTrunk($trunk)) {
@@ -310,28 +296,6 @@ class TrunkController extends Controller
             ->where('outbound_trunk_name', $trunkName)
             ->pluck('name')
             ->all();
-    }
-
-    /**
-     * @param  array<string, mixed>  $trunk
-     */
-    private function publicTrunkGuard(array $trunk, int $organizationId, string $action): ?JsonResponse
-    {
-        if (! in_array($trunk['direction'] ?? '', self::PUBLIC_DIRECTIONS, true)) {
-            return null;
-        }
-
-        Log::warning('Blocked mutation of public trunk', [
-            'organization_id' => $organizationId,
-            'trunk_id' => $trunk['id'] ?? null,
-            'direction' => $trunk['direction'] ?? null,
-            'action' => $action,
-        ]);
-
-        return response()->json([
-            'error' => 'public_trunk_read_only',
-            'message' => 'Public trunks are managed by Cloudonix and cannot be modified.',
-        ], 403);
     }
 
     /**

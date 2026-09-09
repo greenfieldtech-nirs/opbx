@@ -38,7 +38,6 @@ class TrunkResource
             'username' => $auth['username'] ?? null,
             // password NEVER serialized
             'overwrite_from' => (bool) ($auth['overwrite-from'] ?? false),
-            'read_only' => in_array($direction, ['public-inbound', 'public-outbound'], true),
             'in_use_by' => $inUseBy,
         ];
     }
