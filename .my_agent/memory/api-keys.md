@@ -1,6 +1,6 @@
 # Scoped API Keys
 
-> **Updated 2026-09-08**: coverage completed — 23 grantable resources, key auth extended to previously Sanctum-only groups, credential subroutes excluded.
+> **Updated 2026-09-09**: added `trunks` (24 grantable resources). Slug matches route prefix; key-authenticated trunks requests pass the owner shim in `TrunkController::authorizeTrunks`.
 
 Owner-created, long-lived, revocable API keys granting per-resource read/write access to business/config endpoints. Key permissions are the **only** authorization gate for key-authenticated requests — the user role model is NOT consulted for what a key may reach (a role-compat shim only satisfies downstream controller code). Branch of origin: `feature/api-token-access`.
 
@@ -12,8 +12,8 @@ Owner-created, long-lived, revocable API keys granting per-resource read/write a
 - Enforcement matches on **route NAME prefix** (deny-by-default), with explicit prefix aliases and exclusion list.
 - Key format: `opbxk_` + 40 random chars. Only sha256 hash stored in `api_keys.token`. Plaintext returned **once** on create (as `key` field) and shown once in UI.
 
-## Grantable resources (23)
-users, extensions, conference-rooms, ai-assistants, ai-assistant-providers, ring-groups, ai-assistant-load-balancers, ivr-menus, business-hours, phone-numbers, outbound-whitelist, inbound-blacklist, call-detail-records, recordings, call-tracking-campaigns (incl. nested numbers + notification settings/logs), call-tracking-analytics, call-tracking-sessions, call-tracking-ad-platform-integrations, supervisors, auto-dialer-campaigns, distribution-lists, session-updates (incl. disconnect/coach-target with write), call-notifications.
+## Grantable resources (24)
+users, extensions, conference-rooms, ai-assistants, ai-assistant-providers, ring-groups, ai-assistant-load-balancers, ivr-menus, business-hours, phone-numbers, outbound-whitelist, inbound-blacklist, call-detail-records, recordings, call-tracking-campaigns (incl. nested numbers + notification settings/logs), call-tracking-analytics, call-tracking-sessions, call-tracking-ad-platform-integrations, supervisors, auto-dialer-campaigns, distribution-lists, session-updates (incl. disconnect/coach-target with write), call-notifications, dashboard (read-only), trunks.
 
 **Never grantable** (deny-by-default or explicit exclusion): api-keys.*, profile.*, settings.cloudonix.*, webphone.*, dashboard.supervisor, join-requests.*, platform.*, plus credential subroutes even under granted parents: `extensions.password`, `extensions.reset-password`, `users.password.update`, `users.embed-token.*` (via `GrantableResource::EXCLUDED_ROUTE_PREFIXES`).
 
