@@ -35,6 +35,15 @@ class CloudonixTrunksClientTest extends TestCase
         $this->client = new CloudonixTrunksClient($settings);
     }
 
+    public function test_list_trunks_returns_null_on_server_error(): void
+    {
+        Http::fake([
+            $this->trunksUrl => Http::response('Server Error', 500),
+        ]);
+
+        $this->assertNull($this->client->listTrunks());
+    }
+
     public function test_create_trunk_posts_to_trunks_endpoint(): void
     {
         Http::fake([

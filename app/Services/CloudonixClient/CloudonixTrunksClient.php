@@ -147,7 +147,7 @@ class CloudonixTrunksClient extends CloudonixBaseClient
                 }
             },
             cacheKey: $cacheKey,
-            fallbackValue: []
+            fallbackValue: null
         );
     }
 
