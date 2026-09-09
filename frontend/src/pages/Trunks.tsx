@@ -7,6 +7,8 @@ import {
   KeyRound,
   ChevronDown,
   Loader2,
+  Search,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,6 +112,9 @@ const TrunksPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('all');
+  const [search, setSearch] = useState('');
+  const [showDisabled, setShowDisabled] = useState(false);
+  const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingTrunk, setEditingTrunk] = useState<Trunk | null>(null);
@@ -133,9 +138,16 @@ const TrunksPage: React.FC = () => {
   });
 
   const filteredTrunks = useMemo(() => {
-    if (directionFilter === 'all') return trunks;
-    return trunks.filter((t) => directionGroup(t.direction) === directionFilter);
-  }, [trunks, directionFilter]);
+    const term = search.trim().toLowerCase();
+    return trunks.filter((t) => {
+      if (!showDisabled && !t.active) return false;
+      if (directionFilter !== 'all' && directionGroup(t.direction) !== directionFilter) return false;
+      if (term && !t.name.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [trunks, directionFilter, search, showDisabled]);
+
+  const hasActiveFilters = search.trim() !== '' || directionFilter !== 'all' || showDisabled;
 
   const extractValidationErrors = (error: any) => {
     const errors = error?.response?.data?.errors;
@@ -448,6 +460,25 @@ const TrunksPage: React.FC = () => {
               </TabsList>
             </Tabs>
 
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name..."
+                className="pl-8 w-56"
+                aria-label="Search trunks by name"
+              />
+            </div>
+
+            <Button
+              variant={showDisabled ? 'secondary' : 'outline'}
+              onClick={() => setShowDisabled((v) => !v)}
+              aria-pressed={showDisabled}
+            >
+              {showDisabled ? 'Hide disabled' : 'Show disabled'}
+            </Button>
+
             <Button
               variant="outline"
               size="icon"
@@ -461,6 +492,44 @@ const TrunksPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cheatsheet */}
+      <Collapsible open={cheatsheetOpen} onOpenChange={setCheatsheetOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between p-4 text-left"
+              aria-expanded={cheatsheetOpen}
+            >
+              <span className="flex items-center gap-2 font-semibold">
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                Your SIP Trunk Configuration Cheatsheet
+              </span>
+              <ChevronDown className={cn('h-4 w-4 transition-transform text-muted-foreground', cheatsheetOpen && 'rotate-180')} />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 pb-4 px-4 space-y-3 text-sm text-muted-foreground">
+              <div>
+                <p className="font-medium text-foreground">Inbound</p>
+                <p>
+                  Inbound trunks carry calls from your carrier/equipment into this PBX. Point your
+                  carrier's SIP trunk at this domain; use the trunk's prefix to tag incoming calls.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Outbound</p>
+                <p>
+                  Outbound trunks carry calls from your extensions to the world. Reference the trunk
+                  by name in outbound whitelist rules; configure authentication credentials when the
+                  carrier requires them.
+                </p>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Table */}
       <Card>
@@ -567,11 +636,11 @@ const TrunksPage: React.FC = () => {
                   <Network className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No trunks found</h3>
                   <p className="text-sm text-muted-foreground max-w-sm mb-6">
-                    {directionFilter !== 'all'
-                      ? 'No trunks match the selected direction filter. Try a different filter.'
+                    {hasActiveFilters
+                      ? 'Try adjusting your filters'
                       : 'Get started by creating your first trunk'}
                   </p>
-                  {directionFilter === 'all' && canManageTrunks && (
+                  {!hasActiveFilters && canManageTrunks && (
                     <Button onClick={openCreateDialog} size="lg">
                       Create Trunk
                     </Button>
