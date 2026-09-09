@@ -37,6 +37,7 @@ const Profile = lazy(() => import('@/pages/Profile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
 const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
+const TrunksPage = lazy(() => import('@/pages/Trunks'));
 const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
 const ApiKeysSettings = lazy(() => import('@/pages/ApiKeysSettings'));
 const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
@@ -177,6 +178,14 @@ export const router = createBrowserRouter([
       {
         path: 'inbound-blacklist',
         element: <InboundBlacklistPage />,
+      },
+      {
+        path: 'trunks',
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <TrunksPage />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'profile',
