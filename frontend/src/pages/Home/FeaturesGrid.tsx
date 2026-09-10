@@ -2,8 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   BarChart3,
   Bot,
+  BrainCircuit,
   Clock,
+  KeyRound,
   Mic,
+  MonitorSmartphone,
+  Network,
   Phone,
   PhoneCall,
   Radio,
@@ -66,14 +70,29 @@ const features = [
     description: 'Automatic recording with secure storage and compliance.',
   },
   {
-    icon: Shield,
-    title: 'Enterprise Security',
-    description: 'RBAC, multi-tenant isolation, and audit logging.',
+    icon: Network,
+    title: 'Trunk Management',
+    description: 'Create and manage inbound and outbound SIP trunks, with a built-in configuration cheatsheet.',
   },
   {
-    icon: Zap,
-    title: 'Lightning Fast',
-    description: 'Laravel + React with Redis for high-performance call processing.',
+    icon: MonitorSmartphone,
+    title: 'Web Phone',
+    description: 'Browser-based softphone with dialer, call log, and supervisor coaching.',
+  },
+  {
+    icon: BrainCircuit,
+    title: 'MCP Server for AI Agents',
+    description: '112 tools let Claude, Cursor, and other AI agents manage the PBX via the Model Context Protocol.',
+  },
+  {
+    icon: KeyRound,
+    title: 'Scoped API Keys',
+    description: 'Fine-grained, per-resource API keys for safe automation and integrations.',
+  },
+  {
+    icon: Shield,
+    title: 'Enterprise Security',
+    description: 'RBAC, multi-tenant isolation, inbound blacklist, outbound whitelist, and audit logging.',
   },
 ];
 
@@ -91,7 +110,7 @@ export function FeaturesGrid() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map((feature, idx) => (
           <Card
             key={idx}
