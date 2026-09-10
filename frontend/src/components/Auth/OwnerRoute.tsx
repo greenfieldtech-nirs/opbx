@@ -12,9 +12,11 @@ import { useEffect, useRef } from 'react';
 
 interface OwnerRouteProps {
   children: React.ReactNode;
+  /** Allowed roles — defaults to owner only */
+  roles?: string[];
 }
 
-export function OwnerRoute({ children }: OwnerRouteProps) {
+export function OwnerRoute({ children, roles = ['owner'] }: OwnerRouteProps) {
   const { user, isLoading } = useAuth();
   const hasShownToast = useRef(false);
 
@@ -30,21 +32,21 @@ export function OwnerRoute({ children }: OwnerRouteProps) {
     );
   }
 
-  // Check if user is owner
-  const isOwner = user?.role === 'owner';
+  // Check if user has an allowed role
+  const isAllowed = !!user?.role && roles.includes(user.role);
 
-  // Show error toast only once when user is not owner
+  // Show error toast only once when user lacks access
   useEffect(() => {
-    if (!isLoading && !isOwner && !hasShownToast.current) {
+    if (!isLoading && !isAllowed && !hasShownToast.current) {
       toast.error('Access denied', {
-        description: 'This page is only accessible to organization owners.',
+        description: 'You do not have permission to access this page.',
       });
       hasShownToast.current = true;
     }
-  }, [isLoading, isOwner]);
+  }, [isLoading, isAllowed]);
 
-  // Redirect to dashboard if not owner
-  if (!isOwner) {
+  // Redirect to dashboard if not allowed
+  if (!isAllowed) {
     return <Navigate to="/ui/dashboard" replace />;
   }
 

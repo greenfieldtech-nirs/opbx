@@ -12,6 +12,9 @@ on:
       - "mcp-server/**"
       - "docs/opbx-openapi/**"
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest

@@ -60,7 +60,7 @@ never issues or stores credentials:
 | Credential | Format | Notes |
 |---|---|---|
 | OPBX Personal Access Token | Sanctum `id\|token` | Identity resolved via `GET /api/v1/auth/me` (cached 5 min). Expires after 24h and is revoked on any login/refresh/password change upstream — fine for interactive/dev use. |
-| Scoped API key | `opbxk_…` | The durable machine credential (never expires; per-resource read/write grants, deny-by-default). Created by an org owner in OPBX Settings → API Keys. Campaigns/live-call route groups are Sanctum-only and reject keys. |
+| Scoped API key | `opbxk_…` | The durable machine credential (never expires; per-resource read/write grants, deny-by-default). Created by an org owner in OPBX Settings → API Keys. Covers all business resources, including campaigns and live calls. |
 
 The organization is **always derived from the credential** — `organization_id` arguments are
 never accepted and never sent upstream.

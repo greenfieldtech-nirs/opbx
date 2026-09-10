@@ -114,7 +114,7 @@ export function defineGetTool<Op extends OperationId>(cfg: GetToolConfig<Op>): v
     }),
     operation: cfg.operation,
     inputSchema: z.object({
-      id: z.number().int().positive().describe(`ID of the ${cfg.resultKey}`),
+      id: z.coerce.number().int().positive().describe(`ID of the ${cfg.resultKey}`),
     }),
     handler: async (ctx, args) => {
       const { id } = args as { id: number };
@@ -238,7 +238,7 @@ export function defineDeleteTool<DelOp extends OperationId, GetOp extends Operat
     destructive: true,
     operation: cfg.operation,
     inputSchema: z.object({
-      id: z.number().int().positive().describe(`ID of the ${cfg.resultKey} to delete`),
+      id: z.coerce.number().int().positive().describe(`ID of the ${cfg.resultKey} to delete`),
       confirm: confirmField,
     }),
     mapArgs: (args) => ({ pathParams: { [cfg.pathParam]: (args as { id: number }).id } }),

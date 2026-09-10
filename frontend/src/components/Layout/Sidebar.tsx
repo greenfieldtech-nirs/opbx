@@ -70,6 +70,7 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Business Hours', href: '/ui/business-hours', icon: 'codicon-clock', roles: ['owner', 'pbx_admin'] },
       { name: 'Announcements', href: '/ui/announcements', icon: 'codicon-megaphone', roles: ['owner', 'pbx_admin'] },
       { name: 'Phone Numbers', href: '/ui/phone-numbers', icon: 'codicon-arrow-right', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Trunks', href: '/ui/trunks', icon: 'codicon-server-environment', roles: ['owner', 'pbx_admin'] },
     ],
   },
   {

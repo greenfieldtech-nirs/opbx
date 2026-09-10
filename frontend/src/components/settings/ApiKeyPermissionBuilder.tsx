@@ -1,15 +1,20 @@
 /**
  * ApiKeyPermissionBuilder
  *
- * Renders one row per grantable resource with a 3-way selector
- * (none / read / write). "none" removes the resource from the value.
- *
- * No shadcn ToggleGroup exists in this repo, so this uses Button variants
- * as an accessible segmented control (buttons with aria-pressed).
+ * Renders one cell per grantable resource with a select box
+ * (none / read / write), arranged in a responsive 3-column grid.
+ * "none" removes the resource from the value.
  */
 
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { ApiKeyPermission, ApiKeyPermissionLevel } from '@/services/apiKeys.service';
 
 interface ApiKeyPermissionBuilderProps {
@@ -28,7 +33,11 @@ function humanize(slug: string): string {
     .join(' ');
 }
 
-const OPTIONS: Selection[] = ['none', 'read', 'write'];
+const OPTIONS: { value: Selection; label: string }[] = [
+  { value: 'none', label: 'No Access' },
+  { value: 'read', label: 'Read' },
+  { value: 'write', label: 'Write' },
+];
 
 export function ApiKeyPermissionBuilder({
   resources,
@@ -47,6 +56,14 @@ export function ApiKeyPermissionBuilder({
     onChange([...without, { resource, level: selection }]);
   };
 
+  const setAll = (selection: Selection) => {
+    if (selection === 'none') {
+      onChange([]);
+      return;
+    }
+    onChange(resources.map((resource) => ({ resource, level: selection })));
+  };
+
   if (resources.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -57,44 +74,67 @@ export function ApiKeyPermissionBuilder({
 
   return (
     <div className="space-y-2">
-      <Label>Permissions</Label>
-      <div className="space-y-1 rounded-md border p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label>Permissions</Label>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setAll('none')}
+          >
+            Disable All
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setAll('read')}
+          >
+            Grant Read-Only All
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setAll('write')}
+          >
+            Grant Write All
+          </Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-2 lg:grid-cols-3">
         {resources.map((resource) => {
           const current = levelFor(resource);
           return (
             <div
               key={resource}
-              className="flex items-center justify-between gap-4 py-1"
+              className="flex flex-col gap-1.5 rounded-md px-2 py-1.5"
             >
-              <span className="text-sm">{humanize(resource)}</span>
-              <div
-                role="group"
-                aria-label={`${humanize(resource)} access level`}
-                className="inline-flex rounded-md border"
+              <span className="truncate text-sm" title={humanize(resource)}>
+                {humanize(resource)}
+              </span>
+              <Select
+                value={current}
+                onValueChange={(v) => setLevel(resource, v as Selection)}
               >
-                {OPTIONS.map((option, index) => {
-                  const selected = current === option;
-                  return (
-                    <Button
-                      key={option}
-                      type="button"
-                      size="sm"
-                      variant={selected ? 'default' : 'ghost'}
-                      aria-pressed={selected}
-                      onClick={() => setLevel(resource, option)}
-                      className={
-                        index === 0
-                          ? 'rounded-r-none'
-                          : index === OPTIONS.length - 1
-                            ? 'rounded-l-none border-l'
-                            : 'rounded-none border-l'
-                      }
-                    >
-                      {option.charAt(0).toUpperCase() + option.slice(1)}
-                    </Button>
-                  );
-                })}
-              </div>
+                <SelectTrigger
+                  className="h-8 w-full"
+                  aria-label={`${humanize(resource)} access level`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           );
         })}

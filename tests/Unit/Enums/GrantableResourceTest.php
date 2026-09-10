@@ -43,6 +43,31 @@ class GrantableResourceTest extends TestCase
         $this->assertNull(GrantableResource::fromRouteName(null));
     }
 
+    public function test_credential_subroutes_are_excluded_even_under_granted_parents(): void
+    {
+        $this->assertNull(GrantableResource::fromRouteName('extensions.password'));
+        $this->assertNull(GrantableResource::fromRouteName('extensions.reset-password'));
+        $this->assertNull(GrantableResource::fromRouteName('users.embed-token.show'));
+        $this->assertNull(GrantableResource::fromRouteName('users.embed-token.regenerate'));
+        $this->assertNull(GrantableResource::fromRouteName('users.password.update'));
+        // Siblings remain grantable.
+        $this->assertSame(GrantableResource::EXTENSIONS, GrantableResource::fromRouteName('extensions.index'));
+        $this->assertSame(GrantableResource::USERS, GrantableResource::fromRouteName('users.index'));
+    }
+
+    public function test_ai_assistant_provider_routes_map_to_the_provider_resource(): void
+    {
+        $this->assertSame(
+            GrantableResource::AI_ASSISTANT_PROVIDERS,
+            GrantableResource::fromRouteName('ai-assistant.providers.index')
+        );
+        // The assistants resource itself is untouched by the alias.
+        $this->assertSame(
+            GrantableResource::AI_ASSISTANTS,
+            GrantableResource::fromRouteName('ai-assistants.index')
+        );
+    }
+
     public function test_every_grantable_slug_has_a_registered_route(): void
     {
         // ponytail: catches enum/route drift — the one thing that silently breaks scoping
@@ -51,9 +76,11 @@ class GrantableResourceTest extends TestCase
             ->filter()
             ->values();
 
-        foreach (GrantableResource::slugs() as $slug) {
-            $matches = $routeNames->contains(
-                fn (string $name) => $name === $slug || str_starts_with($name, $slug.'.')
+        foreach (GrantableResource::routePrefixes() as $slug => $prefixes) {
+            $matches = collect($prefixes)->contains(
+                fn (string $prefix) => $routeNames->contains(
+                    fn (string $name) => $name === $prefix || str_starts_with($name, $prefix.'.')
+                )
             );
 
             $this->assertTrue($matches, "No route registered for grantable slug: {$slug}");

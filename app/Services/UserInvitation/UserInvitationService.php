@@ -6,6 +6,7 @@ namespace App\Services\UserInvitation;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Models\ApiKey;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\Email\Contracts\TransactionalEmailInterface;
@@ -37,7 +38,7 @@ class UserInvitationService
      * @throws RuntimeException if rate limit exceeded
      * @throws InvalidArgumentException if email already exists in organization
      */
-    public function invite(User $inviter, string $email): array
+    public function invite(User|ApiKey $inviter, string $email): array
     {
         $email = strtolower(trim($email));
         $organizationId = $inviter->organization_id;
@@ -219,7 +220,7 @@ class UserInvitationService
         $this->emailService->sendAsync($message);
     }
 
-    private function notifyPlatformManagersOfDuplicateInvite(string $email, User $inviter): void
+    private function notifyPlatformManagersOfDuplicateInvite(string $email, User|ApiKey $inviter): void
     {
         $managers = OrganizationScope::bypass(fn () => User::where('is_platform_manager', true)->get());
 
@@ -236,11 +237,11 @@ class UserInvitationService
             htmlContent: view('emails.duplicate-invite-alert', [
                 'email' => $email,
                 'inviterName' => $inviter->name,
-                'inviterEmail' => $inviter->email,
+                'inviterEmail' => $inviter instanceof User ? $inviter->email : null,
                 'organizationName' => $inviter->organization->name,
                 'usersUrl' => $frontendUrl.'/ui/users',
             ])->render(),
-            textContent: "An invitation was attempted for {$email} in {$inviter->organization->name} by {$inviter->name} ({$inviter->email}), but a user with that email already exists.",
+            textContent: "An invitation was attempted for {$email} in {$inviter->organization->name} by {$inviter->name}".($inviter instanceof User ? " ({$inviter->email})" : ' (API key)').', but a user with that email already exists.',
         );
 
         $this->emailService->sendAsync($message);

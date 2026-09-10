@@ -17,6 +17,17 @@ use Illuminate\Support\Facades\Log;
 class CloudonixTrunksClient extends CloudonixBaseClient
 {
     /**
+     * HTTP status of the last getTrunk() response (null when the call never
+     * completed, e.g. connection failure or open circuit breaker).
+     */
+    protected ?int $lastHttpStatus = null;
+
+    public function getLastHttpStatus(): ?int
+    {
+        return $this->lastHttpStatus;
+    }
+
+    /**
      * List outbound trunks for the domain.
      *
      * Fetches trunks from /customers/{customer-id}/domains/{domain-id}/trunks
@@ -147,7 +158,257 @@ class CloudonixTrunksClient extends CloudonixBaseClient
                 }
             },
             cacheKey: $cacheKey,
-            fallbackValue: []
+            fallbackValue: null
         );
+    }
+
+    /**
+     * Create a new trunk for the domain.
+     *
+     * @param  array<string, mixed>  $data  Trunk configuration payload
+     * @return array<string, mixed>|null Created trunk object or null on failure
+     */
+    public function createTrunk(array $data): ?array
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($data) {
+                try {
+                    $url = "/customers/{$this->getCustomerId()}/domains/{$this->getDomainUuid()}/trunks";
+
+                    Log::debug('Cloudonix API request: Create Trunk', [
+                        'url' => $this->getBaseUrl().$url,
+                        'domain_uuid' => $this->getDomainUuid(),
+                    ]);
+
+                    $response = $this->client()
+                        ->post($url, $data);
+
+                    if ($response->successful()) {
+                        $trunk = $response->json();
+
+                        Log::info('Successfully created trunk in Cloudonix', [
+                            'domain_uuid' => $this->getDomainUuid(),
+                            'status' => $response->status(),
+                        ]);
+
+                        $this->forgetTrunkCaches();
+
+                        return $trunk;
+                    }
+
+                    Log::warning('Failed to create trunk in Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'url' => $this->getBaseUrl().$url,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while creating trunk in Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null,
+            fallbackValue: null
+        );
+    }
+
+    /**
+     * Get a single trunk by ID.
+     *
+     * @return array<string, mixed>|null Trunk object or null on failure
+     */
+    public function getTrunk(int|string $trunkId): ?array
+    {
+        $this->requireDomainUuid();
+        $this->lastHttpStatus = null;
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($trunkId) {
+                try {
+                    $url = "/customers/{$this->getCustomerId()}/domains/{$this->getDomainUuid()}/trunks/{$trunkId}";
+
+                    Log::debug('Cloudonix API request: Get Trunk', [
+                        'url' => $this->getBaseUrl().$url,
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                    ]);
+
+                    $response = $this->client()
+                        ->get($url);
+
+                    $this->lastHttpStatus = $response->status();
+
+                    if ($response->successful()) {
+                        $trunk = $response->json();
+
+                        Log::info('Successfully fetched trunk from Cloudonix', [
+                            'domain_uuid' => $this->getDomainUuid(),
+                            'trunk_id' => $trunkId,
+                            'status' => $response->status(),
+                        ]);
+
+                        return $trunk;
+                    }
+
+                    Log::warning('Failed to fetch trunk from Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                        'url' => $this->getBaseUrl().$url,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while fetching trunk from Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null,
+            fallbackValue: null
+        );
+    }
+
+    /**
+     * Update an existing trunk.
+     *
+     * @param  array<string, mixed>  $data  Trunk fields to update
+     * @return array<string, mixed>|null Updated trunk object or null on failure
+     */
+    public function updateTrunk(int|string $trunkId, array $data): ?array
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($trunkId, $data) {
+                try {
+                    $url = "/customers/{$this->getCustomerId()}/domains/{$this->getDomainUuid()}/trunks/{$trunkId}";
+
+                    Log::debug('Cloudonix API request: Update Trunk', [
+                        'url' => $this->getBaseUrl().$url,
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                    ]);
+
+                    $response = $this->client()
+                        ->put($url, $data);
+
+                    if ($response->successful()) {
+                        $trunk = $response->json();
+
+                        Log::info('Successfully updated trunk in Cloudonix', [
+                            'domain_uuid' => $this->getDomainUuid(),
+                            'trunk_id' => $trunkId,
+                            'status' => $response->status(),
+                        ]);
+
+                        $this->forgetTrunkCaches();
+
+                        return $trunk;
+                    }
+
+                    Log::warning('Failed to update trunk in Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                        'url' => $this->getBaseUrl().$url,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return null;
+                } catch (\Exception $e) {
+                    Log::error('Exception while updating trunk in Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null,
+            fallbackValue: null
+        );
+    }
+
+    /**
+     * Delete a trunk.
+     *
+     * @return bool True on successful deletion, false on failure
+     */
+    public function deleteTrunk(int|string $trunkId): bool
+    {
+        $this->requireDomainUuid();
+
+        return (bool) $this->withCircuitBreaker(
+            callback: function () use ($trunkId) {
+                try {
+                    $url = "/customers/{$this->getCustomerId()}/domains/{$this->getDomainUuid()}/trunks/{$trunkId}";
+
+                    Log::debug('Cloudonix API request: Delete Trunk', [
+                        'url' => $this->getBaseUrl().$url,
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                    ]);
+
+                    $response = $this->client()
+                        ->delete($url);
+
+                    if ($response->successful()) {
+                        Log::info('Successfully deleted trunk in Cloudonix', [
+                            'domain_uuid' => $this->getDomainUuid(),
+                            'trunk_id' => $trunkId,
+                            'status' => $response->status(),
+                        ]);
+
+                        $this->forgetTrunkCaches();
+
+                        return true;
+                    }
+
+                    Log::warning('Failed to delete trunk in Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                        'url' => $this->getBaseUrl().$url,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+
+                    return false;
+                } catch (\Exception $e) {
+                    Log::error('Exception while deleting trunk in Cloudonix', [
+                        'domain_uuid' => $this->getDomainUuid(),
+                        'trunk_id' => $trunkId,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
+            },
+            cacheKey: null,
+            fallbackValue: false
+        );
+    }
+
+    /**
+     * Invalidate cached trunk lists after a mutation.
+     */
+    private function forgetTrunkCaches(): void
+    {
+        Cache::forget("cloudonix:trunks:{$this->getDomainUuid()}");
+        Cache::forget("cloudonix:outbound_trunks:{$this->getDomainUuid()}");
     }
 }

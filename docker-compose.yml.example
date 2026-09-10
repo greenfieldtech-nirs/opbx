@@ -62,6 +62,7 @@ services:
     volumes:
       - ./:/var/www/html
     environment:
+      - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost}
@@ -78,6 +79,7 @@ services:
       - MINIO_BUCKET=recordings
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_USE_PATH_STYLE=true
+      - MCP_PORT=${MCP_PORT:-8080}
       # Auto Dialer Worker authentication (must match DIALER_WORKER_API_TOKEN env var)
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
     depends_on:
@@ -109,6 +111,7 @@ services:
     volumes:
       - ./:/var/www/html
     environment:
+      - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - DB_CONNECTION=mysql
@@ -143,6 +146,7 @@ services:
     volumes:
       - ./:/var/www/html
     environment:
+      - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - DB_CONNECTION=mysql

@@ -140,16 +140,6 @@ export class OpbxClient {
         { status: response.status, duration_ms: durationMs, error_type: error.type, error_code: error.code },
         "OPBX request failed",
       );
-      // Route groups outside the main API group (campaigns, session-updates,
-      // call-notifications) are Sanctum-only: scoped API keys get a bare 401
-      // there. Give that case an actionable message instead of "invalid token".
-      if (error.type === "authentication_error" && this.credential.startsWith("opbxk_")) {
-        throw Object.assign(error, {
-          message:
-            "This resource is not accessible with scoped API keys (Sanctum-only route group), " +
-            "or the key lacks the required grant. Use a user token for campaign and live-call operations.",
-        });
-      }
       throw error;
     }
 

@@ -26,6 +26,7 @@
 | `create_ivr_menu` | `createIVRMenu` | `POST /v1/ivr-menus` | `ivr.create` | medium | none |
 | `create_phone_number` | `createPhoneNumber` | `POST /v1/phone-numbers` | `phone_numbers.create` | medium | none |
 | `create_ring_group` | `createRingGroup` | `POST /v1/ring-groups` | `ring_groups.create` | medium | none |
+| `create_trunk` | `createTrunk` | `POST /v1/trunks` | `trunks.create` | medium | none |
 | `create_user` | `createUser` | `POST /v1/users` | `users.create` | medium | none |
 | `delete_ai_assistant` | `deleteAiAssistant` | `DELETE /v1/ai-assistants/{ai_assistant}` | `ai_assistants.delete` | high | required |
 | `delete_business_hours` | `deleteBusinessHoursSchedule` | `DELETE /v1/business-hours/{business_hour}` | `business_hours.delete` | high | required |
@@ -36,6 +37,7 @@
 | `delete_ivr_menu` | `deleteIVRMenu` | `DELETE /v1/ivr-menus/{ivrMenu}` | `ivr.delete` | high | required |
 | `delete_phone_number` | `deletePhoneNumber` | `DELETE /v1/phone-numbers/{phone_number}` | `phone_numbers.delete` | high | required |
 | `delete_ring_group` | `deleteRingGroup` | `DELETE /v1/ring-groups/{ring_group}` | `ring_groups.delete` | high | required |
+| `delete_trunk` | `deleteTrunk` | `DELETE /v1/trunks/{trunk}` | `trunks.delete` | high | required |
 | `delete_user` | `deleteUser` | `DELETE /v1/users/{user}` | `users.delete` | high | required |
 | `disconnect_call` | `disconnectSession` | `DELETE /v1/session-updates/{sessionId}/disconnect` | `live_calls.disconnect` | high | required |
 | `duplicate_business_hours` | `duplicateBusinessHours` | `POST /v1/business-hours/{businessHour}/duplicate` | `business_hours.create` | medium | none |
@@ -68,6 +70,7 @@
 | `get_ring_group` | `getRingGroup` | `GET /v1/ring-groups/{ring_group}` | `ring_groups.read` | low | none |
 | `get_supervisor_assignments` | `getSupervisorAssignments` | `GET /v1/supervisors/{user}/assignments` | `supervisors.read` | low | none |
 | `get_supervisor_dashboard` | `getSupervisorDashboard` | `GET /v1/dashboard/supervisor` | `supervisors.read` | low | none |
+| `get_trunk` | `getTrunk` | `GET /v1/trunks/{trunk}` | `trunks.read` | low | none |
 | `get_user` | `getUser` | `GET /v1/users/{user}` | `users.read` | low | none |
 | `invite_user` | `inviteUser` | `POST /v1/users/invite` | `users.invite` | medium | none |
 | `list_active_calls` | `getActiveSessions` | `GET /v1/session-updates/active` | `live_calls.read` | low | none |
@@ -93,6 +96,7 @@
 | `list_phone_numbers` | `listPhoneNumbers` | `GET /v1/phone-numbers` | `phone_numbers.read` | low | none |
 | `list_recordings` | `listRecordings` | `GET /v1/recordings` | `recordings.read` | low | none |
 | `list_ring_groups` | `listRingGroups` | `GET /v1/ring-groups` | `ring_groups.read` | low | none |
+| `list_trunks` | `listTrunks` | `GET /v1/trunks` | `trunks.read` | low | none |
 | `list_users` | `listUsers` | `GET /v1/users` | `users.read` | low | none |
 | `pause_campaign` | `pauseAutoDialerCampaign` | `PATCH /v1/auto-dialer-campaigns/{campaign}/pause` | `campaigns.pause` | high | required |
 | `remove_outbound_whitelist_rule` | `deleteOutboundWhitelistEntry` | `DELETE /v1/outbound-whitelist/{outbound_whitelist}` | `outbound_whitelist.delete` | high | required |
@@ -114,6 +118,7 @@
 | `update_ivr_menu` | `updateIVRMenu` | `PUT /v1/ivr-menus/{ivrMenu}` | `ivr.update` | medium | none |
 | `update_phone_number` | `updatePhoneNumber` | `PUT /v1/phone-numbers/{phone_number}` | `phone_numbers.update` | medium | none |
 | `update_ring_group` | `updateRingGroup` | `PUT /v1/ring-groups/{ring_group}` | `ring_groups.update` | medium | none |
+| `update_trunk` | `updateTrunk` | `PUT /v1/trunks/{trunk}` | `trunks.update` | medium | none |
 | `update_user` | `updateUser` | `PUT /v1/users/{user}` | `users.update` | medium | none |
 | `validate_configuration` | _(composite)_ | — | `configuration.validate` | low | none |
 

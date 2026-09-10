@@ -161,6 +161,11 @@ export function normalizeOpbxError(
       code,
     });
   }
+  if (status === 400) {
+    // Domain-rule rejections (e.g. "Validation errors only available for
+    // failed lists") — the request is invalid for the resource's state.
+    return new OpbxError({ type: "validation_error", message, httpStatus: status, code });
+  }
   if (status === 409) {
     return new OpbxError({ type: "conflict", message, httpStatus: status, code });
   }

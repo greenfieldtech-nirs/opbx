@@ -203,4 +203,18 @@ return [
         'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | MCP Server
+    |--------------------------------------------------------------------------
+    |
+    | Host port on which the opbx-mcp service is published (compose maps
+    | ${MCP_PORT} to container 8080). Used by the config endpoint to derive
+    | the MCP endpoint URL shown in the UI.
+    |
+    */
+    'mcp' => [
+        'port' => (int) env('MCP_PORT', 8080),
+    ],
+
 ];
