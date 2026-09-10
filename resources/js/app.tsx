@@ -1,8 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
 import { LoginPage } from '@/pages/LoginPage';
-import { BusinessHoursPage } from '@/pages/BusinessHours/BusinessHoursPage';
-import { BusinessHoursCreatePage } from '@/pages/BusinessHours/BusinessHoursCreatePage';
-import { BusinessHoursEditPage } from '@/pages/BusinessHours/BusinessHoursEditPage';
 
 function App() {
     return (
@@ -10,9 +7,6 @@ function App() {
             <Routes>
                 <Route path="/" element={<LoginPage />} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/business-hours" element={<BusinessHoursPage />} />
-                <Route path="/business-hours/create" element={<BusinessHoursCreatePage />} />
-                <Route path="/business-hours/:id/edit" element={<BusinessHoursEditPage />} />
             </Routes>
         </div>
     );
