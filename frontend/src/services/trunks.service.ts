@@ -26,6 +26,13 @@ export interface Trunk {
   in_use_by: string[];
 }
 
+export interface TrunksListResponse {
+  data: Trunk[];
+  meta?: {
+    sip_hostname?: string;
+  };
+}
+
 export interface CreateTrunkRequest {
   name: string;
   ip: string;
@@ -53,10 +60,10 @@ export const trunksService = {
    * List trunks, optionally filtered by direction
    * GET /trunks
    */
-  listTrunks: (direction?: TrunkDirection): Promise<Trunk[]> => {
-    return api.get<{ data: Trunk[] }>('/trunks', {
+  listTrunks: (direction?: TrunkDirection): Promise<TrunksListResponse> => {
+    return api.get<TrunksListResponse>('/trunks', {
       params: direction ? { direction } : undefined,
-    }).then(res => res.data.data);
+    }).then(res => res.data);
   },
 
   /**

@@ -11,6 +11,8 @@ import {
   BookOpen,
   PhoneIncoming,
   PhoneOutgoing,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -125,11 +127,12 @@ const TrunksPage: React.FC = () => {
   const [formData, setFormData] = useState<TrunkFormData>(emptyFormData);
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof TrunkFormData, string>>>({});
   const [authOpen, setAuthOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const canManageTrunks = user?.role === 'owner' || user?.role === 'pbx_admin';
 
   const {
-    data: trunks = [],
+    data: trunksResponse,
     isLoading,
     isRefetching,
     error: queryError,
@@ -138,6 +141,31 @@ const TrunksPage: React.FC = () => {
     queryKey: ['trunks'],
     queryFn: () => trunksService.listTrunks(),
   });
+
+  const trunks = trunksResponse?.data ?? [];
+  const sipHostname = trunksResponse?.meta?.sip_hostname;
+
+  const inboundSipUris = useMemo(() => {
+    if (!sipHostname) return [];
+    return [
+      `sip:${sipHostname}:5060;transport=udp;`,
+      `sip:${sipHostname}:5060;transport=tcp;`,
+      `sip:${sipHostname}:5061;transport=tls;`,
+      `sip:${sipHostname}:443;transport=tls;`,
+      `sip:${sipHostname}:8443;transport=tls;`,
+    ];
+  }, [sipHostname]);
+
+  const copyHostname = async () => {
+    if (!sipHostname) return;
+    try {
+      await navigator.clipboard.writeText(sipHostname);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy hostname to clipboard');
+    }
+  };
 
   const filteredTrunks = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -520,9 +548,44 @@ const TrunksPage: React.FC = () => {
                       <PhoneIncoming className="h-4 w-4 text-muted-foreground" />
                       Inbound SIP Trunk Information
                     </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Configuration details coming soon.
-                    </p>
+                    {sipHostname ? (
+                      <>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Your SIP trunk hostname for inbound calls:
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-sm break-all">
+                            {sipHostname}
+                          </code>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={copyHostname}
+                            aria-label="Copy hostname to clipboard"
+                          >
+                            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            {copied ? 'Copied' : 'Copy'}
+                          </Button>
+                        </div>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Use any of the following SIP URIs to send calls to your Cloudonix domain:
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {inboundSipUris.map((uri) => (
+                            <li key={uri}>
+                              <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
+                                {uri}
+                              </code>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Cloudonix settings not configured.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
                 <Card>
