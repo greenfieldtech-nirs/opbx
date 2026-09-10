@@ -28,11 +28,14 @@ class TrunkController extends Controller
     /**
      * CloudonixSettings has no OrganizationScope — filter explicitly.
      */
+    private function settings(int $organizationId): CloudonixSettings
+    {
+        return CloudonixSettings::where('organization_id', $organizationId)->firstOrFail();
+    }
+
     private function client(int $organizationId): CloudonixClient
     {
-        $settings = CloudonixSettings::where('organization_id', $organizationId)->firstOrFail();
-
-        return new CloudonixClient($settings);
+        return new CloudonixClient($this->settings($organizationId));
     }
 
     private function authorizeTrunks(Request $request): void
@@ -57,6 +60,8 @@ class TrunkController extends Controller
             return $this->cloudonixUnavailable();
         }
 
+        $sipHostname = strtolower((string) $this->settings($organizationId)->domain_uuid).'.sip.cloudonix.net';
+
         $direction = $request->query('direction');
         if (is_string($direction) && $direction !== '') {
             $trunks = array_values(array_filter(
@@ -80,6 +85,7 @@ class TrunkController extends Controller
                 ),
                 $trunks
             ),
+            'meta' => ['sip_hostname' => $sipHostname],
         ]);
     }
 

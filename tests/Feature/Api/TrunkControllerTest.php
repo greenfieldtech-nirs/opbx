@@ -113,6 +113,16 @@ class TrunkControllerTest extends TestCase
         $this->getJson('/api/v1/trunks')->assertOk();
     }
 
+    public function test_index_includes_sip_hostname_meta(): void
+    {
+        Http::fake([$this->trunksUrl => Http::response([$this->trunkFixture()])]);
+
+        Sanctum::actingAs($this->owner);
+        $this->getJson('/api/v1/trunks')
+            ->assertOk()
+            ->assertJsonPath('meta.sip_hostname', 'dom-uuid-123.sip.cloudonix.net');
+    }
+
     public function test_pbx_user_cannot_list_trunks(): void
     {
         Http::fake([$this->trunksUrl => Http::response([$this->trunkFixture()])]);
