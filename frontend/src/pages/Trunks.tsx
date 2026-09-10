@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/select';
 import {
   Tabs,
+  TabsContent,
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
@@ -131,7 +132,6 @@ const TrunksPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof TrunkFormData, string>>>({});
   const [authOpen, setAuthOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [ipFallbackOpen, setIpFallbackOpen] = useState(false);
   const [ipCopied, setIpCopied] = useState(false);
 
   const canManageTrunks = user?.role === 'owner' || user?.role === 'pbx_admin';
@@ -574,73 +574,40 @@ const TrunksPage: React.FC = () => {
                       <PhoneIncoming className="h-4 w-4 text-muted-foreground" />
                       Inbound SIP Trunk Information
                     </p>
-                    {sipHostname ? (
-                      <>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Your SIP trunk hostname for inbound calls:
+                    <Tabs defaultValue="dns" className="mt-3">
+                      <TabsList>
+                        <TabsTrigger value="dns">DNS Based Routing</TabsTrigger>
+                        <TabsTrigger value="ip">IP Based Routing</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="dns" className="mt-3">
+                        <p className="text-sm text-muted-foreground">
+                          The recommended option. Your provider sends calls to your domain's SIP hostname, and DNS resolves it to Cloudonix's ingress automatically — no fixed IP to manage, and failover is handled for you.
                         </p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-sm break-all">
-                            {sipHostname}
-                          </code>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={copyHostname}
-                            aria-label="Copy hostname to clipboard"
-                          >
-                            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                            {copied ? 'Copied' : 'Copy'}
-                          </Button>
-                        </div>
-                        <p className="mt-3 text-sm text-muted-foreground">
-                          Use any of the following SIP URIs to send calls to your Cloudonix domain:
-                        </p>
-                        <ul className="mt-1 space-y-1">
-                          {inboundSipUris.map((uri) => (
-                            <li key={uri}>
-                              <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
-                                {uri}
-                              </code>
-                            </li>
-                          ))}
-                        </ul>
-                        <Collapsible open={ipFallbackOpen} onOpenChange={setIpFallbackOpen} className="mt-3">
-                          <CollapsibleTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex w-full items-center justify-between text-left text-xs text-muted-foreground hover:text-foreground"
-                              aria-expanded={ipFallbackOpen}
-                            >
-                              <span>If your provider doesn't support DNS based routing, click here</span>
-                              <ChevronDown className={cn('h-3 w-3 transition-transform', ipFallbackOpen && 'rotate-180')} />
-                            </button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              Your SIP trunk IP address for inbound calls:
+                        {sipHostname ? (
+                          <>
+                            <p className="mt-3 text-sm text-muted-foreground">
+                              Your SIP trunk hostname for inbound calls:
                             </p>
                             <div className="mt-1 flex items-center gap-2">
-                              <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
-                                {CLOUDONIX_SIP_INGRESS_IP}
+                              <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-sm break-all">
+                                {sipHostname}
                               </code>
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={copyIp}
-                                aria-label="Copy IP address to clipboard"
+                                onClick={copyHostname}
+                                aria-label="Copy hostname to clipboard"
                               >
-                                {ipCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                {ipCopied ? 'Copied' : 'Copy'}
+                                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                {copied ? 'Copied' : 'Copy'}
                               </Button>
                             </div>
-                            <p className="mt-3 text-xs text-muted-foreground">
-                              Use any of the below SIP URIs to send calls to Cloudonix. You must configure your call origin for these to work
+                            <p className="mt-3 text-sm text-muted-foreground">
+                              Use any of the following SIP URIs to send calls to your Cloudonix domain:
                             </p>
                             <ul className="mt-1 space-y-1">
-                              {inboundIpSipUris.map((uri) => (
+                              {inboundSipUris.map((uri) => (
                                 <li key={uri}>
                                   <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
                                     {uri}
@@ -648,14 +615,49 @@ const TrunksPage: React.FC = () => {
                                 </li>
                               ))}
                             </ul>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </>
-                    ) : (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Cloudonix settings not configured.
-                      </p>
-                    )}
+                          </>
+                        ) : (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Cloudonix settings not configured.
+                          </p>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="ip" className="mt-3">
+                        <p className="text-sm text-muted-foreground">
+                          Use this when your provider or equipment cannot route to a hostname and needs a fixed IP address. Calls are sent directly to Cloudonix's ingress IP — you must configure your call origin (your source IP) for these calls to be accepted.
+                        </p>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Your SIP trunk IP address for inbound calls:
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-sm break-all">
+                            {CLOUDONIX_SIP_INGRESS_IP}
+                          </code>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={copyIp}
+                            aria-label="Copy IP address to clipboard"
+                          >
+                            {ipCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            {ipCopied ? 'Copied' : 'Copy'}
+                          </Button>
+                        </div>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Use any of the below SIP URIs to send calls to Cloudonix. You must configure your call origin for these to work
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {inboundIpSipUris.map((uri) => (
+                            <li key={uri}>
+                              <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
+                                {uri}
+                              </code>
+                            </li>
+                          ))}
+                        </ul>
+                      </TabsContent>
+                    </Tabs>
                   </CardContent>
                 </Card>
                 <Card>
