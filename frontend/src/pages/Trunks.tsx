@@ -112,8 +112,9 @@ const directionGroup = (direction: Trunk['direction']): 'inbound' | 'outbound' =
 const isCloudonixUnavailable = (error: any): boolean =>
   error?.response?.status === 502 || error?.response?.data?.error === 'cloudonix_unavailable';
 
-// Cloudonix platform ingress IP (fixed); change here if Cloudonix ever regionalizes ingress.
-const CLOUDONIX_SIP_INGRESS_IP = '18.219.128.166';
+// Cloudonix platform signalling IP (fixed) — used for both inbound ingress and
+// outbound egress. Change here if Cloudonix ever regionalizes signalling.
+const CLOUDONIX_SIP_IP = '18.219.128.166';
 
 const TrunksPage: React.FC = () => {
   const { user } = useAuth();
@@ -161,13 +162,14 @@ const TrunksPage: React.FC = () => {
     ];
   }, [sipHostname]);
 
-  const inboundIpSipUris = useMemo(
+  // Same IP serves both directions, so this list feeds both cheatsheet cards.
+  const sipIpUris = useMemo(
     () => [
-      `sip:${CLOUDONIX_SIP_INGRESS_IP}:5060;transport=udp;`,
-      `sip:${CLOUDONIX_SIP_INGRESS_IP}:5060;transport=tcp;`,
-      `sip:${CLOUDONIX_SIP_INGRESS_IP}:5061;transport=tls;`,
-      `sip:${CLOUDONIX_SIP_INGRESS_IP}:443;transport=tls;`,
-      `sip:${CLOUDONIX_SIP_INGRESS_IP}:8443;transport=tls;`,
+      `sip:${CLOUDONIX_SIP_IP}:5060;transport=udp;`,
+      `sip:${CLOUDONIX_SIP_IP}:5060;transport=tcp;`,
+      `sip:${CLOUDONIX_SIP_IP}:5061;transport=tls;`,
+      `sip:${CLOUDONIX_SIP_IP}:443;transport=tls;`,
+      `sip:${CLOUDONIX_SIP_IP}:8443;transport=tls;`,
     ],
     []
   );
@@ -185,7 +187,7 @@ const TrunksPage: React.FC = () => {
 
   const copyIp = async () => {
     try {
-      await navigator.clipboard.writeText(CLOUDONIX_SIP_INGRESS_IP);
+      await navigator.clipboard.writeText(CLOUDONIX_SIP_IP);
       setIpCopied(true);
       setTimeout(() => setIpCopied(false), 2000);
     } catch {
@@ -631,7 +633,7 @@ const TrunksPage: React.FC = () => {
                         </p>
                         <div className="mt-1 flex items-center gap-2">
                           <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-sm break-all">
-                            {CLOUDONIX_SIP_INGRESS_IP}
+                            {CLOUDONIX_SIP_IP}
                           </code>
                           <Button
                             type="button"
@@ -648,7 +650,7 @@ const TrunksPage: React.FC = () => {
                           Use any of the below SIP URIs to send calls to Cloudonix. You must configure your call origin for these to work
                         </p>
                         <ul className="mt-1 space-y-1">
-                          {inboundIpSipUris.map((uri) => (
+                          {sipIpUris.map((uri) => (
                             <li key={uri}>
                               <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
                                 {uri}
@@ -666,9 +668,39 @@ const TrunksPage: React.FC = () => {
                       <PhoneOutgoing className="h-4 w-4 text-muted-foreground" />
                       Outbound SIP Trunk Information
                     </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Configuration details coming soon.
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      When your PBX places outbound calls, Cloudonix signals them to your telephony provider FROM this IP address. Configure your provider to accept and authenticate SIP signalling from it (IP allowlisting / IP-based authentication).
                     </p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Cloudonix source IP address for outbound calls:
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-sm break-all">
+                        {CLOUDONIX_SIP_IP}
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={copyIp}
+                        aria-label="Copy IP address to clipboard"
+                      >
+                        {ipCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {ipCopied ? 'Copied' : 'Copy'}
+                      </Button>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Cloudonix can signal outbound calls to your provider using any of the following protocols and ports:
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {sipIpUris.map((uri) => (
+                        <li key={uri}>
+                          <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
+                            {uri}
+                          </code>
+                        </li>
+                      ))}
+                    </ul>
                   </CardContent>
                 </Card>
               </div>
