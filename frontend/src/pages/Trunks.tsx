@@ -111,6 +111,9 @@ const directionGroup = (direction: Trunk['direction']): 'inbound' | 'outbound' =
 const isCloudonixUnavailable = (error: any): boolean =>
   error?.response?.status === 502 || error?.response?.data?.error === 'cloudonix_unavailable';
 
+// Cloudonix platform ingress IP (fixed); change here if Cloudonix ever regionalizes ingress.
+const CLOUDONIX_SIP_INGRESS_IP = '18.219.128.166';
+
 const TrunksPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -128,6 +131,8 @@ const TrunksPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof TrunkFormData, string>>>({});
   const [authOpen, setAuthOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [ipFallbackOpen, setIpFallbackOpen] = useState(false);
+  const [ipCopied, setIpCopied] = useState(false);
 
   const canManageTrunks = user?.role === 'owner' || user?.role === 'pbx_admin';
 
@@ -156,6 +161,17 @@ const TrunksPage: React.FC = () => {
     ];
   }, [sipHostname]);
 
+  const inboundIpSipUris = useMemo(
+    () => [
+      `sip:${CLOUDONIX_SIP_INGRESS_IP}:5060;transport=udp;`,
+      `sip:${CLOUDONIX_SIP_INGRESS_IP}:5060;transport=tcp;`,
+      `sip:${CLOUDONIX_SIP_INGRESS_IP}:5061;transport=tls;`,
+      `sip:${CLOUDONIX_SIP_INGRESS_IP}:443;transport=tls;`,
+      `sip:${CLOUDONIX_SIP_INGRESS_IP}:8443;transport=tls;`,
+    ],
+    []
+  );
+
   const copyHostname = async () => {
     if (!sipHostname) return;
     try {
@@ -164,6 +180,16 @@ const TrunksPage: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Failed to copy hostname to clipboard');
+    }
+  };
+
+  const copyIp = async () => {
+    try {
+      await navigator.clipboard.writeText(CLOUDONIX_SIP_INGRESS_IP);
+      setIpCopied(true);
+      setTimeout(() => setIpCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy IP address to clipboard');
     }
   };
 
@@ -580,6 +606,50 @@ const TrunksPage: React.FC = () => {
                             </li>
                           ))}
                         </ul>
+                        <Collapsible open={ipFallbackOpen} onOpenChange={setIpFallbackOpen} className="mt-3">
+                          <CollapsibleTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between text-left text-xs text-muted-foreground hover:text-foreground"
+                              aria-expanded={ipFallbackOpen}
+                            >
+                              <span>If your provider doesn't support DNS based routing, click here</span>
+                              <ChevronDown className={cn('h-3 w-3 transition-transform', ipFallbackOpen && 'rotate-180')} />
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Your SIP trunk IP address for inbound calls:
+                            </p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <code className="flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
+                                {CLOUDONIX_SIP_INGRESS_IP}
+                              </code>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={copyIp}
+                                aria-label="Copy IP address to clipboard"
+                              >
+                                {ipCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                {ipCopied ? 'Copied' : 'Copy'}
+                              </Button>
+                            </div>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              Use any of the below SIP URIs to send calls to Cloudonix. You must configure your call origin for these to work
+                            </p>
+                            <ul className="mt-1 space-y-1">
+                              {inboundIpSipUris.map((uri) => (
+                                <li key={uri}>
+                                  <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all">
+                                    {uri}
+                                  </code>
+                                </li>
+                              ))}
+                            </ul>
+                          </CollapsibleContent>
+                        </Collapsible>
                       </>
                     ) : (
                       <p className="mt-2 text-sm text-muted-foreground">
