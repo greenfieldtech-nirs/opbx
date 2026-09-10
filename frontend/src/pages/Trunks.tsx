@@ -9,6 +9,8 @@ import {
   Loader2,
   Search,
   BookOpen,
+  PhoneIncoming,
+  PhoneOutgoing,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -510,21 +512,30 @@ const TrunksPage: React.FC = () => {
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0 pb-4 px-4 space-y-3 text-sm text-muted-foreground">
-              <div>
-                <p className="font-medium text-foreground">Inbound</p>
-                <p>
-                  Inbound trunks carry calls from your carrier/equipment into this PBX. Point your
-                  carrier's SIP trunk at this domain; use the trunk's prefix to tag incoming calls.
-                </p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Outbound</p>
-                <p>
-                  Outbound trunks carry calls from your extensions to the world. Reference the trunk
-                  by name in outbound whitelist rules; configure authentication credentials when the
-                  carrier requires them.
-                </p>
+            <CardContent className="pt-0 pb-4 px-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="flex items-center gap-2 font-medium text-foreground">
+                      <PhoneIncoming className="h-4 w-4 text-muted-foreground" />
+                      Inbound SIP Trunk Information
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Configuration details coming soon.
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="flex items-center gap-2 font-medium text-foreground">
+                      <PhoneOutgoing className="h-4 w-4 text-muted-foreground" />
+                      Outbound SIP Trunk Information
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Configuration details coming soon.
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </CollapsibleContent>
