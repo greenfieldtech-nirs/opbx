@@ -6,11 +6,13 @@ namespace Tests\Feature\ApiKey;
 
 use App\Enums\GrantableResource;
 use App\Http\Middleware\EnforceApiKeyScope;
+use App\Models\CloudonixSettings;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\ApiKeyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -117,6 +119,31 @@ class ApiKeyCoverageTest extends TestCase
         $token = $this->keyFor([['resource' => 'dashboard', 'level' => 'read']]);
 
         $this->withToken($token)->getJson('/api/v1/dashboard/supervisor')->assertStatus(200);
+    }
+
+    public function test_trunks_are_grantable(): void
+    {
+        $org = Organization::factory()->create();
+        CloudonixSettings::factory()->create([
+            'organization_id' => $org->id,
+            'domain_uuid' => 'dom-uuid-trunks',
+        ]);
+        [, $token] = app(ApiKeyService::class)->create(
+            organizationId: $org->id, name: 'k',
+            permissions: [['resource' => 'trunks', 'level' => 'read']],
+            createdBy: null,
+        );
+
+        // Trunks are proxied to Cloudonix — fake the upstream list call.
+        $trunksUrl = rtrim((string) config('cloudonix.api.base_url'), '/')
+            .'/customers/self/domains/dom-uuid-trunks/trunks';
+        Http::fake([$trunksUrl => Http::response([], 200)]);
+
+        $this->withToken($token)->getJson('/api/v1/trunks')->assertStatus(200);
+
+        // A key without the trunks grant is denied.
+        $ungranted = $this->keyFor([['resource' => 'extensions', 'level' => 'read']]);
+        $this->withToken($ungranted)->getJson('/api/v1/trunks')->assertStatus(403);
     }
 
     public function test_credential_subroutes_are_never_grantable(): void

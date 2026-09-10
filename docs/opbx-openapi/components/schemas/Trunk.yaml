@@ -1,0 +1,66 @@
+type: object
+description: >-
+  SIP trunk proxied from Cloudonix (trunks are not stored locally).
+  `password` is WRITE-ONLY: it is accepted on create/update requests but is
+  never serialized in responses. Cloudonix normalizes `direction` on create:
+  `inbound` becomes `public-inbound` and `outbound` becomes `public-outbound`.
+properties:
+  id:
+    type: integer
+  uuid:
+    type: string
+  name:
+    type: string
+  direction:
+    type: string
+    enum:
+    - inbound
+    - outbound
+    - public-inbound
+    - public-outbound
+  ip:
+    type: string
+    description: IPv4, IPv6, or hostname of the trunk peer.
+  port:
+    description: Cloudonix may return the port as an integer or a string.
+    oneOf:
+    - type: integer
+    - type: string
+  transport:
+    type: string
+    enum:
+    - udp
+    - tcp
+    - tls
+  prefix:
+    type:
+    - string
+    - 'null'
+  active:
+    type: boolean
+  created_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  has_credentials:
+    type: boolean
+    description: True when the trunk has authentication credentials configured.
+  username:
+    type:
+    - string
+    - 'null'
+  overwrite_from:
+    type: boolean
+    description: Whether the trunk overwrites the caller's From header.
+  in_use_by:
+    type: array
+    items:
+      type: string
+    description: Names of outbound-whitelist entries referencing this trunk.
+required:
+- id
+- name
+- direction
+- ip
+- transport

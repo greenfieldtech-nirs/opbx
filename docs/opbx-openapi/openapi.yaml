@@ -44,6 +44,7 @@ info:
       | **Inbound Blacklist** | Blocked caller management |
       | **Outbound Whitelist** | Outbound dialing restrictions |
       | **Settings** | Organization and Cloudonix settings |
+      | **Trunks** | SIP trunk management (proxied from Cloudonix) |
       | **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
       | **Supervisors** | Supervisor assignments + supervisor dashboard |
       | **Web Phone** | In-browser softphone SIP provisioning (Owner/Supervisor) |
@@ -645,6 +646,12 @@ paths:
   /v1/dashboard/supervisor:
     $ref: './paths/supervisors/dashboard.yaml#/paths/~1v1~1dashboard~1supervisor'
 
+  /v1/trunks:
+    $ref: './paths/trunks/index.yaml#/paths/~1v1~1trunks'
+
+  /v1/trunks/{trunk}:
+    $ref: './paths/trunks/item.yaml#/paths/~1v1~1trunks~1{trunk}'
+
   /v1/webphone/config:
     $ref: './paths/webphone/config.yaml#/paths/~1v1~1webphone~1config'
 
@@ -834,6 +841,8 @@ components:
       $ref: './components/schemas/MonitorSummary.yaml'
     MonitorDetail:
       $ref: './components/schemas/MonitorDetail.yaml'
+    Trunk:
+      $ref: './components/schemas/Trunk.yaml'
     
     # Webhook payload schemas
     CallInitiatedPayload:
@@ -951,6 +960,8 @@ tags:
     description: Google Ads and Meta conversion upload integrations
   - name: Distribution Lists
     description: Phone number list management for auto-dialer campaigns
+  - name: Trunks
+    description: SIP trunk management (proxied from Cloudonix)
   - name: Configuration
     description: Application configuration
   - name: Webhooks

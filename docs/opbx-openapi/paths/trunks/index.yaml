@@ -1,0 +1,125 @@
+paths:
+  /v1/trunks:
+    get:
+      tags:
+        - Trunks
+      summary: List Trunks
+      description: List SIP trunks proxied from Cloudonix, optionally filtered by direction.
+      operationId: listTrunks
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: direction
+          in: query
+          required: false
+          description: Filter trunks by direction.
+          schema:
+            type: string
+            enum:
+            - inbound
+            - outbound
+            - public-inbound
+            - public-outbound
+      responses:
+        '200':
+          description: List of trunks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/Trunk.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '502':
+          description: Cloudonix API unavailable
+
+    post:
+      tags:
+        - Trunks
+      summary: Create Trunk
+      description: >-
+        Create a trunk in Cloudonix. Only `inbound`/`outbound` directions are
+        accepted; Cloudonix normalizes them to `public-inbound`/`public-outbound`.
+        `password` is write-only and is never returned in responses.
+      operationId: createTrunk
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 64
+                ip:
+                  type: string
+                  description: IPv4, IPv6, or hostname of the trunk peer.
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                transport:
+                  type: string
+                  enum:
+                  - udp
+                  - tcp
+                  - tls
+                direction:
+                  type: string
+                  enum:
+                  - inbound
+                  - outbound
+                prefix:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                username:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 128
+                  description: Required when `password` is provided.
+                password:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 128
+                  writeOnly: true
+                  description: Required when `username` is provided. Never serialized in responses.
+                overwrite_from:
+                  type: boolean
+              required:
+              - name
+              - ip
+              - port
+              - transport
+              - direction
+      responses:
+        '201':
+          description: Trunk created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Trunk.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '502':
+          description: Cloudonix API unavailable

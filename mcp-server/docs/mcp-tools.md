@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-> AUTO-GENERATED from the tool registry by `npm run generate:docs`. 107 tools.
+> AUTO-GENERATED from the tool registry by `npm run generate:docs`. 112 tools.
 > Do not edit by hand. Output shape for all tools: JSON structuredContent
 > (success payload, or `{success:false, error:{...}}`, or `{confirmation_required:true, preview:{...}}`).
 
@@ -351,6 +351,29 @@
 | `status` | enum(active\|inactive) | yes |  |
 | `members` | array | yes | Ring group members (1-50), each with an extension ID and priority |
 
+## `create_trunk`
+
+**Create trunk** — Create a SIP trunk in Cloudonix. direction accepts only 'inbound' or 'outbound' — Cloudonix normalizes them to public-inbound/public-outbound, which is what later listings show. password is write-only (never returned) and requires username.
+
+**Permission:** `trunks.create` | **Roles:** owner, pbx_admin | **Risk:** medium  
+**Destructive:** no | **Idempotent:** no | **Confirmation:** none | **Rate class:** write
+
+**MCP annotations:** `readOnlyHint: false` `destructiveHint: false` `idempotentHint: false` `openWorldHint: true`
+
+**OPBX operation:** `POST /v1/trunks` (`createTrunk`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Trunk name (3-64 chars) |
+| `ip` | string | yes | IPv4, IPv6, or hostname of the trunk peer |
+| `port` | integer | yes | SIP port (1-65535) |
+| `transport` | enum(udp\|tcp\|tls) | yes | SIP transport protocol |
+| `direction` | enum(inbound\|outbound) | yes | inbound: carriers→PBX; outbound: PBX→world. Normalized to public-* by Cloudonix. |
+| `prefix` | string | no | Optional dial prefix for calls via this trunk |
+| `username` | string | no | Auth username for trunk registration |
+| `password` | string | no | Auth password (write-only, never returned). Requires username. |
+| `overwrite_from` | boolean | no | Whether the trunk overwrites the caller's From header |
+
 ## `create_user`
 
 **Create user** — Create a user directly with a password (min 8 chars, mixed case + numbers). Use invite_user instead when the person can set their own password.
@@ -513,6 +536,22 @@
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | integer | yes | ID of the ring_group to delete |
+| `confirm` | boolean | no | Set to true to confirm execution after reviewing the preview |
+
+## `delete_trunk`
+
+**Delete trunk** — Permanently delete a SIP trunk from Cloudonix. Outbound whitelist rules referencing this trunk (see its in_use_by field) will lose their carrier route — remove or re-point those rules first.
+
+**Permission:** `trunks.delete` | **Roles:** owner, pbx_admin | **Risk:** high  
+**Destructive:** yes | **Idempotent:** yes | **Confirmation:** required | **Rate class:** sensitive
+
+**MCP annotations:** `readOnlyHint: false` `destructiveHint: true` `idempotentHint: true` `openWorldHint: true`
+
+**OPBX operation:** `DELETE /v1/trunks/{trunk}` (`deleteTrunk`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | integer | yes | ID of the trunk to delete |
 | `confirm` | boolean | no | Set to true to confirm execution after reviewing the preview |
 
 ## `delete_user`
@@ -990,6 +1029,21 @@ _No arguments._
 
 _No arguments._
 
+## `get_trunk`
+
+**Get trunk** — Get a single SIP trunk by ID, including direction, transport, and whether auth credentials are configured. Auth passwords are never returned (write-only).
+
+**Permission:** `trunks.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
+
+**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
+
+**OPBX operation:** `GET /v1/trunks/{trunk}` (`getTrunk`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | integer | yes | ID of the trunk |
+
 ## `get_user`
 
 **Get user** — Get a user by ID: name, email, role, status, and linked extension. Never contains credentials.
@@ -1414,6 +1468,23 @@ _No arguments._
 | `page` | integer | yes | Page number (1-based) |
 | `per_page` | integer | yes | Items per page (max 100) |
 
+## `list_trunks`
+
+**List trunks** — List SIP trunks proxied from Cloudonix. Inbound trunks carry calls from carriers into the PBX; outbound trunks carry calls to the world. Cloudonix normalizes direction on create (inbound→public-inbound, outbound→public-outbound), so listings mostly show the public-* variants.
+
+**Permission:** `trunks.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
+
+**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
+
+**OPBX operation:** `GET /v1/trunks` (`listTrunks`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `page` | integer | yes | Page number (1-based) |
+| `per_page` | integer | yes | Items per page (max 100) |
+| `direction` | enum(inbound\|outbound\|public-inbound\|public-outbound) | no | Filter by direction (public-* values are the normalized forms seen in practice) |
+
 ## `list_users`
 
 **List users** — List users in the organization with role and status. Supervisors see their assigned scope. NOTE: the OPBX role filter enum in the API predates the supervisor role; filtering by 'supervisor' may not work upstream.
@@ -1837,6 +1908,28 @@ _No arguments._
 | `fallback_ai_load_balancer_id` | any | no | Required when fallback_action=ai_load_balancer |
 | `status` | enum(active\|inactive) | yes |  |
 | `members` | array | yes | Ring group members (1-50), each with an extension ID and priority |
+
+## `update_trunk`
+
+**Update trunk** — Update a SIP trunk. name and direction are immutable post-create. All other fields are optional; omitting password leaves the stored credential untouched. Sending password without username is rejected by the API (422); username may be sent alone.
+
+**Permission:** `trunks.update` | **Roles:** owner, pbx_admin | **Risk:** medium  
+**Destructive:** no | **Idempotent:** no | **Confirmation:** none | **Rate class:** write
+
+**MCP annotations:** `readOnlyHint: false` `destructiveHint: false` `idempotentHint: false` `openWorldHint: true`
+
+**OPBX operation:** `PUT /v1/trunks/{trunk}` (`updateTrunk`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | integer | yes | ID of the trunk to update |
+| `ip` | string | no | IPv4, IPv6, or hostname of the trunk peer |
+| `port` | integer | no | SIP port (1-65535) |
+| `transport` | enum(udp\|tcp\|tls) | no | SIP transport protocol |
+| `prefix` | string | no | Optional dial prefix for calls via this trunk |
+| `username` | string | no | Auth username for trunk registration |
+| `password` | string | no | Auth password (write-only). API rejects password without username (422). |
+| `overwrite_from` | boolean | no | Whether the trunk overwrites the caller's From header |
 
 ## `update_user`
 

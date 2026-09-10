@@ -7,7 +7,7 @@
 **MCP server** `opbx-mcp` (Node 24 LTS, TypeScript, Fastify 5, `@modelcontextprotocol/sdk`
 1.30.0 verified against the installed package, Zod v4, OpenTelemetry, Pino, Vitest, Docker).
 
-- **107 tools** — every one mapped to a validated OPBX REST operation:
+- **112 tools** — every one mapped to a validated OPBX REST operation:
   - Extensions (7), Phone numbers/DIDs (5 incl. composite routing), Ring groups (7),
     IVR (8), Business hours (9), Conference rooms (7), AI providers/assistants (8),
     AI load balancers (2 reads), Campaigns (14), Distribution lists (13),
@@ -86,7 +86,7 @@ Highest-impact:
 
 ## Known limitations / remaining recommendations
 
-- **Tool count (107)** exceeds the original ~35–50 guidance — the approved inventory
+- **Tool count (112)** exceeds the original ~35–50 guidance — the approved inventory
   covered more ground (supervisors, call tracking reads, full distribution-list
   lifecycle). The surface is curated (no REST proxy, merged PUT/PATCH), but a future
   "profile" mechanism could expose role-based subsets at `tools/list` time.
