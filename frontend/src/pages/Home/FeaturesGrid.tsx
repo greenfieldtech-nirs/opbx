@@ -2,8 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   BarChart3,
   Bot,
+  BrainCircuit,
   Clock,
+  KeyRound,
   Mic,
+  MonitorSmartphone,
+  Network,
   Phone,
   PhoneCall,
   Radio,
@@ -14,66 +18,98 @@ import {
   Zap,
 } from 'lucide-react';
 
-const features = [
+type FeatureStatus = 'production' | 'development';
+
+const features: { icon: typeof Bot; title: string; description: string; status: FeatureStatus }[] = [
   {
     icon: Bot,
     title: 'AI Voice Agents',
     description: 'Cloud and OSS Dograh integration plus generic AI assistant support.',
+    status: 'production',
   },
   {
     icon: Phone,
     title: 'Auto Dialer',
     description: 'Outbound campaign manager with distribution lists and scheduling.',
+    status: 'production',
   },
   {
     icon: BarChart3,
     title: 'Call Tracking',
     description: 'Campaign tracking, DNI snippets, and analytics.',
+    status: 'development',
   },
   {
     icon: Workflow,
     title: 'AI Load Balancers',
     description: 'Distribute inbound calls across AI assistants.',
+    status: 'production',
   },
   {
     icon: PhoneCall,
     title: 'Smart Call Routing',
     description: 'Route calls to extensions, ring groups, IVR, or AI assistants.',
+    status: 'production',
   },
   {
     icon: Users,
     title: 'Ring Groups',
     description: 'Simultaneous, round-robin, and weighted ringing strategies.',
+    status: 'production',
   },
   {
     icon: Mic,
     title: 'IVR Menus',
     description: 'Interactive voice response with custom routing logic.',
+    status: 'production',
   },
   {
     icon: Clock,
     title: 'Business Hours',
     description: 'Time-of-day, holiday, and custom schedule routing.',
+    status: 'production',
   },
   {
     icon: Radio,
     title: 'Real-Time Monitoring',
     description: 'Live call dashboard with presence and session updates.',
+    status: 'production',
   },
   {
     icon: Settings,
     title: 'Call Recording',
     description: 'Automatic recording with secure storage and compliance.',
+    status: 'production',
+  },
+  {
+    icon: Network,
+    title: 'Trunk Management',
+    description: 'Create and manage inbound and outbound SIP trunks, with a built-in configuration cheatsheet.',
+    status: 'production',
+  },
+  {
+    icon: MonitorSmartphone,
+    title: 'Web Phone',
+    description: 'Browser-based softphone with dialer, call log, and supervisor coaching.',
+    status: 'production',
+  },
+  {
+    icon: BrainCircuit,
+    title: 'MCP Server for AI Agents',
+    description: '112 tools let Claude, Cursor, and other AI agents manage the PBX via the Model Context Protocol.',
+    status: 'development',
+  },
+  {
+    icon: KeyRound,
+    title: 'Scoped API Keys',
+    description: 'Fine-grained, per-resource API keys for safe automation and integrations.',
+    status: 'production',
   },
   {
     icon: Shield,
     title: 'Enterprise Security',
-    description: 'RBAC, multi-tenant isolation, and audit logging.',
-  },
-  {
-    icon: Zap,
-    title: 'Lightning Fast',
-    description: 'Laravel + React with Redis for high-performance call processing.',
+    description: 'RBAC, multi-tenant isolation, inbound blacklist, outbound whitelist, and audit logging.',
+    status: 'production',
   },
 ];
 
@@ -91,7 +127,7 @@ export function FeaturesGrid() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map((feature, idx) => (
           <Card
             key={idx}
@@ -101,7 +137,18 @@ export function FeaturesGrid() {
               <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                 <feature.icon className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle className="text-2xl text-foreground">{feature.title}</CardTitle>
+              <CardTitle className="text-2xl text-foreground flex items-center gap-2 flex-wrap">
+                {feature.title}
+                <span
+                  className={
+                    feature.status === 'development'
+                      ? 'inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-400'
+                      : 'inline-flex items-center rounded-full border border-green-400/30 bg-green-400/10 px-2 py-0.5 text-xs font-medium text-green-400'
+                  }
+                >
+                  {feature.status === 'development' ? 'Under Development' : 'Production Ready'}
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription className="text-base text-muted-foreground">

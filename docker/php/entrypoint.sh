@@ -126,9 +126,11 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running database migrations..."
     run_as_app php artisan migrate --force --no-interaction || echo "Migration failed or already up to date"
 
-    # Run database seeders on fresh installations (creates default admin user)
+    # Seed only on fresh installations (creates default organization + admin user).
+    # Seeders are bootstrap-only: one-off data fixes belong in migrations
+    # (tracked + run-once), not in seeders that run on every boot.
     echo "Checking if database seeding is needed..."
-    run_as_app php artisan db:seed --force --no-interaction || echo "Seeding skipped or already completed"
+    run_as_app php artisan db:seed-if-fresh --no-interaction || echo "Seeding skipped or already completed"
 
     # Initialize storage (verifies MinIO bucket access).
     # The bucket itself is provisioned by the minio-init service; this must never

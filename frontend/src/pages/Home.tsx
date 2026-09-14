@@ -6,6 +6,7 @@ import { DograhSpotlight } from './Home/DograhSpotlight';
 import { HowItWorks } from './Home/HowItWorks';
 import { AIHandoff } from './Home/AIHandoff';
 import { FeaturesGrid } from './Home/FeaturesGrid';
+// import { ProjectStats } from './Home/ProjectStats'; // uncomment when real stats are ready
 import { TechnologySection } from './Home/TechnologySection';
 import { Pricing } from './Home/Pricing';
 import { FAQSection } from './Home/FAQSection';
@@ -21,6 +22,7 @@ export default function Home() {
       <BuiltDifferent />
       <DograhSpotlight />
       <FeaturesGrid />
+      {/* <ProjectStats /> — hidden until real statistics content is provided */}
       <HowItWorks />
       <AIHandoff />
       <TechnologySection />
