@@ -32,15 +32,32 @@ class ConfigurationController extends Controller
 
     /**
      * Derive the public API and MCP endpoint URLs for the caller. Prefers the
-     * X-Forwarded-Host/Proto headers set by the reverse proxy / dev proxy
-     * (the direct request host is the internal container name otherwise);
-     * falls back to the request's own host. MCP port from MCP_PORT config.
+     * organization's configured Webhook Base URL (same public origin webhooks
+     * use, so it is reachable from the internet); falls back to the
+     * X-Forwarded-Host/Proto headers set by the reverse proxy / dev proxy,
+     * then to the request's own host. MCP port from MCP_PORT config (only
+     * used in the header-based fallback, where no proxy path exists).
      *
      * @return array{api_base_url: string, mcp_url: string, mcp_port: int}
      */
     private function buildEndpoints(Request $request): array
     {
         $mcpPort = (int) config('services.mcp.port', 8080);
+
+        // The route is public: the default (web) guard ignores Bearer tokens,
+        // so resolve the caller through the sanctum guard explicitly.
+        $webhookBaseUrl = $request->user('sanctum')?->organization?->cloudonixSettings?->webhook_base_url;
+
+        if (! empty($webhookBaseUrl)) {
+            $base = rtrim($webhookBaseUrl, '/');
+
+            return [
+                'api_base_url' => $base.'/api/v1',
+                // MCP is proxied at /mcp on the same public origin — no port.
+                'mcp_url' => $base.'/mcp',
+                'mcp_port' => $mcpPort,
+            ];
+        }
 
         // Public origin as seen by the browser (forwarded by nginx/vite proxy).
         $hostWithPort = $request->header('X-Forwarded-Host') ?: $request->getHttpHost();
