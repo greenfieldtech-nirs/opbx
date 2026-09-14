@@ -36,8 +36,8 @@ class SeedIfFreshCommand extends Command
         }
 
         $this->info('Fresh installation detected, running seeders...');
-        $this->call('db:seed', ['--force' => true, '--no-interaction' => true]);
 
-        return self::SUCCESS;
+        // Propagate the seeder's exit code honestly (failures must not masquerade as success).
+        return $this->call('db:seed', ['--force' => true, '--no-interaction' => true]);
     }
 }
