@@ -37,6 +37,12 @@ class QueuePollController extends Controller
         $context = $request->queueContext();
 
         if ($context === null) {
+            Log::warning('QueuePollController: Missing queue context in callback', [
+                'call_sid' => $request->input('CallSid'),
+                'has_session_data' => $request->filled('session_data'),
+                'has_sessiondata' => $request->has('SessionData'),
+            ]);
+
             return response(CxmlBuilder::unavailable('Queue system error'), 200, ['Content-Type' => 'application/xml']);
         }
 

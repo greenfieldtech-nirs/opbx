@@ -158,6 +158,14 @@ class QueueCallFlowTest extends TestCase
             'From' => '10000',
             'To' => '20001',
             'Domain' => 'test.example.com',
+            // Cloudonix sends its own session profile in SessionData; the queue
+            // context must still be resolved from session_data.
+            'SessionData' => [
+                'id' => 32018519,
+                'token' => self::CALL_ID,
+                'status' => 'CONNECTED',
+                'callIds' => ['EB9-r_g3dkai9QG1xmLSqw..'],
+            ],
         ], [
             'Authorization' => "Bearer {$token}",
         ]);

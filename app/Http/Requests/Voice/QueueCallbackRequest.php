@@ -55,12 +55,16 @@ class QueueCallbackRequest extends FormRequest
     /**
      * Resolve queue context from SessionData (flattened), session_data JSON, or top-level fields.
      *
+     * Note: Cloudonix also sends its own "SessionData" session profile object on
+     * poll redirects. Only treat SessionData as queue context when it actually
+     * carries call_queue_id; otherwise fall through to session_data / top-level.
+     *
      * @return array{call_queue_id: int, call_id: string, organization_id: int|null}|null
      */
     public function queueContext(): ?array
     {
         $data = $this->input('SessionData');
-        if (! is_array($data)) {
+        if (! is_array($data) || ! isset($data['call_queue_id'])) {
             $json = $this->input('session_data');
             $data = $json ? (json_decode((string) $json, true) ?: []) : $this->only('call_queue_id', 'call_id', 'organization_id');
         }
