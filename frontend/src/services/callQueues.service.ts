@@ -34,6 +34,12 @@ export interface CallQueue {
   status: 'active' | 'inactive';
   agents?: CallQueueAgent[];
   agents_count?: number;
+  moh_recording?: { id: number; name: string } | null;
+  fallback_extension?: { id: number; extension_number: string } | null;
+  fallback_ring_group?: { id: number; name: string } | null;
+  fallback_ivr_menu?: { id: number; name: string } | null;
+  fallback_ai_assistant?: { id: number; name: string } | null;
+  fallback_ai_load_balancer?: { id: number; name: string } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -145,6 +151,11 @@ export const callQueuesService = {
 
   update: async (id: number | string, payload: CallQueuePayload): Promise<{ data: CallQueue }> => {
     const response = await api.put(`/call-queues/${id}`, payload);
+    return response.data;
+  },
+
+  toggleStatus: async (id: number | string): Promise<{ data: CallQueue }> => {
+    const response = await api.post(`/call-queues/${id}/toggle-status`);
     return response.data;
   },
 

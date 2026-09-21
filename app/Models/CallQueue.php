@@ -7,7 +7,7 @@ namespace App\Models;
 use App\Enums\CallQueueStatus;
 use App\Enums\CallQueueStrategy;
 use App\Enums\RingGroupFallbackAction;
-use App\Models\AI\AiAssistantLoadBalancer;
+use App\Models\AiAssistantLoadBalancer;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;

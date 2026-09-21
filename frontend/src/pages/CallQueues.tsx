@@ -166,6 +166,12 @@ export default function CallQueues() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: callQueuesService.toggleStatus,
+    onSuccess: () => invalidate(),
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: callQueuesService.delete,
     onSuccess: () => {
@@ -242,6 +248,25 @@ export default function CallQueues() {
     }
   };
 
+  const fallbackLabel = (q: CallQueue): string => {
+    switch (q.fallback_action) {
+      case 'extension':
+        return q.fallback_extension ? `Ext ${q.fallback_extension.extension_number}` : '—';
+      case 'ring_group':
+        return q.fallback_ring_group?.name ?? '—';
+      case 'ivr_menu':
+        return q.fallback_ivr_menu?.name ?? '—';
+      case 'ai_assistant':
+        return q.fallback_ai_assistant?.name ?? '—';
+      case 'ai_load_balancer':
+        return q.fallback_ai_load_balancer?.name ?? '—';
+      case 'hangup':
+        return 'Hang Up';
+      default:
+        return q.fallback_action;
+    }
+  };
+
   const columns: Column<CallQueue>[] = [
     {
       header: 'Strategy',
@@ -257,11 +282,46 @@ export default function CallQueues() {
       ),
     },
     {
+      header: 'Music on Hold',
+      cell: (q) =>
+        q.moh_recording ? (
+          <span className="inline-flex items-center gap-1">
+            <ListMusic className="h-3.5 w-3.5 text-muted-foreground" />
+            {q.moh_recording.name}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">None</span>
+        ),
+    },
+    {
+      header: 'Announce Position',
+      cell: (q) =>
+        q.announce_position ? (
+          <Badge variant="outline">Every {q.announce_position_timeout}s</Badge>
+        ) : (
+          <span className="text-muted-foreground">Off</span>
+        ),
+    },
+    {
+      header: 'Fallback',
+      cell: (q) => <Badge variant="secondary">{fallbackLabel(q)}</Badge>,
+    },
+    {
       header: 'Status',
       cell: (q) => (
-        <Badge variant={q.status === 'active' ? 'default' : 'secondary'}>
-          {q.status === 'active' ? 'Active' : 'Inactive'}
-        </Badge>
+        <button
+          type="button"
+          title="Click to toggle status"
+          disabled={!canManage || toggleStatusMutation.isPending}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleStatusMutation.mutate(q.id);
+          }}
+        >
+          <Badge variant={q.status === 'active' ? 'default' : 'secondary'} className="cursor-pointer">
+            {q.status === 'active' ? 'Active' : 'Inactive'}
+          </Badge>
+        </button>
       ),
     },
   ];
@@ -300,6 +360,15 @@ export default function CallQueues() {
               `Max wait ${q.max_wait_seconds}s · Wrap-up ${q.wrap_up_seconds}s`
             }
             onRowClick={(q) => navigate(`/ui/call-queues/${q.id}`)}
+            canView={false}
+            canEdit={canManage}
+            onEdit={(q) => openEdit(q)}
+            canDelete={canManage}
+            onDelete={(q) => {
+              if (confirm(`Delete call queue "${q.name}"? This action cannot be undone.`)) {
+                deleteMutation.mutate(q.id);
+              }
+            }}
             emptyState={
               <EmptyState
                 icon={Users}

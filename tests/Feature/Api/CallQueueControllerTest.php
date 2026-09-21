@@ -301,6 +301,25 @@ class CallQueueControllerTest extends TestCase
         $this->assertDatabaseMissing('call_queue_agents', ['call_queue_id' => $queue->id]);
     }
 
+    public function test_toggle_status_flips_active_inactive(): void
+    {
+        $queue = CallQueue::factory()->create(['organization_id' => $this->organization->id]);
+
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson("/api/v1/call-queues/{$queue->id}/toggle-status")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'inactive');
+
+        $this->postJson("/api/v1/call-queues/{$queue->id}/toggle-status")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'active');
+
+        // PBX users cannot toggle.
+        Sanctum::actingAs($this->pbxUser);
+        $this->postJson("/api/v1/call-queues/{$queue->id}/toggle-status")->assertForbidden();
+    }
+
     public function test_agent_state_endpoint_updates_state(): void
     {
         $queue = CallQueue::factory()->create(['organization_id' => $this->organization->id]);

@@ -80,8 +80,40 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
-        $query->with(['agents.extension:id,user_id,extension_number,status'])
-            ->withCount('agents');
+        $query->with([
+            'agents.extension:id,user_id,extension_number,status',
+            'mohRecording:id,name',
+            'fallbackExtension:id,extension_number',
+            'fallbackRingGroup:id,name',
+            'fallbackIvrMenu:id,name',
+            'fallbackAiAssistant:id,name',
+            'fallbackAiLoadBalancer:id,name',
+        ])->withCount('agents');
+    }
+
+    /**
+     * Toggle the queue between active and inactive.
+     */
+    public function toggleStatus(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $model = $this->resolveModel($request);
+        $this->authorize($this->getUpdateAbility(), $model);
+
+        $model->status = $model->status === CallQueueStatus::ACTIVE
+            ? CallQueueStatus::INACTIVE
+            : CallQueueStatus::ACTIVE;
+        $model->save();
+
+        $this->logOperationCompleted($this->getResourceKey(), 'status_toggle', [
+            'user_id' => $this->getAuthenticatedUser()->id,
+            'call_queue_id' => $model->id,
+            'status' => $model->status->value,
+        ]);
+
+        return response()->json([
+            'message' => 'Call queue '.($model->status === CallQueueStatus::ACTIVE ? 'activated' : 'deactivated').'.',
+            'data' => new ($this->getResourceClass())($model),
+        ]);
     }
 
     /**

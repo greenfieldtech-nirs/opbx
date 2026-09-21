@@ -8,7 +8,7 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
-use App\Models\AI\AiAssistantLoadBalancer;
+use App\Models\AiAssistantLoadBalancer;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;

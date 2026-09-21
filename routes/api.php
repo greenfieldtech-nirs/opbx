@@ -404,6 +404,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('call-queues/agents/me', [CallQueueAgentController::class, 'myQueues'])
             ->name('call-queues.agents.me');
         Route::apiResource('call-queues', CallQueueController::class);
+        Route::post('call-queues/{call_queue}/toggle-status', [CallQueueController::class, 'toggleStatus'])
+            ->name('call-queues.toggle-status');
         Route::post('call-queues/{call_queue}/agents/me/state', [CallQueueAgentController::class, 'updateMyState'])
             ->name('call-queues.agents.me.state');
         Route::get('call-queues/{call_queue}/stats', [QueueStatsController::class, 'stats'])

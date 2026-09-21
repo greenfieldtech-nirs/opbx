@@ -62,6 +62,24 @@ class CallQueueResource extends JsonResource
                     'extension_number' => $this->fallbackExtension->extension_number,
                 ];
             }),
+            'fallback_ring_group' => $this->whenLoaded('fallbackRingGroup', function () {
+                return [
+                    'id' => $this->fallbackRingGroup->id,
+                    'name' => $this->fallbackRingGroup->name,
+                ];
+            }),
+            'fallback_ivr_menu' => $this->whenLoaded('fallbackIvrMenu', function () {
+                return [
+                    'id' => $this->fallbackIvrMenu->id,
+                    'name' => $this->fallbackIvrMenu->name,
+                ];
+            }),
+            'fallback_ai_assistant' => $this->whenLoaded('fallbackAiAssistant', function () {
+                return [
+                    'id' => $this->fallbackAiAssistant->id,
+                    'name' => $this->fallbackAiAssistant->name,
+                ];
+            }),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
