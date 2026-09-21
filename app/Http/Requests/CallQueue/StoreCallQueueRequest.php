@@ -69,20 +69,36 @@ class StoreCallQueueRequest extends FormRequest
             'agent_ring_timeout' => [
                 'required',
                 'integer',
-                'min:5',
-                'max:120',
+                'min:15',
+                'max:60',
             ],
             'max_wait_seconds' => [
                 'required',
                 'integer',
-                'min:10',
-                'max:3600',
+                'min:30',
+                'max:300',
             ],
             'wrap_up_seconds' => [
                 'required',
                 'integer',
-                'min:0',
+                'min:15',
+                'max:120',
+            ],
+            'announce_position' => [
+                'boolean',
+            ],
+            'announce_position_timeout' => [
+                Rule::requiredIf(fn () => $this->boolean('announce_position')),
+                'nullable',
+                'integer',
+                'min:10',
                 'max:600',
+            ],
+            'announce_position_language' => [
+                Rule::requiredIf(fn () => $this->boolean('announce_position')),
+                'nullable',
+                'string',
+                'max:20',
             ],
             'moh_recording_id' => [
                 'nullable',
@@ -258,6 +274,8 @@ class StoreCallQueueRequest extends FormRequest
             'agent_ring_timeout' => 20,
             'max_wait_seconds' => 300,
             'wrap_up_seconds' => 15,
+            'announce_position' => false,
+            'announce_position_timeout' => 60,
             'fallback_action' => RingGroupFallbackAction::HANGUP->value,
         ];
 

@@ -78,8 +78,38 @@ class QueuePollController extends Controller
         return match ($result['action'] ?? 'wait') {
             'dial' => $this->handleDial($request, $callQueue, $queueCall, $result['agents'] ?? []),
             'overflow' => $this->handleOverflow($request, $callQueue, $queueCall),
-            default => app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']),
+            default => $this->holdOrAnnounce($request, $callQueue, $queueCall, (int) ($result['position'] ?? 1)),
         };
+    }
+
+    /**
+     * Wait decision: render the hold CXML, announcing the caller's position
+     * when enabled and the announce interval has elapsed since the last one.
+     */
+    private function holdOrAnnounce(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall, int $position): Response
+    {
+        $announcePosition = null;
+
+        if ($callQueue->announce_position) {
+            $waitedSeconds = max(0, (int) $queueCall->entered_at->diffInSeconds(now()));
+            $lastAnnounced = (int) (\Illuminate\Support\Facades\Redis::get("acd:announce:{$queueCall->call_id}") ?? 0);
+
+            if ($waitedSeconds - $lastAnnounced >= $callQueue->announce_position_timeout) {
+                $announcePosition = $position;
+                \Illuminate\Support\Facades\Redis::setex(
+                    "acd:announce:{$queueCall->call_id}",
+                    $callQueue->max_wait_seconds + 300,
+                    (string) $waitedSeconds
+                );
+            }
+        }
+
+        return app(QueueRoutingStrategy::class)->holdResponse(
+            $request,
+            $callQueue,
+            $queueCall->call_id,
+            $announcePosition
+        );
     }
 
     /**

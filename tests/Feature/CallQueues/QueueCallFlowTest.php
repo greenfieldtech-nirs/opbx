@@ -189,6 +189,33 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringContainsString('<Say>', $content);
     }
 
+    public function test_poll_announces_position_on_interval(): void
+    {
+        $this->queue->update([
+            'announce_position' => true,
+            'announce_position_timeout' => 30,
+            'announce_position_language' => 'en-US',
+        ]);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'entered_at' => now()->subSeconds(45),
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'wait', 'position' => 2], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('caller number 2', $content);
+        $this->assertStringContainsString('language="en-US"', $content);
+
+        // Second poll within the interval: no announcement.
+        $response2 = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+        $this->assertStringNotContainsString('caller number', (string) $response2->getContent());
+    }
+
     public function test_poll_overflow_marks_call_and_runs_fallback(): void
     {
         $fallbackExtension = Extension::factory()->create([

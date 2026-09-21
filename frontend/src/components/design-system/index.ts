@@ -20,6 +20,9 @@ export type { ExtensionType, ExtensionStatus, ExtensionData } from './ExtensionC
 export { RingGroupStrategySelector } from './RingGroupStrategySelector';
 export type { RingGroupStrategy } from './RingGroupStrategySelector';
 
+export { CallQueueStrategySelector } from '@/components/queues/CallQueueStrategySelector';
+export type { CallQueueStrategy } from '@/components/queues/CallQueueStrategySelector';
+
 export { AlbsStrategySelector } from './AlbsStrategySelector';
 export type { AlbsStrategy } from './AlbsStrategySelector';
 

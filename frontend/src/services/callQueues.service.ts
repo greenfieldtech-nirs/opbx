@@ -21,6 +21,9 @@ export interface CallQueue {
   agent_ring_timeout: number;
   max_wait_seconds: number;
   wrap_up_seconds: number;
+  announce_position: boolean;
+  announce_position_timeout: number;
+  announce_position_language?: string | null;
   moh_recording_id?: number | null;
   fallback_action: string;
   fallback_extension_id?: number | null;
@@ -42,6 +45,9 @@ export interface CallQueuePayload {
   agent_ring_timeout: number;
   max_wait_seconds: number;
   wrap_up_seconds: number;
+  announce_position: boolean;
+  announce_position_timeout: number;
+  announce_position_language?: string | null;
   moh_recording_id?: number | null;
   fallback_action: string;
   fallback_extension_id?: number | null;

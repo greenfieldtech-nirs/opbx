@@ -85,11 +85,22 @@ class QueueRoutingStrategy implements RoutingStrategy
     }
 
     /**
-     * Hold CXML: play MOH (if configured) then redirect to the poll endpoint.
+     * Hold CXML: announce queue position (when enabled and a position is known),
+     * play MOH (if configured), then redirect to the poll endpoint.
+     *
+     * @param  int|null  $position  Current queue position (from the worker), if known
      */
-    public function holdResponse(Request $request, CallQueue $callQueue, string $callId): Response
+    public function holdResponse(Request $request, CallQueue $callQueue, string $callId, ?int $position = null): Response
     {
         $builder = new CxmlBuilder;
+
+        if ($position !== null && $callQueue->announce_position) {
+            $builder->say(
+                "You are caller number {$position} in the queue.",
+                null,
+                $callQueue->announce_position_language
+            );
+        }
 
         $mohUrl = $this->resolveMohUrl($request, $callQueue);
         if ($mohUrl !== null) {

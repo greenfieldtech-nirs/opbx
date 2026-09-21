@@ -35,6 +35,9 @@ class CallQueue extends Model
         'agent_ring_timeout',
         'max_wait_seconds',
         'wrap_up_seconds',
+        'announce_position',
+        'announce_position_timeout',
+        'announce_position_language',
         'moh_recording_id',
         'fallback_action',
         'fallback_extension_id',
@@ -59,6 +62,8 @@ class CallQueue extends Model
             'agent_ring_timeout' => 'integer',
             'max_wait_seconds' => 'integer',
             'wrap_up_seconds' => 'integer',
+            'announce_position' => 'boolean',
+            'announce_position_timeout' => 'integer',
         ];
     }
 
