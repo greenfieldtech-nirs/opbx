@@ -127,6 +127,46 @@ class QueueCallFlowTest extends TestCase
             && $request['callId'] === self::CALL_ID);
     }
 
+    public function test_poll_endpoint_accepts_in_progress_status_via_http(): void
+    {
+        // Regression: Cloudonix sends CallStatus "in-progress" on poll redirects.
+        // A validation failure must not produce a 302 redirect (which drops the call).
+        $this->queue->update(['moh_recording_id' => null]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'wait', 'position' => 1], 200)]);
+
+        $token = (string) \Illuminate\Support\Str::random(32);
+        CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->first()
+            ?->update([
+                'domain_name' => 'test.example.com',
+                'domain_requests_api_key' => $token,
+            ]);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        $sessionData = urlencode(json_encode($this->sessionData()));
+
+        $response = $this->postJson("/api/callbacks/voice/queue-poll?session_data={$sessionData}", [
+            'CallSid' => self::CALL_ID,
+            'CallStatus' => 'in-progress',
+            'From' => '10000',
+            'To' => '20001',
+            'Domain' => 'test.example.com',
+        ], [
+            'Authorization' => "Bearer {$token}",
+        ]);
+
+        $response->assertOk();
+        $this->assertStringContainsString('<Response>', (string) $response->getContent());
+        $this->assertStringNotContainsString('Redirecting to', (string) $response->getContent());
+    }
+
     public function test_poll_wait_returns_hold_cxml_again(): void
     {
         QueueCall::factory()->create([

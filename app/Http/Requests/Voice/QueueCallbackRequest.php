@@ -21,6 +21,20 @@ class QueueCallbackRequest extends FormRequest
     }
 
     /**
+     * Voice callbacks must always answer with CXML — never a redirect.
+     * Cloudonix's UA does not send Accept: application/json, so a default
+     * validation failure would surface as a 302 redirect (and drop the call).
+     */
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator): void
+    {
+        throw new \Illuminate\Http\Exceptions\HttpResponseException(response(
+            \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Invalid queue callback request.'),
+            200,
+            ['Content-Type' => 'application/xml']
+        ));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -30,7 +44,10 @@ class QueueCallbackRequest extends FormRequest
             'call_queue_id' => ['nullable', 'integer', 'min:1'],
             'call_id' => ['nullable', 'string', 'max:255'],
             'session_data' => ['nullable', 'string', 'max:2000'],
-            'CallStatus' => ['nullable', 'string', 'in:ringing,answered,completed,failed,busy,no-answer', 'max:20'],
+            // Permissive: Cloudonix sends statuses outside the dial-callback set
+            // (e.g. "in-progress" on poll redirects). Only busy/no-answer/failed
+            // are acted upon, in QueueDialCallbackController.
+            'CallStatus' => ['nullable', 'string', 'max:20'],
             '_organization_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
