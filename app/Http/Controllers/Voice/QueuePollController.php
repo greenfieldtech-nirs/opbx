@@ -81,11 +81,37 @@ class QueuePollController extends Controller
             return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']);
         }
 
+        // Per-caller max-wait enforcement (source of truth: queue_calls.entered_at).
+        // The worker only overflows the queue head when the head itself is polled —
+        // a dead/abandoned caller rotting at the head would otherwise block the
+        // queue forever and callers behind it would never fall back.
+        if (($result['action'] ?? 'wait') === 'wait'
+            && $this->maxWaitExceeded($callQueue, $queueCall)) {
+            Log::info('QueuePollController: Caller exceeded max wait, overflowing', [
+                'call_queue_id' => $callQueue->id,
+                'call_id' => $queueCall->call_id,
+                'entered_at' => $queueCall->entered_at->toIso8601String(),
+                'max_wait_seconds' => $callQueue->max_wait_seconds,
+            ]);
+
+            return $this->handleOverflow($request, $callQueue, $queueCall);
+        }
+
         return match ($result['action'] ?? 'wait') {
             'dial' => $this->handleDial($request, $callQueue, $queueCall, $result['agents'] ?? []),
             'overflow' => $this->handleOverflow($request, $callQueue, $queueCall),
             default => $this->holdOrAnnounce($request, $callQueue, $queueCall, (int) ($result['position'] ?? 1)),
         };
+    }
+
+    /**
+     * Has this caller been waiting longer than the queue's max wait?
+     */
+    private function maxWaitExceeded(CallQueue $callQueue, QueueCall $queueCall): bool
+    {
+        $waitedSeconds = max(0, (int) $queueCall->entered_at->diffInSeconds(now()));
+
+        return $waitedSeconds >= $callQueue->max_wait_seconds;
     }
 
     /**

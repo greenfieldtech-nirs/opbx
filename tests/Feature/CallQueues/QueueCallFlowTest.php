@@ -181,6 +181,7 @@ class QueueCallFlowTest extends TestCase
             'call_queue_id' => $this->queue->id,
             'organization_id' => $this->organization->id,
             'call_id' => self::CALL_ID,
+            'entered_at' => now(),
         ]);
 
         Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'wait', 'position' => 1], 200)]);
@@ -236,6 +237,44 @@ class QueueCallFlowTest extends TestCase
         $content = (string) $response->getContent();
         $this->assertStringNotContainsString('<Dial', $content);
         $this->assertStringContainsString('<Say>', $content);
+    }
+
+    public function test_caller_overflows_on_own_max_wait_even_when_not_at_head(): void
+    {
+        // Regression: a dead/abandoned caller rotting at the head of the worker
+        // queue is never polled, so the worker only ever answers "wait" for
+        // callers behind it. Max wait must be enforced per caller from
+        // queue_calls.entered_at, not per head-of-queue in the worker.
+        $fallbackIvr = \App\Models\IvrMenu::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $this->queue->update([
+            'max_wait_seconds' => 30,
+            'fallback_action' => 'ivr_menu',
+            'fallback_ivr_menu_id' => $fallbackIvr->id,
+        ]);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'entered_at' => now()->subSeconds(90),
+        ]);
+
+        // Worker says "wait" (caller is stuck behind a stale head entry).
+        Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'wait', 'position' => 2], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $this->assertSame(QueueCallDisposition::OVERFLOW, QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('call_id', self::CALL_ID)->first()->disposition);
+
+        // Fallback routes into the IVR menu (Gather-based CXML, not a hold loop).
+        $content = (string) $response->getContent();
+        $this->assertStringNotContainsString('queue-poll', $content);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'overflow');
     }
 
     public function test_poll_announces_position_on_interval(): void
