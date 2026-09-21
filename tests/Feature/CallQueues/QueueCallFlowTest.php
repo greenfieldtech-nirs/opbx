@@ -275,9 +275,9 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringNotContainsString('queue-poll', $content);
         $this->assertStringContainsString('no one is available to take your call', $content);
         $this->assertLessThan(
-            strpos($content, 'No agents available'),
+            strpos($content, '</Say>'),
             strpos($content, 'no one is available'),
-            'Apology must be spoken before the fallback destination content'
+            'Apology must be spoken in the first Say verb, before the fallback routing'
         );
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
