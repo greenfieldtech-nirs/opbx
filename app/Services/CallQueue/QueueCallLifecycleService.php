@@ -73,8 +73,18 @@ class QueueCallLifecycleService
 
         [, $agentUserId] = $this->readDialMarker($queueCall->call_id);
 
+        // The session's own answer time is the INITIAL answer (caller connected
+        // to the voice platform) - it includes the queue wait. The agent bridge
+        // is the first answered-status update that arrives while a dial offer is
+        // pending (the initial answer precedes any dial marker). Without the
+        // marker check, waiting/handling times are computed against the wrong
+        // anchor and both metrics are wrong.
+        if ($agentUserId === null) {
+            return;
+        }
+
         $queueCall->update([
-            'answered_at' => $sessionUpdate->call_answer_time ?? $sessionUpdate->session_modified_at ?? now(),
+            'answered_at' => $sessionUpdate->session_modified_at ?? $sessionUpdate->created_at ?? now(),
             'agent_user_id' => $agentUserId,
         ]);
 
@@ -128,9 +138,12 @@ class QueueCallLifecycleService
             ->find($queueCall->call_queue_id);
 
         $session = $payload['session'] ?? [];
-        $answerAt = isset($session['callAnswerTime']) && $session['callAnswerTime'] > 0
-            ? \Illuminate\Support\Carbon::createFromTimestampMs($session['callAnswerTime'])
-            : null;
+        // Prefer the agent-bridge time captured from session updates; the CDR's
+        // own callAnswerTime is the initial platform answer (includes queue wait).
+        $answerAt = $queueCall->answered_at
+            ?? (isset($session['callAnswerTime']) && $session['callAnswerTime'] > 0
+                ? \Illuminate\Support\Carbon::createFromTimestampMs($session['callAnswerTime'])
+                : null);
         $endAt = isset($session['callEndTime']) && $session['callEndTime'] > 0
             ? \Illuminate\Support\Carbon::createFromTimestampMs($session['callEndTime'])
             : now();

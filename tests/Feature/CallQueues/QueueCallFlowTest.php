@@ -417,6 +417,32 @@ class QueueCallFlowTest extends TestCase
             && $request['type'] === 'answered');
     }
 
+    public function test_initial_platform_answer_does_not_mark_answered(): void
+    {
+        Redis::del('acd:dial:'.self::CALL_ID);
+
+        // The session answers when the caller connects to the voice platform
+        // (before any dial offer). Only the agent-bridge answer may anchor
+        // waiting/handling times.
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $initialAnswer = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'answer',
+        ]);
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($initialAnswer);
+
+        $this->assertNull($queueCall->refresh()->answered_at);
+    }
+
     public function test_cdr_without_answer_marks_abandoned(): void
     {
         $enteredAt = now()->subMinutes(2);
