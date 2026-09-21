@@ -51,6 +51,8 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
 */
 
 use App\Http\Controllers\Voice\AmdActionController;
+use App\Http\Controllers\Voice\QueueDialCallbackController;
+use App\Http\Controllers\Voice\QueuePollController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
 Route::prefix('voice')->group(function (): void {
@@ -84,6 +86,16 @@ Route::prefix('callbacks')->group(function (): void {
     Route::post('/voice/albs-follow-through', [\App\Http\Controllers\Voice\AlbsFollowThroughController::class, 'handle'])
         ->middleware(['voice.webhook.auth'])
         ->name('voice.albs-follow-through');
+
+    // Call queue poll endpoint (hold loop → wait/dial/overflow decision)
+    Route::post('/voice/queue-poll', [QueuePollController::class, 'handle'])
+        ->middleware(['voice.webhook.auth'])
+        ->name('voice.queue-poll');
+
+    // Call queue agent dial result callback
+    Route::post('/voice/queue-dial-callback', [QueueDialCallbackController::class, 'handle'])
+        ->middleware(['voice.webhook.auth'])
+        ->name('voice.queue-dial-callback');
 });
 
 /*

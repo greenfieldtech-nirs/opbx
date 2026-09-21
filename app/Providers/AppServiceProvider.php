@@ -78,6 +78,7 @@ use App\Services\VoiceRouting\Strategies\CallTrackingRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\ConferenceRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
+use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\RingGroupRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\UserRoutingStrategy;
 use App\Services\VoiceRouting\VoiceRoutingCacheService;
@@ -156,7 +157,6 @@ class AppServiceProvider extends ServiceProvider
         );
 
         // Register Voice Routing Strategies
-        // Note: QueueRoutingStrategy is reserved for Phase 4+ Call Center features
         $this->app->tag([
             UserRoutingStrategy::class,
             RingGroupRoutingStrategy::class,
@@ -166,6 +166,7 @@ class AppServiceProvider extends ServiceProvider
             AiLoadBalancerRoutingStrategy::class,
             ForwardRoutingStrategy::class,
             CallTrackingRoutingStrategy::class,
+            QueueRoutingStrategy::class,
         ], 'voice_routing.strategies');
 
         // Register Inbound Blacklist Service
