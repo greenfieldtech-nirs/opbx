@@ -1,0 +1,321 @@
+paths:
+  /v1/call-queues:
+    get:
+      tags:
+        - Call Queues
+      summary: List call queues
+      operationId: listCallQueues
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+      responses:
+        '200':
+          description: List of call queues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/CallQueue.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+    post:
+      tags:
+        - Call Queues
+      summary: Create call queue
+      operationId: createCallQueue
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/CallQueue.yaml'
+      responses:
+        '201':
+          description: Call queue created
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/call-queues/agents/me:
+    get:
+      tags:
+        - Call Queues
+      summary: List my queue agent memberships
+      operationId: listMyQueueMemberships
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Queues the authenticated user is an agent of, with current state
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/call-queues/{call_queue}:
+    get:
+      tags:
+        - Call Queues
+      summary: Get call queue
+      operationId: getCallQueue
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Call queue detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/CallQueue.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    put:
+      tags:
+        - Call Queues
+      summary: Update call queue
+      operationId: updateCallQueue
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/CallQueue.yaml'
+      responses:
+        '200':
+          description: Call queue updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+    delete:
+      tags:
+        - Call Queues
+      summary: Delete call queue
+      operationId: deleteCallQueue
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Call queue deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/call-queues/{call_queue}/agents/me/state:
+    post:
+      tags:
+        - Call Queues
+      summary: Update my agent state in a queue
+      operationId: updateMyQueueAgentState
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - state
+              properties:
+                state:
+                  type: string
+                  enum: [available, wrap_up, logged_out]
+                  description: Agent presence state (wrap_up is sticky when toggled manually)
+      responses:
+        '200':
+          description: Agent state updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+
+  /v1/call-queues/{call_queue}/stats:
+    get:
+      tags:
+        - Call Queues
+      summary: Get call queue statistics
+      operationId: getCallQueueStats
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Waiting/handling time aggregates (min/max/avg/stddev) and totals
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/call-queues/{call_queue}/live:
+    get:
+      tags:
+        - Call Queues
+      summary: Get live call queue snapshot
+      operationId: getCallQueueLive
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Waiting callers with positions, agent states, and rolling counts (15m/30m/1h/24h)
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+
+  /v1/queue-calls:
+    get:
+      tags:
+        - Call Queues
+      summary: List queue call report rows
+      operationId: listQueueCalls
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: queue_id
+          in: query
+          schema:
+            type: integer
+        - name: disposition
+          in: query
+          schema:
+            type: string
+            enum: [answered, abandoned, overflow]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Queue call report rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/QueueCall.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /v1/queue-calls/export:
+    get:
+      tags:
+        - Call Queues
+      summary: Export queue calls (CSV)
+      operationId: exportQueueCalls
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: queue_id
+          in: query
+          schema:
+            type: integer
+        - name: disposition
+          in: query
+          schema:
+            type: string
+            enum: [answered, abandoned, overflow]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: CSV export of queue call report rows
+          content:
+            text/csv: {}
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
