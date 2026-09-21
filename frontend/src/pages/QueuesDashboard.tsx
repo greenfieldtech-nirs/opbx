@@ -110,6 +110,18 @@ export default function QueuesDashboard() {
     refetchInterval: 5000,
   });
 
+  // Agent names come from the queue detail (live only carries user/extension).
+  const { data: queueDetailData } = useQuery({
+    queryKey: ['call-queues', queueId],
+    queryFn: () => callQueuesService.getById(queueId!),
+    enabled: queueId !== undefined,
+    staleTime: 60000,
+  });
+
+  const agentNameById = new Map(
+    (queueDetailData?.data.agents ?? []).map((a) => [a.id, a.name]),
+  );
+
   const { data: statsData } = useQuery({
     queryKey: ['queues-dashboard', queueId, 'stats', timespan],
     queryFn: () => queueStatsService.stats(queueId!, fromIso),
@@ -264,21 +276,24 @@ export default function QueuesDashboard() {
                 </p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {live!.agents.map((agent) => (
-                    <div
-                      key={agent.userId}
-                      className={`rounded-lg border p-3 ${AGENT_CARD_STYLES[agent.state] ?? AGENT_CARD_STYLES.LOGGED_OUT}`}
-                    >
-                      <div className="text-sm font-semibold text-gray-900">
-                        {agent.extensionNumber ?? `User ${agent.userId}`}
+                  {live!.agents.map((agent) => {
+                    const statusText =
+                      agent.state === 'WRAP_UP' && agent.wrapUpRemainingSeconds
+                        ? `Wrap-up · ${agent.wrapUpRemainingSeconds}s left`
+                        : agent.state.replace('_', ' ');
+                    return (
+                      <div
+                        key={agent.userId}
+                        className={`rounded-lg border p-3 ${AGENT_CARD_STYLES[agent.state] ?? AGENT_CARD_STYLES.LOGGED_OUT}`}
+                      >
+                        <div className="text-sm font-semibold text-gray-900">
+                          {agentNameById.get(Number(agent.userId)) ?? `User ${agent.userId}`}
+                        </div>
+                        <div className="text-xs text-gray-800">Ext {agent.extensionNumber ?? '—'}</div>
+                        <div className="text-xs text-gray-700">{statusText}</div>
                       </div>
-                      <div className="text-xs text-gray-700">
-                        {agent.state === 'WRAP_UP' && agent.wrapUpRemainingSeconds
-                          ? `Wrap-up · ${agent.wrapUpRemainingSeconds}s left`
-                          : agent.state.replace('_', ' ')}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
