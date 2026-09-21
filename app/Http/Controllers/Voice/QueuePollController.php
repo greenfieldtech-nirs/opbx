@@ -124,9 +124,15 @@ class QueuePollController extends Controller
 
         if ($callQueue->announce_position) {
             $waitedSeconds = max(0, (int) $queueCall->entered_at->diffInSeconds(now()));
-            $lastAnnounced = (int) (\Illuminate\Support\Facades\Redis::get("acd:announce:{$queueCall->call_id}") ?? 0);
+            $marker = \Illuminate\Support\Facades\Redis::get("acd:announce:{$queueCall->call_id}");
 
-            if ($waitedSeconds - $lastAnnounced >= $callQueue->announce_position_timeout) {
+            // Announce on the first poll of the call, then every interval.
+            // Without the null-marker branch, a caller whose announce interval
+            // exceeds max_wait would overflow without ever hearing a position.
+            $neverAnnounced = $marker === null || $marker === false;
+            $lastAnnounced = (int) $marker;
+
+            if ($neverAnnounced || $waitedSeconds - $lastAnnounced >= $callQueue->announce_position_timeout) {
                 $announcePosition = $position;
                 \Illuminate\Support\Facades\Redis::setex(
                     "acd:announce:{$queueCall->call_id}",

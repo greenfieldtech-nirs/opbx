@@ -277,6 +277,33 @@ class QueueCallFlowTest extends TestCase
             && $request['type'] === 'overflow');
     }
 
+    public function test_position_announced_on_first_poll_regardless_of_interval(): void
+    {
+        Redis::del('acd:announce:'.self::CALL_ID);
+
+        // Interval (60s) exceeds max wait (30s): without announce-on-entry the
+        // caller would overflow without ever hearing their position.
+        $this->queue->update([
+            'announce_position' => true,
+            'announce_position_timeout' => 60,
+            'announce_position_language' => 'en-US',
+            'max_wait_seconds' => 30,
+        ]);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'entered_at' => now()->subSeconds(2),
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'wait', 'position' => 1], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $this->assertStringContainsString('caller number 1', (string) $response->getContent());
+    }
+
     public function test_poll_announces_position_on_interval(): void
     {
         Redis::del('acd:announce:'.self::CALL_ID);
