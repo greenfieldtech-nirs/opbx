@@ -188,3 +188,4 @@ reports/
 .my_agent/
 .superpowers/
 .agent-screenshots/
+acd-worker/target/
