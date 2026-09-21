@@ -269,9 +269,16 @@ class QueueCallFlowTest extends TestCase
         $this->assertSame(QueueCallDisposition::OVERFLOW, QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('call_id', self::CALL_ID)->first()->disposition);
 
-        // Fallback routes into the IVR menu (Gather-based CXML, not a hold loop).
+        // Fallback routes into the IVR menu (Gather-based CXML, not a hold loop),
+        // preceded by the apology message in the queue's language.
         $content = (string) $response->getContent();
         $this->assertStringNotContainsString('queue-poll', $content);
+        $this->assertStringContainsString('no one is available to take your call', $content);
+        $this->assertLessThan(
+            strpos($content, 'No agents available'),
+            strpos($content, 'no one is available'),
+            'Apology must be spoken before the fallback destination content'
+        );
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
             && $request['type'] === 'overflow');

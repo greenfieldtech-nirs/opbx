@@ -211,7 +211,40 @@ class QueuePollController extends Controller
 
         app(QueueCallLifecycleService::class)->markOverflowed($queueCall);
 
-        return $this->handleFallback($callQueue, $request);
+        $response = $this->handleFallback($callQueue, $request);
+
+        // Reassure the caller before routing (not for hangup — the hangup
+        // fallback speaks its own goodbye).
+        if ($callQueue->fallback_action !== RingGroupFallbackAction::HANGUP) {
+            $response = $this->prependSay(
+                $response,
+                "We're sorry, but no one is available to take your call. "
+                    .'Please hold while we redirect your call.',
+                $callQueue->announce_position_language
+            );
+        }
+
+        return $response;
+    }
+
+    /**
+     * Insert a Say verb at the top of a CXML response (spoken in the given
+     * TTS language when provided).
+     */
+    private function prependSay(Response $response, string $text, ?string $language): Response
+    {
+        $document = new \DOMDocument;
+        if (! $document->loadXML((string) $response->getContent())) {
+            return $response;
+        }
+
+        $say = $document->createElement('Say', htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+        if ($language) {
+            $say->setAttribute('language', $language);
+        }
+        $document->documentElement->insertBefore($say, $document->documentElement->firstChild);
+
+        return response($document->saveXML(), 200, ['Content-Type' => 'application/xml']);
     }
 
     /**
