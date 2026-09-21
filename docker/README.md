@@ -1,10 +1,10 @@
-# Docker Infrastructure for OpBX
+# Docker Infrastructure for OPBX
 
-This directory contains the complete Docker-based infrastructure for the **OpBX** open-source business PBX platform. It defines the container orchestration, service configurations, and runtime environment for all platform components.
+This directory contains the complete Docker-based infrastructure for the **OPBX** open-source business PBX platform. It defines the container orchestration, service configurations, and runtime environment for all platform components.
 
 ## Overview
 
-OpBX is a multi-tenant business PBX built on **Laravel 12 (PHP 8.4)** and **React 18 (TypeScript)**, using **Cloudonix CPaaS** for VoIP services. The Docker stack orchestrates 11 services across a single bridge network, providing the full application runtime including the web frontend, API backend, queue workers, real-time WebSocket messaging, object storage, and specialized workers for outbound dialing and voicemail detection.
+OPBX is a multi-tenant business PBX built on **Laravel 12 (PHP 8.4)** and **React 18 (TypeScript)**, using **Cloudonix CPaaS** for VoIP services. The Docker stack orchestrates 11 services across a single bridge network, providing the full application runtime including the web frontend, API backend, queue workers, real-time WebSocket messaging, object storage, and specialized workers for outbound dialing and voicemail detection.
 
 ---
 
@@ -397,4 +397,4 @@ docker compose up -d --build
 
 ## License
 
-This Docker infrastructure is part of the OpBX project and is released under the same open-source license.
+This Docker infrastructure is part of the OPBX project and is released under the same open-source license.

@@ -1,6 +1,6 @@
 # AMD Worker
 
-A Java/Vert.x 5 microservice for real-time Answering Machine Detection (AMD) using stream-based audio analysis. The service receives live audio streams from Cloudonix CPaaS via WebSocket, analyzes the audio for voicemail beep tones using ML and energy-based detectors, and posts detection results back to the OpBX Laravel backend.
+A Java/Vert.x 5 microservice for real-time Answering Machine Detection (AMD) using stream-based audio analysis. The service receives live audio streams from Cloudonix CPaaS via WebSocket, analyzes the audio for voicemail beep tones using ML and energy-based detectors, and posts detection results back to the OPBX Laravel backend.
 
 ---
 
@@ -56,8 +56,8 @@ graph TB
         CB[Callback Client]
     end
 
-    subgraph "OpBX Backend (Laravel)"
-        API[/api/voice/amd-action]
+    subgraph "OPBX Backend (Laravel)"
+        API['/api/voice/amd-action']
     end
 
     CXML -->|&lt;Start&gt;&lt;Stream&gt;| STREAM
@@ -193,9 +193,9 @@ docker run -p 8082:8082 -p 8083:8083 \
   amd-worker:latest
 ```
 
-### Docker Compose (within OpBX stack)
+### Docker Compose (within OPBX stack)
 
-The service is typically started as part of the full OpBX stack:
+The service is typically started as part of the full OPBX stack:
 
 ```bash
 cd /path/to/opbx.cloudonix.com
@@ -446,12 +446,12 @@ Files with beep after 10500ms: 1/1
 
 ### Integration Testing
 
-1. Ensure the full OpBX stack is running:
+1. Ensure the full OPBX stack is running:
    ```bash
    docker compose up -d
    ```
 2. Wait 120 seconds for all services to initialize.
-3. Place an outbound call through OpBX that triggers AMD.
+3. Place an outbound call through OPBX that triggers AMD.
 4. Monitor logs:
    ```bash
    docker compose logs -f amd-worker
@@ -498,4 +498,4 @@ If the ONNX model fails to load (e.g., file missing, architecture mismatch), the
 
 ## License
 
-This component is part of the OpBX open-source business PBX platform. See the repository root for license details.
+This component is part of the OPBX open-source business PBX platform. See the repository root for license details.

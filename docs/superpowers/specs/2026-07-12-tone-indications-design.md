@@ -1,6 +1,6 @@
 # Tone Indications Integration Design Specification
 
-> **Project:** OpBX - Open Source Business PBX on Cloudonix CPaaS
+> **Project:** OPBX - Open Source Business PBX on Cloudonix CPaaS
 > **Feature:** Country-based telephony tone indications for the Web Phone
 > **Source:** Asterisk `indications.conf.sample`
 > **Date:** 2026-07-12
@@ -15,7 +15,7 @@ Play the correct regional telephony tones (ringback, busy, congestion, dial) in 
 
 ## 2. User Story
 
-> As an OpBX user making a call through the Web Phone, I want to hear the ringback, busy, and congestion tones that match my organization's country, so the experience feels like a local phone system.
+> As an OPBX user making a call through the Web Phone, I want to hear the ringback, busy, and congestion tones that match my organization's country, so the experience feels like a local phone system.
 
 ---
 

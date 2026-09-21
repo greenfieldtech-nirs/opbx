@@ -1,8 +1,8 @@
-# Comprehensive OpBX Documentation Refresh — Implementation Plan
+# Comprehensive OPBX Documentation Refresh — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Update `docs/opbx-openapi/` and `docs/opbx-userguide/` to reflect the current OpBX codebase, generate the OpenAPI spec from source routes, and add architecture/worker guides.
+**Goal:** Update `docs/opbx-openapi/` and `docs/opbx-userguide/` to reflect the current OPBX codebase, generate the OpenAPI spec from source routes, and add architecture/worker guides.
 
 **Architecture:** The work is split into independent documentation tracks: (1) OpenAPI generation from `route:list` and code, (2) Docusaurus user-guide refresh, (3) new architecture and worker-service guides. Each track can be worked in parallel. Reviews focus on accuracy against source code and consistency across docs.
 

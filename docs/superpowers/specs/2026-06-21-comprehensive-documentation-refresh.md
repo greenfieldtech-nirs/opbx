@@ -1,4 +1,4 @@
-# Comprehensive OpBX Documentation Refresh
+# Comprehensive OPBX Documentation Refresh
 
 > **Status:** Approved for implementation
 > **Approach:** Option C — Hybrid refresh of existing `docs/opbx-userguide/` and `docs/opbx-openapi/`, plus new worker-service and architecture guides.
@@ -9,7 +9,7 @@
 
 ## Goal
 
-Bring the entire OpBX documentation set into sync with the codebase as it exists today. The deliverables are:
+Bring the entire OPBX documentation set into sync with the codebase as it exists today. The deliverables are:
 
 1. A **generated-from-source OpenAPI 3.1.0 specification** covering every route in `routes/api.php`, `routes/webhooks.php`, and `routes/platform.php`.
 2. An updated **Docusaurus user guide** (`docs/opbx-userguide/`) that accurately describes every module and workflow.
