@@ -104,12 +104,12 @@ export default function QueueReports() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
             <div className="space-y-2">
               <Label>Queue</Label>
-              <Select value={queueId} onValueChange={setQueueId}>
+              <Select value={queueId || 'all'} onValueChange={(v) => setQueueId(v === 'all' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All queues" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All queues</SelectItem>
+                  <SelectItem value="all">All queues</SelectItem>
                   {(queuesData?.data ?? []).map((q) => (
                     <SelectItem key={q.id} value={String(q.id)}>
                       {q.name}
@@ -120,12 +120,12 @@ export default function QueueReports() {
             </div>
             <div className="space-y-2">
               <Label>Disposition</Label>
-              <Select value={disposition} onValueChange={setDisposition}>
+              <Select value={disposition || 'all'} onValueChange={(v) => setDisposition(v === 'all' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="answered">Answered</SelectItem>
                   <SelectItem value="abandoned">Abandoned</SelectItem>
                   <SelectItem value="overflow">Overflow</SelectItem>

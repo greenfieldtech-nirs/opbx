@@ -311,12 +311,15 @@ export default function CallQueues() {
               </div>
               <div className="space-y-2">
                 <Label>Hold Music (MOH)</Label>
-                <Select value={form.moh_recording_id} onValueChange={(v) => set('moh_recording_id', v)}>
+                <Select
+                  value={form.moh_recording_id || 'none'}
+                  onValueChange={(v) => set('moh_recording_id', v === 'none' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="None (spoken hold)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (spoken hold)</SelectItem>
+                    <SelectItem value="none">None (spoken hold)</SelectItem>
                     {(recordingsData?.data ?? []).map((r: any) => (
                       <SelectItem key={r.id} value={String(r.id)}>
                         <span className="inline-flex items-center gap-1">
