@@ -49,10 +49,15 @@ class QueueCallLifecycleService
             $sessionUpdate->status
         );
 
-        $queueCall = $this->findPendingQueueCall(
-            $sessionUpdate->organization_id,
-            $sessionUpdate->call_ids ?? []
-        );
+        // Session updates correlate by session token: call_ids holds SIP call
+        // ids, while queue calls are keyed by the voice CallSid (= session token).
+        $queueCall = $sessionUpdate->session_token
+            ? $this->findPendingQueueCall($sessionUpdate->organization_id, [$sessionUpdate->session_token])
+            : null;
+
+        if (! $queueCall && ! empty($sessionUpdate->call_ids)) {
+            $queueCall = $this->findPendingQueueCall($sessionUpdate->organization_id, $sessionUpdate->call_ids);
+        }
 
         if (! $queueCall) {
             return;
@@ -96,14 +101,22 @@ class QueueCallLifecycleService
     public function handleCdr(int $organizationId, array $payload): void
     {
         $cdrCallId = $payload['call_id'] ?? null;
+        $sessionToken = $payload['session']['token'] ?? $payload['session_token'] ?? null;
 
-        if (! $cdrCallId) {
+        if (! $cdrCallId && ! $sessionToken) {
             return;
         }
 
         $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $organizationId)
-            ->where('call_id', $cdrCallId)
+            ->where(function ($query) use ($cdrCallId, $sessionToken) {
+                if ($sessionToken) {
+                    $query->where('call_id', $sessionToken);
+                }
+                if ($cdrCallId) {
+                    $query->orWhere('call_id', $cdrCallId);
+                }
+            })
             ->whereNull('disposition')
             ->first();
 

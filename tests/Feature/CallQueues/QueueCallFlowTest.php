@@ -401,7 +401,8 @@ class QueueCallFlowTest extends TestCase
 
         $sessionUpdate = SessionUpdate::factory()->create([
             'organization_id' => $this->organization->id,
-            'call_ids' => [self::CALL_ID],
+            'session_token' => self::CALL_ID,
+            'call_ids' => ['sip-call-id-1'], // SIP ids differ from the voice CallSid
             'status' => 'answered',
         ]);
 
@@ -430,8 +431,11 @@ class QueueCallFlowTest extends TestCase
 
         $endMs = $enteredAt->copy()->addMinutes(1)->getTimestampMs();
         app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
-            'call_id' => self::CALL_ID,
-            'session' => ['callEndTime' => $endMs],
+            'call_id' => 'sip-call-id-1',
+            'session' => [
+                'token' => self::CALL_ID,
+                'callEndTime' => $endMs,
+            ],
         ]);
 
         $queueCall->refresh();
