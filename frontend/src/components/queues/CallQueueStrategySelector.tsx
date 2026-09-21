@@ -91,7 +91,7 @@ export function CallQueueStrategySelector({
   return (
     <div className={cn('space-y-2', className)}>
       <Label>Agent Selection Strategy</Label>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {strategies.map((strategy) => {
           const isSelected = value === strategy.value;
           const StrategyIcon = strategy.icon;

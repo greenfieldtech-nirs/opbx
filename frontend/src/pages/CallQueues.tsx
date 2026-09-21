@@ -485,40 +485,41 @@ export default function CallQueues() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Overflow Fallback</Label>
-              <DestinationTypeAndSelector
-                typeValue={form.fallback_action as DestinationType}
-                destinationValue={
-                  form.fallback_action === 'extension'
-                    ? form.fallback_extension_id
-                    : form.fallback_action === 'ring_group'
-                      ? form.fallback_ring_group_id
-                      : form.fallback_action === 'ivr_menu'
-                        ? form.fallback_ivr_menu_id
-                        : form.fallback_action === 'ai_assistant'
-                          ? form.fallback_ai_assistant_id
-                          : form.fallback_action === 'ai_load_balancer'
-                            ? form.fallback_ai_load_balancer_id
-                            : ''
-                }
-                onChange={(type, destinationId) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    fallback_action: type,
-                    fallback_extension_id: type === 'extension' ? destinationId : '',
-                    fallback_ring_group_id: type === 'ring_group' ? destinationId : '',
-                    fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : '',
-                    fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : '',
-                    fallback_ai_load_balancer_id: type === 'ai_load_balancer' ? destinationId : '',
-                  }))
-                }
-                allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'hangup']}
-              />
-              <p className="text-xs text-muted-foreground">
-                Used when a caller exceeds max wait or no agents are available.
-              </p>
-            </div>
+              <div className="space-y-2">
+                <Label>Overflow Fallback</Label>
+                <DestinationTypeAndSelector
+                  layout="horizontal"
+                  typeValue={form.fallback_action as DestinationType}
+                  destinationValue={
+                    form.fallback_action === 'extension'
+                      ? form.fallback_extension_id
+                      : form.fallback_action === 'ring_group'
+                        ? form.fallback_ring_group_id
+                        : form.fallback_action === 'ivr_menu'
+                          ? form.fallback_ivr_menu_id
+                          : form.fallback_action === 'ai_assistant'
+                            ? form.fallback_ai_assistant_id
+                            : form.fallback_action === 'ai_load_balancer'
+                              ? form.fallback_ai_load_balancer_id
+                              : ''
+                  }
+                  onChange={(type, destinationId) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      fallback_action: type,
+                      fallback_extension_id: type === 'extension' ? destinationId : '',
+                      fallback_ring_group_id: type === 'ring_group' ? destinationId : '',
+                      fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : '',
+                      fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : '',
+                      fallback_ai_load_balancer_id: type === 'ai_load_balancer' ? destinationId : '',
+                    }))
+                  }
+                  allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'hangup']}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used when a caller exceeds max wait or no agents are available.
+                </p>
+              </div>
           </div>
 
           <DialogFooter className="gap-2 pt-6">
