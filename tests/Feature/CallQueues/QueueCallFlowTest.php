@@ -443,6 +443,61 @@ class QueueCallFlowTest extends TestCase
         $this->assertNull($queueCall->refresh()->answered_at);
     }
 
+    public function test_spurious_teardown_answer_is_demoted_to_abandoned(): void
+    {
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+        Redis::del('acd:bridge:'.self::CALL_ID);
+
+        // Regression: cloudonix emits an 'answer' status update at call
+        // teardown while a dial offer is pending. Without the dial callback
+        // result as the authority, the abandoned call was finalized as
+        // 'answered'.
+        $enteredAt = now()->subMinutes(2);
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'entered_at' => $enteredAt,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $teardownAnswer = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'answer',
+            'session_modified_at' => now()->subMinute(),
+        ]);
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($teardownAnswer);
+
+        $this->assertNotNull($queueCall->refresh()->answered_at, 'spurious update marks answered pending confirmation');
+
+        // The dial callback reports the offer outcome: no bridge.
+        app(QueueCallLifecycleService::class)->recordDialResult(self::CALL_ID, 'no-answer');
+
+        $endMs = now()->getTimestampMs();
+        app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
+            'call_id' => 'sip-call-id-1',
+            'session' => [
+                'token' => self::CALL_ID,
+                'callEndTime' => $endMs,
+            ],
+        ]);
+
+        $queueCall->refresh();
+        $this->assertSame(QueueCallDisposition::ABANDONED, $queueCall->disposition);
+        $this->assertNull($queueCall->answered_at);
+        $this->assertNull($queueCall->agent_user_id);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'abandoned');
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'dial_failed'
+            && $request['agentUserId'] === (string) $this->agent->id);
+    }
+
     public function test_cdr_without_answer_marks_abandoned(): void
     {
         $enteredAt = now()->subMinutes(2);
@@ -456,6 +511,7 @@ class QueueCallFlowTest extends TestCase
         Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
 
         $endMs = $enteredAt->copy()->addMinutes(1)->getTimestampMs();
+        app(QueueCallLifecycleService::class)->recordDialResult(self::CALL_ID, 'canceled');
         app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
             'call_id' => 'sip-call-id-1',
             'session' => [
@@ -487,9 +543,11 @@ class QueueCallFlowTest extends TestCase
 
         $answerMs = $enteredAt->copy()->addMinutes(1)->getTimestampMs();
         $endMs = $enteredAt->copy()->addMinutes(3)->getTimestampMs();
+        app(QueueCallLifecycleService::class)->recordDialResult(self::CALL_ID, 'completed');
         app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
-            'call_id' => self::CALL_ID,
+            'call_id' => 'sip-call-id-1',
             'session' => [
+                'token' => self::CALL_ID,
                 'callAnswerTime' => $answerMs,
                 'callEndTime' => $endMs,
             ],

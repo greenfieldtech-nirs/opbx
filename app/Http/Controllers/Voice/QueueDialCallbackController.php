@@ -34,6 +34,11 @@ class QueueDialCallbackController extends Controller
 
         $callStatus = (string) $request->input('CallStatus', 'completed');
 
+        // The dial result is the authoritative bridge outcome, used by the CDR
+        // finalization to distinguish a real agent bridge from a spurious
+        // teardown 'answer' session update.
+        app(QueueCallLifecycleService::class)->recordDialResult($context['call_id'], $callStatus);
+
         if (in_array($callStatus, ['busy', 'no-answer', 'failed'], true)) {
             $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $context['call_queue_id'])

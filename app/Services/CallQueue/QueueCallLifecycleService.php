@@ -88,6 +88,11 @@ class QueueCallLifecycleService
             'agent_user_id' => $agentUserId,
         ]);
 
+        // Candidate bridge timestamp, confirmed later by the dial action
+        // callback result (Cloudonix also emits spurious 'answer' updates at
+        // call teardown while a dial offer is pending).
+        Redis::setex("acd:bridge:{$queueCall->call_id}", self::DIAL_MARKER_TTL_SECONDS, $queueCall->answered_at->toIso8601String());
+
         Log::info('Queue call answered', [
             'queue_call_id' => $queueCall->id,
             'call_id' => $queueCall->call_id,
@@ -134,8 +139,57 @@ class QueueCallLifecycleService
             return;
         }
 
+        // Ordering race: the dial action callback (authoritative bridge result)
+        // may arrive after the CDR. If a dial outcome is not recorded yet and
+        // the call saw dial activity, park the CDR and reconcile shortly.
+        if (Redis::get("acd:dialresult:{$queueCall->call_id}") === null
+            && (Redis::exists("acd:dial:{$queueCall->call_id}") || $queueCall->answered_at !== null)) {
+            Redis::setex("acd:cdr:{$queueCall->call_id}", 3600, json_encode($payload));
+
+            \App\Jobs\ReconcileQueueCallDispositionJob::dispatch($queueCall->id)
+                ->delay(now()->addSeconds(10));
+
+            Log::info('Queue call CDR parked awaiting dial result', [
+                'queue_call_id' => $queueCall->id,
+                'call_id' => $queueCall->call_id,
+            ]);
+
+            return;
+        }
+
+        $this->finalizeFromCdr($organizationId, $payload);
+    }
+
+    /**
+     * Finalize a queue call from its CDR, gated by the dial callback result.
+     */
+    public function finalizeFromCdr(int $organizationId, array $payload): void
+    {
+        $cdrCallId = $payload['call_id'] ?? null;
+        $sessionToken = $payload['session']['token'] ?? $payload['session_token'] ?? null;
+
+        $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where(function ($query) use ($cdrCallId, $sessionToken) {
+                if ($sessionToken) {
+                    $query->where('call_id', $sessionToken);
+                }
+                if ($cdrCallId) {
+                    $query->orWhere('call_id', $cdrCallId);
+                }
+            })
+            ->whereNull('disposition')
+            ->first();
+
+        if (! $queueCall) {
+            return;
+        }
+
         $callQueue = CallQueue::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->find($queueCall->call_queue_id);
+
+        $dialResult = Redis::get("acd:dialresult:{$queueCall->call_id}");
+        $bridgeIso = Redis::get("acd:bridge:{$queueCall->call_id}");
 
         $session = $payload['session'] ?? [];
         // Prefer the agent-bridge time captured from session updates; the CDR's
@@ -150,7 +204,20 @@ class QueueCallLifecycleService
 
         $enteredAt = $queueCall->entered_at;
 
-        if ($answerAt) {
+        // An 'answered' disposition requires the dial callback to confirm the
+        // agent actually picked up. A spurious teardown 'answer' session update
+        // may have set answered_at while the offer was still pending; that is
+        // demoted to abandoned here and the agent is released in the worker.
+        $bridgeConfirmed = $dialResult === 'answered'
+            || ($dialResult === null && $queueCall->answered_at !== null); // callback lost: best effort
+
+        if ($answerAt && $bridgeConfirmed) {
+            // Prefer the bridge timestamp captured at the (confirmed) bridge
+            // update; fall back to what is stored, then the CDR answer time.
+            if ($bridgeIso) {
+                $answerAt = \Illuminate\Support\Carbon::parse($bridgeIso);
+            }
+
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($answerAt));
             $handlingSeconds = max(0, (int) $answerAt->diffInSeconds($endAt));
 
@@ -176,8 +243,11 @@ class QueueCallLifecycleService
             );
         } else {
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($endAt));
+            $demotedAgentId = $queueCall->agent_user_id ?? $this->readDialMarker($queueCall->call_id)[1];
 
             $queueCall->update([
+                'answered_at' => null,
+                'agent_user_id' => null,
                 'abandoned_at' => $endAt,
                 'waiting_seconds' => $waitingSeconds,
                 'disposition' => QueueCallDisposition::ABANDONED,
@@ -189,15 +259,43 @@ class QueueCallLifecycleService
                 $queueCall->call_id,
                 'abandoned'
             );
+
+            // A spurious bridge marking may have marked the offered agent BUSY
+            // in the worker; release them back to the pool.
+            if ($demotedAgentId !== null) {
+                $this->worker->event(
+                    $queueCall->organization_id,
+                    $queueCall->call_queue_id,
+                    $queueCall->call_id,
+                    'dial_failed',
+                    $demotedAgentId
+                );
+            }
         }
 
         Redis::del(self::DIAL_MARKER_PREFIX.$queueCall->call_id);
+        Redis::del("acd:bridge:{$queueCall->call_id}");
+        Redis::del("acd:dialresult:{$queueCall->call_id}");
 
         Log::info('Queue call finalized from CDR', [
             'queue_call_id' => $queueCall->id,
             'call_id' => $queueCall->call_id,
             'disposition' => $queueCall->disposition->value,
         ]);
+    }
+
+    /**
+     * Record the dial action callback result - the authoritative bridge outcome.
+     * 'answered'/'completed' mean the agent actually picked up; everything else
+     * (busy/no-answer/failed/canceled) means no bridge happened.
+     */
+    public function recordDialResult(string $callId, string $callStatus): void
+    {
+        $result = in_array($callStatus, ['answered', 'completed'], true)
+            ? 'answered'
+            : 'failed';
+
+        Redis::setex("acd:dialresult:{$callId}", self::DIAL_MARKER_TTL_SECONDS, $result);
     }
 
     /**
