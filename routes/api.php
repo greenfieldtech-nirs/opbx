@@ -33,6 +33,8 @@ use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RegisterController;
+use App\Http\Controllers\Api\CallQueueAgentController;
+use App\Http\Controllers\Api\CallQueueController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
@@ -395,6 +397,11 @@ Route::prefix('v1')->group(function (): void {
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
+
+        // Call Queues
+        Route::apiResource('call-queues', CallQueueController::class);
+        Route::post('call-queues/{call_queue}/agents/me/state', [CallQueueAgentController::class, 'updateMyState'])
+            ->name('call-queues.agents.me.state');
 
         // Supervisor assignments
         Route::prefix('supervisors')->group(function (): void {

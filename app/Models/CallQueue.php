@@ -123,6 +123,16 @@ class CallQueue extends Model
         return $query->where('organization_id', $organizationId);
     }
 
+    public function scopeWithStrategy(Builder $query, CallQueueStrategy $strategy): Builder
+    {
+        return $query->where('strategy', $strategy);
+    }
+
+    public function scopeWithStatus(Builder $query, CallQueueStatus $status): Builder
+    {
+        return $query->where('status', $status);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', CallQueueStatus::ACTIVE);
