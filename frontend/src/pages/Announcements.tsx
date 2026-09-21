@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -144,6 +145,19 @@ export default function Announcements() {
     },
     onError: (error: any) => {
       toast.error('Failed to delete announcement: ' + error.message);
+    },
+  });
+
+  // Toggle hold-music (MOH) tagging
+  const toggleMohMutation = useMutation({
+    mutationFn: ({ id, is_moh }: { id: number; is_moh: boolean }) =>
+      recordingsService.update(id, { is_moh }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      toast.success(variables.is_moh ? 'Tagged as hold music' : 'Removed hold music tag');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update hold music tag: ' + error.message);
     },
   });
 
@@ -325,6 +339,19 @@ export default function Announcements() {
                   <Badge variant={announcement.status === 'active' ? 'default' : 'secondary'}>
                     {announcement.status}
                   </Badge>
+                )
+              },
+              {
+                header: 'Hold Music',
+                cell: (announcement) => (
+                  <Switch
+                    checked={Boolean(announcement.is_moh)}
+                    onCheckedChange={(checked) => {
+                      toggleMohMutation.mutate({ id: announcement.id, is_moh: checked });
+                    }}
+                    disabled={toggleMohMutation.isPending}
+                    aria-label="Use as hold music"
+                  />
                 )
               },
               {

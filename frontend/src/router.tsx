@@ -28,6 +28,9 @@ const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
 const AiAssistantLoadBalancers = lazy(() => import('@/pages/AiAssistantLoadBalancers'));
 const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = lazy(() => import('@/pages/RingGroups'));
+const CallQueues = lazy(() => import('@/pages/CallQueues'));
+const CallQueueDetail = lazy(() => import('@/pages/CallQueueDetail'));
+const QueueReports = lazy(() => import('@/pages/QueueReports'));
 const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
@@ -142,6 +145,18 @@ export const router = createBrowserRouter([
       {
         path: 'ring-groups',
         element: <RingGroups />,
+      },
+      {
+        path: 'call-queues',
+        element: <CallQueues />,
+      },
+      {
+        path: 'call-queues/:id',
+        element: <CallQueueDetail />,
+      },
+      {
+        path: 'queue-reports',
+        element: <QueueReports />,
       },
       {
         path: 'ivr-menus',

@@ -824,6 +824,7 @@ export interface Recording {
   mime_type?: string;
   duration_seconds?: number;
   status: RecordingStatus;
+  is_moh?: boolean;
   created_by?: number;
   updated_by?: number;
   created_at: string;
