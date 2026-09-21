@@ -182,7 +182,8 @@ public class AcdWorkerVerticle extends AbstractVerticle {
 
         AgentState state;
         try {
-            state = AgentState.valueOf(body.get("state").asText());
+            // Laravel sends lowercase state names; Java enum constants are uppercase.
+            state = AgentState.valueOf(body.get("state").asText().toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException e) {
             badRequest(ctx);
             return;

@@ -51,7 +51,11 @@ class CallQueueAgentController extends Controller
             ? (int) $request->input('user_id')
             : $user->id;
 
-        app(QueueAgentStateService::class)->setState($callQueue, $targetUserId, $state);
+        $accepted = app(QueueAgentStateService::class)->setState($callQueue, $targetUserId, $state);
+
+        if (! $accepted) {
+            abort(502, 'Queue engine did not accept the state change. Please try again.');
+        }
 
         AuditLogger::log('call_queue.agent_state_changed', [
             'call_queue_id' => $callQueue->id,

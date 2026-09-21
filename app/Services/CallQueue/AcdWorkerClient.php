@@ -88,8 +88,9 @@ class AcdWorkerClient
 
     /**
      * @param  array{talkSecondsTotal?: int, callsHandledTotal?: int, wrapUpSeconds?: int}  $extra
+     * @return bool whether the worker accepted the state change
      */
-    public function setAgentState(int $organizationId, int $queueId, int $userId, string $state, array $extra = []): void
+    public function setAgentState(int $organizationId, int $queueId, int $userId, string $state, array $extra = []): bool
     {
         $payload = array_filter(array_merge([
             'orgId' => (string) $organizationId,
@@ -98,7 +99,7 @@ class AcdWorkerClient
             'state' => $state,
         ], $extra), fn ($value) => $value !== null);
 
-        $this->post('/agents/state', $payload);
+        return $this->post('/agents/state', $payload) !== null;
     }
 
     private function request(): \Illuminate\Http\Client\PendingRequest
@@ -111,12 +112,25 @@ class AcdWorkerClient
     }
 
     /**
-     * Fire-and-forget POST wrapper: logs and returns null on connection errors.
+     * Fire-and-forget POST wrapper: logs and returns null on connection errors
+     * or non-2xx responses (e.g. worker auth failures must never be silent).
      */
     private function post(string $path, array $payload): ?\Illuminate\Http\Client\Response
     {
         try {
-            return $this->request()->post($path, $payload);
+            $response = $this->request()->post($path, $payload);
+
+            if ($response->failed()) {
+                Log::warning('ACD worker rejected request', [
+                    'path' => $path,
+                    'status' => $response->status(),
+                    'body' => \Illuminate\Support\Str::limit($response->body(), 300),
+                ]);
+
+                return null;
+            }
+
+            return $response;
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::warning('ACD worker unreachable', [
                 'path' => $path,

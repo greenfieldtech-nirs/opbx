@@ -25,8 +25,9 @@ class QueueAgentStateService
      * Set the agent state: available | wrap_up (sticky) | logged_out.
      *
      * @param  array{wrapUpSeconds?: int}  $extra
+     * @return bool whether the worker accepted the state change
      */
-    public function setState(CallQueue $callQueue, int $userId, string $state, array $extra = []): void
+    public function setState(CallQueue $callQueue, int $userId, string $state, array $extra = []): bool
     {
         $payload = $extra;
 
@@ -47,7 +48,7 @@ class QueueAgentStateService
             $payload['wrapUpSeconds'] = 0;
         }
 
-        $this->worker->setAgentState(
+        return $this->worker->setAgentState(
             $callQueue->organization_id,
             $callQueue->id,
             $userId,
