@@ -189,6 +189,7 @@ class QueueCallFlowTest extends TestCase
 
         $content = (string) $response->getContent();
         $this->assertStringContainsString('<Say>', $content);
+        $this->assertStringContainsString('<Pause length="5"/>', $content);
         $this->assertStringContainsString('queue-poll', $content);
     }
 

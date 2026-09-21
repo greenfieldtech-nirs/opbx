@@ -106,7 +106,9 @@ class QueueRoutingStrategy implements RoutingStrategy
         if ($mohUrl !== null) {
             $builder->play($mohUrl);
         } else {
-            $builder->say('Please hold the line.');
+            // No MOH configured: speak the hold prompt, then pause briefly so
+            // the poll loop does not hammer the endpoint back-to-back.
+            $builder->say('Please hold the line.')->pause(5);
         }
 
         $builder->redirect($this->getPollUrl($request, $callQueue, $callId));
