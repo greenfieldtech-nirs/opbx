@@ -5,7 +5,8 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, PhoneCall } from 'lucide-react';
+import { Download, PhoneCall, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   callQueuesService,
@@ -13,6 +14,9 @@ import {
   type QueueCallDisposition,
   type QueueCallRow,
 } from '@/services/callQueues.service';
+import { cdrService } from '@/services/cdr.service';
+import { CdrDetailsDialog } from '@/components/cdr/CdrDetailsDialog';
+import type { CallDetailRecord } from '@/types/api.types';
 import { StandardDataTable, Column, EmptyState } from '@/components/design-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +31,16 @@ const DISPOSITION_VARIANTS: Record<string, 'default' | 'destructive' | 'secondar
   overflow: 'secondary',
 };
 
+const REFRESH_OPTIONS = [
+  { value: '0', label: 'No Refresh', ms: 0 },
+  { value: '5000', label: '5 Seconds', ms: 5000 },
+  { value: '15000', label: '15 Seconds', ms: 15000 },
+  { value: '30000', label: '30 Seconds', ms: 30000 },
+  { value: '60000', label: '60 Seconds', ms: 60000 },
+] as const;
+
+type RefreshInterval = (typeof REFRESH_OPTIONS)[number]['ms'];
+
 function formatDate(value?: string): string {
   if (!value) return '—';
   return new Date(value).toLocaleString();
@@ -37,6 +51,9 @@ export default function QueueReports() {
   const [disposition, setDisposition] = useState<string>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(0);
+  const [selectedCdr, setSelectedCdr] = useState<CallDetailRecord | null>(null);
+  const [showCdrDetails, setShowCdrDetails] = useState(false);
 
   const params = {
     queue_id: queueId || undefined,
@@ -51,13 +68,20 @@ export default function QueueReports() {
     queryFn: () => callQueuesService.getAll({ per_page: 100 }),
   });
 
-  const { data, isLoading } = useQuery({
+  const queueNameById = new Map((queuesData?.data ?? []).map((q) => [q.id, q.name]));
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['queue-calls', params],
     queryFn: () => queueReportsService.list(params),
+    refetchInterval: refreshInterval === 0 ? false : refreshInterval,
+    refetchIntervalInBackground: true,
   });
 
   const columns: Column<QueueCallRow>[] = [
-    { header: 'Queue', accessorKey: 'call_queue_id' },
+    {
+      header: 'Queue',
+      cell: (row) => queueNameById.get(row.call_queue_id) ?? `Queue #${row.call_queue_id}`,
+    },
     { header: 'From', accessorKey: 'from_number' },
     {
       header: 'Entered',
@@ -91,12 +115,34 @@ export default function QueueReports() {
             Per-call history across all queues: waiting and handling times, dispositions, and agents.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <a href={queueReportsService.exportCsvUrl(params)} download>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </a>
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Auto refresh:</span>
+          <Select
+            value={String(refreshInterval)}
+            onValueChange={(value) => setRefreshInterval(Number(value) as RefreshInterval)}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {REFRESH_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button asChild variant="outline">
+            <a href={queueReportsService.exportCsvUrl(params)} download>
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </a>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -163,7 +209,26 @@ export default function QueueReports() {
             identityIconColor="text-indigo-600"
             identityIconBg="bg-indigo-100"
             getIdentityPrimary={(row) => row.call_id}
-            getIdentitySecondary={(row) => `Queue #${row.call_queue_id}`}
+            getIdentitySecondary={(row) => queueNameById.get(row.call_queue_id) ?? `Queue #${row.call_queue_id}`}
+            canView={false}
+            canEdit={false}
+            canDelete={false}
+            onRowClick={(row) => {
+              cdrService
+                .getAll({ session_token: row.call_id, per_page: 1 })
+                .then((response: any) => {
+                  const cdr = response?.data?.[0];
+                  if (!cdr) {
+                    toast.error('No CDR found for this queue call');
+                    return;
+                  }
+                  return cdrService.getById(cdr.id).then((full: any) => {
+                    setSelectedCdr(full);
+                    setShowCdrDetails(true);
+                  });
+                })
+                .catch(() => toast.error('Failed to load CDR details'));
+            }}
             emptyState={
               <EmptyState
                 icon={PhoneCall}
@@ -174,6 +239,8 @@ export default function QueueReports() {
           />
         </CardContent>
       </Card>
+
+      <CdrDetailsDialog cdr={selectedCdr} open={showCdrDetails} onOpenChange={setShowCdrDetails} />
     </div>
   );
 }
