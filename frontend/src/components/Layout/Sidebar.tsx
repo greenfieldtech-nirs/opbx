@@ -67,7 +67,6 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Conference Rooms', href: '/ui/conference-rooms', icon: 'codicon-device-camera-video', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Ring Groups', href: '/ui/ring-groups', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'Call Queues', href: '/ui/call-queues', icon: 'codicon-list-ordered', roles: ['owner', 'pbx_admin', 'reporter'] },
-      { name: 'Queue Reports', href: '/ui/queue-reports', icon: 'codicon-graph', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'IVR Menus', href: '/ui/ivr-menus', icon: 'codicon-menu', roles: ['owner', 'pbx_admin'] },
       { name: 'Business Hours', href: '/ui/business-hours', icon: 'codicon-clock', roles: ['owner', 'pbx_admin'] },
       { name: 'Announcements', href: '/ui/announcements', icon: 'codicon-megaphone', roles: ['owner', 'pbx_admin'] },
@@ -107,6 +106,8 @@ const sidebarSections: SidebarSection[] = [
     accentColor: 'default',
     items: [
       { name: 'Live Calls', href: '/ui/live-calls', icon: 'codicon-debug-rerun', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Queues Dashboard', href: '/ui/queues-dashboard', icon: 'codicon-dashboard', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Queue Reports', href: '/ui/queue-reports', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'Call Logs', href: '/ui/call-logs', icon: 'codicon-list-flat', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Call Notifications', href: '/ui/call-notifications', icon: 'codicon-bell', roles: ['owner', 'pbx_admin'] },
       { name: 'API Keys', href: '/ui/api-keys', icon: 'codicon-key', roles: ['owner'] },
