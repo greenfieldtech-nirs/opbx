@@ -191,6 +191,8 @@ class QueueCallFlowTest extends TestCase
 
     public function test_poll_announces_position_on_interval(): void
     {
+        Redis::del('acd:announce:'.self::CALL_ID);
+
         $this->queue->update([
             'announce_position' => true,
             'announce_position_timeout' => 30,
