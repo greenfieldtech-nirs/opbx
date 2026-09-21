@@ -19,6 +19,7 @@ import type {
 } from '../types/destination.types';
 import {
   transformExtensionsToOptions,
+  transformCallQueuesToOptions,
   transformRingGroupsToOptions,
   transformConferenceRoomsToOptions,
   transformIvrMenusToOptions,
@@ -34,6 +35,7 @@ const conferenceRoomsService = createResourceService('conference-rooms');
 const ivrMenusService = createResourceService('ivr-menus');
 const businessHoursService = createResourceService('business-hours');
 const aiLoadBalancersService = createResourceService('ai-assistant-load-balancers');
+const callQueuesResourceService = createResourceService('call-queues');
 
 /**
  * Default extension types to fetch
@@ -52,6 +54,7 @@ export const destinationQueryKeys = {
   businessHours: (orgId?: string) => ['destinations', 'business-hours', orgId] as const,
   aiAssistants: (orgId?: string) => ['destinations', 'ai-assistants', orgId] as const,
   aiLoadBalancers: (orgId?: string) => ['destinations', 'ai-load-balancers', orgId] as const,
+  callQueues: (orgId?: string) => ['destinations', 'call-queues', orgId] as const,
 };
 
 /**
@@ -175,6 +178,21 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch call queues
+  const callQueuesQuery = useQuery({
+    queryKey: destinationQueryKeys.callQueues(orgId),
+    queryFn: async () => {
+      const response = await callQueuesResourceService.getAll({
+        organization_id: orgId,
+        status: 'active',
+        per_page: 1000,
+      });
+      return (response as any)?.data || [];
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Fetch Users
   const usersQuery = useQuery({
     queryKey: ['destinations', 'users', orgId],
@@ -197,6 +215,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     ivrMenus: ivrMenusQuery.data || [],
     businessHours: businessHoursQuery.data || [],
     aiAssistants: aiAssistantsQuery.data || [],
+    callQueues: callQueuesQuery.data || [],
     aiLoadBalancers: aiLoadBalancersQuery.data || [],
     users: usersQuery.data || [],
   };
@@ -209,6 +228,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     ivrMenus: ivrMenusQuery.isLoading,
     businessHours: businessHoursQuery.isLoading,
     aiAssistants: aiAssistantsQuery.isLoading,
+    callQueues: callQueuesQuery.isLoading,
     aiLoadBalancers: aiLoadBalancersQuery.isLoading,
     users: usersQuery.isLoading,
   };
@@ -221,6 +241,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     ivrMenus: ivrMenusQuery.error as Error | null,
     businessHours: businessHoursQuery.error as Error | null,
     aiAssistants: aiAssistantsQuery.error as Error | null,
+    callQueues: callQueuesQuery.error as Error | null,
     aiLoadBalancers: aiLoadBalancersQuery.error as Error | null,
     users: usersQuery.error as Error | null,
   };
@@ -237,6 +258,7 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
     ivrMenusQuery.refetch();
     businessHoursQuery.refetch();
     aiAssistantsQuery.refetch();
+    callQueuesQuery.refetch();
     aiLoadBalancersQuery.refetch();
     usersQuery.refetch();
   };
@@ -260,6 +282,9 @@ export function useDestinations(organizationId?: string): UseDestinationsReturn 
         break;
       case 'business_hours':
         businessHoursQuery.refetch();
+        break;
+      case 'call_queue':
+        callQueuesQuery.refetch();
         break;
       case 'ai_load_balancer':
         aiLoadBalancersQuery.refetch();
@@ -314,6 +339,8 @@ export function useDestinationOptions(
         return transformBusinessHoursToOptions(data.businessHours);
       case 'ai_assistant':
         return transformAiAssistantsToOptions(data.aiAssistants);
+      case 'call_queue':
+        return transformCallQueuesToOptions(data.callQueues);
       case 'ai_load_balancer':
         return transformAiLoadBalancersToOptions(data.aiLoadBalancers);
       case 'user':
@@ -339,6 +366,8 @@ export function useDestinationOptions(
         return isLoading.ivrMenus;
       case 'business_hours':
         return isLoading.businessHours;
+      case 'call_queue':
+        return isLoading.callQueues;
       case 'ai_load_balancer':
         return isLoading.aiLoadBalancers;
       case 'hangup':
@@ -361,6 +390,8 @@ export function useDestinationOptions(
         return isError.ivrMenus;
       case 'business_hours':
         return isError.businessHours;
+      case 'call_queue':
+        return isError.callQueues;
       case 'ai_load_balancer':
         return isError.aiLoadBalancers;
       case 'hangup':

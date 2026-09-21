@@ -46,6 +46,7 @@ class RingGroup extends Model
         'fallback_ivr_menu_id',
         'fallback_ai_assistant_id',
         'fallback_ai_load_balancer_id',
+        'fallback_call_queue_id',
         'status',
     ];
 
@@ -119,6 +120,14 @@ class RingGroup extends Model
     public function fallbackAiLoadBalancer(): BelongsTo
     {
         return $this->belongsTo(AiAssistantLoadBalancer::class, 'fallback_ai_load_balancer_id');
+    }
+
+    /**
+     * Get the fallback call queue for this ring group.
+     */
+    public function fallbackCallQueue(): BelongsTo
+    {
+        return $this->belongsTo(CallQueue::class, 'fallback_call_queue_id');
     }
 
     /**

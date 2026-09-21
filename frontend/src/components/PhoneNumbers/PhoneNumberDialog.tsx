@@ -296,7 +296,7 @@ export function PhoneNumberDialog({
               layout="vertical"
               typeLabel="Route calls to"
               destinationLabel="Destination"
-              allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+              allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours', 'call_queue']}
             />
             {formErrors.target_id && (
               <p className="text-xs text-red-500">{formErrors.target_id}</p>

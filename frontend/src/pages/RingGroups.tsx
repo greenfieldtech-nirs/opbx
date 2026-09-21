@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
 import { ringGroupsService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
+import { callQueuesService } from '@/services/callQueues.service';
 import { extensionsService } from '@/services/extensions.service';
 import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -102,6 +103,7 @@ import {
   Bot,
   Phone,
   ArrowRight,
+  ListOrdered,
 } from 'lucide-react';
 import {
   DndContext,
@@ -225,6 +227,7 @@ export default function RingGroups() {
     timeout: 30,
     ring_turns: 2,
     fallback_action: 'extension',
+    fallback_call_queue_id: '',
     status: 'active',
     members: [],
   });
@@ -295,6 +298,15 @@ export default function RingGroups() {
   const availableAiLoadBalancers = useMemo(() => {
     return aiLoadBalancersData?.data || [];
   }, [aiLoadBalancersData]);
+
+  const { data: callQueuesData } = useQuery({
+    queryKey: ['ring-groups-form', 'call-queues'],
+    queryFn: () => callQueuesService.getAll({ status: 'active', per_page: 100 }),
+  });
+
+  const availableCallQueues = useMemo(() => {
+    return callQueuesData?.data || [];
+  }, [callQueuesData]);
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
   const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
@@ -550,6 +562,10 @@ export default function RingGroups() {
       errors.fallback_ai_load_balancer = 'Fallback AI load balancer is required';
     }
 
+    if (formData.fallback_action === 'call_queue' && !formData.fallback_call_queue_id) {
+      errors.fallback_call_queue = 'Fallback call queue is required';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -563,6 +579,7 @@ export default function RingGroups() {
       timeout: 30,
       ring_turns: 2,
       fallback_action: 'extension',
+    fallback_call_queue_id: '',
       status: 'active',
       members: [],
 
@@ -629,6 +646,15 @@ export default function RingGroups() {
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
         requestData.fallback_ai_load_balancer_id = formData.fallback_ai_load_balancer_id;
+        requestData.fallback_call_queue_id = null;
+        break;
+      case 'call_queue':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
+        requestData.fallback_call_queue_id = formData.fallback_call_queue_id;
         break;
       case 'hangup':
         // No destination IDs needed for hangup action
@@ -637,6 +663,7 @@ export default function RingGroups() {
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
         requestData.fallback_ai_load_balancer_id = null;
+        requestData.fallback_call_queue_id = null;
         break;
     }
 
@@ -702,6 +729,15 @@ export default function RingGroups() {
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
         requestData.fallback_ai_load_balancer_id = formData.fallback_ai_load_balancer_id;
+        requestData.fallback_call_queue_id = null;
+        break;
+      case 'call_queue':
+        requestData.fallback_extension_id = null;
+        requestData.fallback_ring_group_id = null;
+        requestData.fallback_ivr_menu_id = null;
+        requestData.fallback_ai_assistant_id = null;
+        requestData.fallback_ai_load_balancer_id = null;
+        requestData.fallback_call_queue_id = formData.fallback_call_queue_id;
         break;
       case 'hangup':
         // No destination IDs needed for hangup action
@@ -710,6 +746,7 @@ export default function RingGroups() {
         requestData.fallback_ivr_menu_id = null;
         requestData.fallback_ai_assistant_id = null;
         requestData.fallback_ai_load_balancer_id = null;
+        requestData.fallback_call_queue_id = null;
         break;
     }
 
@@ -745,6 +782,7 @@ export default function RingGroups() {
       fallback_ivr_menu_id: group.fallback_ivr_menu_id?.toString(),
       fallback_ai_assistant_id: group.fallback_ai_assistant_id?.toString(),
       fallback_ai_load_balancer_id: group.fallback_ai_load_balancer_id?.toString(),
+      fallback_call_queue_id: (group as any).fallback_call_queue_id?.toString() ?? '',
       status: group.status,
       members: [...group.members],
     };
@@ -1148,6 +1186,7 @@ export default function RingGroups() {
                       fallback_ring_group_id: value === 'ring_group' ? formData.fallback_ring_group_id : undefined,
                       fallback_ivr_menu_id: value === 'ivr_menu' ? formData.fallback_ivr_menu_id : undefined,
                       fallback_ai_assistant_id: value === 'ai_assistant' ? formData.fallback_ai_assistant_id : undefined,
+                      fallback_call_queue_id: value === 'call_queue' ? formData.fallback_call_queue_id : undefined,
                     });
                   }}
                 >
@@ -1183,6 +1222,12 @@ export default function RingGroups() {
                       <div className="flex items-center gap-2">
                         <Bot className="h-4 w-4" />
                         <span>AI Load Balancer</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="call_queue">
+                      <div className="flex items-center gap-2">
+                        <ListOrdered className="h-4 w-4" />
+                        <span>Call Queue</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="hangup">
@@ -1326,6 +1371,32 @@ export default function RingGroups() {
                             <Badge variant="outline" className="flex items-center gap-1.5 bg-indigo-100 text-indigo-800 border-indigo-200">
                               <Bot className="h-3.5 w-3.5" />
                               {alb.name}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {formData.fallback_action === 'call_queue' && (
+                  <Select
+                    value={formData.fallback_call_queue_id || ''}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, fallback_call_queue_id: value })
+                    }
+                    disabled={availableCallQueues.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={availableCallQueues.length === 0 ? "No active call queues" : "Select call queue"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCallQueues.map((queue) => (
+                        <SelectItem key={queue.id} value={queue.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="flex items-center gap-1.5 bg-indigo-100 text-indigo-800 border-indigo-200">
+                              <ListOrdered className="h-3.5 w-3.5" />
+                              {queue.name}
                             </Badge>
                           </div>
                         </SelectItem>

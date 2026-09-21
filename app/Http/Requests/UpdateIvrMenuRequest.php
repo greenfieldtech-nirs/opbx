@@ -58,7 +58,7 @@ class UpdateIvrMenuRequest extends FormRequest
             'max_timeout' => 'required|integer|min:1|max:30',
             'inter_digit_timeout' => 'required|integer|min:1|max:30',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,hangup',
+            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup',
             'failover_destination_id' => [
                 'nullable',
                 'integer',
@@ -81,7 +81,7 @@ class UpdateIvrMenuRequest extends FormRequest
             'options' => 'required|array|min:1|max:20',
             'options.*.input_digits' => 'required|string|max:10',
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours',
+            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue',
             'options.*.destination_id' => [
                 'required',
                 function ($attribute, $value, $fail) {

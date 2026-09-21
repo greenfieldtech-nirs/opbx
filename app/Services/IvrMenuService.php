@@ -55,7 +55,7 @@ class IvrMenuService
                 },
             ],
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => ['required', Rule::in(['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer'])],
+            'options.*.destination_type' => ['required', Rule::in(['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'call_queue'])],
             'options.*.destination_id' => 'required|string',
             'options.*.priority' => 'required|integer|min:1|max:20',
         ]);
@@ -102,6 +102,9 @@ class IvrMenuService
                     ->where('organization_id', $organizationId)
                     ->where('status', 'active')
                     ->where('id', $destinationId)
+                    ->exists(),
+                'call_queue' => \App\Models\CallQueue::where('id', $destinationId)
+                    ->where('organization_id', $organizationId)
                     ->exists(),
                 'ring_group' => RingGroup::where('id', $destinationId)
                     ->where('organization_id', $organizationId)

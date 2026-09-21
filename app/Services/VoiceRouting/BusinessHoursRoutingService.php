@@ -6,6 +6,7 @@ namespace App\Services\VoiceRouting;
 
 use App\Enums\BusinessHoursActionType;
 use App\Models\BusinessHoursSchedule;
+use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
@@ -112,6 +113,7 @@ class BusinessHoursRoutingService
             'ring_group' => $this->routeToRingGroup($config['ring_group_id'] ?? null, $organizationId, $callSid, $request),
             'conference_room' => $this->routeToConferenceRoom($config['conference_room_id'] ?? null, $organizationId, $callSid),
             'ivr_menu' => $this->routeToIvrMenu($config['ivr_menu_id'] ?? null, $organizationId, $callSid),
+            'call_queue' => $this->routeToCallQueue($config['call_queue_id'] ?? null, $organizationId, $callSid, $request),
             'voicemail' => response(CxmlBuilder::sendToVoicemail(), 200, ['Content-Type' => 'application/xml']),
             'hangup' => response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']),
             default => response(
@@ -120,6 +122,37 @@ class BusinessHoursRoutingService
                 ['Content-Type' => 'application/xml']
             ),
         };
+    }
+
+    /**
+     * Route to call queue.
+     */
+    private function routeToCallQueue(?int $callQueueId, int $organizationId, string $callSid, Request $request): Response
+    {
+        if (! $callQueueId) {
+            return response(
+                CxmlBuilder::unavailable('Call queue not configured'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
+        }
+
+        $callQueue = \App\Models\CallQueue::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $callQueueId)
+            ->where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $callQueue) {
+            return response(
+                CxmlBuilder::unavailable('Call queue not available'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
+        }
+
+        return app(\App\Services\VoiceRouting\VoiceRoutingManager::class)
+            ->executeStrategy(\App\Enums\ExtensionType::QUEUE, $request, new DidNumber, ['call_queue' => $callQueue]);
     }
 
     /**

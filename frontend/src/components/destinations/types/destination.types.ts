@@ -21,6 +21,7 @@ export type DestinationType =
   | 'business_hours'
   | 'ai_assistant'
   | 'ai_load_balancer'
+  | 'call_queue'
   | 'hangup';
 
 /**
@@ -231,6 +232,11 @@ export interface DestinationsData {
     label: string;
   }>;
   /** AI load balancers */
+  callQueues: Array<{
+    id: string;
+    name: string;
+    label: string;
+  }>;
   aiLoadBalancers: Array<{
     id: string;
     name: string;
@@ -255,6 +261,7 @@ export interface DestinationsLoadingState {
   ivrMenus: boolean;
   businessHours: boolean;
   aiAssistants: boolean;
+  callQueues: boolean;
   aiLoadBalancers: boolean;
   users: boolean;
 }
@@ -269,6 +276,7 @@ export interface DestinationsErrorState {
   ivrMenus: Error | null;
   businessHours: Error | null;
   aiAssistants: Error | null;
+  callQueues: Error | null;
   aiLoadBalancers: Error | null;
   users: Error | null;
 }

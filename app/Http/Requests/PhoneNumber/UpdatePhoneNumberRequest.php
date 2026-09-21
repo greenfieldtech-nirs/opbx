@@ -60,7 +60,7 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu']),
+                Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu', 'call_queue']),
             ],
             'routing_config' => [
                 'sometimes',
@@ -130,6 +130,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             match ($routingType) {
                 'extension' => $this->validateExtensionRouting($validator, $user, $routingConfig),
                 'ring_group' => $this->validateRingGroupRouting($validator, $user, $routingConfig),
+                'call_queue' => $this->validateCallQueueRouting($validator, $user, $routingConfig),
                 'business_hours' => $this->validateBusinessHoursRouting($validator, $user, $routingConfig),
                 'conference_room' => $this->validateConferenceRoomRouting($validator, $user, $routingConfig),
                 'ai_assistant' => $this->validateAiAssistantRouting($validator, $user, $routingConfig),
@@ -239,6 +240,43 @@ class UpdatePhoneNumberRequest extends FormRequest
             $validator->errors()->add(
                 'routing_config.ring_group_id',
                 'The selected ring group must have at least one active member. Ring group "'.$ringGroup->name.'" has no active members.'
+            );
+        }
+    }
+
+    /**
+     * Validate call queue routing configuration.
+     *
+     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  \App\Models\User  $user
+     * @param  array<string, mixed>  $routingConfig
+     */
+    private function validateCallQueueRouting($validator, $user, array $routingConfig): void
+    {
+        if (! isset($routingConfig['call_queue_id'])) {
+            $validator->errors()->add(
+                'routing_config.call_queue_id',
+                'Call queue ID is required when routing type is call_queue.'
+            );
+
+            return;
+        }
+
+        $callQueue = \App\Models\CallQueue::find($routingConfig['call_queue_id']);
+
+        if (! $callQueue || $callQueue->organization_id !== $user->organization_id) {
+            $validator->errors()->add(
+                'routing_config.call_queue_id',
+                'The selected call queue does not exist or does not belong to your organization.'
+            );
+
+            return;
+        }
+
+        if (! $callQueue->isActive()) {
+            $validator->errors()->add(
+                'routing_config.call_queue_id',
+                'The selected call queue must be active.'
             );
         }
     }

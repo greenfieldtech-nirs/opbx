@@ -36,6 +36,7 @@ class RingGroupResource extends JsonResource
             'fallback_ivr_menu_id' => $this->fallback_ivr_menu_id,
             'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
             'fallback_ai_load_balancer_id' => $this->fallback_ai_load_balancer_id,
+            'fallback_call_queue_id' => $this->fallback_call_queue_id,
             'status' => $this->status->value,
             'members' => $this->whenLoaded('members', function () {
                 return $this->members->map(function ($member) {
