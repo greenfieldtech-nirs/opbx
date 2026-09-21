@@ -35,6 +35,8 @@ use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\CallQueueAgentController;
 use App\Http\Controllers\Api\CallQueueController;
+use App\Http\Controllers\Api\QueueCallController;
+use App\Http\Controllers\Api\QueueStatsController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
@@ -399,9 +401,19 @@ Route::prefix('v1')->group(function (): void {
         Route::apiResource('ring-groups', RingGroupController::class);
 
         // Call Queues
+        Route::get('call-queues/agents/me', [CallQueueAgentController::class, 'myQueues'])
+            ->name('call-queues.agents.me');
         Route::apiResource('call-queues', CallQueueController::class);
         Route::post('call-queues/{call_queue}/agents/me/state', [CallQueueAgentController::class, 'updateMyState'])
             ->name('call-queues.agents.me.state');
+        Route::get('call-queues/{call_queue}/stats', [QueueStatsController::class, 'stats'])
+            ->name('call-queues.stats');
+        Route::get('call-queues/{call_queue}/live', [QueueStatsController::class, 'live'])
+            ->name('call-queues.live');
+
+        // Queue call report rows (history reports)
+        Route::get('queue-calls', [QueueCallController::class, 'index'])->name('queue-calls.index');
+        Route::get('queue-calls/export', [QueueCallController::class, 'export'])->name('queue-calls.export');
 
         // Supervisor assignments
         Route::prefix('supervisors')->group(function (): void {
