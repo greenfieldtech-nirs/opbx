@@ -539,11 +539,7 @@ export default function CallQueues() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={
-                !form.name ||
-                form.agents.length === 0 ||
-                (form.announce_position && !form.announce_position_language)
-              }
+              disabled={!form.name || form.agents.length === 0}
             >
               {editing ? 'Save Changes' : 'Create Queue'}
             </Button>

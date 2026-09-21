@@ -95,7 +95,6 @@ class StoreCallQueueRequest extends FormRequest
                 'max:600',
             ],
             'announce_position_language' => [
-                Rule::requiredIf(fn () => $this->boolean('announce_position')),
                 'nullable',
                 'string',
                 'max:20',
