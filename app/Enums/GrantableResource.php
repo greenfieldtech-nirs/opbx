@@ -18,6 +18,8 @@ enum GrantableResource: string
     case AI_ASSISTANTS = 'ai-assistants';
     case AI_ASSISTANT_PROVIDERS = 'ai-assistant-providers';
     case RING_GROUPS = 'ring-groups';
+    case CALL_QUEUES = 'call-queues';
+    case QUEUE_CALLS = 'queue-calls';
     case AI_ASSISTANT_LOAD_BALANCERS = 'ai-assistant-load-balancers';
     case IVR_MENUS = 'ivr-menus';
     case BUSINESS_HOURS = 'business-hours';
