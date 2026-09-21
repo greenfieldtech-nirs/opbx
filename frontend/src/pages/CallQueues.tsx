@@ -217,7 +217,7 @@ export default function CallQueues() {
     max_wait_seconds: form.max_wait_seconds,
     wrap_up_seconds: form.wrap_up_seconds,
     announce_position: form.announce_position,
-    announce_position_timeout: form.announce_position ? form.announce_position_timeout : null,
+    announce_position_timeout: form.announce_position_timeout,
     announce_position_language: form.announce_position ? form.announce_position_language || null : null,
     moh_recording_id: form.moh_recording_id ? Number(form.moh_recording_id) : null,
     fallback_action: form.fallback_action,

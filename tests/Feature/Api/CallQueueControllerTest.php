@@ -166,6 +166,19 @@ class CallQueueControllerTest extends TestCase
             ->assertJsonValidationErrors(['moh_recording_id']);
     }
 
+    public function test_store_defaults_null_announce_timeout(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $response = $this->postJson('/api/v1/call-queues', $this->validPayload([
+            'announce_position' => false,
+            'announce_position_timeout' => null,
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('data.announce_position_timeout', 60);
+    }
+
     public function test_store_accepts_announce_position_with_default_language(): void
     {
         Sanctum::actingAs($this->owner);

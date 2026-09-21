@@ -165,6 +165,8 @@ class CallQueueController extends AbstractApiCrudController
         $this->tempAgentIds = $validated['agents'] ?? [];
         unset($validated['agents']);
 
+        $validated = $this->normalizeAnnounceFields($validated);
+
         return $this->normalizeFallbackFields($validated);
     }
 
@@ -185,7 +187,25 @@ class CallQueueController extends AbstractApiCrudController
         $this->tempAgentIds = $validated['agents'] ?? [];
         unset($validated['agents']);
 
+        $validated = $this->normalizeAnnounceFields($validated);
+
         return $this->normalizeFallbackFields($validated, $model);
+    }
+
+    /**
+     * The announce interval column is NOT NULL; default it when the client
+     * sends null (announce disabled) instead of rejecting the payload.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeAnnounceFields(array $validated): array
+    {
+        if (array_key_exists('announce_position_timeout', $validated) && $validated['announce_position_timeout'] === null) {
+            $validated['announce_position_timeout'] = 60;
+        }
+
+        return $validated;
     }
 
     protected function afterUpdate(Model $model, Request $request): void
