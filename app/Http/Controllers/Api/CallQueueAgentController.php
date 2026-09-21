@@ -11,6 +11,7 @@ use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
 use App\Services\Logging\AuditLogger;
 use App\Services\CallQueue\AcdWorkerClient;
+use App\Services\CallQueue\QueueAgentStateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,36 +51,7 @@ class CallQueueAgentController extends Controller
             ? (int) $request->input('user_id')
             : $user->id;
 
-        $extra = [];
-
-        // Seed strategy counters from MySQL at login so least_talk_time /
-        // fewest_calls are correct across worker restarts and re-logins.
-        if ($state === 'available') {
-            $totals = QueueCall::withoutGlobalScope(OrganizationScope::class)
-                ->where('call_queue_id', $callQueue->id)
-                ->where('agent_user_id', $targetUserId)
-                ->where('disposition', 'answered')
-                ->selectRaw('COALESCE(SUM(handling_seconds), 0) as talk_seconds, COUNT(*) as calls_handled')
-                ->first();
-
-            $extra = [
-                'talkSecondsTotal' => (int) ($totals->talk_seconds ?? 0),
-                'callsHandledTotal' => (int) ($totals->calls_handled ?? 0),
-            ];
-        }
-
-        // Manual wrap-up is sticky (no auto-expiry) — the agent toggles back.
-        if ($state === 'wrap_up') {
-            $extra['wrapUpSeconds'] = 0;
-        }
-
-        app(AcdWorkerClient::class)->setAgentState(
-            $callQueue->organization_id,
-            $callQueue->id,
-            $targetUserId,
-            $state,
-            $extra
-        );
+        app(QueueAgentStateService::class)->setState($callQueue, $targetUserId, $state);
 
         AuditLogger::log('call_queue.agent_state_changed', [
             'call_queue_id' => $callQueue->id,

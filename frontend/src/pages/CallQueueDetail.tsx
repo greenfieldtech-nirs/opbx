@@ -3,11 +3,13 @@
  * Live snapshot, agents, and history statistics for a single queue.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, PhoneCall, Timer, Users } from 'lucide-react';
 
-import { callQueuesService, queueStatsService, type QueueAgentState } from '@/services/callQueues.service';
+import { callQueuesService, queueAgentService, queueStatsService, type QueueAgentState } from '@/services/callQueues.service';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +40,25 @@ function formatSeconds(seconds: number | null | undefined): string {
 export default function CallQueueDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const queryClient = useQueryClient();
+
+  const agentStateMutation = useMutation({
+    mutationFn: ({
+      queueId,
+      state,
+      userId,
+    }: {
+      queueId: number;
+      state: 'available' | 'logged_out';
+      userId: number;
+    }) => queueAgentService.setState(queueId, state, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['call-queues', id, 'live'] });
+    },
+    onError: () => toast.error('Failed to update agent state'),
+  });
 
   const { data: queueData } = useQuery({
     queryKey: ['call-queues', id],
@@ -202,17 +223,44 @@ export default function CallQueueDetail() {
                           <TableCell>{agent.name}</TableCell>
                           <TableCell>{agent.extension_number ?? '—'}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                state === 'AVAILABLE'
-                                  ? 'default'
-                                  : state === 'LOGGED_OUT'
-                                    ? 'secondary'
-                                    : 'outline'
-                              }
-                            >
-                              {AGENT_STATE_LABELS[state]}
-                            </Badge>
+                            {canManage && state !== 'BUSY' ? (
+                              <button
+                                type="button"
+                                title="Click to toggle login status"
+                                onClick={() =>
+                                  agentStateMutation.mutate({
+                                    queueId: queue.id,
+                                    state: state === 'LOGGED_OUT' ? 'available' : 'logged_out',
+                                    userId: agent.id,
+                                  })
+                                }
+                              >
+                                <Badge
+                                  variant={
+                                    state === 'AVAILABLE'
+                                      ? 'default'
+                                      : state === 'LOGGED_OUT'
+                                        ? 'secondary'
+                                        : 'outline'
+                                  }
+                                  className="cursor-pointer"
+                                >
+                                  {AGENT_STATE_LABELS[state]}
+                                </Badge>
+                              </button>
+                            ) : (
+                              <Badge
+                                variant={
+                                  state === 'AVAILABLE'
+                                    ? 'default'
+                                    : state === 'LOGGED_OUT'
+                                      ? 'secondary'
+                                      : 'outline'
+                                }
+                              >
+                                {AGENT_STATE_LABELS[state]}
+                              </Badge>
+                            )}
                           </TableCell>
                         </TableRow>
                       );

@@ -196,7 +196,14 @@ export const queueAgentService = {
     return response.data;
   },
 
-  setState: async (queueId: number | string, state: QueueAgentStateInput): Promise<void> => {
-    await api.post(`/call-queues/${queueId}/agents/me/state`, { state });
+  setState: async (
+    queueId: number | string,
+    state: QueueAgentStateInput,
+    userId?: number,
+  ): Promise<void> => {
+    await api.post(`/call-queues/${queueId}/agents/me/state`, {
+      state,
+      ...(userId ? { user_id: userId } : {}),
+    });
   },
 };

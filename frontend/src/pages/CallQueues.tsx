@@ -282,6 +282,14 @@ export default function CallQueues() {
       ),
     },
     {
+      header: 'Agent Login',
+      cell: (q) => (
+        <span className="font-mono text-xs text-muted-foreground" title="Dial this code to log in or out of the queue">
+          *45{q.id}
+        </span>
+      ),
+    },
+    {
       header: 'Music on Hold',
       cell: (q) =>
         q.moh_recording ? (
