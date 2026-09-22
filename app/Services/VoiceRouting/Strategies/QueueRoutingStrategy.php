@@ -57,7 +57,7 @@ class QueueRoutingStrategy implements RoutingStrategy
 
         // Record the queue call for statistics. Unique (queue, call) constraint makes
         // this idempotent against webhook retries.
-        QueueCall::firstOrCreate(
+        $queueCall = QueueCall::firstOrCreate(
             [
                 'call_queue_id' => $callQueue->id,
                 'call_id' => $callId,
@@ -75,19 +75,43 @@ class QueueRoutingStrategy implements RoutingStrategy
         // re-enqueues on worker recovery.
         app(AcdWorkerClient::class)->enqueue($organizationId, $callQueue->id, $callId);
 
-        // Immediate connect: if agents are already available, interrupt the hold
-        // via the Cloudonix REST application switch instead of waiting for the
-        // first poll cycle.
-        if ($callQueue->immediate_connect) {
-            app(\App\Services\CallQueue\ImmediateConnectService::class)->connectAvailableCallers($callQueue);
-        }
-
         Log::info('QueueRoutingStrategy: Call enqueued', [
             'call_queue_id' => $callQueue->id,
             'call_queue_name' => $callQueue->name,
             'call_id' => $callId,
             'organization_id' => $organizationId,
         ]);
+
+        // Immediate connect: when agents are already available, dial straight from
+        // the initial routing response. Returning the hold CXML and THEN switching
+        // the application races the in-flight <Play> - the caller keeps hearing
+        // MOH until the track ends while the agent is already ringing.
+        // Only fresh entries dial immediately; a route() retry for a call that
+        // is already ringing (or finalized) must fall through to the hold path.
+        if ($callQueue->immediate_connect && $queueCall->wasRecentlyCreated) {
+            $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
+            $result = app(AcdWorkerClient::class)->poll(
+                $organizationId,
+                $callQueue->id,
+                $callId,
+                $dialOffer->roster($callQueue),
+                $callQueue->strategy->value,
+                $callQueue->max_wait_seconds
+            );
+
+            if (($result['action'] ?? 'wait') === 'dial') {
+                $dialResponse = $dialOffer->buildDialResponse($request, $callQueue, $queueCall, $result['agents'] ?? []);
+
+                if ($dialResponse !== null) {
+                    Log::info('QueueRoutingStrategy: Immediate connect, dialing agent directly', [
+                        'call_queue_id' => $callQueue->id,
+                        'call_id' => $callId,
+                    ]);
+
+                    return $dialResponse;
+                }
+            }
+        }
 
         return $this->holdResponse($request, $callQueue, $callId);
     }

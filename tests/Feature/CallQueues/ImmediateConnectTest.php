@@ -107,19 +107,15 @@ class ImmediateConnectTest extends TestCase
             && str_contains((string) ($request['url'] ?? ''), 'sig='));
     }
 
-    public function test_call_entering_with_available_agent_switches_immediately(): void
+    public function test_call_entering_with_available_agent_dials_directly_from_route(): void
     {
-        // Regression: immediate connect only fired on login events, so a call
-        // entering while agents were already available waited for the first
-        // poll cycle (end of MOH) instead of connecting immediately.
+        // Immediate connect at entry returns <Dial> from the initial routing
+        // response - no hold CXML, no application switch (switching mid-MOH
+        // leaves the caller hearing music until the track ends).
         QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('call_id', self::CALL_ID)->delete();
 
         Http::fake([
-            'http://acd-worker:8084/queue/live' => Http::response([
-                'waiting' => [['callId' => self::CALL_ID, 'position' => 1, 'waitedSeconds' => 0]],
-                'agents' => [],
-            ], 200),
             'http://acd-worker:8084/queue/poll' => Http::response([
                 'action' => 'dial',
                 'agents' => [['userId' => (string) $this->agent->id, 'extensionNumber' => '1001']],
@@ -136,10 +132,40 @@ class ImmediateConnectTest extends TestCase
             '_organization_id' => $this->organization->id,
         ]);
 
-        app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
+        $response = app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
             ->route($request, new \App\Models\DidNumber, ['call_queue' => $this->queue]);
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), '/sessions/'.self::SESSION_TOKEN.'/application'));
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1001', $content);
+        $this->assertStringNotContainsString('queue-poll', $content);
+
+        // No application switch: the dial came straight from the route response.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/sessions/'.self::SESSION_TOKEN.'/application'));
+    }
+
+    public function test_call_entering_without_agents_returns_hold_cxml(): void
+    {
+        QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('call_id', self::CALL_ID)->delete();
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response(['action' => 'wait', 'position' => 1], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $request = Request::create('/voice/route', 'POST', [
+            'CallSid' => self::CALL_ID,
+            'Session' => self::SESSION_TOKEN,
+            'From' => '10000',
+            'To' => '20001',
+            '_organization_id' => $this->organization->id,
+        ]);
+
+        $response = app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
+            ->route($request, new \App\Models\DidNumber, ['call_queue' => $this->queue]);
+
+        $this->assertStringContainsString('queue-poll', (string) $response->getContent());
     }
 
     public function test_ghost_worker_entries_are_reaped_before_offering(): void
