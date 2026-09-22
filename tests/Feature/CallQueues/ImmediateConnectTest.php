@@ -107,6 +107,41 @@ class ImmediateConnectTest extends TestCase
             && str_contains((string) ($request['url'] ?? ''), 'sig='));
     }
 
+    public function test_call_entering_with_available_agent_switches_immediately(): void
+    {
+        // Regression: immediate connect only fired on login events, so a call
+        // entering while agents were already available waited for the first
+        // poll cycle (end of MOH) instead of connecting immediately.
+        QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('call_id', self::CALL_ID)->delete();
+
+        Http::fake([
+            'http://acd-worker:8084/queue/live' => Http::response([
+                'waiting' => [['callId' => self::CALL_ID, 'position' => 1, 'waitedSeconds' => 0]],
+                'agents' => [],
+            ], 200),
+            'http://acd-worker:8084/queue/poll' => Http::response([
+                'action' => 'dial',
+                'agents' => [['userId' => (string) $this->agent->id, 'extensionNumber' => '1001']],
+            ], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+            '*' => Http::response([], 200),
+        ]);
+
+        $request = Request::create('/voice/route', 'POST', [
+            'CallSid' => self::CALL_ID,
+            'Session' => self::SESSION_TOKEN,
+            'From' => '10000',
+            'To' => '20001',
+            '_organization_id' => $this->organization->id,
+        ]);
+
+        app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
+            ->route($request, new \App\Models\DidNumber, ['call_queue' => $this->queue]);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/sessions/'.self::SESSION_TOKEN.'/application'));
+    }
+
     public function test_no_switch_when_toggle_disabled(): void
     {
         $this->queue->update(['immediate_connect' => false]);

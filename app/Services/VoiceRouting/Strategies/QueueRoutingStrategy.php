@@ -75,6 +75,13 @@ class QueueRoutingStrategy implements RoutingStrategy
         // re-enqueues on worker recovery.
         app(AcdWorkerClient::class)->enqueue($organizationId, $callQueue->id, $callId);
 
+        // Immediate connect: if agents are already available, interrupt the hold
+        // via the Cloudonix REST application switch instead of waiting for the
+        // first poll cycle.
+        if ($callQueue->immediate_connect) {
+            app(\App\Services\CallQueue\ImmediateConnectService::class)->connectAvailableCallers($callQueue);
+        }
+
         Log::info('QueueRoutingStrategy: Call enqueued', [
             'call_queue_id' => $callQueue->id,
             'call_queue_name' => $callQueue->name,
