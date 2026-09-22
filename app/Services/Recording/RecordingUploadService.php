@@ -317,11 +317,22 @@ class RecordingUploadService
                 $metadata = $this->extractWavMetadata($filePath);
             }
 
-            // For MP3 files, basic size information
+            // For MP3 files, extract duration via getID3
             if (str_starts_with($file->getMimeType(), 'audio/mpeg')) {
-                // MP3 metadata extraction would require a library like getID3
-                // For now, we'll just store basic info
                 $metadata['file_size'] = $fileSize;
+
+                try {
+                    $getId3 = new \getID3;
+                    $info = $getId3->analyze($filePath);
+                    if (isset($info['playtime_seconds']) && $info['playtime_seconds'] > 0) {
+                        $metadata['duration_seconds'] = (int) round($info['playtime_seconds']);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to extract MP3 duration', [
+                        'error' => $e->getMessage(),
+                        'filename' => $file->getClientOriginalName(),
+                    ]);
+                }
             }
 
         } catch (\Exception $e) {

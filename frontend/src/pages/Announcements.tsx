@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw } from 'lucide-react';
+import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
@@ -338,7 +338,7 @@ export default function Announcements() {
             onIdentityClick={(announcement) => setSelectedAnnouncement(announcement)}
             canView={false}
             canEdit={false}
-            onDelete={handleDelete}
+            canDelete={false}
             columns={[
               {
                 header: 'Status',
@@ -354,6 +354,7 @@ export default function Announcements() {
                 cell: (announcement) => (
                   <Switch
                     checked={Boolean(announcement.is_moh)}
+                    onClick={(e) => e.stopPropagation()}
                     onCheckedChange={(checked) => {
                       toggleMohMutation.mutate({ id: announcement.id, is_moh: checked });
                     }}
@@ -419,6 +420,18 @@ export default function Announcements() {
                         <Download className="h-4 w-4" />
                       </Button>
                     )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(announcement);
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 )
               }
