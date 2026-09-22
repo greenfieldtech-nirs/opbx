@@ -24,6 +24,7 @@ export interface CallQueue {
   announce_position: boolean;
   announce_position_timeout: number;
   announce_position_language?: string | null;
+  immediate_connect: boolean;
   moh_recording_id?: number | null;
   fallback_action: string;
   fallback_extension_id?: number | null;
@@ -54,6 +55,7 @@ export interface CallQueuePayload {
   announce_position: boolean;
   announce_position_timeout: number;
   announce_position_language?: string | null;
+  immediate_connect: boolean;
   moh_recording_id?: number | null;
   fallback_action: string;
   fallback_extension_id?: number | null;

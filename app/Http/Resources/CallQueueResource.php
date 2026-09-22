@@ -31,6 +31,7 @@ class CallQueueResource extends JsonResource
             'announce_position' => $this->announce_position,
             'announce_position_timeout' => $this->announce_position_timeout,
             'announce_position_language' => $this->announce_position_language,
+            'immediate_connect' => $this->immediate_connect,
             'moh_recording_id' => $this->moh_recording_id,
             'fallback_action' => $this->fallback_action->value,
             'fallback_extension_id' => $this->fallback_extension_id,

@@ -66,6 +66,7 @@ class QueueRoutingStrategy implements RoutingStrategy
                 'organization_id' => $organizationId,
                 'from_number' => $request->input('From'),
                 'to_number' => $request->input('To'),
+                'session_token' => $request->input('Session') ?: null,
                 'entered_at' => now(),
             ]
         );

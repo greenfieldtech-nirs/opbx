@@ -48,13 +48,21 @@ class QueueAgentStateService
             $payload['wrapUpSeconds'] = 0;
         }
 
-        return $this->worker->setAgentState(
+        $accepted = $this->worker->setAgentState(
             $callQueue->organization_id,
             $callQueue->id,
             $userId,
             $state,
             $payload
         );
+
+        // Immediate connect: a newly available agent may interrupt the hold of
+        // waiting callers instead of waiting for the next poll cycle.
+        if ($accepted && $state === 'available') {
+            app(ImmediateConnectService::class)->connectAvailableCallers($callQueue);
+        }
+
+        return $accepted;
     }
 
     /**

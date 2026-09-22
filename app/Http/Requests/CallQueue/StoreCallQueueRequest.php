@@ -87,6 +87,9 @@ class StoreCallQueueRequest extends FormRequest
             'announce_position' => [
                 'boolean',
             ],
+            'immediate_connect' => [
+                'boolean',
+            ],
             'announce_position_timeout' => [
                 Rule::requiredIf(fn () => $this->boolean('announce_position')),
                 'nullable',
@@ -275,6 +278,7 @@ class StoreCallQueueRequest extends FormRequest
             'wrap_up_seconds' => 15,
             'announce_position' => false,
             'announce_position_timeout' => 60,
+            'immediate_connect' => false,
             'fallback_action' => RingGroupFallbackAction::HANGUP->value,
         ];
 

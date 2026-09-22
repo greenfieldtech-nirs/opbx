@@ -71,7 +71,7 @@ class QueuePollController extends Controller
             $callQueue->organization_id,
             $callQueue->id,
             $context['call_id'],
-            $this->roster($callQueue),
+            app(\App\Services\CallQueue\QueueDialOfferService::class)->roster($callQueue),
             $callQueue->strategy->value,
             $callQueue->max_wait_seconds
         );
@@ -155,50 +155,15 @@ class QueuePollController extends Controller
      */
     private function handleDial(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall, array $agents): Response
     {
-        $presence = app(ExtensionPresenceTracker::class);
+        $dialResponse = app(\App\Services\CallQueue\QueueDialOfferService::class)
+            ->buildDialResponse($request, $callQueue, $queueCall, $agents);
 
-        // Belt-and-suspenders: skip agents whose extension is on an active call.
-        $targets = [];
-        $agentUserIds = [];
-        foreach ($agents as $agent) {
-            if ($presence->isBusy($callQueue->organization_id, (string) $agent['extensionNumber'])) {
-                Log::info('QueuePollController: Skipping presence-busy agent', [
-                    'call_queue_id' => $callQueue->id,
-                    'call_id' => $queueCall->call_id,
-                    'agent_user_id' => $agent['userId'],
-                    'extension_number' => $agent['extensionNumber'],
-                ]);
-                continue;
-            }
-            $targets[] = (string) $agent['extensionNumber'];
-            $agentUserIds[] = (int) $agent['userId'];
+        if ($dialResponse !== null) {
+            return $dialResponse;
         }
 
-        if (empty($targets)) {
-            // All offered agents are busy on other calls: keep holding.
-            return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $queueCall->call_id);
-        }
-
-        // Remember the offered agents for answer attribution.
-        // ponytail: ring_all may offer several agents; we attribute the answer to the
-        // first offered agent. Exact per-leg attribution requires bridged-leg CDR
-        // correlation — add if ring_all attribution proves too coarse.
-        app(QueueCallLifecycleService::class)->markDial($callQueue->id, $queueCall->call_id, $agentUserIds[0]);
-
-        $callbackUrl = $this->getDialCallbackUrl($request, $callQueue, $queueCall->call_id);
-
-        Log::info('QueuePollController: Offering call to agents', [
-            'call_queue_id' => $callQueue->id,
-            'call_queue_name' => $callQueue->name,
-            'call_id' => $queueCall->call_id,
-            'targets' => $targets,
-            'timeout' => $callQueue->agent_ring_timeout,
-        ]);
-
-        $builder = new CxmlBuilder;
-        $builder->dial($targets, $callQueue->agent_ring_timeout, $callbackUrl);
-
-        return $builder->toResponse();
+        // All offered agents are busy on other calls: keep holding.
+        return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $queueCall->call_id);
     }
 
     private function handleOverflow(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall): Response
@@ -376,38 +341,4 @@ class QueuePollController extends Controller
         );
     }
 
-    /**
-     * Build the agent roster for the worker poll from queue membership.
-     *
-     * @return array<int, array{userId: int, extensionNumber: string}>
-     */
-    private function roster(CallQueue $callQueue): array
-    {
-        return $callQueue->agents()
-            ->withoutGlobalScope(OrganizationScope::class)
-            ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
-            ->get()
-            ->filter(fn ($user) => $user->extension !== null)
-            ->map(fn ($user) => [
-                'userId' => $user->id,
-                'extensionNumber' => $user->extension->extension_number,
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function getDialCallbackUrl(QueueCallbackRequest $request, CallQueue $callQueue, string $callId): string
-    {
-        $sessionData = json_encode([
-            'call_queue_id' => $callQueue->id,
-            'call_id' => $callId,
-            'organization_id' => $callQueue->organization_id,
-            'callback_type' => 'queue_dial_callback',
-        ]);
-
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
-        $baseUrl = rtrim($cloudonixSettings?->effective_webhook_base_url ?? config('app.url'), '/');
-
-        return $baseUrl.route('voice.queue-dial-callback', ['session_data' => $sessionData], false);
-    }
 }

@@ -52,6 +52,7 @@ Route::prefix('webhooks/cloudonix')->group(function (): void {
 
 use App\Http\Controllers\Voice\AmdActionController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
+use App\Http\Controllers\Voice\QueueImmediateDialController;
 use App\Http\Controllers\Voice\QueuePollController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
@@ -96,6 +97,10 @@ Route::prefix('callbacks')->group(function (): void {
     Route::post('/voice/queue-dial-callback', [QueueDialCallbackController::class, 'handle'])
         ->middleware(['voice.webhook.auth'])
         ->name('voice.queue-dial-callback');
+
+    // Proactive (immediate connect) dial endpoint - HMAC-signed URL, no Bearer auth
+    Route::any('/voice/queue-dial', [QueueImmediateDialController::class, 'handle'])
+        ->name('voice.queue-dial');
 });
 
 /*

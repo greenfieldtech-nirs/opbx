@@ -33,6 +33,7 @@ class CallQueueFactory extends Factory
             'announce_position' => false,
             'announce_position_timeout' => 60,
             'announce_position_language' => null,
+            'immediate_connect' => false,
             'moh_recording_id' => null,
             'fallback_action' => RingGroupFallbackAction::HANGUP,
             'fallback_extension_id' => null,
