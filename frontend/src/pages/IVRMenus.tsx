@@ -838,7 +838,11 @@ export default function IVRMenus() {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(menu) => menu.name}
-            getIdentitySecondary={(menu) => menu.description || 'No description'}
+            getIdentitySecondary={(menu) =>
+              menu.options_count !== undefined
+                ? `${menu.options_count} option${menu.options_count === 1 ? '' : 's'}`
+                : 'IVR Menu'
+            }
             onIdentityClick={openEditDialog}
             sortField={sortField}
             sortDirection={sortDirection}
