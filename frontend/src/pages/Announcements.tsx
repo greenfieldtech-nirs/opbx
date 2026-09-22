@@ -24,6 +24,14 @@ import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
 
+function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
 export default function Announcements() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
@@ -355,8 +363,16 @@ export default function Announcements() {
                 )
               },
               {
-                header: 'Size',
-                cell: (announcement) => announcement.formatted_file_size || (announcement.file_size ? `${(announcement.file_size / 1024).toFixed(1)} KB` : '—')
+                header: 'Size / Duration',
+                cell: (announcement) => {
+                  const size = announcement.formatted_file_size || (announcement.file_size ? `${(announcement.file_size / 1024).toFixed(1)} KB` : '—');
+                  const duration = announcement.duration_seconds != null ? formatDuration(announcement.duration_seconds) : '—';
+                  return (
+                    <span className="text-muted-foreground">
+                      {size} <span className="text-muted-foreground/60">·</span> {duration}
+                    </span>
+                  );
+                }
               },
               {
                 header: 'Created By',
