@@ -76,11 +76,56 @@ class QueueStatsController extends Controller
         return response()->json([
             'data' => [
                 'call_queue_id' => $callQueue->id,
-                'waiting' => $live['waiting'] ?? [],
+                'call_queue_name' => $callQueue->name,
+                'waiting' => $this->enrichWaiting($callQueue, $live['waiting'] ?? []),
                 'agents' => $live['agents'] ?? [],
                 'rolling' => $this->rollingCounts($callQueue),
+                'waiting_time_avg_seconds' => $this->averageWaitingTime($callQueue),
             ],
         ]);
+    }
+
+    /**
+     * Join worker waiting entries with queue_calls for caller context.
+     *
+     * @param  array<int, array<string, mixed>>  $waiting
+     * @return array<int, array<string, mixed>>
+     */
+    private function enrichWaiting(CallQueue $callQueue, array $waiting): array
+    {
+        if (empty($waiting)) {
+            return [];
+        }
+
+        $rows = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $callQueue->id)
+            ->whereIn('call_id', collect($waiting)->pluck('callId')->all())
+            ->get()
+            ->keyBy('call_id');
+
+        return array_map(function (array $entry) use ($rows) {
+            $row = $rows->get($entry['callId'] ?? '');
+
+            return array_merge($entry, [
+                'from_number' => $row?->from_number,
+                'to_number' => $row?->to_number,
+                'entered_at' => $row?->entered_at?->toIso8601String(),
+            ]);
+        }, $waiting);
+    }
+
+    /**
+     * Average waiting time (answered calls, last 24 hours) for this queue.
+     */
+    private function averageWaitingTime(CallQueue $callQueue): ?float
+    {
+        $avg = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $callQueue->id)
+            ->where('disposition', 'answered')
+            ->where('entered_at', '>=', now()->subDay())
+            ->avg('waiting_seconds');
+
+        return $avg !== null ? round((float) $avg, 1) : null;
     }
 
     /**

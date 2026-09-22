@@ -103,6 +103,9 @@ export interface QueueLiveWaiting {
   callId: string;
   position: number;
   waitedSeconds: number;
+  from_number?: string | null;
+  to_number?: string | null;
+  entered_at?: string | null;
 }
 
 export interface QueueLiveAgent {
@@ -114,9 +117,11 @@ export interface QueueLiveAgent {
 
 export interface QueueLive {
   call_queue_id: number;
+  call_queue_name?: string;
   waiting: QueueLiveWaiting[];
   agents: QueueLiveAgent[];
   rolling: Record<string, number>;
+  waiting_time_avg_seconds?: number | null;
 }
 
 export interface MyQueueMembership {

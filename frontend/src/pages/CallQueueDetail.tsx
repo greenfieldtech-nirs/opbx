@@ -173,17 +173,25 @@ export default function CallQueueDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Queue</TableHead>
                       <TableHead>Position</TableHead>
-                      <TableHead>Call ID</TableHead>
                       <TableHead>Waiting</TableHead>
+                      <TableHead>Avg Wait (24h)</TableHead>
+                      <TableHead>Caller ID</TableHead>
+                      <TableHead>Destination</TableHead>
+                      <TableHead>Call Start</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {live!.waiting.map((w) => (
                       <TableRow key={w.callId}>
+                        <TableCell>{live?.call_queue_name ?? queue.name}</TableCell>
                         <TableCell>{w.position}</TableCell>
-                        <TableCell className="font-mono text-xs">{w.callId}</TableCell>
                         <TableCell>{formatSeconds(w.waitedSeconds)}</TableCell>
+                        <TableCell>{formatSeconds(live?.waiting_time_avg_seconds ?? null)}</TableCell>
+                        <TableCell>{w.from_number ?? '—'}</TableCell>
+                        <TableCell>{w.to_number ?? '—'}</TableCell>
+                        <TableCell>{w.entered_at ? new Date(w.entered_at).toLocaleString() : '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -154,6 +154,15 @@ class QueueStatsAndAgentTest extends TestCase
             'entered_at' => now()->subMinutes(100),
         ]);
 
+        QueueCall::factory()->answered($this->agent, waitSeconds: 30, handleSeconds: 60)->create([
+            'organization_id' => $this->organization->id,
+            'call_queue_id' => $this->queue->id,
+            'call_id' => 'c1',
+            'from_number' => '+15551234567',
+            'to_number' => '20001',
+            'entered_at' => now()->subMinutes(10),
+        ]);
+
         Http::fake(['http://acd-worker:8084/*' => Http::response([
             'waiting' => [['callId' => 'c1', 'position' => 1, 'waitedSeconds' => 42]],
             'agents' => [['userId' => (string) $this->agent->id, 'state' => 'WRAP_UP']],
@@ -164,9 +173,15 @@ class QueueStatsAndAgentTest extends TestCase
         $response = $this->getJson("/api/v1/call-queues/{$this->queue->id}/live");
 
         $response->assertOk()
+            ->assertJsonPath('data.call_queue_name', $this->queue->name)
             ->assertJsonPath('data.waiting.0.callId', 'c1')
+            ->assertJsonPath('data.waiting.0.position', 1)
+            ->assertJsonPath('data.waiting.0.from_number', '+15551234567')
+            ->assertJsonPath('data.waiting.0.to_number', '20001')
+            ->assertJsonPath('data.waiting.0.entered_at', now()->subMinutes(10)->toIso8601String())
+            ->assertJsonPath('data.waiting_time_avg_seconds', 30)
             ->assertJsonPath('data.agents.0.state', 'WRAP_UP')
-            ->assertJsonPath('data.rolling.handled_15m', 1)
+            ->assertJsonPath('data.rolling.handled_15m', 2)
             ->assertJsonPath('data.rolling.handled_60m', 1)
             ->assertJsonPath('data.rolling.abandoned_15m', 0)
             ->assertJsonPath('data.rolling.abandoned_24h', 1);
