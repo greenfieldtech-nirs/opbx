@@ -77,7 +77,7 @@ export function DestinationSelector({
         onValueChange={handleChange}
         disabled={isDisabled}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full [&>span]:flex-1 [&>span]:min-w-0 [&>span]:text-left">
           <SelectValue placeholder={isLoading ? loadingMessage : placeholder} />
         </SelectTrigger>
         <SelectContent className="min-w-[300px]">
