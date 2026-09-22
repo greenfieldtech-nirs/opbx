@@ -393,7 +393,7 @@ export default function CallQueues() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Call Queue' : 'New Call Queue'}</DialogTitle>
           </DialogHeader>
@@ -580,10 +580,12 @@ export default function CallQueues() {
               </div>
             </div>
 
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label>Overflow Fallback</Label>
                 <DestinationTypeAndSelector
                   layout="horizontal"
+                  typeClassName="min-w-0"
+                  destinationClassName="min-w-0"
                   typeValue={form.fallback_action as DestinationType}
                   destinationValue={
                     form.fallback_action === 'extension'
