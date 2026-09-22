@@ -30,7 +30,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 
 const AGENT_RING_TIMEOUTS = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 const MAX_WAIT_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
@@ -220,7 +219,6 @@ export default function CallQueues() {
 
   const buildPayload = (): CallQueuePayload => ({
     name: form.name,
-    description: form.description || undefined,
     strategy: form.strategy,
     agent_ring_timeout: form.agent_ring_timeout,
     max_wait_seconds: form.max_wait_seconds,
@@ -402,11 +400,6 @@ export default function CallQueues() {
             <div className="space-y-2">
               <Label>Name *</Label>
               <Input value={form.name} onChange={(e) => set('name', e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={2} />
             </div>
 
             <CallQueueStrategySelector value={form.strategy} onChange={(v) => set('strategy', v)} />
