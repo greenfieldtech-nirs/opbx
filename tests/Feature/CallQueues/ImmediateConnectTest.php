@@ -142,6 +142,40 @@ class ImmediateConnectTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/sessions/'.self::SESSION_TOKEN.'/application'));
     }
 
+    public function test_ghost_worker_entries_are_reaped_before_offering(): void
+    {
+        $this->waitingCall();
+
+        Http::fake([
+            // First live() shows a ghost ahead of our caller; after the reap
+            // event, the second live() shows our caller at the head.
+            'http://acd-worker:8084/queue/live' => Http::sequence()
+                ->push(['waiting' => [
+                    ['callId' => 'ghost-call', 'position' => 1, 'waitedSeconds' => 999],
+                    ['callId' => self::CALL_ID, 'position' => 2, 'waitedSeconds' => 5],
+                ], 'agents' => []])
+                ->push(['waiting' => [
+                    ['callId' => self::CALL_ID, 'position' => 1, 'waitedSeconds' => 5],
+                ], 'agents' => []]),
+            'http://acd-worker:8084/queue/poll' => Http::response([
+                'action' => 'dial',
+                'agents' => [['userId' => (string) $this->agent->id, 'extensionNumber' => '1001']],
+            ], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+            '*' => Http::response([], 200),
+        ]);
+
+        app(ImmediateConnectService::class)->connectAvailableCallers($this->queue);
+
+        // The ghost was told to leave the queue.
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['callId'] === 'ghost-call'
+            && $request['type'] === 'abandoned');
+
+        // And the real caller was switched to the dial application.
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/sessions/'.self::SESSION_TOKEN.'/application'));
+    }
+
     public function test_no_switch_when_toggle_disabled(): void
     {
         $this->queue->update(['immediate_connect' => false]);

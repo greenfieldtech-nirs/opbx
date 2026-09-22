@@ -76,11 +76,34 @@ class QueueImmediateDialController extends Controller
         );
 
         if (($result['action'] ?? 'wait') === 'dial') {
+            Log::info('QueueImmediateDialController: worker offered agents', [
+                'call_queue_id' => $callQueue->id,
+                'call_id' => $queueCall->call_id,
+                'agents' => $result['agents'] ?? [],
+            ]);
+
             $dialResponse = $dialOffer->buildDialResponse($request, $callQueue, $queueCall, $result['agents'] ?? []);
 
             if ($dialResponse !== null) {
+                Log::info('QueueImmediateDialController: returning <Dial> for proactive connect', [
+                    'call_queue_id' => $callQueue->id,
+                    'call_id' => $queueCall->call_id,
+                    'cxml' => \Illuminate\Support\Str::limit((string) $dialResponse->getContent(), 500),
+                ]);
+
                 return $dialResponse;
             }
+
+            Log::info('QueueImmediateDialController: all offered agents presence-busy, holding', [
+                'call_queue_id' => $callQueue->id,
+                'call_id' => $queueCall->call_id,
+            ]);
+        } else {
+            Log::info('QueueImmediateDialController: worker did not offer (stale), holding', [
+                'call_queue_id' => $callQueue->id,
+                'call_id' => $queueCall->call_id,
+                'action' => $result['action'] ?? 'wait',
+            ]);
         }
 
         // Offer stale or agents busy: caller keeps holding.

@@ -40,6 +40,15 @@ class ImmediateConnectService
         $roster = $this->dialOffer->roster($callQueue);
         $live = $this->worker->live($callQueue->organization_id, $callQueue->id, $roster);
 
+        // Reap ghost entries (calls that ended without the worker being told)
+        // so a stale head cannot block immediate connect.
+        app(QueueCallLifecycleService::class)->reconcileStaleCalls(
+            $callQueue,
+            collect($live['waiting'] ?? [])->pluck('callId')->all()
+        );
+
+        $live = $this->worker->live($callQueue->organization_id, $callQueue->id, $roster);
+
         // FIFO: only the head caller can be offered (worker semantics serialize
         // offers naturally — subsequent polls return wait for non-head calls).
         $head = collect($live['waiting'] ?? [])->sortBy('position')->first();
@@ -59,6 +68,12 @@ class ImmediateConnectService
                 'call_id' => $head['callId'] ?? null,
             ]);
 
+            return;
+        }
+
+        // A caller past max wait must overflow (pull path), not be switched.
+        $waitedSeconds = max(0, (int) $queueCall->entered_at->diffInSeconds(now()));
+        if ($waitedSeconds >= $callQueue->max_wait_seconds) {
             return;
         }
 

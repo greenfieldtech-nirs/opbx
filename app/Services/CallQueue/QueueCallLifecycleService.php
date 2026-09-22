@@ -285,6 +285,37 @@ class QueueCallLifecycleService
     }
 
     /**
+     * Reap ghost entries from the worker queue: waiting callIds that have no
+     * pending queue_calls row (their call already ended without the worker
+     * being notified). Ghosts at the head would otherwise block the queue
+     * forever - nothing ever polls them.
+     *
+     * @param  array<int, string>  $waitingCallIds
+     */
+    public function reconcileStaleCalls(CallQueue $callQueue, array $waitingCallIds): void
+    {
+        if (empty($waitingCallIds)) {
+            return;
+        }
+
+        $pending = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $callQueue->id)
+            ->whereIn('call_id', $waitingCallIds)
+            ->whereNull('disposition')
+            ->pluck('call_id')
+            ->all();
+
+        foreach (array_diff($waitingCallIds, $pending) as $ghostCallId) {
+            Log::info('QueueCallLifecycleService: reaping ghost queue entry', [
+                'call_queue_id' => $callQueue->id,
+                'call_id' => $ghostCallId,
+            ]);
+
+            $this->worker->event($callQueue->organization_id, $callQueue->id, $ghostCallId, 'abandoned');
+        }
+    }
+
+    /**
      * Record the dial action callback result - the authoritative bridge outcome.
      * 'answered'/'completed' mean the agent actually picked up; everything else
      * (busy/no-answer/failed/canceled) means no bridge happened.

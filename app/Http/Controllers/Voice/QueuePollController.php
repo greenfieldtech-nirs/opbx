@@ -81,6 +81,26 @@ class QueuePollController extends Controller
             return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']);
         }
 
+        // Reap ghost worker entries (ended calls never dequeued) so a stale
+        // head cannot block the queue, then re-check the decision once.
+        if (($result['action'] ?? 'wait') === 'wait') {
+            $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
+            $roster = $dialOffer->roster($callQueue);
+            $waiting = app(AcdWorkerClient::class)->live($callQueue->organization_id, $callQueue->id, $roster);
+
+            app(\App\Services\CallQueue\QueueCallLifecycleService::class)
+                ->reconcileStaleCalls($callQueue, collect($waiting['waiting'] ?? [])->pluck('callId')->all());
+
+            $result = app(AcdWorkerClient::class)->poll(
+                $callQueue->organization_id,
+                $callQueue->id,
+                $context['call_id'],
+                $roster,
+                $callQueue->strategy->value,
+                $callQueue->max_wait_seconds
+            ) ?? $result;
+        }
+
         // Per-caller max-wait enforcement (source of truth: queue_calls.entered_at).
         // The worker only overflows the queue head when the head itself is polled —
         // a dead/abandoned caller rotting at the head would otherwise block the
