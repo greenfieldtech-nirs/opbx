@@ -207,18 +207,21 @@ public class QueueEngine {
 
                     List<Future<Map<String, Object>>> agentFutures = new ArrayList<>();
                     for (AgentInfo agent : roster) {
-                        agentFutures.add(store.hgetall(agentKey(org, queue, agent.userId())).map(fields -> {
-                            AgentState state = AgentState.fromString(fields.get("state"));
-                            long wrapUpUntil = Long.parseLong(fields.getOrDefault("wrapUpUntil", "0"));
-                            Long wrapUpRemaining = state == AgentState.WRAP_UP && wrapUpUntil > 0
-                                    ? Math.max(0, (wrapUpUntil - now) / 1000)
-                                    : null;
-                            return Map.<String, Object>of(
-                                    "userId", agent.userId(),
-                                    "extensionNumber", agent.extensionNumber(),
-                                    "state", state.name(),
-                                    "wrapUpRemainingSeconds", wrapUpRemaining == null ? "" : String.valueOf(wrapUpRemaining));
-                        }));
+                        // Expire wrap-up lazily on read too: otherwise an agent
+                        // with no calls polling stays WRAP_UP forever in live views.
+                        agentFutures.add(resolveStateWithExpiry(org, queue, agent.userId(), now)
+                                .map(resolved -> {
+                                    boolean expired = resolved.state() == AgentState.AVAILABLE;
+                                    long wrapUpUntil = Long.parseLong(resolved.fields().getOrDefault("wrapUpUntil", "0"));
+                                    Long wrapUpRemaining = !expired && wrapUpUntil > 0
+                                            ? Math.max(0, (wrapUpUntil - now) / 1000)
+                                            : null;
+                                    return Map.<String, Object>of(
+                                            "userId", agent.userId(),
+                                            "extensionNumber", agent.extensionNumber(),
+                                            "state", resolved.state().name(),
+                                            "wrapUpRemainingSeconds", wrapUpRemaining == null ? "" : String.valueOf(wrapUpRemaining));
+                                }));
                     }
 
                     return Future.all(waitingFutures).compose(waitingComposite -> Future.all(agentFutures)
@@ -251,6 +254,32 @@ public class QueueEngine {
 
     private Future<Void> updateAgentFields(String org, String queue, String userId, Map<String, String> fields) {
         return store.hset(agentKey(org, queue, userId), fields);
+    }
+
+    /**
+     * Read an agent's state, lazily flipping WRAP_UP to AVAILABLE once the
+     * wrap-up deadline passed (sticky wrap-up has no deadline and never expires).
+     * Shared by poll (selection) and live (status display).
+     */
+    private Future<AgentStateWithFields> resolveStateWithExpiry(String org, String queue, String userId, long now) {
+        return store.hgetall(agentKey(org, queue, userId)).compose(fields -> {
+            AgentState state = AgentState.fromString(fields.get("state"));
+
+            if (state == AgentState.WRAP_UP) {
+                long wrapUpUntil = Long.parseLong(fields.getOrDefault("wrapUpUntil", "0"));
+                if (wrapUpUntil > 0 && now >= wrapUpUntil) {
+                    return store.hset(agentKey(org, queue, userId), Map.of(
+                            "state", AgentState.AVAILABLE.name(),
+                            "wrapUpUntil", "0")).map(v -> new AgentStateWithFields(AgentState.AVAILABLE, fields));
+                }
+            }
+
+            return Future.succeededFuture(new AgentStateWithFields(state, fields));
+        });
+    }
+
+    /** Agent state plus the stored hash fields at read time. */
+    private record AgentStateWithFields(AgentState state, Map<String, String> fields) {
     }
 
     /**

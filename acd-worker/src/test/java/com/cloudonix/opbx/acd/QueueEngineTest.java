@@ -298,6 +298,32 @@ class QueueEngineTest {
     }
 
     @Test
+    void liveReflectsWrapUpExpiryWithoutPolls() {
+        engine.setAgentState("org1", "q1", "u1", com.cloudonix.opbx.acd.model.AgentState.WRAP_UP, null, null, 15L)
+                .result();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> live = engine.live("org1", "q1", List.of(agent("u1"))).result();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> agents = (List<Map<String, Object>>) live.get("agents");
+        assertEquals("WRAP_UP", agents.get(0).get("state"));
+
+        fakeTime.advance(16_000);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> after = engine.live("org1", "q1", List.of(agent("u1"))).result();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> agentsAfter = (List<Map<String, Object>>) after.get("agents");
+        assertEquals("AVAILABLE", agentsAfter.get(0).get("state"));
+
+        // The flip is persisted, not just reported.
+        Map<String, Object> again = engine.live("org1", "q1", List.of(agent("u1"))).result();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> agentsAgain = (List<Map<String, Object>>) again.get("agents");
+        assertEquals("AVAILABLE", agentsAgain.get(0).get("state"));
+    }
+
+    @Test
     void queuesAreIsolatedPerOrganization() {
         engine.enqueue("org1", "q1", "call-1").result();
         engine.enqueue("org2", "q1", "call-1").result();
